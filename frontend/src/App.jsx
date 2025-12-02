@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { Moon, Sun, Plus } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -7,11 +10,30 @@ function App() {
   const [commands, setCommands] = useState([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingCommand, setEditingCommand] = useState(null)
+  const [theme, setTheme] = useState('dark')
   const terminalRef = useRef(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     loadCommands()
+    // Check system preference or saved theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+    document.documentElement.className = savedTheme;
   }, [])
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.className = newTheme;
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -55,7 +77,11 @@ function App() {
   const loadCommands = () => {
     fetch('/api/commands')
       .then(r => r.json())
-      .then(setCommands)
+      .then(data => {
+        // Ensure data is an array
+        const cmds = Array.isArray(data) ? data : [];
+        setCommands(cmds);
+      })
       .catch(err => console.error('Failed to load commands:', err))
   }
 
@@ -117,26 +143,49 @@ function App() {
     setIsModalOpen(false)
   }
 
-  // Sort favorites first
-  const sortedCommands = [...commands].sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0))
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      const oldIndex = commands.findIndex((c) => c.id === active.id);
+      const newIndex = commands.findIndex((c) => c.id === over.id);
+
+      const newCommands = arrayMove(commands, oldIndex, newIndex);
+      saveCommands(newCommands);
+    }
+  };
 
   return (
     <div className="app">
       <div className="terminal-pane">
-        <ForgeTerminal ref={terminalRef} />
+        <ForgeTerminal ref={terminalRef} theme={theme} />
       </div>
       <div className="sidebar">
         <div className="sidebar-header">
           <h3>⚡ Commands</h3>
-          <button className="btn btn-primary" onClick={handleAdd}>+ Add</button>
+          <div className="header-actions">
+            <button className="btn btn-ghost btn-icon" onClick={toggleTheme} title="Toggle Theme">
+              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+            <button className="btn btn-primary" onClick={handleAdd}>
+              <Plus size={16} /> Add
+            </button>
+          </div>
         </div>
-        <CommandCards
-          commands={sortedCommands}
-          onExecute={handleExecute}
-          onPaste={handlePaste}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
+
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <CommandCards
+            commands={commands}
+            onExecute={handleExecute}
+            onPaste={handlePaste}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        </DndContext>
       </div>
 
       <CommandModal

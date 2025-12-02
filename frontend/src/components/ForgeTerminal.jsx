@@ -12,54 +12,54 @@ function debounce(fn, ms) {
   };
 }
 
-// Dark theme (Catppuccin Mocha)
+// Molten Metal Dark Theme
 const darkTheme = {
-  background: '#1e1e2e',
-  foreground: '#cdd6f4',
-  cursor: '#f5e0dc',
-  cursorAccent: '#1e1e2e',
-  selectionBackground: '#585b70',
-  black: '#45475a',
-  red: '#f38ba8',
-  green: '#a6e3a1',
-  yellow: '#f9e2af',
-  blue: '#89b4fa',
-  magenta: '#f5c2e7',
-  cyan: '#94e2d5',
-  white: '#bac2de',
-  brightBlack: '#585b70',
-  brightRed: '#f38ba8',
-  brightGreen: '#a6e3a1',
-  brightYellow: '#f9e2af',
-  brightBlue: '#89b4fa',
-  brightMagenta: '#f5c2e7',
-  brightCyan: '#94e2d5',
-  brightWhite: '#a6adc8',
+  background: '#0a0a0a', // Deepest black
+  foreground: '#e5e5e5',
+  cursor: '#f97316', // Orange cursor
+  cursorAccent: '#0a0a0a',
+  selectionBackground: '#262626',
+  black: '#171717',
+  red: '#ef4444',
+  green: '#22c55e',
+  yellow: '#facc15',
+  blue: '#3b82f6',
+  magenta: '#d946ef',
+  cyan: '#06b6d4',
+  white: '#e5e5e5',
+  brightBlack: '#404040',
+  brightRed: '#f87171',
+  brightGreen: '#4ade80',
+  brightYellow: '#fde047',
+  brightBlue: '#60a5fa',
+  brightMagenta: '#e879f9',
+  brightCyan: '#22d3ee',
+  brightWhite: '#ffffff',
 };
 
-// Light theme (Catppuccin Latte)
+// Molten Metal Light Theme (Warm)
 const lightTheme = {
-  background: '#eff1f5',
-  foreground: '#4c4f69',
-  cursor: '#dc8a78',
-  cursorAccent: '#eff1f5',
-  selectionBackground: '#acb0be',
-  black: '#5c5f77',
-  red: '#d20f39',
-  green: '#40a02b',
-  yellow: '#df8e1d',
-  blue: '#1e66f5',
-  magenta: '#ea76cb',
-  cyan: '#179299',
-  white: '#acb0be',
-  brightBlack: '#6c6f85',
-  brightRed: '#d20f39',
-  brightGreen: '#40a02b',
-  brightYellow: '#df8e1d',
-  brightBlue: '#1e66f5',
-  brightMagenta: '#ea76cb',
-  brightCyan: '#179299',
-  brightWhite: '#bcc0cc',
+  background: '#f5f5f4', // Warm gray
+  foreground: '#1c1917',
+  cursor: '#ea580c', // Darker orange cursor
+  cursorAccent: '#f5f5f4',
+  selectionBackground: '#e7e5e4',
+  black: '#57534e',
+  red: '#dc2626',
+  green: '#16a34a',
+  yellow: '#ca8a04',
+  blue: '#2563eb',
+  magenta: '#c026d3',
+  cyan: '#0891b2',
+  white: '#1c1917',
+  brightBlack: '#78716c',
+  brightRed: '#ef4444',
+  brightGreen: '#22c55e',
+  brightYellow: '#eab308',
+  brightBlue: '#3b82f6',
+  brightMagenta: '#d946ef',
+  brightCyan: '#06b6d4',
+  brightWhite: '#000000',
 };
 
 /**
@@ -70,7 +70,7 @@ const lightTheme = {
 const ForgeTerminal = forwardRef(function ForgeTerminal({
   className,
   style,
-  isDarkMode = true,
+  theme = 'dark', // 'dark' or 'light'
   onConnectionChange = null,
 }, ref) {
   const terminalRef = useRef(null);
@@ -111,25 +111,31 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     },
   }));
 
-  // Update terminal theme when isDarkMode changes
+  // Update terminal theme when theme prop changes
   useEffect(() => {
     if (xtermRef.current) {
       const term = xtermRef.current;
-      const newTheme = isDarkMode ? darkTheme : lightTheme;
+      const newTheme = theme === 'dark' ? darkTheme : lightTheme;
       term.options.theme = newTheme;
+      // Force background update
+      if (terminalRef.current) {
+        terminalRef.current.style.backgroundColor = newTheme.background;
+      }
       term.refresh(0, term.rows - 1);
     }
-  }, [isDarkMode]);
+  }, [theme]);
 
   useEffect(() => {
     if (!terminalRef.current) return;
+
+    const isDark = theme === 'dark';
 
     // Initialize xterm.js
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 14,
       fontFamily: '"Cascadia Code", "Fira Code", Consolas, Monaco, monospace',
-      theme: isDarkMode ? darkTheme : lightTheme,
+      theme: isDark ? darkTheme : lightTheme,
       allowProposedApi: true,
       scrollback: 5000,
     });
@@ -148,15 +154,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // Connect to WebSocket
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use the specific port 3333 as per charter if running separately, but usually it's relative
-    // The charter says "WebSocket URL: ws://localhost:3333/ws"
-    // But if we are serving frontend from the same binary, relative path is better.
-    // However, during dev (Vite), we might need to proxy or use absolute.
-    // Let's assume relative '/ws' which Vite proxy should handle, or the binary will serve.
-    // Wait, charter says `ws://localhost:3333/ws`. I'll stick to relative `/ws` which is safer for deployment,
-    // assuming Vite proxy is set up or we are running from the binary.
-    // Actually, let's look at the charter again. It says "WebSocket URL: ws://localhost:3333/ws".
-    // If I use relative, it works for both dev (with proxy) and prod.
     const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
 
     const ws = new WebSocket(wsUrl);
@@ -166,7 +163,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     ws.onopen = () => {
       console.log('[Terminal] WebSocket connected');
-      term.write('\r\n\x1b[1;34m[Forge Terminal]\x1b[0m Connected.\r\n\r\n');
+      // Use orange for the welcome message to match theme
+      term.write('\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected.\r\n\r\n');
 
       // Send initial size
       const { cols, rows } = term;
@@ -233,7 +231,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
       term.dispose();
     };
-  }, []);
+  }, []); // Only run once on mount, theme updates handled by other effect
 
   return (
     <div
@@ -242,7 +240,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       style={{
         width: '100%',
         height: '100%',
-        backgroundColor: isDarkMode ? '#1e1e2e' : '#eff1f5',
+        backgroundColor: theme === 'dark' ? darkTheme.background : lightTheme.background,
         ...style,
       }}
     />
