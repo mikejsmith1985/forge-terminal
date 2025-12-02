@@ -174,12 +174,12 @@ These 4 commands are created automatically on first run:
 - [ ] Can run interactive programs (vim, htop)
 - [ ] Terminal resize works
 
-### Issue #3: Commands API
+### Issue #3: Commands API ✅ DONE
 **Goal**: Load/save commands from JSON file
 
 **Files to create/modify**:
-- `internal/commands/storage.go` - Already created, may need tweaks
-- `cmd/forge/main.go` - Add HTTP handlers
+- [x] `internal/commands/storage.go` - Already created, may need tweaks
+- [ ] `cmd/forge/main.go` - Add HTTP handlers
 
 **Endpoints**:
 ```
@@ -188,11 +188,11 @@ POST /api/commands  → saves []Command to file
 ```
 
 **Test criteria**:
-- [ ] First run creates `~/.forge/commands.json` with 4 defaults
-- [ ] `curl http://localhost:3333/api/commands` returns JSON
-- [ ] Restart app, commands persist
+- [x] First run creates `~/.forge/commands.json` with 4 defaults
+- [x] `curl http://localhost:3333/api/commands` returns JSON
+- [x] Restart app, commands persist
 
-### Issue #4: Frontend
+### Issue #4: Frontend ✅ DONE
 **Goal**: Terminal + command cards UI
 
 **Files to create/modify**:
@@ -225,13 +225,13 @@ POST /api/commands  → saves []Command to file
 - Focus stays on terminal
 
 **Test criteria**:
-- [ ] Terminal connects and works
-- [ ] Cards display with correct info
-- [ ] Click Execute → command runs
-- [ ] Click Paste → command pasted (no Enter)
-- [ ] Keyboard shortcuts work
-- [ ] Add/Edit/Delete commands works
-- [ ] `npm run build` creates working `web/` folder
+- [x] Terminal connects and works
+- [x] Cards display with correct info
+- [x] Click Execute → command runs
+- [x] Click Paste → command pasted (no Enter)
+- [x] Keyboard shortcuts work
+- [x] Add/Edit/Delete commands works
+- [x] `npm run build` creates working `web/` folder
 
 ### Issue #5: Polish & Release
 **Goal**: Ship binaries

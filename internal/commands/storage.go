@@ -52,20 +52,33 @@ Favorite:    true,
 },
 }
 
+// UserHomeDir is a variable to allow mocking in tests
+var UserHomeDir = os.UserHomeDir
+
 // GetConfigDir returns the Forge configuration directory
-func GetConfigDir() string {
-home, _ := os.UserHomeDir()
-return filepath.Join(home, ".forge")
+func GetConfigDir() (string, error) {
+	home, err := UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".forge"), nil
 }
 
 // GetCommandsPath returns the path to the commands JSON file
-func GetCommandsPath() string {
-return filepath.Join(GetConfigDir(), "commands.json")
+func GetCommandsPath() (string, error) {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, "commands.json"), nil
 }
 
 // LoadCommands loads commands from the JSON file, creating defaults if needed
 func LoadCommands() ([]Command, error) {
-path := GetCommandsPath()
+	path, err := GetCommandsPath()
+	if err != nil {
+		return nil, err
+	}
 
 // Create default if doesn't exist
 if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -90,15 +103,25 @@ return commands, nil
 
 // SaveCommands saves commands to the JSON file
 func SaveCommands(commands []Command) error {
-// Ensure directory exists
-if err := os.MkdirAll(GetConfigDir(), 0700); err != nil {
-return err
-}
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return err
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return err
+	}
 
 data, err := json.MarshalIndent(commands, "", "  ")
 if err != nil {
 return err
 }
 
-return os.WriteFile(GetCommandsPath(), data, 0600)
+	path, err := GetCommandsPath()
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, 0600)
 }

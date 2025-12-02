@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+      - name: Build Binaries
+        run: |
+          mkdir -p bin
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 go build -o bin/forge-linux-amd64 ./cmd/forge
+          # Windows AMD64
+          GOOS=windows GOARCH=amd64 go build -o bin/forge-windows-amd64.exe ./cmd/forge
+          # macOS AMD64
+          GOOS=darwin GOARCH=amd64 go build -o bin/forge-darwin-amd64 ./cmd/forge
+          # macOS ARM64
+          GOOS=darwin GOARCH=arm64 go build -o bin/forge-darwin-arm64 ./cmd/forge
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            bin/forge-linux-amd64
+            bin/forge-windows-amd64.exe
+            bin/forge-darwin-amd64
+            bin/forge-darwin-arm64
+          generate_release_notes: true
