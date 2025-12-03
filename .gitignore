@@ -9,7 +9,7 @@ bin/
 # Go
 *.test
 *.out
-go.sum
+
 
 # Node
 node_modules/
