@@ -32,6 +32,9 @@ jobs:
           cd frontend
           npm install
           npm run build
+          # Copy assets for embedding
+          mkdir -p ../cmd/forge/web
+          cp -r dist/* ../cmd/forge/web/
 
       - name: Build Binaries
         run: |
