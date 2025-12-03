@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus } from 'lucide-react';
+import { Moon, Sun, Plus, MessageSquare } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
+import FeedbackModal from './components/FeedbackModal'
 
 function App() {
   const [commands, setCommands] = useState([])
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
   const terminalRef = useRef(null)
@@ -167,6 +169,9 @@ function App() {
             <button className="btn btn-ghost btn-icon" onClick={toggleTheme} title="Toggle Theme">
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
+            <button className="btn btn-ghost btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
+              <MessageSquare size={18} />
+            </button>
             <button className="btn btn-primary" onClick={handleAdd}>
               <Plus size={16} /> Add
             </button>
@@ -193,6 +198,11 @@ function App() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveCommand}
         initialData={editingCommand}
+      />
+
+      <FeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
       />
     </div>
   )
