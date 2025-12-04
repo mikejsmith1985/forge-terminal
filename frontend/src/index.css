@@ -94,9 +94,9 @@ body {
   /* Terminal always dark usually, or match theme? keeping black for now */
 }
 
-/* Custom orange cursor for terminal - works on Windows */
+/* Custom orange cursor for terminal - PNG for Windows/Edge compatibility */
 .terminal-pane .xterm-screen {
-  cursor: url('/cursor-orange.svg') 5 2, url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M5 2L5 20L9 16L12 22L15 21L12 15L18 15Z' fill='%23f97316' stroke='%23000' stroke-width='1.5'/></svg>") 5 2, default !important;
+  cursor: url('/cursor-orange.png') 5 2, url('/cursor-orange.svg') 5 2, pointer !important;
 }
 
 .shell-toggle {
