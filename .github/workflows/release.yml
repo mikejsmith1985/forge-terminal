@@ -38,8 +38,8 @@ jobs:
           mkdir -p bin
           # Linux AMD64
           GOOS=linux GOARCH=amd64 go build -o bin/forge-linux-amd64 ./cmd/forge
-          # Windows AMD64
-          GOOS=windows GOARCH=amd64 go build -o bin/forge-windows-amd64.exe ./cmd/forge
+          # Windows AMD64 (GUI mode - no console window)
+          GOOS=windows GOARCH=amd64 go build -ldflags "-H windowsgui" -o bin/forge-windows-amd64.exe ./cmd/forge
           # macOS AMD64
           GOOS=darwin GOARCH=amd64 go build -o bin/forge-darwin-amd64 ./cmd/forge
           # macOS ARM64

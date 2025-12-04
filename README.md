@@ -22,6 +22,16 @@ Download the latest release for your platform from the [Releases](https://github
 ### Windows
 Download `forge-windows-amd64.exe` and double-click it.
 
+> **⚠️ Windows Troubleshooting**
+> 
+> **SmartScreen Warning**: Since the binary isn't code-signed, Windows may show "Windows protected your PC". Click "More info" → "Run anyway", or right-click the file → Properties → check "Unblock" → OK.
+>
+> **Requirements**: Windows 10 version 1809 (October 2018 Update) or later is required for ConPTY support.
+>
+> **PowerShell**: The terminal uses PowerShell by default. If you have issues, ensure PowerShell is available and not restricted by execution policies.
+>
+> **Firewall**: If the browser opens but shows a connection error, check that your firewall allows connections to `localhost:3333`.
+
 ### macOS
 Download `forge-darwin-amd64` (Intel) or `forge-darwin-arm64` (Apple Silicon).
 ```bash
