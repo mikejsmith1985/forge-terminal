@@ -94,6 +94,19 @@ body {
   /* Terminal always dark usually, or match theme? keeping black for now */
 }
 
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.shell-toggle {
+  border-radius: 6px;
+}
+
 .sidebar {
   width: 360px;
   /* Slightly wider for new cards */

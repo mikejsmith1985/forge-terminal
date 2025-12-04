@@ -10,6 +10,13 @@ import (
 	"sync"
 )
 
+// ShellConfig contains shell configuration options
+type ShellConfig struct {
+	ShellType   string // "cmd", "powershell", or "wsl"
+	WSLDistro   string // WSL distribution name (e.g., "Ubuntu-24.04")
+	WSLHomePath string // WSL home directory (e.g., "/home/mikej")
+}
+
 // TerminalSession represents a single PTY terminal session.
 type TerminalSession struct {
 	ID  string
@@ -21,30 +28,61 @@ type TerminalSession struct {
 	doneChan chan struct{}
 }
 
-// NewTerminalSession creates a new PTY session.
+// NewTerminalSession creates a new PTY session with default shell.
 func NewTerminalSession(id string) (*TerminalSession, error) {
+	return NewTerminalSessionWithConfig(id, nil)
+}
+
+// NewTerminalSessionWithConfig creates a new PTY session with specified shell config.
+func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSession, error) {
 	// Determine shell
 	shell := os.Getenv("SHELL")
-	if shell == "" {
-		if runtime.GOOS == "windows" {
-			shell = "cmd.exe"
+	shellArgs := []string{}
+
+	if runtime.GOOS == "windows" {
+		// Windows shell selection
+		if config != nil && config.ShellType == "wsl" {
+			shell = "wsl.exe"
+			if config.WSLDistro != "" {
+				shellArgs = append(shellArgs, "-d", config.WSLDistro)
+			}
+			if config.WSLHomePath != "" {
+				shellArgs = append(shellArgs, "--cd", config.WSLHomePath)
+			} else {
+				shellArgs = append(shellArgs, "--cd", "~")
+			}
+			shellArgs = append(shellArgs, "-e", "bash", "-l")
+		} else if config != nil && config.ShellType == "powershell" {
+			shell = "powershell.exe"
 		} else {
+			shell = "cmd.exe"
+		}
+	} else {
+		// Unix shell
+		if shell == "" {
 			shell = "/bin/bash"
 		}
+		shellArgs = []string{"-l"}
 	}
 
 	// Create command (only used on Unix)
 	var cmd *exec.Cmd
 	if runtime.GOOS != "windows" {
-		cmd = exec.Command(shell, "-l")
+		cmd = exec.Command(shell, shellArgs...)
 		cmd.Env = append(os.Environ(),
 			"TERM=xterm-256color",
 			"COLORTERM=truecolor",
 		)
 	}
 
-	// Start PTY (platform specific)
-	ptmx, err := startPTY(cmd)
+	// Start PTY (platform specific) - pass shell info for Windows
+	var ptmx io.ReadWriteCloser
+	var err error
+	if runtime.GOOS == "windows" {
+		ptmx, err = startPTYWithShell(shell, shellArgs)
+	} else {
+		ptmx, err = startPTY(cmd)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to start PTY: %w", err)
 	}

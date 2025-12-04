@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 
 	"github.com/UserExistsError/conpty"
 )
@@ -18,6 +19,21 @@ func startPTY(cmd *exec.Cmd) (io.ReadWriteCloser, error) {
 	cpty, err := conpty.Start("cmd.exe")
 	if err != nil {
 		return nil, fmt.Errorf("conpty start failed: %w", err)
+	}
+	return cpty, nil
+}
+
+// startPTYWithShell starts a PTY session with a specific shell and arguments.
+func startPTYWithShell(shell string, args []string) (io.ReadWriteCloser, error) {
+	// Build command line
+	commandLine := shell
+	if len(args) > 0 {
+		commandLine += " " + strings.Join(args, " ")
+	}
+
+	cpty, err := conpty.Start(commandLine)
+	if err != nil {
+		return nil, fmt.Errorf("conpty start failed for %s: %w", commandLine, err)
 	}
 	return cpty, nil
 }

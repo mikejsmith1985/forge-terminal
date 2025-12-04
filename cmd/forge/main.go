@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -48,6 +50,12 @@ func main() {
 
 	// Commands API
 	http.HandleFunc("/api/commands", handleCommands)
+
+	// Config API
+	http.HandleFunc("/api/config", handleConfig)
+
+	// WSL detection API
+	http.HandleFunc("/api/wsl/detect", handleWSLDetect)
 
 	// Shutdown API - allows graceful shutdown from browser
 	http.HandleFunc("/api/shutdown", handleShutdown)
@@ -133,6 +141,93 @@ func handleShutdown(w http.ResponseWriter, r *http.Request) {
 		<-time.After(500 * time.Millisecond)
 		os.Exit(0)
 	}()
+}
+
+func handleConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	switch r.Method {
+	case http.MethodGet:
+		config, err := commands.LoadConfig()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(config)
+
+	case http.MethodPost:
+		var config commands.Config
+		if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := commands.SaveConfig(&config); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleWSLDetect(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if runtime.GOOS != "windows" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"available": false,
+			"reason":    "Not running on Windows",
+		})
+		return
+	}
+
+	// Get list of WSL distros
+	cmd := exec.Command("wsl", "--list", "--quiet")
+	output, err := cmd.Output()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"available": false,
+			"reason":    "WSL not installed or not available",
+		})
+		return
+	}
+
+	// Parse distro names (handle UTF-16 output from wsl.exe)
+	distros := []string{}
+	lines := strings.Split(string(bytes.ReplaceAll(output, []byte{0}, []byte{})), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			distros = append(distros, line)
+		}
+	}
+
+	if len(distros) == 0 {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"available": false,
+			"reason":    "No WSL distributions installed",
+		})
+		return
+	}
+
+	// Try to get the username from the first distro
+	username := ""
+	if len(distros) > 0 {
+		userCmd := exec.Command("wsl", "-d", distros[0], "-e", "whoami")
+		userOutput, err := userCmd.Output()
+		if err == nil {
+			username = strings.TrimSpace(string(userOutput))
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"available":   true,
+		"distros":     distros,
+		"defaultUser": username,
+		"defaultHome": "/home/" + username,
+	})
 }
 
 // findAvailablePort tries preferred ports in order and returns the first available one

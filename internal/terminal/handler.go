@@ -48,12 +48,20 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// Create terminal session
+	// Parse shell config from query params
+	query := r.URL.Query()
+	shellConfig := &ShellConfig{
+		ShellType:   query.Get("shell"),
+		WSLDistro:   query.Get("distro"),
+		WSLHomePath: query.Get("home"),
+	}
+
+	// Create terminal session with config
 	sessionID := uuid.New().String()
-	session, err := NewTerminalSession(sessionID)
+	session, err := NewTerminalSessionWithConfig(sessionID, shellConfig)
 	if err != nil {
 		log.Printf("[Terminal] Failed to create session: %v", err)
-		_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session"})
+		_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
 		return
 	}
 	defer func() {
@@ -62,7 +70,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	h.sessions.Store(sessionID, session)
-	log.Printf("[Terminal] Session %s created", sessionID)
+	log.Printf("[Terminal] Session %s created (shell: %s)", sessionID, shellConfig.ShellType)
 
 	// Set initial terminal size (default 80x24)
 	_ = session.Resize(80, 24)

@@ -72,11 +72,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   style,
   theme = 'dark', // 'dark' or 'light'
   onConnectionChange = null,
+  shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
 }, ref) {
   const terminalRef = useRef(null);
   const xtermRef = useRef(null);
   const wsRef = useRef(null);
   const fitAddonRef = useRef(null);
+  const shellConfigRef = useRef(shellConfig);
+  const connectFnRef = useRef(null);
+
+  // Keep shellConfig ref updated
+  useEffect(() => {
+    shellConfigRef.current = shellConfig;
+  }, [shellConfig]);
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -108,6 +116,21 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     },
     isConnected: () => {
       return wsRef.current && wsRef.current.readyState === WebSocket.OPEN;
+    },
+    reconnect: () => {
+      // Close existing connection
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.close();
+      }
+      // Clear terminal
+      if (xtermRef.current) {
+        xtermRef.current.clear();
+        xtermRef.current.write('\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Reconnecting...\r\n\r\n');
+      }
+      // Reconnect with new shell config
+      if (connectFnRef.current) {
+        connectFnRef.current();
+      }
     },
   }));
 
@@ -153,61 +176,84 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     setTimeout(() => fitAddon.fit(), 0);
 
     // Connect to WebSocket
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.binaryType = 'arraybuffer';
-
-    ws.onopen = () => {
-      console.log('[Terminal] WebSocket connected');
-      // Use orange for the welcome message to match theme
-      term.write('\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected.\r\n\r\n');
-
-      // Send initial size
-      const { cols, rows } = term;
-      ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-
-      if (onConnectionChange) onConnectionChange(true);
-    };
-
-    ws.onmessage = (event) => {
-      if (event.data instanceof ArrayBuffer) {
-        // Binary data from PTY
-        const data = new Uint8Array(event.data);
-        term.write(data);
-      } else {
-        // Text data
-        term.write(event.data);
+    const connectWebSocket = () => {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      let wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+      
+      // Add shell config query params
+      const cfg = shellConfigRef.current;
+      if (cfg && cfg.shellType) {
+        const params = new URLSearchParams();
+        params.set('shell', cfg.shellType);
+        if (cfg.shellType === 'wsl') {
+          if (cfg.wslDistro) params.set('distro', cfg.wslDistro);
+          if (cfg.wslHomePath) params.set('home', cfg.wslHomePath);
+        }
+        wsUrl += '?' + params.toString();
       }
-    };
 
-    ws.onerror = (error) => {
-      console.error('[Terminal] WebSocket error:', error);
-      term.write('\r\n\x1b[1;31m[Error]\x1b[0m Connection error.\r\n');
-    };
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onclose = () => {
-      console.log('[Terminal] WebSocket closed');
-      term.write('\r\n\x1b[1;33m[Disconnected]\x1b[0m Terminal session ended.\r\n');
-      if (onConnectionChange) onConnectionChange(false);
-    };
+      ws.binaryType = 'arraybuffer';
 
-    // Handle terminal input
-    term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
+      ws.onopen = () => {
+        console.log('[Terminal] WebSocket connected');
+        // Use orange for the welcome message to match theme
+        const shellLabel = cfg?.shellType ? ` (${cfg.shellType.toUpperCase()})` : '';
+        term.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}.\r\n\r\n`);
 
-    // Handle terminal resize
-    term.onResize(({ cols, rows }) => {
-      if (ws.readyState === WebSocket.OPEN) {
+        // Send initial size
+        const { cols, rows } = term;
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-      }
-    });
+
+        if (onConnectionChange) onConnectionChange(true);
+      };
+
+      ws.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          // Binary data from PTY
+          const data = new Uint8Array(event.data);
+          term.write(data);
+        } else {
+          // Text data
+          term.write(event.data);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('[Terminal] WebSocket error:', error);
+        term.write('\r\n\x1b[1;31m[Error]\x1b[0m Connection error.\r\n');
+      };
+
+      ws.onclose = () => {
+        console.log('[Terminal] WebSocket closed');
+        term.write('\r\n\x1b[1;33m[Disconnected]\x1b[0m Terminal session ended.\r\n');
+        if (onConnectionChange) onConnectionChange(false);
+      };
+
+      // Handle terminal input
+      term.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
+
+      // Handle terminal resize
+      term.onResize(({ cols, rows }) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
+
+      return ws;
+    };
+
+    // Store connect function for reconnect
+    connectFnRef.current = connectWebSocket;
+
+    // Initial connection
+    connectWebSocket();
 
     // Handle window resize
     const debouncedFit = debounce(() => {
@@ -226,8 +272,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     return () => {
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.close();
       }
       term.dispose();
     };

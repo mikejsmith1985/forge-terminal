@@ -17,6 +17,16 @@ func startPTY(cmd *exec.Cmd) (io.ReadWriteCloser, error) {
 	return pty.Start(cmd)
 }
 
+// startPTYWithShell is not used on Unix (shell config handled in session.go).
+func startPTYWithShell(shell string, args []string) (io.ReadWriteCloser, error) {
+	cmd := exec.Command(shell, args...)
+	cmd.Env = append(os.Environ(),
+		"TERM=xterm-256color",
+		"COLORTERM=truecolor",
+	)
+	return pty.Start(cmd)
+}
+
 // resizePTY resizes the PTY window.
 func resizePTY(ptmx io.ReadWriteCloser, cols, rows uint16) error {
 	f, ok := ptmx.(*os.File)
