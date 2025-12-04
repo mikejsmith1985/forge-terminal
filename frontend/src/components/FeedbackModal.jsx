@@ -211,7 +211,13 @@ const FeedbackModal = ({ isOpen, onClose }) => {
             <div className="modal" style={{ maxWidth: '600px' }}>
                 <div className="modal-header">
                     <h3><Github size={20} style={{ marginRight: '8px', verticalAlign: 'bottom' }} /> Send Feedback</h3>
-                    <button className="btn-close" onClick={onClose}>×</button>
+                    <button 
+                        className="btn-close" 
+                        onClick={onClose}
+                        title={screenshot ? "Minimize (screenshot saved)" : "Close"}
+                    >
+                        {screenshot ? '−' : '×'}
+                    </button>
                 </div>
 
                 <div className="modal-body" style={{ padding: '20px' }}>

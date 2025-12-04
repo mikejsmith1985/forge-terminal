@@ -45,6 +45,15 @@ function App() {
       const data = await res.json();
       if (data && data.shellType) {
         setShellConfig(data);
+        // If config was loaded and differs from default, reconnect terminal
+        if (data.shellType !== 'powershell' || data.wslDistro || data.wslHomePath) {
+          // Small delay to ensure terminal is mounted
+          setTimeout(() => {
+            if (terminalRef.current) {
+              terminalRef.current.reconnect();
+            }
+          }, 500);
+        }
       }
     } catch (err) {
       console.error('Failed to load config:', err);
@@ -226,11 +235,14 @@ function App() {
   }
 
   const handleShutdown = async () => {
+    // Show toast first, then confirm
+    addToast('Shutting down Forge Terminal...', 'warning', 3000);
+    
+    // Small delay to ensure toast renders before confirm dialog
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     if (window.confirm('Quit Forge Terminal?')) {
-      addToast('Shutting down Forge Terminal...', 'warning', 5000);
       try {
-        // Small delay so user sees the toast
-        await new Promise(resolve => setTimeout(resolve, 500));
         await fetch('/api/shutdown', { method: 'POST' });
         window.close(); // Try to close the tab
       } catch (err) {
