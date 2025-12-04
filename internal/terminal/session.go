@@ -14,7 +14,7 @@ import (
 type TerminalSession struct {
 	ID       string
 	PTY      io.ReadWriteCloser
-	Cmd      *exec.Cmd
+	Cmd      *exec.Cmd // nil on Windows (ConPTY manages process internally)
 	
 	mu       sync.Mutex
 	closed   bool
@@ -27,25 +27,21 @@ func NewTerminalSession(id string) (*TerminalSession, error) {
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		if runtime.GOOS == "windows" {
-			shell = "powershell.exe"
+			shell = "cmd.exe"
 		} else {
 			shell = "/bin/bash"
 		}
 	}
 
-	// Create command
+	// Create command (only used on Unix)
 	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command(shell)
-	} else {
+	if runtime.GOOS != "windows" {
 		cmd = exec.Command(shell, "-l")
+		cmd.Env = append(os.Environ(),
+			"TERM=xterm-256color",
+			"COLORTERM=truecolor",
+		)
 	}
-	
-	// Set environment
-	cmd.Env = append(os.Environ(),
-		"TERM=xterm-256color",
-		"COLORTERM=truecolor",
-	)
 
 	// Start PTY (platform specific)
 	ptmx, err := startPTY(cmd)
@@ -60,11 +56,13 @@ func NewTerminalSession(id string) (*TerminalSession, error) {
 		doneChan: make(chan struct{}),
 	}
 
-	// Monitor process exit
-	go func() {
-		_ = cmd.Wait()
-		close(session.doneChan)
-	}()
+	// Monitor process exit (only on Unix where we have cmd)
+	if cmd != nil {
+		go func() {
+			_ = cmd.Wait()
+			close(session.doneChan)
+		}()
+	}
 
 	return session, nil
 }
@@ -98,7 +96,8 @@ func (s *TerminalSession) Close() error {
 	}
 	s.closed = true
 
-	if s.Cmd.Process != nil {
+	// Kill process if we have one (Unix only)
+	if s.Cmd != nil && s.Cmd.Process != nil {
 		_ = s.Cmd.Process.Kill()
 	}
 	return s.PTY.Close()

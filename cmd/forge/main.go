@@ -25,12 +25,21 @@ var embeddedFS embed.FS
 var preferredPorts = []int{8333, 8080, 9000, 3000, 3333}
 
 func main() {
-	// Serve embedded frontend
+	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
 		log.Fatal("Failed to load embedded web files:", err)
 	}
-	http.Handle("/", http.FileServer(http.FS(webFS)))
+	
+	// Wrap file server with cache-control headers
+	fileServer := http.FileServer(http.FS(webFS))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Prevent caching to avoid stale WebSocket connection issues
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		fileServer.ServeHTTP(w, r)
+	})
 
 	// WebSocket terminal handler
 	termHandler := terminal.NewHandler()
@@ -117,7 +126,7 @@ func findAvailablePort() (string, net.Listener, error) {
 		}
 		log.Printf("Port %d unavailable, trying next...", port)
 	}
-	
+
 	// Fallback: let OS assign a random available port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

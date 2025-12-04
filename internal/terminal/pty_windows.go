@@ -7,19 +7,19 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"strings"
 
 	"github.com/UserExistsError/conpty"
 )
 
 // startPTY starts a PTY session on Windows using ConPTY.
 func startPTY(cmd *exec.Cmd) (io.ReadWriteCloser, error) {
-	commandLine := cmd.Path
-	if len(cmd.Args) > 1 {
-		// Simple joining of arguments. For complex cases, proper escaping might be needed.
-		commandLine += " " + strings.Join(cmd.Args[1:], " ")
+	// ConPTY takes a command string, not exec.Cmd
+	// Use cmd.exe as a wrapper for better compatibility
+	cpty, err := conpty.Start("cmd.exe")
+	if err != nil {
+		return nil, fmt.Errorf("conpty start failed: %w", err)
 	}
-	return conpty.Start(commandLine)
+	return cpty, nil
 }
 
 // resizePTY resizes the PTY window.
