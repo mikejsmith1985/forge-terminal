@@ -12,10 +12,10 @@ import (
 
 // TerminalSession represents a single PTY terminal session.
 type TerminalSession struct {
-	ID       string
-	PTY      io.ReadWriteCloser
-	Cmd      *exec.Cmd // nil on Windows (ConPTY manages process internally)
-	
+	ID  string
+	PTY io.ReadWriteCloser
+	Cmd *exec.Cmd // nil on Windows (ConPTY manages process internally)
+
 	mu       sync.Mutex
 	closed   bool
 	doneChan chan struct{}

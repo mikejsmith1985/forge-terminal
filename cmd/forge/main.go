@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
@@ -30,7 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to load embedded web files:", err)
 	}
-	
+
 	// Wrap file server with cache-control headers
 	fileServer := http.FileServer(http.FS(webFS))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +48,9 @@ func main() {
 
 	// Commands API
 	http.HandleFunc("/api/commands", handleCommands)
+
+	// Shutdown API - allows graceful shutdown from browser
+	http.HandleFunc("/api/shutdown", handleShutdown)
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()
@@ -114,6 +118,21 @@ func openBrowser(url string) {
 	if cmd != nil {
 		_ = cmd.Start()
 	}
+}
+
+func handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"shutting down"}`))
+	log.Println("👋 Shutdown requested from browser")
+	// Give the response time to send before exiting
+	go func() {
+		<-time.After(500 * time.Millisecond)
+		os.Exit(0)
+	}()
 }
 
 // findAvailablePort tries preferred ports in order and returns the first available one

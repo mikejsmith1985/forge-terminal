@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, MessageSquare } from 'lucide-react';
+import { Moon, Sun, Plus, MessageSquare, Power } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -87,6 +87,18 @@ function App() {
       .catch(err => console.error('Failed to load commands:', err))
   }
 
+  const handleShutdown = async () => {
+    if (window.confirm('Quit Forge Terminal?')) {
+      try {
+        await fetch('/api/shutdown', { method: 'POST' });
+        window.close(); // Try to close the tab
+      } catch (err) {
+        // Server already shut down, that's expected
+        window.close();
+      }
+    }
+  }
+
   const saveCommands = async (newCommands) => {
     try {
       await fetch('/api/commands', {
@@ -169,8 +181,11 @@ function App() {
             <button className="btn btn-ghost btn-icon" onClick={toggleTheme} title="Toggle Theme">
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button className="btn btn-ghost btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
+            <button className="btn btn-feedback btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
               <MessageSquare size={18} />
+            </button>
+            <button className="btn btn-danger btn-icon" onClick={handleShutdown} title="Quit Forge">
+              <Power size={18} />
             </button>
             <button className="btn btn-primary" onClick={handleAdd}>
               <Plus size={16} /> Add

@@ -177,6 +177,28 @@ body {
   color: var(--text);
 }
 
+.btn-feedback {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.btn-feedback:hover {
+  background: var(--accent-secondary);
+  transform: translateY(-1px);
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--red);
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--red);
+}
+
 /* Card Styles */
 .card {
   background: var(--card-bg);
