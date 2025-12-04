@@ -235,20 +235,17 @@ function App() {
   }
 
   const handleShutdown = async () => {
-    // Show toast first, then confirm
     addToast('Shutting down Forge Terminal...', 'warning', 3000);
     
-    // Small delay to ensure toast renders before confirm dialog
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Small delay so user sees the toast
+    await new Promise(resolve => setTimeout(resolve, 800));
     
-    if (window.confirm('Quit Forge Terminal?')) {
-      try {
-        await fetch('/api/shutdown', { method: 'POST' });
-        window.close(); // Try to close the tab
-      } catch (err) {
-        // Server already shut down, that's expected
-        window.close();
-      }
+    try {
+      await fetch('/api/shutdown', { method: 'POST' });
+      window.close(); // Try to close the tab
+    } catch (err) {
+      // Server already shut down, that's expected
+      window.close();
     }
   }
 

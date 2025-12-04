@@ -215,8 +215,9 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                         className="btn-close" 
                         onClick={onClose}
                         title={screenshot ? "Minimize (screenshot saved)" : "Close"}
+                        style={screenshot ? { fontSize: '28px', fontWeight: 'bold', lineHeight: '1' } : {}}
                     >
-                        {screenshot ? '−' : '×'}
+                        {screenshot ? '—' : '×'}
                     </button>
                 </div>
 
