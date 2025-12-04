@@ -327,23 +327,8 @@ function App() {
         <div className="sidebar-header">
           <h3>⚡ Commands</h3>
           <div className="header-actions">
-            <ShellToggle 
-              shellConfig={shellConfig} 
-              onToggle={handleShellToggle}
-              wslAvailable={wslAvailable}
-            />
-            <button 
-              className="btn btn-ghost btn-icon" 
-              onClick={() => setIsSettingsModalOpen(true)} 
-              title="Shell Settings"
-            >
-              <Settings size={18} />
-            </button>
             <button className="btn btn-ghost btn-icon" onClick={toggleTheme} title="Toggle Theme">
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
-            <button className="btn btn-feedback btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
-              <MessageSquare size={18} />
             </button>
             <button className="btn btn-danger btn-icon" onClick={handleShutdown} title="Quit Forge">
               <Power size={18} />
@@ -352,6 +337,24 @@ function App() {
               <Plus size={16} /> Add
             </button>
           </div>
+        </div>
+
+        <div className="terminal-controls">
+          <ShellToggle 
+            shellConfig={shellConfig} 
+            onToggle={handleShellToggle}
+            wslAvailable={wslAvailable}
+          />
+          <button 
+            className="btn btn-ghost btn-icon" 
+            onClick={() => setIsSettingsModalOpen(true)} 
+            title="Shell Settings"
+          >
+            <Settings size={18} />
+          </button>
+          <button className="btn btn-feedback btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
+            <MessageSquare size={18} />
+          </button>
         </div>
 
         <DndContext
