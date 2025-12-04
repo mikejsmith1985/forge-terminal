@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -33,11 +34,50 @@ func NewTerminalSession(id string) (*TerminalSession, error) {
 	return NewTerminalSessionWithConfig(id, nil)
 }
 
+// convertWSLPath converts a Windows UNC path to a Linux path for WSL
+// e.g., "\\wsl.localhost\Ubuntu-24.04\home\mikej\projects" -> "/home/mikej/projects"
+// or "\\wsl$\Ubuntu\home\user" -> "/home/user"
+func convertWSLPath(windowsPath string) string {
+	path := windowsPath
+
+	// Handle \\wsl.localhost\Distro\path or \\wsl$\Distro\path
+	if strings.HasPrefix(path, `\\wsl.localhost\`) || strings.HasPrefix(path, `\\wsl$\`) {
+		// Remove the \\wsl.localhost\ or \\wsl$\ prefix
+		if strings.HasPrefix(path, `\\wsl.localhost\`) {
+			path = strings.TrimPrefix(path, `\\wsl.localhost\`)
+		} else {
+			path = strings.TrimPrefix(path, `\\wsl$\`)
+		}
+
+		// Remove the distro name (first path component)
+		parts := strings.SplitN(path, `\`, 2)
+		if len(parts) == 2 {
+			path = parts[1]
+		} else {
+			return "~" // Just distro name, go to home
+		}
+
+		// Convert backslashes to forward slashes
+		path = strings.ReplaceAll(path, `\`, `/`)
+
+		// Ensure it starts with /
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+
+		return path
+	}
+
+	// Already a Linux path or other format, return as-is
+	return path
+}
+
 // NewTerminalSessionWithConfig creates a new PTY session with specified shell config.
 func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSession, error) {
 	// Determine shell
 	shell := os.Getenv("SHELL")
 	shellArgs := []string{}
+	workingDir := ""
 
 	if runtime.GOOS == "windows" {
 		// Windows shell selection
@@ -47,7 +87,9 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 				shellArgs = append(shellArgs, "-d", config.WSLDistro)
 			}
 			if config.WSLHomePath != "" {
-				shellArgs = append(shellArgs, "--cd", config.WSLHomePath)
+				// Convert Windows UNC path to Linux path
+				linuxPath := convertWSLPath(config.WSLHomePath)
+				shellArgs = append(shellArgs, "--cd", linuxPath)
 			} else {
 				shellArgs = append(shellArgs, "--cd", "~")
 			}
@@ -58,11 +100,16 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 			shell = "cmd.exe"
 		}
 	} else {
-		// Unix shell
+		// Unix shell (including WSL running natively)
 		if shell == "" {
 			shell = "/bin/bash"
 		}
 		shellArgs = []string{"-l"}
+
+		// Use WSL home path as working directory if provided
+		if config != nil && config.WSLHomePath != "" {
+			workingDir = convertWSLPath(config.WSLHomePath)
+		}
 	}
 
 	// Create command (only used on Unix)
@@ -73,6 +120,10 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 			"TERM=xterm-256color",
 			"COLORTERM=truecolor",
 		)
+		// Set working directory if specified
+		if workingDir != "" {
+			cmd.Dir = workingDir
+		}
 	}
 
 	// Start PTY (platform specific) - pass shell info for Windows

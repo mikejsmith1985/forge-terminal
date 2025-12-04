@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
-import { Camera, Github, Copy, Check, Settings, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { Camera, Github, Copy, Check, Settings, ExternalLink, Image as ImageIcon, Minus, X } from 'lucide-react';
 import { getLogs } from '../utils/logger';
 
 // ----------------------------------------------------------------------
@@ -215,9 +215,9 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                         className="btn-close" 
                         onClick={onClose}
                         title={screenshot ? "Minimize (screenshot saved)" : "Close"}
-                        style={screenshot ? { fontSize: '28px', fontWeight: 'bold', lineHeight: '1' } : {}}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                        {screenshot ? '—' : '×'}
+                        {screenshot ? <Minus size={20} strokeWidth={3} /> : <X size={20} />}
                     </button>
                 </div>
 
