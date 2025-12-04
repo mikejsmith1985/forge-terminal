@@ -8,6 +8,7 @@ import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import ShellToggle from './components/ShellToggle'
+import { ToastContainer, useToast } from './components/Toast'
 
 function App() {
   const [commands, setCommands] = useState([])
@@ -19,6 +20,7 @@ function App() {
   const [shellConfig, setShellConfig] = useState({ shellType: 'powershell', wslDistro: '', wslHomePath: '' })
   const [wslAvailable, setWslAvailable] = useState(false)
   const terminalRef = useRef(null)
+  const { toasts, addToast, removeToast } = useToast()
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -50,6 +52,17 @@ function App() {
   }
 
   const saveConfig = async (config) => {
+    const oldShell = shellConfig.shellType;
+    const newShell = config.shellType;
+    
+    // Show warning toast when switching between PS and WSL
+    if ((oldShell === 'powershell' && newShell === 'wsl') || 
+        (oldShell === 'wsl' && newShell === 'powershell')) {
+      addToast(`Switching from ${oldShell.toUpperCase()} to ${newShell.toUpperCase()}. Current session will end.`, 'warning', 4000);
+    } else if (oldShell !== newShell) {
+      addToast(`Switching to ${newShell.toUpperCase()}`, 'info', 2000);
+    }
+    
     try {
       await fetch('/api/config', {
         method: 'POST',
@@ -63,6 +76,7 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to save config:', err);
+      addToast('Failed to save shell configuration', 'error', 3000);
     }
   }
 
@@ -213,7 +227,10 @@ function App() {
 
   const handleShutdown = async () => {
     if (window.confirm('Quit Forge Terminal?')) {
+      addToast('Shutting down Forge Terminal...', 'warning', 5000);
       try {
+        // Small delay so user sees the toast
+        await new Promise(resolve => setTimeout(resolve, 500));
         await fetch('/api/shutdown', { method: 'POST' });
         window.close(); // Try to close the tab
       } catch (err) {
@@ -372,6 +389,8 @@ function App() {
         shellConfig={shellConfig}
         onSave={saveConfig}
       />
+
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   )
 }
