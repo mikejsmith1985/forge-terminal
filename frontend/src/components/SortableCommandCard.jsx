@@ -2,6 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Play, Clipboard, Edit2, Trash2, GripVertical } from 'lucide-react';
+import { iconMap } from './IconPicker';
 
 export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDelete }) {
     const {
@@ -18,6 +19,9 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
         transition,
         zIndex: isDragging ? 999 : 'auto',
     };
+
+    // Get icon component if specified
+    const CommandIcon = command.icon ? iconMap[command.icon] : null;
 
     return (
         <div
@@ -48,6 +52,7 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
 
             <div className="card-body">
                 <div className="command-preview" title={command.command}>
+                    {CommandIcon && <CommandIcon size={18} className="command-icon" />}
                     {command.description || command.command}
                 </div>
             </div>

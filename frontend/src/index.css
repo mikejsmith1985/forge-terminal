@@ -94,6 +94,18 @@ body {
   /* Terminal always dark usually, or match theme? keeping black for now */
 }
 
+/* Custom cursor for terminal - orange in dark mode */
+.terminal-pane :global(.xterm),
+.terminal-pane [class*="xterm"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4 0 L4 14 L7 11 L9 15 L11 14 L9 10 L13 10 Z' fill='%23f97316' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") 4 0, text;
+}
+
+/* Light mode cursor - dark */
+.light .terminal-pane :global(.xterm),
+.light .terminal-pane [class*="xterm"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4 0 L4 14 L7 11 L9 15 L11 14 L9 10 L13 10 Z' fill='%231c1917' stroke='%23fff' stroke-width='1'/%3E%3C/svg%3E") 4 0, text;
+}
+
 .shell-toggle {
   border-radius: 6px;
   border: 1px solid var(--accent);
@@ -532,4 +544,111 @@ body {
 .toast-close:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* Icon Picker */
+.icon-select-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 60px;
+  height: 42px;
+  background: var(--bg);
+  border: 1px solid var(--overlay);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.icon-select-btn:hover {
+  border-color: var(--accent);
+}
+
+.icon-select-btn:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.icon-picker {
+  background: var(--surface);
+  border: 1px solid var(--overlay);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.icon-picker-search {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--overlay);
+  border-radius: 6px;
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.icon-picker-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.icon-category {
+  margin-bottom: 12px;
+}
+
+.icon-category-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.icon-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.icon-option:hover {
+  background: var(--overlay);
+  border-color: var(--accent);
+}
+
+.icon-option.selected {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+
+.icon-option-clear {
+  font-size: 0.8rem;
+  color: var(--subtext);
+}
+
+.command-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-right: 8px;
 }

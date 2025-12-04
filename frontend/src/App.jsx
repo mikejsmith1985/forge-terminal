@@ -386,6 +386,7 @@ function App() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveCommand}
         initialData={editingCommand}
+        commands={commands}
       />
 
       <FeedbackModal

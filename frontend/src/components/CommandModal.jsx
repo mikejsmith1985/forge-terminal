@@ -1,27 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import IconPicker, { iconMap } from './IconPicker';
+import { ChevronDown } from 'lucide-react';
 
-const CommandModal = ({ isOpen, onClose, onSave, initialData }) => {
+// Smart keybinding generator - matches logic in App.jsx
+const generateSmartKeybinding = (position, existingCommands) => {
+    // Cards 1-10: Ctrl+Shift+1, Ctrl+Shift+2, ... Ctrl+Shift+0
+    if (position <= 10) {
+        const key = position === 10 ? '0' : String(position);
+        return `Ctrl+Shift+${key}`;
+    }
+    
+    // Card 11+: Try to auto-increment from previous card
+    if (existingCommands.length > 0) {
+        const lastCmd = existingCommands[existingCommands.length - 1];
+        if (lastCmd.keyBinding) {
+            const match = lastCmd.keyBinding.match(/Ctrl\+Shift\+(.+)$/i);
+            if (match) {
+                const lastKey = match[1];
+                // Increment key
+                if (/^[0-9]$/.test(lastKey)) {
+                    const num = parseInt(lastKey);
+                    if (num < 9) return `Ctrl+Shift+${num + 1}`;
+                    return 'Ctrl+Shift+A';
+                }
+                if (/^[A-Z]$/i.test(lastKey)) {
+                    const upper = lastKey.toUpperCase();
+                    if (upper < 'Z') return `Ctrl+Shift+${String.fromCharCode(upper.charCodeAt(0) + 1)}`;
+                }
+            }
+        }
+    }
+    
+    // Fallback: use letters starting from A for 11+
+    const letterIndex = position - 11;
+    if (letterIndex < 26) {
+        return `Ctrl+Shift+${String.fromCharCode(65 + letterIndex)}`;
+    }
+    
+    return '';
+};
+
+const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) => {
     const [formData, setFormData] = useState({
         description: '',
         command: '',
         keyBinding: '',
         pasteOnly: false,
-        favorite: false
+        favorite: false,
+        icon: null
     });
+    const [showIconPicker, setShowIconPicker] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             if (initialData) {
-                setFormData(initialData);
+                setFormData({ icon: null, ...initialData });
             } else {
                 setFormData({
                     description: '',
                     command: '',
                     keyBinding: '',
                     pasteOnly: false,
-                    favorite: false
+                    favorite: false,
+                    icon: null
                 });
             }
+            setShowIconPicker(false);
         }
     }, [isOpen, initialData]);
 
@@ -33,10 +77,24 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData }) => {
         }));
     };
 
+    const handleIconSelect = (iconName) => {
+        setFormData(prev => ({ ...prev, icon: iconName }));
+        setShowIconPicker(false);
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         onSave(formData);
     };
+
+    const SelectedIcon = formData.icon ? iconMap[formData.icon] : null;
+
+    // Calculate the smart keybinding that will be auto-assigned
+    const smartKeybinding = useMemo(() => {
+        if (initialData) return ''; // Editing existing command
+        const position = commands.length + 1;
+        return generateSmartKeybinding(position, commands);
+    }, [commands, initialData]);
 
     if (!isOpen) return null;
 
@@ -48,17 +106,37 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData }) => {
                     <button className="btn-close" onClick={onClose}>×</button>
                 </div>
                 <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label>Description</label>
-                        <input
-                            type="text"
-                            name="description"
-                            value={formData.description}
-                            onChange={handleChange}
-                            placeholder="e.g. 🤖 Run Claude Code"
-                            required
-                        />
+                    <div className="form-row" style={{ gap: '12px', alignItems: 'flex-end' }}>
+                        <div className="form-group" style={{ flex: '0 0 auto' }}>
+                            <label>Icon</label>
+                            <button
+                                type="button"
+                                className="icon-select-btn"
+                                onClick={() => setShowIconPicker(!showIconPicker)}
+                            >
+                                {SelectedIcon ? <SelectedIcon size={20} /> : <span style={{ color: '#666' }}>∅</span>}
+                                <ChevronDown size={14} />
+                            </button>
+                        </div>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Description</label>
+                            <input
+                                type="text"
+                                name="description"
+                                value={formData.description}
+                                onChange={handleChange}
+                                placeholder="e.g. Run Claude Code"
+                                required
+                            />
+                        </div>
                     </div>
+
+                    {showIconPicker && (
+                        <IconPicker
+                            selectedIcon={formData.icon}
+                            onSelect={handleIconSelect}
+                        />
+                    )}
 
                     <div className="form-group">
                         <label>Command</label>
@@ -79,9 +157,9 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData }) => {
                             name="keyBinding"
                             value={formData.keyBinding}
                             onChange={handleChange}
-                            placeholder="e.g. Ctrl+Shift+1"
+                            placeholder={smartKeybinding ? `Auto: ${smartKeybinding}` : 'e.g. Ctrl+Shift+1'}
                         />
-                        <small>Supported: Ctrl+Shift+[0-9]</small>
+                        <small>{smartKeybinding && !initialData ? `Will auto-assign: ${smartKeybinding}` : 'Supported: Ctrl+Shift+[0-9, A-Z]'}</small>
                     </div>
 
                     <div className="form-row">

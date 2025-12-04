@@ -14,6 +14,7 @@ Command     string `json:"command"`
 KeyBinding  string `json:"keyBinding"`
 PasteOnly   bool   `json:"pasteOnly"`
 Favorite    bool   `json:"favorite"`
+Icon        string `json:"icon,omitempty"`
 }
 
 // Default commands created on first run
