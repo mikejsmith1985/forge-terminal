@@ -16,6 +16,7 @@ const FeedbackModal = ({ isOpen, onClose }) => {
     const [screenshot, setScreenshot] = useState(null);
     const [isCapturing, setIsCapturing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [createdIssueUrl, setCreatedIssueUrl] = useState(null);
 
     // Auth State
     const [githubToken, setGithubToken] = useState('');
@@ -190,12 +191,14 @@ const FeedbackModal = ({ isOpen, onClose }) => {
             setStatus({ type: 'info', msg: 'Creating GitHub issue...' });
             const issue = await createIssue(imageUrl);
 
+            setCreatedIssueUrl(issue.html_url);
             setStatus({ type: 'success', msg: `Issue #${issue.number} created!` });
             setTimeout(() => {
                 onClose();
                 setComment('');
                 setScreenshot(null);
                 setStatus({ type: '', msg: '' });
+                setCreatedIssueUrl(null);
             }, 2000);
 
         } catch (err) {
@@ -309,7 +312,16 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                                     color: status.type === 'error' ? '#fca5a5' : status.type === 'success' ? '#86efac' : '#bfdbfe',
                                     fontSize: '0.9em'
                                 }}>
-                                    {status.msg}
+                                    {createdIssueUrl ? (
+                                        <a 
+                                            href={createdIssueUrl} 
+                                            target="_blank" 
+                                            rel="noreferrer"
+                                            style={{ color: 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                        >
+                                            {status.msg} <ExternalLink size={14} />
+                                        </a>
+                                    ) : status.msg}
                                 </div>
                             )}
 

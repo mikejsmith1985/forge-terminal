@@ -94,16 +94,9 @@ body {
   /* Terminal always dark usually, or match theme? keeping black for now */
 }
 
-/* Custom cursor for terminal - orange in dark mode */
-.terminal-pane :global(.xterm),
-.terminal-pane [class*="xterm"] {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4 0 L4 14 L7 11 L9 15 L11 14 L9 10 L13 10 Z' fill='%23f97316' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") 4 0, text;
-}
-
-/* Light mode cursor - dark */
-.light .terminal-pane :global(.xterm),
-.light .terminal-pane [class*="xterm"] {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4 0 L4 14 L7 11 L9 15 L11 14 L9 10 L13 10 Z' fill='%231c1917' stroke='%23fff' stroke-width='1'/%3E%3C/svg%3E") 4 0, text;
+/* Custom orange cursor for terminal - works on Windows */
+.terminal-pane .xterm-screen {
+  cursor: url('/cursor-orange.svg') 5 2, url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M5 2L5 20L9 16L12 22L15 21L12 15L18 15Z' fill='%23f97316' stroke='%23000' stroke-width='1.5'/></svg>") 5 2, default !important;
 }
 
 .shell-toggle {
