@@ -185,6 +185,7 @@ func handleWSLDetect(w http.ResponseWriter, r *http.Request) {
 
 	// Get list of WSL distros
 	cmd := exec.Command("wsl", "--list", "--quiet")
+	hideWindow(cmd) // Prevent console window flash
 	output, err := cmd.Output()
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -216,6 +217,7 @@ func handleWSLDetect(w http.ResponseWriter, r *http.Request) {
 	username := ""
 	if len(distros) > 0 {
 		userCmd := exec.Command("wsl", "-d", distros[0], "-e", "whoami")
+		hideWindow(userCmd) // Prevent console window flash
 		userOutput, err := userCmd.Output()
 		if err == nil {
 			username = strings.TrimSpace(string(userOutput))

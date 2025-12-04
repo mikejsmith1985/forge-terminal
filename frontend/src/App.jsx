@@ -321,26 +321,24 @@ function App() {
   return (
     <div className="app">
       <div className="terminal-pane">
-        <div className="terminal-header">
-          <ShellToggle 
-            shellConfig={shellConfig} 
-            onToggle={handleShellToggle}
-            wslAvailable={wslAvailable}
-          />
-          <button 
-            className="btn btn-ghost btn-icon" 
-            onClick={() => setIsSettingsModalOpen(true)} 
-            title="Shell Settings"
-          >
-            <Settings size={18} />
-          </button>
-        </div>
         <ForgeTerminal ref={terminalRef} theme={theme} shellConfig={shellConfig} />
       </div>
       <div className="sidebar">
         <div className="sidebar-header">
           <h3>⚡ Commands</h3>
           <div className="header-actions">
+            <ShellToggle 
+              shellConfig={shellConfig} 
+              onToggle={handleShellToggle}
+              wslAvailable={wslAvailable}
+            />
+            <button 
+              className="btn btn-ghost btn-icon" 
+              onClick={() => setIsSettingsModalOpen(true)} 
+              title="Shell Settings"
+            >
+              <Settings size={18} />
+            </button>
             <button className="btn btn-ghost btn-icon" onClick={toggleTheme} title="Toggle Theme">
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
