@@ -30,7 +30,7 @@ Download `forge-windows-amd64.exe` and double-click it.
 >
 > **PowerShell**: The terminal uses PowerShell by default. If you have issues, ensure PowerShell is available and not restricted by execution policies.
 >
-> **Firewall**: If the browser opens but shows a connection error, check that your firewall allows connections to `localhost:3333`.
+> **Firewall**: If the browser opens but shows a connection error, check that your firewall allows localhost connections. The app tries ports 8333, 8080, 9000, 3000, 3333 in order.
 
 ### macOS
 Download `forge-darwin-amd64` (Intel) or `forge-darwin-arm64` (Apple Silicon).
@@ -48,7 +48,7 @@ chmod +x forge-linux-amd64
 
 ## Usage
 
-1. **Run the app**: It will automatically open your default browser to `http://127.0.0.1:3333`.
+1. **Run the app**: It will automatically open your default browser (typically at `http://127.0.0.1:8333`). If that port is busy, it will try other ports automatically.
 2. **Use the Terminal**: It works just like your system terminal.
 3. **Manage Commands**:
    - Click **+ Add** to create a new command card.

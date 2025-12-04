@@ -3,8 +3,10 @@ package main
 import (
 	"embed"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,6 +20,9 @@ import (
 
 //go:embed all:web
 var embeddedFS embed.FS
+
+// Preferred ports to try, in order
+var preferredPorts = []int{8333, 8080, 9000, 3000, 3333}
 
 func main() {
 	// Serve embedded frontend
@@ -34,7 +39,12 @@ func main() {
 	// Commands API
 	http.HandleFunc("/api/commands", handleCommands)
 
-	addr := "127.0.0.1:3333"
+	// Find an available port
+	addr, listener, err := findAvailablePort()
+	if err != nil {
+		log.Fatalf("Failed to find available port: %v", err)
+	}
+
 	log.Printf("🔥 Forge Terminal starting at http://%s", addr)
 
 	// Handle graceful shutdown
@@ -50,7 +60,7 @@ func main() {
 	// Auto-open browser
 	go openBrowser("http://" + addr)
 
-	log.Fatal(http.ListenAndServe(addr, nil))
+	log.Fatal(http.Serve(listener, nil))
 }
 
 func handleCommands(w http.ResponseWriter, r *http.Request) {
@@ -95,4 +105,25 @@ func openBrowser(url string) {
 	if cmd != nil {
 		_ = cmd.Start()
 	}
+}
+
+// findAvailablePort tries preferred ports in order and returns the first available one
+func findAvailablePort() (string, net.Listener, error) {
+	for _, port := range preferredPorts {
+		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		listener, err := net.Listen("tcp", addr)
+		if err == nil {
+			return addr, listener, nil
+		}
+		log.Printf("Port %d unavailable, trying next...", port)
+	}
+	
+	// Fallback: let OS assign a random available port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", nil, fmt.Errorf("no available ports: %w", err)
+	}
+	addr := listener.Addr().String()
+	log.Printf("Using OS-assigned port: %s", addr)
+	return addr, listener, nil
 }
