@@ -61,23 +61,30 @@ export function useTabManager(initialShellConfig) {
     return state.tabs.find(t => t.id === state.activeTabId) || null;
   }, [state.tabs, state.activeTabId]);
 
+  // Track created tab ID via ref to handle React's async setState batching
+  const lastCreatedTabIdRef = useRef(null);
+
   /**
    * Create a new tab
    * @param {Object} shellConfig - Optional shell config, defaults to initialShellConfig
    * @returns {string|null} New tab ID, or null if max tabs reached
    */
   const createTabAction = useCallback((shellConfig) => {
-    let newTabId = null;
+    // Reset the ref before attempting to create
+    lastCreatedTabIdRef.current = null;
     
     setState(prev => {
       if (prev.tabs.length >= MAX_TABS) {
+        // Don't create - already at max
         return prev;
       }
 
       const config = shellConfig || configRef.current;
       const newTabNumber = prev.tabs.length + 1;
       const newTab = createTab(config, newTabNumber);
-      newTabId = newTab.id;
+      
+      // Store in ref so we can return it after setState completes
+      lastCreatedTabIdRef.current = newTab.id;
       
       return {
         tabs: [...prev.tabs, newTab],
@@ -85,7 +92,9 @@ export function useTabManager(initialShellConfig) {
       };
     });
 
-    return newTabId;
+    // Return the tab ID stored in the ref
+    // This works because setState with a function updater runs synchronously
+    return lastCreatedTabIdRef.current;
   }, []);
 
   /**
