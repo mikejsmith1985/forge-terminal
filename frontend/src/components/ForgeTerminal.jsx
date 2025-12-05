@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, us
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import { getTerminalTheme } from '../themes';
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -12,56 +13,6 @@ function debounce(fn, ms) {
   };
 }
 
-// Molten Metal Dark Theme
-const darkTheme = {
-  background: '#0a0a0a', // Deepest black
-  foreground: '#e5e5e5',
-  cursor: '#f97316', // Orange cursor
-  cursorAccent: '#0a0a0a',
-  selectionBackground: '#262626',
-  black: '#171717',
-  red: '#ef4444',
-  green: '#22c55e',
-  yellow: '#facc15',
-  blue: '#3b82f6',
-  magenta: '#d946ef',
-  cyan: '#06b6d4',
-  white: '#e5e5e5',
-  brightBlack: '#404040',
-  brightRed: '#f87171',
-  brightGreen: '#4ade80',
-  brightYellow: '#fde047',
-  brightBlue: '#60a5fa',
-  brightMagenta: '#e879f9',
-  brightCyan: '#22d3ee',
-  brightWhite: '#ffffff',
-};
-
-// Molten Metal Light Theme (Warm)
-const lightTheme = {
-  background: '#f5f5f4', // Warm gray
-  foreground: '#1c1917',
-  cursor: '#ea580c', // Darker orange cursor
-  cursorAccent: '#f5f5f4',
-  selectionBackground: '#e7e5e4',
-  black: '#57534e',
-  red: '#dc2626',
-  green: '#16a34a',
-  yellow: '#ca8a04',
-  blue: '#2563eb',
-  magenta: '#c026d3',
-  cyan: '#0891b2',
-  white: '#1c1917',
-  brightBlack: '#78716c',
-  brightRed: '#ef4444',
-  brightGreen: '#22c55e',
-  brightYellow: '#eab308',
-  brightBlue: '#3b82f6',
-  brightMagenta: '#d946ef',
-  brightCyan: '#06b6d4',
-  brightWhite: '#000000',
-};
-
 /**
  * Terminal Component
  * 
@@ -71,6 +22,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   className,
   style,
   theme = 'dark', // 'dark' or 'light'
+  colorTheme = 'molten', // theme color scheme
+  fontSize = 14,
   onConnectionChange = null,
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
 }, ref) {
@@ -134,11 +87,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     },
   }));
 
-  // Update terminal theme when theme prop changes
+  // Update terminal theme when theme or colorTheme prop changes
   useEffect(() => {
     if (xtermRef.current) {
       const term = xtermRef.current;
-      const newTheme = theme === 'dark' ? darkTheme : lightTheme;
+      const newTheme = getTerminalTheme(colorTheme, theme);
       term.options.theme = newTheme;
       // Force background update
       if (terminalRef.current) {
@@ -146,19 +99,26 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
       term.refresh(0, term.rows - 1);
     }
-  }, [theme]);
+  }, [theme, colorTheme]);
+
+  // Handle fontSize changes
+  useEffect(() => {
+    if (xtermRef.current && fitAddonRef.current) {
+      xtermRef.current.options.fontSize = fontSize;
+      fitAddonRef.current.fit();
+    }
+  }, [fontSize]);
 
   useEffect(() => {
     if (!terminalRef.current) return;
 
-    const isDark = theme === 'dark';
-
     // Initialize xterm.js
+    const initialTheme = getTerminalTheme(colorTheme, theme);
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 14,
+      fontSize: fontSize,
       fontFamily: '"Cascadia Code", "Fira Code", Consolas, Monaco, monospace',
-      theme: isDark ? darkTheme : lightTheme,
+      theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
     });
@@ -286,7 +246,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       style={{
         width: '100%',
         height: '100%',
-        backgroundColor: theme === 'dark' ? darkTheme.background : lightTheme.background,
+        backgroundColor: getTerminalTheme(colorTheme, theme).background,
         ...style,
       }}
     />

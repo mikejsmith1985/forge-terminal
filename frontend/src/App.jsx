@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, MessageSquare, Power, Settings } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -9,6 +9,7 @@ import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import ShellToggle from './components/ShellToggle'
 import { ToastContainer, useToast } from './components/Toast'
+import { themes, themeOrder, applyTheme } from './themes'
 
 function App() {
   const [commands, setCommands] = useState([])
@@ -17,10 +18,53 @@ function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
+  const [colorTheme, setColorTheme] = useState(() => {
+    return localStorage.getItem('colorTheme') || 'molten';
+  })
+  const [sidebarPosition, setSidebarPosition] = useState(() => {
+    return localStorage.getItem('sidebarPosition') || 'right';
+  })
   const [shellConfig, setShellConfig] = useState({ shellType: 'powershell', wslDistro: '', wslHomePath: '' })
   const [wslAvailable, setWslAvailable] = useState(false)
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = localStorage.getItem('terminalFontSize');
+    return saved ? parseInt(saved, 10) : 14;
+  })
   const terminalRef = useRef(null)
   const { toasts, addToast, removeToast } = useToast()
+
+  const DEFAULT_FONT_SIZE = 14;
+  const MIN_FONT_SIZE = 10;
+  const MAX_FONT_SIZE = 24;
+
+  const handleFontSizeChange = (delta) => {
+    setFontSize(prev => {
+      const newSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, prev + delta));
+      localStorage.setItem('terminalFontSize', newSize.toString());
+      return newSize;
+    });
+  };
+
+  const handleFontSizeReset = () => {
+    setFontSize(DEFAULT_FONT_SIZE);
+    localStorage.setItem('terminalFontSize', DEFAULT_FONT_SIZE.toString());
+  };
+
+  const cycleColorTheme = () => {
+    const currentIndex = themeOrder.indexOf(colorTheme);
+    const nextIndex = (currentIndex + 1) % themeOrder.length;
+    const nextTheme = themeOrder[nextIndex];
+    setColorTheme(nextTheme);
+    localStorage.setItem('colorTheme', nextTheme);
+    applyTheme(nextTheme, theme);
+    addToast(`Theme: ${themes[nextTheme].name}`, 'info', 1500);
+  };
+
+  const toggleSidebarPosition = () => {
+    const newPosition = sidebarPosition === 'right' ? 'left' : 'right';
+    setSidebarPosition(newPosition);
+    localStorage.setItem('sidebarPosition', newPosition);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -35,8 +79,11 @@ function App() {
     checkWSL()
     // Check system preference or saved theme
     const savedTheme = localStorage.getItem('theme') || 'dark';
+    const savedColorTheme = localStorage.getItem('colorTheme') || 'molten';
     setTheme(savedTheme);
+    setColorTheme(savedColorTheme);
     document.documentElement.className = savedTheme;
+    applyTheme(savedColorTheme, savedTheme);
   }, [])
 
   const loadConfig = async () => {
@@ -123,6 +170,7 @@ function App() {
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.className = newTheme;
+    applyTheme(colorTheme, newTheme);
   };
 
   // Smart keybinding generator
@@ -318,7 +366,7 @@ function App() {
   const handleDragEnd = (event) => {
     const { active, over } = event;
 
-    if (active.id !== over.id) {
+    if (over && active.id !== over.id) {
       const oldIndex = commands.findIndex((c) => c.id === active.id);
       const newIndex = commands.findIndex((c) => c.id === over.id);
 
@@ -327,59 +375,102 @@ function App() {
     }
   };
 
-  return (
-    <div className="app">
-      <div className="terminal-pane">
-        <ForgeTerminal ref={terminalRef} theme={theme} shellConfig={shellConfig} />
+  const sidebar = (
+    <div className="sidebar">
+      {/* Row 1: Title and Add button */}
+      <div className="sidebar-header">
+        <h3>⚡ Commands</h3>
+        <button className="btn btn-primary" onClick={handleAdd}>
+          <Plus size={16} /> Add
+        </button>
       </div>
-      <div className="sidebar">
-        <div className="sidebar-header">
-          <h3>⚡ Commands</h3>
-          <div className="header-actions">
-            <button className="btn btn-ghost btn-icon" onClick={toggleTheme} title="Toggle Theme">
-              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
-            <button className="btn btn-danger btn-icon" onClick={handleShutdown} title="Quit Forge">
-              <Power size={18} />
-            </button>
-            <button className="btn btn-primary" onClick={handleAdd}>
-              <Plus size={16} /> Add
-            </button>
-          </div>
-        </div>
 
-        <div className="terminal-controls">
-          <ShellToggle 
-            shellConfig={shellConfig} 
-            onToggle={handleShellToggle}
-            wslAvailable={wslAvailable}
-          />
+      {/* Row 2: Theme controls */}
+      <div className="theme-controls">
+        <button className="btn btn-ghost btn-icon" onClick={cycleColorTheme} title={`Theme: ${themes[colorTheme]?.name || 'Molten Metal'}`}>
+          <Palette size={18} />
+        </button>
+        <button className="btn btn-ghost btn-icon" onClick={toggleTheme} title="Toggle Light/Dark">
+          {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+        </button>
+        <button className="btn btn-ghost btn-icon" onClick={toggleSidebarPosition} title={`Move sidebar to ${sidebarPosition === 'right' ? 'left' : 'right'}`}>
+          {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
+        </button>
+        <div className="spacer"></div>
+        <button className="btn btn-danger btn-icon" onClick={handleShutdown} title="Quit Forge">
+          <Power size={18} />
+        </button>
+      </div>
+
+      {/* Row 3: Shell and terminal controls */}
+      <div className="terminal-controls">
+        <ShellToggle 
+          shellConfig={shellConfig} 
+          onToggle={handleShellToggle}
+          wslAvailable={wslAvailable}
+        />
+        <div className="font-size-controls">
           <button 
-            className="btn btn-ghost btn-icon" 
-            onClick={() => setIsSettingsModalOpen(true)} 
-            title="Shell Settings"
+            className="btn btn-ghost btn-icon btn-sm" 
+            onClick={() => handleFontSizeChange(-1)} 
+            title="Decrease Font Size"
+            disabled={fontSize <= MIN_FONT_SIZE}
           >
-            <Settings size={18} />
+            <Minus size={14} />
           </button>
-          <button className="btn btn-feedback btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
-            <MessageSquare size={18} />
+          <span className="font-size-display" title="Font Size">{fontSize}px</span>
+          <button 
+            className="btn btn-ghost btn-icon btn-sm" 
+            onClick={() => handleFontSizeChange(1)} 
+            title="Increase Font Size"
+            disabled={fontSize >= MAX_FONT_SIZE}
+          >
+            <Plus size={14} />
+          </button>
+          <button 
+            className="btn btn-ghost btn-icon btn-sm" 
+            onClick={handleFontSizeReset} 
+            title="Reset Font Size"
+            disabled={fontSize === DEFAULT_FONT_SIZE}
+          >
+            <RotateCcw size={12} />
           </button>
         </div>
-
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+        <button 
+          className="btn btn-ghost btn-icon" 
+          onClick={() => setIsSettingsModalOpen(true)} 
+          title="Shell Settings"
         >
-          <CommandCards
-            commands={commands}
-            onExecute={handleExecute}
-            onPaste={handlePaste}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        </DndContext>
+          <Settings size={18} />
+        </button>
+        <button className="btn btn-feedback btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
+          <MessageSquare size={18} />
+        </button>
       </div>
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <CommandCards
+          commands={commands}
+          onExecute={handleExecute}
+          onPaste={handlePaste}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      </DndContext>
+    </div>
+  );
+
+  return (
+    <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''}`}>
+      {sidebarPosition === 'left' && sidebar}
+      <div className="terminal-pane">
+        <ForgeTerminal ref={terminalRef} theme={theme} colorTheme={colorTheme} fontSize={fontSize} shellConfig={shellConfig} />
+      </div>
+      {sidebarPosition === 'right' && sidebar}
 
       <CommandModal
         isOpen={isModalOpen}
