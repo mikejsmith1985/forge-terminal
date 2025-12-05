@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight } from 'lucide-react';
@@ -8,8 +8,12 @@ import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import ShellToggle from './components/ShellToggle'
+import TabBar from './components/TabBar'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
+import { useTabManager } from './hooks/useTabManager'
+
+const MAX_TABS = 20;
 
 function App() {
   const [commands, setCommands] = useState([])
@@ -30,12 +34,31 @@ function App() {
     const saved = localStorage.getItem('terminalFontSize');
     return saved ? parseInt(saved, 10) : 14;
   })
-  const terminalRef = useRef(null)
+  
+  // Tab management
+  const {
+    tabs,
+    activeTabId,
+    activeTab,
+    createTab,
+    closeTab,
+    switchTab,
+    updateTabTitle,
+    reorderTabs,
+  } = useTabManager(shellConfig);
+  
+  // Store refs for each terminal by tab ID
+  const terminalRefs = useRef({});
   const { toasts, addToast, removeToast } = useToast()
 
   const DEFAULT_FONT_SIZE = 14;
   const MIN_FONT_SIZE = 10;
   const MAX_FONT_SIZE = 24;
+
+  // Get ref for active terminal
+  const getActiveTerminalRef = useCallback(() => {
+    return activeTabId ? terminalRefs.current[activeTabId] : null;
+  }, [activeTabId]);
 
   const handleFontSizeChange = (delta) => {
     setFontSize(prev => {
@@ -101,8 +124,9 @@ function App() {
         if (data.shellType !== 'powershell' || data.wslDistro || data.wslHomePath) {
           // Small delay to ensure terminal is mounted
           setTimeout(() => {
-            if (terminalRef.current) {
-              terminalRef.current.reconnect();
+            const termRef = getActiveTerminalRef();
+            if (termRef) {
+              termRef.reconnect();
             }
           }, 500);
         }
@@ -131,9 +155,10 @@ function App() {
         body: JSON.stringify(config)
       });
       setShellConfig(config);
-      // Reconnect terminal with new shell
-      if (terminalRef.current) {
-        terminalRef.current.reconnect();
+      // Reconnect active terminal with new shell
+      const termRef = getActiveTerminalRef();
+      if (termRef) {
+        termRef.reconnect();
       }
     } catch (err) {
       console.error('Failed to save config:', err);
@@ -277,7 +302,50 @@ function App() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Check for Ctrl+Shift+1/2/3/4...
+      // Tab shortcuts (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+1-9)
+      if (e.ctrlKey && !e.shiftKey) {
+        // Ctrl+T: New tab
+        if (e.key === 't' || e.key === 'T') {
+          e.preventDefault();
+          handleNewTab();
+          return;
+        }
+        
+        // Ctrl+W: Close active tab
+        if (e.key === 'w' || e.key === 'W') {
+          e.preventDefault();
+          if (tabs.length > 1 && activeTabId) {
+            closeTab(activeTabId);
+          }
+          return;
+        }
+        
+        // Ctrl+Tab / Ctrl+Shift+Tab: Cycle through tabs
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+          if (currentIndex !== -1) {
+            const nextIndex = e.shiftKey 
+              ? (currentIndex - 1 + tabs.length) % tabs.length
+              : (currentIndex + 1) % tabs.length;
+            switchTab(tabs[nextIndex].id);
+          }
+          return;
+        }
+        
+        // Ctrl+1 through Ctrl+9: Switch to tab by number
+        const digit = parseInt(e.key);
+        if (digit >= 1 && digit <= 9) {
+          e.preventDefault();
+          const tabIndex = digit - 1;
+          if (tabIndex < tabs.length) {
+            switchTab(tabs[tabIndex].id);
+          }
+          return;
+        }
+      }
+      
+      // Check for Ctrl+Shift+1/2/3/4... (command shortcuts)
       if (e.ctrlKey && e.shiftKey) {
         const key = e.key.toLowerCase();
         // Find command with this binding
@@ -311,7 +379,37 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [commands]);
+  }, [commands, tabs, activeTabId, closeTab, switchTab]);
+
+  // Handle new tab creation
+  const handleNewTab = useCallback(() => {
+    const newTabId = createTab(shellConfig);
+    if (newTabId === null) {
+      addToast('Maximum tab limit reached (20)', 'warning', 3000);
+    }
+  }, [createTab, shellConfig, addToast]);
+
+  // Handle tab switch - focus terminal after switching
+  const handleTabSwitch = useCallback((tabId) => {
+    switchTab(tabId);
+    // Small delay to ensure the terminal is visible before focusing
+    setTimeout(() => {
+      const termRef = terminalRefs.current[tabId];
+      if (termRef) {
+        termRef.focus();
+      }
+    }, 50);
+  }, [switchTab]);
+
+  // Handle tab close
+  const handleTabClose = useCallback((tabId) => {
+    if (tabs.length > 1) {
+      closeTab(tabId);
+      // Clean up the ref
+      delete terminalRefs.current[tabId];
+    }
+  }, [tabs.length, closeTab]);
+
 
   const loadCommands = () => {
     fetch('/api/commands')
@@ -353,16 +451,18 @@ function App() {
   }
 
   const handleExecute = (cmd) => {
-    if (terminalRef.current) {
-      terminalRef.current.sendCommand(cmd.command)
-      terminalRef.current.focus()
+    const termRef = getActiveTerminalRef();
+    if (termRef) {
+      termRef.sendCommand(cmd.command)
+      termRef.focus()
     }
   }
 
   const handlePaste = (cmd) => {
-    if (terminalRef.current) {
-      terminalRef.current.pasteCommand(cmd.command)
-      terminalRef.current.focus()
+    const termRef = getActiveTerminalRef();
+    if (termRef) {
+      termRef.pasteCommand(cmd.command)
+      termRef.focus()
     }
   }
 
@@ -510,7 +610,39 @@ function App() {
     <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''}`}>
       {sidebarPosition === 'left' && sidebar}
       <div className="terminal-pane">
-        <ForgeTerminal ref={terminalRef} theme={theme} colorTheme={colorTheme} fontSize={fontSize} shellConfig={shellConfig} />
+        <TabBar
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onTabClick={handleTabSwitch}
+          onTabClose={handleTabClose}
+          onNewTab={handleNewTab}
+          onReorder={reorderTabs}
+          disableNewTab={tabs.length >= MAX_TABS}
+        />
+        <div className="terminal-pane-content">
+          <div className="terminal-container">
+            {tabs.map((tab) => (
+              <div
+                key={tab.id}
+                className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
+              >
+                <ForgeTerminal
+                  ref={(el) => {
+                    if (el) {
+                      terminalRefs.current[tab.id] = el;
+                    }
+                  }}
+                  tabId={tab.id}
+                  isVisible={tab.id === activeTabId}
+                  theme={theme}
+                  colorTheme={colorTheme}
+                  fontSize={fontSize}
+                  shellConfig={tab.shellConfig}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
       {sidebarPosition === 'right' && sidebar}
 

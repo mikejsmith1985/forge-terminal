@@ -26,6 +26,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   fontSize = 14,
   onConnectionChange = null,
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
+  tabId = null, // Unique identifier for this terminal tab
+  isVisible = true, // Whether this terminal is currently visible
 }, ref) {
   const terminalRef = useRef(null);
   const xtermRef = useRef(null);
@@ -38,6 +40,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     shellConfigRef.current = shellConfig;
   }, [shellConfig]);
+
+  // Refit terminal when becoming visible
+  useEffect(() => {
+    if (isVisible && fitAddonRef.current && xtermRef.current) {
+      // Small delay to ensure the container is properly sized
+      setTimeout(() => {
+        fitAddonRef.current.fit();
+        xtermRef.current.focus();
+      }, 50);
+    }
+  }, [isVisible]);
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
