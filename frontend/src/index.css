@@ -768,29 +768,12 @@ body {
   overflow: hidden;
 }
 
-.tab-color-indicator {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 6px 0 0 0;
-  opacity: 0.7;
-  transition: opacity 0.15s ease, width 0.15s ease;
-}
-
-.tab:hover .tab-color-indicator,
-.tab.active .tab-color-indicator {
-  opacity: 1;
-  width: 4px;
+.tab:hover {
+  background: var(--overlay);
 }
 
 .tab.waiting {
   animation: tab-waiting-pulse 2s ease-in-out infinite;
-}
-
-.tab.waiting .tab-color-indicator {
-  animation: tab-indicator-glow 2s ease-in-out infinite;
 }
 
 @keyframes tab-waiting-pulse {
@@ -800,21 +783,6 @@ body {
   50% { 
     box-shadow: 0 0 8px var(--tab-accent, var(--accent));
   }
-}
-
-@keyframes tab-indicator-glow {
-  0%, 100% { 
-    opacity: 0.7;
-    width: 3px;
-  }
-  50% { 
-    opacity: 1;
-    width: 5px;
-  }
-}
-
-.tab:hover {
-  background: var(--overlay);
 }
 
 .tab.active {
@@ -839,15 +807,11 @@ body {
 .tab-title {
   flex: 1;
   font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--subtext);
+  font-weight: 700;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.tab.active .tab-title {
-  color: var(--text);
 }
 
 .tab-close {

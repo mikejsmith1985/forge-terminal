@@ -126,9 +126,10 @@ function Tab({ tab, isActive, onClick, onClose, onRename, isWaiting = false, mod
 
   const shellType = tab.shellConfig?.shellType || 'powershell';
 
-  // Style for the colored indicator
-  const indicatorStyle = accentColor ? {
+  // Style for the colored tab background
+  const tabStyle = accentColor ? {
     '--tab-accent': accentColor,
+    backgroundColor: `${accentColor}33`, // 20% opacity
   } : {};
 
   return (
@@ -140,12 +141,11 @@ function Tab({ tab, isActive, onClick, onClose, onRename, isWaiting = false, mod
         onContextMenu={handleContextMenu}
         onMouseDown={handleMouseDown}
         data-shell={shellType}
-        style={indicatorStyle}
+        style={tabStyle}
         role="tab"
         aria-selected={isActive}
         tabIndex={0}
       >
-        <span className="tab-color-indicator" style={{ backgroundColor: accentColor }} />
         <span className="tab-icon" data-shell={shellType}>
           {getShellIcon(shellType)}
         </span>
