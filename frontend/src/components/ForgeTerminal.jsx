@@ -16,28 +16,32 @@ function debounce(fn, ms) {
   };
 }
 
-// Common shell prompt patterns for detecting when terminal is waiting for input
-const PROMPT_PATTERNS = [
-  /[$#>]\s*$/, // Generic Unix/Windows prompts
-  /PS [A-Z]:\\[^>]*>\s*$/, // PowerShell prompt
-  /\([^)]+\)\s*[$#]\s*$/, // Conda/virtualenv prompts
-  /\w+@[\w-]+:[^$#]*[$#]\s*$/, // user@host:path$ format
-  /➜\s+/, // Oh-my-zsh arrow prompt
-  /❯\s*$/, // Starship/other modern prompts
+// CLI confirmation prompt patterns - specifically for tools like GitHub Copilot CLI
+// These indicate the CLI is waiting for user confirmation to proceed
+const CLI_CONFIRMATION_PATTERNS = [
+  /\(y\/n\)\s*[>:]?\s*$/i, // (y/n) or (y/n): or (y/n) >
+  /\[Y\/n\]\s*:?\s*$/i, // [Y/n] or [Y/n]:
+  /\[y\/N\]\s*:?\s*$/i, // [y/N] or [y/N]:
+  /\(yes\/no\)\s*[>:]?\s*$/i, // (yes/no)
+  /proceed\?\s*(\(y\/n\))?\s*[>:]?\s*$/i, // Proceed? or Proceed? (y/n)
+  /continue\?\s*(\[Y\/n\])?\s*[>:]?\s*$/i, // Continue? [Y/n]
+  /confirm\?\s*(\(y\/n\))?\s*[>:]?\s*$/i, // Confirm? (y/n)
+  /are you sure\?\s*(\[y\/N\])?\s*[>:]?\s*$/i, // Are you sure? [y/N]
+  /do you want to proceed\?\s*[>:]?\s*$/i, // Do you want to proceed?
 ];
 
 /**
- * Check if text ends with a prompt pattern (terminal waiting for input)
+ * Check if text ends with a CLI confirmation prompt (waiting for y/n input)
  */
-function isPromptWaiting(text) {
+function isCliConfirmationWaiting(text) {
   if (!text) return false;
-  // Get the last 200 characters to check for prompt
-  const lastChunk = text.slice(-200);
-  // Get the last line
-  const lines = lastChunk.split(/[\r\n]/);
-  const lastLine = lines[lines.length - 1] || lines[lines.length - 2] || '';
+  // Get the last 300 characters to check for prompt
+  const lastChunk = text.slice(-300);
+  // Get the last few non-empty lines (CLI prompts can span multiple lines)
+  const lines = lastChunk.split(/[\r\n]/).filter(l => l.trim());
+  const lastLines = lines.slice(-3).join(' ');
   
-  return PROMPT_PATTERNS.some(pattern => pattern.test(lastLine));
+  return CLI_CONFIRMATION_PATTERNS.some(pattern => pattern.test(lastLines));
 }
 
 /**
@@ -56,6 +60,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   isVisible = true, // Whether this terminal is currently visible
+  autoRespond = false, // Auto-respond "yes" to CLI confirmation prompts
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -67,10 +72,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const connectFnRef = useRef(null);
   const lastOutputRef = useRef('');
   const waitingCheckTimeoutRef = useRef(null);
+  const autoRespondRef = useRef(autoRespond);
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
+
+  // Keep autoRespond ref updated
+  useEffect(() => {
+    autoRespondRef.current = autoRespond;
+  }, [autoRespond]);
 
   // Keep shellConfig ref updated
   useEffect(() => {
@@ -284,11 +295,24 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           clearTimeout(waitingCheckTimeoutRef.current);
         }
         waitingCheckTimeoutRef.current = setTimeout(() => {
-          const waiting = isPromptWaiting(lastOutputRef.current);
+          const waiting = isCliConfirmationWaiting(lastOutputRef.current);
           if (waiting !== isWaiting) {
             setIsWaiting(waiting);
             if (onWaitingChange) {
               onWaitingChange(waiting);
+            }
+          }
+          
+          // Auto-respond if enabled and CLI is waiting for confirmation
+          if (waiting && autoRespondRef.current && ws.readyState === WebSocket.OPEN) {
+            logger.terminal('Auto-responding to CLI prompt', { tabId });
+            // Send "y" followed by Enter to confirm
+            ws.send('y\r');
+            // Clear waiting state after auto-respond
+            lastOutputRef.current = '';
+            setIsWaiting(false);
+            if (onWaitingChange) {
+              onWaitingChange(false);
             }
           }
         }, 100);

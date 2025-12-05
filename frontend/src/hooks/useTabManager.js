@@ -46,6 +46,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null) {
     title: `Terminal ${tabNumber}`,
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
+    autoRespond: false, // Auto-respond to CLI confirmation prompts
     createdAt: Date.now(),
   };
   
@@ -73,6 +74,7 @@ function tabsToSession(tabs, activeTabId) {
         wslHomePath: tab.shellConfig?.wslHomePath || '',
       },
       colorTheme: tab.colorTheme,
+      autoRespond: tab.autoRespond || false,
     })),
     activeTabId: activeTabId,
   };
@@ -106,21 +108,26 @@ const debouncedSaveSession = debounce(saveSession, 500);
 
 /**
  * Load session from backend
+ * @returns {{ session: Object|null, loadFailed: boolean }}
  */
 async function loadSession() {
   try {
     logger.session('Loading session from backend');
     const res = await fetch('/api/sessions');
+    if (!res.ok) {
+      logger.session('Session load failed - server error', { status: res.status });
+      return { session: null, loadFailed: true };
+    }
     const session = await res.json();
     logger.session('Session loaded', { 
       tabCount: session?.tabs?.length || 0,
       activeTabId: session?.activeTabId
     });
-    return session;
+    return { session, loadFailed: false };
   } catch (err) {
     logger.session('Failed to load session', { error: err.message });
     console.error('[Session] Failed to load session:', err);
-    return null;
+    return { session: null, loadFailed: true };
   }
 }
 
@@ -152,7 +159,15 @@ export function useTabManager(initialShellConfig) {
     if (sessionLoadedRef.current) return;
     sessionLoadedRef.current = true;
 
-    loadSession().then(session => {
+    loadSession().then(({ session, loadFailed }) => {
+      if (loadFailed) {
+        // Don't set sessionLoaded to true on failure - prevents overwriting saved sessions
+        // User will start with default tab but we won't save over their existing sessions
+        logger.session('Session load failed - skipping save to preserve existing sessions');
+        setState(prev => ({ ...prev, sessionLoaded: false }));
+        return;
+      }
+      
       if (session && session.tabs && session.tabs.length > 0) {
         // Restore tabs from session
         const restoredTabs = session.tabs.map((tabState, index) => ({
@@ -160,6 +175,7 @@ export function useTabManager(initialShellConfig) {
           title: tabState.title || `Terminal ${index + 1}`,
           shellConfig: tabState.shellConfig || configRef.current,
           colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
+          autoRespond: tabState.autoRespond || false,
           createdAt: Date.now(),
         }));
 
@@ -178,6 +194,7 @@ export function useTabManager(initialShellConfig) {
           sessionLoaded: true,
         });
       } else {
+        // Empty session from server - ok to save new tabs
         setState(prev => ({ ...prev, sessionLoaded: true }));
       }
     });
@@ -422,6 +439,37 @@ export function useTabManager(initialShellConfig) {
     });
   }, []);
 
+  /**
+   * Toggle auto-respond for a tab
+   * @param {string} tabId - ID of tab to update
+   */
+  const toggleTabAutoRespond = useCallback((tabId) => {
+    logger.tabs('Toggling tab auto-respond', { tabId });
+    
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        logger.tabs('Tab not found for auto-respond toggle', { tabId });
+        return prev;
+      }
+
+      const oldValue = prev.tabs[tabIndex].autoRespond;
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], autoRespond: !oldValue };
+      
+      logger.tabs('Tab auto-respond toggled', { 
+        tabId, 
+        oldValue, 
+        newValue: !oldValue 
+      });
+      
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
   return {
     tabs: state.tabs,
     activeTabId: state.activeTabId,
@@ -432,6 +480,7 @@ export function useTabManager(initialShellConfig) {
     updateTabTitle,
     updateTabShellConfig,
     updateTabColorTheme,
+    toggleTabAutoRespond,
     reorderTabs,
   };
 }

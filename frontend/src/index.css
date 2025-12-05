@@ -785,6 +785,19 @@ body {
   }
 }
 
+.tab.auto-respond {
+  border-left: 2px solid var(--accent);
+}
+
+.auto-respond-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
 .tab.active {
   background: var(--bg);
   border-color: var(--overlay);
@@ -882,6 +895,14 @@ body {
 
 .tab-context-menu button:hover {
   background: var(--overlay);
+}
+
+.tab-context-menu button.active {
+  color: var(--accent);
+}
+
+.tab-context-menu button.active svg {
+  color: var(--accent);
 }
 
 .tab-context-menu button svg {
@@ -1078,4 +1099,29 @@ body {
 
 .search-btn.search-close:hover {
   color: var(--red);
+}
+/* Update indicator styles */
+.btn-icon.update-available {
+  position: relative;
+  animation: pulse-update 2s ease-in-out infinite;
+}
+
+@keyframes pulse-update {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0);
+  }
+}
+
+.update-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  background: #8b5cf6;
+  border-radius: 50%;
+  pointer-events: none;
 }

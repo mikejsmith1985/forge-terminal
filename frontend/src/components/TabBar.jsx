@@ -13,6 +13,7 @@ function TabBar({
   onTabRename,
   onNewTab,
   onReorder,
+  onToggleAutoRespond = null, // Callback to toggle auto-respond for a tab
   disableNewTab = false,
   waitingTabs = {}, // Map of tabId -> isWaiting
   mode = 'dark', // 'dark' or 'light' for theme mode
@@ -31,6 +32,12 @@ function TabBar({
     }
   };
 
+  const handleToggleAutoRespond = (tabId) => {
+    if (onToggleAutoRespond) {
+      onToggleAutoRespond(tabId);
+    }
+  };
+
   return (
     <div className="tab-bar" role="tablist">
       <div className="tab-bar-scroll">
@@ -44,6 +51,7 @@ function TabBar({
             onClick={() => handleTabClick(tab.id)}
             onClose={() => handleTabClose(tab.id)}
             onRename={(newTitle) => handleTabRename(tab.id, newTitle)}
+            onToggleAutoRespond={() => handleToggleAutoRespond(tab.id)}
           />
         ))}
       </div>

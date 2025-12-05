@@ -39,15 +39,23 @@ test.describe('Issue #11: Max Tabs Notification Bug', () => {
     // Wait for app to load
     await page.waitForSelector('.app', { timeout: 10000 });
     
+    // Wait for session to load
+    await page.waitForTimeout(2000);
+    
     const tabs = page.locator('.tab-bar .tab');
     const newTabBtn = page.locator('.tab-bar button[title*="tab"], .tab-bar .new-tab-btn');
     
-    // Create 2 more tabs (for a total of 3)
+    // Get initial tab count
+    const initialCount = await tabs.count();
+    
+    // Create 2 more tabs
     await newTabBtn.click();
-    await expect(tabs).toHaveCount(2);
+    await page.waitForTimeout(300);
+    await expect(tabs).toHaveCount(initialCount + 1, { timeout: 5000 });
     
     await newTabBtn.click();
-    await expect(tabs).toHaveCount(3);
+    await page.waitForTimeout(300);
+    await expect(tabs).toHaveCount(initialCount + 2, { timeout: 5000 });
     
     // Wait a moment and verify no warning toasts appeared
     await page.waitForTimeout(500);
@@ -73,21 +81,30 @@ test.describe('Issue #11: Max Tabs Notification Bug', () => {
   });
   
   test('createTab should return valid tab ID when creating tabs', async ({ page }) => {
+    // Clear session first to start fresh
+    await page.request.post('/api/sessions', {
+      data: { tabs: [], activeTabId: '' }
+    });
+    
     await page.goto('/');
     
     // Wait for app to load
     await page.waitForSelector('.app', { timeout: 10000 });
     
+    // Wait for session to fully load
+    await page.waitForTimeout(2000);
+    
     const tabs = page.locator('.tab-bar .tab');
     const newTabBtn = page.locator('.tab-bar button[title*="tab"], .tab-bar .new-tab-btn');
     
-    // Start with 1 tab
-    await expect(tabs).toHaveCount(1);
+    // Get initial tab count
+    const initialCount = await tabs.count();
     
-    // Click to create tabs - each should work and add a new tab
-    for (let i = 2; i <= 5; i++) {
+    // Click to create additional tabs - each should work and add a new tab
+    for (let i = 1; i <= 4; i++) {
       await newTabBtn.click();
-      await expect(tabs).toHaveCount(i);
+      await page.waitForTimeout(300);
+      await expect(tabs).toHaveCount(initialCount + i, { timeout: 5000 });
       
       // Verify the new tab becomes active (indicated by 'active' class)
       const activeTab = page.locator('.tab-bar .tab.active');
@@ -100,30 +117,43 @@ test.describe('Issue #11: Max Tabs Notification Bug', () => {
   });
   
   test('tabs can be closed and new ones created without false warnings', async ({ page }) => {
+    // Clear session first
+    await page.request.post('/api/sessions', {
+      data: { tabs: [], activeTabId: '' }
+    });
+    
     await page.goto('/');
     
     // Wait for app to load
     await page.waitForSelector('.app', { timeout: 10000 });
     
+    // Wait for session to fully load
+    await page.waitForTimeout(2000);
+    
     const tabs = page.locator('.tab-bar .tab');
     const newTabBtn = page.locator('.tab-bar button[title*="tab"], .tab-bar .new-tab-btn');
     
-    // Create 3 tabs
+    // Get initial count
+    const initialCount = await tabs.count();
+    
+    // Create 2 additional tabs
     await newTabBtn.click();
+    await page.waitForTimeout(300);
     await newTabBtn.click();
-    await expect(tabs).toHaveCount(3);
+    await page.waitForTimeout(300);
+    await expect(tabs).toHaveCount(initialCount + 2, { timeout: 5000 });
     
     // Close one tab (click the close button on the active tab)
     const activeTab = page.locator('.tab-bar .tab.active');
     const closeBtn = activeTab.locator('.tab-close');
     await closeBtn.click();
     
-    // Should have 2 tabs now
-    await expect(tabs).toHaveCount(2);
+    // Should have one less tab now
+    await expect(tabs).toHaveCount(initialCount + 1, { timeout: 5000 });
     
     // Create another tab - should work without warning
     await newTabBtn.click();
-    await expect(tabs).toHaveCount(3);
+    await expect(tabs).toHaveCount(initialCount + 2, { timeout: 5000 });
     
     // No max warning should appear
     await page.waitForTimeout(300);

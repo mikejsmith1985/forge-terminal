@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight, Download } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
+import UpdateModal from './components/UpdateModal'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
 import SearchBar from './components/SearchBar'
@@ -22,6 +23,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
   const [colorTheme, setColorTheme] = useState(() => {
@@ -36,6 +38,10 @@ function App() {
     const saved = localStorage.getItem('terminalFontSize');
     return saved ? parseInt(saved, 10) : 14;
   })
+  
+  // Update state - persists across toast dismissal
+  const [updateInfo, setUpdateInfo] = useState(null)
+  const [currentVersion, setCurrentVersion] = useState('')
   
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -57,6 +63,7 @@ function App() {
     updateTabTitle,
     updateTabShellConfig,
     updateTabColorTheme,
+    toggleTabAutoRespond,
     reorderTabs,
   } = useTabManager(shellConfig);
   
@@ -218,38 +225,42 @@ function App() {
 
   const checkForUpdates = async () => {
     try {
+      // Get current version
+      const versionRes = await fetch('/api/version');
+      const versionData = await versionRes.json();
+      setCurrentVersion(versionData.version || '');
+      
+      // Check for updates
       const res = await fetch('/api/update/check');
       const data = await res.json();
+      
+      // Store update info regardless of availability (for the modal)
+      setUpdateInfo(data);
+      
       if (data.available) {
-        addToast(
-          `Update available: ${data.latestVersion}`,
-          'update',
-          0, // Don't auto-dismiss
-          {
-            action: 'Update Now',
-            onAction: () => applyUpdate(data.latestVersion)
-          }
-        );
+        // Check if user dismissed this version recently (within 24 hours)
+        const dismissedAt = localStorage.getItem('updateDismissedAt');
+        const dismissedVersion = localStorage.getItem('updateDismissedVersion');
+        const dayInMs = 24 * 60 * 60 * 1000;
+        
+        const wasRecentlyDismissed = dismissedAt && 
+          dismissedVersion === data.latestVersion &&
+          (Date.now() - parseInt(dismissedAt, 10)) < dayInMs;
+        
+        if (!wasRecentlyDismissed) {
+          addToast(
+            `Update available: ${data.latestVersion}`,
+            'update',
+            0, // Don't auto-dismiss
+            {
+              action: 'View Update',
+              onAction: () => setIsUpdateModalOpen(true)
+            }
+          );
+        }
       }
     } catch (err) {
       console.error('Failed to check for updates:', err);
-    }
-  }
-
-  const applyUpdate = async (version) => {
-    addToast(`Downloading update ${version}...`, 'info', 0);
-    try {
-      const res = await fetch('/api/update/apply', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        addToast('Update applied! Restarting...', 'success', 3000);
-        // The server will restart, page will reload automatically
-        setTimeout(() => window.location.reload(), 2000);
-      } else {
-        addToast(`Update failed: ${data.error}`, 'error', 5000);
-      }
-    } catch (err) {
-      addToast(`Update failed: ${err.message}`, 'error', 5000);
     }
   }
 
@@ -695,6 +706,26 @@ function App() {
           {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
         </button>
         <div className="spacer"></div>
+        {/* Update indicator - shows when update is available */}
+        <button 
+          className={`btn btn-ghost btn-icon ${updateInfo?.available ? 'update-available' : ''}`}
+          onClick={() => setIsUpdateModalOpen(true)} 
+          title={updateInfo?.available ? `Update available: ${updateInfo.latestVersion}` : `Version ${currentVersion}`}
+          style={updateInfo?.available ? { color: '#a78bfa' } : {}}
+        >
+          <Download size={18} />
+          {updateInfo?.available && (
+            <span className="update-badge" style={{
+              position: 'absolute',
+              top: '2px',
+              right: '2px',
+              width: '8px',
+              height: '8px',
+              background: '#8b5cf6',
+              borderRadius: '50%',
+            }} />
+          )}
+        </button>
         <button className="btn btn-danger btn-icon" onClick={handleShutdown} title="Quit Forge">
           <Power size={18} />
         </button>
@@ -774,6 +805,7 @@ function App() {
           onTabRename={handleTabRename}
           onNewTab={handleNewTab}
           onReorder={reorderTabs}
+          onToggleAutoRespond={toggleTabAutoRespond}
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}
           mode={theme}
@@ -806,6 +838,7 @@ function App() {
                   colorTheme={colorTheme}
                   fontSize={fontSize}
                   shellConfig={tab.shellConfig}
+                  autoRespond={tab.autoRespond || false}
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                 />
               </div>
@@ -833,6 +866,13 @@ function App() {
         onClose={() => setIsSettingsModalOpen(false)}
         shellConfig={shellConfig}
         onSave={saveConfig}
+      />
+
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        updateInfo={updateInfo}
+        currentVersion={currentVersion}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />

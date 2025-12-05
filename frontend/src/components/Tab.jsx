@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2 } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -29,7 +29,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, isWaiting = false, mode = 'dark' }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, isWaiting = false, mode = 'dark' }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -135,7 +135,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, isWaiting = false, mod
   return (
     <>
       <div
-        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''}`}
+        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
@@ -145,10 +145,16 @@ function Tab({ tab, isActive, onClick, onClose, onRename, isWaiting = false, mod
         role="tab"
         aria-selected={isActive}
         tabIndex={0}
+        title={tab.autoRespond ? `${tab.title} (Auto-respond enabled)` : tab.title}
       >
         <span className="tab-icon" data-shell={shellType}>
           {getShellIcon(shellType)}
         </span>
+        {tab.autoRespond && (
+          <span className="auto-respond-indicator" title="Auto-respond enabled">
+            <Zap size={10} />
+          </span>
+        )}
         {isEditing ? (
           <input
             ref={inputRef}
@@ -183,6 +189,16 @@ function Tab({ tab, isActive, onClick, onClose, onRename, isWaiting = false, mod
           <button onClick={startEditing}>
             <Edit2 size={14} />
             Rename
+          </button>
+          <button 
+            onClick={() => { 
+              setShowContextMenu(false); 
+              if (onToggleAutoRespond) onToggleAutoRespond(); 
+            }}
+            className={tab.autoRespond ? 'active' : ''}
+          >
+            <Zap size={14} />
+            Auto-respond {tab.autoRespond ? '✓' : ''}
           </button>
           <button onClick={() => { setShowContextMenu(false); onClose(); }}>
             <X size={14} />
