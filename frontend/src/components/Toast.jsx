@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { X, AlertTriangle, Info, CheckCircle, Download } from 'lucide-react';
+import { logger } from '../utils/logger';
 
 const Toast = ({ message, type = 'info', duration = 3000, onClose, action, onAction }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
+
+  useEffect(() => {
+    logger.toast('Displayed', { message, type, duration });
+  }, [message, type, duration]);
 
   useEffect(() => {
     if (duration > 0) {

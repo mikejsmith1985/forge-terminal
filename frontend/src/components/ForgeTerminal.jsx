@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
+import { logger } from '../utils/logger';
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -125,6 +126,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     if (xtermRef.current) {
       const term = xtermRef.current;
       const newTheme = getTerminalTheme(colorTheme, theme);
+      
+      logger.terminal('Theme updated', { 
+        tabId, 
+        colorTheme, 
+        baseTheme: theme,
+        isVisible 
+      });
+      
       term.options.theme = newTheme;
       // Force background update
       if (terminalRef.current) {
@@ -132,7 +141,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
       term.refresh(0, term.rows - 1);
     }
-  }, [theme, colorTheme]);
+  }, [theme, colorTheme, tabId, isVisible]);
 
   // Handle fontSize changes
   useEffect(() => {
@@ -196,7 +205,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
-        console.log('[Terminal] WebSocket connected');
+        logger.terminal('WebSocket connected', { 
+          tabId, 
+          shellType: cfg?.shellType,
+          wsUrl: wsUrl.replace(window.location.host, '[host]')
+        });
         // Use orange for the welcome message to match theme
         const shellLabel = cfg?.shellType ? ` (${cfg.shellType.toUpperCase()})` : '';
         term.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}.\r\n\r\n`);
@@ -204,6 +217,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Send initial size
         const { cols, rows } = term;
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        logger.terminal('Initial size sent', { tabId, cols, rows });
 
         if (onConnectionChange) onConnectionChange(true);
       };
@@ -220,12 +234,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       };
 
       ws.onerror = (error) => {
-        console.error('[Terminal] WebSocket error:', error);
+        logger.terminal('WebSocket error', { tabId, error: error.message || 'unknown' });
         term.write('\r\n\x1b[1;31m[Error]\x1b[0m Connection error.\r\n');
       };
 
       ws.onclose = () => {
-        console.log('[Terminal] WebSocket closed');
+        logger.terminal('WebSocket closed', { tabId });
         term.write('\r\n\x1b[1;33m[Disconnected]\x1b[0m Terminal session ended.\r\n');
         if (onConnectionChange) onConnectionChange(false);
       };

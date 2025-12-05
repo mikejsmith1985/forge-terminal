@@ -13,6 +13,7 @@ import SearchBar from './components/SearchBar'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
+import { logger } from './utils/logger'
 
 const MAX_TABS = 20;
 
@@ -88,6 +89,13 @@ function App() {
     const currentIndex = themeOrder.indexOf(currentTabTheme);
     const nextIndex = (currentIndex + 1) % themeOrder.length;
     const nextTheme = themeOrder[nextIndex];
+    
+    logger.theme('Cycling color theme', { 
+      activeTabId, 
+      currentTheme: currentTabTheme, 
+      nextTheme,
+      themeIndex: nextIndex 
+    });
     
     // Update the active tab's theme
     if (activeTabId) {
@@ -419,19 +427,47 @@ function App() {
 
   // Handle new tab creation
   const handleNewTab = useCallback(() => {
+    logger.tabs('New tab button clicked', { 
+      currentTabCount: tabs.length, 
+      maxTabs: MAX_TABS 
+    });
+    
+    if (tabs.length >= MAX_TABS) {
+      logger.tabs('Max tabs limit check failed in handleNewTab', { 
+        currentTabCount: tabs.length, 
+        maxTabs: MAX_TABS 
+      });
+      addToast('Maximum tab limit reached (20)', 'warning', 3000);
+      return;
+    }
+    
     const newTabId = createTab(shellConfig);
     if (newTabId === null) {
+      logger.tabs('Tab creation returned null (should not happen - already checked limit)');
       addToast('Maximum tab limit reached (20)', 'warning', 3000);
+    } else {
+      logger.tabs('New tab created via handleNewTab', { newTabId });
     }
-  }, [createTab, shellConfig, addToast]);
+  }, [createTab, shellConfig, addToast, tabs.length]);
 
   // Handle tab switch - focus terminal after switching and apply tab's theme
   const handleTabSwitch = useCallback((tabId) => {
+    const targetTab = tabs.find(t => t.id === tabId);
+    logger.tabs('Tab switch initiated', { 
+      fromTabId: activeTabId, 
+      toTabId: tabId,
+      targetTabTheme: targetTab?.colorTheme,
+      currentGlobalTheme: colorTheme
+    });
+    
     switchTab(tabId);
     
     // Apply the tab's color theme
-    const targetTab = tabs.find(t => t.id === tabId);
     if (targetTab?.colorTheme) {
+      logger.theme('Applying tab color theme on switch', { 
+        tabId, 
+        colorTheme: targetTab.colorTheme 
+      });
       setColorTheme(targetTab.colorTheme);
       applyTheme(targetTab.colorTheme, theme);
     }
@@ -443,7 +479,7 @@ function App() {
         termRef.focus();
       }
     }, 50);
-  }, [switchTab, tabs, theme]);
+  }, [switchTab, tabs, theme, activeTabId, colorTheme]);
 
   // Handle tab close
   const handleTabClose = useCallback((tabId) => {

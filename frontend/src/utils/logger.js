@@ -1,4 +1,4 @@
-const MAX_LOGS = 100;
+const MAX_LOGS = 200;
 const logs = [];
 
 const originalLog = console.log;
@@ -45,4 +45,26 @@ console.error = (...args) => {
 
 export const getLogs = () => {
     return logs.join('\n');
+};
+
+/**
+ * Application logger for structured logging by component
+ * Usage: logger.tabs('Tab created', { id: 'tab-1', theme: 'molten' });
+ */
+export const logger = {
+    tabs: (action, data = {}) => {
+        console.log(`[Tabs] ${action}`, data);
+    },
+    theme: (action, data = {}) => {
+        console.log(`[Theme] ${action}`, data);
+    },
+    session: (action, data = {}) => {
+        console.log(`[Session] ${action}`, data);
+    },
+    toast: (action, data = {}) => {
+        console.log(`[Toast] ${action}`, data);
+    },
+    terminal: (action, data = {}) => {
+        console.log(`[Terminal] ${action}`, data);
+    },
 };

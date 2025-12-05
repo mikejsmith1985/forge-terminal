@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
+import { logger } from '../utils/logger';
 
 const MAX_TABS = 20;
 
@@ -40,13 +41,22 @@ function createTab(shellConfig, tabNumber, colorTheme = null) {
   const assignedTheme = colorTheme || themeOrder[themeIndex % themeOrder.length];
   themeIndex++;
   
-  return {
+  const newTab = {
     id: generateId(),
     title: `Terminal ${tabNumber}`,
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     createdAt: Date.now(),
   };
+  
+  logger.tabs('Creating tab object', { 
+    tabId: newTab.id, 
+    tabNumber, 
+    colorTheme: assignedTheme,
+    themeIndex: themeIndex - 1
+  });
+  
+  return newTab;
 }
 
 /**
@@ -74,12 +84,19 @@ function tabsToSession(tabs, activeTabId) {
 async function saveSession(tabs, activeTabId) {
   try {
     const session = tabsToSession(tabs, activeTabId);
+    logger.session('Saving session', { 
+      tabCount: tabs.length, 
+      activeTabId,
+      tabIds: tabs.map(t => t.id)
+    });
     await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(session),
     });
+    logger.session('Session saved successfully');
   } catch (err) {
+    logger.session('Failed to save session', { error: err.message });
     console.error('[Session] Failed to save session:', err);
   }
 }
@@ -92,10 +109,16 @@ const debouncedSaveSession = debounce(saveSession, 500);
  */
 async function loadSession() {
   try {
+    logger.session('Loading session from backend');
     const res = await fetch('/api/sessions');
     const session = await res.json();
+    logger.session('Session loaded', { 
+      tabCount: session?.tabs?.length || 0,
+      activeTabId: session?.activeTabId
+    });
     return session;
   } catch (err) {
+    logger.session('Failed to load session', { error: err.message });
     console.error('[Session] Failed to load session:', err);
     return null;
   }
@@ -183,9 +206,18 @@ export function useTabManager(initialShellConfig) {
     // Reset the ref before attempting to create
     lastCreatedTabIdRef.current = null;
     
+    logger.tabs('Create tab requested', { 
+      currentTabCount: state.tabs.length,
+      maxTabs: MAX_TABS 
+    });
+    
     setState(prev => {
       if (prev.tabs.length >= MAX_TABS) {
         // Don't create - already at max
+        logger.tabs('Max tabs limit reached', { 
+          currentCount: prev.tabs.length, 
+          maxTabs: MAX_TABS 
+        });
         return prev;
       }
 
@@ -195,6 +227,12 @@ export function useTabManager(initialShellConfig) {
       
       // Store in ref so we can return it after setState completes
       lastCreatedTabIdRef.current = newTab.id;
+      
+      logger.tabs('Tab created successfully', { 
+        tabId: newTab.id, 
+        newTabCount: prev.tabs.length + 1,
+        colorTheme: newTab.colorTheme
+      });
       
       return {
         ...prev, // Preserve other state like sessionLoaded
@@ -213,14 +251,18 @@ export function useTabManager(initialShellConfig) {
    * @param {string} tabId - ID of tab to close
    */
   const closeTab = useCallback((tabId) => {
+    logger.tabs('Close tab requested', { tabId });
+    
     setState(prev => {
       // Don't close the last tab
       if (prev.tabs.length <= 1) {
+        logger.tabs('Cannot close last tab', { tabId, tabCount: prev.tabs.length });
         return prev;
       }
 
       const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
       if (tabIndex === -1) {
+        logger.tabs('Tab not found for close', { tabId });
         return prev;
       }
 
@@ -232,7 +274,16 @@ export function useTabManager(initialShellConfig) {
         // Prefer the previous tab, or next if closing first
         const newActiveIndex = tabIndex > 0 ? tabIndex - 1 : 0;
         newActiveTabId = newTabs[newActiveIndex]?.id || null;
+        logger.tabs('Closed active tab, switching', { 
+          closedTabId: tabId, 
+          newActiveTabId 
+        });
       }
+
+      logger.tabs('Tab closed', { 
+        tabId, 
+        remainingTabs: newTabs.length 
+      });
 
       return {
         ...prev, // Preserve sessionLoaded
@@ -248,10 +299,18 @@ export function useTabManager(initialShellConfig) {
    */
   const switchTab = useCallback((tabId) => {
     setState(prev => {
-      const tabExists = prev.tabs.some(t => t.id === tabId);
-      if (!tabExists) {
+      const targetTab = prev.tabs.find(t => t.id === tabId);
+      if (!targetTab) {
+        logger.tabs('Switch tab failed - tab not found', { tabId });
         return prev;
       }
+      
+      logger.tabs('Switching tab', { 
+        fromTabId: prev.activeTabId, 
+        toTabId: tabId,
+        targetColorTheme: targetTab.colorTheme 
+      });
+      
       return {
         ...prev,
         activeTabId: tabId,
@@ -334,14 +393,25 @@ export function useTabManager(initialShellConfig) {
    * @param {string} colorTheme - New color theme name
    */
   const updateTabColorTheme = useCallback((tabId, colorTheme) => {
+    logger.theme('Updating tab color theme', { tabId, colorTheme });
+    
     setState(prev => {
       const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
       if (tabIndex === -1) {
+        logger.theme('Tab not found for theme update', { tabId });
         return prev;
       }
 
+      const oldTheme = prev.tabs[tabIndex].colorTheme;
       const newTabs = [...prev.tabs];
       newTabs[tabIndex] = { ...newTabs[tabIndex], colorTheme };
+      
+      logger.theme('Tab theme updated', { 
+        tabId, 
+        oldTheme, 
+        newTheme: colorTheme 
+      });
+      
       return {
         ...prev,
         tabs: newTabs,
