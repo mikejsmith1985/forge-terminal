@@ -841,7 +841,7 @@ function App() {
                   tabId={tab.id}
                   isVisible={tab.id === activeTabId}
                   theme={theme}
-                  colorTheme={colorTheme}
+                  colorTheme={tab.colorTheme || colorTheme}
                   fontSize={fontSize}
                   shellConfig={tab.shellConfig}
                   autoRespond={tab.autoRespond || false}

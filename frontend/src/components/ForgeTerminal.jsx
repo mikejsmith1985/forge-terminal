@@ -18,30 +18,70 @@ function debounce(fn, ms) {
 
 // CLI confirmation prompt patterns - specifically for tools like GitHub Copilot CLI
 // These indicate the CLI is waiting for user confirmation to proceed
+// Patterns are checked against the LAST line of output (where prompts appear)
 const CLI_CONFIRMATION_PATTERNS = [
-  /\(y\/n\)\s*[>:]?\s*$/i, // (y/n) or (y/n): or (y/n) >
-  /\[Y\/n\]\s*:?\s*$/i, // [Y/n] or [Y/n]:
-  /\[y\/N\]\s*:?\s*$/i, // [y/N] or [y/N]:
-  /\(yes\/no\)\s*[>:]?\s*$/i, // (yes/no)
-  /proceed\?\s*(\(y\/n\))?\s*[>:]?\s*$/i, // Proceed? or Proceed? (y/n)
-  /continue\?\s*(\[Y\/n\])?\s*[>:]?\s*$/i, // Continue? [Y/n]
-  /confirm\?\s*(\(y\/n\))?\s*[>:]?\s*$/i, // Confirm? (y/n)
-  /are you sure\?\s*(\[y\/N\])?\s*[>:]?\s*$/i, // Are you sure? [y/N]
-  /do you want to proceed\?\s*[>:]?\s*$/i, // Do you want to proceed?
+  /\(y\/n\)\s*$/i, // (y/n) at end of line
+  /\[Y\/n\]\s*$/i, // [Y/n] at end
+  /\[y\/N\]\s*$/i, // [y/N] at end
+  /\(yes\/no\)\s*$/i, // (yes/no) at end
+  /\? Run this command\?\s*$/i, // GitHub Copilot CLI: ? Run this command?
+  /Run this command\?\s*\([YyNn]\/[YyNn]\)\s*$/i, // Run this command? (Y/n)
+  /proceed\?\s*(\([YyNn]\/[YyNn]\))?\s*$/i, // Proceed? or Proceed? (y/n)
+  /continue\?\s*(\[[YyNn]\/[YyNn]\])?\s*$/i, // Continue? or Continue? [Y/n]
+  /confirm\?\s*(\([YyNn]\/[YyNn]\))?\s*$/i, // Confirm? (y/n)
+  /are you sure\?\s*(\[[YyNn]\/[YyNn]\])?\s*$/i, // Are you sure? [y/N]
+  /do you want to proceed\?\s*$/i, // Do you want to proceed?
+  /do you want to run\?\s*$/i, // Do you want to run?
+  /\?\s*›\s*$/i, // Interactive prompt with › (inquirer style)
 ];
+
+// Secondary check - must have y/n indicator somewhere in recent output
+const HAS_YN_INDICATOR = /\([YyNn]\/[YyNn]\)|\[[YyNn]\/[YyNn]\]|\(yes\/no\)/i;
+
+/**
+ * Strip ANSI escape codes from text
+ */
+function stripAnsi(text) {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+}
 
 /**
  * Check if text ends with a CLI confirmation prompt (waiting for y/n input)
  */
 function isCliConfirmationWaiting(text) {
   if (!text) return false;
-  // Get the last 300 characters to check for prompt
-  const lastChunk = text.slice(-300);
-  // Get the last few non-empty lines (CLI prompts can span multiple lines)
+  // Strip ANSI escape codes before checking
+  const cleanText = stripAnsi(text);
+  // Get the last 500 characters to check for prompt
+  const lastChunk = cleanText.slice(-500);
+  // Get the last non-empty line (where the prompt would be)
   const lines = lastChunk.split(/[\r\n]/).filter(l => l.trim());
-  const lastLines = lines.slice(-3).join(' ');
+  if (lines.length === 0) return false;
   
-  return CLI_CONFIRMATION_PATTERNS.some(pattern => pattern.test(lastLines));
+  const lastLine = lines[lines.length - 1].trim();
+  const recentLines = lines.slice(-5).join(' '); // Last 5 lines for context
+  
+  // Check if the last line matches any prompt pattern
+  const hasPromptEnding = CLI_CONFIRMATION_PATTERNS.some(pattern => {
+    if (typeof pattern === 'object' && pattern instanceof RegExp) {
+      return pattern.test(lastLine);
+    }
+    return false;
+  });
+  
+  // For less specific patterns (like "Proceed?"), also require a y/n indicator nearby
+  if (hasPromptEnding) {
+    return true;
+  }
+  
+  // Also check if recent output has y/n indicator AND last line looks like waiting for input
+  // (ends with ?, :, or ›)
+  if (HAS_YN_INDICATOR.test(recentLines) && /[?:›]\s*$/.test(lastLine)) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**

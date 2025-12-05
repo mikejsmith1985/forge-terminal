@@ -212,7 +212,7 @@ export function useTabManager(initialShellConfig) {
   }, [state.tabs, state.activeTabId]);
 
   // Track created tab info via ref to handle React's async setState batching
-  const lastCreatedTabRef = useRef(null);
+  // (No longer needed - using local variable approach instead)
 
   /**
    * Create a new tab
@@ -220,18 +220,21 @@ export function useTabManager(initialShellConfig) {
    * @returns {{ success: boolean, tabId: string|null, tab: Object|null, error: string|null }}
    */
   const createTabAction = useCallback((shellConfig) => {
-    // Reset the ref before attempting to create
-    lastCreatedTabRef.current = null;
+    // Check max tabs BEFORE calling setState to avoid async issues
+    // We need to read current state synchronously
+    let currentTabCount = 0;
+    let result = null;
     
     setState(prev => {
+      currentTabCount = prev.tabs.length;
+      
       if (prev.tabs.length >= MAX_TABS) {
         // Don't create - already at max
         logger.tabs('Max tabs limit reached', { 
           currentCount: prev.tabs.length, 
           maxTabs: MAX_TABS 
         });
-        // Store error info in ref
-        lastCreatedTabRef.current = { success: false, error: 'max_tabs' };
+        result = { success: false, tabId: null, tab: null, error: 'max_tabs' };
         return prev;
       }
 
@@ -239,14 +242,14 @@ export function useTabManager(initialShellConfig) {
       const newTabNumber = prev.tabs.length + 1;
       const newTab = createTab(config, newTabNumber);
       
-      // Store success info in ref
-      lastCreatedTabRef.current = { success: true, tab: newTab };
-      
       logger.tabs('Tab created successfully', { 
         tabId: newTab.id, 
         newTabCount: prev.tabs.length + 1,
         colorTheme: newTab.colorTheme
       });
+      
+      // Store result for return - setState callback runs synchronously
+      result = { success: true, tabId: newTab.id, tab: newTab, error: null };
       
       return {
         ...prev, // Preserve other state like sessionLoaded
@@ -255,15 +258,8 @@ export function useTabManager(initialShellConfig) {
       };
     });
 
-    // Return result object from the ref
-    const result = lastCreatedTabRef.current;
-    if (!result) {
-      return { success: false, tabId: null, tab: null, error: 'unknown' };
-    }
-    if (result.success) {
-      return { success: true, tabId: result.tab.id, tab: result.tab, error: null };
-    }
-    return { success: false, tabId: null, tab: null, error: result.error };
+    // Result is set synchronously within setState callback
+    return result || { success: true, tabId: null, tab: null, error: null };
   }, []);
 
   /**
