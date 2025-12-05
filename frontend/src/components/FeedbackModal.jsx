@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
-import { Camera, Github, Copy, Check, Settings, ExternalLink, Image as ImageIcon, Minus, X } from 'lucide-react';
+import { Camera, Github, Copy, Check, Settings, ExternalLink, Image as ImageIcon, Minus, X, Trash2 } from 'lucide-react';
 import { getLogs } from '../utils/logger';
 
 // ----------------------------------------------------------------------
@@ -13,7 +13,7 @@ const IMGUR_CLIENT_ID = '';
 
 const FeedbackModal = ({ isOpen, onClose }) => {
     const [comment, setComment] = useState('');
-    const [screenshot, setScreenshot] = useState(null);
+    const [screenshots, setScreenshots] = useState([]);
     const [isCapturing, setIsCapturing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [createdIssueUrl, setCreatedIssueUrl] = useState(null);
@@ -59,9 +59,9 @@ const FeedbackModal = ({ isOpen, onClose }) => {
             if (modal) modal.style.visibility = 'visible';
 
             const dataUrl = canvas.toDataURL('image/png');
-            setScreenshot(dataUrl);
+            setScreenshots(prev => [...prev, dataUrl]);
 
-            // Backup copy
+            // Backup copy to clipboard
             canvas.toBlob(async (blob) => {
                 try {
                     await navigator.clipboard.write([
@@ -79,6 +79,10 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         } finally {
             setIsCapturing(false);
         }
+    };
+
+    const handleRemoveScreenshot = (index) => {
+        setScreenshots(prev => prev.filter((_, i) => i !== index));
     };
 
     const uploadToImgur = async (base64Image) => {
@@ -128,12 +132,15 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         return data.content.download_url;
     };
 
-    const createIssue = async (imageUrl) => {
+    const createIssue = async (imageUrls) => {
         const title = `Feedback: ${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}`;
         let body = `**Description**\n${comment}\n\n`;
 
-        if (imageUrl) {
-            body += `**Screenshot**\n![Screenshot](${imageUrl})\n\n`;
+        if (imageUrls && imageUrls.length > 0) {
+            body += `**Screenshot${imageUrls.length > 1 ? 's' : ''}**\n`;
+            imageUrls.forEach((url, idx) => {
+                body += `<img src="${url}">\n\n`;
+            });
         } else {
             body += `**Screenshot**\n> 📋 **Paste Screenshot Here**\n> The screenshot is in your clipboard. Please press **Ctrl+V** (or Cmd+V) to attach it.\n\n`;
         }
@@ -164,39 +171,48 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         setStatus({ type: 'info', msg: 'Processing...' });
 
         try {
-            let imageUrl = null;
+            let imageUrls = [];
 
-            if (screenshot) {
-                // Strategy: Imgur -> GitHub Repo -> Fail
-                if (IMGUR_CLIENT_ID) {
-                    setStatus({ type: 'info', msg: 'Uploading to Imgur...' });
-                    try {
-                        imageUrl = await uploadToImgur(screenshot);
-                    } catch (err) {
-                        console.warn('Imgur failed, trying GitHub...', err);
+            if (screenshots.length > 0) {
+                for (let i = 0; i < screenshots.length; i++) {
+                    const screenshot = screenshots[i];
+                    let imageUrl = null;
+                    
+                    // Strategy: Imgur -> GitHub Repo -> Fail
+                    if (IMGUR_CLIENT_ID) {
+                        setStatus({ type: 'info', msg: `Uploading screenshot ${i + 1}/${screenshots.length} to Imgur...` });
+                        try {
+                            imageUrl = await uploadToImgur(screenshot);
+                        } catch (err) {
+                            console.warn('Imgur failed, trying GitHub...', err);
+                        }
                     }
-                }
 
-                if (!imageUrl) {
-                    setStatus({ type: 'info', msg: 'Uploading to Repo...' });
-                    try {
-                        imageUrl = await uploadToGithub(screenshot);
-                    } catch (err) {
-                        console.warn('GitHub upload failed:', err);
-                        setStatus({ type: 'warning', msg: 'Upload failed. Creating issue...' });
+                    if (!imageUrl) {
+                        setStatus({ type: 'info', msg: `Uploading screenshot ${i + 1}/${screenshots.length} to Repo...` });
+                        try {
+                            imageUrl = await uploadToGithub(screenshot);
+                        } catch (err) {
+                            console.warn('GitHub upload failed:', err);
+                            setStatus({ type: 'warning', msg: 'Upload failed. Creating issue...' });
+                        }
+                    }
+                    
+                    if (imageUrl) {
+                        imageUrls.push(imageUrl);
                     }
                 }
             }
 
             setStatus({ type: 'info', msg: 'Creating GitHub issue...' });
-            const issue = await createIssue(imageUrl);
+            const issue = await createIssue(imageUrls);
 
             setCreatedIssueUrl(issue.html_url);
             setStatus({ type: 'success', msg: `Issue #${issue.number} created!` });
             setTimeout(() => {
                 onClose();
                 setComment('');
-                setScreenshot(null);
+                setScreenshots([]);
                 setStatus({ type: '', msg: '' });
                 setCreatedIssueUrl(null);
             }, 2000);
@@ -217,10 +233,10 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                     <button 
                         className="btn-close" 
                         onClick={onClose}
-                        title={screenshot ? "Minimize (screenshot saved)" : "Close"}
+                        title={screenshots.length > 0 ? "Minimize (screenshots saved)" : "Close"}
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                        {screenshot ? <Minus size={20} strokeWidth={3} /> : <X size={20} />}
+                        {screenshots.length > 0 ? <Minus size={20} strokeWidth={3} /> : <X size={20} />}
                     </button>
                 </div>
 
@@ -281,7 +297,7 @@ const FeedbackModal = ({ isOpen, onClose }) => {
 
                             <div className="screenshot-section" style={{ marginTop: '20px', marginBottom: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                    <label>Screenshot</label>
+                                    <label>Screenshots {screenshots.length > 0 && `(${screenshots.length})`}</label>
                                     <button
                                         type="button"
                                         className="btn btn-secondary btn-sm"
@@ -289,15 +305,41 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                                         disabled={isCapturing}
                                     >
                                         <Camera size={16} style={{ marginRight: '6px' }} />
-                                        {isCapturing ? 'Capturing...' : 'Capture Screen'}
+                                        {isCapturing ? 'Capturing...' : screenshots.length > 0 ? 'Add Another' : 'Capture Screen'}
                                     </button>
                                 </div>
 
-                                {screenshot && (
-                                    <div className="screenshot-preview" style={{ border: '1px solid #333', borderRadius: '6px', padding: '10px', background: '#111' }}>
-                                        <img src={screenshot} alt="Screenshot preview" style={{ maxWidth: '100%', borderRadius: '4px' }} />
-                                        <div style={{ marginTop: '10px', fontSize: '0.9em', color: '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Check size={14} color="#4ade80" /> Ready to submit
+                                {screenshots.length > 0 && (
+                                    <div className="screenshots-preview" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {screenshots.map((screenshot, index) => (
+                                            <div key={index} className="screenshot-preview" style={{ border: '1px solid #333', borderRadius: '6px', padding: '10px', background: '#111', position: 'relative' }}>
+                                                <img src={screenshot} alt={`Screenshot ${index + 1}`} style={{ maxWidth: '100%', borderRadius: '4px' }} />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveScreenshot(index)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '5px',
+                                                        right: '5px',
+                                                        background: 'rgba(239, 68, 68, 0.9)',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        padding: '4px 6px',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        color: '#fff',
+                                                        fontSize: '0.75em'
+                                                    }}
+                                                    title="Remove screenshot"
+                                                >
+                                                    <Trash2 size={12} /> Remove
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <div style={{ fontSize: '0.9em', color: '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <Check size={14} color="#4ade80" /> {screenshots.length} screenshot{screenshots.length > 1 ? 's' : ''} ready to submit
                                         </div>
                                     </div>
                                 )}

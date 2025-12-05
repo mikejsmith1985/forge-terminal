@@ -492,4 +492,76 @@ describe('useTabManager', () => {
       expect(typeof tab.createdAt).toBe('number');
     });
   });
+
+  describe('updateTabShellConfig', () => {
+    it('should update shell config for a tab', () => {
+      const { result } = renderHook(() => useTabManager(defaultShellConfig));
+
+      const tabId = result.current.tabs[0].id;
+      const newConfig = {
+        shellType: 'wsl',
+        wslDistro: 'Ubuntu-24.04',
+        wslHomePath: '/home/user',
+      };
+
+      act(() => {
+        result.current.updateTabShellConfig(tabId, newConfig);
+      });
+
+      expect(result.current.tabs[0].shellConfig).toEqual(newConfig);
+    });
+
+    it('should not affect other tabs', () => {
+      const { result } = renderHook(() => useTabManager(defaultShellConfig));
+
+      act(() => {
+        result.current.createTab();
+      });
+
+      const firstTabId = result.current.tabs[0].id;
+      const newConfig = {
+        shellType: 'wsl',
+        wslDistro: 'Ubuntu-24.04',
+        wslHomePath: '/home/user',
+      };
+
+      act(() => {
+        result.current.updateTabShellConfig(firstTabId, newConfig);
+      });
+
+      expect(result.current.tabs[0].shellConfig).toEqual(newConfig);
+      expect(result.current.tabs[1].shellConfig).toEqual(defaultShellConfig);
+    });
+
+    it('should do nothing for non-existent tab ID', () => {
+      const { result } = renderHook(() => useTabManager(defaultShellConfig));
+
+      const originalConfig = { ...result.current.tabs[0].shellConfig };
+
+      act(() => {
+        result.current.updateTabShellConfig('non-existent-id', { shellType: 'wsl' });
+      });
+
+      expect(result.current.tabs[0].shellConfig).toEqual(originalConfig);
+    });
+
+    it('should create a new object reference for immutability', () => {
+      const { result } = renderHook(() => useTabManager(defaultShellConfig));
+
+      const tabId = result.current.tabs[0].id;
+      const originalConfig = result.current.tabs[0].shellConfig;
+      const newConfig = {
+        shellType: 'wsl',
+        wslDistro: 'Ubuntu-24.04',
+        wslHomePath: '/home/user',
+      };
+
+      act(() => {
+        result.current.updateTabShellConfig(tabId, newConfig);
+      });
+
+      expect(result.current.tabs[0].shellConfig).not.toBe(originalConfig);
+      expect(result.current.tabs[0].shellConfig).not.toBe(newConfig);
+    });
+  });
 });

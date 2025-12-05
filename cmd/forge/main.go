@@ -84,8 +84,10 @@ func main() {
 		os.Exit(0)
 	}()
 
-	// Auto-open browser
-	go openBrowser("http://" + addr)
+	// Auto-open browser (skip if NO_BROWSER env var is set for testing)
+	if os.Getenv("NO_BROWSER") == "" {
+		go openBrowser("http://" + addr)
+	}
 
 	log.Fatal(http.Serve(listener, nil))
 }

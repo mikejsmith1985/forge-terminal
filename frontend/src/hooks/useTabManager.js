@@ -174,6 +174,27 @@ export function useTabManager(initialShellConfig) {
     });
   }, []);
 
+  /**
+   * Update a tab's shell configuration
+   * @param {string} tabId - ID of tab to update
+   * @param {Object} shellConfig - New shell configuration
+   */
+  const updateTabShellConfig = useCallback((tabId, shellConfig) => {
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        return prev;
+      }
+
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], shellConfig: { ...shellConfig } };
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
   return {
     tabs: state.tabs,
     activeTabId: state.activeTabId,
@@ -182,6 +203,7 @@ export function useTabManager(initialShellConfig) {
     closeTab,
     switchTab,
     updateTabTitle,
+    updateTabShellConfig,
     reorderTabs,
   };
 }

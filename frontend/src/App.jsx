@@ -44,6 +44,7 @@ function App() {
     closeTab,
     switchTab,
     updateTabTitle,
+    updateTabShellConfig,
     reorderTabs,
   } = useTabManager(shellConfig);
   
@@ -120,6 +121,10 @@ function App() {
       const data = await res.json();
       if (data && data.shellType) {
         setShellConfig(data);
+        // Update the first tab's shell config to match loaded settings
+        if (tabs.length > 0) {
+          updateTabShellConfig(tabs[0].id, data);
+        }
         // If config was loaded and differs from default, reconnect terminal
         if (data.shellType !== 'powershell' || data.wslDistro || data.wslHomePath) {
           // Small delay to ensure terminal is mounted
