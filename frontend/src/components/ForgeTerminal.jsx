@@ -363,9 +363,58 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         term.write('\r\n\x1b[1;31m[Error]\x1b[0m Connection error.\r\n');
       };
 
-      ws.onclose = () => {
-        logger.terminal('WebSocket closed', { tabId });
-        term.write('\r\n\x1b[1;33m[Disconnected]\x1b[0m Terminal session ended.\r\n');
+      ws.onclose = (event) => {
+        logger.terminal('WebSocket closed', { tabId, code: event.code, reason: event.reason });
+        
+        // Provide meaningful disconnect messages based on close code
+        let disconnectMessage = 'Terminal session ended.';
+        let messageColor = '1;33'; // Yellow by default
+        
+        switch (event.code) {
+          case 1000:
+            // Normal closure
+            disconnectMessage = 'Session closed normally.';
+            break;
+          case 1001:
+            disconnectMessage = 'Server is shutting down.';
+            break;
+          case 1006:
+            // Abnormal closure (no close frame received)
+            disconnectMessage = 'Connection lost unexpectedly.';
+            messageColor = '1;31'; // Red
+            break;
+          case 1011:
+            // Server error
+            disconnectMessage = 'Server encountered an error.';
+            messageColor = '1;31'; // Red
+            break;
+          case 1012:
+            disconnectMessage = 'Server is restarting.';
+            break;
+          case 1013:
+            disconnectMessage = 'Server is overloaded, try again later.';
+            messageColor = '1;31'; // Red
+            break;
+          case 4000:
+            // Custom: PTY process exited
+            disconnectMessage = 'Shell process exited.';
+            break;
+          case 4001:
+            // Custom: Session timeout
+            disconnectMessage = 'Session timed out.';
+            break;
+          case 4002:
+            // Custom: PTY read error
+            disconnectMessage = 'Terminal read error.';
+            messageColor = '1;31'; // Red
+            break;
+          default:
+            if (event.reason) {
+              disconnectMessage = event.reason;
+            }
+        }
+        
+        term.write(`\r\n\x1b[${messageColor}m[Disconnected]\x1b[0m ${disconnectMessage}\r\n`);
         if (onConnectionChange) onConnectionChange(false);
       };
 

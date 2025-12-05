@@ -12,6 +12,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Custom WebSocket close codes (4000-4999 range is for application use)
+const (
+	CloseCodePTYExited   = 4000 // Shell process exited normally
+	CloseCodeTimeout     = 4001 // Session timed out
+	CloseCodePTYError    = 4002 // PTY read/write error
+)
+
 // Handler manages WebSocket terminal connections.
 type Handler struct {
 	upgrader websocket.Upgrader
@@ -75,7 +82,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Set initial terminal size (default 80x24)
 	_ = session.Resize(80, 24)
 
-	// Channel to coordinate shutdown
+	// Channel to coordinate shutdown with reason
+	type closeReason struct {
+		code   int
+		reason string
+	}
+	closeChan := make(chan closeReason, 1)
 	done := make(chan struct{})
 	var closeOnce sync.Once
 
@@ -87,6 +99,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			n, err := session.Read(buf)
 			if err != nil {
 				log.Printf("[Terminal] PTY read error: %v", err)
+				select {
+				case closeChan <- closeReason{CloseCodePTYError, "Terminal read error"}:
+				default:
+				}
 				return
 			}
 			if n > 0 {
@@ -125,18 +141,34 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// Regular input - write to PTY
 			if _, err := session.Write(data); err != nil {
 				log.Printf("[Terminal] PTY write error: %v", err)
+				select {
+				case closeChan <- closeReason{CloseCodePTYError, "Terminal write error"}:
+				default:
+				}
 				return
 			}
 		}
 	}()
 
 	// Wait for shutdown or session termination
+	var finalReason closeReason
 	select {
 	case <-done:
 		log.Printf("[Terminal] Session %s: I/O loop ended", sessionID)
+		select {
+		case finalReason = <-closeChan:
+		default:
+			finalReason = closeReason{websocket.CloseNormalClosure, "Connection closed"}
+		}
 	case <-session.Done():
 		log.Printf("[Terminal] Session %s: Process exited", sessionID)
+		finalReason = closeReason{CloseCodePTYExited, "Shell process exited"}
 	case <-time.After(24 * time.Hour):
 		log.Printf("[Terminal] Session %s: Timeout (24h)", sessionID)
+		finalReason = closeReason{CloseCodeTimeout, "Session timed out after 24 hours"}
 	}
+
+	// Send close message with reason
+	closeMessage := websocket.FormatCloseMessage(finalReason.code, finalReason.reason)
+	_ = conn.WriteControl(websocket.CloseMessage, closeMessage, time.Now().Add(time.Second))
 }
