@@ -153,6 +153,18 @@ function App() {
     return () => clearInterval(updateInterval);
   }, [])
 
+  // Apply theme when active tab changes (handles new tab creation and tab switching)
+  useEffect(() => {
+    if (activeTab?.colorTheme) {
+      logger.theme('Applying theme for active tab', { 
+        tabId: activeTab.id, 
+        colorTheme: activeTab.colorTheme 
+      });
+      setColorTheme(activeTab.colorTheme);
+      applyTheme(activeTab.colorTheme, theme);
+    }
+  }, [activeTab?.id, activeTab?.colorTheme, theme]);
+
   const loadConfig = async () => {
     try {
       const res = await fetch('/api/config');
@@ -509,13 +521,8 @@ function App() {
     }
     
     logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme });
-    
-    // Immediately apply the new tab's theme so user sees it without switching tabs
-    if (result.tab?.colorTheme) {
-      setColorTheme(result.tab.colorTheme);
-      applyTheme(result.tab.colorTheme, theme);
-    }
-  }, [createTab, shellConfig, addToast, theme]);
+    // Theme will be applied by the activeTab useEffect below
+  }, [createTab, shellConfig, addToast]);
 
   // Handle tab switch - focus terminal after switching and apply tab's theme
   const handleTabSwitch = useCallback((tabId) => {
@@ -528,16 +535,7 @@ function App() {
     });
     
     switchTab(tabId);
-    
-    // Apply the tab's color theme
-    if (targetTab?.colorTheme) {
-      logger.theme('Applying tab color theme on switch', { 
-        tabId, 
-        colorTheme: targetTab.colorTheme 
-      });
-      setColorTheme(targetTab.colorTheme);
-      applyTheme(targetTab.colorTheme, theme);
-    }
+    // Theme will be applied by the activeTab useEffect
     
     // Small delay to ensure the terminal is visible before focusing
     setTimeout(() => {
@@ -546,7 +544,7 @@ function App() {
         termRef.focus();
       }
     }, 50);
-  }, [switchTab, tabs, theme, activeTabId, colorTheme]);
+  }, [switchTab, tabs, activeTabId, colorTheme]);
 
   // Handle tab close
   const handleTabClose = useCallback((tabId) => {

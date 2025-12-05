@@ -33,10 +33,18 @@ const CLI_CONFIRMATION_PATTERNS = [
   /do you want to proceed\?\s*$/i, // Do you want to proceed?
   /do you want to run\?\s*$/i, // Do you want to run?
   /\?\s*›\s*$/i, // Interactive prompt with › (inquirer style)
+  // Additional patterns for various CLI tools
+  /\(Y\/n\)\s*$/i, // Capital Y default
+  /\(y\/N\)\s*$/i, // Capital N default
+  /\[yes\/no\]\s*$/i, // [yes/no] at end
+  /\? \(Y\/n\)\s*$/i, // ? (Y/n) format
+  /\? \[Y\/n\]\s*$/i, // ? [Y/n] format
+  /›\s*Yes\s*$/i, // inquirer style with Yes selected
+  /❯\s*Yes\s*$/i, // inquirer style with arrow
 ];
 
 // Secondary check - must have y/n indicator somewhere in recent output
-const HAS_YN_INDICATOR = /\([YyNn]\/[YyNn]\)|\[[YyNn]\/[YyNn]\]|\(yes\/no\)/i;
+const HAS_YN_INDICATOR = /\([YyNn]\/[YyNn]\)|\[[YyNn]\/[YyNn]\]|\(yes\/no\)|\[yes\/no\]/i;
 
 /**
  * Strip ANSI escape codes from text
@@ -49,7 +57,7 @@ function stripAnsi(text) {
 /**
  * Check if text ends with a CLI confirmation prompt (waiting for y/n input)
  */
-function isCliConfirmationWaiting(text) {
+function isCliConfirmationWaiting(text, debugLog = false) {
   if (!text) return false;
   // Strip ANSI escape codes before checking
   const cleanText = stripAnsi(text);
@@ -62,10 +70,18 @@ function isCliConfirmationWaiting(text) {
   const lastLine = lines[lines.length - 1].trim();
   const recentLines = lines.slice(-5).join(' '); // Last 5 lines for context
   
+  if (debugLog) {
+    console.log('[AutoRespond] Checking prompt:', { lastLine, recentLines: recentLines.slice(-100) });
+  }
+  
   // Check if the last line matches any prompt pattern
   const hasPromptEnding = CLI_CONFIRMATION_PATTERNS.some(pattern => {
     if (typeof pattern === 'object' && pattern instanceof RegExp) {
-      return pattern.test(lastLine);
+      const matches = pattern.test(lastLine);
+      if (matches && debugLog) {
+        console.log('[AutoRespond] Pattern matched:', pattern.toString());
+      }
+      return matches;
     }
     return false;
   });
@@ -77,7 +93,10 @@ function isCliConfirmationWaiting(text) {
   
   // Also check if recent output has y/n indicator AND last line looks like waiting for input
   // (ends with ?, :, or ›)
-  if (HAS_YN_INDICATOR.test(recentLines) && /[?:›]\s*$/.test(lastLine)) {
+  if (HAS_YN_INDICATOR.test(recentLines) && /[?:›❯]\s*$/.test(lastLine)) {
+    if (debugLog) {
+      console.log('[AutoRespond] Y/N indicator found with question mark ending');
+    }
     return true;
   }
   
@@ -335,7 +354,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           clearTimeout(waitingCheckTimeoutRef.current);
         }
         waitingCheckTimeoutRef.current = setTimeout(() => {
-          const waiting = isCliConfirmationWaiting(lastOutputRef.current);
+          // Enable debug logging when auto-respond is on
+          const debugMode = autoRespondRef.current;
+          const waiting = isCliConfirmationWaiting(lastOutputRef.current, debugMode);
+          
           if (waiting !== isWaiting) {
             setIsWaiting(waiting);
             if (onWaitingChange) {
