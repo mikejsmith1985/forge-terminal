@@ -1,5 +1,6 @@
-import React from 'react';
-import { X, Terminal, TerminalSquare } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Terminal, TerminalSquare, Edit2 } from 'lucide-react';
+import { themes } from '../themes';
 
 /**
  * Get shell icon based on shell type
@@ -17,15 +18,76 @@ function getShellIcon(shellType) {
 }
 
 /**
+ * Get the accent color for a tab based on its colorTheme
+ */
+function getTabAccentColor(colorTheme, mode = 'dark') {
+  const themeData = themes[colorTheme];
+  if (!themeData) return null;
+  return themeData[mode]?.ui?.accent || null;
+}
+
+/**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, isWaiting = false, mode = 'dark' }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(tab.title);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+  const inputRef = useRef(null);
+  const contextMenuRef = useRef(null);
+
+  // Get the accent color for this tab's theme
+  const accentColor = getTabAccentColor(tab.colorTheme, mode);
+
   const handleClick = (e) => {
-    // Don't trigger onClick if clicking close button
-    if (e.target.closest('.tab-close')) {
+    // Don't trigger onClick if clicking close button or in edit mode
+    if (e.target.closest('.tab-close') || isEditing) {
       return;
     }
     onClick();
+  };
+
+  const handleDoubleClick = (e) => {
+    // Don't trigger if clicking close button
+    if (e.target.closest('.tab-close')) {
+      return;
+    }
+    startEditing();
+  };
+
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
+    setShowContextMenu(true);
+  };
+
+  const startEditing = () => {
+    setEditValue(tab.title);
+    setIsEditing(true);
+    setShowContextMenu(false);
+  };
+
+  const handleEditSubmit = () => {
+    const newTitle = editValue.trim();
+    if (newTitle && newTitle !== tab.title && onRename) {
+      onRename(newTitle);
+    }
+    setIsEditing(false);
+  };
+
+  const handleEditCancel = () => {
+    setEditValue(tab.title);
+    setIsEditing(false);
+  };
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleEditSubmit();
+    } else if (e.key === 'Escape') {
+      handleEditCancel();
+    }
   };
 
   const handleCloseClick = (e) => {
@@ -41,31 +103,94 @@ function Tab({ tab, isActive, onClick, onClose }) {
     }
   };
 
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setShowContextMenu(false);
+      }
+    };
+    if (showContextMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showContextMenu]);
+
   const shellType = tab.shellConfig?.shellType || 'powershell';
 
+  // Style for the colored indicator
+  const indicatorStyle = accentColor ? {
+    '--tab-accent': accentColor,
+  } : {};
+
   return (
-    <div
-      className={`tab ${isActive ? 'active' : ''}`}
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      data-shell={shellType}
-      role="tab"
-      aria-selected={isActive}
-      tabIndex={0}
-    >
-      <span className="tab-icon" data-shell={shellType}>
-        {getShellIcon(shellType)}
-      </span>
-      <span className="tab-title">{tab.title}</span>
-      <button
-        className="tab-close"
-        onClick={handleCloseClick}
-        aria-label="Close tab"
-        tabIndex={-1}
+    <>
+      <div
+        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''}`}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
+        onMouseDown={handleMouseDown}
+        data-shell={shellType}
+        style={indicatorStyle}
+        role="tab"
+        aria-selected={isActive}
+        tabIndex={0}
       >
-        <X size={14} />
-      </button>
-    </div>
+        <span className="tab-color-indicator" style={{ backgroundColor: accentColor }} />
+        <span className="tab-icon" data-shell={shellType}>
+          {getShellIcon(shellType)}
+        </span>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            className="tab-title-input"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleEditSubmit}
+            onKeyDown={handleEditKeyDown}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className="tab-title">{tab.title}</span>
+        )}
+        <button
+          className="tab-close"
+          onClick={handleCloseClick}
+          aria-label="Close tab"
+          tabIndex={-1}
+        >
+          <X size={14} />
+        </button>
+      </div>
+      
+      {/* Context Menu */}
+      {showContextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="tab-context-menu"
+          style={{ top: contextMenuPos.y, left: contextMenuPos.x }}
+        >
+          <button onClick={startEditing}>
+            <Edit2 size={14} />
+            Rename
+          </button>
+          <button onClick={() => { setShowContextMenu(false); onClose(); }}>
+            <X size={14} />
+            Close
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

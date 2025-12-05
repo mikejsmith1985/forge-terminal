@@ -764,6 +764,53 @@ body {
   max-width: 180px;
   transition: all 0.15s ease;
   user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-color-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 6px 0 0 0;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, width 0.15s ease;
+}
+
+.tab:hover .tab-color-indicator,
+.tab.active .tab-color-indicator {
+  opacity: 1;
+  width: 4px;
+}
+
+.tab.waiting {
+  animation: tab-waiting-pulse 2s ease-in-out infinite;
+}
+
+.tab.waiting .tab-color-indicator {
+  animation: tab-indicator-glow 2s ease-in-out infinite;
+}
+
+@keyframes tab-waiting-pulse {
+  0%, 100% { 
+    box-shadow: none;
+  }
+  50% { 
+    box-shadow: 0 0 8px var(--tab-accent, var(--accent));
+  }
+}
+
+@keyframes tab-indicator-glow {
+  0%, 100% { 
+    opacity: 0.7;
+    width: 3px;
+  }
+  50% { 
+    opacity: 1;
+    width: 5px;
+  }
 }
 
 .tab:hover {
@@ -827,6 +874,56 @@ body {
   color: var(--red);
 }
 
+/* Tab title input for renaming */
+.tab-title-input {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 2px 4px;
+  min-width: 60px;
+  outline: none;
+}
+
+/* Tab context menu */
+.tab-context-menu {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--overlay);
+  border-radius: 6px;
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  z-index: 1000;
+  min-width: 120px;
+}
+
+.tab-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.tab-context-menu button:hover {
+  background: var(--overlay);
+}
+
+.tab-context-menu button svg {
+  color: var(--subtext);
+}
+
 .new-tab-btn {
   display: flex;
   align-items: center;
@@ -872,6 +969,51 @@ body {
 .terminal-wrapper.hidden {
   visibility: hidden;
   pointer-events: none;
+}
+
+/* Terminal outer container for scroll button positioning */
+.terminal-outer-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.terminal-inner {
+  width: 100%;
+  height: 100%;
+}
+
+/* Scroll to bottom button */
+.scroll-to-bottom-btn {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--overlay);
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s ease;
+  z-index: 10;
+  opacity: 0.9;
+}
+
+.scroll-to-bottom-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.scroll-to-bottom-btn:active {
+  transform: scale(0.95);
 }
 
 /* ========================================

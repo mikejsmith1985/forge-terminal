@@ -43,6 +43,9 @@ function App() {
   const [searchMatchCount, setSearchMatchCount] = useState(0)
   const [searchCurrentMatch, setSearchCurrentMatch] = useState(0)
   
+  // Tab waiting state (for prompt watcher)
+  const [waitingTabs, setWaitingTabs] = useState({})
+  
   // Tab management
   const {
     tabs,
@@ -345,6 +348,16 @@ function App() {
         setIsSearchOpen(true);
         return;
       }
+      
+      // Ctrl+End: Scroll to bottom
+      if (e.ctrlKey && e.key === 'End') {
+        e.preventDefault();
+        const termRef = getActiveTerminalRef();
+        if (termRef && termRef.scrollToBottom) {
+          termRef.scrollToBottom();
+        }
+        return;
+      }
 
       // Tab shortcuts (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+1-9)
       if (e.ctrlKey && !e.shiftKey) {
@@ -423,32 +436,33 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [commands, tabs, activeTabId, closeTab, switchTab]);
+  }, [commands, tabs, activeTabId, closeTab, switchTab, getActiveTerminalRef]);
 
   // Handle new tab creation
   const handleNewTab = useCallback(() => {
-    logger.tabs('New tab button clicked', { 
-      currentTabCount: tabs.length, 
-      maxTabs: MAX_TABS 
-    });
+    logger.tabs('New tab button clicked');
     
-    if (tabs.length >= MAX_TABS) {
-      logger.tabs('Max tabs limit check failed in handleNewTab', { 
-        currentTabCount: tabs.length, 
-        maxTabs: MAX_TABS 
-      });
-      addToast('Maximum tab limit reached (20)', 'warning', 3000);
+    const result = createTab(shellConfig);
+    
+    if (!result.success) {
+      if (result.error === 'max_tabs') {
+        logger.tabs('Max tabs limit reached');
+        addToast('Maximum tab limit reached (20)', 'warning', 3000);
+      } else {
+        logger.tabs('Tab creation failed', { error: result.error });
+        addToast('Failed to create new tab', 'error', 3000);
+      }
       return;
     }
     
-    const newTabId = createTab(shellConfig);
-    if (newTabId === null) {
-      logger.tabs('Tab creation returned null (should not happen - already checked limit)');
-      addToast('Maximum tab limit reached (20)', 'warning', 3000);
-    } else {
-      logger.tabs('New tab created via handleNewTab', { newTabId });
+    logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme });
+    
+    // Immediately apply the new tab's theme so user sees it without switching tabs
+    if (result.tab?.colorTheme) {
+      setColorTheme(result.tab.colorTheme);
+      applyTheme(result.tab.colorTheme, theme);
     }
-  }, [createTab, shellConfig, addToast, tabs.length]);
+  }, [createTab, shellConfig, addToast, theme]);
 
   // Handle tab switch - focus terminal after switching and apply tab's theme
   const handleTabSwitch = useCallback((tabId) => {
@@ -485,10 +499,29 @@ function App() {
   const handleTabClose = useCallback((tabId) => {
     if (tabs.length > 1) {
       closeTab(tabId);
-      // Clean up the ref
+      // Clean up the ref and waiting state
       delete terminalRefs.current[tabId];
+      setWaitingTabs(prev => {
+        const newState = { ...prev };
+        delete newState[tabId];
+        return newState;
+      });
     }
   }, [tabs.length, closeTab]);
+
+  // Handle tab rename
+  const handleTabRename = useCallback((tabId, newTitle) => {
+    logger.tabs('Tab rename', { tabId, newTitle });
+    updateTabTitle(tabId, newTitle);
+  }, [updateTabTitle]);
+
+  // Handle waiting state change from terminal
+  const handleWaitingChange = useCallback((tabId, isWaiting) => {
+    setWaitingTabs(prev => ({
+      ...prev,
+      [tabId]: isWaiting
+    }));
+  }, []);
 
 
   const loadCommands = () => {
@@ -738,9 +771,12 @@ function App() {
           activeTabId={activeTabId}
           onTabClick={handleTabSwitch}
           onTabClose={handleTabClose}
+          onTabRename={handleTabRename}
           onNewTab={handleNewTab}
           onReorder={reorderTabs}
           disableNewTab={tabs.length >= MAX_TABS}
+          waitingTabs={waitingTabs}
+          mode={theme}
         />
         <SearchBar
           isOpen={isSearchOpen}
@@ -770,6 +806,7 @@ function App() {
                   colorTheme={colorTheme}
                   fontSize={fontSize}
                   shellConfig={tab.shellConfig}
+                  onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                 />
               </div>
             ))}

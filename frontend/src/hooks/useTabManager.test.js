@@ -64,24 +64,25 @@ describe('useTabManager', () => {
     it('should return the new tab ID', () => {
       const { result } = renderHook(() => useTabManager(defaultShellConfig));
 
-      let newTabId;
+      let createResult;
       act(() => {
-        newTabId = result.current.createTab();
+        createResult = result.current.createTab();
       });
 
-      expect(newTabId).toBeTruthy();
-      expect(result.current.tabs.find(t => t.id === newTabId)).toBeDefined();
+      expect(createResult.success).toBe(true);
+      expect(createResult.tabId).toBeTruthy();
+      expect(result.current.tabs.find(t => t.id === createResult.tabId)).toBeDefined();
     });
 
     it('should set new tab as active', () => {
       const { result } = renderHook(() => useTabManager(defaultShellConfig));
 
-      let newTabId;
+      let createResult;
       act(() => {
-        newTabId = result.current.createTab();
+        createResult = result.current.createTab();
       });
 
-      expect(result.current.activeTabId).toBe(newTabId);
+      expect(result.current.activeTabId).toBe(createResult.tabId);
     });
 
     it('should use provided shell config for new tab', () => {
@@ -93,12 +94,12 @@ describe('useTabManager', () => {
         wslHomePath: '/home/test',
       };
 
-      let newTabId;
+      let createResult;
       act(() => {
-        newTabId = result.current.createTab(wslConfig);
+        createResult = result.current.createTab(wslConfig);
       });
 
-      const newTab = result.current.tabs.find(t => t.id === newTabId);
+      const newTab = result.current.tabs.find(t => t.id === createResult.tabId);
       expect(newTab.shellConfig).toEqual(wslConfig);
     });
 
@@ -152,12 +153,13 @@ describe('useTabManager', () => {
       expect(result.current.tabs).toHaveLength(20);
 
       // Try to create one more
-      let newTabId;
+      let createResult;
       act(() => {
-        newTabId = result.current.createTab();
+        createResult = result.current.createTab();
       });
 
-      expect(newTabId).toBeNull();
+      expect(createResult.success).toBe(false);
+      expect(createResult.tabId).toBeNull();
       expect(result.current.tabs).toHaveLength(20);
     });
   });
@@ -166,19 +168,19 @@ describe('useTabManager', () => {
     it('should remove the specified tab', () => {
       const { result } = renderHook(() => useTabManager(defaultShellConfig));
 
-      let tabToClose;
+      let createResult;
       act(() => {
-        tabToClose = result.current.createTab();
+        createResult = result.current.createTab();
       });
 
       expect(result.current.tabs).toHaveLength(2);
 
       act(() => {
-        result.current.closeTab(tabToClose);
+        result.current.closeTab(createResult.tabId);
       });
 
       expect(result.current.tabs).toHaveLength(1);
-      expect(result.current.tabs.find(t => t.id === tabToClose)).toBeUndefined();
+      expect(result.current.tabs.find(t => t.id === createResult.tabId)).toBeUndefined();
     });
 
     it('should switch to previous tab when closing active tab', () => {
@@ -204,9 +206,9 @@ describe('useTabManager', () => {
 
       const firstTabId = result.current.tabs[0].id;
 
-      let secondTabId;
+      let createResult;
       act(() => {
-        secondTabId = result.current.createTab();
+        createResult = result.current.createTab();
         result.current.switchTab(firstTabId); // Switch back to first
       });
 
@@ -214,7 +216,7 @@ describe('useTabManager', () => {
         result.current.closeTab(firstTabId);
       });
 
-      expect(result.current.activeTabId).toBe(secondTabId);
+      expect(result.current.activeTabId).toBe(createResult.tabId);
     });
 
     it('should not close the last remaining tab', () => {
@@ -251,17 +253,17 @@ describe('useTabManager', () => {
 
       const firstTabId = result.current.tabs[0].id;
 
-      let secondTabId;
+      let createResult;
       act(() => {
-        secondTabId = result.current.createTab();
+        createResult = result.current.createTab();
       });
 
-      // Active is now secondTabId
+      // Active is now createResult.tabId
       act(() => {
         result.current.closeTab(firstTabId);
       });
 
-      expect(result.current.activeTabId).toBe(secondTabId);
+      expect(result.current.activeTabId).toBe(createResult.tabId);
     });
   });
 

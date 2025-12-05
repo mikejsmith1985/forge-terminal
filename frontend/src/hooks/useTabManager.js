@@ -194,22 +194,17 @@ export function useTabManager(initialShellConfig) {
     return state.tabs.find(t => t.id === state.activeTabId) || null;
   }, [state.tabs, state.activeTabId]);
 
-  // Track created tab ID via ref to handle React's async setState batching
-  const lastCreatedTabIdRef = useRef(null);
+  // Track created tab info via ref to handle React's async setState batching
+  const lastCreatedTabRef = useRef(null);
 
   /**
    * Create a new tab
    * @param {Object} shellConfig - Optional shell config, defaults to initialShellConfig
-   * @returns {string|null} New tab ID, or null if max tabs reached
+   * @returns {{ success: boolean, tabId: string|null, tab: Object|null, error: string|null }}
    */
   const createTabAction = useCallback((shellConfig) => {
     // Reset the ref before attempting to create
-    lastCreatedTabIdRef.current = null;
-    
-    logger.tabs('Create tab requested', { 
-      currentTabCount: state.tabs.length,
-      maxTabs: MAX_TABS 
-    });
+    lastCreatedTabRef.current = null;
     
     setState(prev => {
       if (prev.tabs.length >= MAX_TABS) {
@@ -218,6 +213,8 @@ export function useTabManager(initialShellConfig) {
           currentCount: prev.tabs.length, 
           maxTabs: MAX_TABS 
         });
+        // Store error info in ref
+        lastCreatedTabRef.current = { success: false, error: 'max_tabs' };
         return prev;
       }
 
@@ -225,8 +222,8 @@ export function useTabManager(initialShellConfig) {
       const newTabNumber = prev.tabs.length + 1;
       const newTab = createTab(config, newTabNumber);
       
-      // Store in ref so we can return it after setState completes
-      lastCreatedTabIdRef.current = newTab.id;
+      // Store success info in ref
+      lastCreatedTabRef.current = { success: true, tab: newTab };
       
       logger.tabs('Tab created successfully', { 
         tabId: newTab.id, 
@@ -241,9 +238,15 @@ export function useTabManager(initialShellConfig) {
       };
     });
 
-    // Return the tab ID stored in the ref
-    // This works because setState with a function updater runs synchronously
-    return lastCreatedTabIdRef.current;
+    // Return result object from the ref
+    const result = lastCreatedTabRef.current;
+    if (!result) {
+      return { success: false, tabId: null, tab: null, error: 'unknown' };
+    }
+    if (result.success) {
+      return { success: true, tabId: result.tab.id, tab: result.tab, error: null };
+    }
+    return { success: false, tabId: null, tab: null, error: result.error };
   }, []);
 
   /**

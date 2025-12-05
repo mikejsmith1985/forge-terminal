@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, us
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
+import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
@@ -13,6 +14,30 @@ function debounce(fn, ms) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn(...args), ms);
   };
+}
+
+// Common shell prompt patterns for detecting when terminal is waiting for input
+const PROMPT_PATTERNS = [
+  /[$#>]\s*$/, // Generic Unix/Windows prompts
+  /PS [A-Z]:\\[^>]*>\s*$/, // PowerShell prompt
+  /\([^)]+\)\s*[$#]\s*$/, // Conda/virtualenv prompts
+  /\w+@[\w-]+:[^$#]*[$#]\s*$/, // user@host:path$ format
+  /➜\s+/, // Oh-my-zsh arrow prompt
+  /❯\s*$/, // Starship/other modern prompts
+];
+
+/**
+ * Check if text ends with a prompt pattern (terminal waiting for input)
+ */
+function isPromptWaiting(text) {
+  if (!text) return false;
+  // Get the last 200 characters to check for prompt
+  const lastChunk = text.slice(-200);
+  // Get the last line
+  const lines = lastChunk.split(/[\r\n]/);
+  const lastLine = lines[lines.length - 1] || lines[lines.length - 2] || '';
+  
+  return PROMPT_PATTERNS.some(pattern => pattern.test(lastLine));
 }
 
 /**
@@ -27,17 +52,25 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   colorTheme = 'molten', // theme color scheme
   fontSize = 14,
   onConnectionChange = null,
+  onWaitingChange = null, // Callback when prompt waiting state changes
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   isVisible = true, // Whether this terminal is currently visible
 }, ref) {
   const terminalRef = useRef(null);
+  const containerRef = useRef(null);
   const xtermRef = useRef(null);
   const wsRef = useRef(null);
   const fitAddonRef = useRef(null);
   const searchAddonRef = useRef(null);
   const shellConfigRef = useRef(shellConfig);
   const connectFnRef = useRef(null);
+  const lastOutputRef = useRef('');
+  const waitingCheckTimeoutRef = useRef(null);
+  
+  // State for scroll button visibility
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false);
 
   // Keep shellConfig ref updated
   useEffect(() => {
@@ -119,6 +152,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         searchAddonRef.current.clearDecorations();
       }
     },
+    scrollToBottom: () => {
+      if (xtermRef.current) {
+        xtermRef.current.scrollToBottom();
+        setShowScrollButton(false);
+      }
+    },
+    isWaitingForPrompt: () => isWaiting,
   }));
 
   // Update terminal theme when theme or colorTheme prop changes
@@ -223,14 +263,35 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       };
 
       ws.onmessage = (event) => {
+        let textData = '';
         if (event.data instanceof ArrayBuffer) {
           // Binary data from PTY
           const data = new Uint8Array(event.data);
           term.write(data);
+          // Convert to string for prompt detection
+          textData = new TextDecoder().decode(data);
         } else {
           // Text data
           term.write(event.data);
+          textData = event.data;
         }
+        
+        // Accumulate recent output for prompt detection
+        lastOutputRef.current = (lastOutputRef.current + textData).slice(-500);
+        
+        // Debounce waiting check - wait 100ms after last output
+        if (waitingCheckTimeoutRef.current) {
+          clearTimeout(waitingCheckTimeoutRef.current);
+        }
+        waitingCheckTimeoutRef.current = setTimeout(() => {
+          const waiting = isPromptWaiting(lastOutputRef.current);
+          if (waiting !== isWaiting) {
+            setIsWaiting(waiting);
+            if (onWaitingChange) {
+              onWaitingChange(waiting);
+            }
+          }
+        }, 100);
       };
 
       ws.onerror = (error) => {
@@ -257,6 +318,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           ws.send(JSON.stringify({ type: 'resize', cols, rows }));
         }
       });
+      
+      // Track scroll position to show/hide scroll button
+      const viewport = terminalRef.current?.querySelector('.xterm-viewport');
+      if (viewport) {
+        const checkScroll = () => {
+          const isAtBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 50;
+          setShowScrollButton(!isAtBottom);
+        };
+        viewport.addEventListener('scroll', checkScroll);
+      }
 
       return ws;
     };
@@ -284,6 +355,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     return () => {
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();
+      if (waitingCheckTimeoutRef.current) {
+        clearTimeout(waitingCheckTimeoutRef.current);
+      }
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.close();
       }
@@ -291,17 +365,35 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
   }, []); // Only run once on mount, theme updates handled by other effect
 
+  const handleScrollToBottom = () => {
+    if (xtermRef.current) {
+      xtermRef.current.scrollToBottom();
+      setShowScrollButton(false);
+    }
+  };
+
   return (
-    <div
-      ref={terminalRef}
-      className={className}
-      style={{
-        width: '100%',
-        height: '100%',
-        backgroundColor: getTerminalTheme(colorTheme, theme).background,
-        ...style,
-      }}
-    />
+    <div ref={containerRef} className={`terminal-outer-container ${className || ''}`} style={style}>
+      <div
+        ref={terminalRef}
+        className="terminal-inner"
+        style={{
+          width: '100%',
+          height: '100%',
+          backgroundColor: getTerminalTheme(colorTheme, theme).background,
+        }}
+      />
+      {showScrollButton && isVisible && (
+        <button
+          className="scroll-to-bottom-btn"
+          onClick={handleScrollToBottom}
+          title="Scroll to bottom (Ctrl+End)"
+          aria-label="Scroll to bottom"
+        >
+          <ArrowDownToLine size={16} />
+        </button>
+      )}
+    </div>
   );
 });
 
