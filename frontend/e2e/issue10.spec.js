@@ -85,7 +85,7 @@ test.describe('Issue #10 Fixes', () => {
       expect(response.ok()).toBe(true);
       
       const data = await response.json();
-      expect(data.version).toBe('1.4.0');
+      expect(data.version).toBe('1.5.0');
     });
     
     test('should not show update notification for current version', async ({ page }) => {

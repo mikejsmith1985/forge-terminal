@@ -66,6 +66,9 @@ func main() {
 	http.HandleFunc("/api/update/check", handleUpdateCheck)
 	http.HandleFunc("/api/update/apply", handleUpdateApply)
 
+	// Sessions API - persist tab state across refreshes
+	http.HandleFunc("/api/sessions", handleSessions)
+
 	// Find an available port
 	addr, listener, err := findAvailablePort()
 	if err != nil {
@@ -371,5 +374,34 @@ func restartSelf() {
 	} else {
 		// Unix: replace current process
 		syscall.Exec(executable, []string{executable}, os.Environ())
+	}
+}
+
+func handleSessions(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	switch r.Method {
+	case http.MethodGet:
+		session, err := commands.LoadSession()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(session)
+
+	case http.MethodPost:
+		var session commands.Session
+		if err := json.NewDecoder(r.Body).Decode(&session); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := commands.SaveSession(&session); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }

@@ -9,6 +9,7 @@ import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
+import SearchBar from './components/SearchBar'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -34,6 +35,12 @@ function App() {
     const saved = localStorage.getItem('terminalFontSize');
     return saved ? parseInt(saved, 10) : 14;
   })
+  
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchMatchCount, setSearchMatchCount] = useState(0)
+  const [searchCurrentMatch, setSearchCurrentMatch] = useState(0)
   
   // Tab management
   const {
@@ -324,6 +331,13 @@ function App() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Ctrl+F: Open search
+      if (e.ctrlKey && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setIsSearchOpen(true);
+        return;
+      }
+
       // Tab shortcuts (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+1-9)
       if (e.ctrlKey && !e.shiftKey) {
         // Ctrl+T: New tab
@@ -496,6 +510,49 @@ function App() {
     }
   }
 
+  // Search handlers
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+    const termRef = getActiveTerminalRef();
+    if (termRef && query) {
+      const found = termRef.findNext(query);
+      // The xterm search addon doesn't provide a match count directly
+      // We'll track if matches are found
+      setSearchMatchCount(found ? 1 : 0);
+      setSearchCurrentMatch(found ? 1 : 0);
+    } else if (termRef) {
+      termRef.clearSearch();
+      setSearchMatchCount(0);
+      setSearchCurrentMatch(0);
+    }
+  }, [getActiveTerminalRef]);
+
+  const handleSearchNext = useCallback(() => {
+    const termRef = getActiveTerminalRef();
+    if (termRef && searchQuery) {
+      termRef.findNext(searchQuery);
+    }
+  }, [getActiveTerminalRef, searchQuery]);
+
+  const handleSearchPrev = useCallback(() => {
+    const termRef = getActiveTerminalRef();
+    if (termRef && searchQuery) {
+      termRef.findPrevious(searchQuery);
+    }
+  }, [getActiveTerminalRef, searchQuery]);
+
+  const handleSearchClose = useCallback(() => {
+    setIsSearchOpen(false);
+    setSearchQuery('');
+    setSearchMatchCount(0);
+    setSearchCurrentMatch(0);
+    const termRef = getActiveTerminalRef();
+    if (termRef) {
+      termRef.clearSearch();
+      termRef.focus();
+    }
+  }, [getActiveTerminalRef]);
+
   const handleAdd = () => {
     setEditingCommand(null)
     setIsModalOpen(true)
@@ -648,6 +705,15 @@ function App() {
           onNewTab={handleNewTab}
           onReorder={reorderTabs}
           disableNewTab={tabs.length >= MAX_TABS}
+        />
+        <SearchBar
+          isOpen={isSearchOpen}
+          onClose={handleSearchClose}
+          onSearch={handleSearch}
+          onNext={handleSearchNext}
+          onPrev={handleSearchPrev}
+          matchCount={searchMatchCount}
+          currentMatch={searchCurrentMatch}
         />
         <div className="terminal-pane-content">
           <div className="terminal-container">

@@ -10,10 +10,13 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 
 - **🚀 Single Binary**: No Docker, Node.js, or config files required. Just download and run.
 - **💻 Full Terminal**: Real PTY support (xterm.js) for interactive apps like `vim`, `htop`, and `claude`.
+- **📑 Multi-Tab Support**: Open multiple terminal tabs (up to 20) with `Ctrl+T`.
 - **⚡ Command Cards**: Save frequently used commands (e.g., complex AI prompts).
 - **⌨️ Shortcuts**: Trigger commands instantly with `Ctrl+Shift+1`, `Ctrl+Shift+2`, etc.
-- **🎨 Beautiful UI**: Dark mode by default, inspired by Catppuccin Mocha.
-- **💾 Persistent**: Commands are saved to `~/.forge/commands.json`.
+- **🔍 Terminal Search**: Find text in terminal output with `Ctrl+F`.
+- **💾 Session Persistence**: Tabs are restored automatically when you refresh or restart.
+- **🎨 Beautiful UI**: 6 color themes (Molten Metal, Deep Ocean, Emerald Forest, Midnight Purple, Rose Gold, Arctic Frost).
+- **🔄 Auto-Updates**: Automatically checks for new versions and offers one-click updates.
 
 ## Installation
 
@@ -50,12 +53,21 @@ chmod +x forge-linux-amd64
 
 1. **Run the app**: It will automatically open your default browser (typically at `http://127.0.0.1:8333`). If that port is busy, it will try other ports automatically.
 2. **Use the Terminal**: It works just like your system terminal.
-3. **Manage Commands**:
+3. **Manage Tabs**:
+   - `Ctrl+T`: New tab
+   - `Ctrl+W`: Close current tab
+   - `Ctrl+1-9`: Switch to tab by number
+   - `Ctrl+Tab`: Cycle through tabs
+4. **Search in Terminal**:
+   - `Ctrl+F`: Open search bar
+   - Type to search, use prev/next buttons or `Enter`/`Shift+Enter`
+   - `Escape`: Close search
+5. **Manage Commands**:
    - Click **+ Add** to create a new command card.
    - **Execute (▶️)**: Pastes the command and presses Enter.
    - **Paste (📋)**: Pastes the command into the terminal (useful for editing before running).
    - **Edit (✏️)**: Modify existing commands.
-4. **Keyboard Shortcuts**:
+6. **Command Shortcuts**:
    - `Ctrl+Shift+1`: Run/Paste Command #1
    - `Ctrl+Shift+2`: Run/Paste Command #2
    - ...and so on.
@@ -86,10 +98,40 @@ go build -o bin/forge ./cmd/forge
 ./bin/forge
 ```
 
+### Run Tests
+
+```bash
+# Unit tests
+cd frontend && npm run test
+
+# End-to-end tests (requires Playwright)
+cd frontend && npx playwright test
+```
+
 ### Cross-Platform Build
 ```bash
 make build-all
 ```
+
+## Changelog
+
+### v1.5.0 (Latest)
+- **Session Persistence**: Tabs are now restored automatically when you refresh or restart the app
+- **Terminal Search**: Find text in terminal output with `Ctrl+F` (prev/next navigation, highlights matches)
+
+### v1.4.2
+- Per-tab color theming
+- Bug fixes for max tabs warning
+
+### v1.4.0
+- Multi-tab terminal support (up to 20 tabs)
+- Tab keyboard shortcuts (`Ctrl+T`, `Ctrl+W`, `Ctrl+1-9`)
+
+### v1.3.9
+- 6 color themes
+- Sidebar positioning (left/right)
+- Font size controls
+- Auto-update system
 
 ## License
 MIT

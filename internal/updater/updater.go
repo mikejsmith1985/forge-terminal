@@ -13,7 +13,7 @@ import (
 )
 
 // Current version - update this with each release
-const CurrentVersion = "1.4.2"
+const CurrentVersion = "1.5.0"
 
 // GitHub repo info
 const (

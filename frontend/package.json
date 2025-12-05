@@ -1,7 +1,7 @@
 {
   "name": "forge-terminal-frontend",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@xterm/addon-fit": "*",
+    "@xterm/addon-search": "*",
     "@xterm/addon-web-links": "*",
     "@xterm/xterm": "*",
     "html2canvas": "^1.4.1",

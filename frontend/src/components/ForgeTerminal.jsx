@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 
@@ -33,6 +34,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const xtermRef = useRef(null);
   const wsRef = useRef(null);
   const fitAddonRef = useRef(null);
+  const searchAddonRef = useRef(null);
   const shellConfigRef = useRef(shellConfig);
   const connectFnRef = useRef(null);
 
@@ -98,6 +100,24 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         connectFnRef.current();
       }
     },
+    // Search methods
+    findNext: (query) => {
+      if (searchAddonRef.current && query) {
+        return searchAddonRef.current.findNext(query, { caseSensitive: false, wholeWord: false, regex: false });
+      }
+      return false;
+    },
+    findPrevious: (query) => {
+      if (searchAddonRef.current && query) {
+        return searchAddonRef.current.findPrevious(query, { caseSensitive: false, wholeWord: false, regex: false });
+      }
+      return false;
+    },
+    clearSearch: () => {
+      if (searchAddonRef.current) {
+        searchAddonRef.current.clearDecorations();
+      }
+    },
   }));
 
   // Update terminal theme when theme or colorTheme prop changes
@@ -140,6 +160,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     fitAddonRef.current = fitAddon;
+
+    // Add search addon
+    const searchAddon = new SearchAddon();
+    term.loadAddon(searchAddon);
+    searchAddonRef.current = searchAddon;
 
     // Open terminal
     term.open(terminalRef.current);

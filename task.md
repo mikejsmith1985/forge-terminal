@@ -1,4 +1,4 @@
-# Current Task: Polish & Release (Issue #5)
+# Current Task: v1.5.0 Release
 
 ## Status
 - [x] **Issue #1: Project Scaffold**
@@ -6,14 +6,26 @@
 - [x] **Issue #3: Commands API**
 - [x] **Issue #4: Frontend**
 - [x] **Issue #5: Polish & Release**
+- [x] **v1.5.0 Features**
+  - [x] Session Persistence (tabs restore on refresh/restart)
+  - [x] Terminal Search (Ctrl+F with prev/next navigation)
 
-## Completed Objectives
-1. Added graceful shutdown (Ctrl+C)
-2. Tested on Mac, Linux, Windows (via cross-compilation)
-3. Written README with screenshots
-4. Created GitHub Actions workflow for releases
-5. Verified builds with `make build-all`
+## v1.5.0 Implementation Details
+
+### Session Persistence
+- Added `/api/sessions` endpoint (GET/POST)
+- Sessions saved to `~/.forge/sessions.json`
+- Tabs (id, title, shellConfig, colorTheme) and activeTabId persisted
+- Debounced save (500ms) on tab changes
+- Auto-restore on page load
+
+### Terminal Search
+- Added `@xterm/addon-search` dependency
+- SearchBar component with Ctrl+F shortcut
+- Prev/Next navigation (Enter/Shift+Enter)
+- Match highlighting with no-results indicator
+- Escape to close
 
 ## Next Steps
-- Project is complete!
-- User can now tag v1.0.0 and push to GitHub to trigger the release workflow.
+- Tag and release v1.5.0
+- Push to GitHub to trigger release workflow

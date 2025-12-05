@@ -1,7 +1,19 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
 
 const MAX_TABS = 20;
+
+// Debounce helper for session saving
+function debounce(fn, ms) {
+  let timeoutId;
+  return (...args) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      timeoutId = null;
+      fn(...args);
+    }, ms);
+  };
+}
 
 // Counter for unique IDs
 let idCounter = 0;
@@ -38,23 +50,121 @@ function createTab(shellConfig, tabNumber, colorTheme = null) {
 }
 
 /**
+ * Convert tabs to session format for persistence
+ */
+function tabsToSession(tabs, activeTabId) {
+  return {
+    tabs: tabs.map(tab => ({
+      id: tab.id,
+      title: tab.title,
+      shellConfig: {
+        shellType: tab.shellConfig?.shellType || 'cmd',
+        wslDistro: tab.shellConfig?.wslDistro || '',
+        wslHomePath: tab.shellConfig?.wslHomePath || '',
+      },
+      colorTheme: tab.colorTheme,
+    })),
+    activeTabId: activeTabId,
+  };
+}
+
+/**
+ * Save session to backend
+ */
+async function saveSession(tabs, activeTabId) {
+  try {
+    const session = tabsToSession(tabs, activeTabId);
+    await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session),
+    });
+  } catch (err) {
+    console.error('[Session] Failed to save session:', err);
+  }
+}
+
+// Debounced save to avoid excessive writes
+const debouncedSaveSession = debounce(saveSession, 500);
+
+/**
+ * Load session from backend
+ */
+async function loadSession() {
+  try {
+    const res = await fetch('/api/sessions');
+    const session = await res.json();
+    return session;
+  } catch (err) {
+    console.error('[Session] Failed to load session:', err);
+    return null;
+  }
+}
+
+/**
  * Hook for managing terminal tabs
  * @param {Object} initialShellConfig - Default shell configuration
  * @returns {Object} Tab state and actions
  */
 export function useTabManager(initialShellConfig) {
+  // Track if session has been loaded
+  const sessionLoadedRef = useRef(false);
+  
   // Initialize with one default tab
   const [state, setState] = useState(() => {
     const initialTab = createTab(initialShellConfig, 1);
     return {
       tabs: [initialTab],
       activeTabId: initialTab.id,
+      sessionLoaded: false,
     };
   });
 
   // Store initialShellConfig in a ref so callbacks don't need it as dependency
   const configRef = useRef(initialShellConfig);
   configRef.current = initialShellConfig;
+
+  // Load session on mount
+  useEffect(() => {
+    if (sessionLoadedRef.current) return;
+    sessionLoadedRef.current = true;
+
+    loadSession().then(session => {
+      if (session && session.tabs && session.tabs.length > 0) {
+        // Restore tabs from session
+        const restoredTabs = session.tabs.map((tabState, index) => ({
+          id: tabState.id || generateId(),
+          title: tabState.title || `Terminal ${index + 1}`,
+          shellConfig: tabState.shellConfig || configRef.current,
+          colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
+          createdAt: Date.now(),
+        }));
+
+        // Update idCounter to avoid collisions
+        idCounter = restoredTabs.length + 1;
+        themeIndex = restoredTabs.length;
+
+        // Find active tab, default to first if not found
+        const activeId = session.activeTabId && restoredTabs.some(t => t.id === session.activeTabId)
+          ? session.activeTabId
+          : restoredTabs[0].id;
+
+        setState({
+          tabs: restoredTabs,
+          activeTabId: activeId,
+          sessionLoaded: true,
+        });
+      } else {
+        setState(prev => ({ ...prev, sessionLoaded: true }));
+      }
+    });
+  }, []);
+
+  // Save session when tabs or active tab changes (debounced)
+  useEffect(() => {
+    if (!state.sessionLoaded) return;
+    debouncedSaveSession(state.tabs, state.activeTabId);
+  }, [state.tabs, state.activeTabId, state.sessionLoaded]);
 
   // Computed: get active tab object
   const activeTab = useMemo(() => {
@@ -87,6 +197,7 @@ export function useTabManager(initialShellConfig) {
       lastCreatedTabIdRef.current = newTab.id;
       
       return {
+        ...prev, // Preserve other state like sessionLoaded
         tabs: [...prev.tabs, newTab],
         activeTabId: newTab.id,
       };
@@ -124,6 +235,7 @@ export function useTabManager(initialShellConfig) {
       }
 
       return {
+        ...prev, // Preserve sessionLoaded
         tabs: newTabs,
         activeTabId: newActiveTabId,
       };
