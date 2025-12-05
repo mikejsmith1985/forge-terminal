@@ -1,9 +1,13 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
+import { themeOrder } from '../themes';
 
 const MAX_TABS = 20;
 
 // Counter for unique IDs
 let idCounter = 0;
+
+// Counter for theme cycling - each new tab gets next theme
+let themeIndex = 0;
 
 /**
  * Generate a unique ID for tabs
@@ -15,12 +19,20 @@ function generateId() {
 
 /**
  * Create a new tab object
+ * @param {Object} shellConfig - Shell configuration
+ * @param {number} tabNumber - Tab number for title
+ * @param {string} colorTheme - Optional color theme override
  */
-function createTab(shellConfig, tabNumber) {
+function createTab(shellConfig, tabNumber, colorTheme = null) {
+  // Auto-assign next theme in cycle if not specified
+  const assignedTheme = colorTheme || themeOrder[themeIndex % themeOrder.length];
+  themeIndex++;
+  
   return {
     id: generateId(),
     title: `Terminal ${tabNumber}`,
     shellConfig: { ...shellConfig },
+    colorTheme: assignedTheme,
     createdAt: Date.now(),
   };
 }
@@ -195,6 +207,27 @@ export function useTabManager(initialShellConfig) {
     });
   }, []);
 
+  /**
+   * Update a tab's color theme
+   * @param {string} tabId - ID of tab to update
+   * @param {string} colorTheme - New color theme name
+   */
+  const updateTabColorTheme = useCallback((tabId, colorTheme) => {
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        return prev;
+      }
+
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], colorTheme };
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
   return {
     tabs: state.tabs,
     activeTabId: state.activeTabId,
@@ -204,6 +237,7 @@ export function useTabManager(initialShellConfig) {
     switchTab,
     updateTabTitle,
     updateTabShellConfig,
+    updateTabColorTheme,
     reorderTabs,
   };
 }

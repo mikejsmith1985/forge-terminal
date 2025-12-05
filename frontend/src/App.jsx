@@ -45,6 +45,7 @@ function App() {
     switchTab,
     updateTabTitle,
     updateTabShellConfig,
+    updateTabColorTheme,
     reorderTabs,
   } = useTabManager(shellConfig);
   
@@ -75,9 +76,18 @@ function App() {
   };
 
   const cycleColorTheme = () => {
-    const currentIndex = themeOrder.indexOf(colorTheme);
+    // Cycle the active tab's color theme
+    const currentTabTheme = activeTab?.colorTheme || colorTheme;
+    const currentIndex = themeOrder.indexOf(currentTabTheme);
     const nextIndex = (currentIndex + 1) % themeOrder.length;
     const nextTheme = themeOrder[nextIndex];
+    
+    // Update the active tab's theme
+    if (activeTabId) {
+      updateTabColorTheme(activeTabId, nextTheme);
+    }
+    
+    // Also update the global colorTheme state and apply
     setColorTheme(nextTheme);
     localStorage.setItem('colorTheme', nextTheme);
     applyTheme(nextTheme, theme);
@@ -120,14 +130,21 @@ function App() {
       const res = await fetch('/api/config');
       const data = await res.json();
       if (data && data.shellType) {
+        // Check if config differs from the initial default
+        const defaultConfig = { shellType: 'powershell', wslDistro: '', wslHomePath: '' };
+        const configDiffers = 
+          data.shellType !== defaultConfig.shellType ||
+          data.wslDistro !== defaultConfig.wslDistro ||
+          data.wslHomePath !== defaultConfig.wslHomePath;
+        
         setShellConfig(data);
         // Update the first tab's shell config to match loaded settings
         if (tabs.length > 0) {
           updateTabShellConfig(tabs[0].id, data);
         }
-        // If config was loaded and differs from default, reconnect terminal
-        if (data.shellType !== 'powershell' || data.wslDistro || data.wslHomePath) {
-          // Small delay to ensure terminal is mounted
+        // Reconnect the terminal if loaded config differs from default
+        // (the initial tab was created with default settings before config loaded)
+        if (configDiffers) {
           setTimeout(() => {
             const termRef = getActiveTerminalRef();
             if (termRef) {
@@ -394,9 +411,17 @@ function App() {
     }
   }, [createTab, shellConfig, addToast]);
 
-  // Handle tab switch - focus terminal after switching
+  // Handle tab switch - focus terminal after switching and apply tab's theme
   const handleTabSwitch = useCallback((tabId) => {
     switchTab(tabId);
+    
+    // Apply the tab's color theme
+    const targetTab = tabs.find(t => t.id === tabId);
+    if (targetTab?.colorTheme) {
+      setColorTheme(targetTab.colorTheme);
+      applyTheme(targetTab.colorTheme, theme);
+    }
+    
     // Small delay to ensure the terminal is visible before focusing
     setTimeout(() => {
       const termRef = terminalRefs.current[tabId];
@@ -404,7 +429,7 @@ function App() {
         termRef.focus();
       }
     }, 50);
-  }, [switchTab]);
+  }, [switchTab, tabs, theme]);
 
   // Handle tab close
   const handleTabClose = useCallback((tabId) => {
