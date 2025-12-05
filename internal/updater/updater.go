@@ -13,7 +13,7 @@ import (
 )
 
 // Current version - update this with each release
-const CurrentVersion = "1.5.2"
+const CurrentVersion = "1.5.3"
 
 // GitHub repo info
 const (
@@ -217,6 +217,70 @@ func ApplyUpdate(newBinaryPath string) error {
 // GetVersion returns the current version
 func GetVersion() string {
 	return CurrentVersion
+}
+
+// ReleaseInfo represents a simplified release for the versions list
+type ReleaseInfo struct {
+	Version      string `json:"version"`
+	Name         string `json:"name"`
+	PublishedAt  string `json:"publishedAt"`
+	ReleaseNotes string `json:"releaseNotes"`
+	DownloadURL  string `json:"downloadUrl"`
+	IsCurrent    bool   `json:"isCurrent"`
+}
+
+// ListReleases returns the last N releases for rollback
+func ListReleases(limit int) ([]ReleaseInfo, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases?per_page=%d", repoOwner, repoName, limit)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "Forge-Terminal-Updater")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var releases []Release
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, err
+	}
+
+	assetName := getAssetName()
+	currentVersion := strings.TrimPrefix(CurrentVersion, "v")
+	result := make([]ReleaseInfo, 0, len(releases))
+
+	for _, release := range releases {
+		var downloadURL string
+		for _, asset := range release.Assets {
+			if asset.Name == assetName {
+				downloadURL = asset.BrowserDownloadURL
+				break
+			}
+		}
+
+		version := strings.TrimPrefix(release.TagName, "v")
+		result = append(result, ReleaseInfo{
+			Version:      release.TagName,
+			Name:         release.Name,
+			PublishedAt:  release.PublishedAt,
+			ReleaseNotes: release.Body,
+			DownloadURL:  downloadURL,
+			IsCurrent:    version == currentVersion,
+		})
+	}
+
+	return result, nil
 }
 
 // Helper functions

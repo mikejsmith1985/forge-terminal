@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, AlertTriangle, Info, CheckCircle, Download } from 'lucide-react';
 import { logger } from '../utils/logger';
 
-const Toast = ({ message, type = 'info', duration = 3000, onClose, action, onAction }) => {
+const Toast = ({ message, type = 'info', duration = 3000, onClose, action, onAction, secondaryAction, onSecondaryAction }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
 
@@ -29,6 +29,11 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose, action, onAct
 
   const handleAction = () => {
     onAction?.();
+    handleClose();
+  };
+
+  const handleSecondaryAction = () => {
+    onSecondaryAction?.();
     handleClose();
   };
 
@@ -62,6 +67,11 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose, action, onAct
     >
       <span style={{ color: color.icon }}>{icons[type]}</span>
       <span className="toast-message">{message}</span>
+      {secondaryAction && (
+        <button className="toast-action toast-action-secondary" onClick={handleSecondaryAction} style={{ color: '#888' }}>
+          {secondaryAction}
+        </button>
+      )}
       {action && (
         <button className="toast-action" onClick={handleAction} style={{ color: color.border }}>
           {action}
@@ -86,6 +96,8 @@ export const ToastContainer = ({ toasts, removeToast }) => {
           duration={toast.duration}
           action={toast.action}
           onAction={toast.onAction}
+          secondaryAction={toast.secondaryAction}
+          onSecondaryAction={toast.onSecondaryAction}
           onClose={() => removeToast(toast.id)}
         />
       ))}
@@ -105,7 +117,9 @@ export const useToast = () => {
       type, 
       duration,
       action: options.action,
-      onAction: options.onAction
+      onAction: options.onAction,
+      secondaryAction: options.secondaryAction,
+      onSecondaryAction: options.onSecondaryAction
     }]);
     return id;
   };

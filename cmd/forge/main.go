@@ -65,6 +65,7 @@ func main() {
 	http.HandleFunc("/api/version", handleVersion)
 	http.HandleFunc("/api/update/check", handleUpdateCheck)
 	http.HandleFunc("/api/update/apply", handleUpdateApply)
+	http.HandleFunc("/api/update/versions", handleListVersions)
 
 	// Sessions API - persist tab state across refreshes
 	http.HandleFunc("/api/sessions", handleSessions)
@@ -375,6 +376,25 @@ func restartSelf() {
 		// Unix: replace current process
 		syscall.Exec(executable, []string{executable}, os.Environ())
 	}
+}
+
+func handleListVersions(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	releases, err := updater.ListReleases(10) // Get last 10 releases
+	if err != nil {
+		log.Printf("[Updater] Failed to list releases: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":    err.Error(),
+			"releases": []interface{}{},
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"releases":       releases,
+		"currentVersion": updater.GetVersion(),
+	})
 }
 
 func handleSessions(w http.ResponseWriter, r *http.Request) {

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, ExternalLink, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Download, RefreshCw, ExternalLink, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, History } from 'lucide-react';
 
 const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdate }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateStatus, setUpdateStatus] = useState(null); // 'downloading' | 'applying' | 'success' | 'error'
   const [errorMessage, setErrorMessage] = useState('');
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -12,8 +15,30 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       setIsUpdating(false);
       setUpdateStatus(null);
       setErrorMessage('');
+      setShowVersions(false);
     }
   }, [isOpen]);
+
+  const fetchVersions = async () => {
+    if (versions.length > 0) {
+      setShowVersions(!showVersions);
+      return;
+    }
+    
+    setLoadingVersions(true);
+    try {
+      const res = await fetch('/api/update/versions');
+      const data = await res.json();
+      if (data.releases) {
+        setVersions(data.releases);
+        setShowVersions(true);
+      }
+    } catch (err) {
+      console.error('Failed to fetch versions:', err);
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
 
   const handleUpdate = async () => {
     setIsUpdating(true);
@@ -47,13 +72,23 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
     onClose();
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
   if (!isOpen) return null;
 
   const hasUpdate = updateInfo?.available;
 
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: '500px' }}>
+      <div className="modal" style={{ maxWidth: '550px' }}>
         <div className="modal-header">
           <h3>
             <Download size={20} style={{ marginRight: '8px', verticalAlign: 'bottom' }} />
@@ -181,10 +216,108 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
             </div>
           )}
 
+          {/* Version History Section */}
+          <div style={{ marginTop: '15px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+            <button
+              onClick={fetchVersions}
+              disabled={loadingVersions}
+              style={{
+                background: 'transparent',
+                border: '1px solid #444',
+                borderRadius: '6px',
+                padding: '10px 15px',
+                color: '#888',
+                cursor: 'pointer',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontSize: '0.9em'
+              }}
+            >
+              {loadingVersions ? (
+                <RefreshCw size={16} className="spin" />
+              ) : (
+                <History size={16} />
+              )}
+              {showVersions ? 'Hide' : 'Show'} Previous Versions
+              {showVersions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {showVersions && versions.length > 0 && (
+              <div style={{ 
+                marginTop: '15px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                border: '1px solid #333',
+                borderRadius: '8px'
+              }}>
+                {versions.map((release, idx) => (
+                  <div 
+                    key={release.version}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '10px 12px',
+                      borderBottom: idx < versions.length - 1 ? '1px solid #333' : 'none',
+                      background: release.isCurrent ? '#1a2e1a' : 'transparent'
+                    }}
+                  >
+                    <div>
+                      <span style={{ 
+                        fontFamily: 'monospace', 
+                        fontWeight: 600,
+                        color: release.isCurrent ? '#4ade80' : '#ccc'
+                      }}>
+                        {release.version}
+                        {release.isCurrent && (
+                          <span style={{ 
+                            marginLeft: '8px', 
+                            fontSize: '0.75em', 
+                            background: '#22c55e',
+                            color: '#000',
+                            padding: '2px 6px',
+                            borderRadius: '4px'
+                          }}>
+                            Current
+                          </span>
+                        )}
+                      </span>
+                      <div style={{ fontSize: '0.8em', color: '#666', marginTop: '2px' }}>
+                        {formatDate(release.publishedAt)}
+                      </div>
+                    </div>
+                    {release.downloadUrl && !release.isCurrent && (
+                      <a
+                        href={release.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: '0.8em',
+                          color: '#60a5fa',
+                          textDecoration: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Download size={14} />
+                        Download
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* GitHub Releases Link */}
           <div style={{ 
             textAlign: 'center',
             paddingTop: '15px',
+            marginTop: '15px',
             borderTop: '1px solid #333'
           }}>
             <a 
@@ -203,14 +336,6 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
               <ExternalLink size={14} />
               View all releases on GitHub
             </a>
-            <p style={{ 
-              fontSize: '0.8em', 
-              color: '#666', 
-              marginTop: '8px',
-              marginBottom: 0 
-            }}>
-              Download previous versions or view full changelog
-            </p>
           </div>
         </div>
 

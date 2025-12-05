@@ -254,7 +254,13 @@ function App() {
             0, // Don't auto-dismiss
             {
               action: 'View Update',
-              onAction: () => setIsUpdateModalOpen(true)
+              onAction: () => setIsUpdateModalOpen(true),
+              secondaryAction: 'Later',
+              onSecondaryAction: () => {
+                // Dismiss for this version for 24 hours
+                localStorage.setItem('updateDismissedAt', Date.now().toString());
+                localStorage.setItem('updateDismissedVersion', data.latestVersion);
+              }
             }
           );
         }
