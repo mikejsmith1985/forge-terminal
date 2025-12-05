@@ -70,6 +70,9 @@ func main() {
 	// Sessions API - persist tab state across refreshes
 	http.HandleFunc("/api/sessions", handleSessions)
 
+	// Welcome screen API - track if welcome has been shown
+	http.HandleFunc("/api/welcome", handleWelcome)
+
 	// Find an available port
 	addr, listener, err := findAvailablePort()
 	if err != nil {
@@ -420,6 +423,35 @@ func handleSessions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleWelcome(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	currentVersion := updater.GetVersion()
+
+	switch r.Method {
+	case http.MethodGet:
+		// Check if welcome screen should be shown
+		shown := commands.IsWelcomeShown(currentVersion)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"shown":   shown,
+			"version": currentVersion,
+		})
+
+	case http.MethodPost:
+		// Mark welcome as shown for current version
+		if err := commands.SetWelcomeShown(currentVersion); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"version": currentVersion,
+		})
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

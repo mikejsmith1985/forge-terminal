@@ -8,6 +8,7 @@ import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import UpdateModal from './components/UpdateModal'
+import WelcomeModal from './components/WelcomeModal'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
 import SearchBar from './components/SearchBar'
@@ -24,6 +25,7 @@ function App() {
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false)
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
   const [colorTheme, setColorTheme] = useState(() => {
@@ -137,6 +139,7 @@ function App() {
     loadConfig()
     checkWSL()
     checkForUpdates()
+    checkWelcome()
     // Check system preference or saved theme
     const savedTheme = localStorage.getItem('theme') || 'dark';
     const savedColorTheme = localStorage.getItem('colorTheme') || 'molten';
@@ -268,6 +271,39 @@ function App() {
     } catch (err) {
       console.error('Failed to check for updates:', err);
     }
+  }
+
+  const checkWelcome = async () => {
+    try {
+      const res = await fetch('/api/welcome');
+      const data = await res.json();
+      
+      // Show welcome if not already shown for this version
+      if (!data.shown) {
+        setIsWelcomeModalOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to check welcome status:', err);
+    }
+  }
+
+  const dismissWelcome = async () => {
+    setIsWelcomeModalOpen(false);
+    
+    // Mark welcome as shown
+    try {
+      await fetch('/api/welcome', { method: 'POST' });
+    } catch (err) {
+      console.error('Failed to save welcome status:', err);
+    }
+    
+    // Focus the terminal after dismissing welcome
+    setTimeout(() => {
+      const termRef = getActiveTerminalRef();
+      if (termRef) {
+        termRef.focus();
+      }
+    }, 100);
   }
 
   const handleShellToggle = () => {
@@ -879,6 +915,12 @@ function App() {
         onClose={() => setIsUpdateModalOpen(false)}
         updateInfo={updateInfo}
         currentVersion={currentVersion}
+      />
+
+      <WelcomeModal
+        isOpen={isWelcomeModalOpen}
+        onClose={dismissWelcome}
+        version={currentVersion}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
