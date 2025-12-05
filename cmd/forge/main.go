@@ -19,6 +19,7 @@ import (
 
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
+	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
 
 //go:embed all:web
@@ -59,6 +60,11 @@ func main() {
 
 	// Shutdown API - allows graceful shutdown from browser
 	http.HandleFunc("/api/shutdown", handleShutdown)
+
+	// Update API - check for updates and apply them
+	http.HandleFunc("/api/version", handleVersion)
+	http.HandleFunc("/api/update/check", handleUpdateCheck)
+	http.HandleFunc("/api/update/apply", handleUpdateApply)
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()
@@ -251,4 +257,117 @@ func findAvailablePort() (string, net.Listener, error) {
 	addr := listener.Addr().String()
 	log.Printf("Using OS-assigned port: %s", addr)
 	return addr, listener, nil
+}
+
+func handleVersion(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"version": updater.GetVersion(),
+	})
+}
+
+func handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	info, err := updater.CheckForUpdate()
+	if err != nil {
+		log.Printf("[Updater] Check failed: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"available":      false,
+			"currentVersion": updater.GetVersion(),
+			"error":          err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(info)
+}
+
+// Stored update info for apply
+var pendingUpdate *updater.UpdateInfo
+
+func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Check for update first
+	info, err := updater.CheckForUpdate()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	if !info.Available {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "No update available",
+		})
+		return
+	}
+
+	// Download the update
+	log.Printf("[Updater] Downloading %s...", info.AssetName)
+	tmpPath, err := updater.DownloadUpdate(info)
+	if err != nil {
+		log.Printf("[Updater] Download failed: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Download failed: " + err.Error(),
+		})
+		return
+	}
+
+	// Apply the update
+	log.Printf("[Updater] Applying update...")
+	if err := updater.ApplyUpdate(tmpPath); err != nil {
+		log.Printf("[Updater] Apply failed: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Apply failed: " + err.Error(),
+		})
+		return
+	}
+
+	log.Printf("[Updater] Update applied successfully! Restarting...")
+
+	// Send success response
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":    true,
+		"newVersion": info.LatestVersion,
+		"message":    "Update applied. Restarting...",
+	})
+
+	// Restart the application
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		restartSelf()
+	}()
+}
+
+func restartSelf() {
+	executable, err := os.Executable()
+	if err != nil {
+		log.Printf("[Updater] Failed to get executable path: %v", err)
+		os.Exit(1)
+	}
+
+	// On Windows, we need to start a new process and exit
+	// On Unix, we can use exec to replace the current process
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command(executable)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Start()
+		os.Exit(0)
+	} else {
+		// Unix: replace current process
+		syscall.Exec(executable, []string{executable}, os.Environ())
+	}
 }

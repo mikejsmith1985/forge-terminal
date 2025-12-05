@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, AlertTriangle, Info, CheckCircle } from 'lucide-react';
+import { X, AlertTriangle, Info, CheckCircle, Download } from 'lucide-react';
 
-const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
+const Toast = ({ message, type = 'info', duration = 3000, onClose, action, onAction }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
 
@@ -22,6 +22,11 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
     }, 300);
   };
 
+  const handleAction = () => {
+    onAction?.();
+    handleClose();
+  };
+
   if (!isVisible) return null;
 
   const icons = {
@@ -29,6 +34,7 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
     warning: <AlertTriangle size={18} />,
     success: <CheckCircle size={18} />,
     error: <AlertTriangle size={18} />,
+    update: <Download size={18} />,
   };
 
   const colors = {
@@ -36,6 +42,7 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
     warning: { bg: '#422006', border: '#f97316', icon: '#fb923c' },
     success: { bg: '#14532d', border: '#22c55e', icon: '#4ade80' },
     error: { bg: '#450a0a', border: '#ef4444', icon: '#f87171' },
+    update: { bg: '#1e1b4b', border: '#8b5cf6', icon: '#a78bfa' },
   };
 
   const color = colors[type] || colors.info;
@@ -50,6 +57,11 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
     >
       <span style={{ color: color.icon }}>{icons[type]}</span>
       <span className="toast-message">{message}</span>
+      {action && (
+        <button className="toast-action" onClick={handleAction} style={{ color: color.border }}>
+          {action}
+        </button>
+      )}
       <button className="toast-close" onClick={handleClose}>
         <X size={16} />
       </button>
@@ -67,6 +79,8 @@ export const ToastContainer = ({ toasts, removeToast }) => {
           message={toast.message}
           type={toast.type}
           duration={toast.duration}
+          action={toast.action}
+          onAction={toast.onAction}
           onClose={() => removeToast(toast.id)}
         />
       ))}
@@ -78,9 +92,16 @@ export const ToastContainer = ({ toasts, removeToast }) => {
 export const useToast = () => {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = (message, type = 'info', duration = 3000) => {
+  const addToast = (message, type = 'info', duration = 3000, options = {}) => {
     const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, message, type, duration }]);
+    setToasts((prev) => [...prev, { 
+      id, 
+      message, 
+      type, 
+      duration,
+      action: options.action,
+      onAction: options.onAction
+    }]);
     return id;
   };
 

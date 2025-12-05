@@ -593,6 +593,21 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.toast-action {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toast-action:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 /* Icon Picker */
 .icon-select-btn {
   display: flex;

@@ -77,6 +77,7 @@ function App() {
     loadCommands()
     loadConfig()
     checkWSL()
+    checkForUpdates()
     // Check system preference or saved theme
     const savedTheme = localStorage.getItem('theme') || 'dark';
     const savedColorTheme = localStorage.getItem('colorTheme') || 'molten';
@@ -84,6 +85,10 @@ function App() {
     setColorTheme(savedColorTheme);
     document.documentElement.className = savedTheme;
     applyTheme(savedColorTheme, savedTheme);
+    
+    // Check for updates periodically (every 30 minutes)
+    const updateInterval = setInterval(checkForUpdates, 30 * 60 * 1000);
+    return () => clearInterval(updateInterval);
   }, [])
 
   const loadConfig = async () => {
@@ -143,6 +148,43 @@ function App() {
       setWslAvailable(data.available || false);
     } catch (err) {
       setWslAvailable(false);
+    }
+  }
+
+  const checkForUpdates = async () => {
+    try {
+      const res = await fetch('/api/update/check');
+      const data = await res.json();
+      if (data.available) {
+        addToast(
+          `Update available: ${data.latestVersion}`,
+          'update',
+          0, // Don't auto-dismiss
+          {
+            action: 'Update Now',
+            onAction: () => applyUpdate(data.latestVersion)
+          }
+        );
+      }
+    } catch (err) {
+      console.error('Failed to check for updates:', err);
+    }
+  }
+
+  const applyUpdate = async (version) => {
+    addToast(`Downloading update ${version}...`, 'info', 0);
+    try {
+      const res = await fetch('/api/update/apply', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        addToast('Update applied! Restarting...', 'success', 3000);
+        // The server will restart, page will reload automatically
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        addToast(`Update failed: ${data.error}`, 'error', 5000);
+      }
+    } catch (err) {
+      addToast(`Update failed: ${err.message}`, 'error', 5000);
     }
   }
 
