@@ -591,7 +591,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
         }
         
-        term.write(`\r\n\x1b[${messageColor}m[Disconnected]\x1b[0m ${disconnectMessage}\r\n`);
+        // Only write to terminal if it's still active (not disposed)
+        if (xtermRef.current) {
+          term.write(`\r\n\x1b[${messageColor}m[Disconnected]\x1b[0m ${disconnectMessage}\r\n`);
+        }
         if (onConnectionChange) onConnectionChange(false);
       };
 
@@ -649,8 +652,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         clearTimeout(waitingCheckTimeoutRef.current);
       }
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        // Remove onclose handler before closing to avoid race condition
+        // (component unmount is intentional, not a disconnect to display)
+        wsRef.current.onclose = null;
         wsRef.current.close();
       }
+      xtermRef.current = null;
       term.dispose();
     };
   }, []); // Only run once on mount, theme updates handled by other effect
