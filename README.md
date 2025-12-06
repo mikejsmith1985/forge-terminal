@@ -17,14 +17,16 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 
 ### Command Cards
 - **⚡ Quick Commands**: Save frequently used commands with descriptions and icons.
+- **🎭 Emoji & Lucide Icons**: Choose from 40+ colorful emoji icons or professional Lucide icons for command cards.
 - **⌨️ Keyboard Shortcuts**: Trigger commands instantly with `Ctrl+Shift+1` through `Ctrl+Shift+9` (and beyond with letters).
 - **📋 Paste vs Execute**: Choose to paste commands for editing or execute immediately.
 - **🔄 Drag & Drop**: Reorder command cards to your preference.
 - **⭐ Favorites**: Mark important commands as favorites.
 
 ### Theming & Customization
-- **🎨 6 Color Themes**: Molten Metal, Deep Ocean, Emerald Forest, Midnight Purple, Rose Gold, Arctic Frost.
-- **🌗 Light/Dark Mode**: Toggle between light and dark modes.
+- **🎨 10 Color Themes**: Molten Metal, Deep Ocean, Emerald Forest, Midnight Purple, Rose Gold, Arctic Frost, plus 4 high-contrast accessibility themes.
+- **🌗 Per-Tab Light/Dark Mode**: Each tab can independently toggle between light and dark modes (10 themes × 2 modes = 20 unique visuals).
+- **♿ High-Contrast Themes**: Includes color-blind friendly themes for visual accessibility.
 - **📏 Font Size Control**: Adjust terminal font size (10-24px).
 - **📐 Flexible Layout**: Position the command sidebar on the left or right.
 - **🎯 Per-Tab Themes**: Each tab can have its own color theme.
@@ -35,11 +37,13 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **📂 Path Translation**: Automatic conversion of Windows paths to WSL paths.
 
 ### Quality of Life
+- **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./am/` directory.
 - **🔄 Auto-Updates**: Automatic update checking with one-click installation.
 - **📜 Version History**: View and rollback to previous versions.
-- **🤖 Prompt Watcher**: Auto-respond to CLI confirmation prompts (per-tab toggle).
+- **🤖 Auto-Respond**: Auto-respond to CLI confirmation prompts (per-tab toggle).
 - **📍 Scroll to Bottom**: Quick button to jump to latest output.
 - **🔌 Disconnect Reasons**: Clear messages when terminal sessions end.
+- **🖥️ Desktop Shortcut**: Create a desktop shortcut from Settings for quick access.
 
 ## Installation
 
@@ -109,18 +113,24 @@ chmod +x forge-linux-amd64
 
 3. **Manage Command Cards**:
    - Click **+ Add** to create a new command card.
+   - Choose an **emoji** 🎨 or **icon** for visual identification.
    - **Execute (▶️)**: Pastes the command and presses Enter.
    - **Paste (📋)**: Pastes the command into the terminal (for editing before running).
    - **Edit (✏️)**: Modify existing commands.
    - **Drag**: Reorder cards by dragging.
 
 4. **Customize Appearance**:
-   - Click the **palette icon** to cycle through color themes.
-   - Click the **sun/moon icon** to toggle light/dark mode.
+   - Click the **palette icon** to cycle through 10 color themes.
+   - **Right-click a tab** and select "Light Mode" or "Dark Mode" for per-tab themes.
    - Use **+/-** buttons to adjust font size.
    - Click the **panel icon** to move sidebar left/right.
 
-5. **Windows Shell Selection**:
+5. **Enable AM Logging** (Optional):
+   - Right-click a tab → "AM Logging" to enable session recording.
+   - Logs are saved to `./am/` directory.
+   - Use the "📖 Summarize Last Session" command card to review previous work.
+
+6. **Windows Shell Selection**:
    - Click the shell indicator (CMD/PS/WSL) to cycle through shells.
    - Use the **settings gear** for detailed WSL configuration.
 
@@ -176,9 +186,30 @@ Forge Terminal stores configuration in `~/.forge/`:
 | `sessions.json` | Tab state for session restore |
 | `welcome_shown` | Tracks if welcome screen was shown for current version |
 
+AM logs are stored in the working directory:
+- `./am/` - Active session logs (Markdown format)
+- `./am_archive/` - Archived logs from completed sessions
+
 ## Changelog
 
-### v1.6.0 (Latest)
+### v1.9.0 (Latest)
+- **Per-Tab Light/Dark Mode**: Each tab can independently toggle between light and dark modes (20 unique visual combinations)
+- **Emoji Icons**: 40+ colorful emoji icons for command cards alongside existing Lucide icons
+- **High-Contrast Accessibility Themes**: 4 new themes including color-blind friendly options (10 total themes)
+- **Desktop Shortcut Creation**: Create desktop shortcuts from Settings > Installation
+- **Enhanced Welcome Screen**: Updated with AM, Auto-Respond, Self-Naming Tabs, and accessibility info
+
+### v1.8.0
+- **Desktop Shortcut**: Create shortcuts from Settings modal
+- **4 High-Contrast Themes**: Accessibility-focused themes for visual impairments
+- **Welcome Screen Enhancements**: Added feature descriptions for AM, Auto-Respond, and Self-Naming Tabs
+
+### v1.7.0
+- **AM (Artificial Memory)**: Per-tab session logging for crash recovery
+- **Self-Naming Tabs**: Tabs automatically rename to current working directory
+- **Auto-Respond**: Per-tab toggle for CLI confirmation prompt automation
+
+### v1.6.0
 - **Welcome Screen**: First-launch splash screen with feature overview
 - **Enhanced Documentation**: Comprehensive README with all features documented
 - **Prompt Watcher**: Auto-respond to CLI confirmation prompts (per-tab toggle)

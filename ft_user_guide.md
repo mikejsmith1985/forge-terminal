@@ -15,11 +15,12 @@
 7. [Themes & Customization](#-themes--customization)
 8. [Windows Features (CMD, PowerShell, WSL)](#-windows-features-cmd-powershell-wsl)
 9. [Search Your Terminal](#-search-your-terminal)
-10. [Prompt Watcher (Auto-Respond)](#-prompt-watcher-auto-respond)
-11. [Updates & Versions](#-updates--versions)
-12. [Where Settings Are Saved](#-where-settings-are-saved)
-13. [Technical Details](#-technical-details)
-14. [Troubleshooting](#-troubleshooting)
+10. [Auto-Respond (Prompt Watcher)](#-auto-respond-prompt-watcher)
+11. [AM (Artificial Memory) Logging](#-am-artificial-memory-logging)
+12. [Updates & Versions](#-updates--versions)
+13. [Where Settings Are Saved](#-where-settings-are-saved)
+14. [Technical Details](#-technical-details)
+15. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -33,8 +34,10 @@ Think of it like your computer's command prompt or terminal, but with superpower
 
 - **One File = Everything**: Just download one file, double-click, and it works. No complicated setup!
 - **Command Cards**: Save your favorite commands and run them with a single click or keyboard shortcut
-- **Multiple Tabs**: Open up to 20 different terminals at once
-- **Pretty Colors**: Choose from 6 beautiful color themes
+- **Multiple Tabs**: Open up to 20 different terminals at once with per-tab customization
+- **10 Beautiful Themes**: Choose from 10 color themes including high-contrast accessibility options
+- **Per-Tab Modes**: Each tab can be light or dark mode independently (20 unique visual combinations)
+- **AM Logging**: Optional session recording to never lose your work context
 - **Works Everywhere**: Runs on Windows, Mac, and Linux
 
 ### The "One Binary, Double-Click, Works" Promise
@@ -160,7 +163,7 @@ Each card has:
 
 ### Pre-Made Commands
 
-Forge Terminal comes with 4 default commands designed for AI coding:
+Forge Terminal comes with 5 default commands designed for AI coding:
 
 | Command | What It Does |
 |---------|-------------|
@@ -168,6 +171,7 @@ Forge Terminal comes with 4 default commands designed for AI coding:
 | 📝 **Design Command** | Pastes a prompt asking AI to design before coding |
 | ⚡ **Execute Command** | Pastes a prompt to implement the design using TDD |
 | 🛑 **F*** THIS!** | A "reset" prompt when the AI gets stuck in a loop |
+| 📖 **Summarize Last Session** | AI prompt to read AM logs and summarize where you left off |
 
 ### Execute vs. Paste
 
@@ -182,13 +186,27 @@ Some commands (like the AI prompts) are "paste only" - they don't have a Run but
 
 1. Click the **+ Add** button at the top of the sidebar
 2. Fill in:
-   - **Name**: What to call it
-   - **Description**: Optional explanation
-   - **Command**: The actual text
-   - **Keyboard Shortcut**: Automatically assigned, or pick your own
+   - **Icon**: Choose from 40+ colorful emoji icons or professional Lucide icons
+   - **Description**: A friendly name for the card
+   - **Command**: The actual text to paste/run
+   - **Keyboard Shortcut**: Automatically assigned, or customize it
    - **Paste Only**: Check if you don't want an Execute button
    - **Favorite**: Check to highlight it in yellow
 3. Click **Save**
+
+### Choosing Icons
+
+When creating or editing a command, click the icon button to open the icon picker:
+
+**Emoji Category** 🎭
+- 40+ colorful emoji icons: 🤖 🚀 🔥 ✨ 💡 🎯 🏆 💎 and more!
+- Perfect for personal projects and quick visual identification
+- Works on all platforms (native emoji rendering)
+
+**Other Categories**
+- AI & Automation, Development, Git, Infrastructure, etc.
+- Professional Lucide icons for a consistent look
+- Great for team environments
 
 ### Reordering Commands
 
@@ -249,8 +267,9 @@ Commands automatically get shortcuts assigned:
 
 ### Color Themes
 
-Forge Terminal has **6 beautiful color themes**:
+Forge Terminal has **10 beautiful color themes** including high-contrast accessibility options:
 
+**Standard Themes:**
 | Theme | Colors |
 |-------|--------|
 | 🔥 **Molten Metal** | Orange and red, like lava |
@@ -260,17 +279,35 @@ Forge Terminal has **6 beautiful color themes**:
 | 🌹 **Rose Gold** | Pink and rose colors |
 | ❄️ **Arctic Frost** | Light blue and cyan, like ice |
 
+**High-Contrast Accessibility Themes:**
+| Theme | Purpose |
+|-------|---------|
+| ♿ **High Contrast Dark** | Black background, bright cyan/magenta accents |
+| ♿ **High Contrast Light** | Strong contrast with yellow accents |
+| ♿ **Blue/Yellow (CVD)** | Colorblind-friendly, avoids red/green |
+| ♿ **Yellow/Purple (CVD)** | Tritanopia-friendly palette |
+
 ### Changing Themes
 
 **For the current tab:**
-- Click the **palette icon (🎨)** in the sidebar to cycle through themes
+- Click the **palette icon (🎨)** in the sidebar to cycle through all 10 themes
 
 **Per-Tab Theming:**
 Each tab can have its own color theme! When you switch tabs, the theme changes too.
 
-### Light/Dark Mode
+### Per-Tab Light/Dark Mode
 
-Click the **sun/moon icon** to toggle between light and dark mode. This works with all color themes!
+Each tab can independently be in light or dark mode!
+
+**To toggle a tab's mode:**
+1. **Right-click** on the tab
+2. Select **"Light Mode"** or **"Dark Mode"**
+3. The tab indicator shows "Light" when in light mode
+
+**Why is this cool?**
+- 10 themes × 2 modes = **20 unique visual combinations**
+- New tabs automatically alternate modes for visual variety
+- Perfect for distinguishing different projects or workspaces
 
 ### Font Size
 
@@ -285,6 +322,15 @@ Adjust how big or small the terminal text is:
 ### Sidebar Position
 
 Click the **panel icon** to move the command cards sidebar between left and right sides of the screen.
+
+### Desktop Shortcut
+
+Create a desktop shortcut for quick access:
+1. Click the ⚙️ **settings gear** icon
+2. Scroll to the **Installation** section
+3. Click **"Create Desktop Shortcut"**
+
+Works on Windows, macOS, and Linux!
 
 ---
 
@@ -347,7 +393,7 @@ The search bar shows you how many matches were found and highlights them in the 
 
 ---
 
-## 🤖 Prompt Watcher (Auto-Respond)
+## 🤖 Auto-Respond (Prompt Watcher)
 
 When using AI coding tools like GitHub Copilot CLI, you often see prompts like:
 
@@ -355,7 +401,7 @@ When using AI coding tools like GitHub Copilot CLI, you often see prompts like:
 ? Run this command? (y/n)
 ```
 
-The **Prompt Watcher** can automatically respond "yes" to these prompts!
+The **Auto-Respond** feature can automatically respond "yes" to these prompts!
 
 ### How to Enable
 
@@ -377,6 +423,60 @@ The Prompt Watcher looks for common confirmation patterns:
 - Auto-respond is **per-tab** - enable it only where you want it
 - It only responds to **confirmation prompts**, not passwords or other input
 - Turn it off when you need manual control
+
+---
+
+## 📖 AM (Artificial Memory) Logging
+
+**AM** stands for **Artificial Memory** - it's an optional feature that records everything that happens in your terminal session so you never lose your work context.
+
+### What Is It?
+
+When you enable AM logging for a tab, Forge Terminal creates a Markdown file that records:
+- Every command you type
+- All terminal output
+- Timestamps for when things happened
+- The working directory and tab name
+
+Think of it like a detailed lab notebook for your terminal sessions!
+
+### Why Use It?
+
+- **Crash Recovery**: If your terminal crashes or you accidentally close it, you have a complete record
+- **Session Resuming**: Use the "📖 Summarize Last Session" command card to get an AI-powered summary of where you left off
+- **Documentation**: Perfect audit trail for debugging or explaining what you did
+- **Team Collaboration**: Share logs with teammates to show exact steps you took
+
+### How to Enable
+
+1. **Right-click** on a tab
+2. Select **"AM Logging"** to enable it
+3. A green indicator appears on the tab when active
+
+### Where Are Logs Stored?
+
+AM logs are stored in your current working directory:
+- **Active logs**: `./am/session-{tabID}-{date}.md`
+- **Archived logs**: `./am_archive/` (automatically moved when sessions end)
+
+### Using the Summary Command
+
+The default command card "📖 Summarize Last Session" (Ctrl+Shift+5) is a special prompt designed to work with AM logs:
+
+1. **Paste the command** into your AI assistant (like Claude)
+2. The AI will **read the most recent AM log** from `./am/`
+3. You get a **200-word summary** covering:
+   - What you were working on
+   - The last significant action
+   - Any errors encountered
+   - What to do next
+
+### Tips
+
+- Enable AM logging when working on complex tasks
+- Logs are stored as Markdown files - you can read them directly!
+- Old logs (7+ days) are automatically cleaned up to save space
+- Disable AM logging when you don't need it (reduces disk writes)
 
 ---
 

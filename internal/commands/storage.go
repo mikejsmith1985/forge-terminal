@@ -51,6 +51,15 @@ var DefaultCommands = []Command{
 		PasteOnly:   true,
 		Favorite:    true,
 	},
+	{
+		ID:          5,
+		Description: "📖 Summarize Last Session",
+		Command:     "Read and analyze the AM (Artificial Memory) session log located in the ./am/ directory. Find the most recent session-*.md file and provide a concise 200-word-or-less summary covering:\n\n1. What tasks or commands were being worked on\n2. The last significant action or output\n3. Any errors or issues encountered\n4. What the user should continue with or investigate next\n\nBe direct and actionable. Focus on helping me pick up where I left off.\n\nThe AM log is in: ./am/\n",
+		KeyBinding:  "Ctrl+Shift+5",
+		PasteOnly:   true,
+		Favorite:    false,
+		Icon:        "emoji-eyes",
+	},
 }
 
 // UserHomeDir is a variable to allow mocking in tests
