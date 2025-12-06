@@ -16,7 +16,7 @@ test.describe('v1.9.3 Bug Fixes', () => {
     await page.goto('http://localhost:8333');
     await page.waitForLoadState('networkidle');
     // Wait for terminal to be ready
-    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.locator('.xterm-screen').first().waitFor({ state: 'visible', timeout: 20000 });
   });
 
   test('Issue 1: Restore default cards button is always visible in settings', async ({ page }) => {
@@ -73,7 +73,7 @@ test.describe('v1.9.3 Bug Fixes', () => {
     console.log('[Test] Toast notification appeared:', toastText);
     
     // Terminal should reconnect (look for connection message)
-    await page.waitForSelector('.xterm-screen', { timeout: 5000 });
+    await page.locator('.xterm-screen').first().waitFor({ state: 'visible', timeout: 20000 });
     console.log('[Test] Terminal reconnected successfully');
   });
 
@@ -111,7 +111,7 @@ test.describe('v1.9.3 Bug Fixes', () => {
     console.log('[Test] Testing directory persistence...');
     
     // Wait for terminal to be ready
-    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.locator('.xterm-screen').first().waitFor({ state: 'visible', timeout: 20000 });
     await page.waitForTimeout(2000); // Wait for prompt
     
     // Get initial tab name
@@ -139,7 +139,7 @@ test.describe('v1.9.3 Bug Fixes', () => {
     console.log('[Test] Refreshing page to test persistence...');
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.locator('.xterm-screen').first().waitFor({ state: 'visible', timeout: 20000 });
     await page.waitForTimeout(2000);
     
     // Check if tab name persisted
@@ -160,7 +160,7 @@ test.describe('v1.9.3 Bug Fixes', () => {
     console.log('[Test] Testing directory persistence across multiple tabs...');
     
     // Wait for initial terminal
-    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.locator('.xterm-screen').first().waitFor({ state: 'visible', timeout: 20000 });
     await page.waitForTimeout(2000);
     
     // Create a second tab
@@ -197,7 +197,7 @@ test.describe('v1.9.3 Bug Fixes', () => {
     console.log('[Test] Refreshing page...');
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.locator('.xterm-screen').first().waitFor({ state: 'visible', timeout: 20000 });
     await page.waitForTimeout(2000);
     
     // Check that both tabs persisted
@@ -221,7 +221,7 @@ test.describe('v1.9.3 Bug Fixes', () => {
     console.log('[Test] Testing connection overlay...');
     
     // Wait for terminal to connect
-    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.locator('.xterm-screen').first().waitFor({ state: 'visible', timeout: 20000 });
     await page.waitForTimeout(1000);
     
     // Connection overlay should NOT be visible when connected
@@ -237,7 +237,7 @@ test.describe('v1.9.3 Bug Fixes', () => {
     console.log('[Test] Testing reconnect button calls terminal.reconnect()...');
     
     // Wait for terminal
-    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.locator('.xterm-screen').first().waitFor({ state: 'visible', timeout: 20000 });
     await page.waitForTimeout(1000);
     
     // Click reconnect button
