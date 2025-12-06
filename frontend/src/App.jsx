@@ -646,7 +646,8 @@ function App() {
   const handleRestoreSession = async (session, aiTool) => {
     try {
       // Get the session content
-      const response = await fetch(`/api/am/content/${session.TabID}`);
+      const tabId = session.tabId || session.TabID;
+      const response = await fetch(`/api/am/content/${tabId}`);
       const data = await response.json();
       
       if (!data.success) {
@@ -680,10 +681,10 @@ Please acknowledge you've reviewed this and tell me where we left off, then cont
         addToast('Session restore sent to ' + aiTool, 'success', 3000);
         
         // Archive the session
-        await fetch(`/api/am/archive/${session.TabID}`, { method: 'POST' });
+        await fetch(`/api/am/archive/${tabId}`, { method: 'POST' });
         
         // Remove from recoverable list
-        setRecoverableSessions(prev => prev.filter(s => s.TabID !== session.TabID));
+        setRecoverableSessions(prev => prev.filter(s => (s.tabId || s.TabID) !== tabId));
       }
     } catch (err) {
       console.error('[AM] Failed to restore session:', err);
@@ -694,11 +695,12 @@ Please acknowledge you've reviewed this and tell me where we left off, then cont
   // Handle dismissing an AM restore card
   const handleDismissSession = async (session) => {
     try {
+      const tabId = session.tabId || session.TabID;
       // Archive the session
-      await fetch(`/api/am/archive/${session.TabID}`, { method: 'POST' });
+      await fetch(`/api/am/archive/${tabId}`, { method: 'POST' });
       
       // Remove from recoverable list
-      setRecoverableSessions(prev => prev.filter(s => s.TabID !== session.TabID));
+      setRecoverableSessions(prev => prev.filter(s => (s.tabId || s.TabID) !== tabId));
       
       addToast('Session dismissed', 'info', 2000);
     } catch (err) {
@@ -709,10 +711,12 @@ Please acknowledge you've reviewed this and tell me where we left off, then cont
 
   // Handle viewing an AM log
   const handleViewLog = (session) => {
+    const content = session.content || session.Content || '';
+    const tabId = session.tabId || session.TabID;
     // Open log in a modal or new window
     const logWindow = window.open('', '_blank', 'width=800,height=600');
-    logWindow.document.write('<pre>' + session.Content + '</pre>');
-    logWindow.document.title = `Session Log - ${session.TabID}`;
+    logWindow.document.write('<pre>' + content + '</pre>');
+    logWindow.document.title = `Session Log - ${tabId}`;
   };
 
   const loadCommands = () => {
@@ -973,7 +977,7 @@ Please acknowledge you've reviewed this and tell me where we left off, then cont
         {/* AM Restore Cards - Show at top if recoverable sessions exist */}
         {recoverableSessions.map(session => (
           <AMRestoreCard
-            key={session.TabID}
+            key={session.tabId || session.TabID}
             session={session}
             onRestore={handleRestoreSession}
             onDismiss={() => handleDismissSession(session)}

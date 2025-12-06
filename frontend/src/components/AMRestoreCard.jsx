@@ -19,7 +19,8 @@ export function AMRestoreCard({ session, onRestore, onDismiss, onViewLog }) {
 
   // Extract last activity hint from session content
   const getLastActivity = () => {
-    const lines = session.Content.split('\n');
+    const content = session.content || session.Content || '';
+    const lines = content.split('\n');
     // Look for the last non-empty content entry
     for (let i = lines.length - 1; i >= 0; i--) {
       const line = lines[i].trim();
@@ -32,7 +33,8 @@ export function AMRestoreCard({ session, onRestore, onDismiss, onViewLog }) {
   };
 
   const timeAgo = () => {
-    const diff = Date.now() - new Date(session.LastUpdated).getTime();
+    const lastUpdated = session.lastUpdated || session.LastUpdated;
+    const diff = Date.now() - new Date(lastUpdated).getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
