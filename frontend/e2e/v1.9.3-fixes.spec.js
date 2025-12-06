@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('v1.9.3 Bug Fixes', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:9000');
+    await page.goto('http://localhost:8333');
     await page.waitForLoadState('networkidle');
     // Wait for terminal to be ready
     await page.waitForSelector('.xterm-screen', { timeout: 10000 });
