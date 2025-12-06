@@ -36,8 +36,9 @@ function generateId() {
  * @param {number} tabNumber - Tab number for title
  * @param {string} colorTheme - Optional color theme override
  * @param {string} mode - Optional mode override ('dark' or 'light')
+ * @param {string} currentDirectory - Optional current directory path
  */
-function createTab(shellConfig, tabNumber, colorTheme = null, mode = null) {
+function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, currentDirectory = null) {
   // Auto-assign next theme in cycle if not specified
   const assignedTheme = colorTheme || themeOrder[themeIndex % themeOrder.length];
   // Alternate mode for visual variety: even tabs dark, odd tabs light (if not specified)
@@ -52,6 +53,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null) {
     mode: assignedMode, // Per-tab light/dark mode
     autoRespond: false, // Auto-respond to CLI confirmation prompts
     amEnabled: false, // AM (Artificial Memory) logging
+    currentDirectory: currentDirectory || null, // Current working directory
     createdAt: Date.now(),
   };
   
@@ -60,6 +62,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null) {
     tabNumber, 
     colorTheme: assignedTheme,
     mode: assignedMode,
+    currentDirectory,
     themeIndex: themeIndex - 1
   });
   
@@ -83,6 +86,7 @@ function tabsToSession(tabs, activeTabId) {
       mode: tab.mode || 'dark',
       autoRespond: tab.autoRespond || false,
       amEnabled: tab.amEnabled || false,
+      currentDirectory: tab.currentDirectory || null,
     })),
     activeTabId: activeTabId,
   };
@@ -183,8 +187,10 @@ export function useTabManager(initialShellConfig) {
           title: tabState.title || `Terminal ${index + 1}`,
           shellConfig: tabState.shellConfig || configRef.current,
           colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
+          mode: tabState.mode || 'dark',
           autoRespond: tabState.autoRespond || false,
           amEnabled: tabState.amEnabled || false,
+          currentDirectory: tabState.currentDirectory || null,
           createdAt: Date.now(),
         }));
 
@@ -538,6 +544,28 @@ export function useTabManager(initialShellConfig) {
     });
   }, []);
 
+  /**
+   * Update a tab's current directory
+   * @param {string} tabId - ID of tab to update
+   * @param {string} currentDirectory - Current working directory path
+   */
+  const updateTabDirectory = useCallback((tabId, currentDirectory) => {
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        return prev;
+      }
+
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], currentDirectory };
+      
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
   return {
     tabs: state.tabs,
     activeTabId: state.activeTabId,
@@ -551,6 +579,7 @@ export function useTabManager(initialShellConfig) {
     toggleTabAutoRespond,
     toggleTabAM,
     toggleTabMode,
+    updateTabDirectory,
     reorderTabs,
   };
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight, Download } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight, Download, RefreshCw } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -68,6 +68,7 @@ function App() {
     toggleTabAutoRespond,
     toggleTabAM,
     toggleTabMode,
+    updateTabDirectory,
     reorderTabs,
   } = useTabManager(shellConfig);
   
@@ -578,13 +579,16 @@ function App() {
     }));
   }, []);
 
-  // Handle directory change from terminal - auto-rename tab to folder name
-  const handleDirectoryChange = useCallback((tabId, folderName) => {
+  // Handle directory change from terminal - auto-rename tab and save directory
+  const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
     if (folderName) {
-      logger.tabs('Auto-renaming tab to folder', { tabId, folderName });
+      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath });
       updateTabTitle(tabId, folderName);
     }
-  }, [updateTabTitle]);
+    if (fullPath) {
+      updateTabDirectory(tabId, fullPath);
+    }
+  }, [updateTabTitle, updateTabDirectory]);
 
   // Handle AM toggle - enable/disable AM logging via backend API
   const handleToggleAM = useCallback(async (tabId) => {
@@ -645,6 +649,14 @@ function App() {
       window.close();
     }
   }
+
+  const handleReconnect = useCallback(() => {
+    const termRef = getActiveTerminalRef();
+    if (termRef) {
+      termRef.reconnect();
+      addToast('Reconnecting terminal...', 'info', 2000);
+    }
+  }, [getActiveTerminalRef, addToast]);
 
   const saveCommands = async (newCommands) => {
     try {
@@ -857,6 +869,13 @@ function App() {
         >
           <Settings size={18} />
         </button>
+        <button 
+          className="btn btn-ghost btn-icon" 
+          onClick={handleReconnect} 
+          title="Reconnect Terminal Session"
+        >
+          <RefreshCw size={18} />
+        </button>
         <button className="btn btn-feedback btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
           <MessageSquare size={18} />
         </button>
@@ -928,8 +947,9 @@ function App() {
                   autoRespond={tab.autoRespond || false}
                   amEnabled={tab.amEnabled || false}
                   tabName={tab.title}
+                  currentDirectory={tab.currentDirectory || null}
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
-                  onDirectoryChange={(folderName) => handleDirectoryChange(tab.id, folderName)}
+                  onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                 />
               </div>
             ))}

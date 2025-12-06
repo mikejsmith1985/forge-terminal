@@ -8,13 +8,14 @@ import (
 
 // TabState represents the persisted state of a terminal tab
 type TabState struct {
-	ID          string      `json:"id"`
-	Title       string      `json:"title"`
-	ShellConfig ShellConfig `json:"shellConfig"`
-	ColorTheme  string      `json:"colorTheme"`
-	Mode        string      `json:"mode"`
-	AutoRespond bool        `json:"autoRespond"`
-	AMEnabled   bool        `json:"amEnabled"`
+	ID               string      `json:"id"`
+	Title            string      `json:"title"`
+	ShellConfig      ShellConfig `json:"shellConfig"`
+	ColorTheme       string      `json:"colorTheme"`
+	Mode             string      `json:"mode"`
+	AutoRespond      bool        `json:"autoRespond"`
+	AMEnabled        bool        `json:"amEnabled"`
+	CurrentDirectory string      `json:"currentDirectory,omitempty"` // Current working directory
 }
 
 // ShellConfig represents the shell configuration for a tab

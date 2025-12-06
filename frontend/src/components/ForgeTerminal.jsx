@@ -345,6 +345,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   isVisible = true, // Whether this terminal is currently visible
   autoRespond = false, // Auto-respond "yes" to CLI confirmation prompts
   amEnabled = false, // AM (Artificial Memory) logging enabled
+  currentDirectory = null, // Current working directory to restore on connect
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -353,6 +354,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const fitAddonRef = useRef(null);
   const searchAddonRef = useRef(null);
   const shellConfigRef = useRef(shellConfig);
+  const currentDirectoryRef = useRef(currentDirectory);
   const connectFnRef = useRef(null);
   const lastOutputRef = useRef('');
   const waitingCheckTimeoutRef = useRef(null);
@@ -392,6 +394,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     shellConfigRef.current = shellConfig;
   }, [shellConfig]);
+
+  // Keep currentDirectory ref updated
+  useEffect(() => {
+    currentDirectoryRef.current = currentDirectory;
+  }, [currentDirectory]);
 
   // Keep onDirectoryChange ref updated
   useEffect(() => {
@@ -629,6 +636,34 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
         logger.terminal('Initial size sent', { tabId, cols, rows });
 
+        // Restore directory if available
+        if (currentDirectoryRef.current) {
+          const dir = currentDirectoryRef.current;
+          logger.terminal('Restoring directory', { tabId, directory: dir });
+          
+          // Wait a bit for the shell to be ready, then send cd command
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              // Different cd command syntax for different shells
+              const shellType = cfg?.shellType || 'powershell';
+              let cdCommand = '';
+              
+              if (shellType === 'wsl') {
+                cdCommand = `cd "${dir}"\r`;
+              } else if (shellType === 'cmd') {
+                // CMD needs /d flag to change drive too
+                cdCommand = `cd /d "${dir}"\r`;
+              } else {
+                // PowerShell
+                cdCommand = `cd "${dir}"\r`;
+              }
+              
+              ws.send(cdCommand);
+              logger.terminal('Directory restore command sent', { tabId, command: cdCommand.trim() });
+            }
+          }, 500);
+        }
+
         if (onConnectionChange) onConnectionChange(true);
       };
 
@@ -695,14 +730,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
           
-          // Detect directory changes for tab renaming
+          // Detect directory changes for tab renaming and persistence
           const detectedDir = extractDirectory(lastOutputRef.current);
           if (detectedDir && detectedDir !== lastDirectoryRef.current) {
             lastDirectoryRef.current = detectedDir;
             const folderName = getFolderName(detectedDir);
             if (folderName && onDirectoryChangeRef.current) {
               logger.terminal('Directory changed', { tabId, directory: detectedDir, folderName });
-              onDirectoryChangeRef.current(folderName);
+              onDirectoryChangeRef.current(folderName, detectedDir);
             }
           }
           

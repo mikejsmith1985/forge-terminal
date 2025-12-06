@@ -51,8 +51,10 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       
       if (data.success) {
         setUpdateStatus('success');
-        // Server will restart, trigger page reload
-        setTimeout(() => window.location.reload(), 2000);
+        // Server will restart, reload in same tab
+        setTimeout(() => {
+          window.location.href = window.location.href;
+        }, 2000);
       } else {
         setUpdateStatus('error');
         setErrorMessage(data.error || 'Unknown error occurred');
