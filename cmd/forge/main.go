@@ -82,6 +82,9 @@ func main() {
 	http.HandleFunc("/api/am/archive/", handleAMArchive)
 	http.HandleFunc("/api/am/cleanup", handleAMCleanup)
 
+	// Desktop shortcut API
+	http.HandleFunc("/api/desktop-shortcut", handleDesktopShortcut)
+
 	// Run AM cleanup on startup
 	go am.CleanupOldLogs()
 
@@ -662,5 +665,30 @@ func handleAMCleanup(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
+	})
+}
+
+func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	err := createDesktopShortcut()
+	if err != nil {
+		log.Printf("[Desktop] Failed to create shortcut: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	log.Printf("[Desktop] Shortcut created successfully")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Desktop shortcut created",
 	})
 }

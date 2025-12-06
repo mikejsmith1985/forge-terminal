@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Terminal, Palette, Layers, Search, Keyboard, Zap, Settings, RefreshCw } from 'lucide-react';
+import { X, Terminal, Palette, Layers, Search, Keyboard, Zap, Settings, RefreshCw, BookOpen, FolderOpen, Eye } from 'lucide-react';
 
 /**
  * Welcome Modal - Shows on first launch or after upgrade
@@ -90,8 +90,8 @@ function WelcomeModal({ isOpen, onClose, version }) {
                 <Palette size={24} />
               </div>
               <div className="welcome-feature-text">
-                <strong>6 Color Themes</strong>
-                <span>Per-tab theming with light/dark mode</span>
+                <strong>10 Color Themes</strong>
+                <span>Including 4 high-contrast accessibility themes</span>
               </div>
             </div>
 
@@ -132,6 +132,46 @@ function WelcomeModal({ isOpen, onClose, version }) {
               <div className="welcome-feature-text">
                 <strong>Auto-Updates</strong>
                 <span>Stay current with one-click updates</span>
+              </div>
+            </div>
+
+            <div className="welcome-feature">
+              <div className="welcome-feature-icon">
+                <BookOpen size={24} />
+              </div>
+              <div className="welcome-feature-text">
+                <strong>AM (Artificial Memory)</strong>
+                <span>Session logging for crash recovery</span>
+              </div>
+            </div>
+
+            <div className="welcome-feature">
+              <div className="welcome-feature-icon">
+                <Zap size={24} />
+              </div>
+              <div className="welcome-feature-text">
+                <strong>Auto-Respond</strong>
+                <span>Auto-answer AI tool prompts (Y/N)</span>
+              </div>
+            </div>
+
+            <div className="welcome-feature">
+              <div className="welcome-feature-icon">
+                <FolderOpen size={24} />
+              </div>
+              <div className="welcome-feature-text">
+                <strong>Self-Naming Tabs</strong>
+                <span>Tabs auto-rename to current folder</span>
+              </div>
+            </div>
+
+            <div className="welcome-feature">
+              <div className="welcome-feature-icon">
+                <Eye size={24} />
+              </div>
+              <div className="welcome-feature-text">
+                <strong>Accessibility Themes</strong>
+                <span>High contrast + colorblind-friendly options</span>
               </div>
             </div>
           </div>

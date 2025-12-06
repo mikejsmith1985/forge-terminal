@@ -952,6 +952,7 @@ function App() {
         onClose={() => setIsSettingsModalOpen(false)}
         shellConfig={shellConfig}
         onSave={saveConfig}
+        onToast={addToast}
       />
 
       <UpdateModal

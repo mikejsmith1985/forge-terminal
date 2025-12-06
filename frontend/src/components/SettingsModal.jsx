@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon } from 'lucide-react';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [creatingShortcut, setCreatingShortcut] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -41,6 +42,24 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave }) => {
   const handleSave = () => {
     onSave(config);
     onClose();
+  };
+
+  const handleCreateDesktopShortcut = async () => {
+    setCreatingShortcut(true);
+    try {
+      const res = await fetch('/api/desktop-shortcut', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        if (onToast) onToast('Desktop shortcut created!', 'success', 3000);
+      } else {
+        if (onToast) onToast('Failed: ' + data.error, 'error', 3000);
+      }
+    } catch (err) {
+      console.error('Failed to create desktop shortcut:', err);
+      if (onToast) onToast('Failed to create desktop shortcut', 'error', 3000);
+    } finally {
+      setCreatingShortcut(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -147,6 +166,32 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave }) => {
             color: '#a3a3a3'
           }}>
             💡 Changing shell will end the current terminal session.
+          </div>
+
+          {/* Desktop Shortcut Section */}
+          <div style={{ 
+            marginTop: '20px',
+            paddingTop: '20px',
+            borderTop: '1px solid #333'
+          }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Installation</label>
+            <button
+              className="btn btn-secondary"
+              onClick={handleCreateDesktopShortcut}
+              disabled={creatingShortcut}
+              style={{ width: '100%' }}
+            >
+              <DesktopIcon size={16} style={{ marginRight: '6px' }} />
+              {creatingShortcut ? 'Creating...' : 'Create Desktop Shortcut'}
+            </button>
+            <small style={{ 
+              display: 'block', 
+              marginTop: '8px', 
+              color: '#888', 
+              fontSize: '0.8em' 
+            }}>
+              Add a shortcut to your desktop for quick access
+            </small>
           </div>
         </div>
 
