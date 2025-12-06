@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// Current version - update this with each release
-const CurrentVersion = "1.7.0"
+// Version is set at build time via ldflags
+var Version = "dev"
 
 // GitHub repo info
 const (
@@ -70,7 +70,7 @@ func CheckForUpdate() (*UpdateInfo, error) {
 		// No releases yet
 		return &UpdateInfo{
 			Available:      false,
-			CurrentVersion: CurrentVersion,
+			CurrentVersion: Version,
 		}, nil
 	}
 
@@ -85,7 +85,7 @@ func CheckForUpdate() (*UpdateInfo, error) {
 
 	// Parse version (remove 'v' prefix if present)
 	latestVersion := strings.TrimPrefix(release.TagName, "v")
-	currentVersion := strings.TrimPrefix(CurrentVersion, "v")
+	currentVersion := strings.TrimPrefix(Version, "v")
 
 	// Simple version comparison - assumes semver format
 	isNewer := compareVersions(latestVersion, currentVersion) > 0
@@ -93,7 +93,7 @@ func CheckForUpdate() (*UpdateInfo, error) {
 	if !isNewer {
 		return &UpdateInfo{
 			Available:      false,
-			CurrentVersion: CurrentVersion,
+			CurrentVersion: Version,
 			LatestVersion:  release.TagName,
 		}, nil
 	}
@@ -117,7 +117,7 @@ func CheckForUpdate() (*UpdateInfo, error) {
 
 	return &UpdateInfo{
 		Available:      true,
-		CurrentVersion: CurrentVersion,
+		CurrentVersion: Version,
 		LatestVersion:  release.TagName,
 		ReleaseNotes:   release.Body,
 		DownloadURL:    downloadURL,
@@ -216,7 +216,7 @@ func ApplyUpdate(newBinaryPath string) error {
 
 // GetVersion returns the current version
 func GetVersion() string {
-	return CurrentVersion
+	return Version
 }
 
 // ReleaseInfo represents a simplified release for the versions list
@@ -257,7 +257,7 @@ func ListReleases(limit int) ([]ReleaseInfo, error) {
 	}
 
 	assetName := getAssetName()
-	currentVersion := strings.TrimPrefix(CurrentVersion, "v")
+	currentVersion := strings.TrimPrefix(Version, "v")
 	result := make([]ReleaseInfo, 0, len(releases))
 
 	for _, release := range releases {

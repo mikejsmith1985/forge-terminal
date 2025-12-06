@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -27,6 +29,15 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build Frontend
         run: |
           cd frontend
@@ -34,16 +45,20 @@ jobs:
           npm run build
 
       - name: Build Binaries
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
           mkdir -p bin
+          LDFLAGS="-X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=${VERSION}"
+          
           # Linux AMD64
-          GOOS=linux GOARCH=amd64 go build -o bin/forge-linux-amd64 ./cmd/forge
+          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-linux-amd64 ./cmd/forge
           # Windows AMD64 (GUI mode - no console window)
-          GOOS=windows GOARCH=amd64 go build -ldflags "-H windowsgui" -o bin/forge-windows-amd64.exe ./cmd/forge
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS -H windowsgui" -o bin/forge-windows-amd64.exe ./cmd/forge
           # macOS AMD64
-          GOOS=darwin GOARCH=amd64 go build -o bin/forge-darwin-amd64 ./cmd/forge
+          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-darwin-amd64 ./cmd/forge
           # macOS ARM64
-          GOOS=darwin GOARCH=arm64 go build -o bin/forge-darwin-arm64 ./cmd/forge
+          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/forge-darwin-arm64 ./cmd/forge
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
