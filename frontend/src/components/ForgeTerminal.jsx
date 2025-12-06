@@ -423,8 +423,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Send the command followed by Enter key
         wsRef.current.send(command + '\r');
         
-        // Log to AM if enabled
-        if (amEnabledRef.current && command) {
+        // Always log commands to AM for crash recovery
+        if (command) {
           fetch('/api/am/log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -451,8 +451,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Send text WITHOUT Enter key - user can continue typing
         wsRef.current.send(sanitized);
         
-        // Log to AM if enabled
-        if (amEnabledRef.current && sanitized) {
+        // Always log user input to AM for crash recovery
+        if (sanitized) {
           fetch('/api/am/log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -631,6 +631,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         const reconnectLabel = reconnectAttemptsRef.current > 0 ? ' [Reconnected]' : '';
         term.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}${reconnectLabel}.\r\n\r\n`);
 
+        // Initialize AM logging session for this tab (always enabled for crash recovery)
+        fetch('/api/am/enable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tabId: tabId,
+            tabName: tabNameRef.current || 'Terminal',
+            workspace: window.location.pathname,
+            enabled: true, // Always enable for crash recovery
+          }),
+        }).catch(err => console.warn('[AM] Failed to initialize session:', err));
+
         // Send initial size
         const { cols, rows } = term;
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
@@ -684,8 +696,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Accumulate recent output for prompt detection (larger buffer for TUI apps)
         lastOutputRef.current = (lastOutputRef.current + textData).slice(-3000);
         
-        // AM logging: accumulate output and send periodically
-        if (amEnabledRef.current && textData) {
+        // AM logging: ALWAYS accumulate output for crash recovery
+        // The amEnabled flag only controls visibility/archiving, not capture
+        if (textData) {
           amLogBufferRef.current += textData;
           
           // Debounce AM log writes - flush every 2 seconds
@@ -693,10 +706,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             clearTimeout(amLogTimeoutRef.current);
           }
           amLogTimeoutRef.current = setTimeout(() => {
-            if (amLogBufferRef.current && amEnabledRef.current) {
+            if (amLogBufferRef.current) {
               const cleanContent = stripAnsi(amLogBufferRef.current);
               if (cleanContent.trim()) {
-                // Send to AM API
+                // Send to AM API - always log for recovery
                 fetch('/api/am/log', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },

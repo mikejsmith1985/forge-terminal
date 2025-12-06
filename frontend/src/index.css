@@ -1333,3 +1333,121 @@ body {
   color: var(--subtext);
   opacity: 0.7;
 }
+
+
+/* ============================================================================
+   AM Restore Card Styles
+   ============================================================================ */
+
+.am-restore-card {
+  background: linear-gradient(135deg, var(--accent-glow) 0%, var(--card-bg) 100%);
+  border: 2px solid var(--accent);
+  animation: pulse-border 2s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+  50% {
+    border-color: var(--accent-bright);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+}
+
+.am-restore-card .card-icon {
+  color: var(--accent);
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.am-restore-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.am-restore-message {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.am-restore-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  border-left: 3px solid var(--accent);
+}
+
+.am-restore-activity small {
+  color: var(--subtext);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.activity-preview {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 0.85rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am-restore-footer {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.restore-actions {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.btn-restore {
+  flex: 1;
+  background: var(--gradient-primary);
+  color: white;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-restore:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.btn-restore:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-view-log {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  color: var(--subtext);
+  transition: all 0.2s ease;
+}
+
+.btn-view-log:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+

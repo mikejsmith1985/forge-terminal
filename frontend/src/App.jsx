@@ -4,6 +4,7 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight, Download, RefreshCw } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
+import AMRestoreCard from './components/AMRestoreCard'
 import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
@@ -53,6 +54,9 @@ function App() {
   
   // Tab waiting state (for prompt watcher)
   const [waitingTabs, setWaitingTabs] = useState({})
+  
+  // AM Recovery state
+  const [recoverableSessions, setRecoverableSessions] = useState([])
   
   // Tab management
   const {
@@ -143,6 +147,7 @@ function App() {
     checkWSL()
     checkForUpdates()
     checkWelcome()
+    checkForRecoverableSessions() // Check for interrupted AM sessions
     // Check system preference or saved theme
     const savedTheme = localStorage.getItem('theme') || 'dark';
     const savedColorTheme = localStorage.getItem('colorTheme') || 'molten';
@@ -623,6 +628,92 @@ function App() {
     }
   }, [tabs, toggleTabAM, addToast]);
 
+  // Check for recoverable AM sessions on startup
+  const checkForRecoverableSessions = async () => {
+    try {
+      const response = await fetch('/api/am/check');
+      const data = await response.json();
+      if (data.hasRecoverable && data.sessions) {
+        setRecoverableSessions(data.sessions);
+        logger.tabs('Found recoverable sessions', { count: data.sessions.length });
+      }
+    } catch (err) {
+      console.error('[AM] Failed to check for recoverable sessions:', err);
+    }
+  };
+
+  // Handle restoring an AM session
+  const handleRestoreSession = async (session, aiTool) => {
+    try {
+      // Get the session content
+      const response = await fetch(`/api/am/content/${session.TabID}`);
+      const data = await response.json();
+      
+      if (!data.success) {
+        addToast('Failed to load session content', 'error', 3000);
+        return;
+      }
+
+      // Create restore prompt
+      const prompt = `I'm resuming a previous coding session that was interrupted. Please read the session log below and:
+
+1. Summarize what was accomplished
+2. Identify any incomplete tasks  
+3. Continue from where we left off
+
+Here is the session log:
+
+---
+${data.content}
+---
+
+Please acknowledge you've reviewed this and tell me where we left off, then continue with the next step.`;
+
+      // Send to terminal based on AI tool choice
+      const termRef = getActiveTerminalRef();
+      if (termRef) {
+        const cliCommand = aiTool === 'copilot' 
+          ? `gh copilot suggest "${prompt.replace(/"/g, '\\"')}"`
+          : `claude "${prompt.replace(/"/g, '\\"')}"`;
+        
+        termRef.sendCommand(cliCommand);
+        addToast('Session restore sent to ' + aiTool, 'success', 3000);
+        
+        // Archive the session
+        await fetch(`/api/am/archive/${session.TabID}`, { method: 'POST' });
+        
+        // Remove from recoverable list
+        setRecoverableSessions(prev => prev.filter(s => s.TabID !== session.TabID));
+      }
+    } catch (err) {
+      console.error('[AM] Failed to restore session:', err);
+      addToast('Failed to restore session', 'error', 3000);
+    }
+  };
+
+  // Handle dismissing an AM restore card
+  const handleDismissSession = async (session) => {
+    try {
+      // Archive the session
+      await fetch(`/api/am/archive/${session.TabID}`, { method: 'POST' });
+      
+      // Remove from recoverable list
+      setRecoverableSessions(prev => prev.filter(s => s.TabID !== session.TabID));
+      
+      addToast('Session dismissed', 'info', 2000);
+    } catch (err) {
+      console.error('[AM] Failed to dismiss session:', err);
+      addToast('Failed to dismiss session', 'error', 3000);
+    }
+  };
+
+  // Handle viewing an AM log
+  const handleViewLog = (session) => {
+    // Open log in a modal or new window
+    const logWindow = window.open('', '_blank', 'width=800,height=600');
+    logWindow.document.write('<pre>' + session.Content + '</pre>');
+    logWindow.document.title = `Session Log - ${session.TabID}`;
+  };
 
   const loadCommands = () => {
     fetch('/api/commands')
@@ -869,13 +960,6 @@ function App() {
         >
           <Settings size={18} />
         </button>
-        <button 
-          className="btn btn-ghost btn-icon" 
-          onClick={handleReconnect} 
-          title="Reconnect Terminal Session"
-        >
-          <RefreshCw size={18} />
-        </button>
         <button className="btn btn-feedback btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
           <MessageSquare size={18} />
         </button>
@@ -886,6 +970,17 @@ function App() {
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
       >
+        {/* AM Restore Cards - Show at top if recoverable sessions exist */}
+        {recoverableSessions.map(session => (
+          <AMRestoreCard
+            key={session.TabID}
+            session={session}
+            onRestore={handleRestoreSession}
+            onDismiss={() => handleDismissSession(session)}
+            onViewLog={handleViewLog}
+          />
+        ))}
+        
         <CommandCards
           commands={commands}
           onExecute={handleExecute}

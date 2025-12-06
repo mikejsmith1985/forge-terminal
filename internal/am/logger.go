@@ -156,9 +156,8 @@ func (l *Logger) Log(entryType LogEntryType, content string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if !l.enabled {
-		return nil
-	}
+	// Don't check enabled here - let caller decide
+	// This allows logging even when AM is "off" for recovery purposes
 
 	l.session.Entries = append(l.session.Entries, LogEntry{
 		Timestamp: time.Now(),
