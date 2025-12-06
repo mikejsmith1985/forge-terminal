@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import IconPicker, { iconMap } from './IconPicker';
+import IconPicker, { iconMap, emojiMap } from './IconPicker';
 import { ChevronDown } from 'lucide-react';
 
 // Smart keybinding generator - matches logic in App.jsx
@@ -87,7 +87,10 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         onSave(formData);
     };
 
-    const SelectedIcon = formData.icon ? iconMap[formData.icon] : null;
+    // Handle emoji vs lucide icon rendering
+    const isEmoji = formData.icon && formData.icon.startsWith('emoji-');
+    const selectedEmoji = isEmoji ? emojiMap[formData.icon] : null;
+    const SelectedIcon = !isEmoji && formData.icon ? iconMap[formData.icon] : null;
 
     // Calculate the smart keybinding that will be auto-assigned
     const smartKeybinding = useMemo(() => {
@@ -114,7 +117,13 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                                 className="icon-select-btn"
                                 onClick={() => setShowIconPicker(!showIconPicker)}
                             >
-                                {SelectedIcon ? <SelectedIcon size={20} /> : <span style={{ color: '#666' }}>∅</span>}
+                                {selectedEmoji ? (
+                                    <span style={{ fontSize: '20px' }}>{selectedEmoji}</span>
+                                ) : SelectedIcon ? (
+                                    <SelectedIcon size={20} />
+                                ) : (
+                                    <span style={{ color: '#666' }}>∅</span>
+                                )}
                                 <ChevronDown size={14} />
                             </button>
                         </div>

@@ -248,3 +248,155 @@ test.describe('Desktop Shortcut Feature', () => {
   });
 
 });
+
+test.describe('Per-Tab Light/Dark Mode', () => {
+
+  test.beforeEach(async ({ page }) => {
+    await page.request.post('/api/sessions', {
+      data: { tabs: [], activeTabId: '' }
+    });
+  });
+
+  test('should show Light/Dark Mode option in tab context menu', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+    await page.waitForTimeout(2000);
+
+    // Right-click on tab to open context menu
+    const tab = page.locator('.tab-bar .tab').first();
+    await tab.click({ button: 'right' });
+
+    // Context menu should have Light Mode or Dark Mode option
+    const contextMenu = page.locator('.tab-context-menu');
+    await expect(contextMenu).toBeVisible();
+    
+    // Should have either Light Mode or Dark Mode text
+    const modeOption = contextMenu.locator('button:has-text("Light Mode"), button:has-text("Dark Mode")');
+    await expect(modeOption).toBeVisible();
+  });
+
+  test('should toggle mode when clicking Light/Dark Mode option', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+    await page.waitForTimeout(2000);
+
+    // Get initial background color
+    const initialBg = await page.evaluate(() => {
+      return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    });
+
+    // Right-click on tab to open context menu
+    const tab = page.locator('.tab-bar .tab').first();
+    await tab.click({ button: 'right' });
+
+    // Click the Light/Dark Mode option
+    const modeOption = page.locator('.tab-context-menu button:has-text("Light Mode"), .tab-context-menu button:has-text("Dark Mode")');
+    await modeOption.click();
+
+    await page.waitForTimeout(500);
+
+    // Background should have changed
+    const newBg = await page.evaluate(() => {
+      return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    });
+
+    expect(newBg).not.toBe(initialBg);
+  });
+
+  test('new tabs should alternate modes for visual variety', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+    await page.waitForTimeout(2000);
+
+    // Create a second tab
+    const newTabBtn = page.locator('.tab-bar .new-tab-btn');
+    await newTabBtn.click();
+    await page.waitForTimeout(1000);
+
+    // Check session has tabs with alternating modes
+    const sessionRes = await page.request.get('/api/sessions');
+    const session = await sessionRes.json();
+    
+    if (session.tabs && session.tabs.length >= 2) {
+      const modes = session.tabs.map(t => t.mode || 'dark');
+      // At least one should be different (alternating)
+      const hasVariety = modes.some((m, i) => i > 0 && m !== modes[i-1]);
+      expect(hasVariety).toBe(true);
+    }
+  });
+
+});
+
+test.describe('Emoji Icons for Command Cards', () => {
+
+  test('should show Emoji category in icon picker', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+
+    // Click Add button to open command modal
+    const addBtn = page.locator('.sidebar button:has-text("Add")');
+    await addBtn.click();
+
+    // Click on icon picker button
+    const iconBtn = page.locator('.icon-select-btn');
+    await iconBtn.click();
+
+    // Emoji category should be visible
+    const emojiCategory = page.locator('.category-btn:has-text("Emoji")');
+    await expect(emojiCategory).toBeVisible();
+  });
+
+  test('should show emoji icons in picker', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+
+    // Click Add button to open command modal
+    const addBtn = page.locator('.sidebar button:has-text("Add")');
+    await addBtn.click();
+
+    // Click on icon picker button
+    const iconBtn = page.locator('.icon-select-btn');
+    await iconBtn.click();
+
+    // Click Emoji category
+    const emojiCategory = page.locator('.category-btn:has-text("Emoji")');
+    await emojiCategory.click();
+
+    // Should have emoji icons (check for robot emoji)
+    const robotIcon = page.locator('.icon-option:has-text("🤖")');
+    await expect(robotIcon).toBeVisible();
+  });
+
+  test('should be able to select emoji icon for command', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+
+    // Click Add button to open command modal
+    const addBtn = page.locator('.sidebar button:has-text("Add")');
+    await addBtn.click();
+
+    // Click on icon picker button
+    const iconBtn = page.locator('.icon-select-btn');
+    await iconBtn.click();
+
+    // Click Emoji category (should be default now)
+    const emojiCategory = page.locator('.category-btn:has-text("Emoji")');
+    if (await emojiCategory.isVisible()) {
+      await emojiCategory.click();
+    }
+
+    // Click rocket emoji
+    const rocketIcon = page.locator('.icon-option:has-text("🚀")');
+    await rocketIcon.click();
+
+    // Icon button should now show rocket emoji
+    await expect(iconBtn.locator('text=🚀')).toBeVisible();
+  });
+
+});

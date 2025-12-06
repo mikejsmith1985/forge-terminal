@@ -42,6 +42,48 @@ import {
 
 // Icon definitions with categories
 const iconCategories = {
+  'Emoji': [
+    { name: 'emoji-robot', icon: null, label: 'Robot', emoji: '🤖' },
+    { name: 'emoji-rocket', icon: null, label: 'Rocket', emoji: '🚀' },
+    { name: 'emoji-fire', icon: null, label: 'Fire', emoji: '🔥' },
+    { name: 'emoji-sparkles', icon: null, label: 'Sparkles', emoji: '✨' },
+    { name: 'emoji-star', icon: null, label: 'Star', emoji: '⭐' },
+    { name: 'emoji-lightning', icon: null, label: 'Lightning', emoji: '⚡' },
+    { name: 'emoji-brain', icon: null, label: 'Brain', emoji: '🧠' },
+    { name: 'emoji-bulb', icon: null, label: 'Light Bulb', emoji: '💡' },
+    { name: 'emoji-gear', icon: null, label: 'Gear', emoji: '⚙️' },
+    { name: 'emoji-wrench', icon: null, label: 'Wrench', emoji: '🔧' },
+    { name: 'emoji-hammer', icon: null, label: 'Hammer', emoji: '🔨' },
+    { name: 'emoji-link', icon: null, label: 'Link', emoji: '🔗' },
+    { name: 'emoji-package', icon: null, label: 'Package', emoji: '📦' },
+    { name: 'emoji-folder', icon: null, label: 'Folder', emoji: '📁' },
+    { name: 'emoji-file', icon: null, label: 'File', emoji: '📄' },
+    { name: 'emoji-code', icon: null, label: 'Code', emoji: '💻' },
+    { name: 'emoji-terminal', icon: null, label: 'Terminal', emoji: '🖥️' },
+    { name: 'emoji-bug', icon: null, label: 'Bug', emoji: '🐛' },
+    { name: 'emoji-check', icon: null, label: 'Check', emoji: '✅' },
+    { name: 'emoji-cross', icon: null, label: 'Cross', emoji: '❌' },
+    { name: 'emoji-warning', icon: null, label: 'Warning', emoji: '⚠️' },
+    { name: 'emoji-stop', icon: null, label: 'Stop', emoji: '🛑' },
+    { name: 'emoji-play', icon: null, label: 'Play', emoji: '▶️' },
+    { name: 'emoji-target', icon: null, label: 'Target', emoji: '🎯' },
+    { name: 'emoji-trophy', icon: null, label: 'Trophy', emoji: '🏆' },
+    { name: 'emoji-medal', icon: null, label: 'Medal', emoji: '🥇' },
+    { name: 'emoji-gem', icon: null, label: 'Gem', emoji: '💎' },
+    { name: 'emoji-crystal', icon: null, label: 'Crystal Ball', emoji: '🔮' },
+    { name: 'emoji-paint', icon: null, label: 'Paint', emoji: '🎨' },
+    { name: 'emoji-music', icon: null, label: 'Music', emoji: '🎵' },
+    { name: 'emoji-coffee', icon: null, label: 'Coffee', emoji: '☕' },
+    { name: 'emoji-pizza', icon: null, label: 'Pizza', emoji: '🍕' },
+    { name: 'emoji-heart', icon: null, label: 'Heart', emoji: '❤️' },
+    { name: 'emoji-thumbsup', icon: null, label: 'Thumbs Up', emoji: '👍' },
+    { name: 'emoji-clap', icon: null, label: 'Clap', emoji: '👏' },
+    { name: 'emoji-wave', icon: null, label: 'Wave', emoji: '👋' },
+    { name: 'emoji-eyes', icon: null, label: 'Eyes', emoji: '👀' },
+    { name: 'emoji-100', icon: null, label: '100', emoji: '💯' },
+    { name: 'emoji-boom', icon: null, label: 'Boom', emoji: '💥' },
+    { name: 'emoji-zap', icon: null, label: 'Zap', emoji: '💨' },
+  ],
   'AI & Automation': [
     { name: 'Bot', icon: Bot, label: 'Robot/Bot' },
     { name: 'Cpu', icon: Cpu, label: 'CPU' },
@@ -151,8 +193,52 @@ export const iconMap = {
   Leaf, Sun, Pizza,
 };
 
+// Emoji map for rendering emoji icons
+export const emojiMap = {
+  'emoji-robot': '🤖',
+  'emoji-rocket': '🚀',
+  'emoji-fire': '🔥',
+  'emoji-sparkles': '✨',
+  'emoji-star': '⭐',
+  'emoji-lightning': '⚡',
+  'emoji-brain': '🧠',
+  'emoji-bulb': '💡',
+  'emoji-gear': '⚙️',
+  'emoji-wrench': '🔧',
+  'emoji-hammer': '🔨',
+  'emoji-link': '🔗',
+  'emoji-package': '📦',
+  'emoji-folder': '📁',
+  'emoji-file': '📄',
+  'emoji-code': '💻',
+  'emoji-terminal': '🖥️',
+  'emoji-bug': '🐛',
+  'emoji-check': '✅',
+  'emoji-cross': '❌',
+  'emoji-warning': '⚠️',
+  'emoji-stop': '🛑',
+  'emoji-play': '▶️',
+  'emoji-target': '🎯',
+  'emoji-trophy': '🏆',
+  'emoji-medal': '🥇',
+  'emoji-gem': '💎',
+  'emoji-crystal': '🔮',
+  'emoji-paint': '🎨',
+  'emoji-music': '🎵',
+  'emoji-coffee': '☕',
+  'emoji-pizza': '🍕',
+  'emoji-heart': '❤️',
+  'emoji-thumbsup': '👍',
+  'emoji-clap': '👏',
+  'emoji-wave': '👋',
+  'emoji-eyes': '👀',
+  'emoji-100': '💯',
+  'emoji-boom': '💥',
+  'emoji-zap': '💨',
+};
+
 const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
-  const [activeCategory, setActiveCategory] = useState('AI & Automation');
+  const [activeCategory, setActiveCategory] = useState('Emoji');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Filter icons based on search
@@ -204,14 +290,18 @@ const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
         >
           <span style={{ color: '#666' }}>∅</span>
         </button>
-        {filteredIcons.map(({ name, icon: Icon, label }) => (
+        {filteredIcons.map(({ name, icon: Icon, label, emoji }) => (
           <button
             key={name}
             className={`icon-option ${selectedIcon === name ? 'selected' : ''}`}
             onClick={() => onSelect(name)}
             title={label}
           >
-            <Icon size={20} />
+            {emoji ? (
+              <span style={{ fontSize: '20px' }}>{emoji}</span>
+            ) : (
+              <Icon size={20} />
+            )}
           </button>
         ))}
       </div>

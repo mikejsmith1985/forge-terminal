@@ -67,6 +67,7 @@ function App() {
     updateTabColorTheme,
     toggleTabAutoRespond,
     toggleTabAM,
+    toggleTabMode,
     reorderTabs,
   } = useTabManager(shellConfig);
   
@@ -157,14 +158,16 @@ function App() {
   // Apply theme when active tab changes (handles new tab creation and tab switching)
   useEffect(() => {
     if (activeTab?.colorTheme) {
+      const tabMode = activeTab.mode || 'dark';
       logger.theme('Applying theme for active tab', { 
         tabId: activeTab.id, 
-        colorTheme: activeTab.colorTheme 
+        colorTheme: activeTab.colorTheme,
+        mode: tabMode
       });
       setColorTheme(activeTab.colorTheme);
-      applyTheme(activeTab.colorTheme, theme);
+      applyTheme(activeTab.colorTheme, tabMode);
     }
-  }, [activeTab?.id, activeTab?.colorTheme, theme]);
+  }, [activeTab?.id, activeTab?.colorTheme, activeTab?.mode]);
 
   const loadConfig = async () => {
     try {
@@ -889,6 +892,7 @@ function App() {
           onReorder={reorderTabs}
           onToggleAutoRespond={toggleTabAutoRespond}
           onToggleAM={handleToggleAM}
+          onToggleMode={toggleTabMode}
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}
           mode={theme}
@@ -917,7 +921,7 @@ function App() {
                   }}
                   tabId={tab.id}
                   isVisible={tab.id === activeTabId}
-                  theme={theme}
+                  theme={tab.mode || 'dark'}
                   colorTheme={tab.colorTheme || colorTheme}
                   fontSize={fontSize}
                   shellConfig={tab.shellConfig}

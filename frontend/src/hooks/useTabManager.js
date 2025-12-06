@@ -35,10 +35,13 @@ function generateId() {
  * @param {Object} shellConfig - Shell configuration
  * @param {number} tabNumber - Tab number for title
  * @param {string} colorTheme - Optional color theme override
+ * @param {string} mode - Optional mode override ('dark' or 'light')
  */
-function createTab(shellConfig, tabNumber, colorTheme = null) {
+function createTab(shellConfig, tabNumber, colorTheme = null, mode = null) {
   // Auto-assign next theme in cycle if not specified
   const assignedTheme = colorTheme || themeOrder[themeIndex % themeOrder.length];
+  // Alternate mode for visual variety: even tabs dark, odd tabs light (if not specified)
+  const assignedMode = mode || (themeIndex % 2 === 0 ? 'dark' : 'light');
   themeIndex++;
   
   const newTab = {
@@ -46,6 +49,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null) {
     title: `Terminal ${tabNumber}`,
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
+    mode: assignedMode, // Per-tab light/dark mode
     autoRespond: false, // Auto-respond to CLI confirmation prompts
     amEnabled: false, // AM (Artificial Memory) logging
     createdAt: Date.now(),
@@ -55,6 +59,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null) {
     tabId: newTab.id, 
     tabNumber, 
     colorTheme: assignedTheme,
+    mode: assignedMode,
     themeIndex: themeIndex - 1
   });
   
@@ -75,6 +80,7 @@ function tabsToSession(tabs, activeTabId) {
         wslHomePath: tab.shellConfig?.wslHomePath || '',
       },
       colorTheme: tab.colorTheme,
+      mode: tab.mode || 'dark',
       autoRespond: tab.autoRespond || false,
       amEnabled: tab.amEnabled || false,
     })),
@@ -500,6 +506,38 @@ export function useTabManager(initialShellConfig) {
     });
   }, []);
 
+  /**
+   * Toggle light/dark mode for a tab
+   * @param {string} tabId - ID of tab to update
+   */
+  const toggleTabMode = useCallback((tabId) => {
+    logger.tabs('Toggling tab mode', { tabId });
+    
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        logger.tabs('Tab not found for mode toggle', { tabId });
+        return prev;
+      }
+
+      const oldMode = prev.tabs[tabIndex].mode || 'dark';
+      const newMode = oldMode === 'dark' ? 'light' : 'dark';
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], mode: newMode };
+      
+      logger.tabs('Tab mode toggled', { 
+        tabId, 
+        oldMode, 
+        newMode 
+      });
+      
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
   return {
     tabs: state.tabs,
     activeTabId: state.activeTabId,
@@ -512,6 +550,7 @@ export function useTabManager(initialShellConfig) {
     updateTabColorTheme,
     toggleTabAutoRespond,
     toggleTabAM,
+    toggleTabMode,
     reorderTabs,
   };
 }

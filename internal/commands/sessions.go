@@ -12,6 +12,7 @@ type TabState struct {
 	Title       string      `json:"title"`
 	ShellConfig ShellConfig `json:"shellConfig"`
 	ColorTheme  string      `json:"colorTheme"`
+	Mode        string      `json:"mode"`
 	AutoRespond bool        `json:"autoRespond"`
 	AMEnabled   bool        `json:"amEnabled"`
 }

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -29,16 +29,13 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, isWaiting = false, mode = 'dark' }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleMode, isWaiting = false, mode = 'dark' }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const inputRef = useRef(null);
   const contextMenuRef = useRef(null);
-
-  // Get the accent color for this tab's theme
-  const accentColor = getTabAccentColor(tab.colorTheme, mode);
 
   const handleClick = (e) => {
     // Don't trigger onClick if clicking close button or in edit mode
@@ -125,8 +122,10 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   }, [showContextMenu]);
 
   const shellType = tab.shellConfig?.shellType || 'powershell';
+  const tabMode = tab.mode || 'dark';
 
-  // Style for the colored tab background
+  // Style for the colored tab background - use tab's own mode
+  const accentColor = getTabAccentColor(tab.colorTheme, tabMode);
   const tabStyle = accentColor ? {
     '--tab-accent': accentColor,
     backgroundColor: `${accentColor}33`, // 20% opacity
@@ -137,6 +136,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   const indicators = [];
   if (tab.autoRespond) indicators.push('Auto-respond');
   if (tab.amEnabled) indicators.push('AM Logging');
+  if (tabMode === 'light') indicators.push('Light');
   if (indicators.length > 0) {
     titleText = `${tab.title} (${indicators.join(', ')})`;
   }
@@ -203,6 +203,15 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
           <button onClick={startEditing}>
             <Edit2 size={14} />
             Rename
+          </button>
+          <button 
+            onClick={() => { 
+              setShowContextMenu(false); 
+              if (onToggleMode) onToggleMode(); 
+            }}
+          >
+            {tabMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            {tabMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
           <button 
             onClick={() => { 
