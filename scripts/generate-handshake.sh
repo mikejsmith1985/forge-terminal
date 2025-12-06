@@ -10,8 +10,9 @@ OUTPUT_FILE="$ROOT_DIR/FORGE_HANDSHAKE.md"
 
 echo "🔥 Generating Forge Terminal Handshake Document..."
 
-# Extract version from Go code
-BACKEND_VERSION=$(grep 'var Version = ' "$ROOT_DIR/internal/updater/updater.go" | sed 's/.*"\(.*\)"/\1/')
+# Extract version from git tag or use "dev"
+BACKEND_VERSION=$(cd "$ROOT_DIR" && git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BACKEND_VERSION=${BACKEND_VERSION#v}  # Remove 'v' prefix
 echo "📦 Backend Version: $BACKEND_VERSION"
 
 # Extract version from package.json

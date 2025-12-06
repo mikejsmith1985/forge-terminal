@@ -4,21 +4,23 @@
 
 ### Before Release
 ```bash
-# Update version
-vim internal/updater/updater.go  # Update version string
-
 # Generate handshake
 make handshake-doc
 
 # Validate
 make validate-handshake
 
-# Commit changes
-git add internal/updater/updater.go FORGE_HANDSHAKE.md
-git commit -m "chore: bump version to v1.X.X"
+# Commit changes (if any)
+git add FORGE_HANDSHAKE.md
+git commit -m "chore: update handshake for v1.X.X"
+
+# Tag release (version is auto-injected at build time)
 git tag v1.X.X
 git push && git push --tags
 ```
+
+**Note:** Version is now automatically injected from git tags at build time via ldflags.
+No manual version file updates needed!
 
 ### After Release
 GitHub workflow automatically:
@@ -84,9 +86,9 @@ curl -L "https://github.com/mikejsmith1985/forge-terminal/releases/download/$VER
 ## Validation
 
 ```bash
-# Check version match
-grep 'var Version' internal/updater/updater.go
-grep '**Version**' FORGE_HANDSHAKE.md
+# Version is auto-injected from git tags - no manual check needed
+# Just verify handshake is current:
+make validate-handshake
 
 # Check API endpoint count
 grep -c 'http.HandleFunc' cmd/forge/main.go

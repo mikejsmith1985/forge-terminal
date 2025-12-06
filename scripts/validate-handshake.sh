@@ -16,8 +16,9 @@ if [ ! -f "$HANDSHAKE" ]; then
     exit 1
 fi
 
-# Get current version from code
-CURRENT_VERSION=$(grep 'var Version = ' "$ROOT_DIR/internal/updater/updater.go" | sed 's/.*"\(.*\)"/\1/')
+# Get current version from git tag
+CURRENT_VERSION=$(cd "$ROOT_DIR" && git describe --tags --always --dirty 2>/dev/null || echo "dev")
+CURRENT_VERSION=${CURRENT_VERSION#v}  # Remove 'v' prefix
 DOC_VERSION=$(grep '^\*\*Version\*\*:' "$HANDSHAKE" | sed 's/.*: \(.*\)/\1/' | tr -d ' ')
 
 echo "📦 Current Version: $CURRENT_VERSION"
@@ -26,7 +27,7 @@ echo "📄 Document Version: $DOC_VERSION"
 # Check if versions match
 if [ "$CURRENT_VERSION" != "$DOC_VERSION" ]; then
     echo "❌ Version mismatch!"
-    echo "   Document version ($DOC_VERSION) doesn't match code version ($CURRENT_VERSION)"
+    echo "   Document version ($DOC_VERSION) doesn't match git version ($CURRENT_VERSION)"
     echo "   Run: make handshake-doc"
     exit 1
 fi
