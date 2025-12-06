@@ -52,6 +52,7 @@ func main() {
 
 	// Commands API
 	http.HandleFunc("/api/commands", handleCommands)
+	http.HandleFunc("/api/commands/restore-defaults", handleRestoreDefaultCommands)
 
 	// Config API
 	http.HandleFunc("/api/config", handleConfig)
@@ -141,6 +142,77 @@ func handleCommands(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func handleRestoreDefaultCommands(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Parse the request body to see which commands to restore
+	var req struct {
+		CommandIDs []int `json:"commandIds"` // Empty means restore all missing
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Load existing commands
+	existingCmds, err := commands.LoadCommands()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Create a map of existing command IDs
+	existingIDs := make(map[int]bool)
+	for _, cmd := range existingCmds {
+		existingIDs[cmd.ID] = true
+	}
+
+	// Add missing default commands
+	newCommands := existingCmds
+	restoredCount := 0
+
+	for _, defaultCmd := range commands.DefaultCommands {
+		// Check if we should restore this command
+		shouldRestore := false
+		if len(req.CommandIDs) == 0 {
+			// No specific IDs requested - restore all missing
+			shouldRestore = !existingIDs[defaultCmd.ID]
+		} else {
+			// Specific IDs requested - check if this one is in the list
+			for _, id := range req.CommandIDs {
+				if id == defaultCmd.ID {
+					shouldRestore = true
+					break
+				}
+			}
+		}
+
+		if shouldRestore && !existingIDs[defaultCmd.ID] {
+			newCommands = append(newCommands, defaultCmd)
+			restoredCount++
+		}
+	}
+
+	// Save updated commands
+	if restoredCount > 0 {
+		if err := commands.SaveCommands(newCommands); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"restored": restoredCount,
+		"commands": newCommands,
+	})
 }
 
 func openBrowser(url string) {

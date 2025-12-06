@@ -6,16 +6,77 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast }) => {
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [creatingShortcut, setCreatingShortcut] = useState(false);
+  const [restoringCards, setRestoringCards] = useState(false);
+  const [defaultCards, setDefaultCards] = useState([]);
+  const [missingCards, setMissingCards] = useState([]);
+  const [selectedCards, setSelectedCards] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
       detectWSL();
+      checkMissingCards();
     }
   }, [isOpen]);
 
   useEffect(() => {
     setConfig(shellConfig);
   }, [shellConfig]);
+
+  const checkMissingCards = async () => {
+    try {
+      // Get default cards from the backend
+      const defaultCardsData = [
+        { id: 1, description: '🤖 Run Claude Code' },
+        { id: 2, description: '📝 Design Command' },
+        { id: 3, description: '⚡ Execute Command' },
+        { id: 4, description: '🛑 F*** THIS!' },
+        { id: 5, description: '📖 Summarize Last Session' },
+      ];
+      setDefaultCards(defaultCardsData);
+      
+      // Get current commands
+      const res = await fetch('/api/commands');
+      const currentCommands = await res.json();
+      const currentIds = new Set(currentCommands.map(c => c.id));
+      
+      // Find missing defaults
+      const missing = defaultCardsData.filter(d => !currentIds.has(d.id));
+      setMissingCards(missing);
+      setSelectedCards(missing.map(c => c.id)); // Select all by default
+    } catch (err) {
+      console.error('Failed to check missing cards:', err);
+    }
+  };
+
+  const handleRestoreDefaultCards = async () => {
+    if (selectedCards.length === 0) {
+      if (onToast) onToast('Please select at least one card to restore', 'warning', 3000);
+      return;
+    }
+    
+    setRestoringCards(true);
+    try {
+      const res = await fetch('/api/commands/restore-defaults', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commandIds: selectedCards })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        if (onToast) onToast(`Restored ${data.restored} default card(s)!`, 'success', 3000);
+        // Refresh the page to reload commands
+        window.location.reload();
+      } else {
+        if (onToast) onToast('Failed to restore cards', 'error', 3000);
+      }
+    } catch (err) {
+      console.error('Failed to restore default cards:', err);
+      if (onToast) onToast('Failed to restore default cards', 'error', 3000);
+    } finally {
+      setRestoringCards(false);
+    }
+  };
 
   const detectWSL = async () => {
     setLoading(true);
@@ -193,6 +254,72 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast }) => {
               Add a shortcut to your desktop for quick access
             </small>
           </div>
+
+          {/* Restore Default Cards Section */}
+          {missingCards.length > 0 && (
+            <div style={{ 
+              marginTop: '20px',
+              paddingTop: '20px',
+              borderTop: '1px solid #333'
+            }}>
+              <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>
+                Restore Default Command Cards
+              </label>
+              <div style={{ 
+                background: '#422006', 
+                border: '1px solid #f97316',
+                borderRadius: '8px',
+                padding: '12px',
+                marginBottom: '12px',
+                fontSize: '0.85em'
+              }}>
+                <strong>⚠ Missing {missingCards.length} default card(s)</strong>
+                <br />
+                <span style={{ color: '#fed7aa' }}>
+                  Select which default cards you want to restore:
+                </span>
+              </div>
+              
+              {missingCards.map(card => (
+                <label 
+                  key={card.id}
+                  style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px 12px',
+                    background: '#1a1a1a',
+                    borderRadius: '6px',
+                    marginBottom: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedCards.includes(card.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCards([...selectedCards, card.id]);
+                      } else {
+                        setSelectedCards(selectedCards.filter(id => id !== card.id));
+                      }
+                    }}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span>{card.description}</span>
+                </label>
+              ))}
+              
+              <button
+                className="btn btn-primary"
+                onClick={handleRestoreDefaultCards}
+                disabled={restoringCards || selectedCards.length === 0}
+                style={{ width: '100%', marginTop: '10px' }}
+              >
+                {restoringCards ? 'Restoring...' : `Restore ${selectedCards.length} Card(s)`}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="modal-footer" style={{ 

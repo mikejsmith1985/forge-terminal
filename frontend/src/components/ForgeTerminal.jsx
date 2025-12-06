@@ -363,10 +363,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const onDirectoryChangeRef = useRef(onDirectoryChange);
   const amLogBufferRef = useRef('');
   const amLogTimeoutRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimeoutRef = useRef(null);
+  const maxReconnectAttempts = 5;
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
 
   // Keep autoRespond ref updated
   useEffect(() => {
@@ -468,6 +473,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       return wsRef.current && wsRef.current.readyState === WebSocket.OPEN;
     },
     reconnect: () => {
+      // Clear any pending reconnection timeouts
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      // Reset reconnection attempts
+      reconnectAttemptsRef.current = 0;
+      
       // Close existing connection
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.close();
@@ -596,11 +610,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         logger.terminal('WebSocket connected', { 
           tabId, 
           shellType: cfg?.shellType,
-          wsUrl: wsUrl.replace(window.location.host, '[host]')
+          wsUrl: wsUrl.replace(window.location.host, '[host]'),
+          reconnectAttempts: reconnectAttemptsRef.current
         });
+        
+        // Reset reconnection state
+        reconnectAttemptsRef.current = 0;
+        setReconnecting(false);
+        setIsConnected(true);
+        
         // Use orange for the welcome message to match theme
         const shellLabel = cfg?.shellType ? ` (${cfg.shellType.toUpperCase()})` : '';
-        term.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}.\r\n\r\n`);
+        const reconnectLabel = reconnectAttemptsRef.current > 0 ? ' [Reconnected]' : '';
+        term.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}${reconnectLabel}.\r\n\r\n`);
 
         // Send initial size
         const { cols, rows } = term;
@@ -724,9 +746,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       ws.onclose = (event) => {
         logger.terminal('WebSocket closed', { tabId, code: event.code, reason: event.reason });
         
+        setIsConnected(false);
+        if (onConnectionChange) onConnectionChange(false);
+        
         // Provide meaningful disconnect messages based on close code
         let disconnectMessage = 'Terminal session ended.';
         let messageColor = '1;33'; // Yellow by default
+        let shouldReconnect = false;
         
         switch (event.code) {
           case 1000:
@@ -734,24 +760,26 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             disconnectMessage = 'Session closed normally.';
             break;
           case 1001:
-            disconnectMessage = 'Server is shutting down.';
+          case 1012:
+            disconnectMessage = 'Server is restarting...';
+            shouldReconnect = true;
             break;
           case 1006:
-            // Abnormal closure (no close frame received)
-            disconnectMessage = 'Connection lost unexpectedly.';
-            messageColor = '1;31'; // Red
+            // Abnormal closure (no close frame received) - likely server restart
+            disconnectMessage = 'Connection lost. Attempting to reconnect...';
+            messageColor = '1;33'; // Yellow
+            shouldReconnect = true;
             break;
           case 1011:
             // Server error
             disconnectMessage = 'Server encountered an error.';
             messageColor = '1;31'; // Red
-            break;
-          case 1012:
-            disconnectMessage = 'Server is restarting.';
+            shouldReconnect = true;
             break;
           case 1013:
-            disconnectMessage = 'Server is overloaded, try again later.';
-            messageColor = '1;31'; // Red
+            disconnectMessage = 'Server is overloaded, trying again...';
+            messageColor = '1;33'; // Yellow
+            shouldReconnect = true;
             break;
           case 4000:
             // Custom: PTY process exited
@@ -770,13 +798,42 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             if (event.reason) {
               disconnectMessage = event.reason;
             }
+            // For unknown errors, try to reconnect
+            shouldReconnect = true;
         }
         
         // Only write to terminal if it's still active (not disposed)
         if (xtermRef.current) {
           term.write(`\r\n\x1b[${messageColor}m[Disconnected]\x1b[0m ${disconnectMessage}\r\n`);
         }
-        if (onConnectionChange) onConnectionChange(false);
+        
+        // Attempt reconnection with exponential backoff
+        if (shouldReconnect && reconnectAttemptsRef.current < maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+          reconnectAttemptsRef.current += 1;
+          setReconnecting(true);
+          
+          logger.terminal('Scheduling reconnection', { 
+            tabId, 
+            attempt: reconnectAttemptsRef.current, 
+            delay 
+          });
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (xtermRef.current && wsRef.current === ws) {
+              logger.terminal('Attempting reconnection...', { tabId, attempt: reconnectAttemptsRef.current });
+              if (xtermRef.current) {
+                term.write(`\x1b[1;33m[Reconnecting...]\x1b[0m Attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}\r\n`);
+              }
+              connectWebSocket();
+            }
+          }, delay);
+        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          setReconnecting(false);
+          if (xtermRef.current) {
+            term.write(`\x1b[1;31m[Connection Failed]\x1b[0m Max reconnection attempts reached. Click to reconnect manually.\r\n`);
+          }
+        }
       };
 
       // Handle terminal input
@@ -852,13 +909,55 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
   return (
     <div ref={containerRef} className={`terminal-outer-container ${className || ''}`} style={style}>
+      {/* Connection Status Indicator */}
+      {!isConnected && (
+        <div className="terminal-connection-overlay">
+          <div className="connection-status">
+            {reconnecting ? (
+              <>
+                <div className="spinner"></div>
+                <span>Reconnecting... (Attempt {reconnectAttemptsRef.current}/{maxReconnectAttempts})</span>
+              </>
+            ) : (
+              <>
+                <span style={{ color: '#ef4444', fontWeight: 600 }}>⚠ Disconnected</span>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => {
+                    if (xtermRef.current) {
+                      xtermRef.current.clear();
+                    }
+                    reconnectAttemptsRef.current = 0;
+                    if (connectFnRef.current) {
+                      connectFnRef.current();
+                    }
+                  }}
+                  style={{ marginTop: '10px' }}
+                >
+                  Reconnect Terminal
+                </button>
+                <small style={{ marginTop: '8px', opacity: 0.7 }}>
+                  The terminal connection was lost. Click to reconnect.
+                </small>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <div
         ref={terminalRef}
         className="terminal-inner"
+        onClick={() => {
+          // Fix spacebar issue: focus terminal on click
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        }}
         style={{
           width: '100%',
           height: '100%',
           backgroundColor: getTerminalTheme(colorTheme, theme).background,
+          cursor: 'text',
         }}
       />
       {showScrollButton && isVisible && (
