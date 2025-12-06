@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -29,7 +29,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, isWaiting = false, mode = 'dark' }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, isWaiting = false, mode = 'dark' }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -132,10 +132,19 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, i
     backgroundColor: `${accentColor}33`, // 20% opacity
   } : {};
 
+  // Build title with indicators
+  let titleText = tab.title;
+  const indicators = [];
+  if (tab.autoRespond) indicators.push('Auto-respond');
+  if (tab.amEnabled) indicators.push('AM Logging');
+  if (indicators.length > 0) {
+    titleText = `${tab.title} (${indicators.join(', ')})`;
+  }
+
   return (
     <>
       <div
-        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''}`}
+        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''} ${tab.amEnabled ? 'am-enabled' : ''}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
@@ -145,11 +154,16 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, i
         role="tab"
         aria-selected={isActive}
         tabIndex={0}
-        title={tab.autoRespond ? `${tab.title} (Auto-respond enabled)` : tab.title}
+        title={titleText}
       >
         <span className="tab-icon" data-shell={shellType}>
           {getShellIcon(shellType)}
         </span>
+        {tab.amEnabled && (
+          <span className="am-indicator" title="AM Logging enabled">
+            <BookOpen size={10} />
+          </span>
+        )}
         {tab.autoRespond && (
           <span className="auto-respond-indicator" title="Auto-respond enabled">
             <Zap size={10} />
@@ -189,6 +203,16 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, i
           <button onClick={startEditing}>
             <Edit2 size={14} />
             Rename
+          </button>
+          <button 
+            onClick={() => { 
+              setShowContextMenu(false); 
+              if (onToggleAM) onToggleAM(); 
+            }}
+            className={tab.amEnabled ? 'active' : ''}
+          >
+            <BookOpen size={14} />
+            AM Logging {tab.amEnabled ? '✓' : ''}
           </button>
           <button 
             onClick={() => { 

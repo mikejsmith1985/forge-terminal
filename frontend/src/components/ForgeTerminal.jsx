@@ -246,6 +246,90 @@ function detectCliPrompt(text, debugLog = false) {
  * 
  * Full PTY terminal using xterm.js connected via WebSocket.
  */
+// ----------------------------------------------------------------------------
+// DIRECTORY DETECTION FROM TERMINAL OUTPUT
+// ----------------------------------------------------------------------------
+
+/**
+ * Extract the current directory from terminal output/prompt
+ * Supports PowerShell, CMD, and Bash/WSL prompts
+ * @param {string} text - Raw terminal output
+ * @returns {string|null} - Extracted directory path or null
+ */
+function extractDirectory(text) {
+  // Strip ANSI codes
+  const clean = stripAnsi(text);
+  
+  // Get last few lines where prompt would be
+  const lines = clean.split(/[\r\n]/).filter(l => l.trim());
+  const lastLines = lines.slice(-5);
+  
+  for (let i = lastLines.length - 1; i >= 0; i--) {
+    const line = lastLines[i].trim();
+    
+    // PowerShell prompt: "PS C:\Users\foo>" or "PS C:\Users\foo> "
+    const psMatch = line.match(/^PS\s+([A-Za-z]:\\[^>]*?)>\s*$/i);
+    if (psMatch) {
+      return psMatch[1];
+    }
+    
+    // CMD prompt: "C:\Users\foo>" or "C:\Users\foo>command"
+    const cmdMatch = line.match(/^([A-Za-z]:\\[^>]*?)>/);
+    if (cmdMatch) {
+      return cmdMatch[1];
+    }
+    
+    // Bash/WSL prompt with path: "user@host:~/projects$" or "user@host:/home/user$"
+    // Also handles: "user@host:~/projects$ " (with trailing space)
+    const bashMatch = line.match(/[@][\w.-]+:([~\/][^\$#]*?)[\$#]\s*$/);
+    if (bashMatch) {
+      return bashMatch[1];
+    }
+    
+    // Simple bash prompt: "~/projects$ " or "/home/user$ "
+    const simpleBashMatch = line.match(/^([~\/][^\$#\s]+)[\$#]\s*$/);
+    if (simpleBashMatch) {
+      return simpleBashMatch[1];
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Get the folder name (basename) from a path
+ * @param {string} path - Full path (Windows or Unix style)
+ * @returns {string} - Just the folder name
+ */
+function getFolderName(path) {
+  if (!path) return null;
+  
+  // Handle home directory
+  if (path === '~' || path === '~/' || path === '/') {
+    return '~';
+  }
+  
+  // Normalize path separators and remove trailing slashes
+  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  
+  // Handle ~ paths
+  if (normalized.startsWith('~/')) {
+    const parts = normalized.split('/');
+    return parts[parts.length - 1] || '~';
+  }
+  
+  // Get the last part of the path
+  const parts = normalized.split('/');
+  const lastPart = parts[parts.length - 1];
+  
+  // For Windows root like "C:" return "C:"
+  if (/^[A-Za-z]:$/.test(lastPart)) {
+    return lastPart;
+  }
+  
+  return lastPart || normalized;
+}
+
 const ForgeTerminal = forwardRef(function ForgeTerminal({
   className,
   style,
@@ -254,10 +338,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   fontSize = 14,
   onConnectionChange = null,
   onWaitingChange = null, // Callback when prompt waiting state changes
+  onDirectoryChange = null, // Callback when directory changes (for tab rename)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
+  tabName = null, // Tab display name (for AM logging)
   isVisible = true, // Whether this terminal is currently visible
   autoRespond = false, // Auto-respond "yes" to CLI confirmation prompts
+  amEnabled = false, // AM (Artificial Memory) logging enabled
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -270,6 +357,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const lastOutputRef = useRef('');
   const waitingCheckTimeoutRef = useRef(null);
   const autoRespondRef = useRef(autoRespond);
+  const amEnabledRef = useRef(amEnabled);
+  const tabNameRef = useRef(tabName);
+  const lastDirectoryRef = useRef(null);
+  const onDirectoryChangeRef = useRef(onDirectoryChange);
+  const amLogBufferRef = useRef('');
+  const amLogTimeoutRef = useRef(null);
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -280,10 +373,25 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     autoRespondRef.current = autoRespond;
   }, [autoRespond]);
 
+  // Keep amEnabled ref updated
+  useEffect(() => {
+    amEnabledRef.current = amEnabled;
+  }, [amEnabled]);
+
+  // Keep tabName ref updated
+  useEffect(() => {
+    tabNameRef.current = tabName;
+  }, [tabName]);
+
   // Keep shellConfig ref updated
   useEffect(() => {
     shellConfigRef.current = shellConfig;
   }, [shellConfig]);
+
+  // Keep onDirectoryChange ref updated
+  useEffect(() => {
+    onDirectoryChangeRef.current = onDirectoryChange;
+  }, [onDirectoryChange]);
 
   // Refit terminal when becoming visible
   useEffect(() => {
@@ -302,6 +410,22 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Send the command followed by Enter key
         wsRef.current.send(command + '\r');
+        
+        // Log to AM if enabled
+        if (amEnabledRef.current && command) {
+          fetch('/api/am/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tabId: tabId,
+              tabName: tabNameRef.current || 'Terminal',
+              workspace: window.location.pathname,
+              entryType: 'COMMAND_EXECUTED',
+              content: command,
+            }),
+          }).catch(err => console.warn('[AM] Failed to log command:', err));
+        }
+        
         return true;
       }
       console.warn('[Terminal] Cannot send command - WebSocket not connected');
@@ -314,6 +438,22 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         const sanitized = text.replace(/[\r\n]+/g, ' ').trim();
         // Send text WITHOUT Enter key - user can continue typing
         wsRef.current.send(sanitized);
+        
+        // Log to AM if enabled
+        if (amEnabledRef.current && sanitized) {
+          fetch('/api/am/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tabId: tabId,
+              tabName: tabNameRef.current || 'Terminal',
+              workspace: window.location.pathname,
+              entryType: 'USER_INPUT',
+              content: sanitized,
+            }),
+          }).catch(err => console.warn('[AM] Failed to log user input:', err));
+        }
+        
         return true;
       }
       console.warn('[Terminal] Cannot paste - WebSocket not connected');
@@ -487,6 +627,36 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Accumulate recent output for prompt detection (larger buffer for TUI apps)
         lastOutputRef.current = (lastOutputRef.current + textData).slice(-3000);
         
+        // AM logging: accumulate output and send periodically
+        if (amEnabledRef.current && textData) {
+          amLogBufferRef.current += textData;
+          
+          // Debounce AM log writes - flush every 2 seconds
+          if (amLogTimeoutRef.current) {
+            clearTimeout(amLogTimeoutRef.current);
+          }
+          amLogTimeoutRef.current = setTimeout(() => {
+            if (amLogBufferRef.current && amEnabledRef.current) {
+              const cleanContent = stripAnsi(amLogBufferRef.current);
+              if (cleanContent.trim()) {
+                // Send to AM API
+                fetch('/api/am/log', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    tabId: tabId,
+                    tabName: tabNameRef.current || 'Terminal',
+                    workspace: window.location.pathname,
+                    entryType: 'AGENT_OUTPUT',
+                    content: cleanContent.slice(-2000), // Limit content size
+                  }),
+                }).catch(err => console.warn('[AM] Failed to log:', err));
+              }
+              amLogBufferRef.current = '';
+            }
+          }, 2000);
+        }
+        
         // Debounce waiting check - wait 500ms after last output for TUI to fully render
         if (waitingCheckTimeoutRef.current) {
           clearTimeout(waitingCheckTimeoutRef.current);
@@ -500,6 +670,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             setIsWaiting(waiting);
             if (onWaitingChange) {
               onWaitingChange(waiting);
+            }
+          }
+          
+          // Detect directory changes for tab renaming
+          const detectedDir = extractDirectory(lastOutputRef.current);
+          if (detectedDir && detectedDir !== lastDirectoryRef.current) {
+            lastDirectoryRef.current = detectedDir;
+            const folderName = getFolderName(detectedDir);
+            if (folderName && onDirectoryChangeRef.current) {
+              logger.terminal('Directory changed', { tabId, directory: detectedDir, folderName });
+              onDirectoryChangeRef.current(folderName);
             }
           }
           

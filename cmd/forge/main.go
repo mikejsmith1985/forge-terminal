@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
@@ -72,6 +73,17 @@ func main() {
 
 	// Welcome screen API - track if welcome has been shown
 	http.HandleFunc("/api/welcome", handleWelcome)
+
+	// AM (Artificial Memory) API - session logging and recovery
+	http.HandleFunc("/api/am/enable", handleAMEnable)
+	http.HandleFunc("/api/am/log", handleAMLog)
+	http.HandleFunc("/api/am/check", handleAMCheck)
+	http.HandleFunc("/api/am/content/", handleAMContent)
+	http.HandleFunc("/api/am/archive/", handleAMArchive)
+	http.HandleFunc("/api/am/cleanup", handleAMCleanup)
+
+	// Run AM cleanup on startup
+	go am.CleanupOldLogs()
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()
@@ -456,4 +468,199 @@ func handleWelcome(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// AM (Artificial Memory) handlers
+
+func handleAMEnable(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req am.EnableRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	registry := am.GetRegistry()
+	logger, err := registry.Get(req.TabID, req.TabName, req.Workspace)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	if req.Enabled {
+		if err := logger.Enable(); err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+		log.Printf("[AM] Logging enabled for tab %s", req.TabID)
+	} else {
+		if err := logger.Disable(); err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+		log.Printf("[AM] Logging disabled for tab %s", req.TabID)
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"enabled": req.Enabled,
+		"logPath": logger.GetLogPath(),
+	})
+}
+
+func handleAMLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req am.AppendLogRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	registry := am.GetRegistry()
+	logger, err := registry.Get(req.TabID, req.TabName, req.Workspace)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	if err := logger.Log(req.EntryType, req.Content); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func handleAMCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	sessions, err := am.CheckForRecoverableSessions()
+	if err != nil {
+		json.NewEncoder(w).Encode(am.RecoveryInfo{
+			HasRecoverable: false,
+			Sessions:       []am.SessionInfo{},
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(am.RecoveryInfo{
+		HasRecoverable: len(sessions) > 0,
+		Sessions:       sessions,
+	})
+}
+
+func handleAMContent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract tabId from URL path
+	tabID := strings.TrimPrefix(r.URL.Path, "/api/am/content/")
+	if tabID == "" {
+		http.Error(w, "Tab ID required", http.StatusBadRequest)
+		return
+	}
+
+	content, err := am.GetLogContent(tabID)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"content": content,
+	})
+}
+
+func handleAMArchive(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract tabId from URL path
+	tabID := strings.TrimPrefix(r.URL.Path, "/api/am/archive/")
+	if tabID == "" {
+		http.Error(w, "Tab ID required", http.StatusBadRequest)
+		return
+	}
+
+	if err := am.ArchiveLog(tabID); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Remove from registry
+	am.GetRegistry().Remove(tabID)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func handleAMCleanup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := am.CleanupOldLogs(); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
 }

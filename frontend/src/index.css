@@ -789,6 +789,24 @@ body {
   border-left: 2px solid var(--tab-accent, var(--accent));
 }
 
+.tab.am-enabled {
+  border-right: 2px solid #10b981; /* Green for AM logging */
+}
+
+.tab.am-enabled.auto-respond {
+  border-left: 2px solid var(--tab-accent, var(--accent));
+  border-right: 2px solid #10b981;
+}
+
+.am-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #10b981; /* Green */
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
 .auto-respond-indicator {
   display: flex;
   align-items: center;

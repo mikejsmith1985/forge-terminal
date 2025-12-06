@@ -12,6 +12,8 @@ type TabState struct {
 	Title       string      `json:"title"`
 	ShellConfig ShellConfig `json:"shellConfig"`
 	ColorTheme  string      `json:"colorTheme"`
+	AutoRespond bool        `json:"autoRespond"`
+	AMEnabled   bool        `json:"amEnabled"`
 }
 
 // ShellConfig represents the shell configuration for a tab

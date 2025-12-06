@@ -32,3 +32,12 @@ web/assets/
 
 # Issue images (downloaded for debugging, auto-cleaned after 7 days)
 issue-images/
+
+# AM logs (local session data)
+.forge/
+
+# Test artifacts
+frontend/test-results/
+
+# Build binary
+forge

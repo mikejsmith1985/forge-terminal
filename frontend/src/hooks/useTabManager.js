@@ -47,6 +47,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null) {
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     autoRespond: false, // Auto-respond to CLI confirmation prompts
+    amEnabled: false, // AM (Artificial Memory) logging
     createdAt: Date.now(),
   };
   
@@ -75,6 +76,7 @@ function tabsToSession(tabs, activeTabId) {
       },
       colorTheme: tab.colorTheme,
       autoRespond: tab.autoRespond || false,
+      amEnabled: tab.amEnabled || false,
     })),
     activeTabId: activeTabId,
   };
@@ -176,6 +178,7 @@ export function useTabManager(initialShellConfig) {
           shellConfig: tabState.shellConfig || configRef.current,
           colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
           autoRespond: tabState.autoRespond || false,
+          amEnabled: tabState.amEnabled || false,
           createdAt: Date.now(),
         }));
 
@@ -466,6 +469,37 @@ export function useTabManager(initialShellConfig) {
     });
   }, []);
 
+  /**
+   * Toggle AM (Artificial Memory) logging for a tab
+   * @param {string} tabId - ID of tab to update
+   */
+  const toggleTabAM = useCallback((tabId) => {
+    logger.tabs('Toggling tab AM', { tabId });
+    
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        logger.tabs('Tab not found for AM toggle', { tabId });
+        return prev;
+      }
+
+      const oldValue = prev.tabs[tabIndex].amEnabled;
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], amEnabled: !oldValue };
+      
+      logger.tabs('Tab AM toggled', { 
+        tabId, 
+        oldValue, 
+        newValue: !oldValue 
+      });
+      
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
   return {
     tabs: state.tabs,
     activeTabId: state.activeTabId,
@@ -477,6 +511,7 @@ export function useTabManager(initialShellConfig) {
     updateTabShellConfig,
     updateTabColorTheme,
     toggleTabAutoRespond,
+    toggleTabAM,
     reorderTabs,
   };
 }

@@ -66,6 +66,7 @@ function App() {
     updateTabShellConfig,
     updateTabColorTheme,
     toggleTabAutoRespond,
+    toggleTabAM,
     reorderTabs,
   } = useTabManager(shellConfig);
   
@@ -574,6 +575,47 @@ function App() {
     }));
   }, []);
 
+  // Handle directory change from terminal - auto-rename tab to folder name
+  const handleDirectoryChange = useCallback((tabId, folderName) => {
+    if (folderName) {
+      logger.tabs('Auto-renaming tab to folder', { tabId, folderName });
+      updateTabTitle(tabId, folderName);
+    }
+  }, [updateTabTitle]);
+
+  // Handle AM toggle - enable/disable AM logging via backend API
+  const handleToggleAM = useCallback(async (tabId) => {
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab) return;
+
+    const newEnabled = !tab.amEnabled;
+    
+    try {
+      const response = await fetch('/api/am/enable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tabId: tabId,
+          tabName: tab.title,
+          workspace: window.location.pathname,
+          enabled: newEnabled,
+        }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        toggleTabAM(tabId);
+        addToast(newEnabled ? 'AM Logging enabled' : 'AM Logging disabled', 'info', 2000);
+        logger.tabs('AM toggled', { tabId, enabled: newEnabled, logPath: result.logPath });
+      } else {
+        addToast('Failed to toggle AM: ' + result.error, 'error', 3000);
+      }
+    } catch (err) {
+      console.error('Failed to toggle AM:', err);
+      addToast('Failed to toggle AM logging', 'error', 3000);
+    }
+  }, [tabs, toggleTabAM, addToast]);
+
 
   const loadCommands = () => {
     fetch('/api/commands')
@@ -846,6 +888,7 @@ function App() {
           onNewTab={handleNewTab}
           onReorder={reorderTabs}
           onToggleAutoRespond={toggleTabAutoRespond}
+          onToggleAM={handleToggleAM}
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}
           mode={theme}
@@ -879,7 +922,10 @@ function App() {
                   fontSize={fontSize}
                   shellConfig={tab.shellConfig}
                   autoRespond={tab.autoRespond || false}
+                  amEnabled={tab.amEnabled || false}
+                  tabName={tab.title}
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
+                  onDirectoryChange={(folderName) => handleDirectoryChange(tab.id, folderName)}
                 />
               </div>
             ))}
