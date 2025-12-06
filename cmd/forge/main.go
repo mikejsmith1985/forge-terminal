@@ -19,6 +19,7 @@ import (
 
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
+	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
@@ -85,6 +86,13 @@ func main() {
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", handleDesktopShortcut)
+
+	// File management API
+	http.HandleFunc("/api/files/list", files.HandleList)
+	http.HandleFunc("/api/files/read", files.HandleRead)
+	http.HandleFunc("/api/files/write", files.HandleWrite)
+	http.HandleFunc("/api/files/delete", files.HandleDelete)
+	http.HandleFunc("/api/files/stream", files.HandleReadStream)
 
 	// Run AM cleanup on startup
 	go am.CleanupOldLogs()

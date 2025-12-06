@@ -1,0 +1,46 @@
+.workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 280px;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
+}
+
+.workspace-tabs {
+  display: flex;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.workspace-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.workspace-tab:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.workspace-tab.active {
+  color: var(--accent-color);
+  background: var(--bg-primary);
+  border-bottom: 2px solid var(--accent-color);
+}
+
+.workspace-content {
+  flex: 1;
+  overflow: hidden;
+}

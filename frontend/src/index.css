@@ -101,6 +101,25 @@ body {
   overflow: hidden;
 }
 
+/* Editor panel layout */
+.app.with-workspace {
+  /* Workspace visible */
+}
+
+.app.with-editor .terminal-pane {
+  max-width: 60%;
+}
+
+.editor-panel {
+  width: 40%;
+  min-width: 300px;
+  max-width: 50%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-color);
+}
+
 .terminal-pane-content {
   flex: 1;
   padding: 8px;

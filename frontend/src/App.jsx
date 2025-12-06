@@ -12,6 +12,8 @@ import WelcomeModal from './components/WelcomeModal'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
 import SearchBar from './components/SearchBar'
+import Workspace from './components/Workspace'
+import MonacoEditor from './components/MonacoEditor'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -55,6 +57,11 @@ function App() {
   
   // Tab waiting state (for prompt watcher)
   const [waitingTabs, setWaitingTabs] = useState({})
+  
+  // File explorer and editor state
+  const [showWorkspace, setShowWorkspace] = useState(true)
+  const [editorFile, setEditorFile] = useState(null)
+  const [showEditor, setShowEditor] = useState(false)
   
   // Tab management
   const {
@@ -612,6 +619,21 @@ function App() {
     }
   }, [updateTabTitle, updateTabDirectory]);
 
+  // File explorer handlers
+  const handleFileOpen = useCallback((file) => {
+    setEditorFile(file);
+    setShowEditor(true);
+  }, []);
+
+  const handleEditorClose = useCallback(() => {
+    setShowEditor(false);
+    setEditorFile(null);
+  }, []);
+
+  const handleEditorSave = useCallback((file) => {
+    addToast(`Saved: ${file.name}`, 'success', 2000);
+  }, [addToast]);
+
   // Handle AM toggle - enable/disable AM logging via backend API
   const handleToggleAM = useCallback(async (tabId) => {
     const tab = tabs.find(t => t.id === tabId);
@@ -938,7 +960,19 @@ function App() {
   );
 
   return (
-    <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''}`}>
+    <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''} ${showWorkspace ? 'with-workspace' : ''} ${showEditor ? 'with-editor' : ''}`}>
+      {showWorkspace && (
+        <Workspace
+          currentPath={activeTab?.currentDirectory}
+          onFileOpen={handleFileOpen}
+          terminalRef={getActiveTerminalRef()}
+          commands={commands}
+          onCommandRun={handleExecute}
+          onCommandAdd={handleAdd}
+          onCommandDelete={handleDelete}
+          onCommandsReorder={handleDragEnd}
+        />
+      )}
       {sidebarPosition === 'left' && sidebar}
       <div className="terminal-pane">
         <TabBar
@@ -996,6 +1030,17 @@ function App() {
           </div>
         </div>
       </div>
+      {showEditor && editorFile && (
+        <div className="editor-panel">
+          <MonacoEditor
+            file={editorFile}
+            onClose={handleEditorClose}
+            onSave={handleEditorSave}
+            theme={activeTab?.mode || theme}
+            terminalRef={getActiveTerminalRef()}
+          />
+        </div>
+      )}
       {sidebarPosition === 'right' && sidebar}
 
       <CommandModal
