@@ -30,6 +30,9 @@ web/assets/
 # Logs
 *.log
 
+# Handshake document (auto-generated, shared with Orchestrator)
+FORGE_HANDSHAKE.md
+
 # Issue images (downloaded for debugging, auto-cleaned after 7 days)
 issue-images/
 

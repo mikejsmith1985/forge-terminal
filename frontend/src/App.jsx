@@ -22,6 +22,8 @@ const MAX_TABS = 20;
 
 function App() {
   const [commands, setCommands] = useState([])
+  const [commandsLoading, setCommandsLoading] = useState(true)
+  const [commandsError, setCommandsError] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
@@ -720,14 +722,37 @@ Please acknowledge you've reviewed this and tell me where we left off, then cont
   };
 
   const loadCommands = () => {
+    setCommandsLoading(true);
+    setCommandsError(null);
+    
+    // Set a timeout to detect hanging requests
+    const timeoutId = setTimeout(() => {
+      setCommandsError('Request timeout - server may be unresponsive');
+      setCommandsLoading(false);
+      addToast('Failed to load command cards - timeout', 'error', 5000);
+    }, 10000); // 10 second timeout
+    
     fetch('/api/commands')
-      .then(r => r.json())
+      .then(r => {
+        clearTimeout(timeoutId);
+        if (!r.ok) {
+          throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        }
+        return r.json();
+      })
       .then(data => {
         // Ensure data is an array
         const cmds = Array.isArray(data) ? data : [];
         setCommands(cmds);
+        setCommandsLoading(false);
       })
-      .catch(err => console.error('Failed to load commands:', err))
+      .catch(err => {
+        clearTimeout(timeoutId);
+        console.error('Failed to load commands:', err);
+        setCommandsError(err.message);
+        setCommandsLoading(false);
+        addToast(`Failed to load command cards: ${err.message}`, 'error', 5000);
+      })
   }
 
   const handleShutdown = async () => {
@@ -987,10 +1012,13 @@ Please acknowledge you've reviewed this and tell me where we left off, then cont
         
         <CommandCards
           commands={commands}
+          loading={commandsLoading}
+          error={commandsError}
           onExecute={handleExecute}
           onPaste={handlePaste}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onRetry={loadCommands}
         />
       </DndContext>
     </div>

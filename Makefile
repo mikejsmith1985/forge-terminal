@@ -1,4 +1,4 @@
-.PHONY: build build-linux build-mac build-windows build-all dev clean
+.PHONY: build build-linux build-mac build-windows build-all dev clean handshake-doc validate-handshake
 
 # Version is extracted from git tag or set to dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -41,3 +41,13 @@ dev:
 
 clean:
 	rm -rf bin/ web/assets frontend/dist frontend/node_modules
+
+# Generate handshake documentation
+handshake-doc:
+	@echo "🔥 Generating Forge Terminal Handshake Document..."
+	@./scripts/generate-handshake.sh
+	@echo "✅ Handshake document updated!"
+
+# Validate handshake documentation
+validate-handshake:
+	@./scripts/validate-handshake.sh

@@ -27,8 +27,8 @@ func TestStorage(t *testing.T) {
 		t.Fatalf("LoadCommands failed: %v", err)
 	}
 
-	if len(commands) != 4 {
-		t.Errorf("Expected 4 default commands, got %d", len(commands))
+	if len(commands) != 5 {
+		t.Errorf("Expected 5 default commands, got %d", len(commands))
 	}
 
 	if commands[0].Command != "claude" {
@@ -44,10 +44,10 @@ func TestStorage(t *testing.T) {
 
 	// Test 2: SaveCommands should persist changes
 	newCommand := Command{
-		ID:          5,
+		ID:          6,
 		Description: "Test Command",
 		Command:     "echo test",
-		KeyBinding:  "Ctrl+Shift+5",
+		KeyBinding:  "Ctrl+Shift+6",
 		PasteOnly:   false,
 		Favorite:    false,
 	}
@@ -63,11 +63,11 @@ func TestStorage(t *testing.T) {
 		t.Fatalf("LoadCommands failed: %v", err)
 	}
 
-	if len(loadedCommands) != 5 {
-		t.Errorf("Expected 5 commands, got %d", len(loadedCommands))
+	if len(loadedCommands) != 6 {
+		t.Errorf("Expected 6 commands, got %d", len(loadedCommands))
 	}
 
-	lastCmd := loadedCommands[4]
+	lastCmd := loadedCommands[5]
 	if lastCmd.Description != "Test Command" {
 		t.Errorf("Expected last command description 'Test Command', got '%s'", lastCmd.Description)
 	}

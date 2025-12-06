@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -54,9 +55,9 @@ var DefaultCommands = []Command{
 	{
 		ID:          5,
 		Description: "📖 Summarize Last Session",
-		Command:     "Read and analyze the AM (Artificial Memory) session log located in the ./am/ directory. Find the most recent session-*.md file and provide a concise 200-word-or-less summary covering:\n\n1. What tasks or commands were being worked on\n2. The last significant action or output\n3. Any errors or issues encountered\n4. What the user should continue with or investigate next\n\nBe direct and actionable. Focus on helping me pick up where I left off.\n\nThe AM log is in: ./am/\n",
+		Command:     "Read and analyze the AM (Artificial Memory) session log located in the ./.forge/am/ directory. Find the most recent session-*.md file and provide a concise 200-word-or-less summary covering:\n\n1. What tasks or commands were being worked on\n2. The last significant action or output\n3. Any errors or issues encountered\n4. What the user should continue with or investigate next\n\nBe direct and actionable. Focus on helping me pick up where I left off.\n\nThe AM log is in: ./.forge/am/\n",
 		KeyBinding:  "Ctrl+Shift+5",
-		PasteOnly:   true,
+		PasteOnly:   false,
 		Favorite:    false,
 		Icon:        "emoji-eyes",
 	},
@@ -87,25 +88,25 @@ func GetCommandsPath() (string, error) {
 func LoadCommands() ([]Command, error) {
 	path, err := GetCommandsPath()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get commands path: %w", err)
 	}
 
 	// Create default if doesn't exist
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err := SaveCommands(DefaultCommands); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create default commands: %w", err)
 		}
 		return DefaultCommands, nil
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read commands file: %w", err)
 	}
 
 	var commands []Command
 	if err := json.Unmarshal(data, &commands); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse commands JSON: %w", err)
 	}
 
 	return commands, nil
