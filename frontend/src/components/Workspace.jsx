@@ -12,7 +12,11 @@ export default function Workspace({
   onCommandRun,
   onCommandAdd,
   onCommandDelete,
-  onCommandsReorder
+  onCommandsReorder,
+  commandsLoading,
+  commandsError,
+  onCommandEdit,
+  onCommandPaste
 }) {
   const [activeTab, setActiveTab] = useState('files');
   
@@ -45,10 +49,13 @@ export default function Workspace({
         ) : (
           <CommandCards
             commands={commands}
-            onCommandRun={onCommandRun}
-            onCommandAdd={onCommandAdd}
-            onCommandDelete={onCommandDelete}
-            onCommandsReorder={onCommandsReorder}
+            loading={commandsLoading}
+            error={commandsError}
+            onExecute={onCommandRun}
+            onPaste={onCommandPaste}
+            onEdit={onCommandEdit}
+            onDelete={onCommandDelete}
+            onRetry={onCommandsReorder}
           />
         )}
       </div>

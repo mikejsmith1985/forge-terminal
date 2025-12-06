@@ -967,8 +967,12 @@ function App() {
           onFileOpen={handleFileOpen}
           terminalRef={getActiveTerminalRef()}
           commands={commands}
+          commandsLoading={commandsLoading}
+          commandsError={commandsError}
           onCommandRun={handleExecute}
+          onCommandPaste={handlePaste}
           onCommandAdd={handleAdd}
+          onCommandEdit={handleEdit}
           onCommandDelete={handleDelete}
           onCommandsReorder={handleDragEnd}
         />
