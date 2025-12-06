@@ -661,7 +661,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               let cdCommand = '';
               
               if (shellType === 'wsl') {
-                cdCommand = `cd "${dir}"\r`;
+                // For bash/WSL: Don't quote if path starts with ~, bash needs to expand it
+                // For paths with spaces, escape them instead of quoting the whole path
+                if (dir.startsWith('~')) {
+                  cdCommand = `cd ${dir.replace(/ /g, '\\ ')}\r`;
+                } else {
+                  cdCommand = `cd "${dir}"\r`;
+                }
               } else if (shellType === 'cmd') {
                 // CMD needs /d flag to change drive too
                 cdCommand = `cd /d "${dir}"\r`;
@@ -888,6 +894,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       term.onData((data) => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
+          
+          // Clear waiting state when user types (they're responding to the prompt)
+          if (isWaiting) {
+            setIsWaiting(false);
+            if (onWaitingChange) {
+              onWaitingChange(false);
+            }
+            logger.terminal('Waiting state cleared by user input', { tabId });
+          }
         }
       });
 
