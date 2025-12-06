@@ -16,92 +16,230 @@ function debounce(fn, ms) {
   };
 }
 
-// CLI confirmation prompt patterns - specifically for tools like GitHub Copilot CLI
-// These indicate the CLI is waiting for user confirmation to proceed
-// Patterns are checked against the LAST line of output (where prompts appear)
-const CLI_CONFIRMATION_PATTERNS = [
-  /\(y\/n\)\s*$/i, // (y/n) at end of line
-  /\[Y\/n\]\s*$/i, // [Y/n] at end
-  /\[y\/N\]\s*$/i, // [y/N] at end
-  /\(yes\/no\)\s*$/i, // (yes/no) at end
-  /\? Run this command\?\s*$/i, // GitHub Copilot CLI: ? Run this command?
-  /Run this command\?\s*\([YyNn]\/[YyNn]\)\s*$/i, // Run this command? (Y/n)
-  /proceed\?\s*(\([YyNn]\/[YyNn]\))?\s*$/i, // Proceed? or Proceed? (y/n)
-  /continue\?\s*(\[[YyNn]\/[YyNn]\])?\s*$/i, // Continue? or Continue? [Y/n]
-  /confirm\?\s*(\([YyNn]\/[YyNn]\))?\s*$/i, // Confirm? (y/n)
-  /are you sure\?\s*(\[[YyNn]\/[YyNn]\])?\s*$/i, // Are you sure? [y/N]
-  /do you want to proceed\?\s*$/i, // Do you want to proceed?
-  /do you want to run\?\s*$/i, // Do you want to run?
-  /\?\s*›\s*$/i, // Interactive prompt with › (inquirer style)
-  // Additional patterns for various CLI tools
-  /\(Y\/n\)\s*$/i, // Capital Y default
-  /\(y\/N\)\s*$/i, // Capital N default
-  /\[yes\/no\]\s*$/i, // [yes/no] at end
-  /\? \(Y\/n\)\s*$/i, // ? (Y/n) format
-  /\? \[Y\/n\]\s*$/i, // ? [Y/n] format
-  /›\s*Yes\s*$/i, // inquirer style with Yes selected
-  /❯\s*Yes\s*$/i, // inquirer style with arrow
-];
-
-// Secondary check - must have y/n indicator somewhere in recent output
-const HAS_YN_INDICATOR = /\([YyNn]\/[YyNn]\)|\[[YyNn]\/[YyNn]\]|\(yes\/no\)|\[yes\/no\]/i;
+// ============================================================================
+// CLI Prompt Detection for Auto-Respond Feature
+// ============================================================================
+// Detects when CLI tools (Copilot, Claude, npm, etc.) are waiting for user input
+// and determines the appropriate response type.
 
 /**
- * Strip ANSI escape codes from text
+ * Strip ANSI escape codes from text for pattern matching
  */
 function stripAnsi(text) {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
 }
 
+// ----------------------------------------------------------------------------
+// PATTERN DEFINITIONS
+// ----------------------------------------------------------------------------
+
+// Menu-style prompts where an option is already selected (just press Enter)
+// These search the ENTIRE buffer, not just the last line
+const MENU_SELECTION_PATTERNS = [
+  // Copilot CLI: "❯ 1. Yes" or "> 1. Yes" (numbered menu with selection indicator)
+  /[›❯>]\s*1\.\s*Yes\b/i,
+  // Generic inquirer-style: "❯ Yes" anywhere in buffer
+  /[›❯>]\s*Yes\b/i,
+  // Copilot CLI: "❯ Run this command"
+  /[›❯>]\s*Run\s+this\s+command/i,
+  // Selected option with checkmark or bullet
+  /[●◉✓✔]\s*Yes\b/i,
+];
+
+// Context patterns that indicate a CLI is showing a confirmation menu
+// Must be combined with MENU_SELECTION_PATTERNS
+const MENU_CONTEXT_PATTERNS = [
+  // Copilot CLI instruction line
+  /Confirm with number keys or.*Enter/i,
+  // Generic "use arrow keys" instruction
+  /use.*arrow.*keys.*select/i,
+  /↑↓.*keys.*Enter/i,
+  // "Do you want to run" question
+  /Do you want to run this command\??/i,
+  /Do you want to run\??/i,
+  // Cancel with Esc instruction (common in TUI prompts)
+  /Cancel with Esc/i,
+];
+
+// Y/N style prompts: These expect typing 'y' or 'n' then Enter
+const YN_PROMPT_PATTERNS = [
+  // Standard y/n patterns at end of line
+  /\(y\/n\)\s*$/i,
+  /\[Y\/n\]\s*$/i,
+  /\[y\/N\]\s*$/i,
+  /\(yes\/no\)\s*$/i,
+  /\[yes\/no\]\s*$/i,
+  // Question followed by y/n
+  /\?\s*\(y\/n\)\s*$/i,
+  /\?\s*\[Y\/n\]\s*$/i,
+  /\?\s*\[y\/N\]\s*$/i,
+  // npm/yarn style
+  /\?\s*›?\s*\(Y\/n\)\s*$/i,
+  /Are you sure.*\?\s*$/i,
+];
+
+// Question patterns that indicate waiting for input (used with context)
+const QUESTION_PATTERNS = [
+  /Do you want to run this command\?/i,
+  /Do you want to proceed\?/i,
+  /Do you want to continue\?/i,
+  /Would you like to proceed\?/i,
+  /Proceed\?/i,
+  /Continue\?/i,
+  /Run this command\?/i,
+];
+
+// TUI frame indicators (box drawing characters indicate a TUI is active)
+const TUI_FRAME_INDICATORS = [
+  // Box drawing corners and lines
+  /[╭╮╯╰│─┌┐└┘├┤┬┴┼]/,
+  // Copilot CLI footer
+  /Remaining requests:\s*[\d.]+%/i,
+  // Ctrl+c Exit indicator
+  /Ctrl\+c\s+Exit/i,
+];
+
+// ----------------------------------------------------------------------------
+// DETECTION FUNCTIONS
+// ----------------------------------------------------------------------------
+
 /**
- * Check if text ends with a CLI confirmation prompt (waiting for y/n input)
+ * Detect if CLI is showing a menu-style prompt with "Yes" selected
+ * @param {string} cleanText - ANSI-stripped text buffer
+ * @param {boolean} debugLog - Enable debug logging
+ * @returns {{ detected: boolean, confidence: 'high'|'medium'|'low' }}
  */
-function isCliConfirmationWaiting(text, debugLog = false) {
-  if (!text) return false;
-  // Strip ANSI escape codes before checking
-  const cleanText = stripAnsi(text);
-  // Get the last 500 characters to check for prompt
-  const lastChunk = cleanText.slice(-500);
-  // Get the last non-empty line (where the prompt would be)
-  const lines = lastChunk.split(/[\r\n]/).filter(l => l.trim());
-  if (lines.length === 0) return false;
+function detectMenuPrompt(cleanText, debugLog = false) {
+  // Check if "Yes" option is selected (has selection indicator)
+  const hasYesSelected = MENU_SELECTION_PATTERNS.some(p => p.test(cleanText));
   
-  const lastLine = lines[lines.length - 1].trim();
-  const recentLines = lines.slice(-5).join(' '); // Last 5 lines for context
+  if (!hasYesSelected) {
+    return { detected: false, confidence: 'low' };
+  }
+  
+  // Check for supporting context (instructions, question, etc.)
+  const hasMenuContext = MENU_CONTEXT_PATTERNS.some(p => p.test(cleanText));
+  const hasQuestion = QUESTION_PATTERNS.some(p => p.test(cleanText));
+  const hasTuiFrame = TUI_FRAME_INDICATORS.some(p => p.test(cleanText));
   
   if (debugLog) {
-    console.log('[AutoRespond] Checking prompt:', { lastLine, recentLines: recentLines.slice(-100) });
+    console.log('[AutoRespond] Menu detection:', { 
+      hasYesSelected, 
+      hasMenuContext, 
+      hasQuestion, 
+      hasTuiFrame 
+    });
   }
   
-  // Check if the last line matches any prompt pattern
-  const hasPromptEnding = CLI_CONFIRMATION_PATTERNS.some(pattern => {
-    if (typeof pattern === 'object' && pattern instanceof RegExp) {
-      const matches = pattern.test(lastLine);
-      if (matches && debugLog) {
-        console.log('[AutoRespond] Pattern matched:', pattern.toString());
-      }
-      return matches;
-    }
-    return false;
-  });
-  
-  // For less specific patterns (like "Proceed?"), also require a y/n indicator nearby
-  if (hasPromptEnding) {
-    return true;
+  // High confidence: Yes is selected AND we see menu instructions or TUI frame
+  if (hasYesSelected && (hasMenuContext || hasTuiFrame)) {
+    return { detected: true, confidence: 'high' };
   }
   
-  // Also check if recent output has y/n indicator AND last line looks like waiting for input
-  // (ends with ?, :, or ›)
-  if (HAS_YN_INDICATOR.test(recentLines) && /[?:›❯]\s*$/.test(lastLine)) {
-    if (debugLog) {
-      console.log('[AutoRespond] Y/N indicator found with question mark ending');
-    }
-    return true;
+  // Medium confidence: Yes is selected AND there's a relevant question
+  if (hasYesSelected && hasQuestion) {
+    return { detected: true, confidence: 'medium' };
   }
   
-  return false;
+  // Low confidence: Just the selection indicator alone
+  // We still detect it but with lower confidence
+  if (hasYesSelected) {
+    return { detected: true, confidence: 'low' };
+  }
+  
+  return { detected: false, confidence: 'low' };
 }
+
+/**
+ * Detect if CLI is showing a Y/N style prompt
+ * @param {string} cleanText - ANSI-stripped text buffer
+ * @param {boolean} debugLog - Enable debug logging
+ * @returns {{ detected: boolean }}
+ */
+function detectYnPrompt(cleanText, debugLog = false) {
+  // Get last few lines for y/n detection (these appear at end)
+  const lines = cleanText.split(/[\r\n]/).filter(l => l.trim());
+  const lastLines = lines.slice(-3).join('\n');
+  
+  const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(lastLines));
+  
+  if (debugLog && hasYnPrompt) {
+    console.log('[AutoRespond] Y/N prompt detected in:', lastLines.slice(-100));
+  }
+  
+  return { detected: hasYnPrompt };
+}
+
+/**
+ * Main detection function - determines if CLI is waiting for user input
+ * @param {string} text - Raw terminal output buffer
+ * @param {boolean} debugLog - Enable debug logging
+ * @returns {{ waiting: boolean, responseType: 'enter'|'y-enter'|null, confidence: string }}
+ */
+function detectCliPrompt(text, debugLog = false) {
+  if (!text || text.length < 10) {
+    return { waiting: false, responseType: null, confidence: 'none' };
+  }
+  
+  // Strip ANSI escape codes
+  const cleanText = stripAnsi(text);
+  
+  // Use larger buffer for TUI apps that redraw the screen
+  const bufferToCheck = cleanText.slice(-2000);
+  
+  if (debugLog) {
+    // Log a summary of what we're checking
+    const lines = bufferToCheck.split(/[\r\n]/).filter(l => l.trim());
+    console.log('[AutoRespond] Checking buffer:', {
+      bufferLength: bufferToCheck.length,
+      lineCount: lines.length,
+      lastLine: lines[lines.length - 1]?.slice(0, 100) || '(empty)',
+      sample: bufferToCheck.slice(-300)
+    });
+  }
+  
+  // Priority 1: Check for menu-style prompts (Copilot, Claude, etc.)
+  const menuResult = detectMenuPrompt(bufferToCheck, debugLog);
+  if (menuResult.detected && menuResult.confidence !== 'low') {
+    if (debugLog) {
+      console.log('[AutoRespond] ✓ Menu prompt detected, confidence:', menuResult.confidence);
+    }
+    return { 
+      waiting: true, 
+      responseType: 'enter', 
+      confidence: menuResult.confidence 
+    };
+  }
+  
+  // Priority 2: Check for Y/N style prompts
+  const ynResult = detectYnPrompt(bufferToCheck, debugLog);
+  if (ynResult.detected) {
+    if (debugLog) {
+      console.log('[AutoRespond] ✓ Y/N prompt detected');
+    }
+    return { 
+      waiting: true, 
+      responseType: 'y-enter', 
+      confidence: 'high' 
+    };
+  }
+  
+  // Priority 3: Low confidence menu detection (still report as waiting but may not auto-respond)
+  if (menuResult.detected && menuResult.confidence === 'low') {
+    if (debugLog) {
+      console.log('[AutoRespond] ? Low confidence menu detection');
+    }
+    return { 
+      waiting: true, 
+      responseType: 'enter', 
+      confidence: 'low' 
+    };
+  }
+  
+  return { waiting: false, responseType: null, confidence: 'none' };
+}
+
 
 /**
  * Terminal Component
@@ -346,17 +484,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           textData = event.data;
         }
         
-        // Accumulate recent output for prompt detection
-        lastOutputRef.current = (lastOutputRef.current + textData).slice(-500);
+        // Accumulate recent output for prompt detection (larger buffer for TUI apps)
+        lastOutputRef.current = (lastOutputRef.current + textData).slice(-3000);
         
-        // Debounce waiting check - wait 100ms after last output
+        // Debounce waiting check - wait 500ms after last output for TUI to fully render
         if (waitingCheckTimeoutRef.current) {
           clearTimeout(waitingCheckTimeoutRef.current);
         }
         waitingCheckTimeoutRef.current = setTimeout(() => {
           // Enable debug logging when auto-respond is on
           const debugMode = autoRespondRef.current;
-          const waiting = isCliConfirmationWaiting(lastOutputRef.current, debugMode);
+          const { waiting, responseType, confidence } = detectCliPrompt(lastOutputRef.current, debugMode);
           
           if (waiting !== isWaiting) {
             setIsWaiting(waiting);
@@ -365,19 +503,36 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
           
-          // Auto-respond if enabled and CLI is waiting for confirmation
-          if (waiting && autoRespondRef.current && ws.readyState === WebSocket.OPEN) {
-            logger.terminal('Auto-responding to CLI prompt', { tabId });
-            // Send "y" followed by Enter to confirm
-            ws.send('y\r');
+          // Auto-respond only with high/medium confidence, not low
+          // Low confidence will trigger the tab pulse for user attention
+          const shouldAutoRespond = waiting && 
+            autoRespondRef.current && 
+            ws.readyState === WebSocket.OPEN &&
+            (confidence === 'high' || confidence === 'medium');
+          
+          if (shouldAutoRespond) {
+            logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
+            
+            // Send appropriate response based on prompt type
+            if (responseType === 'enter') {
+              // Menu-style: just press Enter (option already selected)
+              ws.send('\r');
+            } else {
+              // Y/N style: send "y" followed by Enter
+              ws.send('y\r');
+            }
+            
             // Clear waiting state after auto-respond
             lastOutputRef.current = '';
             setIsWaiting(false);
             if (onWaitingChange) {
               onWaitingChange(false);
             }
+          } else if (waiting && !autoRespondRef.current && debugMode === false) {
+            // Log when waiting is detected but auto-respond is off (for debugging)
+            logger.terminal('Prompt detected, waiting for user input', { tabId, responseType, confidence });
           }
-        }, 100);
+        }, 500);
       };
 
       ws.onerror = (error) => {

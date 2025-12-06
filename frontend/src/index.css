@@ -786,14 +786,14 @@ body {
 }
 
 .tab.auto-respond {
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid var(--tab-accent, var(--accent));
 }
 
 .auto-respond-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent);
+  color: var(--tab-accent, var(--accent));
   margin-right: 2px;
   flex-shrink: 0;
 }

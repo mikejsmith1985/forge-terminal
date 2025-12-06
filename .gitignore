@@ -29,3 +29,6 @@ web/assets/
 
 # Logs
 *.log
+
+# Issue images (downloaded for debugging, auto-cleaned after 7 days)
+issue-images/
