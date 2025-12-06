@@ -120,23 +120,30 @@ func handleCommands(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		log.Printf("[API] Loading commands...")
 		cmds, err := commands.LoadCommands()
 		if err != nil {
+			log.Printf("[API] Failed to load commands: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		log.Printf("[API] Successfully loaded %d commands", len(cmds))
 		json.NewEncoder(w).Encode(cmds)
 
 	case http.MethodPost:
 		var cmds []commands.Command
 		if err := json.NewDecoder(r.Body).Decode(&cmds); err != nil {
+			log.Printf("[API] Failed to decode commands: %v", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		log.Printf("[API] Saving %d commands...", len(cmds))
 		if err := commands.SaveCommands(cmds); err != nil {
+			log.Printf("[API] Failed to save commands: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		log.Printf("[API] Successfully saved commands")
 		w.WriteHeader(http.StatusOK)
 
 	default:

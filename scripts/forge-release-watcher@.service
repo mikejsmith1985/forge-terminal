@@ -1,0 +1,19 @@
+[Unit]
+Description=Forge Terminal Release Watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/mikej/projects/forge-terminal
+ExecStart=/home/mikej/projects/forge-terminal/scripts/watch-releases.sh
+Restart=always
+RestartSec=60
+StandardOutput=append:/home/mikej/.forge/release-watcher.log
+StandardError=append:/home/mikej/.forge/release-watcher.log
+
+# Environment
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=default.target

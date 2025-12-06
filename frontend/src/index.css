@@ -1451,3 +1451,46 @@ body {
   background: var(--accent-glow);
 }
 
+/* Command Cards Loading/Error States */
+.command-cards-loading,
+.command-cards-error,
+.command-cards-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--subtext);
+  gap: 1rem;
+}
+
+.command-cards-loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--overlay);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.command-cards-error {
+  color: var(--red);
+}
+
+.command-cards-error .error-message {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.command-cards-error .error-details {
+  font-size: 0.9rem;
+  color: var(--subtext);
+  margin-bottom: 1rem;
+}
+
+.command-cards-empty {
+  opacity: 0.7;
+}
+

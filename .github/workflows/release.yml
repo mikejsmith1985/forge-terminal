@@ -60,6 +60,16 @@ jobs:
           # macOS ARM64
           GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/forge-darwin-arm64 ./cmd/forge
 
+      - name: Generate Handshake Document
+        run: |
+          chmod +x scripts/generate-handshake.sh
+          ./scripts/generate-handshake.sh
+
+      - name: Validate Handshake Document
+        run: |
+          chmod +x scripts/validate-handshake.sh
+          ./scripts/validate-handshake.sh
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -68,4 +78,5 @@ jobs:
             bin/forge-windows-amd64.exe
             bin/forge-darwin-amd64
             bin/forge-darwin-arm64
+            FORGE_HANDSHAKE.md
           generate_release_notes: true
