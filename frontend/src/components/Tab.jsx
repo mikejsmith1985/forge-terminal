@@ -29,7 +29,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleMode, isWaiting = false, mode = 'dark' }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleMode, isWaiting = false, mode = 'dark', devMode = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -135,7 +135,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   let titleText = tab.title;
   const indicators = [];
   if (tab.autoRespond) indicators.push('Auto-respond');
-  if (tab.amEnabled) indicators.push('AM Logging');
+  if (devMode && tab.amEnabled) indicators.push('AM Logging');
   if (tabMode === 'light') indicators.push('Light');
   if (indicators.length > 0) {
     titleText = `${tab.title} (${indicators.join(', ')})`;
@@ -144,7 +144,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   return (
     <>
       <div
-        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''} ${tab.amEnabled ? 'am-enabled' : ''}`}
+        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''} ${devMode && tab.amEnabled ? 'am-enabled' : ''}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
@@ -159,7 +159,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
         <span className="tab-icon" data-shell={shellType}>
           {getShellIcon(shellType)}
         </span>
-        {tab.amEnabled && (
+        {devMode && tab.amEnabled && (
           <span className="am-indicator" title="AM Logging enabled">
             <BookOpen size={10} />
           </span>
@@ -213,16 +213,18 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             {tabMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             {tabMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
-          <button 
-            onClick={() => { 
-              setShowContextMenu(false); 
-              if (onToggleAM) onToggleAM(); 
-            }}
-            className={tab.amEnabled ? 'active' : ''}
-          >
-            <BookOpen size={14} />
-            AM Logging {tab.amEnabled ? '✓' : ''}
-          </button>
+          {devMode && onToggleAM && (
+            <button 
+              onClick={() => { 
+                setShowContextMenu(false); 
+                if (onToggleAM) onToggleAM(); 
+              }}
+              className={tab.amEnabled ? 'active' : ''}
+            >
+              <BookOpen size={14} />
+              AM Logging {tab.amEnabled ? '✓' : ''}
+            </button>
+          )}
           <button 
             onClick={() => { 
               setShowContextMenu(false); 

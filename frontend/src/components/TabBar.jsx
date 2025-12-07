@@ -19,6 +19,7 @@ function TabBar({
   disableNewTab = false,
   waitingTabs = {}, // Map of tabId -> isWaiting
   mode = 'dark', // 'dark' or 'light' for theme mode
+  devMode = false, // Whether dev mode is enabled
 }) {
   const handleTabClick = (tabId) => {
     onTabClick(tabId);
@@ -66,8 +67,9 @@ function TabBar({
             onClose={() => handleTabClose(tab.id)}
             onRename={(newTitle) => handleTabRename(tab.id, newTitle)}
             onToggleAutoRespond={() => handleToggleAutoRespond(tab.id)}
-            onToggleAM={() => handleToggleAM(tab.id)}
+            onToggleAM={devMode ? () => handleToggleAM(tab.id) : null}
             onToggleMode={() => handleToggleMode(tab.id)}
+            devMode={devMode}
           />
         ))}
       </div>

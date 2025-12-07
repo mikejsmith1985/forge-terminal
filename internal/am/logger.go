@@ -1,4 +1,4 @@
-// Package am provides Artificial Memory session logging for terminal recovery.
+// Package am provides session logging for terminal recovery.
 package am
 
 import (
@@ -16,7 +16,7 @@ const (
 	retentionDays = 10
 )
 
-// LogEntryType represents the type of log entry
+// LogEntryType represents the type of log entry.
 type LogEntryType string
 
 const (
@@ -31,14 +31,14 @@ const (
 	EntrySessionInterrupted LogEntryType = "SESSION_INTERRUPTED"
 )
 
-// LogEntry represents a single log entry
+// LogEntry represents a single log entry.
 type LogEntry struct {
 	Timestamp time.Time    `json:"timestamp"`
 	Type      LogEntryType `json:"type"`
 	Content   string       `json:"content"`
 }
 
-// SessionLog represents a complete session log
+// SessionLog represents a complete session log.
 type SessionLog struct {
 	TabID       string     `json:"tabId"`
 	TabName     string     `json:"tabName"`
@@ -49,7 +49,7 @@ type SessionLog struct {
 	Ended       bool       `json:"ended"`
 }
 
-// Logger manages AM logging for a session
+// Logger manages AM logging for a session.
 type Logger struct {
 	mu      sync.Mutex
 	tabID   string
@@ -58,24 +58,23 @@ type Logger struct {
 	enabled bool
 }
 
-// GetAMDir returns the AM directory path
+// GetAMDir returns the AM directory path.
 func GetAMDir() string {
 	cwd, _ := os.Getwd()
 	return filepath.Join(cwd, amDir)
 }
 
-// GetArchiveDir returns the archive directory path
+// GetArchiveDir returns the archive directory path.
 func GetArchiveDir() string {
 	cwd, _ := os.Getwd()
 	return filepath.Join(cwd, archiveDir)
 }
 
-// ensureDir creates a directory if it doesn't exist
 func ensureDir(path string) error {
 	return os.MkdirAll(path, 0755)
 }
 
-// NewLogger creates a new AM logger for a tab
+// NewLogger creates a new AM logger for a tab.
 func NewLogger(tabID, tabName, workspace string) (*Logger, error) {
 	if err := ensureDir(GetAMDir()); err != nil {
 		return nil, fmt.Errorf("failed to create AM directory: %w", err)
@@ -94,17 +93,15 @@ func NewLogger(tabID, tabName, workspace string) (*Logger, error) {
 		Ended:       false,
 	}
 
-	logger := &Logger{
+	return &Logger{
 		tabID:   tabID,
 		logPath: logPath,
 		session: session,
 		enabled: false,
-	}
-
-	return logger, nil
+	}, nil
 }
 
-// Enable starts logging
+// Enable starts logging.
 func (l *Logger) Enable() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -124,7 +121,7 @@ func (l *Logger) Enable() error {
 	return l.flush()
 }
 
-// Disable stops logging and marks session as ended
+// Disable stops logging.
 func (l *Logger) Disable() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -144,20 +141,17 @@ func (l *Logger) Disable() error {
 	return l.flush()
 }
 
-// IsEnabled returns whether logging is enabled
+// IsEnabled returns whether logging is enabled.
 func (l *Logger) IsEnabled() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.enabled
 }
 
-// Log adds an entry to the session log
+// Log adds an entry to the session log.
 func (l *Logger) Log(entryType LogEntryType, content string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	// Don't check enabled here - let caller decide
-	// This allows logging even when AM is "off" for recovery purposes
 
 	l.session.Entries = append(l.session.Entries, LogEntry{
 		Timestamp: time.Now(),
@@ -169,13 +163,11 @@ func (l *Logger) Log(entryType LogEntryType, content string) error {
 	return l.flush()
 }
 
-// flush writes the session to disk
 func (l *Logger) flush() error {
 	content := l.generateMarkdown()
 	return os.WriteFile(l.logPath, []byte(content), 0644)
 }
 
-// generateMarkdown creates the markdown log file content
 func (l *Logger) generateMarkdown() string {
 	var sb strings.Builder
 
@@ -200,35 +192,18 @@ func (l *Logger) generateMarkdown() string {
 
 	if !l.session.Ended {
 		sb.WriteString("---\n\n")
-		sb.WriteString("> ⚠️ **Session in progress** - Log will be marked as interrupted if not properly closed.\n")
+		sb.WriteString("> ⚠️ **Session in progress**\n")
 	}
 
 	return sb.String()
 }
 
-// GetLogPath returns the path to the log file
+// GetLogPath returns the path to the log file.
 func (l *Logger) GetLogPath() string {
 	return l.logPath
 }
 
-// Archive moves the log to the archive directory
-func (l *Logger) Archive() error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if err := ensureDir(GetArchiveDir()); err != nil {
-		return fmt.Errorf("failed to create archive directory: %w", err)
-	}
-
-	if _, err := os.Stat(l.logPath); os.IsNotExist(err) {
-		return nil // Nothing to archive
-	}
-
-	archivePath := filepath.Join(GetArchiveDir(), filepath.Base(l.logPath))
-	return os.Rename(l.logPath, archivePath)
-}
-
-// SessionInfo represents info about a recoverable session
+// SessionInfo represents info about a recoverable session.
 type SessionInfo struct {
 	TabID       string    `json:"tabId"`
 	FilePath    string    `json:"filePath"`
@@ -237,7 +212,7 @@ type SessionInfo struct {
 	Content     string    `json:"content"`
 }
 
-// CheckForRecoverableSessions looks for interrupted sessions
+// CheckForRecoverableSessions looks for interrupted sessions.
 func CheckForRecoverableSessions() ([]SessionInfo, error) {
 	amPath := GetAMDir()
 	if _, err := os.Stat(amPath); os.IsNotExist(err) {
@@ -261,7 +236,6 @@ func CheckForRecoverableSessions() ([]SessionInfo, error) {
 			continue
 		}
 
-		// Check if session was properly ended
 		contentStr := string(content)
 		if !strings.Contains(contentStr, "[SESSION_ENDED]") {
 			info, err := entry.Info()
@@ -269,10 +243,8 @@ func CheckForRecoverableSessions() ([]SessionInfo, error) {
 				continue
 			}
 
-			// Extract tab ID from filename
 			tabID := strings.TrimPrefix(entry.Name(), "session-")
 			tabID = strings.TrimSuffix(tabID, filepath.Ext(tabID))
-			// Remove date suffix
 			if idx := strings.LastIndex(tabID, "-"); idx > 0 {
 				tabID = tabID[:idx]
 			}
@@ -290,7 +262,7 @@ func CheckForRecoverableSessions() ([]SessionInfo, error) {
 	return sessions, nil
 }
 
-// CleanupOldLogs removes archived logs older than retention period
+// CleanupOldLogs removes archived logs older than retention period.
 func CleanupOldLogs() error {
 	archivePath := GetArchiveDir()
 	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
@@ -315,18 +287,14 @@ func CleanupOldLogs() error {
 
 		if info.ModTime().Before(cutoff) {
 			filePath := filepath.Join(archivePath, entry.Name())
-			if err := os.Remove(filePath); err != nil {
-				fmt.Printf("[AM] Failed to remove old log %s: %v\n", entry.Name(), err)
-			} else {
-				fmt.Printf("[AM] Cleaned up old log: %s\n", entry.Name())
-			}
+			os.Remove(filePath)
 		}
 	}
 
 	return nil
 }
 
-// GetLogContent returns the content of a log file
+// GetLogContent returns the content of a log file.
 func GetLogContent(tabID string) (string, error) {
 	amPath := GetAMDir()
 	entries, err := os.ReadDir(amPath)
@@ -348,7 +316,7 @@ func GetLogContent(tabID string) (string, error) {
 	return "", fmt.Errorf("log not found for tab %s", tabID)
 }
 
-// ArchiveLog archives a specific log file by tab ID
+// ArchiveLog archives a specific log file.
 func ArchiveLog(tabID string) error {
 	if err := ensureDir(GetArchiveDir()); err != nil {
 		return err
@@ -371,41 +339,22 @@ func ArchiveLog(tabID string) error {
 	return nil
 }
 
-// DeleteLog deletes a specific log file by tab ID
-func DeleteLog(tabID string) error {
-	amPath := GetAMDir()
-	entries, err := os.ReadDir(amPath)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		if strings.Contains(entry.Name(), tabID) && !entry.IsDir() {
-			filePath := filepath.Join(amPath, entry.Name())
-			return os.Remove(filePath)
-		}
-	}
-
-	return nil
-}
-
-// LoggerRegistry manages loggers for multiple tabs
+// LoggerRegistry manages loggers for multiple tabs.
 type LoggerRegistry struct {
 	mu      sync.RWMutex
 	loggers map[string]*Logger
 }
 
-// Global registry
 var registry = &LoggerRegistry{
 	loggers: make(map[string]*Logger),
 }
 
-// GetRegistry returns the global logger registry
+// GetRegistry returns the global logger registry.
 func GetRegistry() *LoggerRegistry {
 	return registry
 }
 
-// Get returns a logger for a tab, creating one if needed
+// Get returns a logger for a tab, creating one if needed.
 func (r *LoggerRegistry) Get(tabID, tabName, workspace string) (*Logger, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -423,14 +372,14 @@ func (r *LoggerRegistry) Get(tabID, tabName, workspace string) (*Logger, error) 
 	return logger, nil
 }
 
-// Remove removes a logger from the registry
+// Remove removes a logger from the registry.
 func (r *LoggerRegistry) Remove(tabID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.loggers, tabID)
 }
 
-// AppendLogRequest represents a request to append to a log
+// AppendLogRequest represents a request to append to a log.
 type AppendLogRequest struct {
 	TabID     string       `json:"tabId"`
 	TabName   string       `json:"tabName"`
@@ -439,7 +388,7 @@ type AppendLogRequest struct {
 	Content   string       `json:"content"`
 }
 
-// EnableRequest represents a request to enable/disable AM
+// EnableRequest represents a request to enable/disable AM.
 type EnableRequest struct {
 	TabID     string `json:"tabId"`
 	TabName   string `json:"tabName"`
@@ -447,7 +396,7 @@ type EnableRequest struct {
 	Enabled   bool   `json:"enabled"`
 }
 
-// RecoveryInfo represents session recovery information
+// RecoveryInfo represents session recovery information.
 type RecoveryInfo struct {
 	HasRecoverable bool          `json:"hasRecoverable"`
 	Sessions       []SessionInfo `json:"sessions"`

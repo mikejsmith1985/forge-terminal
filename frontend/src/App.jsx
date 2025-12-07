@@ -1081,11 +1081,12 @@ function App() {
         </button>
       </div>
 
-      {/* AM Monitor - Shows LLM activity status */}
-      {activeTab && (
+      {/* AM Monitor - Shows LLM activity status (Dev Mode only) */}
+      {activeTab && devMode && (
         <AMMonitor 
           tabId={activeTab.id} 
           amEnabled={activeTab.amEnabled || false}
+          devMode={devMode}
         />
       )}
 

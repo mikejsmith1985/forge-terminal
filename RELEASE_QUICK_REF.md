@@ -37,10 +37,9 @@ GitHub workflow automatically:
 ./sync-handshake.sh  # Download from latest release
 ```
 
-### Option 2: Auto-Watch (Background)
-```bash
-./scripts/watch-releases.sh &  # Polls every 5 minutes
-```
+### Option 2: Auto-Watch (Deprecated)
+The automated release watcher and handshake sync have been deprecated and removed. Prefer manual sync (./sync-handshake.sh) or CI-driven workflows; the background watcher is no longer available.
+
 
 ### Option 3: Webhook (Advanced)
 ```bash
@@ -71,7 +70,7 @@ curl -L "https://github.com/mikejsmith1985/forge-terminal/releases/download/$VER
 | `make handshake-doc` | Generate handshake locally |
 | `make validate-handshake` | Validate handshake is current |
 | `./sync-handshake.sh` | Download from latest release |
-| `./scripts/watch-releases.sh` | Start background watcher |
+| `./scripts/watch-releases.sh` | Deprecated (release watcher removed) |
 | `./scripts/webhook-server.sh` | Start webhook server |
 
 ## File Locations
@@ -106,11 +105,8 @@ grep 'UI Components' FORGE_HANDSHAKE.md
 make handshake-doc
 ```
 
-**Watcher not running?**
-```bash
-ps aux | grep watch-releases
-tail -f .forge/release-watcher.log
-```
+**Release watcher deprecated.**
+The release watcher and local handshake sync have been removed; use manual sync (./sync-handshake.sh) or your CI to retrieve handshake assets.
 
 **Webhook not receiving?**
 ```bash

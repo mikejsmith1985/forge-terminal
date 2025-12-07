@@ -86,6 +86,8 @@ func main() {
 	http.HandleFunc("/api/am/archive/", handleAMArchive)
 	http.HandleFunc("/api/am/cleanup", handleAMCleanup)
 	http.HandleFunc("/api/am/llm/conversations/", handleAMLLMConversations)
+	http.HandleFunc("/api/am/health", handleAMHealth)
+	http.HandleFunc("/api/am/conversations", handleAMActiveConversations)
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", handleDesktopShortcut)
@@ -97,8 +99,12 @@ func main() {
 	http.HandleFunc("/api/files/delete", files.HandleDelete)
 	http.HandleFunc("/api/files/stream", files.HandleReadStream)
 
-	// Run AM cleanup on startup
+	// Run AM cleanup on startup and initialize AM system
 	go am.CleanupOldLogs()
+	amSystem := am.InitSystem(am.DefaultAMDir())
+	if err := amSystem.Start(); err != nil {
+		log.Printf("[AM] Failed to start AM system: %v", err)
+	}
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()
@@ -911,13 +917,57 @@ func handleAMLLMConversations(w http.ResponseWriter, r *http.Request) {
 	tabID := pathParts[len(pathParts)-1]
 
 	// Get LLM logger for this tab
-	llmLogger := am.GetLLMLogger(tabID)
+	llmLogger := am.GetLLMLogger(tabID, am.DefaultAMDir())
 	conversations := llmLogger.GetConversations()
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":       true,
 		"conversations": conversations,
 		"count":         len(conversations),
+	})
+}
+
+func handleAMHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	system := am.GetSystem()
+	if system == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "NOT_INITIALIZED",
+		})
+		return
+	}
+
+	health := system.GetHealth()
+	json.NewEncoder(w).Encode(health)
+}
+
+func handleAMActiveConversations(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	system := am.GetSystem()
+	if system == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"active": map[string]interface{}{},
+			"count":  0,
+		})
+		return
+	}
+
+	convs := system.GetActiveConversations()
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"active": convs,
+		"count":  len(convs),
 	})
 }
 

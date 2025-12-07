@@ -1,95 +1,161 @@
-// Package llm provides LLM command detection and conversation tracking for AI CLI tools.
+// Package llm provides LLM command detection for AI CLI tools.
 package llm
 
 import (
-"fmt"
-"regexp"
-"strings"
+	"log"
+	"regexp"
+	"strings"
 )
 
-// Provider represents an LLM CLI provider
+// Provider represents an LLM CLI provider.
 type Provider string
 
 const (
-ProviderGitHubCopilot Provider = "github-copilot"
-ProviderClaude        Provider = "claude"
-ProviderUnknown       Provider = "unknown"
+	ProviderGitHubCopilot Provider = "github-copilot"
+	ProviderClaude        Provider = "claude"
+	ProviderAider         Provider = "aider"
+	ProviderUnknown       Provider = "unknown"
 )
 
-// CommandType represents the type of LLM command
+// CommandType represents the type of LLM command.
 type CommandType string
 
 const (
-CommandChat    CommandType = "chat"
-CommandUnknown CommandType = "unknown"
+	CommandChat    CommandType = "chat"
+	CommandSuggest CommandType = "suggest"
+	CommandExplain CommandType = "explain"
+	CommandCode    CommandType = "code"
+	CommandUnknown CommandType = "unknown"
 )
 
-// DetectedCommand represents a detected LLM command
+// DetectedCommand represents a detected LLM command.
 type DetectedCommand struct {
-Provider Provider
-Type     CommandType
-Prompt   string
-RawInput string
-Detected bool
+	Provider Provider
+	Type     CommandType
+	Prompt   string
+	RawInput string
+	Detected bool
 }
 
-var (
-// GitHub Copilot CLI patterns (standalone copilot command)
-// Users type: copilot (then interact in TUI)
-copilotPattern = regexp.MustCompile(`^copilot\s*$`)
+// LLMPattern defines a detection pattern for an LLM CLI.
+type LLMPattern struct {
+	Name    string
+	Regex   *regexp.Regexp
+	Extract func(string) (Provider, CommandType)
+}
 
-// Claude CLI patterns
-// Users type: claude (then interact in TUI)
-claudePattern = regexp.MustCompile(`^claude\s*$`)
-)
+// Detector handles LLM command detection.
+type Detector struct {
+	patterns []*LLMPattern
+}
 
-// DetectCommand analyzes input to determine if it's an LLM command
+// NewDetector creates a new LLM detector with all supported patterns.
+func NewDetector() *Detector {
+	d := &Detector{
+		patterns: []*LLMPattern{
+			{
+				Name:  "copilot-standalone",
+				Regex: regexp.MustCompile(`(?i)^copilot\s*$`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGitHubCopilot, CommandChat
+				},
+			},
+			{
+				Name:  "gh-copilot-suggest",
+				Regex: regexp.MustCompile(`(?i)^gh\s+copilot\s+suggest`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGitHubCopilot, CommandSuggest
+				},
+			},
+			{
+				Name:  "gh-copilot-explain",
+				Regex: regexp.MustCompile(`(?i)^gh\s+copilot\s+explain`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGitHubCopilot, CommandExplain
+				},
+			},
+			{
+				Name:  "gh-copilot",
+				Regex: regexp.MustCompile(`(?i)^gh\s+copilot`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGitHubCopilot, CommandChat
+				},
+			},
+			{
+				Name:  "claude-standalone",
+				Regex: regexp.MustCompile(`(?i)^claude\s*$`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderClaude, CommandChat
+				},
+			},
+			{
+				Name:  "claude-code",
+				Regex: regexp.MustCompile(`(?i)^claude\s+code`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderClaude, CommandCode
+				},
+			},
+			{
+				Name:  "aider",
+				Regex: regexp.MustCompile(`(?i)^aider`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderAider, CommandCode
+				},
+			},
+		},
+	}
+	return d
+}
+
+// DetectCommand analyzes input to determine if it's an LLM command.
+func (d *Detector) DetectCommand(input string) *DetectedCommand {
+	trimmed := strings.TrimSpace(input)
+
+	log.Printf("[LLM Detector] Analyzing: '%s' (len=%d)", trimmed, len(trimmed))
+
+	for _, pattern := range d.patterns {
+		if pattern.Regex.MatchString(trimmed) {
+			provider, cmdType := pattern.Extract(trimmed)
+			log.Printf("[LLM Detector] ✓ Matched pattern '%s': provider=%s type=%s", pattern.Name, provider, cmdType)
+			return &DetectedCommand{
+				Provider: provider,
+				Type:     cmdType,
+				Prompt:   "",
+				RawInput: input,
+				Detected: true,
+			}
+		}
+	}
+
+	log.Printf("[LLM Detector] ✗ No pattern matched")
+	return &DetectedCommand{
+		Provider: ProviderUnknown,
+		Type:     CommandUnknown,
+		RawInput: input,
+		Detected: false,
+	}
+}
+
+// IsLLMCommand checks if input is an LLM command.
+func (d *Detector) IsLLMCommand(input string) bool {
+	return d.DetectCommand(input).Detected
+}
+
+// IsLLMProcess checks if a process name/command line is an LLM CLI.
+func (d *Detector) IsLLMProcess(cmdLine string) (bool, Provider, CommandType) {
+	result := d.DetectCommand(cmdLine)
+	return result.Detected, result.Provider, result.Type
+}
+
+// Global detector instance for convenience.
+var globalDetector = NewDetector()
+
+// DetectCommand uses the global detector.
 func DetectCommand(input string) *DetectedCommand {
-trimmed := strings.TrimSpace(input)
-
-fmt.Printf("[LLM Detector] Analyzing command: '%s' (original: '%s', length: %d, trimmed length: %d)\n", 
-	trimmed, input, len(input), len(trimmed))
-
-// GitHub Copilot CLI detection (standalone command)
-// User just types: copilot
-if copilotPattern.MatchString(trimmed) {
-fmt.Printf("[LLM Detector] ✅ MATCHED copilot pattern\n")
-return &DetectedCommand{
-Provider: ProviderGitHubCopilot,
-Type:     CommandChat,
-Prompt:   "", // Interactive TUI mode, no initial prompt
-RawInput: input,
-Detected: true,
-}
-} else {
-fmt.Printf("[LLM Detector] copilot pattern DID NOT match\n")
+	return globalDetector.DetectCommand(input)
 }
 
-// Claude CLI detection
-// User just types: claude
-if claudePattern.MatchString(trimmed) {
-fmt.Printf("[LLM Detector] ✅ MATCHED claude pattern\n")
-return &DetectedCommand{
-Provider: ProviderClaude,
-Type:     CommandChat,
-Prompt:   "", // Interactive TUI mode, no initial prompt
-RawInput: input,
-Detected: true,
-}
-} else {
-fmt.Printf("[LLM Detector] claude pattern DID NOT match\n")
-}
-
-fmt.Printf("[LLM Detector] ❌ No LLM pattern matched\n")
-return &DetectedCommand{
-Provider: ProviderUnknown,
-Type:     CommandUnknown,
-RawInput: input,
-Detected: false,
-}
-}
-
-// IsLLMCommand is a convenience method to check if input is an LLM command
+// IsLLMCommand uses the global detector.
 func IsLLMCommand(input string) bool {
-return DetectCommand(input).Detected
+	return globalDetector.IsLLMCommand(input)
 }

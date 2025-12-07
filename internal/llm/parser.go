@@ -1,127 +1,76 @@
-// Package llm provides output parsing for LLM CLI tools
+// Package llm provides output parsing for LLM CLI tools.
 package llm
 
 import (
-"regexp"
-"strings"
+	"regexp"
+	"strings"
 )
 
 var (
-// ANSI escape code patterns
-ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-
-// Bracketed paste mode markers
-bracketedPasteStart = regexp.MustCompile(`\x1b\[(\?)?200[0-4]h`)
-bracketedPasteEnd   = regexp.MustCompile(`\x1b\[(\?)?200[0-4]l`)
-
-// Box drawing and TUI frame characters
-tuiFramePattern = regexp.MustCompile(`[╭╮╯╰│─┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬]`)
-
-// GitHub Copilot TUI patterns
-copilotFooterPattern = regexp.MustCompile(`(?i)(Ctrl\+c\s+Exit|Remaining\s+requests:|Enter\s+@\s+to\s+mention)`)
-copilotMenuPattern   = regexp.MustCompile(`(?i)(Confirm with number keys|Cancel with Esc)`)
+	ansiPattern         = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	bracketedPasteStart = regexp.MustCompile(`\x1b\[(\?)?200[0-4]h`)
+	bracketedPasteEnd   = regexp.MustCompile(`\x1b\[(\?)?200[0-4]l`)
+	tuiFramePattern     = regexp.MustCompile(`[╭╮╯╰│─┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬]`)
+	copilotFooter       = regexp.MustCompile(`(?i)(Ctrl\+c\s+Exit|Remaining\s+requests:|Enter\s+@\s+to\s+mention)`)
+	copilotMenu         = regexp.MustCompile(`(?i)(Confirm with number keys|Cancel with Esc)`)
+	multiNewline        = regexp.MustCompile(`\n{3,}`)
 )
 
-// CleanANSI removes all ANSI escape codes from text
+// CleanANSI removes all ANSI escape codes from text.
 func CleanANSI(text string) string {
-// Remove ANSI color/style codes
-cleaned := ansiPattern.ReplaceAllString(text, "")
+	cleaned := ansiPattern.ReplaceAllString(text, "")
+	cleaned = bracketedPasteStart.ReplaceAllString(cleaned, "")
+	cleaned = bracketedPasteEnd.ReplaceAllString(cleaned, "")
 
-// Remove bracketed paste mode markers
-cleaned = bracketedPasteStart.ReplaceAllString(cleaned, "")
-cleaned = bracketedPasteEnd.ReplaceAllString(cleaned, "")
-
-// Remove other control characters except newlines and tabs
-var result strings.Builder
-for _, r := range cleaned {
-// Keep printable chars, newlines, tabs
-if r == '\n' || r == '\r' || r == '\t' || (r >= 32 && r < 127) || r >= 160 {
-result.WriteRune(r)
-}
+	var result strings.Builder
+	for _, r := range cleaned {
+		if r == '\n' || r == '\r' || r == '\t' || (r >= 32 && r < 127) || r >= 160 {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
 }
 
-return result.String()
-}
-
-// ParseCopilotOutput extracts clean content from GitHub Copilot CLI TUI output
+// ParseCopilotOutput extracts clean content from GitHub Copilot CLI output.
 func ParseCopilotOutput(raw string) string {
-// First pass: clean ANSI codes
-cleaned := CleanANSI(raw)
+	cleaned := CleanANSI(raw)
+	cleaned = tuiFramePattern.ReplaceAllString(cleaned, "")
 
-// Remove TUI frame characters
-cleaned = tuiFramePattern.ReplaceAllString(cleaned, "")
+	var contentLines []string
+	for _, line := range strings.Split(cleaned, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || len(trimmed) < 3 {
+			continue
+		}
+		if copilotFooter.MatchString(trimmed) || copilotMenu.MatchString(trimmed) {
+			continue
+		}
+		contentLines = append(contentLines, trimmed)
+	}
 
-// Remove footer/menu lines
-lines := strings.Split(cleaned, "\n")
-var contentLines []string
-
-for _, line := range lines {
-trimmed := strings.TrimSpace(line)
-
-// Skip empty lines
-if trimmed == "" {
-continue
+	result := strings.Join(contentLines, "\n")
+	result = strings.TrimSpace(result)
+	result = multiNewline.ReplaceAllString(result, "\n\n")
+	return result
 }
 
-// Skip footer patterns
-if copilotFooterPattern.MatchString(trimmed) {
-continue
-}
-
-// Skip menu instruction lines
-if copilotMenuPattern.MatchString(trimmed) {
-continue
-}
-
-// Skip lines that are just box drawing remnants
-if len(trimmed) < 3 {
-continue
-}
-
-contentLines = append(contentLines, trimmed)
-}
-
-result := strings.Join(contentLines, "\n")
-
-// Clean up excessive whitespace
-result = strings.TrimSpace(result)
-result = regexp.MustCompile(`\n{3,}`).ReplaceAllString(result, "\n\n")
-
-return result
-}
-
-// ParseClaudeOutput extracts clean content from Claude CLI output
+// ParseClaudeOutput extracts clean content from Claude CLI output.
 func ParseClaudeOutput(raw string) string {
-// Claude has simpler output, mostly just needs ANSI cleaning
-cleaned := CleanANSI(raw)
-
-// Remove TUI frames if present
-cleaned = tuiFramePattern.ReplaceAllString(cleaned, "")
-
-// Basic cleanup
-cleaned = strings.TrimSpace(cleaned)
-cleaned = regexp.MustCompile(`\n{3,}`).ReplaceAllString(cleaned, "\n\n")
-
-return cleaned
+	cleaned := CleanANSI(raw)
+	cleaned = tuiFramePattern.ReplaceAllString(cleaned, "")
+	cleaned = strings.TrimSpace(cleaned)
+	cleaned = multiNewline.ReplaceAllString(cleaned, "\n\n")
+	return cleaned
 }
 
-// ParseLLMOutput routes to provider-specific parser
+// ParseLLMOutput routes to provider-specific parser.
 func ParseLLMOutput(raw string, provider Provider) string {
-switch provider {
-case ProviderGitHubCopilot:
-return ParseCopilotOutput(raw)
-case ProviderClaude:
-return ParseClaudeOutput(raw)
-default:
-return CleanANSI(raw)
-}
-}
-
-// ExtractPromptFromCommand extracts the actual prompt text from a command line
-func ExtractPromptFromCommand(cmdLine string) string {
-detected := DetectCommand(cmdLine)
-if detected.Detected {
-return detected.Prompt
-}
-return ""
+	switch provider {
+	case ProviderGitHubCopilot:
+		return ParseCopilotOutput(raw)
+	case ProviderClaude:
+		return ParseClaudeOutput(raw)
+	default:
+		return CleanANSI(raw)
+	}
 }
