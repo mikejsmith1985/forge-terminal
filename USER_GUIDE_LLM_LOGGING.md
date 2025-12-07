@@ -26,35 +26,81 @@
 
 ---
 
-## Examples of What Gets Logged
+## Real User Workflow
 
-### **Scenario 1: GitHub Copilot Suggest**
+This is **exactly** what users do (and what gets logged automatically):
+
+### **Step 1: Launch Forge**
+```bash
+# User opens Forge Terminal in browser
+# → LLM logging activated automatically ✅
+```
+
+### **Step 2: Navigate to project**
+```bash
+cd ~/my-project
+# → Regular command, not logged as LLM conversation ✅
+```
+
+### **Step 3: Start LLM session**
+```bash
+copilot
+# → DETECTED! Conversation tracking starts ✅
+# → User enters TUI and starts chatting
+# → Every prompt and response logged automatically ✅
+```
+
+Or:
+```bash
+claude
+# → DETECTED! Conversation tracking starts ✅
+# → User enters TUI and starts chatting
+# → Every prompt and response logged automatically ✅
+```
+
+### **Step 4: Work continues until...**
+
+**Scenario A: App crashes**
+- ✅ Conversation logged up to crash point
+- ✅ Can be recovered from `.forge/am/llm-conv-*.json`
+
+**Scenario B: Accidentally shut down**
+- ✅ Conversation logged up to shutdown
+- ✅ Can resume from where you left off
+
+**Scenario C: Update happens**
+- ✅ Conversation logged before update
+- ✅ Available after restart
+
+**All conversations kept for 10 days automatically.**
 
 **You type in terminal:**
 ```bash
-gh copilot suggest "create a web server"
+copilot
 ```
 
 **What happens automatically:**
 - ✅ System detects this is an LLM command
-- ✅ Starts tracking conversation
-- ✅ Captures your prompt: "create a web server"
-- ✅ Captures Copilot's response (cleaned, no ANSI codes)
+- ✅ Starts tracking the entire interactive session
+- ✅ Captures all your prompts in the TUI
+- ✅ Captures all Copilot responses (cleaned, no ANSI codes)
+- ✅ Continues logging until you exit Copilot
 - ✅ Saves to: `.forge/am/llm-conv-{tabId}-{convId}.json`
 
-**You see:** Normal Copilot output in terminal  
+**You see:** Normal Copilot interactive TUI  
 **Behind the scenes:** Clean conversation saved to disk
 
 ### **Scenario 2: Claude CLI**
 
 **You type:**
 ```bash
-claude "help me debug this error"
+claude
 ```
 
 **What happens automatically:**
 - ✅ Detected as LLM command
-- ✅ Conversation tracked and saved
+- ✅ Entire interactive session tracked
+- ✅ All prompts and responses captured
 - ✅ Clean JSON format for recovery
 
 ### **Scenario 3: Regular Commands**
@@ -127,13 +173,15 @@ npm install
 
 ### **Currently Auto-Detected:**
 
-1. **GitHub Copilot CLI**
-   - `gh copilot suggest "..."`
-   - `gh copilot explain "..."`
-   - `gh copilot` (interactive mode)
+1. **GitHub Copilot CLI (standalone)**
+   - Just type: `copilot`
+   - Interactive TUI mode
+   - All conversations automatically logged
 
 2. **Claude CLI**
-   - `claude "..."`
+   - Just type: `claude`
+   - Interactive TUI mode
+   - All conversations automatically logged
 
 ### **Coming Soon:**
 - OpenAI CLI
