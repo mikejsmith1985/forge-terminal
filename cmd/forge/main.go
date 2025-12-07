@@ -85,6 +85,7 @@ func main() {
 	http.HandleFunc("/api/am/content/", handleAMContent)
 	http.HandleFunc("/api/am/archive/", handleAMArchive)
 	http.HandleFunc("/api/am/cleanup", handleAMCleanup)
+	http.HandleFunc("/api/am/llm/conversations/", handleAMLLMConversations)
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", handleDesktopShortcut)
@@ -890,6 +891,33 @@ func handleAMCleanup(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
+	})
+}
+
+func handleAMLLMConversations(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract tab ID from URL path
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 5 {
+		http.Error(w, "Tab ID required", http.StatusBadRequest)
+		return
+	}
+	tabID := pathParts[len(pathParts)-1]
+
+	// Get LLM logger for this tab
+	llmLogger := am.GetLLMLogger(tabID)
+	conversations := llmLogger.GetConversations()
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":       true,
+		"conversations": conversations,
+		"count":         len(conversations),
 	})
 }
 

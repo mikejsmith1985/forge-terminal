@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/mikejsmith1985/forge-terminal/internal/am"
+	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 )
 
 // Custom WebSocket close codes (4000-4999 range is for application use)
@@ -82,6 +85,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Set initial terminal size (default 80x24)
 	_ = session.Resize(80, 24)
 
+	// Get LLM logger for this session (will be used if LLM commands detected)
+	llmLogger := am.GetLLMLogger(sessionID)
+	var inputBuffer strings.Builder
+	const flushTimeout = 2 * time.Second
+	lastFlushCheck := time.Now()
+
 	// Channel to coordinate shutdown with reason
 	type closeReason struct {
 		code   int
@@ -106,11 +115,20 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if n > 0 {
+				// Send output to browser
 				err = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
 				if err != nil {
 					log.Printf("[Terminal] WebSocket write error: %v", err)
 					return
 				}
+
+				// Check if we should flush LLM output (inactivity-based)
+				if llmLogger.ShouldFlushOutput(flushTimeout) {
+					llmLogger.FlushOutput()
+				}
+
+				// Feed output to LLM logger if conversation is active
+				llmLogger.AddOutput(string(buf[:n]))
 			}
 		}
 	}()
@@ -136,6 +154,33 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 					continue
 				}
+			}
+
+			// Accumulate input for LLM detection
+			dataStr := string(data)
+			inputBuffer.WriteString(dataStr)
+
+			// Check for newline/enter (command submission)
+			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
+				commandLine := strings.TrimSpace(inputBuffer.String())
+				inputBuffer.Reset()
+
+				// Detect if this is an LLM command
+				detected := llm.DetectCommand(commandLine)
+				if detected.Detected {
+					log.Printf("[Terminal] LLM command detected: provider=%s type=%s", detected.Provider, detected.Type)
+					// Start tracking this conversation
+					convID := llmLogger.StartConversation(detected)
+					log.Printf("[Terminal] Started LLM conversation: %s", convID)
+				}
+			}
+
+			// Periodic flush check for LLM output
+			if time.Since(lastFlushCheck) > flushTimeout {
+				if llmLogger.ShouldFlushOutput(flushTimeout) {
+					llmLogger.FlushOutput()
+				}
+				lastFlushCheck = time.Now()
 			}
 
 			// Regular input - write to PTY
