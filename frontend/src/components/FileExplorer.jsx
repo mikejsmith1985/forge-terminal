@@ -150,7 +150,7 @@ function ContextMenu({ x, y, node, onClose, onAction }) {
   );
 }
 
-export default function FileExplorer({ currentPath, rootPath, onFileOpen, terminalRef, onRefresh }) {
+export default function FileExplorer({ currentPath, rootPath, onFileOpen, terminalRef, onRefresh, shellConfig }) {
   const [fileTree, setFileTree] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -168,10 +168,18 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
     setError(null);
     try {
       const root = rootPath || '.';
-      const params = new URLSearchParams({
-        path: encodeURIComponent(path),
-        rootPath: encodeURIComponent(root)
-      });
+      const params = new URLSearchParams();
+      params.set('path', path);
+      params.set('rootPath', root);
+      
+      // Pass shell type and WSL distro for proper path resolution
+      if (shellConfig?.shellType) {
+        params.set('shell', shellConfig.shellType);
+        if (shellConfig.shellType === 'wsl' && shellConfig.wslDistro) {
+          params.set('distro', shellConfig.wslDistro);
+        }
+      }
+      
       const response = await fetch(`/api/files/list?${params.toString()}`);
       if (!response.ok) {
         const errorText = await response.text();

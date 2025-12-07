@@ -285,11 +285,11 @@ function App() {
         body: JSON.stringify(config)
       });
       setShellConfig(config);
-      // Reconnect active terminal with new shell
-      const termRef = getActiveTerminalRef();
-      if (termRef) {
-        termRef.reconnect();
-      }
+      // Hard refresh the page to restart terminal with new config
+      // This is more reliable than websocket reconnection
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err) {
       console.error('Failed to save config:', err);
       addToast('Failed to save shell configuration', 'error', 3000);
@@ -1056,6 +1056,7 @@ function App() {
             rootPath={activeTab?.currentDirectory}
             onFileOpen={handleFileOpen}
             terminalRef={getActiveTerminalRef()}
+            shellConfig={activeTab?.shellConfig || shellConfig}
           />
         )}
       </div>

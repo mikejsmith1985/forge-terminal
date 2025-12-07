@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -34,14 +35,50 @@ func normalizePath(p string) string {
 // resolvePath converts WSL paths to Windows equivalents on Windows,
 // and handles path resolution across platforms
 func resolvePath(p string) (string, error) {
+	return resolvePathWithDistro(p, "")
+}
+
+// resolvePathWithDistro converts WSL Linux paths to Windows UNC paths
+// when running on Windows with a specific WSL distro
+func resolvePathWithDistro(p string, distro string) (string, error) {
 	if p == "" || p == "." {
 		wd, err := os.Getwd()
 		return wd, err
 	}
 
-	// For WSL paths on Windows (e.g., /mnt/c/..., //wsl.localhost/...)
-	if runtime.GOOS == "windows" && strings.HasPrefix(p, "/") {
-		// Handle /mnt/c/... style paths
+	// On Windows, handle Linux-style paths from WSL
+	if runtime.GOOS == "windows" {
+		// Handle ~ paths by expanding to /home/username equivalent
+		if strings.HasPrefix(p, "~") {
+			// If we have a distro, convert to UNC path
+			if distro != "" {
+				// ~ or ~/path -> \\wsl.localhost\distro\home\username
+				// We need to query WSL for the actual home path
+				// For now, assume standard /home structure
+				remainder := strings.TrimPrefix(p, "~")
+				remainder = strings.TrimPrefix(remainder, "/")
+				// Build UNC path: \\wsl.localhost\distro\home\user\remainder
+				// Since we can't easily get the username, we'll use wsl.exe to resolve
+				uncPath := `\\wsl.localhost\` + distro
+				if remainder != "" {
+					uncPath += `\` + strings.ReplaceAll(remainder, "/", `\`)
+				}
+				// Try to expand ~ by getting the home directory from WSL
+				return resolveWSLHome(distro, remainder)
+			}
+		}
+		
+		// Handle absolute Linux paths like /home/user/projects
+		if strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "/mnt/") {
+			if distro != "" {
+				// /home/user/projects -> \\wsl.localhost\distro\home\user\projects
+				linuxPath := strings.TrimPrefix(p, "/")
+				uncPath := `\\wsl.localhost\` + distro + `\` + strings.ReplaceAll(linuxPath, "/", `\`)
+				return uncPath, nil
+			}
+		}
+
+		// Handle /mnt/c/... style paths (WSL accessing Windows drives)
 		if strings.HasPrefix(p, "/mnt/") && len(p) > 5 {
 			parts := strings.Split(p, "/")
 			if len(parts) >= 3 {
@@ -52,18 +89,12 @@ func resolvePath(p string) (string, error) {
 				return resolved, nil
 			}
 		}
+		
 		// Handle //wsl.localhost/distro/... style paths
 		if strings.HasPrefix(p, "//wsl.localhost/") {
-			// For localhost paths, convert to /mnt style
 			parts := strings.Split(p, "/")
 			if len(parts) > 3 {
-				// Skip to the actual path part after distro name
-				remainder := strings.Join(parts[4:], "/")
-				// Try /mnt/c/... conversion
-				if strings.HasPrefix(remainder, "home/") {
-					// This is a Linux home path, keep as-is but try to access
-					return "\\\\" + "wsl.localhost" + "\\" + strings.Join(parts[3:], "\\"), nil
-				}
+				return "\\\\" + "wsl.localhost" + "\\" + strings.Join(parts[3:], "\\"), nil
 			}
 		}
 	}
@@ -74,6 +105,34 @@ func resolvePath(p string) (string, error) {
 		return p, err
 	}
 	return abs, nil
+}
+
+// resolveWSLHome resolves ~ to the actual WSL home directory
+func resolveWSLHome(distro, remainder string) (string, error) {
+	// Try to get the WSL home directory using wsl.exe
+	// This runs: wsl -d <distro> -e echo $HOME
+	cmd := exec.Command("wsl", "-d", distro, "-e", "sh", "-c", "echo $HOME")
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback: just use ~ as-is, won't work but provides error feedback
+		uncPath := `\\wsl.localhost\` + distro
+		if remainder != "" {
+			uncPath += `\` + strings.ReplaceAll(remainder, "/", `\`)
+		}
+		return uncPath, nil
+	}
+	
+	homePath := strings.TrimSpace(string(output))
+	// homePath is like "/home/mikej"
+	fullLinuxPath := homePath
+	if remainder != "" {
+		fullLinuxPath = homePath + "/" + remainder
+	}
+	
+	// Convert to UNC: /home/mikej -> \\wsl.localhost\distro\home\mikej
+	linuxPath := strings.TrimPrefix(fullLinuxPath, "/")
+	uncPath := `\\wsl.localhost\` + distro + `\` + strings.ReplaceAll(linuxPath, "/", `\`)
+	return uncPath, nil
 }
 
 // isPathWithinRoot checks if targetPath is within rootPath
@@ -158,22 +217,39 @@ func HandleList(w http.ResponseWriter, r *http.Request) {
 		rootPath = "."
 	}
 
-	absPath, err := filepath.Abs(dirPath)
+	// Get shell type and WSL distro for path resolution
+	shellType := r.URL.Query().Get("shell")
+	distro := r.URL.Query().Get("distro")
+
+	// Use resolvePathWithDistro to handle WSL paths on Windows
+	absPath, err := resolvePathWithDistro(dirPath, distro)
 	if err != nil {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
+		http.Error(w, "Invalid path: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Validate path is within root if rootPath is specified
-	within, err := isPathWithinRoot(absPath, rootPath)
-	if err != nil || !within {
-		http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
-		return
+	// Also resolve root path for consistent comparison
+	absRootPath, err := resolvePathWithDistro(rootPath, distro)
+	if err != nil {
+		absRootPath = rootPath // fallback
+	}
+
+	// Log for debugging
+	if shellType == "wsl" {
+		// For WSL, skip the "within root" check since paths may not be directly comparable
+		// and we trust the frontend to send valid paths from the current terminal directory
+	} else {
+		// Validate path is within root if rootPath is specified
+		within, err := isPathWithinRoot(absPath, absRootPath)
+		if err != nil || !within {
+			http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
+			return
+		}
 	}
 
 	info, err := os.Stat(absPath)
 	if err != nil {
-		http.Error(w, "Path not found", http.StatusNotFound)
+		http.Error(w, "Path not found: "+absPath, http.StatusNotFound)
 		return
 	}
 

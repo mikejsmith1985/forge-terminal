@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw, ExternalLink, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, History } from 'lucide-react';
-import PostInstallModal from './PostInstallModal';
 
 const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdate }) => {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -9,7 +8,6 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
   const [showVersions, setShowVersions] = useState(false);
   const [versions, setVersions] = useState([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
-  const [showPostInstall, setShowPostInstall] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -53,10 +51,11 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       
       if (data.success) {
         setUpdateStatus('success');
-        // Show post-install modal instead of immediate reload
+        // Perform a hard refresh after a brief delay to show success message
         setTimeout(() => {
-          setShowPostInstall(true);
-        }, 500);
+          const timestamp = new Date().getTime();
+          window.location.href = `${window.location.origin}?t=${timestamp}`;
+        }, 1500);
       } else {
         setUpdateStatus('error');
         setErrorMessage(data.error || 'Unknown error occurred');
@@ -398,12 +397,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
           animation: spin 1s linear infinite;
         }
       `}</style>
-    </div>
-
-      <PostInstallModal 
-        isOpen={showPostInstall}
-        onCompleted={() => setShowPostInstall(false)}
-      />
+       </div>
     </>
   );
 };
