@@ -164,13 +164,18 @@ function App() {
     document.documentElement.className = savedTheme;
     applyTheme(savedColorTheme, savedTheme);
     
-    // Set up SSE for real-time update notifications
+    // Set up SSE for real-time update notifications with exponential backoff
     let eventSource = null;
+    let reconnectAttempt = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const BASE_RECONNECT_DELAY = 5000; // 5 seconds
+    
     const connectSSE = () => {
       eventSource = new EventSource('/api/update/events');
       
       eventSource.addEventListener('connected', (e) => {
         console.log('[SSE] Connected to update events');
+        reconnectAttempt = 0; // Reset counter on successful connection
       });
       
       eventSource.addEventListener('update', (e) => {
@@ -203,10 +208,28 @@ function App() {
         }
       });
       
+      eventSource.addEventListener('error', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          console.warn('[SSE] Update check error:', data.message);
+        } catch (err) {
+          // Ignore parse errors for error events
+        }
+      });
+      
       eventSource.onerror = () => {
-        console.log('[SSE] Connection error, will retry in 30s');
+        console.log(`[SSE] Connection error, reconnect attempt ${reconnectAttempt + 1}/${MAX_RECONNECT_ATTEMPTS}`);
         eventSource.close();
-        setTimeout(connectSSE, 30000);
+        
+        if (reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
+          // Exponential backoff: 5s, 10s, 20s, 40s, 80s
+          const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempt);
+          reconnectAttempt++;
+          console.log(`[SSE] Retrying in ${delay}ms...`);
+          setTimeout(connectSSE, delay);
+        } else {
+          console.error('[SSE] Max reconnection attempts reached, giving up');
+        }
       };
     };
     

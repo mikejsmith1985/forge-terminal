@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, ExternalLink, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, History } from 'lucide-react';
+import { Download, RefreshCw, ExternalLink, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, History, Upload } from 'lucide-react';
 
 const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdate }) => {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -8,6 +8,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
   const [showVersions, setShowVersions] = useState(false);
   const [versions, setVersions] = useState([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
+  const [installFromFileInput, setInstallFromFileInput] = useState('');
 
   useEffect(() => {
     if (!isOpen) {
@@ -16,6 +17,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       setUpdateStatus(null);
       setErrorMessage('');
       setShowVersions(false);
+      setInstallFromFileInput('');
     }
   }, [isOpen]);
 
@@ -52,6 +54,42 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       if (data.success) {
         setUpdateStatus('success');
         // Perform a hard refresh after a brief delay to show success message
+        setTimeout(() => {
+          const timestamp = new Date().getTime();
+          window.location.href = `${window.location.origin}?t=${timestamp}`;
+        }, 1500);
+      } else {
+        setUpdateStatus('error');
+        setErrorMessage(data.error || 'Unknown error occurred');
+        setIsUpdating(false);
+      }
+    } catch (err) {
+      setUpdateStatus('error');
+      setErrorMessage(err.message || 'Failed to connect to server');
+      setIsUpdating(false);
+    }
+  };
+
+  const handleInstallFromFile = async () => {
+    if (!installFromFileInput.trim()) {
+      setErrorMessage('Please enter a file path');
+      return;
+    }
+
+    setIsUpdating(true);
+    setUpdateStatus('applying');
+    setErrorMessage('');
+
+    try {
+      const res = await fetch('/api/update/install-manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: installFromFileInput })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setUpdateStatus('success');
         setTimeout(() => {
           const timestamp = new Date().getTime();
           window.location.href = `${window.location.origin}?t=${timestamp}`;
@@ -315,6 +353,67 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Manual Install Section */}
+          <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+            <h4 style={{ marginBottom: '12px', fontSize: '0.9em', color: '#888' }}>
+              <Upload size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+              Install from Downloaded File
+            </h4>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="text"
+                placeholder="Enter path to downloaded binary (e.g., /Users/me/Downloads/forge-darwin-arm64)"
+                value={installFromFileInput}
+                onChange={(e) => setInstallFromFileInput(e.target.value)}
+                disabled={isUpdating}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  background: '#0a0a0a',
+                  border: '1px solid #333',
+                  borderRadius: '6px',
+                  color: '#ccc',
+                  fontSize: '0.85em',
+                  fontFamily: 'monospace'
+                }}
+              />
+              <button
+                onClick={handleInstallFromFile}
+                disabled={isUpdating || !installFromFileInput.trim()}
+                style={{
+                  padding: '10px 16px',
+                  background: '#3b82f6',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  cursor: isUpdating || !installFromFileInput.trim() ? 'not-allowed' : 'pointer',
+                  opacity: isUpdating || !installFromFileInput.trim() ? 0.5 : 1,
+                  fontSize: '0.85em',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {isUpdating && updateStatus === 'applying' ? (
+                  <>
+                    <RefreshCw size={14} className="spin" />
+                    Installing...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} />
+                    Install
+                  </>
+                )}
+              </button>
+            </div>
+            <div style={{ fontSize: '0.75em', color: '#666', marginTop: '8px' }}>
+              After downloading a binary manually, paste its full path above to install it.
+            </div>
           </div>
 
           {/* GitHub Releases Link */}

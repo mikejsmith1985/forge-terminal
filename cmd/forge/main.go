@@ -70,6 +70,7 @@ func main() {
 	http.HandleFunc("/api/update/apply", handleUpdateApply)
 	http.HandleFunc("/api/update/versions", handleListVersions)
 	http.HandleFunc("/api/update/events", handleUpdateEvents) // SSE for push update notifications
+	http.HandleFunc("/api/update/install-manual", handleInstallManualUpdate) // Install manually downloaded binary
 
 	// Sessions API - persist tab state across refreshes
 	http.HandleFunc("/api/sessions", handleSessions)
@@ -463,6 +464,71 @@ func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+func handleInstallManualUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Parse request body for the binary file path
+	var req struct {
+		FilePath string `json:"filePath"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("[Updater] Failed to decode request: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	if req.FilePath == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "File path is required",
+		})
+		return
+	}
+
+	// Verify the file exists
+	if _, err := os.Stat(req.FilePath); err != nil {
+		log.Printf("[Updater] File not found: %s", req.FilePath)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "File not found: " + req.FilePath,
+		})
+		return
+	}
+
+	// Apply the update using the same mechanism as auto-update
+	log.Printf("[Updater] Installing manual update from: %s", req.FilePath)
+	if err := updater.ApplyUpdate(req.FilePath); err != nil {
+		log.Printf("[Updater] Manual install failed: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Install failed: " + err.Error(),
+		})
+		return
+	}
+
+	log.Printf("[Updater] Manual update applied successfully! Restarting...")
+
+	// Send success response
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Update applied. Restarting...",
+	})
+
+	// Restart the application
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		restartSelf()
+	}()
+}
+
 func restartSelf() {
 	executable, err := os.Executable()
 	if err != nil {
@@ -518,30 +584,46 @@ func handleUpdateEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send initial connection event
+	// Send initial connection event with current version
 	fmt.Fprintf(w, "event: connected\ndata: {\"version\":\"%s\"}\n\n", updater.GetVersion())
 	flusher.Flush()
 
-	// Check for updates every 60 seconds and notify
-	ticker := time.NewTicker(60 * time.Second)
+	// Check for updates every 30 seconds (more frequent for better UX)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	// Track last known version to avoid duplicate notifications
 	lastNotifiedVersion := ""
+	consecutiveErrors := 0
+	maxConsecutiveErrors := 3
 
 	for {
 		select {
 		case <-r.Context().Done():
 			// Client disconnected
+			log.Printf("[SSE] Client disconnected")
 			return
 		case <-ticker.C:
-			// Check for updates
+			// Check for updates with timeout
 			info, err := updater.CheckForUpdate()
 			if err != nil {
-				log.Printf("[SSE] Update check failed: %v", err)
+				consecutiveErrors++
+				log.Printf("[SSE] Update check failed (attempt %d/%d): %v", consecutiveErrors, maxConsecutiveErrors, err)
+				
+				// Send error event to client if too many failures
+				if consecutiveErrors >= maxConsecutiveErrors {
+					fmt.Fprintf(w, "event: error\ndata: {\"message\":\"Failed to check for updates\"}\n\n")
+					flusher.Flush()
+					log.Printf("[SSE] Sent error notification after %d failures", consecutiveErrors)
+					consecutiveErrors = 0 // Reset counter after notifying
+				}
 				continue
 			}
 
+			// Reset error counter on success
+			consecutiveErrors = 0
+
+			// Send update notification if available and not already notified
 			if info.Available && info.LatestVersion != lastNotifiedVersion {
 				lastNotifiedVersion = info.LatestVersion
 				data, _ := json.Marshal(map[string]interface{}{
