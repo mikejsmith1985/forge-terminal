@@ -174,7 +174,9 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
       });
       const response = await fetch(`/api/files/list?${params.toString()}`);
       if (!response.ok) {
-        throw new Error(`Failed to load files: ${response.status}`);
+        const errorText = await response.text();
+        const errorMsg = errorText || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`Failed to load files: ${errorMsg}`);
       }
       const data = await response.json();
       setFileTree(data);
@@ -191,8 +193,9 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
       }
       setExpandedDirs(newExpanded);
     } catch (err) {
-      console.error('FileExplorer load error:', err);
-      setError(err.message);
+      const errorMsg = err?.message || 'Unknown error loading files';
+      console.error('FileExplorer load error:', errorMsg);
+      setError(errorMsg);
       // If load fails, try falling back to previous valid path or root
       if (path !== '.' && path !== lastValidPath) {
         setTimeout(() => loadFileTree(lastValidPath || rootPath || '.'), 500);
