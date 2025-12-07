@@ -1,0 +1,105 @@
+=============================================================================
+AM LOGGING DEBUGGING IMPLEMENTATION - SUMMARY
+=============================================================================
+
+PROBLEM:
+--------
+The AM (Artificial Memory) LLM logging feature was not capturing conversations
+with GitHub Copilot CLI and Claude CLI commands, but there was no visibility
+into why it was failing.
+
+SOLUTION:
+---------
+Added comprehensive debug logging throughout the LLM tracking system to make
+every step of the process visible and diagnosable.
+
+CHANGES MADE:
+-------------
+
+1. internal/terminal/handler.go
+   - Logs every command entered (with length)
+   - Shows LLM detection result for every command
+   - Clear ✅/❌ indicators for detected vs. non-detected commands
+   - Shows conversation IDs when tracking starts
+
+2. internal/am/llm_logger.go
+   - Logs conversation start with tab ID, conv ID, provider
+   - Logs every file save operation (path, size, success/failure)
+   - Tracks buffer accumulation (every 1KB milestone)
+   - Logs output flushing with byte counts
+   - Shows conversation turn counts
+
+3. Documentation Created:
+   - AM_LOGGING_DEBUG_GUIDE.md - Complete debugging reference
+   - AM_DEBUG_SUMMARY.md - Implementation overview
+   - TEST_AM_LOGGING.md - Quick start testing guide
+
+4. Test Scripts:
+   - test-am-logging.sh - Automated system test
+   - test-llm-detection.sh - Unit test runner
+
+HOW TO USE:
+-----------
+
+1. Build: make build
+
+2. Run with logging: ./bin/forge 2>&1 | tee forge-debug.log
+
+3. In another terminal: tail -f forge-debug.log | grep -E "\[Terminal\]|\[LLM Logger\]"
+
+4. Test: Type 'copilot' or 'claude' in Forge terminal
+
+5. Observe logs to see:
+   - If command was detected
+   - If conversation started
+   - If JSON file was created
+   - Any errors
+
+EXPECTED OUTPUT:
+----------------
+
+SUCCESS:
+  [Terminal] Command entered: 'copilot' (length: 7)
+  [Terminal] ✅ LLM command DETECTED: provider=github-copilot type=chat
+  [Terminal] ✅ Started LLM conversation: conv-1733581234567890000
+  [LLM Logger] Starting conversation: tabID=tab-1-abc123 ...
+  [LLM Logger] ✅ Conversation saved successfully
+
+FAILURE (Not Detected):
+  [Terminal] Command entered: 'copilot' (length: 7)
+  [Terminal] ❌ Not an LLM command: 'copilot'
+
+FILES CREATED:
+--------------
+Location: .forge/am/llm-conv-[tabID]-[convID].json
+
+Example: .forge/am/llm-conv-tab-1-abc123-conv-1733581234567890000.json
+
+VERIFICATION:
+-------------
+- Unit tests pass: ✅ (LLM detection regex works)
+- Binary compiles: ✅
+- API endpoint works: ✅ (/api/am/llm/conversations/{tabId})
+- Debug logging works: ✅ (verified in test run)
+
+NEXT STEPS:
+-----------
+1. User tests with real 'copilot' or 'claude' commands
+2. Verify JSON files are created
+3. Confirm UI shows "AM Active (N)" indicator
+4. If issues persist, analyze debug logs to identify root cause
+
+COMMITS:
+--------
+522f175 - chore: remove forge-orchestrator handshake files
+9fc03a9 - feat: add comprehensive debug logging for AM LLM tracking
+97ddf39 - docs: add AM debug implementation summary
+980225b - docs: add quick start guide for testing AM LLM logging
+
+TESTING STATUS:
+---------------
+⏳ Awaiting user test with actual LLM CLI tools installed
+✅ All preconditions verified (detection, API, file system)
+✅ Debug logging confirmed working
+
+=============================================================================
