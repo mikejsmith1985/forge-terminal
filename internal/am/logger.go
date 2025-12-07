@@ -13,7 +13,7 @@ import (
 const (
 	amDir         = ".forge/am"
 	archiveDir    = ".forge/am/archive"
-	retentionDays = 7
+	retentionDays = 10
 )
 
 // LogEntryType represents the type of log entry
