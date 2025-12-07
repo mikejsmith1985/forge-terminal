@@ -72,6 +72,9 @@ defer l.mu.Unlock()
 
 convID := fmt.Sprintf("conv-%d", time.Now().UnixNano())
 
+fmt.Printf("[LLM Logger] Starting conversation: tabID=%s convID=%s provider=%s\n", 
+	l.tabID, convID, detected.Provider)
+
 conv := &LLMConversation{
 ConversationID: convID,
 TabID:          l.tabID,
@@ -95,6 +98,10 @@ l.activeConvID = convID
 l.outputBuffer = ""
 l.lastOutputTime = time.Now()
 
+fmt.Printf("[LLM Logger] Conversation started, saving initial state...\n")
+l.saveConversation(conv)
+fmt.Printf("[LLM Logger] Initial conversation saved\n")
+
 return convID
 }
 
@@ -109,6 +116,11 @@ return
 
 l.outputBuffer += rawOutput
 l.lastOutputTime = time.Now()
+
+// Debug: Show buffer accumulation
+if len(l.outputBuffer) > 0 && len(l.outputBuffer)%1000 == 0 {
+	fmt.Printf("[LLM Logger] Buffer size: %d bytes (activeConv=%s)\n", len(l.outputBuffer), l.activeConvID)
+}
 }
 
 // FlushOutput processes accumulated output and adds it as an assistant turn
@@ -122,13 +134,19 @@ return
 
 conv, exists := l.conversations[l.activeConvID]
 if !exists {
+fmt.Printf("[LLM Logger] ⚠️ FlushOutput: conversation %s not found\n", l.activeConvID)
 return
 }
+
+fmt.Printf("[LLM Logger] Flushing output buffer: %d bytes\n", len(l.outputBuffer))
 
 // Parse and clean the output
 cleanedOutput := llm.ParseLLMOutput(l.outputBuffer, conv.Provider)
 
+fmt.Printf("[LLM Logger] Cleaned output: %d bytes\n", len(cleanedOutput))
+
 if cleanedOutput == "" {
+fmt.Printf("[LLM Logger] ⚠️ No useful content after cleaning\n")
 return // Nothing useful to log
 }
 
@@ -139,6 +157,8 @@ Content:   cleanedOutput,
 Timestamp: time.Now(),
 Provider:  conv.Provider,
 })
+
+fmt.Printf("[LLM Logger] Added assistant turn (turn count: %d)\n", len(conv.Turns))
 
 // Clear buffer
 l.outputBuffer = ""
@@ -184,23 +204,32 @@ l.activeConvID = ""
 // saveConversation writes conversation to disk as JSON
 func (l *LLMLogger) saveConversation(conv *LLMConversation) {
 amDir := GetAMDir()
+fmt.Printf("[LLM Logger] Saving conversation to: %s\n", amDir)
+
 if err := ensureDir(amDir); err != nil {
-fmt.Printf("[LLM Logger] Failed to create AM dir: %v\n", err)
+fmt.Printf("[LLM Logger] ❌ Failed to create AM dir: %v\n", err)
 return
 }
 
 filename := fmt.Sprintf("llm-conv-%s-%s.json", l.tabID, conv.ConversationID)
 filepath := filepath.Join(amDir, filename)
 
+fmt.Printf("[LLM Logger] Writing to file: %s\n", filepath)
+
 data, err := json.MarshalIndent(conv, "", "  ")
 if err != nil {
-fmt.Printf("[LLM Logger] Failed to marshal conversation: %v\n", err)
+fmt.Printf("[LLM Logger] ❌ Failed to marshal conversation: %v\n", err)
 return
 }
 
+fmt.Printf("[LLM Logger] JSON data size: %d bytes\n", len(data))
+
 if err := os.WriteFile(filepath, data, 0644); err != nil {
-fmt.Printf("[LLM Logger] Failed to write conversation: %v\n", err)
+fmt.Printf("[LLM Logger] ❌ Failed to write conversation: %v\n", err)
+return
 }
+
+fmt.Printf("[LLM Logger] ✅ Conversation saved successfully: %s\n", filename)
 }
 
 // GetConversations returns all conversations for this tab

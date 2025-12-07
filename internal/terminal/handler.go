@@ -165,13 +165,23 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				commandLine := strings.TrimSpace(inputBuffer.String())
 				inputBuffer.Reset()
 
+				// Debug: Log all commands for inspection
+				if commandLine != "" {
+					log.Printf("[Terminal] Command entered: '%s' (length: %d)", commandLine, len(commandLine))
+				}
+
 				// Detect if this is an LLM command
 				detected := llm.DetectCommand(commandLine)
+				log.Printf("[Terminal] LLM detection result: detected=%v provider=%s type=%s command='%s'", 
+					detected.Detected, detected.Provider, detected.Type, commandLine)
+				
 				if detected.Detected {
-					log.Printf("[Terminal] LLM command detected: provider=%s type=%s", detected.Provider, detected.Type)
+					log.Printf("[Terminal] ✅ LLM command DETECTED: provider=%s type=%s", detected.Provider, detected.Type)
 					// Start tracking this conversation
 					convID := llmLogger.StartConversation(detected)
-					log.Printf("[Terminal] Started LLM conversation: %s", convID)
+					log.Printf("[Terminal] ✅ Started LLM conversation: %s", convID)
+				} else {
+					log.Printf("[Terminal] ❌ Not an LLM command: '%s'", commandLine)
 				}
 			}
 
