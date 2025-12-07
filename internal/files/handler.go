@@ -6,25 +6,99 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-// isPathWithinRoot checks if targetPath is within rootPath
-// Both paths are converted to absolute paths for comparison
-func isPathWithinRoot(targetPath, rootPath string) (bool, error) {
-	// Convert both to absolute paths
-	absTarget, err := filepath.Abs(targetPath)
-	if err != nil {
-		return false, err
-	}
-	absRoot, err := filepath.Abs(rootPath)
-	if err != nil {
-		return false, err
+// normalizePath handles cross-platform path normalization
+// Supports Windows, WSL, and Linux paths
+func normalizePath(p string) string {
+	if p == "" {
+		return ""
 	}
 
-	// Normalize paths to use forward slashes and remove trailing separators
+	// Convert backslashes to forward slashes for consistent processing
+	normalized := strings.ReplaceAll(p, "\\", "/")
+
+	// Remove trailing slashes (except for root paths)
+	normalized = strings.TrimRight(normalized, "/")
+	if normalized == "" {
+		normalized = "/"
+	}
+
+	return normalized
+}
+
+// resolvePath converts WSL paths to Windows equivalents on Windows,
+// and handles path resolution across platforms
+func resolvePath(p string) (string, error) {
+	if p == "" || p == "." {
+		wd, err := os.Getwd()
+		return wd, err
+	}
+
+	// For WSL paths on Windows (e.g., /mnt/c/..., //wsl.localhost/...)
+	if runtime.GOOS == "windows" && strings.HasPrefix(p, "/") {
+		// Handle /mnt/c/... style paths
+		if strings.HasPrefix(p, "/mnt/") && len(p) > 5 {
+			parts := strings.Split(p, "/")
+			if len(parts) >= 3 {
+				// /mnt/c/Users/... -> C:\Users\...
+				drive := strings.ToUpper(string(parts[2]))
+				remainder := strings.Join(parts[3:], "\\")
+				resolved := drive + ":\\" + remainder
+				return resolved, nil
+			}
+		}
+		// Handle //wsl.localhost/distro/... style paths
+		if strings.HasPrefix(p, "//wsl.localhost/") {
+			// For localhost paths, convert to /mnt style
+			parts := strings.Split(p, "/")
+			if len(parts) > 3 {
+				// Skip to the actual path part after distro name
+				remainder := strings.Join(parts[4:], "/")
+				// Try /mnt/c/... conversion
+				if strings.HasPrefix(remainder, "home/") {
+					// This is a Linux home path, keep as-is but try to access
+					return "\\\\" + "wsl.localhost" + "\\" + strings.Join(parts[3:], "\\"), nil
+				}
+			}
+		}
+	}
+
+	// Use filepath.Abs for normal path resolution
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p, err
+	}
+	return abs, nil
+}
+
+// isPathWithinRoot checks if targetPath is within rootPath
+// Handles cross-platform paths including WSL on Windows
+func isPathWithinRoot(targetPath, rootPath string) (bool, error) {
+	// Resolve both paths, handling WSL conversions
+	absTarget, err := resolvePath(targetPath)
+	if err != nil {
+		// Still try to proceed with the original path
+		absTarget = filepath.Clean(targetPath)
+	}
+
+	absRoot, err := resolvePath(rootPath)
+	if err != nil {
+		// Still try to proceed with the original path
+		absRoot = filepath.Clean(rootPath)
+	}
+
+	// Normalize paths for comparison (lowercase on Windows for case-insensitivity)
+	if runtime.GOOS == "windows" {
+		absTarget = strings.ToLower(absTarget)
+		absRoot = strings.ToLower(absRoot)
+	}
+
+	// Clean paths
 	absTarget = filepath.Clean(absTarget)
 	absRoot = filepath.Clean(absRoot)
 
