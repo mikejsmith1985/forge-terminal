@@ -7,8 +7,39 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
+
+// isPathWithinRoot checks if targetPath is within rootPath
+// Both paths are converted to absolute paths for comparison
+func isPathWithinRoot(targetPath, rootPath string) (bool, error) {
+	// Convert both to absolute paths
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		return false, err
+	}
+	absRoot, err := filepath.Abs(rootPath)
+	if err != nil {
+		return false, err
+	}
+
+	// Normalize paths to use forward slashes and remove trailing separators
+	absTarget = filepath.Clean(absTarget)
+	absRoot = filepath.Clean(absRoot)
+
+	// Check if target is root itself or within root
+	if absTarget == absRoot {
+		return true, nil
+	}
+
+	// Ensure the root path ends with separator for prefix comparison
+	if !strings.HasSuffix(absRoot, string(os.PathSeparator)) {
+		absRoot += string(os.PathSeparator)
+	}
+
+	return strings.HasPrefix(absTarget, absRoot), nil
+}
 
 type FileNode struct {
 	Name         string      `json:"name"`
@@ -21,16 +52,19 @@ type FileNode struct {
 }
 
 type FileReadRequest struct {
-	Path string `json:"path"`
+	Path     string `json:"path"`
+	RootPath string `json:"rootPath"`
 }
 
 type FileWriteRequest struct {
-	Path    string `json:"path"`
-	Content string `json:"content"`
+	Path     string `json:"path"`
+	Content  string `json:"content"`
+	RootPath string `json:"rootPath"`
 }
 
 type FileDeleteRequest struct {
-	Path string `json:"path"`
+	Path     string `json:"path"`
+	RootPath string `json:"rootPath"`
 }
 
 // HandleList returns directory tree structure
@@ -45,9 +79,21 @@ func HandleList(w http.ResponseWriter, r *http.Request) {
 		dirPath = "."
 	}
 
+	rootPath := r.URL.Query().Get("rootPath")
+	if rootPath == "" {
+		rootPath = "."
+	}
+
 	absPath, err := filepath.Abs(dirPath)
 	if err != nil {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Validate path is within root if rootPath is specified
+	within, err := isPathWithinRoot(absPath, rootPath)
+	if err != nil || !within {
+		http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
 		return
 	}
 
@@ -82,9 +128,22 @@ func HandleRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default rootPath if not specified
+	rootPath := req.RootPath
+	if rootPath == "" {
+		rootPath = "."
+	}
+
 	absPath, err := filepath.Abs(req.Path)
 	if err != nil {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Validate path is within root
+	within, err := isPathWithinRoot(absPath, rootPath)
+	if err != nil || !within {
+		http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
 		return
 	}
 
@@ -125,9 +184,22 @@ func HandleWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default rootPath if not specified
+	rootPath := req.RootPath
+	if rootPath == "" {
+		rootPath = "."
+	}
+
 	absPath, err := filepath.Abs(req.Path)
 	if err != nil {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Validate path is within root
+	within, err := isPathWithinRoot(absPath, rootPath)
+	if err != nil || !within {
+		http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
 		return
 	}
 
@@ -162,9 +234,22 @@ func HandleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default rootPath if not specified
+	rootPath := req.RootPath
+	if rootPath == "" {
+		rootPath = "."
+	}
+
 	absPath, err := filepath.Abs(req.Path)
 	if err != nil {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Validate path is within root
+	within, err := isPathWithinRoot(absPath, rootPath)
+	if err != nil || !within {
+		http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
 		return
 	}
 
@@ -266,9 +351,21 @@ func HandleReadStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rootPath := r.URL.Query().Get("rootPath")
+	if rootPath == "" {
+		rootPath = "."
+	}
+
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Validate path is within root
+	within, err := isPathWithinRoot(absPath, rootPath)
+	if err != nil || !within {
+		http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
 		return
 	}
 
@@ -281,7 +378,7 @@ func HandleReadStream(w http.ResponseWriter, r *http.Request) {
 
 	info, _ := file.Stat()
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Content-Length", string(info.Size()))
+	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
 
 	io.Copy(w, file)
 }

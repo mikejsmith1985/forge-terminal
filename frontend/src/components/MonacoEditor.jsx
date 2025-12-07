@@ -8,6 +8,7 @@ export default function MonacoEditor({
   onClose, 
   onSave, 
   theme = 'vs-dark',
+  rootPath = '.',
   terminalRef 
 }) {
   const [content, setContent] = useState('');
@@ -33,7 +34,7 @@ export default function MonacoEditor({
       const response = await fetch('/api/files/read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path })
+        body: JSON.stringify({ path, rootPath })
       });
       
       if (!response.ok) {
@@ -63,7 +64,8 @@ export default function MonacoEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           path: file.path,
-          content: editorRef.current?.getValue() || content
+          content: editorRef.current?.getValue() || content,
+          rootPath
         })
       });
       

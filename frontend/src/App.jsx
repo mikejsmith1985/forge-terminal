@@ -1047,6 +1047,7 @@ function App() {
         ) : (
           <FileExplorer
             currentPath={activeTab?.currentDirectory}
+            rootPath={activeTab?.currentDirectory}
             onFileOpen={handleFileOpen}
             terminalRef={getActiveTerminalRef()}
           />
@@ -1121,6 +1122,7 @@ function App() {
             onClose={handleEditorClose}
             onSave={handleEditorSave}
             theme={activeTab?.mode || theme}
+            rootPath={activeTab?.currentDirectory}
             terminalRef={getActiveTerminalRef()}
           />
         </div>

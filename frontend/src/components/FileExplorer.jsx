@@ -150,7 +150,7 @@ function ContextMenu({ x, y, node, onClose, onAction }) {
   );
 }
 
-export default function FileExplorer({ currentPath, onFileOpen, terminalRef, onRefresh }) {
+export default function FileExplorer({ currentPath, rootPath, onFileOpen, terminalRef, onRefresh }) {
   const [fileTree, setFileTree] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -159,15 +159,20 @@ export default function FileExplorer({ currentPath, onFileOpen, terminalRef, onR
   const [lastValidPath, setLastValidPath] = useState(null);
   
   useEffect(() => {
-    const pathToLoad = currentPath || lastValidPath || '.';
+    const pathToLoad = currentPath || lastValidPath || rootPath || '.';
     loadFileTree(pathToLoad);
-  }, [currentPath]);
+  }, [currentPath, rootPath]);
   
   const loadFileTree = async (path) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/files/list?path=${encodeURIComponent(path)}`);
+      const root = rootPath || '.';
+      const params = new URLSearchParams({
+        path: encodeURIComponent(path),
+        rootPath: encodeURIComponent(root)
+      });
+      const response = await fetch(`/api/files/list?${params.toString()}`);
       if (!response.ok) {
         throw new Error(`Failed to load files: ${response.status}`);
       }
@@ -190,7 +195,7 @@ export default function FileExplorer({ currentPath, onFileOpen, terminalRef, onR
       setError(err.message);
       // If load fails, try falling back to previous valid path or root
       if (path !== '.' && path !== lastValidPath) {
-        setTimeout(() => loadFileTree(lastValidPath || '.'), 500);
+        setTimeout(() => loadFileTree(lastValidPath || rootPath || '.'), 500);
       }
     } finally {
       setLoading(false);
@@ -198,7 +203,7 @@ export default function FileExplorer({ currentPath, onFileOpen, terminalRef, onR
   };
   
   const handleRetry = () => {
-    loadFileTree(currentPath || '.');
+    loadFileTree(currentPath || rootPath || '.');
   };
   
   const toggleExpanded = (path) => {
@@ -256,13 +261,14 @@ export default function FileExplorer({ currentPath, onFileOpen, terminalRef, onR
       case 'delete':
         if (confirm(`Delete ${node.name}?`)) {
           try {
+            const root = rootPath || '.';
             const response = await fetch('/api/files/delete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ path: node.path })
+              body: JSON.stringify({ path: node.path, rootPath: root })
             });
             if (response.ok) {
-              loadFileTree(currentPath);
+              loadFileTree(currentPath || root);
             }
           } catch (err) {
             console.error('Delete failed:', err);
