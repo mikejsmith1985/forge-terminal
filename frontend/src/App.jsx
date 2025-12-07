@@ -14,6 +14,7 @@ import TabBar from './components/TabBar'
 import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import MonacoEditor from './components/MonacoEditor'
+import AMMonitor from './components/AMMonitor'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -84,6 +85,12 @@ function App() {
   
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
+  
+  // AM Default state (global override for new tabs)
+  const [amDefaultEnabled, setAMDefaultEnabled] = useState(() => {
+    const saved = localStorage.getItem('amDefaultEnabled');
+    return saved !== null ? saved === 'true' : true; // Default to ON for legal compliance
+  });
   
   // Store refs for each terminal by tab ID
   const terminalRefs = useRef({});
@@ -621,9 +628,14 @@ function App() {
       return;
     }
     
-    logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme });
+    // Override AM setting based on global default
+    if (!amDefaultEnabled && result.tab) {
+      toggleTabAM(result.tabId); // Toggle it off if global default is off
+    }
+    
+    logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme, amEnabled: amDefaultEnabled });
     // Theme will be applied by the activeTab useEffect below
-  }, [createTab, shellConfig, addToast]);
+  }, [createTab, shellConfig, addToast, amDefaultEnabled, toggleTabAM]);
 
   // Handle tab switch - focus terminal after switching and apply tab's theme
   const handleTabSwitch = useCallback((tabId) => {
@@ -751,6 +763,21 @@ function App() {
       addToast('Failed to toggle AM logging', 'error', 3000);
     }
   }, [tabs, toggleTabAM, addToast]);
+
+  // Handle global AM default change
+  const handleAMDefaultChange = useCallback((enabled) => {
+    setAMDefaultEnabled(enabled);
+    localStorage.setItem('amDefaultEnabled', enabled.toString());
+    addToast(
+      enabled 
+        ? 'New tabs will have AM enabled by default' 
+        : '⚠️ New tabs will have AM disabled by default',
+      enabled ? 'success' : 'warning',
+      3000
+    );
+    logger.settings('AM default changed', { enabled });
+  }, [addToast]);
+
 
   const loadCommands = () => {
     setCommandsLoading(true);
@@ -1054,6 +1081,14 @@ function App() {
         </button>
       </div>
 
+      {/* AM Monitor - Shows LLM activity status */}
+      {activeTab && (
+        <AMMonitor 
+          tabId={activeTab.id} 
+          amEnabled={activeTab.amEnabled || false}
+        />
+      )}
+
       {/* Content area - Cards or Files */}
       <div className="sidebar-content">
         {sidebarView === 'cards' ? (
@@ -1181,6 +1216,8 @@ function App() {
         onToast={addToast}
         devMode={devMode}
         onDevModeChange={setDevMode}
+        amDefaultEnabled={amDefaultEnabled}
+        onAMDefaultChange={handleAMDefaultChange}
       />
 
       <UpdateModal

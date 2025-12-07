@@ -1566,3 +1566,79 @@ body {
   opacity: 0.7;
 }
 
+
+/* ==============================================================================
+   AM Monitor Indicator
+   ============================================================================== */
+.am-monitor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85em;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.am-monitor svg {
+  flex-shrink: 0;
+}
+
+/* AM Active - Green */
+.am-monitor.am-active {
+  background: #1a2e1a;
+  color: #22c55e;
+  border: 1px solid #22c55e40;
+}
+
+.am-monitor.am-active svg.pulse {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* AM Inactive - Red (Warning) */
+.am-monitor.am-inactive {
+  background: #2e1a1a;
+  color: #ef4444;
+  border: 1px solid #ef444440;
+  cursor: help;
+}
+
+.am-monitor.am-inactive:hover {
+  background: #3e1a1a;
+  border-color: #ef444460;
+}
+
+/* AM Disabled */
+.am-monitor.am-disabled {
+  background: #262626;
+  color: #888;
+  border: 1px solid #33333340;
+}
+
+/* AM Loading */
+.am-monitor.am-loading {
+  background: #1a2a2e;
+  color: #06b6d4;
+  border: 1px solid #06b6d440;
+}
+
+.am-monitor.am-loading svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* AM Monitor in Right Sidebar */
+.command-sidebar .am-monitor {
+  margin: 10px;
+  margin-top: 0;
+}

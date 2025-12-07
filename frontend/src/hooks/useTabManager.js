@@ -52,7 +52,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
     autoRespond: false, // Auto-respond to CLI confirmation prompts
-    amEnabled: false, // AM (Artificial Memory) logging
+    amEnabled: true, // AM (Artificial Memory) logging - DEFAULT ON for legal compliance
     currentDirectory: currentDirectory || null, // Current working directory
     createdAt: Date.now(),
   };

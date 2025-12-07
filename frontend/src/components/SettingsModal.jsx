@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Terminal, Monitor, Monitor as DesktopIcon } from 'lucide-react';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amDefaultEnabled = true, onAMDefaultChange }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -378,6 +378,44 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
                 (Show experimental features)
               </span>
             </label>
+          </div>
+
+          {/* AM Default Toggle - Legal Compliance */}
+          <div className="form-group" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #333' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                name="amDefaultEnabled"
+                checked={amDefaultEnabled}
+                onChange={(e) => {
+                  if (onAMDefaultChange) {
+                    onAMDefaultChange(e.target.checked);
+                  }
+                }}
+                style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+              />
+              <span style={{ fontWeight: 500, userSelect: 'none' }}>
+                Enable AM Logging by Default
+              </span>
+              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '4px' }}>
+                (For legal compliance & disaster recovery)
+              </span>
+            </label>
+            <small style={{ 
+              display: 'block', 
+              marginTop: '8px', 
+              marginLeft: '28px',
+              color: '#888', 
+              fontSize: '0.8em',
+              lineHeight: '1.4'
+            }}>
+              When enabled, new tabs will have AM logging ON by default. You can still toggle individual tabs via right-click.
+              {!amDefaultEnabled && (
+                <strong style={{ color: '#f97316', display: 'block', marginTop: '4px' }}>
+                  ⚠️ Disabling may compromise legal compliance
+                </strong>
+              )}
+            </small>
           </div>
         </div>
 
