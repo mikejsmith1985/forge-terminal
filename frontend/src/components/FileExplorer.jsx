@@ -150,25 +150,30 @@ function ContextMenu({ x, y, node, onClose, onAction }) {
   );
 }
 
-export default function FileExplorer({ currentPath, onFileOpen, terminalRef }) {
+export default function FileExplorer({ currentPath, onFileOpen, terminalRef, onRefresh }) {
   const [fileTree, setFileTree] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedDirs, setExpandedDirs] = useState(new Set());
   const [contextMenu, setContextMenu] = useState(null);
+  const [lastValidPath, setLastValidPath] = useState(null);
   
   useEffect(() => {
-    loadFileTree(currentPath || '.');
+    const pathToLoad = currentPath || lastValidPath || '.';
+    loadFileTree(pathToLoad);
   }, [currentPath]);
   
   const loadFileTree = async (path) => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`/api/files/list?path=${encodeURIComponent(path)}`);
-      if (!response.ok) throw new Error('Failed to load files');
+      if (!response.ok) {
+        throw new Error(`Failed to load files: ${response.status}`);
+      }
       const data = await response.json();
       setFileTree(data);
-      setError(null);
+      setLastValidPath(path);
       
       // Auto-expand root and first-level directories
       const newExpanded = new Set([data.path]);
@@ -181,10 +186,19 @@ export default function FileExplorer({ currentPath, onFileOpen, terminalRef }) {
       }
       setExpandedDirs(newExpanded);
     } catch (err) {
+      console.error('FileExplorer load error:', err);
       setError(err.message);
+      // If load fails, try falling back to previous valid path or root
+      if (path !== '.' && path !== lastValidPath) {
+        setTimeout(() => loadFileTree(lastValidPath || '.'), 500);
+      }
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handleRetry = () => {
+    loadFileTree(currentPath || '.');
   };
   
   const toggleExpanded = (path) => {
@@ -266,7 +280,14 @@ export default function FileExplorer({ currentPath, onFileOpen, terminalRef }) {
   }
   
   if (error) {
-    return <div className="file-explorer-error">Error: {error}</div>;
+    return (
+      <div className="file-explorer-error">
+        <div>Error: {error}</div>
+        <button className="file-explorer-retry-btn" onClick={handleRetry}>
+          Retry
+        </button>
+      </div>
+    );
   }
   
   return (

@@ -17,28 +17,37 @@ export default function MonacoEditor({
   const editorRef = useRef(null);
   
   useEffect(() => {
-    if (file) {
+    if (file && file.path) {
+      console.log('[MonacoEditor] Loading file:', file.path, file.name);
       loadFile(file.path);
+    } else if (file) {
+      console.error('[MonacoEditor] File object missing path:', file);
     }
   }, [file]);
   
   const loadFile = async (path) => {
     setLoading(true);
+    setContent(''); // Reset content while loading
     try {
+      console.log('[MonacoEditor] Fetching content for:', path);
       const response = await fetch('/api/files/read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path })
       });
       
-      if (!response.ok) throw new Error('Failed to load file');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to load file: ${response.status} - ${errorText}`);
+      }
       
       const data = await response.json();
-      setContent(data.content);
+      console.log('[MonacoEditor] Loaded content, length:', data.content?.length || 0);
+      setContent(data.content || '');
       setModified(false);
     } catch (err) {
       console.error('Failed to load file:', err);
-      alert('Failed to load file: ' + err.message);
+      setContent(`// Error loading file: ${err.message}\n// Path: ${path}`);
     } finally {
       setLoading(false);
     }

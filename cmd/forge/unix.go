@@ -68,6 +68,14 @@ Categories=Development;System;TerminalEmulator;
 		return fmt.Errorf("failed to write desktop file: %w", err)
 	}
 
+	// Try to mark as trusted using gio (works on GNOME-based systems)
+	gioCmd := exec.Command("gio", "set", shortcutPath, "metadata::trusted", "true")
+	_ = gioCmd.Run() // Ignore errors - this is optional
+
+	// Also try chmod to make it executable (redundant but ensures compatibility)
+	chmodCmd := exec.Command("chmod", "+x", shortcutPath)
+	_ = chmodCmd.Run()
+
 	return nil
 }
 

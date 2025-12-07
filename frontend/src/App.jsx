@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight, Download, RefreshCw } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight, Download, RefreshCw, Folder, Command } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -12,7 +12,7 @@ import WelcomeModal from './components/WelcomeModal'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
 import SearchBar from './components/SearchBar'
-import Workspace from './components/Workspace'
+import FileExplorer from './components/FileExplorer'
 import MonacoEditor from './components/MonacoEditor'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
@@ -59,7 +59,7 @@ function App() {
   const [waitingTabs, setWaitingTabs] = useState({})
   
   // File explorer and editor state
-  const [showWorkspace, setShowWorkspace] = useState(true)
+  const [sidebarView, setSidebarView] = useState('cards') // 'cards' or 'files'
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   
@@ -160,9 +160,59 @@ function App() {
     document.documentElement.className = savedTheme;
     applyTheme(savedColorTheme, savedTheme);
     
-    // Check for updates periodically (every 30 minutes)
-    const updateInterval = setInterval(checkForUpdates, 30 * 60 * 1000);
-    return () => clearInterval(updateInterval);
+    // Set up SSE for real-time update notifications
+    let eventSource = null;
+    const connectSSE = () => {
+      eventSource = new EventSource('/api/update/events');
+      
+      eventSource.addEventListener('connected', (e) => {
+        console.log('[SSE] Connected to update events');
+      });
+      
+      eventSource.addEventListener('update', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          console.log('[SSE] Update notification received:', data);
+          if (data.available) {
+            setUpdateInfo(data);
+            // Show toast notification
+            const dismissedVersion = localStorage.getItem('updateDismissedVersion');
+            if (dismissedVersion !== data.latestVersion) {
+              addToast(
+                `Update available: ${data.latestVersion}`,
+                'update',
+                0,
+                {
+                  action: 'View Update',
+                  onAction: () => setIsUpdateModalOpen(true),
+                  secondaryAction: 'Later',
+                  onSecondaryAction: () => {
+                    localStorage.setItem('updateDismissedAt', Date.now().toString());
+                    localStorage.setItem('updateDismissedVersion', data.latestVersion);
+                  }
+                }
+              );
+            }
+          }
+        } catch (err) {
+          console.error('[SSE] Error parsing update event:', err);
+        }
+      });
+      
+      eventSource.onerror = () => {
+        console.log('[SSE] Connection error, will retry in 30s');
+        eventSource.close();
+        setTimeout(connectSSE, 30000);
+      };
+    };
+    
+    connectSSE();
+    
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
   }, [])
 
   // Apply theme when active tab changes (handles new tab creation and tab switching)
@@ -619,6 +669,14 @@ function App() {
     }
   }, [updateTabTitle, updateTabDirectory]);
 
+  // Helper to get folder name from a path
+  const getFolderNameFromPath = (path) => {
+    if (!path) return '';
+    const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
+    const parts = normalized.split('/');
+    return parts[parts.length - 1] || normalized;
+  };
+
   // File explorer handlers
   const handleFileOpen = useCallback((file) => {
     setEditorFile(file);
@@ -849,15 +907,42 @@ function App() {
 
   const sidebar = (
     <div className="sidebar">
-      {/* Row 1: Title and Add button */}
-      <div className="sidebar-header">
-        <h3>⚡ Commands</h3>
-        <button className="btn btn-primary" onClick={handleAdd}>
-          <Plus size={16} /> Add
+      {/* Row 1: View toggle tabs */}
+      <div className="sidebar-view-tabs">
+        <button 
+          className={`sidebar-view-tab ${sidebarView === 'cards' ? 'active' : ''}`}
+          onClick={() => setSidebarView('cards')}
+        >
+          <Command size={16} />
+          Cards
+        </button>
+        <button 
+          className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
+          onClick={() => setSidebarView('files')}
+        >
+          <Folder size={16} />
+          Files
         </button>
       </div>
 
-      {/* Row 2: Theme controls */}
+      {/* Row 2: Header - context-aware based on view */}
+      <div className="sidebar-header">
+        {sidebarView === 'cards' ? (
+          <>
+            <h3>⚡ Commands</h3>
+            <button className="btn btn-primary" onClick={handleAdd}>
+              <Plus size={16} /> Add
+            </button>
+          </>
+        ) : (
+          <>
+            <h3>📁 Files</h3>
+            <span className="sidebar-path-hint">{activeTab?.currentDirectory ? getFolderNameFromPath(activeTab.currentDirectory) : 'Root'}</span>
+          </>
+        )}
+      </div>
+
+      {/* Row 3: Theme controls */}
       <div className="theme-controls">
         <button className="btn btn-ghost btn-icon" onClick={cycleColorTheme} title={`Theme: ${themes[colorTheme]?.name || 'Molten Metal'}`}>
           <Palette size={18} />
@@ -894,7 +979,7 @@ function App() {
         </button>
       </div>
 
-      {/* Row 3: Shell and terminal controls */}
+      {/* Row 4: Shell and terminal controls */}
       <div className="terminal-controls">
         <ShellToggle 
           shellConfig={shellConfig} 
@@ -940,43 +1025,38 @@ function App() {
         </button>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <CommandCards
-          commands={commands}
-          loading={commandsLoading}
-          error={commandsError}
-          onExecute={handleExecute}
-          onPaste={handlePaste}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onRetry={loadCommands}
-        />
-      </DndContext>
+      {/* Content area - Cards or Files */}
+      <div className="sidebar-content">
+        {sidebarView === 'cards' ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <CommandCards
+              commands={commands}
+              loading={commandsLoading}
+              error={commandsError}
+              onExecute={handleExecute}
+              onPaste={handlePaste}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onRetry={loadCommands}
+            />
+          </DndContext>
+        ) : (
+          <FileExplorer
+            currentPath={activeTab?.currentDirectory}
+            onFileOpen={handleFileOpen}
+            terminalRef={getActiveTerminalRef()}
+          />
+        )}
+      </div>
     </div>
   );
 
   return (
-    <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''} ${showWorkspace ? 'with-workspace' : ''} ${showEditor ? 'with-editor' : ''}`}>
-      {showWorkspace && (
-        <Workspace
-          currentPath={activeTab?.currentDirectory}
-          onFileOpen={handleFileOpen}
-          terminalRef={getActiveTerminalRef()}
-          commands={commands}
-          commandsLoading={commandsLoading}
-          commandsError={commandsError}
-          onCommandRun={handleExecute}
-          onCommandPaste={handlePaste}
-          onCommandAdd={handleAdd}
-          onCommandEdit={handleEdit}
-          onCommandDelete={handleDelete}
-          onCommandsReorder={handleDragEnd}
-        />
-      )}
+    <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''} ${showEditor ? 'with-editor' : ''}`}>
       {sidebarPosition === 'left' && sidebar}
       <div className="terminal-pane">
         <TabBar

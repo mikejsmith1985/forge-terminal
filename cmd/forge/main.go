@@ -69,6 +69,7 @@ func main() {
 	http.HandleFunc("/api/update/check", handleUpdateCheck)
 	http.HandleFunc("/api/update/apply", handleUpdateApply)
 	http.HandleFunc("/api/update/versions", handleListVersions)
+	http.HandleFunc("/api/update/events", handleUpdateEvents) // SSE for push update notifications
 
 	// Sessions API - persist tab state across refreshes
 	http.HandleFunc("/api/sessions", handleSessions)
@@ -500,6 +501,61 @@ func handleListVersions(w http.ResponseWriter, r *http.Request) {
 		"releases":       releases,
 		"currentVersion": updater.GetVersion(),
 	})
+}
+
+// handleUpdateEvents provides Server-Sent Events (SSE) for real-time update notifications
+func handleUpdateEvents(w http.ResponseWriter, r *http.Request) {
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Ensure we can flush
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "SSE not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Send initial connection event
+	fmt.Fprintf(w, "event: connected\ndata: {\"version\":\"%s\"}\n\n", updater.GetVersion())
+	flusher.Flush()
+
+	// Check for updates every 60 seconds and notify
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+
+	// Track last known version to avoid duplicate notifications
+	lastNotifiedVersion := ""
+
+	for {
+		select {
+		case <-r.Context().Done():
+			// Client disconnected
+			return
+		case <-ticker.C:
+			// Check for updates
+			info, err := updater.CheckForUpdate()
+			if err != nil {
+				log.Printf("[SSE] Update check failed: %v", err)
+				continue
+			}
+
+			if info.Available && info.LatestVersion != lastNotifiedVersion {
+				lastNotifiedVersion = info.LatestVersion
+				data, _ := json.Marshal(map[string]interface{}{
+					"available":     true,
+					"latestVersion": info.LatestVersion,
+					"releaseNotes":  info.ReleaseNotes,
+					"downloadURL":   info.DownloadURL,
+				})
+				fmt.Fprintf(w, "event: update\ndata: %s\n\n", data)
+				flusher.Flush()
+				log.Printf("[SSE] Sent update notification: %s", info.LatestVersion)
+			}
+		}
+	}
 }
 
 func handleSessions(w http.ResponseWriter, r *http.Request) {

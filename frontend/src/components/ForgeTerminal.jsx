@@ -416,6 +416,36 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     }
   }, [isVisible]);
 
+  // Fix spacebar issue: Focus terminal on window focus
+  useEffect(() => {
+    if (!isVisible) return;
+    
+    const handleWindowFocus = () => {
+      // Small delay to let browser settle focus
+      setTimeout(() => {
+        if (xtermRef.current && isVisible) {
+          xtermRef.current.focus();
+        }
+      }, 100);
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && xtermRef.current && isVisible) {
+        setTimeout(() => {
+          xtermRef.current.focus();
+        }, 100);
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isVisible]);
+
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     sendCommand: (command) => {

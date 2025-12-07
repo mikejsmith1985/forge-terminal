@@ -203,6 +203,59 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+/* Sidebar view toggle tabs */
+.sidebar-view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--overlay);
+}
+
+.sidebar-view-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--overlay);
+  background: transparent;
+  color: var(--subtext);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-view-tab:hover {
+  background: var(--overlay);
+  color: var(--text);
+}
+
+.sidebar-view-tab.active {
+  background: var(--gradient-primary);
+  border-color: var(--accent);
+  color: white;
+}
+
+.sidebar-path-hint {
+  font-size: 0.75rem;
+  color: var(--subtext);
+  font-weight: 400;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 /* Theme controls row */
 .theme-controls {
   display: flex;
