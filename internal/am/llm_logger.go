@@ -54,6 +54,8 @@ llmLoggersMu.Lock()
 defer llmLoggersMu.Unlock()
 
 if logger, exists := llmLoggers[tabID]; exists {
+fmt.Printf("[LLM Logger] Returning existing logger for tab %s (conversations: %d)\n", 
+	tabID, len(logger.conversations))
 return logger
 }
 
@@ -62,6 +64,7 @@ tabID:         tabID,
 conversations: make(map[string]*LLMConversation),
 }
 llmLoggers[tabID] = logger
+fmt.Printf("[LLM Logger] Created NEW logger for tab %s\n", tabID)
 return logger
 }
 
@@ -111,6 +114,7 @@ l.mu.Lock()
 defer l.mu.Unlock()
 
 if l.activeConvID == "" {
+fmt.Printf("[LLM Logger] AddOutput called but NO active conversation (output size: %d bytes)\n", len(rawOutput))
 return
 }
 
@@ -120,6 +124,11 @@ l.lastOutputTime = time.Now()
 // Debug: Show buffer accumulation
 if len(l.outputBuffer) > 0 && len(l.outputBuffer)%1000 == 0 {
 	fmt.Printf("[LLM Logger] Buffer size: %d bytes (activeConv=%s)\n", len(l.outputBuffer), l.activeConvID)
+} else if len(l.outputBuffer) <= 1000 {
+	// Log smaller increments for initial output
+	if len(l.outputBuffer)%100 == 0 {
+		fmt.Printf("[LLM Logger] Buffer accumulating: %d bytes (activeConv=%s)\n", len(l.outputBuffer), l.activeConvID)
+	}
 }
 }
 
@@ -173,11 +182,15 @@ l.mu.Lock()
 defer l.mu.Unlock()
 
 if l.activeConvID == "" {
+fmt.Printf("[LLM Logger] EndConversation called but NO active conversation\n")
 return
 }
 
+fmt.Printf("[LLM Logger] Ending conversation: %s (buffer size: %d bytes)\n", l.activeConvID, len(l.outputBuffer))
+
 // Flush any remaining output
 if l.outputBuffer != "" {
+fmt.Printf("[LLM Logger] Flushing remaining buffer before ending conversation\n")
 if conv, exists := l.conversations[l.activeConvID]; exists {
 cleanedOutput := llm.ParseLLMOutput(l.outputBuffer, conv.Provider)
 if cleanedOutput != "" {
@@ -187,6 +200,7 @@ Content:   cleanedOutput,
 Timestamp: time.Now(),
 Provider:  conv.Provider,
 })
+fmt.Printf("[LLM Logger] Added final assistant turn\n")
 }
 }
 l.outputBuffer = ""
@@ -196,9 +210,13 @@ if conv, exists := l.conversations[l.activeConvID]; exists {
 conv.Complete = true
 conv.EndTime = time.Now()
 l.saveConversation(conv)
+fmt.Printf("[LLM Logger] ✅ Conversation %s marked as complete\n", l.activeConvID)
+} else {
+fmt.Printf("[LLM Logger] ❌ ERROR: Conversation %s not found in map\n", l.activeConvID)
 }
 
 l.activeConvID = ""
+fmt.Printf("[LLM Logger] Active conversation cleared\n")
 }
 
 // saveConversation writes conversation to disk as JSON
@@ -250,8 +268,24 @@ l.mu.Lock()
 defer l.mu.Unlock()
 
 if l.outputBuffer == "" || l.activeConvID == "" {
+if l.activeConvID != "" && l.outputBuffer == "" {
+	fmt.Printf("[LLM Logger] ShouldFlushOutput: activeConv=%s but buffer is empty\n", l.activeConvID)
+}
 return false
 }
 
-return time.Since(l.lastOutputTime) > inactivityThreshold
+inactiveDuration := time.Since(l.lastOutputTime)
+shouldFlush := inactiveDuration > inactivityThreshold
+
+fmt.Printf("[LLM Logger] ShouldFlushOutput: buffer=%d bytes, inactive=%v, threshold=%v, shouldFlush=%v\n", 
+	len(l.outputBuffer), inactiveDuration, inactivityThreshold, shouldFlush)
+
+return shouldFlush
+}
+
+// GetActiveConversationID returns the current active conversation ID (for debugging)
+func (l *LLMLogger) GetActiveConversationID() string {
+l.mu.Lock()
+defer l.mu.Unlock()
+return l.activeConvID
 }

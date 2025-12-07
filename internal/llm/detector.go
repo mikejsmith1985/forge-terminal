@@ -2,6 +2,7 @@
 package llm
 
 import (
+"fmt"
 "regexp"
 "strings"
 )
@@ -46,9 +47,13 @@ claudePattern = regexp.MustCompile(`^claude\s*$`)
 func DetectCommand(input string) *DetectedCommand {
 trimmed := strings.TrimSpace(input)
 
+fmt.Printf("[LLM Detector] Analyzing command: '%s' (original: '%s', length: %d, trimmed length: %d)\n", 
+	trimmed, input, len(input), len(trimmed))
+
 // GitHub Copilot CLI detection (standalone command)
 // User just types: copilot
 if copilotPattern.MatchString(trimmed) {
+fmt.Printf("[LLM Detector] ✅ MATCHED copilot pattern\n")
 return &DetectedCommand{
 Provider: ProviderGitHubCopilot,
 Type:     CommandChat,
@@ -56,11 +61,14 @@ Prompt:   "", // Interactive TUI mode, no initial prompt
 RawInput: input,
 Detected: true,
 }
+} else {
+fmt.Printf("[LLM Detector] copilot pattern DID NOT match\n")
 }
 
 // Claude CLI detection
 // User just types: claude
 if claudePattern.MatchString(trimmed) {
+fmt.Printf("[LLM Detector] ✅ MATCHED claude pattern\n")
 return &DetectedCommand{
 Provider: ProviderClaude,
 Type:     CommandChat,
@@ -68,8 +76,11 @@ Prompt:   "", // Interactive TUI mode, no initial prompt
 RawInput: input,
 Detected: true,
 }
+} else {
+fmt.Printf("[LLM Detector] claude pattern DID NOT match\n")
 }
 
+fmt.Printf("[LLM Detector] ❌ No LLM pattern matched\n")
 return &DetectedCommand{
 Provider: ProviderUnknown,
 Type:     CommandUnknown,

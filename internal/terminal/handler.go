@@ -87,6 +87,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Get LLM logger for this session (will be used if LLM commands detected)
 	llmLogger := am.GetLLMLogger(sessionID)
+	log.Printf("[Terminal] LLM logger initialized for session %s", sessionID)
 	var inputBuffer strings.Builder
 	const flushTimeout = 2 * time.Second
 	lastFlushCheck := time.Now()
@@ -124,10 +125,15 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 				// Check if we should flush LLM output (inactivity-based)
 				if llmLogger.ShouldFlushOutput(flushTimeout) {
+					log.Printf("[Terminal] Flush timeout reached, triggering flush")
 					llmLogger.FlushOutput()
 				}
 
 				// Feed output to LLM logger if conversation is active
+				activeConv := llmLogger.GetActiveConversationID()
+				if activeConv != "" {
+					log.Printf("[Terminal] Feeding %d bytes to LLM logger (activeConv=%s)", n, activeConv)
+				}
 				llmLogger.AddOutput(string(buf[:n]))
 			}
 		}
@@ -158,28 +164,43 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// Accumulate input for LLM detection
 			dataStr := string(data)
+			log.Printf("[Terminal] Received input data: %d bytes (contains newline: %v)", 
+				len(dataStr), strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n"))
 			inputBuffer.WriteString(dataStr)
 
 			// Check for newline/enter (command submission)
 			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
 				commandLine := strings.TrimSpace(inputBuffer.String())
+				log.Printf("[Terminal] Newline detected, buffer contains: '%s' (length before trim: %d, after: %d)", 
+					commandLine, inputBuffer.Len(), len(commandLine))
 				inputBuffer.Reset()
 
 				// Debug: Log all commands for inspection
 				if commandLine != "" {
-					log.Printf("[Terminal] Command entered: '%s' (length: %d)", commandLine, len(commandLine))
+					log.Printf("[Terminal] Command entered: '%s' (length: %d, hex: %x)", 
+						commandLine, len(commandLine), commandLine)
+				} else {
+					log.Printf("[Terminal] Empty command (just newline)")
 				}
 
 				// Detect if this is an LLM command
 				detected := llm.DetectCommand(commandLine)
-				log.Printf("[Terminal] LLM detection result: detected=%v provider=%s type=%s command='%s'", 
-					detected.Detected, detected.Provider, detected.Type, commandLine)
+				log.Printf("[Terminal] LLM detection result: detected=%v provider=%s type=%s command='%s' rawInput='%s'", 
+					detected.Detected, detected.Provider, detected.Type, commandLine, detected.RawInput)
 				
 				if detected.Detected {
 					log.Printf("[Terminal] ✅ LLM command DETECTED: provider=%s type=%s", detected.Provider, detected.Type)
-					// Start tracking this conversation
+					log.Printf("[Terminal] Calling StartConversation...")
 					convID := llmLogger.StartConversation(detected)
-					log.Printf("[Terminal] ✅ Started LLM conversation: %s", convID)
+					log.Printf("[Terminal] ✅ StartConversation returned: %s", convID)
+					
+					// Verify the conversation was actually started
+					if llmLogger.GetActiveConversationID() == convID {
+						log.Printf("[Terminal] ✅ VERIFIED: Active conversation set to %s", convID)
+					} else {
+						log.Printf("[Terminal] ❌ ERROR: Active conversation is '%s', expected '%s'", 
+							llmLogger.GetActiveConversationID(), convID)
+					}
 				} else {
 					log.Printf("[Terminal] ❌ Not an LLM command: '%s'", commandLine)
 				}
@@ -187,8 +208,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// Periodic flush check for LLM output
 			if time.Since(lastFlushCheck) > flushTimeout {
+				log.Printf("[Terminal] Periodic flush check (last check: %v ago)", time.Since(lastFlushCheck))
 				if llmLogger.ShouldFlushOutput(flushTimeout) {
+					log.Printf("[Terminal] ShouldFlushOutput=true, calling FlushOutput")
 					llmLogger.FlushOutput()
+				} else {
+					log.Printf("[Terminal] ShouldFlushOutput=false, skipping flush")
 				}
 				lastFlushCheck = time.Now()
 			}
