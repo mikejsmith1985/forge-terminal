@@ -194,4 +194,147 @@ test.describe('AM (Artificial Memory) Feature', () => {
     await expect(tab).not.toHaveClass(/am-enabled/);
   });
 
+  test('should log user input to AM when typing in terminal', async ({ page }) => {
+    // Track AM log API calls
+    const amLogCalls = [];
+    
+    page.on('request', request => {
+      if (request.url().includes('/api/am/log') && request.method() === 'POST') {
+        const body = request.postDataJSON();
+        amLogCalls.push(body);
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+
+    // Wait for terminal to connect and AM session to start
+    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.waitForTimeout(2000);
+
+    // Type something in the terminal
+    const terminal = page.locator('.xterm-screen').first();
+    await terminal.click();
+    await page.keyboard.type('echo "AM test input"', { delay: 50 });
+    await page.keyboard.press('Enter');
+
+    // Wait for AM debounce (1 second for input + buffer)
+    await page.waitForTimeout(2500);
+
+    // Should have captured user input
+    const inputCalls = amLogCalls.filter(c => c.entryType === 'USER_INPUT');
+    expect(inputCalls.length).toBeGreaterThan(0);
+    
+    // At least one should contain our test command
+    const hasTestInput = inputCalls.some(c => c.content && c.content.includes('echo'));
+    expect(hasTestInput).toBe(true);
+  });
+
+  test('should log terminal output to AM', async ({ page }) => {
+    // Track AM log API calls
+    const amLogCalls = [];
+    
+    page.on('request', request => {
+      if (request.url().includes('/api/am/log') && request.method() === 'POST') {
+        const body = request.postDataJSON();
+        amLogCalls.push(body);
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+
+    // Wait for terminal to connect
+    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.waitForTimeout(2000);
+
+    // Type a command that produces output
+    const terminal = page.locator('.xterm-screen').first();
+    await terminal.click();
+    await page.keyboard.type('echo "AM_OUTPUT_TEST_12345"', { delay: 50 });
+    await page.keyboard.press('Enter');
+
+    // Wait for output and AM debounce (2 seconds for output)
+    await page.waitForTimeout(4000);
+
+    // Should have captured agent output
+    const outputCalls = amLogCalls.filter(c => c.entryType === 'AGENT_OUTPUT');
+    expect(outputCalls.length).toBeGreaterThan(0);
+    
+    // At least one should contain echo output or the prompt
+    const hasOutput = outputCalls.some(c => c.content && c.content.length > 0);
+    expect(hasOutput).toBe(true);
+  });
+
+  test('should enable AM session on terminal connect', async ({ page }) => {
+    // Track AM enable API calls
+    let amEnableCalled = false;
+    let enabledState = null;
+    
+    page.on('request', request => {
+      if (request.url().includes('/api/am/enable') && request.method() === 'POST') {
+        amEnableCalled = true;
+        enabledState = request.postDataJSON();
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    
+    // Wait for terminal to connect
+    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.waitForTimeout(1000);
+
+    // AM should be auto-enabled on connect
+    expect(amEnableCalled).toBe(true);
+    expect(enabledState).not.toBeNull();
+    expect(enabledState.enabled).toBe(true);
+    expect(enabledState.tabId).toBeTruthy();
+  });
+
+  test('should capture both input and output for session recovery', async ({ page }) => {
+    // Track all AM log API calls
+    const amLogCalls = [];
+    
+    page.on('request', request => {
+      if (request.url().includes('/api/am/log') && request.method() === 'POST') {
+        const body = request.postDataJSON();
+        amLogCalls.push(body);
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForSelector('.app', { timeout: 10000 });
+    await dismissToasts(page);
+
+    // Wait for terminal to connect
+    await page.waitForSelector('.xterm-screen', { timeout: 10000 });
+    await page.waitForTimeout(2000);
+
+    // Type a command
+    const terminal = page.locator('.xterm-screen').first();
+    await terminal.click();
+    await page.keyboard.type('pwd', { delay: 50 });
+    await page.keyboard.press('Enter');
+
+    // Wait for debounce
+    await page.waitForTimeout(3000);
+
+    // Type another command
+    await page.keyboard.type('ls', { delay: 50 });
+    await page.keyboard.press('Enter');
+
+    // Wait for debounce
+    await page.waitForTimeout(3000);
+
+    // Should have captured both USER_INPUT and AGENT_OUTPUT
+    const inputCalls = amLogCalls.filter(c => c.entryType === 'USER_INPUT');
+    const outputCalls = amLogCalls.filter(c => c.entryType === 'AGENT_OUTPUT');
+
+    expect(inputCalls.length).toBeGreaterThan(0);
+    expect(outputCalls.length).toBeGreaterThan(0);
+  });
+
 });

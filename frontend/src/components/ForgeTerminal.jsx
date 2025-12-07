@@ -365,6 +365,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const onDirectoryChangeRef = useRef(onDirectoryChange);
   const amLogBufferRef = useRef('');
   const amLogTimeoutRef = useRef(null);
+  const amInputBufferRef = useRef('');
+  const amInputTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 5;
@@ -925,6 +927,37 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
           
+          // AM logging: Capture user keyboard input for crash recovery
+          // Buffer and debounce to avoid logging every keystroke
+          amInputBufferRef.current += data;
+          
+          if (amInputTimeoutRef.current) {
+            clearTimeout(amInputTimeoutRef.current);
+          }
+          amInputTimeoutRef.current = setTimeout(() => {
+            if (amInputBufferRef.current) {
+              // Clean the input - strip control chars but keep meaningful content
+              const cleanInput = amInputBufferRef.current
+                .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // Strip ANSI
+                .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ''); // Strip control chars except \r\n\t
+              
+              if (cleanInput.trim() || cleanInput.includes('\r') || cleanInput.includes('\n')) {
+                fetch('/api/am/log', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    tabId: tabId,
+                    tabName: tabNameRef.current || 'Terminal',
+                    workspace: window.location.pathname,
+                    entryType: 'USER_INPUT',
+                    content: cleanInput.slice(-500), // Limit size
+                  }),
+                }).catch(err => console.warn('[AM] Failed to log input:', err));
+              }
+              amInputBufferRef.current = '';
+            }
+          }, 1000); // 1 second debounce for input
+          
           // Clear waiting state when user types (they're responding to the prompt)
           if (isWaiting) {
             setIsWaiting(false);
@@ -982,6 +1015,45 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       if (waitingCheckTimeoutRef.current) {
         clearTimeout(waitingCheckTimeoutRef.current);
       }
+      if (amLogTimeoutRef.current) {
+        clearTimeout(amLogTimeoutRef.current);
+      }
+      if (amInputTimeoutRef.current) {
+        clearTimeout(amInputTimeoutRef.current);
+      }
+      
+      // Flush any pending AM logs before closing
+      if (amLogBufferRef.current || amInputBufferRef.current) {
+        const flushData = [];
+        if (amLogBufferRef.current) {
+          const cleanContent = stripAnsi(amLogBufferRef.current);
+          if (cleanContent.trim()) {
+            flushData.push({ entryType: 'AGENT_OUTPUT', content: cleanContent.slice(-2000) });
+          }
+        }
+        if (amInputBufferRef.current) {
+          const cleanInput = amInputBufferRef.current
+            .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+            .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+          if (cleanInput.trim() || cleanInput.includes('\r')) {
+            flushData.push({ entryType: 'USER_INPUT', content: cleanInput.slice(-500) });
+          }
+        }
+        // Fire-and-forget flush
+        flushData.forEach(data => {
+          fetch('/api/am/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tabId: tabId,
+              tabName: tabNameRef.current || 'Terminal',
+              workspace: window.location.pathname,
+              ...data,
+            }),
+          }).catch(() => {}); // Ignore errors on cleanup
+        });
+      }
+      
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Remove onclose handler before closing to avoid race condition
         // (component unmount is intentional, not a disconnect to display)
