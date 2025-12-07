@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Terminal, Monitor, Monitor as DesktopIcon } from 'lucide-react';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -355,6 +355,29 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast }) => {
                 </small>
               </>
             )}
+          </div>
+
+          {/* DevMode Toggle */}
+          <div className="form-group" style={{ marginTop: '25px', paddingTop: '15px', borderTop: '1px solid #333' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                name="devMode"
+                checked={devMode}
+                onChange={(e) => {
+                  if (onDevModeChange) {
+                    onDevModeChange(e.target.checked);
+                  }
+                }}
+                style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+              />
+              <span style={{ fontWeight: 500, userSelect: 'none' }}>
+                Dev Mode
+              </span>
+              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '4px' }}>
+                (Show experimental features)
+              </span>
+            </label>
           </div>
         </div>
 

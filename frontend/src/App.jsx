@@ -17,6 +17,7 @@ import MonacoEditor from './components/MonacoEditor'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
+import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 
 const MAX_TABS = 20;
@@ -80,6 +81,9 @@ function App() {
     updateTabDirectory,
     reorderTabs,
   } = useTabManager(shellConfig);
+  
+  // DevMode state
+  const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
   
   // Store refs for each terminal by tab ID
   const terminalRefs = useRef({});
@@ -916,13 +920,15 @@ function App() {
           <Command size={16} />
           Cards
         </button>
-        <button 
-          className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
-          onClick={() => setSidebarView('files')}
-        >
-          <Folder size={16} />
-          Files
-        </button>
+        {devMode && (
+          <button 
+            className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
+            onClick={() => setSidebarView('files')}
+          >
+            <Folder size={16} />
+            Files
+          </button>
+        )}
       </div>
 
       {/* Row 2: Header - context-aware based on view */}
@@ -1074,6 +1080,7 @@ function App() {
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}
           mode={theme}
+          devMode={devMode}
         />
         <SearchBar
           isOpen={isSearchOpen}
@@ -1148,6 +1155,8 @@ function App() {
         shellConfig={shellConfig}
         onSave={saveConfig}
         onToast={addToast}
+        devMode={devMode}
+        onDevModeChange={setDevMode}
       />
 
       <UpdateModal
