@@ -7,7 +7,10 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [ollamaStatus, setOllamaStatus] = useState({ available: false, models: [] });
+  const [ollamaStatus, setOllamaStatus] = useState({ available: false, models: [], currentModel: '' });
+  const [selectedModel, setSelectedModel] = useState('');
+  const [isChangingModel, setIsChangingModel] = useState(false);
+  const [showModelSelector, setShowModelSelector] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
 
@@ -30,6 +33,15 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId }) => {
       const response = await fetch('/api/assistant/status');
       const data = await response.json();
       setOllamaStatus(data);
+      
+      // Set selected model from status or localStorage
+      const savedModel = localStorage.getItem('forge-assistant-model');
+      if (data.currentModel) {
+        setSelectedModel(data.currentModel);
+      } else if (savedModel) {
+        setSelectedModel(savedModel);
+      }
+      
       if (!data.available) {
         setError('Ollama is not running. Please start Ollama to use the assistant.');
       }
@@ -127,6 +139,60 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId }) => {
     }
   };
 
+  const handleModelChange = async (newModel) => {
+    if (newModel === selectedModel || !newModel) return;
+    
+    setIsChangingModel(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/assistant/model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: newModel }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setSelectedModel(newModel);
+        localStorage.setItem('forge-assistant-model', newModel);
+        setShowModelSelector(false);
+        
+        // Add system message to chat
+        setMessages(prev => [...prev, {
+          role: 'system',
+          content: `Switched to ${getModelDisplayName(newModel)}`,
+          timestamp: new Date().toISOString(),
+        }]);
+      } else {
+        setError(data.error || 'Failed to change model');
+      }
+    } catch (err) {
+      console.error('Model change error:', err);
+      setError(`Failed to change model: ${err.message}`);
+    } finally {
+      setIsChangingModel(false);
+    }
+  };
+
+  const getModelDisplayName = (modelName) => {
+    const model = ollamaStatus.models.find(m => m.name === modelName);
+    if (!model) return modelName;
+    
+    const parts = [];
+    parts.push(model.friendlyName || modelName);
+    if (model.sizeFormatted) parts.push(model.sizeFormatted);
+    if (model.performance) parts.push(model.performance);
+    
+    return parts.join(' • ');
+  };
+
+  const getCurrentModelInfo = () => {
+    if (!selectedModel) return null;
+    return ollamaStatus.models.find(m => m.name === selectedModel);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -170,11 +236,44 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId }) => {
 
       {ollamaStatus.available && (
         <>
-          <div className="assistant-status">
-            <span className="status-indicator status-online"></span>
-            <span className="status-text">
-              Connected • {ollamaStatus.models.length} model{ollamaStatus.models.length !== 1 ? 's' : ''}
-            </span>
+          <div 
+            className={`assistant-status ${showModelSelector ? 'expanded' : ''}`}
+            onClick={() => !isChangingModel && setShowModelSelector(!showModelSelector)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="status-main">
+              <span className="status-indicator status-online"></span>
+              <span className="status-text">
+                {selectedModel ? getModelDisplayName(selectedModel) : 'No model selected'}
+              </span>
+              <span className="status-action">
+                {showModelSelector ? '▼' : '▶'} Click to change
+              </span>
+            </div>
+            
+            {showModelSelector && (
+              <div className="model-selector-dropdown" onClick={(e) => e.stopPropagation()}>
+                {ollamaStatus.models.map((model) => (
+                  <div
+                    key={model.name}
+                    className={`model-option ${model.name === selectedModel ? 'selected' : ''} ${isChangingModel ? 'disabled' : ''}`}
+                    onClick={() => !isChangingModel && handleModelChange(model.name)}
+                  >
+                    <div className="model-name">{model.friendlyName || model.name}</div>
+                    <div className="model-meta">
+                      {model.sizeFormatted && <span className="model-size">{model.sizeFormatted}</span>}
+                      {model.performance && <span className={`model-perf perf-${model.performance.toLowerCase().replace(' ', '-')}`}>{model.performance}</span>}
+                      {model.bestFor && <span className="model-best">{model.bestFor}</span>}
+                    </div>
+                  </div>
+                ))}
+                {ollamaStatus.models.length === 0 && (
+                  <div className="model-option disabled">
+                    No models available. Run: ollama pull mistral
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="assistant-messages">

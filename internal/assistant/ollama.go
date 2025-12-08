@@ -43,7 +43,9 @@ type OllamaChatResponse struct {
 // OllamaTagsResponse represents the list of available models.
 type OllamaTagsResponse struct {
 	Models []struct {
-		Name string `json:"name"`
+		Name       string `json:"name"`
+		Size       int64  `json:"size"`
+		ModifiedAt string `json:"modified_at"`
 	} `json:"models"`
 }
 
@@ -83,8 +85,8 @@ func (c *OllamaClient) IsAvailable(ctx context.Context) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// GetModels returns the list of available models.
-func (c *OllamaClient) GetModels(ctx context.Context) ([]string, error) {
+// GetModels returns the list of available models with metadata.
+func (c *OllamaClient) GetModels(ctx context.Context) ([]ModelInfo, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/tags", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -105,12 +107,22 @@ func (c *OllamaClient) GetModels(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	models := make([]string, len(tagsResp.Models))
+	models := make([]ModelInfo, len(tagsResp.Models))
 	for i, m := range tagsResp.Models {
-		models[i] = m.Name
+		models[i] = enrichModelInfo(m.Name, m.Size)
 	}
 
 	return models, nil
+}
+
+// SetModel changes the current model.
+func (c *OllamaClient) SetModel(model string) {
+	c.model = model
+}
+
+// GetCurrentModel returns the currently selected model.
+func (c *OllamaClient) GetCurrentModel() string {
+	return c.model
 }
 
 // Chat sends a chat request to Ollama and returns the response.
@@ -205,4 +217,89 @@ func BuildContextPrompt(ctx *TerminalContext, userMessage string) []OllamaMessag
 	})
 
 	return messages
+}
+
+// enrichModelInfo adds friendly names and metadata to model names.
+func enrichModelInfo(name string, size int64) ModelInfo {
+	info := ModelInfo{
+		Name:          name,
+		FriendlyName:  makeFriendlyName(name),
+		Size:          size,
+		SizeFormatted: formatSize(size),
+		Family:        extractFamily(name),
+	}
+
+	// Add performance/quality ratings based on model type
+	switch info.Family {
+	case "llama", "llama2", "llama3":
+		info.Performance = "Balanced"
+		info.Quality = "Excellent"
+		info.BestFor = "General purpose, code"
+	case "mistral":
+		info.Performance = "Fast"
+		info.Quality = "Excellent"
+		info.BestFor = "Code, chat, reasoning"
+	case "codellama":
+		info.Performance = "Balanced"
+		info.Quality = "Excellent"
+		info.BestFor = "Code generation"
+	case "phi", "phi2", "phi3":
+		info.Performance = "Very Fast"
+		info.Quality = "Good"
+		info.BestFor = "Quick responses, chat"
+	case "gemma":
+		info.Performance = "Fast"
+		info.Quality = "Good"
+		info.BestFor = "Chat, general purpose"
+	case "qwen", "qwen2":
+		info.Performance = "Balanced"
+		info.Quality = "Excellent"
+		info.BestFor = "Multilingual, code"
+	case "deepseek-coder":
+		info.Performance = "Balanced"
+		info.Quality = "Excellent"
+		info.BestFor = "Code generation, debugging"
+	default:
+		info.Performance = "Unknown"
+		info.Quality = "Unknown"
+		info.BestFor = "General purpose"
+	}
+
+	return info
+}
+
+// makeFriendlyName converts model names to friendly display names.
+func makeFriendlyName(name string) string {
+	// Examples:
+	// "mistral:7b-instruct" -> "Mistral 7B Instruct"
+	// "llama2:13b" -> "Llama 2 13B"
+	// "codellama:7b" -> "CodeLlama 7B"
+	
+	// This is a simplified version - could be enhanced
+	return name
+}
+
+// extractFamily extracts the model family from the name.
+func extractFamily(name string) string {
+	// Extract base model name before colon
+	for i, char := range name {
+		if char == ':' {
+			return name[:i]
+		}
+	}
+	return name
+}
+
+// formatSize formats bytes into human-readable format.
+func formatSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

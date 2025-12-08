@@ -39,4 +39,7 @@ type Service interface {
 
 	// GetStatus checks if the assistant (Ollama) is available.
 	GetStatus(ctx context.Context) (*OllamaStatusResponse, error)
+
+	// SetModel changes the current Ollama model.
+	SetModel(ctx context.Context, model string) error
 }

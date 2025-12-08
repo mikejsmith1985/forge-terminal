@@ -45,7 +45,32 @@ type ExecuteCommandResponse struct {
 
 // OllamaStatusResponse represents Ollama availability status.
 type OllamaStatusResponse struct {
-	Available bool     `json:"available"`
-	Models    []string `json:"models,omitempty"`
-	Error     string   `json:"error,omitempty"`
+	Available    bool        `json:"available"`
+	Models       []ModelInfo `json:"models,omitempty"`
+	CurrentModel string      `json:"currentModel"`
+	Error        string      `json:"error,omitempty"`
+}
+
+// ModelInfo provides detailed information about an Ollama model.
+type ModelInfo struct {
+	Name          string  `json:"name"`
+	FriendlyName  string  `json:"friendlyName"`
+	Size          int64   `json:"size"`
+	SizeFormatted string  `json:"sizeFormatted"`
+	Performance   string  `json:"performance"`
+	Quality       string  `json:"quality"`
+	BestFor       string  `json:"bestFor"`
+	Family        string  `json:"family"`
+}
+
+// SetModelRequest represents a request to change the current model.
+type SetModelRequest struct {
+	Model string `json:"model"`
+}
+
+// SetModelResponse represents the response from changing models.
+type SetModelResponse struct {
+	Success bool   `json:"success"`
+	Model   string `json:"model"`
+	Error   string `json:"error,omitempty"`
 }

@@ -40,6 +40,7 @@ func NewRegistry() *Registry {
 	// Register default detectors
 	r.Register(NewGitStatusDetector())
 	r.Register(NewJSONDetector())
+	r.Register(NewFilePathDetector())
 	
 	return r
 }

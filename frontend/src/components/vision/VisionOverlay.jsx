@@ -72,6 +72,14 @@ export default function VisionOverlay({ activeOverlay, onAction, onDismiss }) {
           selectedIndex={selectedIndex}
         />
       )}
+      {activeOverlay.type === 'FILE_PATH' && (
+        <FilePathOverlay 
+          data={activeOverlay.payload}
+          onAction={onAction}
+          onDismiss={onDismiss}
+          selectedIndex={selectedIndex}
+        />
+      )}
     </div>
   );
 }
@@ -244,3 +252,141 @@ function JSONOverlay({ data, onAction, onDismiss, selectedIndex }) {
     </div>
   );
 }
+
+/**
+ * FilePathOverlay - File/directory browser with actions
+ */
+function FilePathOverlay({ data, onAction, onDismiss, selectedIndex }) {
+  const { primary, all, count } = data;
+  const [copied, setCopied] = useState(false);
+
+  const handleOpenFile = (path) => {
+    onAction({
+      type: 'INJECT_COMMAND',
+      command: `cat "${path}"`
+    });
+  };
+
+  const handleOpenInEditor = (path) => {
+    // Try common editors
+    onAction({
+      type: 'INJECT_COMMAND',
+      command: `\${EDITOR:-nano} "${path}"`
+    });
+  };
+
+  const handleCopyPath = async (path) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
+
+  const handleListDir = (path) => {
+    onAction({
+      type: 'INJECT_COMMAND',
+      command: `ls -lah "${path}"`
+    });
+  };
+
+  const getFileTypeIcon = (pathInfo) => {
+    if (pathInfo.isDir) return '📁';
+    
+    const ext = pathInfo.extension?.toLowerCase();
+    if (['.js', '.jsx', '.ts', '.tsx'].includes(ext)) return '📜';
+    if (['.md', '.txt'].includes(ext)) return '📄';
+    if (['.json', '.yml', '.yaml'].includes(ext)) return '⚙️';
+    if (['.go'].includes(ext)) return '🐹';
+    if (['.py'].includes(ext)) return '🐍';
+    if (['.jpg', '.png', '.gif'].includes(ext)) return '🖼️';
+    
+    return '📄';
+  };
+
+  const renderPathItem = (pathInfo, index) => {
+    const isDir = pathInfo.isDir;
+    const icon = getFileTypeIcon(pathInfo);
+    
+    return (
+      <div key={index} className="vision-file-section">
+        <div className="vision-file-item file-path-item">
+          <span className="vision-file-icon">{icon}</span>
+          <div className="file-path-info">
+            <span className="vision-file-name">{pathInfo.path}</span>
+            <span className="file-path-meta">
+              {isDir ? 'Directory' : `File • ${formatFileSize(pathInfo.size)}`}
+            </span>
+          </div>
+        </div>
+        
+        <div className="file-path-actions">
+          {!isDir && (
+            <>
+              <button 
+                className="vision-action-btn compact"
+                data-action="true"
+                onClick={() => handleOpenFile(pathInfo.fullPath)}
+              >
+                View
+              </button>
+              <button 
+                className="vision-action-btn compact"
+                data-action="true"
+                onClick={() => handleOpenInEditor(pathInfo.fullPath)}
+              >
+                Edit
+              </button>
+            </>
+          )}
+          {isDir && (
+            <button 
+              className="vision-action-btn compact"
+              data-action="true"
+              onClick={() => handleListDir(pathInfo.fullPath)}
+            >
+              List
+            </button>
+          )}
+          <button 
+            className="vision-action-btn compact"
+            data-action="true"
+            onClick={() => handleCopyPath(pathInfo.fullPath)}
+          >
+            {copied ? '✓' : 'Copy'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="vision-overlay filepath-overlay">
+      <div className="vision-overlay-header">
+        <div className="vision-overlay-title">
+          <span className="vision-git-icon">📂</span>
+          <span>Detected Paths</span>
+          {count > 1 && <span className="vision-branch-name">{count} paths</span>}
+        </div>
+        <button className="vision-close-btn" onClick={onDismiss}>×</button>
+      </div>
+
+      <div className="vision-overlay-content">
+        {all.map((pathInfo, index) => renderPathItem(pathInfo, index))}
+      </div>
+
+      <div className="vision-overlay-footer">
+        <span className="vision-hint">↑↓ Navigate • Enter Select • 1-9 Quick • ESC Close</span>
+      </div>
+    </div>
+  );
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+

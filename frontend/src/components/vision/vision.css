@@ -243,3 +243,71 @@ body.light-theme .json-preview {
   border-color: #dee2e6;
   color: #1e293b;
 }
+
+/* File Path Overlay Styles */
+.filepath-overlay .vision-overlay-content {
+  max-height: 500px;
+}
+
+.file-path-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: none;
+}
+
+.file-path-item .vision-file-icon {
+  font-size: 24px;
+  margin-top: 2px;
+}
+
+.file-path-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.file-path-info .vision-file-name {
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 13px;
+  color: #61dafb;
+  word-break: break-all;
+}
+
+.file-path-meta {
+  font-size: 11px;
+  color: #888;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.file-path-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 0 12px 12px 56px;
+}
+
+.vision-action-btn.compact {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-width: auto;
+}
+
+.filepath-overlay .vision-file-section {
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.filepath-overlay .vision-file-section:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.filepath-overlay .vision-file-section:last-child {
+  border-bottom: none;
+}

@@ -123,13 +123,27 @@
 
 .assistant-status {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
   padding: 8px 16px;
   background: #1f3a1f;
   border-bottom: 1px solid #2f4a2f;
   font-size: 12px;
   color: #a8e6a8;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.assistant-status.expanded {
+  background: #1a2f1a;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.status-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
 }
 
 .status-indicator {
@@ -145,7 +159,103 @@
 }
 
 .status-text {
-  font-size: 12px;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status-action {
+  font-size: 11px;
+  color: #81c784;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.assistant-status:hover .status-action {
+  opacity: 1;
+}
+
+.model-selector-dropdown {
+  margin-top: 8px;
+  padding: 8px 0;
+  border-top: 1px solid #2f4a2f;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.model-option {
+  padding: 10px 12px;
+  background: #252525;
+  border: 1px solid #333;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.model-option:hover:not(.disabled) {
+  background: #2a2a2a;
+  border-color: #4caf50;
+}
+
+.model-option.selected {
+  background: #1f3a1f;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 1px #4caf50;
+}
+
+.model-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.model-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.model-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: #999;
+}
+
+.model-size {
+  color: #81c784;
+}
+
+.model-perf {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  font-size: 10px;
+}
+
+.model-perf.perf-fast,
+.model-perf.perf-very-fast {
+  background: #1f3a1f;
+  color: #81c784;
+}
+
+.model-perf.perf-balanced {
+  background: #3a3a1f;
+  color: #ffd700;
+}
+
+.model-perf.perf-slow {
+  background: #3a1f1f;
+  color: #ff8a80;
+}
+
+.model-best {
+  color: #64b5f6;
+  font-style: italic;
 }
 
 .assistant-messages {

@@ -117,14 +117,23 @@ func (s *LocalService) GetStatus(ctx context.Context) (*OllamaStatusResponse, er
 	models, err := ollamaClient.GetModels(ctx)
 	if err != nil {
 		return &OllamaStatusResponse{
-			Available: true,
-			Error:     "Connected but failed to list models: " + err.Error(),
+			Available:    true,
+			CurrentModel: ollamaClient.GetCurrentModel(),
+			Error:        "Connected but failed to list models: " + err.Error(),
 		}, nil
 	}
 
 	return &OllamaStatusResponse{
-		Available: true,
-		Models:    models,
+		Available:    true,
+		Models:       models,
+		CurrentModel: ollamaClient.GetCurrentModel(),
 	}, nil
+}
+
+// SetModel changes the current Ollama model.
+func (s *LocalService) SetModel(ctx context.Context, model string) error {
+	ollamaClient := s.core.GetOllamaClient()
+	ollamaClient.SetModel(model)
+	return nil
 }
 

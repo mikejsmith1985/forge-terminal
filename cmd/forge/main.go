@@ -144,6 +144,7 @@ func main() {
 	http.HandleFunc("/api/assistant/status", handleAssistantStatus)
 	http.HandleFunc("/api/assistant/chat", handleAssistantChat)
 	http.HandleFunc("/api/assistant/execute", handleAssistantExecute)
+	http.HandleFunc("/api/assistant/model", handleAssistantSetModel)
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()
@@ -1475,4 +1476,41 @@ return
 }
 
 json.NewEncoder(w).Encode(response)
+}
+
+// handleAssistantSetModel changes the current Ollama model.
+func handleAssistantSetModel(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodPost {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+w.Header().Set("Content-Type", "application/json")
+ctx := r.Context()
+
+var req assistant.SetModelRequest
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+http.Error(w, "Invalid request body", http.StatusBadRequest)
+return
+}
+
+if req.Model == "" {
+http.Error(w, "Model name is required", http.StatusBadRequest)
+return
+}
+
+if err := assistantService.SetModel(ctx, req.Model); err != nil {
+log.Printf("[Assistant] SetModel error: %v", err)
+json.NewEncoder(w).Encode(assistant.SetModelResponse{
+Success: false,
+Error:   err.Error(),
+})
+return
+}
+
+log.Printf("[Assistant] Model changed to: %s", req.Model)
+json.NewEncoder(w).Encode(assistant.SetModelResponse{
+Success: true,
+Model:   req.Model,
+})
 }
