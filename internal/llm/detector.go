@@ -53,6 +53,7 @@ type Detector struct {
 func NewDetector() *Detector {
 	d := &Detector{
 		patterns: []*LLMPattern{
+			// Exact command patterns (highest priority)
 			{
 				Name:  "copilot-standalone",
 				Regex: regexp.MustCompile(`(?i)^copilot\s*$`),
@@ -98,6 +99,28 @@ func NewDetector() *Detector {
 			{
 				Name:  "aider",
 				Regex: regexp.MustCompile(`(?i)^aider`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderAider, CommandCode
+				},
+			},
+			// Path-based patterns (fallback for shell-resolved commands)
+			{
+				Name:  "copilot-path",
+				Regex: regexp.MustCompile(`(?i)/copilot(\s|$)`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGitHubCopilot, CommandChat
+				},
+			},
+			{
+				Name:  "claude-path",
+				Regex: regexp.MustCompile(`(?i)/claude(\s|$)`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderClaude, CommandChat
+				},
+			},
+			{
+				Name:  "aider-path",
+				Regex: regexp.MustCompile(`(?i)/aider(\s|$)`),
 				Extract: func(cmd string) (Provider, CommandType) {
 					return ProviderAider, CommandCode
 				},

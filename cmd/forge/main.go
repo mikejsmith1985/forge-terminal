@@ -20,6 +20,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
+	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
@@ -148,6 +149,17 @@ func handleCommands(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Auto-migrate commands with missing LLM metadata
+		migrated, changed := commands.MigrateCommands(cmds)
+		if changed {
+			log.Printf("[API] Auto-migrated %d commands with new LLM metadata", len(migrated))
+			if err := commands.SaveCommands(migrated); err != nil {
+				log.Printf("[API] Failed to save migrated commands: %v", err)
+			}
+			cmds = migrated
+		}
+
 		log.Printf("[API] Successfully loaded %d commands", len(cmds))
 		json.NewEncoder(w).Encode(cmds)
 
@@ -794,9 +806,77 @@ func handleAMLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If triggerAM is set, start LLM conversation tracking
+	var convID string
+	if req.TriggerAM {
+		amSystem := am.GetSystem()
+		if amSystem != nil {
+			llmLogger := amSystem.GetLLMLogger(req.TabID)
+			if llmLogger != nil {
+				// Determine provider from explicit field or infer from command
+				provider := inferLLMProvider(req.LLMProvider, req.Content)
+				cmdType := inferLLMType(req.LLMType)
+
+				detected := &llm.DetectedCommand{
+					Provider: provider,
+					Type:     cmdType,
+					Prompt:   req.Description,
+					RawInput: req.Content,
+					Detected: true,
+				}
+
+				convID = llmLogger.StartConversation(detected)
+				log.Printf("[AM] Started LLM conversation from command card: %s (provider=%s type=%s)", convID, provider, cmdType)
+			}
+		}
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
+		"success":        true,
+		"conversationId": convID,
 	})
+}
+
+// inferLLMProvider determines the LLM provider from explicit field or command text
+func inferLLMProvider(explicit string, command string) llm.Provider {
+	// Use explicit provider if specified
+	switch strings.ToLower(explicit) {
+	case "copilot", "github-copilot":
+		return llm.ProviderGitHubCopilot
+	case "claude":
+		return llm.ProviderClaude
+	case "aider":
+		return llm.ProviderAider
+	}
+
+	// Fallback: infer from command text
+	lower := strings.ToLower(command)
+	if strings.Contains(lower, "copilot") || strings.Contains(lower, "gh copilot") {
+		return llm.ProviderGitHubCopilot
+	}
+	if strings.Contains(lower, "claude") {
+		return llm.ProviderClaude
+	}
+	if strings.Contains(lower, "aider") {
+		return llm.ProviderAider
+	}
+
+	return llm.ProviderUnknown
+}
+
+// inferLLMType determines the command type from explicit field
+func inferLLMType(explicit string) llm.CommandType {
+	switch strings.ToLower(explicit) {
+	case "chat":
+		return llm.CommandChat
+	case "suggest":
+		return llm.CommandSuggest
+	case "explain":
+		return llm.CommandExplain
+	case "code":
+		return llm.CommandCode
+	}
+	return llm.CommandChat // Default to chat
 }
 
 func handleAMCheck(w http.ResponseWriter, r *http.Request) {

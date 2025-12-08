@@ -871,9 +871,23 @@ function App() {
               description: cmd.description,
               content: cmd.command,
               triggerAM: true,
+              llmProvider: cmd.llmProvider || '',
+              llmType: cmd.llmType || 'chat',
               timestamp: new Date().toISOString()
             }),
-          }).catch(err => console.warn('[AM] Failed to send command-card AM event:', err));
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.conversationId) {
+              addToast(`🧠 AM tracking started: ${cmd.description}`, 'success', 2000);
+              logger.am('LLM conversation started from command card', { 
+                conversationId: data.conversationId, 
+                provider: cmd.llmProvider || 'auto-detected',
+                commandId: cmd.id 
+              });
+            }
+          })
+          .catch(err => console.warn('[AM] Failed to send command-card AM event:', err));
         }
       } catch (err) {
         console.warn('[AM] Error while triggering AM for command card:', err);

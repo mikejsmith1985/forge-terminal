@@ -48,6 +48,8 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         pasteOnly: false,
         favorite: false,
         triggerAM: false,
+        llmProvider: '',
+        llmType: 'chat',
         icon: null
     });
     const [showIconPicker, setShowIconPicker] = useState(false);
@@ -62,7 +64,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
     useEffect(() => {
         if (isOpen) {
             if (initialData) {
-                setFormData({ icon: null, ...initialData });
+                setFormData({ icon: null, llmProvider: '', llmType: 'chat', ...initialData });
             } else {
                 setFormData({
                     description: '',
@@ -70,6 +72,9 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     keyBinding: '',
                     pasteOnly: false,
                     favorite: false,
+                    triggerAM: false,
+                    llmProvider: '',
+                    llmType: 'chat',
                     icon: null
                 });
             }
@@ -293,6 +298,42 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                             />
                             Trigger AM (start AM when executed)
                         </label>
+
+                        {formData.triggerAM && (
+                            <div style={{ marginLeft: '24px', marginTop: '8px', padding: '12px', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '4px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px' }}>
+                                    <strong>LLM Provider (optional):</strong>
+                                    <select 
+                                        name="llmProvider" 
+                                        value={formData.llmProvider} 
+                                        onChange={handleChange}
+                                        style={{ width: '100%', marginTop: '4px', padding: '6px' }}
+                                    >
+                                        <option value="">Auto-detect from command</option>
+                                        <option value="copilot">GitHub Copilot</option>
+                                        <option value="claude">Claude</option>
+                                        <option value="aider">Aider</option>
+                                    </select>
+                                </label>
+                                <label style={{ display: 'block', marginTop: '8px' }}>
+                                    <strong>Command Type:</strong>
+                                    <select 
+                                        name="llmType" 
+                                        value={formData.llmType} 
+                                        onChange={handleChange}
+                                        style={{ width: '100%', marginTop: '4px', padding: '6px' }}
+                                    >
+                                        <option value="chat">Chat/Conversation</option>
+                                        <option value="suggest">Suggest Command</option>
+                                        <option value="explain">Explain Code</option>
+                                        <option value="code">Code Generation</option>
+                                    </select>
+                                </label>
+                                <p style={{ fontSize: '12px', marginTop: '8px', opacity: 0.7 }}>
+                                    💡 Specifying the provider helps AM track conversations more reliably
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <div className="modal-actions">

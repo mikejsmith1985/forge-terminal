@@ -381,11 +381,15 @@ func (r *LoggerRegistry) Remove(tabID string) {
 
 // AppendLogRequest represents a request to append to a log.
 type AppendLogRequest struct {
-	TabID     string       `json:"tabId"`
-	TabName   string       `json:"tabName"`
-	Workspace string       `json:"workspace"`
-	EntryType LogEntryType `json:"entryType"`
-	Content   string       `json:"content"`
+	TabID       string       `json:"tabId"`
+	TabName     string       `json:"tabName"`
+	Workspace   string       `json:"workspace"`
+	EntryType   LogEntryType `json:"entryType"`
+	Content     string       `json:"content"`
+	TriggerAM   bool         `json:"triggerAM,omitempty"`
+	LLMProvider string       `json:"llmProvider,omitempty"`
+	LLMType     string       `json:"llmType,omitempty"`
+	Description string       `json:"description,omitempty"`
 }
 
 // EnableRequest represents a request to enable/disable AM.

@@ -16,6 +16,8 @@ type Command struct {
 	PasteOnly   bool   `json:"pasteOnly"`
 	Favorite    bool   `json:"favorite"`
 	TriggerAM   bool   `json:"triggerAM,omitempty"`
+	LLMProvider string `json:"llmProvider,omitempty"` // "copilot", "claude", "aider"
+	LLMType     string `json:"llmType,omitempty"`     // "chat", "suggest", "explain", "code"
 	Icon        string `json:"icon,omitempty"`
 }
 

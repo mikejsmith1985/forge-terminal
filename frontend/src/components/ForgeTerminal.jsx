@@ -177,15 +177,7 @@ function detectYnPrompt(cleanText, debugLog = false) {
  * @param {boolean} debugLog - Enable debug logging
  * @returns {{ waiting: boolean, responseType: 'enter'|'y-enter'|null, confidence: string }}
  */
-function detectCliPrompt(text, debugLog = false, skipDetection = false) {
-  // Skip detection if user just sent input - wait for LLM tool output
-  if (skipDetection) {
-    if (debugLog) {
-      console.log('[AutoRespond] Skipping detection - user input echo in progress');
-    }
-    return { waiting: false, responseType: null, confidence: 'none' };
-  }
-  
+function detectCliPrompt(text, debugLog = false) {
   if (!text || text.length < 10) {
     return { waiting: false, responseType: null, confidence: 'none' };
   }
@@ -365,7 +357,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const currentDirectoryRef = useRef(currentDirectory);
   const connectFnRef = useRef(null);
   const lastOutputRef = useRef('');
-  const userInputEchoCountdownRef = useRef(0);
   const waitingCheckTimeoutRef = useRef(null);
   const autoRespondRef = useRef(autoRespond);
   const amEnabledRef = useRef(amEnabled);
@@ -782,14 +773,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           // Enable debug logging when auto-respond is on
           const debugMode = autoRespondRef.current;
           
-          // Decrement the echo countdown on each check
-          if (userInputEchoCountdownRef.current > 0) {
-            userInputEchoCountdownRef.current--;
-          }
-          
-          // Skip prompt detection if user just sent input (echo still coming through)
-          const skipDetection = userInputEchoCountdownRef.current > 0;
-          const { waiting, responseType, confidence } = detectCliPrompt(lastOutputRef.current, debugMode, skipDetection);
+          const { waiting, responseType, confidence } = detectCliPrompt(lastOutputRef.current, debugMode);
           
           if (waiting !== isWaiting) {
             setIsWaiting(waiting);
@@ -817,7 +801,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             ws.readyState === WebSocket.OPEN;
           
           if (shouldAutoRespond) {
-            logger.terminal('Auto-responding to CLI prompt (broad mode)', { tabId, responseType, confidence });
+            logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
             
             // Send appropriate response based on prompt type
             if (responseType === 'enter') {
@@ -828,9 +812,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               ws.send('y\r');
             }
             
-            // Clear waiting state after auto-respond and reset echo countdown
+            // Clear waiting state after auto-respond
             lastOutputRef.current = '';
-            userInputEchoCountdownRef.current = 2; // Give another grace period after auto-respond
             setIsWaiting(false);
             if (onWaitingChange) {
               onWaitingChange(false);
@@ -944,11 +927,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       term.onData((data) => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
-          
-          // Mark that user input was sent - skip prompt detection for the next ~500ms
-          // This prevents matching on echoed user input (e.g., user types "yes" and it gets echoed back)
-          // Set countdown to 2 checks (debounce is 500ms per check = ~1000ms grace period)
-          userInputEchoCountdownRef.current = 2;
           
           // AM logging: Capture user keyboard input for crash recovery
           // Buffer and debounce to avoid logging every keystroke
