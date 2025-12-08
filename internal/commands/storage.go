@@ -15,6 +15,7 @@ type Command struct {
 	KeyBinding  string `json:"keyBinding"`
 	PasteOnly   bool   `json:"pasteOnly"`
 	Favorite    bool   `json:"favorite"`
+	TriggerAM   bool   `json:"triggerAM,omitempty"`
 	Icon        string `json:"icon,omitempty"`
 }
 

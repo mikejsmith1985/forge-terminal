@@ -809,15 +809,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
           
-          // Auto-respond only with high/medium confidence, not low
-          // Low confidence will trigger the tab pulse for user attention
+          // Revert to broader auto-respond behavior (previously more reliable):
+          // Auto-respond when a prompt is detected and the tab has Auto-Respond enabled.
+          // This avoids missing prompts when detection of LLM-only output is unreliable.
           const shouldAutoRespond = waiting && 
             autoRespondRef.current && 
-            ws.readyState === WebSocket.OPEN &&
-            (confidence === 'high' || confidence === 'medium');
+            ws.readyState === WebSocket.OPEN;
           
           if (shouldAutoRespond) {
-            logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
+            logger.terminal('Auto-responding to CLI prompt (broad mode)', { tabId, responseType, confidence });
             
             // Send appropriate response based on prompt type
             if (responseType === 'enter') {

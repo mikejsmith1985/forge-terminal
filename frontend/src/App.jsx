@@ -854,6 +854,30 @@ function App() {
     if (termRef) {
       termRef.sendCommand(cmd.command)
       termRef.focus()
+
+      // If this command card is configured to trigger AM, send an AM log entry
+      // so the backend can start/associate a conversation without relying on text detection.
+      try {
+        if (cmd.triggerAM && activeTab?.amEnabled) {
+          fetch('/api/am/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tabId: activeTabId,
+              tabName: activeTab?.title || 'Terminal',
+              workspace: window.location.pathname,
+              entryType: 'COMMAND_CARD_EXECUTED',
+              commandId: cmd.id,
+              description: cmd.description,
+              content: cmd.command,
+              triggerAM: true,
+              timestamp: new Date().toISOString()
+            }),
+          }).catch(err => console.warn('[AM] Failed to send command-card AM event:', err));
+        }
+      } catch (err) {
+        console.warn('[AM] Error while triggering AM for command card:', err);
+      }
     }
   }
 

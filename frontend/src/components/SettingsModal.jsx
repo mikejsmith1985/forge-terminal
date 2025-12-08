@@ -258,6 +258,47 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             </small>
           </div>
 
+          {/* Shell Hooks Section */}
+          <div style={{ 
+            marginTop: '20px',
+            paddingTop: '20px',
+            borderTop: '1px solid #333'
+          }}>
+            <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>
+              Shell Hooks
+            </label>
+
+            <div style={{ marginBottom: '12px', color: '#a3a3a3' }}>
+              Install optional shell hooks to enable Layer 2 (Shell Hooks) for AM. Hooks add minimal wrapper code to your shell rc to emit events when command cards or CLI commands run.
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/am/install-hooks', { method: 'POST' });
+                  const data = await res.json();
+                  if (data.success) {
+                    if (onToast) onToast('Shell hooks installed (or instructions saved)', 'success', 4000);
+                  } else {
+                    if (onToast) onToast('Failed to install hooks: ' + (data.error || 'unknown'), 'error', 4000);
+                  }
+                } catch (err) {
+                  console.error('Install hooks failed:', err);
+                  if (onToast) onToast('Failed to install hooks', 'error', 4000);
+                }
+              }}
+              style={{ width: '100%', marginBottom: '10px' }}
+            >
+              Install Shell Hooks
+            </button>
+
+            <small style={{ display: 'block', color: '#888', marginBottom: '8px' }}>
+              If automatic install is not possible, a script will be saved to <code>~/.forge/install-shell-hooks.sh</code> with instructions.
+            </small>
+
+          </div>
+
           {/* Restore Default Cards Section - Always show */}
           <div style={{ 
             marginTop: '20px',

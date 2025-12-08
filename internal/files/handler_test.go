@@ -57,4 +57,3 @@ func TestIsPathWithinRoot(t *testing.T) {
 		})
 	}
 }
-

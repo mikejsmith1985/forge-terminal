@@ -69,7 +69,7 @@ func main() {
 	http.HandleFunc("/api/update/check", handleUpdateCheck)
 	http.HandleFunc("/api/update/apply", handleUpdateApply)
 	http.HandleFunc("/api/update/versions", handleListVersions)
-	http.HandleFunc("/api/update/events", handleUpdateEvents) // SSE for push update notifications
+	http.HandleFunc("/api/update/events", handleUpdateEvents)                // SSE for push update notifications
 	http.HandleFunc("/api/update/install-manual", handleInstallManualUpdate) // Install manually downloaded binary
 
 	// Sessions API - persist tab state across refreshes
@@ -85,9 +85,13 @@ func main() {
 	http.HandleFunc("/api/am/content/", handleAMContent)
 	http.HandleFunc("/api/am/archive/", handleAMArchive)
 	http.HandleFunc("/api/am/cleanup", handleAMCleanup)
+	http.HandleFunc("/api/am/install-hooks", handleAMInstallHooks)
 	http.HandleFunc("/api/am/llm/conversations/", handleAMLLMConversations)
 	http.HandleFunc("/api/am/health", handleAMHealth)
 	http.HandleFunc("/api/am/conversations", handleAMActiveConversations)
+	http.HandleFunc("/api/am/apply-hooks", handleAMApplyHooks)
+	http.HandleFunc("/api/am/hook", handleAMHook)
+	http.HandleFunc("/api/am/restore-hooks", handleAMRestoreHooks)
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", handleDesktopShortcut)
@@ -616,7 +620,7 @@ func handleUpdateEvents(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				consecutiveErrors++
 				log.Printf("[SSE] Update check failed (attempt %d/%d): %v", consecutiveErrors, maxConsecutiveErrors, err)
-				
+
 				// Send error event to client if too many failures
 				if consecutiveErrors >= maxConsecutiveErrors {
 					fmt.Fprintf(w, "event: error\ndata: {\"message\":\"Failed to check for updates\"}\n\n")
@@ -897,6 +901,170 @@ func handleAMCleanup(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
+	})
+}
+
+// handleAMInstallHooks writes a helper script to the user's ~/.forge and returns its path and contents.
+func handleAMInstallHooks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	path, content, err := am.InstallShellHooks()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"path":    path,
+		"content": content,
+	})
+}
+
+// handleAMApplyHooks will append hook snippets to the user's shell rc when requested.
+func handleAMApplyHooks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Shell   string `json:"shell"`   // "bash" or "powershell"
+		Preview bool   `json:"preview"` // if true, return the snippet only
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	if req.Preview {
+		snippet := am.GetSnippet(req.Shell)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"snippet": snippet,
+		})
+		return
+	}
+
+	path, backup, err := am.ApplyShellHooks(req.Shell)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"path":    path,
+		"backup":  backup,
+	})
+}
+
+// handleAMHook receives hook POSTs from user shells and marks Layer 2 healthy when seen.
+func handleAMHook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var payload map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Publish layer 2 event to the AM EventBus
+	am.EventBus.Publish(&am.LayerEvent{
+		Type:      "HOOK",
+		Layer:     2,
+		Timestamp: time.Now(),
+		Metadata:  payload,
+	})
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+// handleAMRestoreHooks restores a backup file over the target profile.
+func handleAMRestoreHooks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Backup string `json:"backup"`
+		Target string `json:"target"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Basic validation: ensure backup file exists and contains the .forge-backup- marker
+	if req.Backup == "" || !strings.Contains(req.Backup, ".forge-backup-") {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "invalid backup path",
+		})
+		return
+	}
+
+	if _, err := os.Stat(req.Backup); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "backup not found",
+		})
+		return
+	}
+
+	// Read backup and overwrite target
+	b, err := os.ReadFile(req.Backup)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	if err := os.WriteFile(req.Target, b, 0644); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"restored": req.Target,
 	})
 }
 

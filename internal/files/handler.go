@@ -67,7 +67,7 @@ func resolvePathWithDistro(p string, distro string) (string, error) {
 				return resolveWSLHome(distro, remainder)
 			}
 		}
-		
+
 		// Handle absolute Linux paths like /home/user/projects
 		if strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "/mnt/") {
 			if distro != "" {
@@ -89,7 +89,7 @@ func resolvePathWithDistro(p string, distro string) (string, error) {
 				return resolved, nil
 			}
 		}
-		
+
 		// Handle //wsl.localhost/distro/... style paths
 		if strings.HasPrefix(p, "//wsl.localhost/") {
 			parts := strings.Split(p, "/")
@@ -121,14 +121,14 @@ func resolveWSLHome(distro, remainder string) (string, error) {
 		}
 		return uncPath, nil
 	}
-	
+
 	homePath := strings.TrimSpace(string(output))
 	// homePath is like "/home/mikej"
 	fullLinuxPath := homePath
 	if remainder != "" {
 		fullLinuxPath = homePath + "/" + remainder
 	}
-	
+
 	// Convert to UNC: /home/mikej -> \\wsl.localhost\distro\home\mikej
 	linuxPath := strings.TrimPrefix(fullLinuxPath, "/")
 	uncPath := `\\wsl.localhost\` + distro + `\` + strings.ReplaceAll(linuxPath, "/", `\`)

@@ -17,9 +17,9 @@ import (
 
 // Custom WebSocket close codes (4000-4999 range is for application use)
 const (
-	CloseCodePTYExited   = 4000 // Shell process exited normally
-	CloseCodeTimeout     = 4001 // Session timed out
-	CloseCodePTYError    = 4002 // PTY read/write error
+	CloseCodePTYExited = 4000 // Shell process exited normally
+	CloseCodeTimeout   = 4001 // Session timed out
+	CloseCodePTYError  = 4002 // PTY read/write error
 )
 
 // Handler manages WebSocket terminal connections.
@@ -114,7 +114,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ticker.C:

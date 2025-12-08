@@ -194,10 +194,10 @@ func (hm *HealthMonitor) GetMetrics() *HealthMetrics {
 func (hm *HealthMonitor) computeOverallStatus() string {
 	operational := 0
 	totalRelevant := 0
-	
+
 	for layerID, status := range hm.layers {
-		// Skip Layer 5 (self) and Layer 2 (Shell Hooks - requires manual install)
-		if layerID == 5 || layerID == 2 {
+		// Skip Layer 5 (self) only — include Layer 2 (Shell Hooks) in overall computation
+		if layerID == 5 {
 			continue
 		}
 		totalRelevant++
@@ -231,6 +231,15 @@ func (hm *HealthMonitor) RecordPTYHeartbeat() {
 	EventBus.Publish(&LayerEvent{
 		Type:      "HEARTBEAT",
 		Layer:     1,
+		Timestamp: time.Now(),
+	})
+}
+
+// RecordShellHooksHeartbeat records a heartbeat for Layer 2 (Shell Hooks).
+func (hm *HealthMonitor) RecordShellHooksHeartbeat() {
+	EventBus.Publish(&LayerEvent{
+		Type:      "HEARTBEAT",
+		Layer:     2,
 		Timestamp: time.Now(),
 	})
 }
