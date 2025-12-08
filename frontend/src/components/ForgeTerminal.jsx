@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
+import AssistantPanel from './AssistantPanel/AssistantPanel';
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -348,6 +349,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   amEnabled = false, // AM (Artificial Memory) logging enabled
   currentDirectory = null, // Current working directory to restore on connect
   visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
+  assistantEnabled = false, // Forge Assistant panel enabled (Dev Mode)
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -382,6 +384,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Vision state
   const [activeVisionOverlay, setActiveVisionOverlay] = useState(null);
   const visionEnabledRef = useRef(visionEnabled);
+
+  // Assistant state
+  const [assistantPanelOpen, setAssistantPanelOpen] = useState(false);
+  const assistantEnabledRef = useRef(assistantEnabled);
 
   // Keep autoRespond ref updated
   useEffect(() => {
@@ -431,6 +437,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       setActiveVisionOverlay(null);
     }
   }, [visionEnabled, tabId]);
+
+  // Keep assistantEnabled ref updated
+  useEffect(() => {
+    assistantEnabledRef.current = assistantEnabled;
+    // Auto-open panel when enabled
+    if (assistantEnabled && !assistantPanelOpen) {
+      setAssistantPanelOpen(true);
+    }
+  }, [assistantEnabled, assistantPanelOpen]);
 
   // Refit terminal when becoming visible
   useEffect(() => {
@@ -1195,6 +1210,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           activeOverlay={activeVisionOverlay}
           onAction={handleVisionAction}
           onDismiss={handleVisionDismiss}
+        />
+      )}
+
+      {/* Assistant Panel (Dev Mode only) */}
+      {assistantEnabled && (
+        <AssistantPanel
+          isOpen={assistantPanelOpen}
+          onClose={() => setAssistantPanelOpen(false)}
+          currentTabId={tabId}
         />
       )}
       
