@@ -210,6 +210,12 @@ AM logs are stored in the working directory:
 
 ## Changelog
 
+### v1.16.1
+- **Update Modal Cleanup**: Removed dead hard-refresh code that never executed
+- **16 New Unit Tests**: Comprehensive test coverage for update flow
+- **Improved Documentation**: Clear README guide for updating and spacebar recovery
+- **Better UX Messages**: "Update applied. New version launching in new tab..." message
+
 ### v1.9.0 (Latest)
 - **Per-Tab Light/Dark Mode**: Each tab can independently toggle between light and dark modes (20 unique visual combinations)
 - **Emoji Icons**: 40+ colorful emoji icons for command cards alongside existing Lucide icons
