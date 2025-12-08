@@ -52,7 +52,7 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 		baseURL = "http://localhost:11434"
 	}
 	if model == "" {
-		model = "codellama:7b"
+		model = "mistral:7b-instruct" // More common default
 	}
 
 	return &OllamaClient{
