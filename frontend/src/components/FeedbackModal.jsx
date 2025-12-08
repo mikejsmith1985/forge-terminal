@@ -85,6 +85,33 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         setScreenshots(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handlePasteFromClipboard = async () => {
+        try {
+            const clipboardItems = await navigator.clipboard.read();
+            for (const item of clipboardItems) {
+                for (const type of item.types) {
+                    if (type.startsWith('image/')) {
+                        const blob = await item.getType(type);
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            setScreenshots(prev => [...prev, e.target.result]);
+                            setStatus({ type: 'success', msg: 'Image pasted from clipboard!' });
+                            setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
+                        };
+                        reader.readAsDataURL(blob);
+                        return;
+                    }
+                }
+            }
+            setStatus({ type: 'warning', msg: 'No image found in clipboard' });
+            setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
+        } catch (err) {
+            console.error('Paste failed:', err);
+            setStatus({ type: 'error', msg: 'Failed to paste. Try Ctrl+V instead.' });
+            setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
+        }
+    };
+
     const uploadToImgur = async (base64Image) => {
         if (!IMGUR_CLIENT_ID) throw new Error('NO_IMGUR_ID');
 
@@ -298,16 +325,46 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                             <div className="screenshot-section" style={{ marginTop: '20px', marginBottom: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                     <label>Screenshots {screenshots.length > 0 && `(${screenshots.length})`}</label>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={handleCapture}
-                                        disabled={isCapturing}
-                                    >
-                                        <Camera size={16} style={{ marginRight: '6px' }} />
-                                        {isCapturing ? 'Capturing...' : screenshots.length > 0 ? 'Add Another' : 'Capture Screen'}
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={handlePasteFromClipboard}
+                                            title="Paste image from clipboard"
+                                        >
+                                            <ImageIcon size={16} style={{ marginRight: '6px' }} />
+                                            Paste
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={handleCapture}
+                                            disabled={isCapturing}
+                                        >
+                                            <Camera size={16} style={{ marginRight: '6px' }} />
+                                            {isCapturing ? 'Capturing...' : screenshots.length > 0 ? 'Add Another' : 'Capture'}
+                                        </button>
+                                    </div>
                                 </div>
+
+                                {screenshots.length === 0 && (
+                                    <div style={{ 
+                                        padding: '30px', 
+                                        border: '2px dashed #333', 
+                                        borderRadius: '8px', 
+                                        textAlign: 'center',
+                                        background: '#0a0a0a',
+                                        color: '#888'
+                                    }}>
+                                        <ImageIcon size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
+                                        <p style={{ margin: '0 0 8px 0', fontSize: '0.9em' }}>
+                                            Press <kbd>Ctrl+V</kbd> to paste screenshot
+                                        </p>
+                                        <p style={{ margin: 0, fontSize: '0.85em', color: '#666' }}>
+                                            or use the buttons above
+                                        </p>
+                                    </div>
+                                )}
 
                                 {screenshots.length > 0 && (
                                     <div className="screenshots-preview" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

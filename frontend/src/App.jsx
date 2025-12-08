@@ -78,6 +78,7 @@ function App() {
     updateTabColorTheme,
     toggleTabAutoRespond,
     toggleTabAM,
+    toggleTabVision,
     toggleTabMode,
     updateTabDirectory,
     reorderTabs,
@@ -1174,6 +1175,10 @@ function App() {
           onReorder={reorderTabs}
           onToggleAutoRespond={toggleTabAutoRespond}
           onToggleAM={handleToggleAM}
+          onToggleVision={(tabId) => {
+            console.log('[App] toggleTabVision called for tab:', tabId);
+            toggleTabVision(tabId);
+          }}
           onToggleMode={toggleTabMode}
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}
@@ -1210,6 +1215,7 @@ function App() {
                   shellConfig={tab.shellConfig}
                   autoRespond={tab.autoRespond || false}
                   amEnabled={tab.amEnabled || false}
+                  visionEnabled={tab.visionEnabled || false}
                   tabName={tab.title}
                   currentDirectory={tab.currentDirectory || null}
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}

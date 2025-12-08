@@ -6,6 +6,7 @@ import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
+import VisionOverlay from './vision/VisionOverlay';
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -346,6 +347,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   autoRespond = false, // Auto-respond "yes" to CLI confirmation prompts
   amEnabled = false, // AM (Artificial Memory) logging enabled
   currentDirectory = null, // Current working directory to restore on connect
+  visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -376,6 +378,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  
+  // Vision state
+  const [activeVisionOverlay, setActiveVisionOverlay] = useState(null);
+  const visionEnabledRef = useRef(visionEnabled);
 
   // Keep autoRespond ref updated
   useEffect(() => {
@@ -406,6 +412,25 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onDirectoryChangeRef.current = onDirectoryChange;
   }, [onDirectoryChange]);
+  
+  // Keep visionEnabled ref updated and send control message to backend
+  useEffect(() => {
+    visionEnabledRef.current = visionEnabled;
+    
+    // Send enable/disable message to backend
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const msg = {
+        type: visionEnabled ? 'VISION_ENABLE' : 'VISION_DISABLE'
+      };
+      wsRef.current.send(JSON.stringify(msg));
+      logger.terminal(`Vision ${visionEnabled ? 'enabled' : 'disabled'}`, { tabId });
+    }
+    
+    // Clear overlay when disabling
+    if (!visionEnabled) {
+      setActiveVisionOverlay(null);
+    }
+  }, [visionEnabled, tabId]);
 
   // Refit terminal when becoming visible
   useEffect(() => {
@@ -561,6 +586,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     },
     isWaitingForPrompt: () => isWaiting,
   }));
+  
+  // Vision action handler
+  const handleVisionAction = useCallback((action) => {
+    if (action.type === 'INJECT_COMMAND' && action.command) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(action));
+        logger.terminal('Vision command injected', { tabId, command: action.command });
+        // Dismiss overlay after action
+        setActiveVisionOverlay(null);
+      }
+    }
+  }, [tabId]);
+  
+  // Vision dismiss handler
+  const handleVisionDismiss = useCallback(() => {
+    setActiveVisionOverlay(null);
+  }, []);
 
   // Update terminal theme when theme or colorTheme prop changes
   useEffect(() => {
@@ -727,8 +769,26 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           term.write(data);
           // Convert to string for prompt detection
           textData = new TextDecoder().decode(data);
+        } else if (typeof event.data === 'string') {
+          // Text data - check if it's a Vision overlay message
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'VISION_OVERLAY') {
+              // Vision overlay detected
+              logger.terminal('Vision overlay received', { tabId, overlayType: msg.overlayType });
+              setActiveVisionOverlay({
+                type: msg.overlayType,
+                payload: msg.payload
+              });
+              return; // Don't write to terminal
+            }
+          } catch (e) {
+            // Not JSON, treat as regular text
+            term.write(event.data);
+            textData = event.data;
+          }
         } else {
-          // Text data
+          // Other text data
           term.write(event.data);
           textData = event.data;
         }
@@ -1128,6 +1188,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           cursor: 'text',
         }}
       />
+      
+      {/* Vision Overlay */}
+      {visionEnabled && (
+        <VisionOverlay 
+          activeOverlay={activeVisionOverlay}
+          onAction={handleVisionAction}
+          onDismiss={handleVisionDismiss}
+        />
+      )}
+      
       {showScrollButton && isVisible && (
         <button
           className="scroll-to-bottom-btn"

@@ -12,14 +12,15 @@ import (
 
 // System is the main AM system orchestrator.
 type System struct {
-	Detector       *llm.Detector
-	ProcessMonitor *ProcessMonitor
-	FSWatcher      *FSWatcher
-	HealthMonitor  *HealthMonitor
-	AMDir          string
-	enabled        bool
-	ctx            context.Context
-	cancel         context.CancelFunc
+	Detector            *llm.Detector
+	ShellHooksMonitor   *ShellHooksMonitor
+	ProcessMonitor      *ProcessMonitor
+	FSWatcher           *FSWatcher
+	HealthMonitor       *HealthMonitor
+	AMDir               string
+	enabled             bool
+	ctx                 context.Context
+	cancel              context.CancelFunc
 }
 
 // NewSystem creates and initializes the AM system.
@@ -46,6 +47,11 @@ func (s *System) Start() error {
 	}
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
+
+	// Layer 2: Shell Hooks Monitor
+	s.ShellHooksMonitor = NewShellHooksMonitor()
+	go s.ShellHooksMonitor.Start(s.ctx)
+	log.Printf("[AM System] Layer 2 (Shell Hooks) started")
 
 	// Layer 3: Process Monitor
 	s.ProcessMonitor = NewProcessMonitor(s.Detector, s.AMDir)

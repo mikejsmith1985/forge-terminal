@@ -83,6 +83,12 @@ func main() {
 	http.HandleFunc("/api/am/enable", handleAMEnable)
 	http.HandleFunc("/api/am/log", handleAMLog)
 	http.HandleFunc("/api/am/check", handleAMCheck)
+	http.HandleFunc("/api/am/check/enhanced", func(w http.ResponseWriter, r *http.Request) {
+		handleAMCheckEnhanced(w, r)
+	})
+	http.HandleFunc("/api/am/check/grouped", func(w http.ResponseWriter, r *http.Request) {
+		handleAMCheckGrouped(w, r)
+	})
 	http.HandleFunc("/api/am/content/", handleAMContent)
 	http.HandleFunc("/api/am/archive/", handleAMArchive)
 	http.HandleFunc("/api/am/cleanup", handleAMCleanup)
@@ -936,6 +942,80 @@ func handleAMCheck(w http.ResponseWriter, r *http.Request) {
 		HasRecoverable: len(sessions) > 0,
 		Sessions:       sessions,
 	})
+}
+
+// handleAMCheckEnhancedCore contains the core logic for enhanced session recovery
+func handleAMCheckEnhancedCore(sessions []am.SessionInfo) am.RecoveryInfo {
+	return am.RecoveryInfo{
+		HasRecoverable: len(sessions) > 0,
+		Sessions:       sessions,
+	}
+}
+
+// handleAMCheckEnhanced returns session recovery info with enhanced context (workspace, commands, etc)
+func handleAMCheckEnhanced(w http.ResponseWriter, r *http.Request, sessions ...[]am.SessionInfo) am.RecoveryInfo {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return am.RecoveryInfo{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var sessionsList []am.SessionInfo
+	if len(sessions) > 0 && sessions[0] != nil {
+		// For testing: allow passing mock sessions
+		sessionsList = sessions[0]
+	} else {
+		// Production: fetch from AM system
+		var err error
+		sessionsList, err = am.CheckForRecoverableSessions()
+		if err != nil {
+			sessionsList = []am.SessionInfo{}
+		}
+	}
+
+	// Response includes all enhanced fields from SessionInfo
+	result := handleAMCheckEnhancedCore(sessionsList)
+	json.NewEncoder(w).Encode(result)
+	return result
+}
+
+// handleAMCheckGroupedCore contains the core logic for grouped session recovery
+func handleAMCheckGroupedCore(sessions []am.SessionInfo) am.RecoveryInfoGrouped {
+	groups := am.GroupSessionsByWorkspace(sessions)
+	return am.RecoveryInfoGrouped{
+		HasRecoverable: len(sessions) > 0,
+		Groups:         groups,
+		TotalSessions:  len(sessions),
+	}
+}
+
+// handleAMCheckGrouped returns session recovery info grouped by workspace
+func handleAMCheckGrouped(w http.ResponseWriter, r *http.Request, sessions ...[]am.SessionInfo) am.RecoveryInfoGrouped {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return am.RecoveryInfoGrouped{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var sessionsList []am.SessionInfo
+	if len(sessions) > 0 && sessions[0] != nil {
+		// For testing: allow passing mock sessions
+		sessionsList = sessions[0]
+	} else {
+		// Production: fetch from AM system
+		var err error
+		sessionsList, err = am.CheckForRecoverableSessions()
+		if err != nil {
+			sessionsList = []am.SessionInfo{}
+		}
+	}
+
+	// Group sessions by workspace
+	result := handleAMCheckGroupedCore(sessionsList)
+	json.NewEncoder(w).Encode(result)
+	return result
 }
 
 func handleAMContent(w http.ResponseWriter, r *http.Request) {

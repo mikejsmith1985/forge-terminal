@@ -53,6 +53,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     mode: assignedMode, // Per-tab light/dark mode
     autoRespond: false, // Auto-respond to CLI confirmation prompts
     amEnabled: true, // AM (Artificial Memory) logging - DEFAULT ON for legal compliance
+    visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
     currentDirectory: currentDirectory || null, // Current working directory
     createdAt: Date.now(),
   };
@@ -86,6 +87,7 @@ function tabsToSession(tabs, activeTabId) {
       mode: tab.mode || 'dark',
       autoRespond: tab.autoRespond || false,
       amEnabled: tab.amEnabled || false,
+      visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
     })),
     activeTabId: activeTabId,
@@ -513,6 +515,37 @@ export function useTabManager(initialShellConfig) {
   }, []);
 
   /**
+   * Toggle Forge Vision overlays for a tab
+   * @param {string} tabId - ID of tab to update
+   */
+  const toggleTabVision = useCallback((tabId) => {
+    logger.tabs('Toggling tab Vision', { tabId });
+    
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        logger.tabs('Tab not found for Vision toggle', { tabId });
+        return prev;
+      }
+
+      const oldValue = prev.tabs[tabIndex].visionEnabled || false;
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], visionEnabled: !oldValue };
+      
+      logger.tabs('Tab Vision toggled', { 
+        tabId, 
+        oldValue, 
+        newValue: !oldValue 
+      });
+      
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
+  /**
    * Toggle light/dark mode for a tab
    * @param {string} tabId - ID of tab to update
    */
@@ -578,6 +611,7 @@ export function useTabManager(initialShellConfig) {
     updateTabColorTheme,
     toggleTabAutoRespond,
     toggleTabAM,
+    toggleTabVision,
     toggleTabMode,
     updateTabDirectory,
     reorderTabs,

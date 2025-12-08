@@ -29,13 +29,26 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleMode, isWaiting = false, mode = 'dark', devMode = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleVision, onToggleMode, isWaiting = false, mode = 'dark', devMode = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const inputRef = useRef(null);
   const contextMenuRef = useRef(null);
+
+  // Debug: Log when context menu opens
+  useEffect(() => {
+    if (showContextMenu) {
+      console.log('[Tab] Context menu opened:', { 
+        devMode, 
+        hasOnToggleVision: !!onToggleVision,
+        hasOnToggleAM: !!onToggleAM,
+        tabId: tab.id,
+        visionEnabled: tab.visionEnabled
+      });
+    }
+  }, [showContextMenu, devMode, onToggleVision, onToggleAM, tab.id, tab.visionEnabled]);
 
   const handleClick = (e) => {
     // Don't trigger onClick if clicking close button or in edit mode
@@ -223,6 +236,18 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             >
               <BookOpen size={14} />
               AM Logging {tab.amEnabled ? '✓' : ''}
+            </button>
+          )}
+          {devMode && onToggleVision && (
+            <button 
+              onClick={() => { 
+                setShowContextMenu(false); 
+                if (onToggleVision) onToggleVision(); 
+              }}
+              className={tab.visionEnabled ? 'active' : ''}
+            >
+              <Terminal size={14} />
+              Forge Vision {tab.visionEnabled ? '✓' : ''}
             </button>
           )}
           <button 

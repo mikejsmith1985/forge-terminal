@@ -2,6 +2,7 @@
 package am
 
 import (
+	"crypto/md5"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -205,11 +206,18 @@ func (l *Logger) GetLogPath() string {
 
 // SessionInfo represents info about a recoverable session.
 type SessionInfo struct {
-	TabID       string    `json:"tabId"`
-	FilePath    string    `json:"filePath"`
-	FileName    string    `json:"fileName"`
-	LastUpdated time.Time `json:"lastUpdated"`
-	Content     string    `json:"content"`
+	TabID           string    `json:"tabId"`
+	TabName         string    `json:"tabName"`
+	Workspace       string    `json:"workspace"`
+	FilePath        string    `json:"filePath"`
+	FileName        string    `json:"fileName"`
+	LastUpdated     time.Time `json:"lastUpdated"`
+	Content         string    `json:"content"`
+	LastCommand     string    `json:"lastCommand"`
+	Provider        string    `json:"provider"`
+	ActiveCount     int       `json:"activeCount"`
+	DurationMinutes int       `json:"durationMinutes"`
+	SessionID       string    `json:"sessionId"`
 }
 
 // CheckForRecoverableSessions looks for interrupted sessions.
@@ -249,12 +257,46 @@ func CheckForRecoverableSessions() ([]SessionInfo, error) {
 				tabID = tabID[:idx]
 			}
 
+			// Parse the session log to extract context
+			sessionLog, err := parseSessionLogContent(contentStr)
+			var tabName, workspace, lastCmd, provider string
+			var duration, convCount int
+			var sessionID string
+
+			if err == nil && sessionLog != nil {
+				tabName = sessionLog.TabName
+				workspace = sessionLog.Workspace
+				lastCmd = extractLastCommand(sessionLog.Entries)
+				duration = calculateSessionDuration(sessionLog.StartTime, sessionLog.LastUpdated)
+				convCount = extractConversationCount(sessionLog.Entries)
+				sessionID = generateSessionID(sessionLog.TabID, workspace)
+
+				// Extract provider
+				for _, entry := range sessionLog.Entries {
+					if strings.Contains(strings.ToLower(entry.Content), "copilot") {
+						provider = "copilot"
+						break
+					}
+					if strings.Contains(strings.ToLower(entry.Content), "claude") {
+						provider = "claude"
+						break
+					}
+				}
+			}
+
 			sessions = append(sessions, SessionInfo{
-				TabID:       tabID,
-				FilePath:    filePath,
-				FileName:    entry.Name(),
-				LastUpdated: info.ModTime(),
-				Content:     contentStr,
+				TabID:           tabID,
+				TabName:         tabName,
+				Workspace:       workspace,
+				FilePath:        filePath,
+				FileName:        entry.Name(),
+				LastUpdated:     info.ModTime(),
+				Content:         contentStr,
+				LastCommand:     lastCmd,
+				Provider:        provider,
+				ActiveCount:     convCount,
+				DurationMinutes: duration,
+				SessionID:       sessionID,
 			})
 		}
 	}
@@ -404,4 +446,238 @@ type EnableRequest struct {
 type RecoveryInfo struct {
 	HasRecoverable bool          `json:"hasRecoverable"`
 	Sessions       []SessionInfo `json:"sessions"`
+}
+
+// RecoveryInfoGrouped represents grouped session recovery information by workspace.
+type RecoveryInfoGrouped struct {
+	HasRecoverable bool            `json:"hasRecoverable"`
+	Groups         []SessionGroup  `json:"groups"`
+	TotalSessions  int             `json:"totalSessions"`
+}
+
+// extractLastCommand finds the most recent command executed in the log entries.
+func extractLastCommand(entries []LogEntry) string {
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].Type == EntryCommandExecuted {
+			return entries[i].Content
+		}
+	}
+	return ""
+}
+
+// calculateSessionDuration returns the session duration in minutes.
+func calculateSessionDuration(startTime, lastUpdated time.Time) int {
+	duration := lastUpdated.Sub(startTime)
+	minutes := int(duration.Minutes())
+	return minutes
+}
+
+// extractConversationCount counts LLM_START events in the entries.
+func extractConversationCount(entries []LogEntry) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.Type == "LLM_START" {
+			count++
+		}
+	}
+	return count
+}
+
+// generateSessionID creates a unique session ID from tab ID and workspace.
+func generateSessionID(tabID, workspace string) string {
+	input := fmt.Sprintf("%s:%s", tabID, workspace)
+	hash := md5.Sum([]byte(input))
+	return fmt.Sprintf("%s-%x", tabID[:len(tabID)/2], hash[:4])
+}
+
+// sessionInfoFromLog converts a SessionLog to SessionInfo with extracted context.
+func sessionInfoFromLog(log *SessionLog) (*SessionInfo, error) {
+	if log == nil {
+		return nil, fmt.Errorf("session log is nil")
+	}
+
+	lastCmd := extractLastCommand(log.Entries)
+	duration := calculateSessionDuration(log.StartTime, log.LastUpdated)
+	convCount := extractConversationCount(log.Entries)
+	sessionID := generateSessionID(log.TabID, log.Workspace)
+
+	// Extract provider from entries (default to empty if not found)
+	provider := ""
+	for _, entry := range log.Entries {
+		if strings.Contains(strings.ToLower(entry.Content), "copilot") {
+			provider = "copilot"
+			break
+		}
+		if strings.Contains(strings.ToLower(entry.Content), "claude") {
+			provider = "claude"
+			break
+		}
+	}
+
+	info := &SessionInfo{
+		TabID:           log.TabID,
+		TabName:         log.TabName,
+		Workspace:       log.Workspace,
+		FilePath:        "",
+		FileName:        "",
+		LastUpdated:     log.LastUpdated,
+		Content:         "",
+		LastCommand:     lastCmd,
+		Provider:        provider,
+		ActiveCount:     convCount,
+		DurationMinutes: duration,
+		SessionID:       sessionID,
+	}
+
+	return info, nil
+}
+
+// SessionGroup represents recoverable sessions grouped by workspace.
+type SessionGroup struct {
+	Workspace string         `json:"workspace"`
+	Sessions  []SessionInfo  `json:"sessions"`
+	Latest    SessionInfo    `json:"latest"`
+	Count     int            `json:"count"`
+}
+
+// parseSessionLogContent parses the markdown content of a session log file.
+func parseSessionLogContent(content string) (*SessionLog, error) {
+	lines := strings.Split(content, "\n")
+	if len(lines) < 10 {
+		return nil, fmt.Errorf("invalid session log format")
+	}
+
+	log := &SessionLog{
+		Entries: []LogEntry{},
+	}
+
+	// Parse the metadata table (lines 2-9)
+	for i := 3; i < len(lines) && i < 10; i++ {
+		line := strings.TrimSpace(lines[i])
+		if !strings.Contains(line, "|") {
+			continue
+		}
+
+		parts := strings.Split(line, "|")
+		if len(parts) < 3 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[1])
+		value := strings.TrimSpace(parts[2])
+
+		switch key {
+		case "Tab ID":
+			log.TabID = value
+		case "Tab Name":
+			log.TabName = value
+		case "Workspace":
+			log.Workspace = value
+		case "Session Start":
+			t, err := time.Parse(time.RFC3339, value)
+			if err == nil {
+				log.StartTime = t
+			}
+		case "Last Updated":
+			t, err := time.Parse(time.RFC3339, value)
+			if err == nil {
+				log.LastUpdated = t
+			}
+		}
+	}
+
+	// Parse entries from the content
+	inActivity := false
+	currentEntry := ""
+	entryType := ""
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Detect activity markers
+		if strings.HasPrefix(trimmed, "###") && strings.Contains(trimmed, "[") {
+			// Save previous entry if exists
+			if entryType != "" && currentEntry != "" {
+				log.Entries = append(log.Entries, LogEntry{
+					Type:    LogEntryType(entryType),
+					Content: strings.TrimSpace(currentEntry),
+				})
+			}
+
+			// Parse new entry
+			if strings.Contains(trimmed, "[USER_INPUT]") {
+				entryType = "USER_INPUT"
+				inActivity = true
+			} else if strings.Contains(trimmed, "[AGENT_OUTPUT]") {
+				entryType = "AGENT_OUTPUT"
+				inActivity = true
+			} else if strings.Contains(trimmed, "[COMMAND_EXECUTED]") {
+				entryType = "COMMAND_EXECUTED"
+				inActivity = true
+			} else if strings.Contains(trimmed, "[LLM_START]") {
+				entryType = "LLM_START"
+				inActivity = true
+			} else if strings.Contains(trimmed, "[LLM_END]") {
+				entryType = "LLM_END"
+				inActivity = true
+			} else {
+				inActivity = false
+			}
+
+			currentEntry = ""
+		} else if inActivity && trimmed != "" && !strings.HasPrefix(trimmed, "###") {
+			currentEntry += line + "\n"
+		}
+	}
+
+	// Save last entry
+	if entryType != "" && currentEntry != "" {
+		log.Entries = append(log.Entries, LogEntry{
+			Type:    LogEntryType(entryType),
+			Content: strings.TrimSpace(currentEntry),
+		})
+	}
+
+	return log, nil
+}
+
+// GroupSessionsByWorkspace groups sessions by their workspace (exported for API use).
+func GroupSessionsByWorkspace(sessions []SessionInfo) []SessionGroup {
+	// Group by workspace
+	groups := make(map[string][]SessionInfo)
+	for _, session := range sessions {
+		groups[session.Workspace] = append(groups[session.Workspace], session)
+	}
+
+	// Create result with sorted workspaces
+	result := make([]SessionGroup, 0, len(groups))
+	workspaces := make([]string, 0, len(groups))
+	for workspace := range groups {
+		workspaces = append(workspaces, workspace)
+	}
+
+	// Sort workspaces for consistent order
+	for _, workspace := range workspaces {
+		sessionList := groups[workspace]
+
+		// Find latest session
+		var latest SessionInfo
+		var latestTime time.Time
+		for _, session := range sessionList {
+			if session.LastUpdated.After(latestTime) {
+				latestTime = session.LastUpdated
+				latest = session
+			}
+		}
+
+		group := SessionGroup{
+			Workspace: workspace,
+			Sessions:  sessionList,
+			Latest:    latest,
+			Count:     len(sessionList),
+		}
+		result = append(result, group)
+	}
+
+	return result
 }

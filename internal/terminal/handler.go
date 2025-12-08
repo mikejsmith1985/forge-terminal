@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
+	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
 
 // Custom WebSocket close codes (4000-4999 range is for application use)
@@ -33,6 +34,19 @@ type ResizeMessage struct {
 	Type string `json:"type"`
 	Cols uint16 `json:"cols"`
 	Rows uint16 `json:"rows"`
+}
+
+// VisionControlMessage represents vision control commands from client.
+type VisionControlMessage struct {
+	Type    string `json:"type"` // "VISION_ENABLE", "VISION_DISABLE", "INJECT_COMMAND"
+	Command string `json:"command,omitempty"`
+}
+
+// VisionOverlayMessage represents vision overlay data sent to client.
+type VisionOverlayMessage struct {
+	Type        string                 `json:"type"` // "VISION_OVERLAY"
+	OverlayType string                 `json:"overlayType"`
+	Payload     map[string]interface{} `json:"payload"`
 }
 
 // NewHandler creates a new terminal WebSocket handler.
@@ -93,6 +107,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Set initial terminal size (default 80x24)
 	_ = session.Resize(80, 24)
 
+	// Initialize Vision parser (disabled by default, enabled via Dev Mode)
+	visionRegistry := vision.NewRegistry()
+	visionParser := vision.NewParser(8192, visionRegistry) // 8KB buffer
+	log.Printf("[Terminal] Vision parser initialized for session %s (disabled by default)", sessionID)
+
 	// Get LLM logger for this session (will be used if LLM commands detected)
 	// CRITICAL: Use tabID (not sessionID) so command card triggers match this logger
 	amSystem := am.GetSystem()
@@ -152,7 +171,21 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if n > 0 {
-				// Send output to browser
+				// Vision: Feed data to parser (non-blocking, async detection)
+				if match := visionParser.Feed(buf[:n]); match != nil {
+					log.Printf("[Vision] Detected pattern: %s", match.Type)
+					// Send overlay message to frontend (JSON text message)
+					overlayMsg := VisionOverlayMessage{
+						Type:        "VISION_OVERLAY",
+						OverlayType: match.Type,
+						Payload:     match.Payload,
+					}
+					if err := conn.WriteJSON(overlayMsg); err != nil {
+						log.Printf("[Vision] Failed to send overlay: %v", err)
+					}
+				}
+
+				// Send output to browser (binary message - unchanged)
 				err = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
 				if err != nil {
 					log.Printf("[Terminal] WebSocket write error: %v", err)
@@ -188,6 +221,29 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 						log.Printf("[Terminal] Resize error: %v", err)
 					} else {
 						log.Printf("[Terminal] Resized to %dx%d", msg.Cols, msg.Rows)
+					}
+					continue
+				}
+
+				// Check for Vision control messages
+				var visionMsg VisionControlMessage
+				if err := json.Unmarshal(data, &visionMsg); err == nil {
+					switch visionMsg.Type {
+					case "VISION_ENABLE":
+						visionParser.SetEnabled(true)
+						log.Printf("[Vision] Enabled for session %s", sessionID)
+					case "VISION_DISABLE":
+						visionParser.SetEnabled(false)
+						visionParser.Clear()
+						log.Printf("[Vision] Disabled for session %s", sessionID)
+					case "INJECT_COMMAND":
+						// Execute command in PTY (like git add <file>)
+						if visionMsg.Command != "" {
+							log.Printf("[Vision] Injecting command: %s", visionMsg.Command)
+							if _, err := session.Write([]byte(visionMsg.Command + "\r")); err != nil {
+								log.Printf("[Vision] Command injection error: %v", err)
+							}
+						}
 					}
 					continue
 				}
