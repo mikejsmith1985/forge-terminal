@@ -61,7 +61,11 @@ func main() {
 	assistantCore := assistant.NewCore(amSystem)
 	log.Printf("[Assistant] Core initialized")
 
-	termHandler := terminal.NewHandler(assistantCore)
+	// Wrap core in LocalService (v1 implementation)
+	assistantService := assistant.NewLocalService(assistantCore)
+	log.Printf("[Assistant] LocalService initialized")
+
+	termHandler := terminal.NewHandler(assistantService, assistantCore)
 	http.HandleFunc("/ws", termHandler.HandleWebSocket)
 
 	// Commands API

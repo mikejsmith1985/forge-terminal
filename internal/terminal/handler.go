@@ -27,6 +27,7 @@ type Handler struct {
 	upgrader      websocket.Upgrader
 	sessions      sync.Map // map[string]*TerminalSession
 	assistantCore *assistant.Core
+	assistant     assistant.Service
 }
 
 // ResizeMessage represents a terminal resize request from the client.
@@ -50,7 +51,7 @@ type VisionOverlayMessage struct {
 }
 
 // NewHandler creates a new terminal WebSocket handler.
-func NewHandler(core *assistant.Core) *Handler {
+func NewHandler(service assistant.Service, core *assistant.Core) *Handler {
 	return &Handler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -60,6 +61,7 @@ func NewHandler(core *assistant.Core) *Handler {
 			WriteBufferSize: 1024,
 		},
 		assistantCore: core,
+		assistant:     service,
 	}
 }
 
