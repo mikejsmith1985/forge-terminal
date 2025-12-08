@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
+	"github.com/mikejsmith1985/forge-terminal/internal/assistant"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
@@ -49,7 +50,18 @@ func main() {
 	})
 
 	// WebSocket terminal handler
-	termHandler := terminal.NewHandler()
+	// Run AM cleanup on startup and initialize AM system
+	go am.CleanupOldLogs()
+	amSystem := am.InitSystem(am.DefaultAMDir())
+	if err := amSystem.Start(); err != nil {
+		log.Printf("[AM] Failed to start AM system: %v", err)
+	}
+
+	// Initialize assistant core with AM system
+	assistantCore := assistant.NewCore(amSystem)
+	log.Printf("[Assistant] Core initialized")
+
+	termHandler := terminal.NewHandler(assistantCore)
 	http.HandleFunc("/ws", termHandler.HandleWebSocket)
 
 	// Commands API
@@ -109,13 +121,6 @@ func main() {
 	http.HandleFunc("/api/files/write", files.HandleWrite)
 	http.HandleFunc("/api/files/delete", files.HandleDelete)
 	http.HandleFunc("/api/files/stream", files.HandleReadStream)
-
-	// Run AM cleanup on startup and initialize AM system
-	go am.CleanupOldLogs()
-	amSystem := am.InitSystem(am.DefaultAMDir())
-	if err := amSystem.Start(); err != nil {
-		log.Printf("[AM] Failed to start AM system: %v", err)
-	}
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()

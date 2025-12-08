@@ -12,8 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
-	"github.com/mikejsmith1985/forge-terminal/internal/llm"
-	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
+	"github.com/mikejsmith1985/forge-terminal/internal/assistant"
 )
 
 // Custom WebSocket close codes (4000-4999 range is for application use)
@@ -25,8 +24,9 @@ const (
 
 // Handler manages WebSocket terminal connections.
 type Handler struct {
-	upgrader websocket.Upgrader
-	sessions sync.Map // map[string]*TerminalSession
+	upgrader      websocket.Upgrader
+	sessions      sync.Map // map[string]*TerminalSession
+	assistantCore *assistant.Core
 }
 
 // ResizeMessage represents a terminal resize request from the client.
@@ -50,7 +50,7 @@ type VisionOverlayMessage struct {
 }
 
 // NewHandler creates a new terminal WebSocket handler.
-func NewHandler() *Handler {
+func NewHandler(core *assistant.Core) *Handler {
 	return &Handler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -59,6 +59,7 @@ func NewHandler() *Handler {
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
+		assistantCore: core,
 	}
 }
 
@@ -107,14 +108,13 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Set initial terminal size (default 80x24)
 	_ = session.Resize(80, 24)
 
-	// Initialize Vision parser (disabled by default, enabled via Dev Mode)
-	visionRegistry := vision.NewRegistry()
-	visionParser := vision.NewParser(8192, visionRegistry) // 8KB buffer
+	// Get Vision parser from assistant core
+	visionParser := h.assistantCore.GetVisionParser()
 	log.Printf("[Terminal] Vision parser initialized for session %s (disabled by default)", sessionID)
 
 	// Get LLM logger for this session (will be used if LLM commands detected)
 	// CRITICAL: Use tabID (not sessionID) so command card triggers match this logger
-	amSystem := am.GetSystem()
+	amSystem := h.assistantCore.GetAMSystem()
 	var llmLogger *am.LLMLogger
 	if amSystem != nil {
 		llmLogger = amSystem.GetLLMLogger(tabID)
@@ -124,7 +124,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			amSystem.HealthMonitor.RecordPTYHeartbeat()
 		}
 	}
-	detector := llm.NewDetector()
+	detector := h.assistantCore.GetLLMDetector()
 	log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
 	var inputBuffer strings.Builder
 	const flushTimeout = 2 * time.Second
