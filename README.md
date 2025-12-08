@@ -39,7 +39,6 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 ### Quality of Life
 - **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./am/` directory.
 - **🔄 Auto-Updates**: Automatic update checking with one-click installation.
-- **⚠️ Release watcher deprecated**: Handshake orchestration removed; this repository no longer requires the release watcher. Manual or CI-driven handshake sync remains available.
 - **📜 Version History**: View and rollback to previous versions.
 - **🤖 Auto-Respond**: Auto-respond to CLI confirmation prompts (per-tab toggle).
 - **📍 Scroll to Bottom**: Quick button to jump to latest output.

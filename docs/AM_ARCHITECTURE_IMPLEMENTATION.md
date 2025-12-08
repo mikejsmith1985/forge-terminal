@@ -16,8 +16,8 @@ Executive summary
 
 Release watcher deprecation
 ---------------------------
-- The release watcher and handshake orchestration have been deprecated and removed; AM no longer depends on the release watcher or the FORGE_HANDSHAKE.md.
-- Scripts related to the release watcher have been disabled or replaced with deprecation stubs (see scripts/watch-releases.sh and watcher-status.sh).
+- The release watcher has been deprecated and removed.
+- AM no longer depends on release polling.
 
 Quick commands
 --------------
@@ -99,7 +99,7 @@ Known failure modes and fixes
 
 Release watcher (deprecated)
 ----------------------------
-- The release watcher and handshake orchestration are deprecated and removed. AM no longer depends on FORGE_HANDSHAKE.md or release polling. This document last updated: 2025-12-07T20:24:16.018Z.
+- The release watcher and handshake orchestration are deprecated and removed. AM no longer depends on release polling. This document last updated: 2025-12-07T20:24:16.018Z.
 
 Testing and verification steps (recommended)
 -------------------------------------------

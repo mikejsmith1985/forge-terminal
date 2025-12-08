@@ -8,7 +8,7 @@
 
 ## How It Works (Zero Configuration)
 
-> ⚠️ Note: The release watcher and heartbeat handshake orchestration have been deprecated and removed from the repository. AM no longer depends on FORGE_HANDSHAKE.md or any background release-watcher process.
+> ⚠️ Note: The release watcher has been deprecated and removed from the repository.
 
 ### **What Happens Automatically:**
 

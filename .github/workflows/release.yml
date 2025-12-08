@@ -93,17 +93,6 @@ jobs:
           echo "ℹ️  Ad-hoc signed for development."
           echo "For production builds with Developer ID: see docs/developer/MACOS_FORK_SETUP.md"
 
-      - name: Generate Handshake Document
-        run: |
-          chmod +x scripts/generate-handshake.sh
-          ./scripts/generate-handshake.sh
-
-      - name: Validate Handshake Document
-        continue-on-error: true  # Don't fail macOS build if validation has issues
-        run: |
-          chmod +x scripts/validate-handshake.sh
-          ./scripts/validate-handshake.sh
-
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
@@ -113,5 +102,4 @@ jobs:
             bin/forge-windows-amd64.exe
             bin/forge-darwin-amd64
             bin/forge-darwin-arm64
-            FORGE_HANDSHAKE.md
           generate_release_notes: true

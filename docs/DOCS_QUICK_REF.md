@@ -9,10 +9,9 @@
 
 ## 📂 Where Things Go Now
 
-### Root Directory (3 files only)
+### Root Directory (2 files only)
 - `README.md` - Main readme
-- `PROJECT_CHARTER.md` - Project vision  
-- `FORGE_HANDSHAKE.md` - Auto-generated
+- `PROJECT_CHARTER.md` - Project vision
 
 ### docs/user/ (User documentation)
 - Guides for end users
@@ -88,7 +87,7 @@ FEATURE_X_QUICK_REF.md
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Root markdown files | 33 | 3 |
+| Root markdown files | 33 | 2 |
 | Clutter | 😵 | 😊 |
 | Copilot guidance | None | Automatic |
 | Git pollution | All committed | Sessions gitignored |

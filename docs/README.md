@@ -77,7 +77,6 @@ scripts/cleanup-session-docs.sh 14  # Clean docs older than 14 days
 Only these files remain in the project root:
 - `README.md` - Main project readme
 - `PROJECT_CHARTER.md` - Project vision and goals
-- `FORGE_HANDSHAKE.md` - Auto-generated orchestrator handshake
 
 All other documentation belongs in this `docs/` directory.
 
