@@ -531,7 +531,11 @@ awk -v endpoints="$(<"$API_ENDPOINTS_FILE")" '
 
 # Update datestamp at bottom
 DATESTAMP=$(date -u +"%Y-%m-%d")
-sed -i '' "s/DATESTAMP_PLACEHOLDER/$DATESTAMP/g" "$OUTPUT_FILE"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s/DATESTAMP_PLACEHOLDER/$DATESTAMP/g" "$OUTPUT_FILE"
+else
+    sed -i "s/DATESTAMP_PLACEHOLDER/$DATESTAMP/g" "$OUTPUT_FILE"
+fi
 
 # Cleanup
 rm -f "$API_ENDPOINTS_FILE"
