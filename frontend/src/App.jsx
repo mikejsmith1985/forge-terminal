@@ -15,6 +15,7 @@ import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import MonacoEditor from './components/MonacoEditor'
 import AMMonitor from './components/AMMonitor'
+import AssistantPanel from './components/AssistantPanel/AssistantPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -61,7 +62,7 @@ function App() {
   const [waitingTabs, setWaitingTabs] = useState({})
   
   // File explorer and editor state
-  const [sidebarView, setSidebarView] = useState('cards') // 'cards' or 'files'
+  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', or 'assistant'
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   
@@ -1010,13 +1011,20 @@ function App() {
           <Command size={16} />
           Cards
         </button>
+        <button 
+          className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
+          onClick={() => setSidebarView('files')}
+        >
+          <Folder size={16} />
+          Files
+        </button>
         {devMode && (
           <button 
-            className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
-            onClick={() => setSidebarView('files')}
+            className={`sidebar-view-tab ${sidebarView === 'assistant' ? 'active' : ''}`}
+            onClick={() => setSidebarView('assistant')}
           >
-            <Folder size={16} />
-            Files
+            <MessageSquare size={16} />
+            Assistant
           </button>
         )}
       </div>
@@ -1030,10 +1038,15 @@ function App() {
               <Plus size={16} /> Add
             </button>
           </>
-        ) : (
+        ) : sidebarView === 'files' ? (
           <>
             <h3>📁 Files</h3>
             <span className="sidebar-path-hint">{activeTab?.currentDirectory ? getFolderNameFromPath(activeTab.currentDirectory) : 'Root'}</span>
+          </>
+        ) : (
+          <>
+            <h3>🤖 AI Assistant</h3>
+            <span className="sidebar-path-hint">Local Ollama</span>
           </>
         )}
       </div>
@@ -1130,7 +1143,7 @@ function App() {
         />
       )}
 
-      {/* Content area - Cards or Files */}
+      {/* Content area - Cards, Files, or Assistant */}
       <div className="sidebar-content">
         {sidebarView === 'cards' ? (
           <DndContext
@@ -1149,13 +1162,19 @@ function App() {
               onRetry={loadCommands}
             />
           </DndContext>
-        ) : (
+        ) : sidebarView === 'files' ? (
           <FileExplorer
             currentPath={activeTab?.currentDirectory}
             rootPath={activeTab?.currentDirectory}
             onFileOpen={handleFileOpen}
             terminalRef={getActiveTerminalRef()}
             shellConfig={activeTab?.shellConfig || shellConfig}
+          />
+        ) : (
+          <AssistantPanel
+            isOpen={true}
+            onClose={() => setSidebarView('cards')}
+            currentTabId={activeTabId}
           />
         )}
       </div>

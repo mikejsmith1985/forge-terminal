@@ -54,9 +54,9 @@ func (s *LocalService) Chat(ctx context.Context, req *ChatRequest) (*ChatRespons
 	// Get terminal context if requested
 	var termCtx *TerminalContext
 	if req.IncludeContext {
-		ctx, err := s.GetContext(ctx, req.TabID)
+		termCtxResult, err := s.GetContext(ctx, req.TabID)
 		if err == nil {
-			termCtx = ctx
+			termCtx = termCtxResult
 		}
 	}
 

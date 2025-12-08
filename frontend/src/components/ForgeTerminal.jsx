@@ -7,7 +7,6 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
-import AssistantPanel from './AssistantPanel/AssistantPanel';
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -385,10 +384,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [activeVisionOverlay, setActiveVisionOverlay] = useState(null);
   const visionEnabledRef = useRef(visionEnabled);
 
-  // Assistant state
-  const [assistantPanelOpen, setAssistantPanelOpen] = useState(false);
-  const assistantEnabledRef = useRef(assistantEnabled);
-
   // Keep autoRespond ref updated
   useEffect(() => {
     autoRespondRef.current = autoRespond;
@@ -437,15 +432,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       setActiveVisionOverlay(null);
     }
   }, [visionEnabled, tabId]);
-
-  // Keep assistantEnabled ref updated
-  useEffect(() => {
-    assistantEnabledRef.current = assistantEnabled;
-    // Auto-open panel when enabled
-    if (assistantEnabled && !assistantPanelOpen) {
-      setAssistantPanelOpen(true);
-    }
-  }, [assistantEnabled, assistantPanelOpen]);
 
   // Refit terminal when becoming visible
   useEffect(() => {
@@ -1210,15 +1196,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           activeOverlay={activeVisionOverlay}
           onAction={handleVisionAction}
           onDismiss={handleVisionDismiss}
-        />
-      )}
-
-      {/* Assistant Panel (Dev Mode only) */}
-      {assistantEnabled && (
-        <AssistantPanel
-          isOpen={assistantPanelOpen}
-          onClose={() => setAssistantPanelOpen(false)}
-          currentTabId={tabId}
         />
       )}
       

@@ -107,7 +107,7 @@ const FeedbackModal = ({ isOpen, onClose }) => {
             setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
         } catch (err) {
             console.error('Paste failed:', err);
-            setStatus({ type: 'error', msg: 'Failed to paste. Try Ctrl+V instead.' });
+            setStatus({ type: 'error', msg: 'Failed to paste. Try Ctrl+v instead.' });
             setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
         }
     };
@@ -169,7 +169,7 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                 body += `<img src="${url}">\n\n`;
             });
         } else {
-            body += `**Screenshot**\n> 📋 **Paste Screenshot Here**\n> The screenshot is in your clipboard. Please press **Ctrl+V** (or Cmd+V) to attach it.\n\n`;
+            body += `**Screenshot**\n> 📋 **Paste Screenshot Here**\n> The screenshot is in your clipboard. Please press **Ctrl+v** (or Cmd+V) to attach it.\n\n`;
         }
 
         body += `**Environment**\n- User Agent: ${navigator.userAgent}\n- Time: ${new Date().toISOString()}\n\n`;
@@ -358,7 +358,7 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                                     }}>
                                         <ImageIcon size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
                                         <p style={{ margin: '0 0 8px 0', fontSize: '0.9em' }}>
-                                            Press <kbd>Ctrl+V</kbd> to paste screenshot
+                                            Press <kbd>Ctrl+v</kbd> to paste screenshot
                                         </p>
                                         <p style={{ margin: 0, fontSize: '0.85em', color: '#666' }}>
                                             or use the buttons above
