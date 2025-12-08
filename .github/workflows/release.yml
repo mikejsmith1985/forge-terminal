@@ -12,7 +12,14 @@ permissions:
 jobs:
   build-and-release:
     name: Build and Release
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            targets: linux-amd64,windows-amd64
+          - os: macos-latest
+            targets: darwin-amd64,darwin-arm64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,7 +51,8 @@ jobs:
           npm install
           npm run build
 
-      - name: Build Binaries
+      - name: Build Linux and Windows Binaries
+        if: matrix.os == 'ubuntu-latest'
         env:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
@@ -55,10 +63,35 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-linux-amd64 ./cmd/forge
           # Windows AMD64 (GUI mode - no console window)
           GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS -H windowsgui" -o bin/forge-windows-amd64.exe ./cmd/forge
+
+      - name: Build macOS Binaries
+        if: matrix.os == 'macos-latest'
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          mkdir -p bin
+          LDFLAGS="-X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=${VERSION}"
+          
           # macOS AMD64
           GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-darwin-amd64 ./cmd/forge
           # macOS ARM64
           GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/forge-darwin-arm64 ./cmd/forge
+
+      - name: Ad-hoc Sign macOS Binaries (Development)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Ad-hoc sign binaries for development
+          # Production builds with Developer ID cert can be created by users via fork
+          /usr/bin/codesign --force --options runtime -s - bin/forge-darwin-amd64
+          /usr/bin/codesign --force --options runtime -s - bin/forge-darwin-arm64
+          
+          # Verify signatures
+          codesign -v bin/forge-darwin-amd64
+          codesign -v bin/forge-darwin-arm64
+          
+          echo ""
+          echo "ℹ️  Ad-hoc signed for development."
+          echo "For production builds with Developer ID: see docs/developer/MACOS_FORK_SETUP.md"
 
       - name: Generate Handshake Document
         run: |
@@ -71,6 +104,7 @@ jobs:
           ./scripts/validate-handshake.sh
 
       - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: |

@@ -70,6 +70,19 @@ chmod +x forge-darwin-*
 ./forge-darwin-arm64
 ```
 
+> **⚠️ macOS Gatekeeper Security Warning**
+>
+> **"Cannot verify developer" error?** This is normal—the binary needs code signing. Choose one:
+> 
+> **Quick Fix** (Recommended):
+> 1. **Right-click** the binary → **Open** → **Open** in the security dialog
+> 2. Or use Terminal: `xattr -d com.apple.quarantine ./forge-darwin-arm64 && ./forge-darwin-arm64`
+>
+> **Full Solution** (No warnings on future updates):
+> - Fork the repository and set up code signing with your own Apple Developer ID
+> - See [Fork & Self-Sign Guide](docs/developer/macos-fork-setup.md) for instructions
+> - Once configured, your releases will be automatically notarized
+
 ### Linux
 Download `forge-linux-amd64`.
 ```bash
