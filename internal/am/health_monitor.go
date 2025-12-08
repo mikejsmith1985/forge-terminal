@@ -193,10 +193,14 @@ func (hm *HealthMonitor) GetMetrics() *HealthMetrics {
 
 func (hm *HealthMonitor) computeOverallStatus() string {
 	operational := 0
+	totalRelevant := 0
+	
 	for layerID, status := range hm.layers {
-		if layerID == 5 {
+		// Skip Layer 5 (self) and Layer 2 (Shell Hooks - requires manual install)
+		if layerID == 5 || layerID == 2 {
 			continue
 		}
+		totalRelevant++
 		if status.Status == "HEALTHY" {
 			operational++
 		}
@@ -204,9 +208,9 @@ func (hm *HealthMonitor) computeOverallStatus() string {
 
 	if operational == 0 {
 		return "CRITICAL"
-	} else if operational < 2 {
+	} else if operational == 1 {
 		return "DEGRADED"
-	} else if operational < hm.metrics.LayersTotal-1 {
+	} else if operational < totalRelevant {
 		return "WARNING"
 	}
 	return "HEALTHY"

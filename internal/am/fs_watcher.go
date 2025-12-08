@@ -49,12 +49,24 @@ func (fw *FSWatcher) Start(ctx context.Context) {
 		Timestamp: time.Now(),
 	})
 
+	// Periodic heartbeat ticker
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			fw.watcher.Close()
 			log.Printf("[FS Layer 4] Shutting down")
 			return
+
+		case <-ticker.C:
+			// Send periodic heartbeat even without file activity
+			EventBus.Publish(&LayerEvent{
+				Type:      "HEARTBEAT",
+				Layer:     4,
+				Timestamp: time.Now(),
+			})
 
 		case event, ok := <-fw.watcher.Events:
 			if !ok {

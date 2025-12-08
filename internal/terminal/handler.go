@@ -110,6 +110,23 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	done := make(chan struct{})
 	var closeOnce sync.Once
 
+	// Layer 1: PTY Heartbeat - Send periodic heartbeats for health monitoring
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		
+		for {
+			select {
+			case <-ticker.C:
+				if amSystem != nil && amSystem.HealthMonitor != nil {
+					amSystem.HealthMonitor.RecordPTYHeartbeat()
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+
 	// PTY -> WebSocket (read from terminal, send to browser)
 	go func() {
 		defer closeOnce.Do(func() { close(done) })
