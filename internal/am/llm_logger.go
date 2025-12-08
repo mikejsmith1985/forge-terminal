@@ -54,17 +54,23 @@ func GetLLMLogger(tabID string, amDir string) *LLMLogger {
 	llmLoggersMu.Lock()
 	defer llmLoggersMu.Unlock()
 
+	log.Printf("[LLM Logger] GetLLMLogger called for tab '%s'", tabID)
+	log.Printf("[LLM Logger] Global logger map size: %d", len(llmLoggers))
+
 	if logger, exists := llmLoggers[tabID]; exists {
+		log.Printf("[LLM Logger] ✓ Found existing logger for tab %s (conversations=%d)", tabID, len(logger.conversations))
 		return logger
 	}
 
+	log.Printf("[LLM Logger] Creating NEW logger for tab %s", tabID)
 	logger := &LLMLogger{
 		tabID:         tabID,
 		conversations: make(map[string]*LLMConversation),
 		amDir:         amDir,
 	}
 	llmLoggers[tabID] = logger
-	log.Printf("[LLM Logger] Created logger for tab %s", tabID)
+	log.Printf("[LLM Logger] ✓ Logger created and registered for tab %s", tabID)
+	log.Printf("[LLM Logger] Global logger map size now: %d", len(llmLoggers))
 	return logger
 }
 
@@ -80,7 +86,16 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	log.Printf("[LLM Logger] ═══ START CONVERSATION ═══")
+	log.Printf("[LLM Logger] TabID: %s", l.tabID)
+	log.Printf("[LLM Logger] Provider: %s, Type: %s", detected.Provider, detected.Type)
+	log.Printf("[LLM Logger] RawInput: '%s'", detected.RawInput)
+	log.Printf("[LLM Logger] Prompt: '%s'", detected.Prompt)
+	log.Printf("[LLM Logger] Current conversation map size: %d", len(l.conversations))
+	log.Printf("[LLM Logger] Current active conversation: '%s'", l.activeConvID)
+
 	convID := fmt.Sprintf("conv-%d", time.Now().UnixNano())
+	log.Printf("[LLM Logger] Generated new conversation ID: '%s'", convID)
 
 	conv := &LLMConversation{
 		ConversationID: convID,
@@ -91,23 +106,38 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 		Turns:          []ConversationTurn{},
 		Complete:       false,
 	}
+	log.Printf("[LLM Logger] Created conversation struct")
 
 	if detected.Prompt != "" {
+		log.Printf("[LLM Logger] Adding initial user turn with prompt: '%s'", detected.Prompt)
 		conv.Turns = append(conv.Turns, ConversationTurn{
 			Role:      "user",
 			Content:   detected.Prompt,
 			Timestamp: time.Now(),
 			Provider:  string(detected.Provider),
 		})
+		log.Printf("[LLM Logger] Initial turn added, total turns: %d", len(conv.Turns))
+	} else {
+		log.Printf("[LLM Logger] No initial prompt provided")
 	}
 
+	log.Printf("[LLM Logger] Adding conversation to map with key '%s'", convID)
 	l.conversations[convID] = conv
+	log.Printf("[LLM Logger] ✓ Conversation added to map, new size: %d", len(l.conversations))
+	
+	log.Printf("[LLM Logger] Setting active conversation ID to '%s'", convID)
 	l.activeConvID = convID
+	log.Printf("[LLM Logger] ✓ Active conversation set")
+	
 	l.outputBuffer = ""
 	l.lastOutputTime = time.Now()
+	log.Printf("[LLM Logger] Output buffer reset")
 
+	log.Printf("[LLM Logger] Saving conversation to disk...")
 	l.saveConversation(conv)
+	log.Printf("[LLM Logger] ✓ Conversation saved")
 
+	log.Printf("[LLM Logger] Publishing LLM_START event...")
 	EventBus.Publish(&LayerEvent{
 		Type:      "LLM_START",
 		Layer:     1,
@@ -116,8 +146,11 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 		Provider:  string(detected.Provider),
 		Timestamp: time.Now(),
 	})
+	log.Printf("[LLM Logger] ✓ Event published")
 
-	log.Printf("[LLM Logger] Started conversation %s (provider=%s)", convID, detected.Provider)
+	log.Printf("[LLM Logger] ✅ CONVERSATION STARTED SUCCESSFULLY")
+	log.Printf("[LLM Logger] Final state: activeConvID='%s', mapSize=%d", l.activeConvID, len(l.conversations))
+	log.Printf("[LLM Logger] ═══ END START CONVERSATION ═══")
 	return convID
 }
 
@@ -232,10 +265,18 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	log.Printf("[LLM Logger] GetConversations called for tab %s", l.tabID)
+	log.Printf("[LLM Logger] Conversation map size: %d", len(l.conversations))
+	log.Printf("[LLM Logger] Active conversation: '%s'", l.activeConvID)
+
 	convs := make([]*LLMConversation, 0, len(l.conversations))
-	for _, conv := range l.conversations {
+	for convID, conv := range l.conversations {
+		log.Printf("[LLM Logger]   Conversation: ID=%s provider=%s type=%s complete=%v turns=%d", 
+			convID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns))
 		convs = append(convs, conv)
 	}
+	
+	log.Printf("[LLM Logger] Returning %d conversations", len(convs))
 	return convs
 }
 

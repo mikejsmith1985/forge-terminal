@@ -630,15 +630,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       
       // Add shell config query params
       const cfg = shellConfigRef.current;
+      const params = new URLSearchParams();
+      // CRITICAL: Pass tabID for AM/LLM logging
+      params.set('tabId', tabId);
       if (cfg && cfg.shellType) {
-        const params = new URLSearchParams();
         params.set('shell', cfg.shellType);
         if (cfg.shellType === 'wsl') {
           if (cfg.wslDistro) params.set('distro', cfg.wslDistro);
           if (cfg.wslHomePath) params.set('home', cfg.wslHomePath);
         }
-        wsUrl += '?' + params.toString();
       }
+      wsUrl += '?' + params.toString();
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;

@@ -66,8 +66,16 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		WSLHomePath: query.Get("home"),
 	}
 
+	// Get tabID from query params (for AM/LLM logging)
+	// If not provided, fall back to WebSocket session ID
+	tabID := query.Get("tabId")
+	if tabID == "" {
+		tabID = uuid.New().String()
+		log.Printf("[Terminal] Warning: No tabID provided, using session ID: %s", tabID)
+	}
+
 	// Create terminal session with config
-	sessionID := uuid.New().String()
+	sessionID := tabID // Use tabID as session ID for consistency
 	session, err := NewTerminalSessionWithConfig(sessionID, shellConfig)
 	if err != nil {
 		log.Printf("[Terminal] Failed to create session: %v", err)
@@ -80,23 +88,25 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	h.sessions.Store(sessionID, session)
-	log.Printf("[Terminal] Session %s created (shell: %s)", sessionID, shellConfig.ShellType)
+	log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
 
 	// Set initial terminal size (default 80x24)
 	_ = session.Resize(80, 24)
 
 	// Get LLM logger for this session (will be used if LLM commands detected)
+	// CRITICAL: Use tabID (not sessionID) so command card triggers match this logger
 	amSystem := am.GetSystem()
 	var llmLogger *am.LLMLogger
 	if amSystem != nil {
-		llmLogger = amSystem.GetLLMLogger(sessionID)
+		llmLogger = amSystem.GetLLMLogger(tabID)
+		log.Printf("[Terminal] Using LLM logger for tabID: %s", tabID)
 		// Record PTY heartbeat for Layer 1
 		if amSystem.HealthMonitor != nil {
 			amSystem.HealthMonitor.RecordPTYHeartbeat()
 		}
 	}
 	detector := llm.NewDetector()
-	log.Printf("[Terminal] Session %s: AM system initialized", sessionID)
+	log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
 	var inputBuffer strings.Builder
 	const flushTimeout = 2 * time.Second
 	lastFlushCheck := time.Now()
@@ -192,13 +202,37 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				commandLine := strings.TrimSpace(inputBuffer.String())
 				inputBuffer.Reset()
 
-				if commandLine != "" && llmLogger != nil {
-					// Detect if this is an LLM command
-					detected := detector.DetectCommand(commandLine)
-					if detected.Detected {
-						log.Printf("[Terminal] LLM command detected: provider=%s type=%s", detected.Provider, detected.Type)
-						llmLogger.StartConversation(detected)
+				if commandLine != "" {
+					log.Printf("[Terminal] ═══ COMMAND ENTERED ═══")
+					log.Printf("[Terminal] Raw command: '%s' (len=%d)", commandLine, len(commandLine))
+					log.Printf("[Terminal] Hex dump: % X", []byte(commandLine))
+					
+					if llmLogger != nil {
+						// Detect if this is an LLM command
+						log.Printf("[Terminal] Calling LLM detector...")
+						detected := detector.DetectCommand(commandLine)
+						
+						log.Printf("[Terminal] Detection result: detected=%v", detected.Detected)
+						if detected.Detected {
+							log.Printf("[Terminal] ✓ LLM command DETECTED: provider=%s type=%s", detected.Provider, detected.Type)
+							log.Printf("[Terminal] Starting LLM conversation...")
+							
+							convID := llmLogger.StartConversation(detected)
+							log.Printf("[Terminal] ✅ Conversation started: ID='%s'", convID)
+							
+							// Verify active conversation was set
+							activeID := llmLogger.GetActiveConversationID()
+							log.Printf("[Terminal] Active conversation ID: '%s'", activeID)
+							if activeID != convID {
+								log.Printf("[Terminal] ⚠️ WARNING: Active ID mismatch! expected=%s got=%s", convID, activeID)
+							}
+						} else {
+							log.Printf("[Terminal] ✗ Not an LLM command: '%s'", commandLine)
+						}
+					} else {
+						log.Printf("[Terminal] LLM logger is nil, skipping detection")
 					}
+					log.Printf("[Terminal] ═══ END COMMAND ENTERED ═══")
 				}
 			}
 

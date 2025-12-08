@@ -1,0 +1,168 @@
+# Copilot Instructions for forge-terminal
+
+## 📋 Documentation Policy
+
+### Where to Put Documentation
+
+#### ✅ Root Directory (Permanent, User-Facing)
+- `README.md` - Main project readme
+- `PROJECT_CHARTER.md` - Project vision and goals
+- `RELEASE_SUMMARY_v*.md` - Version release notes
+- `.github/copilot-instructions.md` - This file
+
+#### ✅ docs/user/ (Permanent, User Documentation)
+- End-user guides and tutorials
+- Feature documentation
+- User-facing references
+- Examples: getting-started, feature guides, FAQ
+
+#### ✅ docs/developer/ (Permanent, Developer Documentation)
+- Architecture documentation
+- Development setup guides
+- API documentation
+- Contributing guidelines
+
+#### 🗑️ docs/sessions/ (Temporary, Conversational)
+**All conversational/session documents go here:**
+- Analysis documents
+- Implementation plans
+- Debugging investigations
+- Test reports
+- "Work-in-progress" documentation
+- Technical explorations
+- Issue investigations
+
+**Naming:** `YYYY-MM-DD-topic-name.md`  
+**Lifecycle:** Can be deleted after 30 days or when no longer relevant
+
+---
+
+## 📝 Documentation Rules for Copilot
+
+### When Creating New Documents
+
+1. **Ask yourself:** "Will this be useful in 30 days?"
+   - **No** → Put in `docs/sessions/`
+   - **Yes** → Put in appropriate permanent location
+
+2. **Default location for analysis/implementation docs:**
+   ```
+   docs/sessions/2025-12-08-descriptive-name.md
+   ```
+
+3. **Use descriptive names:**
+   - ✅ `docs/sessions/2025-12-08-am-logging-implementation.md`
+   - ❌ `IMPLEMENTATION.md`
+
+4. **Group related session docs in subdirectories:**
+   ```
+   docs/sessions/2025-12-08-am-logging/
+   ├── analysis.md
+   ├── implementation.md
+   └── testing.md
+   ```
+
+### What NOT to Create
+
+- ❌ Multiple documents for the same topic in root
+- ❌ Documents with generic names (SUMMARY.md, IMPLEMENTATION.md)
+- ❌ "Quick reference" docs that duplicate existing docs
+- ❌ Documents the user said they won't read
+
+### Instead
+
+- ✅ Single comprehensive document per topic
+- ✅ Update existing docs rather than creating new ones
+- ✅ Put working notes in docs/sessions/
+- ✅ Ask user if they want permanent documentation
+
+---
+
+## 🔧 Code Organization
+
+### Scripts Location
+- Development scripts → `scripts/`
+- Test scripts → Root or `scripts/` (if test-*.sh pattern)
+- Build scripts → Root (run-*.sh pattern) or Makefile
+
+### Logs
+- All `*.log` files are gitignored
+- Use consistent naming: `forge-dev.log`, `forge-test.log`
+
+---
+
+## 🎯 Session Workflow
+
+### At Start of Session
+1. Check if topic already has documentation
+2. If yes, update existing doc
+3. If no, create in `docs/sessions/YYYY-MM-DD-topic.md`
+
+### During Session
+1. Keep all analysis/notes in session docs
+2. Only create permanent docs if user requests
+3. Prefer single comprehensive docs over many small ones
+
+### End of Session
+1. Consolidate related session docs if needed
+2. Move any docs to permanent location if requested
+3. Update main README.md if major features added
+
+---
+
+## 📊 Current Repository Structure
+
+```
+forge-terminal/
+├── README.md                    # Main readme
+├── PROJECT_CHARTER.md          # Project vision
+├── RELEASE_SUMMARY_v*.md       # Release notes
+├── docs/
+│   ├── user/                   # User documentation
+│   ├── developer/              # Developer documentation  
+│   └── sessions/               # Temporary session docs (gitignored)
+├── scripts/                    # Development scripts
+├── cmd/                        # Go commands
+├── internal/                   # Go packages
+├── frontend/                   # React frontend
+└── .github/
+    └── copilot-instructions.md # This file
+```
+
+---
+
+## 💡 Examples
+
+### ✅ Good
+```
+docs/sessions/2025-12-08-am-logging/
+├── problem-analysis.md
+├── implementation-plan.md
+└── test-results.md
+```
+
+### ❌ Bad
+```
+AM_LOGGING_FIX.md
+AM_LOGGING_QUICK_REF.md
+AM_ULTRA_ROBUST_LOGGING_GUIDE.md
+AM_ROBUST_LOGGING_IMPLEMENTATION_REPORT.md
+AM_LOGGING_DEBUG_GUIDE.md
+(all in root directory)
+```
+
+---
+
+## 🧹 Cleanup Policy
+
+Session docs in `docs/sessions/` can be:
+- Deleted after 30 days
+- Archived when issue is resolved
+- Consolidated into permanent documentation if valuable
+
+The user can run `scripts/cleanup-session-docs.sh` to clean up old files.
+
+---
+
+**Last Updated:** 2025-12-08  
+**Note:** These instructions are automatically loaded by GitHub Copilot in every session.

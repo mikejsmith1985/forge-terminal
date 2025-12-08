@@ -134,12 +134,19 @@ func NewDetector() *Detector {
 func (d *Detector) DetectCommand(input string) *DetectedCommand {
 	trimmed := strings.TrimSpace(input)
 
-	log.Printf("[LLM Detector] Analyzing: '%s' (len=%d)", trimmed, len(trimmed))
+	log.Printf("[LLM Detector] ═══ DETECTION START ═══")
+	log.Printf("[LLM Detector] Raw input: '%s' (len=%d)", input, len(input))
+	log.Printf("[LLM Detector] Trimmed: '%s' (len=%d)", trimmed, len(trimmed))
+	log.Printf("[LLM Detector] Hex: % X", []byte(trimmed))
+	log.Printf("[LLM Detector] Testing %d patterns...", len(d.patterns))
 
-	for _, pattern := range d.patterns {
+	for i, pattern := range d.patterns {
+		log.Printf("[LLM Detector] [%d/%d] Testing pattern '%s'...", i+1, len(d.patterns), pattern.Name)
+		
 		if pattern.Regex.MatchString(trimmed) {
 			provider, cmdType := pattern.Extract(trimmed)
-			log.Printf("[LLM Detector] ✓ Matched pattern '%s': provider=%s type=%s", pattern.Name, provider, cmdType)
+			log.Printf("[LLM Detector] ✅ MATCH! pattern='%s' provider=%s type=%s", pattern.Name, provider, cmdType)
+			log.Printf("[LLM Detector] ═══ DETECTION END (MATCHED) ═══")
 			return &DetectedCommand{
 				Provider: provider,
 				Type:     cmdType,
@@ -147,10 +154,13 @@ func (d *Detector) DetectCommand(input string) *DetectedCommand {
 				RawInput: input,
 				Detected: true,
 			}
+		} else {
+			log.Printf("[LLM Detector] ✗ No match for pattern '%s'", pattern.Name)
 		}
 	}
 
-	log.Printf("[LLM Detector] ✗ No pattern matched")
+	log.Printf("[LLM Detector] ❌ NO PATTERNS MATCHED")
+	log.Printf("[LLM Detector] ═══ DETECTION END (NO MATCH) ═══")
 	return &DetectedCommand{
 		Provider: ProviderUnknown,
 		Type:     CommandUnknown,

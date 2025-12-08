@@ -89,13 +89,22 @@ func (hm *HealthMonitor) handleLayerEvent(event *LayerEvent) {
 	hm.mutex.Lock()
 	defer hm.mutex.Unlock()
 
+	log.Printf("[Health Monitor] ═══ EVENT RECEIVED ═══")
+	log.Printf("[Health Monitor] Type: %s, Layer: %d, TabID: %s", event.Type, event.Layer, event.TabID)
+	if event.ConvID != "" {
+		log.Printf("[Health Monitor] ConversationID: %s, Provider: %s", event.ConvID, event.Provider)
+	}
+
 	if layer, exists := hm.layers[event.Layer]; exists {
 		layer.LastHeartbeat = time.Now()
 		layer.EventCount++
 		if layer.Status != "HEALTHY" {
 			layer.Status = "HEALTHY"
-			log.Printf("[Health Layer 5] Layer %d (%s) is now HEALTHY", event.Layer, layer.Name)
+			log.Printf("[Health Monitor] Layer %d (%s) is now HEALTHY", event.Layer, layer.Name)
 		}
+		log.Printf("[Health Monitor] Layer %d event count: %d", event.Layer, layer.EventCount)
+	} else {
+		log.Printf("[Health Monitor] ⚠️ Layer %d not found in layers map", event.Layer)
 	}
 
 	hm.metrics.TotalEventsProcessed++
@@ -104,12 +113,21 @@ func (hm *HealthMonitor) handleLayerEvent(event *LayerEvent) {
 	case "LLM_START":
 		hm.metrics.ConversationsStarted++
 		hm.metrics.ActiveConversations++
+		log.Printf("[Health Monitor] ✓ LLM_START: Total started=%d, Active=%d", 
+			hm.metrics.ConversationsStarted, hm.metrics.ActiveConversations)
 	case "LLM_END":
 		hm.metrics.ConversationsCompleted++
 		if hm.metrics.ActiveConversations > 0 {
 			hm.metrics.ActiveConversations--
 		}
+		log.Printf("[Health Monitor] ✓ LLM_END: Total completed=%d, Active=%d", 
+			hm.metrics.ConversationsCompleted, hm.metrics.ActiveConversations)
 	}
+	
+	log.Printf("[Health Monitor] Metrics: events=%d, convStarted=%d, convCompleted=%d, active=%d",
+		hm.metrics.TotalEventsProcessed, hm.metrics.ConversationsStarted, 
+		hm.metrics.ConversationsCompleted, hm.metrics.ActiveConversations)
+	log.Printf("[Health Monitor] ═══ END EVENT ═══")
 }
 
 func (hm *HealthMonitor) performHealthCheck() {
@@ -118,6 +136,11 @@ func (hm *HealthMonitor) performHealthCheck() {
 
 	now := time.Now()
 	operationalCount := 0
+
+	log.Printf("[Health Monitor] ═══ HEALTH CHECK ═══")
+	log.Printf("[Health Monitor] Active conversations: %d", hm.metrics.ActiveConversations)
+	log.Printf("[Health Monitor] Total started: %d, completed: %d", 
+		hm.metrics.ConversationsStarted, hm.metrics.ConversationsCompleted)
 
 	for layerID, status := range hm.layers {
 		if layerID == 5 {
@@ -128,16 +151,22 @@ func (hm *HealthMonitor) performHealthCheck() {
 		timeSinceHeartbeat := now.Sub(status.LastHeartbeat)
 
 		if status.Status == "UNKNOWN" {
+			log.Printf("[Health Monitor] Layer %d (%s): UNKNOWN status", layerID, status.Name)
 			continue
 		}
+
+		log.Printf("[Health Monitor] Layer %d (%s): status=%s, heartbeat=%s ago, events=%d", 
+			layerID, status.Name, status.Status, timeSinceHeartbeat.Round(time.Second), status.EventCount)
 
 		if timeSinceHeartbeat > hm.alertThreshold {
 			if status.Status == "HEALTHY" {
 				status.Status = "DEGRADED"
-				log.Printf("[Health Layer 5] Layer %d (%s) is DEGRADED", layerID, status.Name)
+				log.Printf("[Health Monitor] ⚠️ Layer %d (%s) is DEGRADED (no heartbeat for %s)", 
+					layerID, status.Name, timeSinceHeartbeat.Round(time.Second))
 			} else if timeSinceHeartbeat > 2*hm.alertThreshold && status.Status == "DEGRADED" {
 				status.Status = "FAILED"
-				log.Printf("[Health Layer 5] Layer %d (%s) has FAILED", layerID, status.Name)
+				log.Printf("[Health Monitor] ❌ Layer %d (%s) has FAILED (no heartbeat for %s)", 
+					layerID, status.Name, timeSinceHeartbeat.Round(time.Second))
 			}
 		}
 
@@ -150,6 +179,10 @@ func (hm *HealthMonitor) performHealthCheck() {
 	hm.metrics.LayersTotal = len(hm.layers)
 	hm.metrics.LastFullScan = now
 	hm.metrics.UptimeSeconds = int64(now.Sub(hm.startTime).Seconds())
+
+	log.Printf("[Health Monitor] Layers operational: %d/%d", operationalCount, len(hm.layers))
+	log.Printf("[Health Monitor] Overall status: %s", hm.computeOverallStatus())
+	log.Printf("[Health Monitor] ═══ END HEALTH CHECK ═══")
 
 	// Update Layer 5 heartbeat
 	hm.layers[5].LastHeartbeat = now

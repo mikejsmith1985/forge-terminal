@@ -809,13 +809,28 @@ func handleAMLog(w http.ResponseWriter, r *http.Request) {
 	// If triggerAM is set, start LLM conversation tracking
 	var convID string
 	if req.TriggerAM {
+		log.Printf("[AM API] ═══ COMMAND CARD TRIGGER ═══")
+		log.Printf("[AM API] triggerAM=true, tabID=%s, command='%s'", req.TabID, req.Content)
+		log.Printf("[AM API] llmProvider='%s', description='%s'", req.LLMProvider, req.Description)
+		
 		amSystem := am.GetSystem()
-		if amSystem != nil {
+		if amSystem == nil {
+			log.Printf("[AM API] ❌ CRITICAL: AM System is nil!")
+		} else {
+			log.Printf("[AM API] ✓ AM System exists")
+			
 			llmLogger := amSystem.GetLLMLogger(req.TabID)
-			if llmLogger != nil {
+			if llmLogger == nil {
+				log.Printf("[AM API] ❌ CRITICAL: LLM Logger is nil for tab %s", req.TabID)
+			} else {
+				log.Printf("[AM API] ✓ LLM Logger exists for tab %s", req.TabID)
+				
 				// Determine provider from explicit field or infer from command
 				provider := inferLLMProvider(req.LLMProvider, req.Content)
 				cmdType := inferLLMType(req.LLMType)
+				
+				log.Printf("[AM API] Provider inference: explicit='%s' command='%s' → result=%s", req.LLMProvider, req.Content, provider)
+				log.Printf("[AM API] Type inference: explicit='%s' → result=%s", req.LLMType, cmdType)
 
 				detected := &llm.DetectedCommand{
 					Provider: provider,
@@ -825,10 +840,31 @@ func handleAMLog(w http.ResponseWriter, r *http.Request) {
 					Detected: true,
 				}
 
+				log.Printf("[AM API] Calling StartConversation with provider=%s type=%s", provider, cmdType)
 				convID = llmLogger.StartConversation(detected)
-				log.Printf("[AM] Started LLM conversation from command card: %s (provider=%s type=%s)", convID, provider, cmdType)
+				log.Printf("[AM API] ✅ StartConversation returned: convID='%s'", convID)
+				
+				// Verify conversation was actually created
+				convs := llmLogger.GetConversations()
+				log.Printf("[AM API] Verification: GetConversations() returned %d conversations", len(convs))
+				if len(convs) > 0 {
+					log.Printf("[AM API] ✓ Latest conversation: ID=%s provider=%s type=%s", 
+						convs[len(convs)-1].ConversationID, 
+						convs[len(convs)-1].Provider, 
+						convs[len(convs)-1].CommandType)
+				}
+				
+				activeID := llmLogger.GetActiveConversationID()
+				log.Printf("[AM API] Active conversation ID: '%s'", activeID)
+				
+				if activeID != convID {
+					log.Printf("[AM API] ⚠️ WARNING: Active ID (%s) != returned ID (%s)", activeID, convID)
+				} else {
+					log.Printf("[AM API] ✓ Active conversation matches returned ID")
+				}
 			}
 		}
+		log.Printf("[AM API] ═══ END COMMAND CARD TRIGGER ═══")
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1164,14 +1200,32 @@ func handleAMLLMConversations(w http.ResponseWriter, r *http.Request) {
 	}
 	tabID := pathParts[len(pathParts)-1]
 
+	log.Printf("[AM API] GET /api/am/llm/conversations/%s", tabID)
+
 	// Get LLM logger for this tab
 	llmLogger := am.GetLLMLogger(tabID, am.DefaultAMDir())
+	log.Printf("[AM API] Retrieved LLM logger for tab %s", tabID)
+	
 	conversations := llmLogger.GetConversations()
+	count := len(conversations)
+	
+	log.Printf("[AM API] GetConversations() returned %d conversations for tab %s", count, tabID)
+	
+	if count == 0 {
+		log.Printf("[AM API] ⚠️ ZERO conversations found for tab %s", tabID)
+		log.Printf("[AM API] Active conversation ID: '%s'", llmLogger.GetActiveConversationID())
+	} else {
+		log.Printf("[AM API] ✓ Found %d conversations:", count)
+		for i, conv := range conversations {
+			log.Printf("[AM API]   [%d] ID=%s provider=%s type=%s complete=%v turns=%d", 
+				i, conv.ConversationID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns))
+		}
+	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":       true,
 		"conversations": conversations,
-		"count":         len(conversations),
+		"count":         count,
 	})
 }
 

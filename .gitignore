@@ -39,6 +39,9 @@ issue-images/
 # AM logs (local session data)
 .forge/
 
+# Copilot session documentation (temporary, conversational)
+docs/sessions/
+
 # Test artifacts
 frontend/test-results/
 
