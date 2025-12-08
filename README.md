@@ -135,6 +135,23 @@ chmod +x forge-linux-amd64
    - Click the shell indicator (CMD/PS/WSL) to cycle through shells.
    - Use the **settings gear** for detailed WSL configuration.
 
+## 🔄 Updating Forge Terminal
+
+Forge Terminal checks for updates automatically. When an update is available:
+
+1. A notification toast appears in the bottom-right corner
+2. Click **"View Update"** or click the download icon in the sidebar
+3. The Update modal opens showing the new version and release notes
+4. Click **"Update Now"** to download and apply the update
+5. A **new browser tab** opens automatically with the updated version
+6. The old tab remains open but becomes unresponsive (the server process has been replaced)
+
+**After the update:**
+- **Close the old tab** and continue using the new tab with the updated version, OR
+- **Press Refresh (F5 or Ctrl+R)** in the old tab to reconnect to the new server
+
+If the spacebar or other features don't work in a tab after an update, simply refresh that tab to reconnect with the new server.
+
 ## 🛠️ Development
 
 ### Prerequisites

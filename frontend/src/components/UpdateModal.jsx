@@ -42,6 +42,22 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
     }
   };
 
+  /**
+   * Handle update application.
+   * 
+   * Backend flow:
+   * 1. Backend downloads and applies the new binary to disk
+   * 2. Backend calls restartSelf() which:
+   *    - Kills the current process
+   *    - Starts the new binary on the same port
+   * 3. Backend calls openBrowser() to open a new tab with the new server
+   * 4. Old tab loses WebSocket connection (server process died)
+   * 5. User sees success message and new tab opens
+   * 6. User should switch to new tab or refresh old tab (F5) to resume
+   * 
+   * Note: Frontend does NOT perform a hard refresh - that was dead code.
+   * The new tab opening is the visual feedback that update is complete.
+   */
   const handleUpdate = async () => {
     setIsUpdating(true);
     setUpdateStatus('downloading');
@@ -53,11 +69,8 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       
       if (data.success) {
         setUpdateStatus('success');
-        // Perform a hard refresh after a brief delay to show success message
-        setTimeout(() => {
-          const timestamp = new Date().getTime();
-          window.location.href = `${window.location.origin}?t=${timestamp}`;
-        }, 1500);
+        // Backend restarts and opens new tab automatically
+        // No hard refresh needed - user will see new tab open
       } else {
         setUpdateStatus('error');
         setErrorMessage(data.error || 'Unknown error occurred');
@@ -70,6 +83,10 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
     }
   };
 
+  /**
+   * Handle manual binary installation from a user-provided file path.
+   * Same update flow as automatic update - backend restarts and opens new tab.
+   */
   const handleInstallFromFile = async () => {
     if (!installFromFileInput.trim()) {
       setErrorMessage('Please enter a file path');
@@ -90,10 +107,8 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       
       if (data.success) {
         setUpdateStatus('success');
-        setTimeout(() => {
-          const timestamp = new Date().getTime();
-          window.location.href = `${window.location.origin}?t=${timestamp}`;
-        }, 1500);
+        // Backend restarts and opens new tab automatically
+        // No hard refresh needed - user will see new tab open
       } else {
         setUpdateStatus('error');
         setErrorMessage(data.error || 'Unknown error occurred');
@@ -235,7 +250,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
                   {updateStatus === 'success' && (
                     <>
                       <CheckCircle size={18} style={{ color: '#4ade80' }} />
-                      <span style={{ color: '#86efac' }}>Update applied! Restarting...</span>
+                      <span style={{ color: '#86efac' }}>Update applied. New version launching in new tab...</span>
                     </>
                   )}
                   {updateStatus === 'error' && (
