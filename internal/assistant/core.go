@@ -15,6 +15,7 @@ type Core struct {
 	visionParser   *vision.Parser
 	llmDetector    *llm.Detector
 	amSystem       *am.System
+	ollamaClient   *OllamaClient
 }
 
 // NewCore creates a new assistant core with all AI features.
@@ -22,11 +23,15 @@ func NewCore(amSystem *am.System) *Core {
 	visionRegistry := vision.NewRegistry()
 	visionParser := vision.NewParser(8192, visionRegistry) // 8KB buffer
 
+	// Initialize Ollama client with defaults
+	ollamaClient := NewOllamaClient("", "") // Uses default localhost:11434 and codellama:7b
+
 	return &Core{
 		visionRegistry: visionRegistry,
 		visionParser:   visionParser,
 		llmDetector:    llm.NewDetector(),
 		amSystem:       amSystem,
+		ollamaClient:   ollamaClient,
 	}
 }
 
@@ -85,3 +90,9 @@ func (c *Core) VisionEnabled() bool {
 	}
 	return c.visionParser.Enabled()
 }
+
+// GetOllamaClient returns the Ollama client for external use.
+func (c *Core) GetOllamaClient() *OllamaClient {
+	return c.ollamaClient
+}
+

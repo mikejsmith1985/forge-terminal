@@ -58,3 +58,32 @@ func (s *RemoteService) VisionEnabled(ctx context.Context) (bool, error) {
 	// GET from s.baseURL + "/api/assistant/vision/status"
 	return false, fmt.Errorf("remote service not implemented yet (v2 feature)")
 }
+
+// Chat sends a message via HTTP API.
+func (s *RemoteService) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error) {
+	// TODO: Implement in v2
+	// POST to s.baseURL + "/api/assistant/chat"
+	return nil, fmt.Errorf("remote service not implemented yet (v2 feature)")
+}
+
+// GetContext retrieves context via HTTP API.
+func (s *RemoteService) GetContext(ctx context.Context, tabID string) (*TerminalContext, error) {
+	// TODO: Implement in v2
+	// GET from s.baseURL + "/api/assistant/context/" + tabID
+	return nil, fmt.Errorf("remote service not implemented yet (v2 feature)")
+}
+
+// ExecuteCommand executes via HTTP API.
+func (s *RemoteService) ExecuteCommand(ctx context.Context, req *ExecuteCommandRequest) (*ExecuteCommandResponse, error) {
+	// TODO: Implement in v2
+	// POST to s.baseURL + "/api/assistant/execute"
+	return nil, fmt.Errorf("remote service not implemented yet (v2 feature)")
+}
+
+// GetStatus checks status via HTTP API.
+func (s *RemoteService) GetStatus(ctx context.Context) (*OllamaStatusResponse, error) {
+	// TODO: Implement in v2
+	// GET from s.baseURL + "/api/assistant/status"
+	return nil, fmt.Errorf("remote service not implemented yet (v2 feature)")
+}
+

@@ -33,6 +33,9 @@ var embeddedFS embed.FS
 // Preferred ports to try, in order
 var preferredPorts = []int{8333, 8080, 9000, 3000, 3333}
 
+// Global assistant service (initialized in main)
+var assistantService assistant.Service
+
 func main() {
 	// Migrate storage structure if needed
 	log.Printf("[Forge] Checking storage structure...")
@@ -73,7 +76,7 @@ func main() {
 	log.Printf("[Assistant] Core initialized")
 
 	// Wrap core in LocalService (v1 implementation)
-	assistantService := assistant.NewLocalService(assistantCore)
+	assistantService = assistant.NewLocalService(assistantCore)
 	log.Printf("[Assistant] LocalService initialized")
 
 	termHandler := terminal.NewHandler(assistantService, assistantCore)
@@ -136,6 +139,11 @@ func main() {
 	http.HandleFunc("/api/files/write", files.HandleWrite)
 	http.HandleFunc("/api/files/delete", files.HandleDelete)
 	http.HandleFunc("/api/files/stream", files.HandleReadStream)
+
+	// Assistant API - AI chat and command suggestions (Dev Mode only)
+	http.HandleFunc("/api/assistant/status", handleAssistantStatus)
+	http.HandleFunc("/api/assistant/chat", handleAssistantChat)
+	http.HandleFunc("/api/assistant/execute", handleAssistantExecute)
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()
@@ -1396,4 +1404,75 @@ func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": "Desktop shortcut created",
 	})
+}
+
+// handleAssistantStatus checks if Ollama is available.
+func handleAssistantStatus(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodGet {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+w.Header().Set("Content-Type", "application/json")
+ctx := r.Context()
+
+status, err := assistantService.GetStatus(ctx)
+if err != nil {
+http.Error(w, err.Error(), http.StatusInternalServerError)
+return
+}
+
+json.NewEncoder(w).Encode(status)
+}
+
+// handleAssistantChat processes chat messages.
+func handleAssistantChat(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodPost {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+w.Header().Set("Content-Type", "application/json")
+ctx := r.Context()
+
+var req assistant.ChatRequest
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+http.Error(w, "Invalid request body", http.StatusBadRequest)
+return
+}
+
+response, err := assistantService.Chat(ctx, &req)
+if err != nil {
+log.Printf("[Assistant] Chat error: %v", err)
+http.Error(w, err.Error(), http.StatusInternalServerError)
+return
+}
+
+json.NewEncoder(w).Encode(response)
+}
+
+// handleAssistantExecute executes a command.
+func handleAssistantExecute(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodPost {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+w.Header().Set("Content-Type", "application/json")
+ctx := r.Context()
+
+var req assistant.ExecuteCommandRequest
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+http.Error(w, "Invalid request body", http.StatusBadRequest)
+return
+}
+
+response, err := assistantService.ExecuteCommand(ctx, &req)
+if err != nil {
+log.Printf("[Assistant] Execute error: %v", err)
+http.Error(w, err.Error(), http.StatusInternalServerError)
+return
+}
+
+json.NewEncoder(w).Encode(response)
 }

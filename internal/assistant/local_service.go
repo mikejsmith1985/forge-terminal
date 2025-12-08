@@ -48,3 +48,83 @@ func (s *LocalService) VisionEnabled(ctx context.Context) (bool, error) {
 	enabled := s.core.VisionEnabled()
 	return enabled, nil
 }
+
+// Chat sends a message to the assistant and gets a response.
+func (s *LocalService) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error) {
+	// Get terminal context if requested
+	var termCtx *TerminalContext
+	if req.IncludeContext {
+		ctx, err := s.GetContext(ctx, req.TabID)
+		if err == nil {
+			termCtx = ctx
+		}
+	}
+
+	// Build messages with context
+	messages := BuildContextPrompt(termCtx, req.Message)
+
+	// Call Ollama
+	ollamaClient := s.core.GetOllamaClient()
+	response, err := ollamaClient.Chat(ctx, messages)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse response for command suggestions
+	// For v1, we'll return the raw response
+	// Command detection can be enhanced later
+	return &ChatResponse{
+		Message: response,
+	}, nil
+}
+
+// GetContext retrieves the current terminal context for a tab.
+func (s *LocalService) GetContext(ctx context.Context, tabID string) (*TerminalContext, error) {
+	// TODO: Implement actual context gathering from terminal sessions
+	// For now, return a basic context
+	// This will need to be wired up to the terminal handler
+	return &TerminalContext{
+		WorkingDirectory: ".", // Will be filled by terminal handler
+		RecentCommands:   []string{},
+		RecentOutput:     "",
+		SessionID:        tabID,
+	}, nil
+}
+
+// ExecuteCommand executes a command in the specified terminal tab.
+func (s *LocalService) ExecuteCommand(ctx context.Context, req *ExecuteCommandRequest) (*ExecuteCommandResponse, error) {
+	// TODO: Implement command execution
+	// This will need to inject the command into the terminal's PTY
+	// For now, return not implemented
+	return &ExecuteCommandResponse{
+		Success: false,
+		Error:   "Command execution not yet implemented",
+	}, nil
+}
+
+// GetStatus checks if Ollama is available.
+func (s *LocalService) GetStatus(ctx context.Context) (*OllamaStatusResponse, error) {
+	ollamaClient := s.core.GetOllamaClient()
+	
+	available := ollamaClient.IsAvailable(ctx)
+	if !available {
+		return &OllamaStatusResponse{
+			Available: false,
+			Error:     "Ollama is not running or not accessible",
+		}, nil
+	}
+
+	models, err := ollamaClient.GetModels(ctx)
+	if err != nil {
+		return &OllamaStatusResponse{
+			Available: true,
+			Error:     "Connected but failed to list models: " + err.Error(),
+		}, nil
+	}
+
+	return &OllamaStatusResponse{
+		Available: true,
+		Models:    models,
+	}, nil
+}
+

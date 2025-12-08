@@ -27,4 +27,16 @@ type Service interface {
 
 	// VisionEnabled returns whether vision is currently enabled.
 	VisionEnabled(ctx context.Context) (bool, error)
+
+	// Chat sends a message to the assistant and gets a response.
+	Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error)
+
+	// GetContext retrieves the current terminal context for a tab.
+	GetContext(ctx context.Context, tabID string) (*TerminalContext, error)
+
+	// ExecuteCommand executes a command in the specified terminal tab.
+	ExecuteCommand(ctx context.Context, req *ExecuteCommandRequest) (*ExecuteCommandResponse, error)
+
+	// GetStatus checks if the assistant (Ollama) is available.
+	GetStatus(ctx context.Context) (*OllamaStatusResponse, error)
 }
