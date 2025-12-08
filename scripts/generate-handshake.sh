@@ -502,8 +502,14 @@ Forge Terminal and Forge Orchestrator commit to:
 HANDSHAKE_DOC
 
 # Replace placeholders
-sed -i '' "s/VERSION_PLACEHOLDER/$BACKEND_VERSION/g" "$OUTPUT_FILE"
-sed -i '' "s/TIMESTAMP_PLACEHOLDER/$TIMESTAMP/g" "$OUTPUT_FILE"
+# Replace placeholders (portable sed syntax for both Linux and macOS)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s/VERSION_PLACEHOLDER/$BACKEND_VERSION/g" "$OUTPUT_FILE"
+    sed -i '' "s/TIMESTAMP_PLACEHOLDER/$TIMESTAMP/g" "$OUTPUT_FILE"
+else
+    sed -i "s/VERSION_PLACEHOLDER/$BACKEND_VERSION/g" "$OUTPUT_FILE"
+    sed -i "s/TIMESTAMP_PLACEHOLDER/$TIMESTAMP/g" "$OUTPUT_FILE"
+fi
 sed -i '' "s/COMPONENT_COUNT_PLACEHOLDER/$COMPONENT_COUNT/g" "$OUTPUT_FILE"
 sed -i '' "s/COMMAND_COUNT_PLACEHOLDER/$COMMAND_COUNT/g" "$OUTPUT_FILE"
 
