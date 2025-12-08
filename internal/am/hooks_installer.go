@@ -6,18 +6,15 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 )
 
 // InstallShellHooks writes a helper script to the user's ~/.forge directory
 // with instructions for installing shell hooks. It also emits a Layer 2 heartbeat
 // event so the health monitor can mark Shell Hooks as healthy after installation.
 func InstallShellHooks() (string, string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get home dir: %w", err)
-	}
-
-	forgeDir := filepath.Join(home, ".forge")
+	forgeDir := storage.GetForgeDir()
 	if err := os.MkdirAll(forgeDir, 0755); err != nil {
 		return "", "", fmt.Errorf("failed to create .forge dir: %w", err)
 	}

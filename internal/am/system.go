@@ -5,9 +5,9 @@ import (
 	"context"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
+	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 )
 
 // System is the main AM system orchestrator.
@@ -126,8 +126,7 @@ func (s *System) GetActiveConversations() map[string]*LLMConversation {
 
 // DefaultAMDir returns the default AM directory path.
 func DefaultAMDir() string {
-	cwd, _ := os.Getwd()
-	return filepath.Join(cwd, ".forge", "am")
+	return storage.GetAMDir()
 }
 
 // Global AM system instance

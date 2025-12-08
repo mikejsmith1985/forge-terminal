@@ -22,6 +22,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
+	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
@@ -33,6 +34,16 @@ var embeddedFS embed.FS
 var preferredPorts = []int{8333, 8080, 9000, 3000, 3333}
 
 func main() {
+	// Migrate storage structure if needed
+	log.Printf("[Forge] Checking storage structure...")
+	if err := storage.MigrateToV2(); err != nil {
+		log.Printf("[Forge] Warning: storage migration failed: %v", err)
+	}
+	if err := storage.EnsureDirectories(); err != nil {
+		log.Printf("[Forge] Warning: failed to ensure directories: %v", err)
+	}
+	log.Printf("[Forge] Storage structure: %s", storage.GetCurrentStructure())
+
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
