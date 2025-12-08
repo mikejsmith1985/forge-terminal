@@ -1,8 +1,8 @@
 // Package assistant provides the core AI assistant logic.
+// Package assistant provides the core AI assistant logic.
 package assistant
 
 import (
-	"context"
 	"log"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
@@ -25,19 +25,9 @@ func NewCore(amSystem *am.System) *Core {
 	visionParser := vision.NewParser(8192, visionRegistry) // 8KB buffer
 
 	// Initialize Ollama client with defaults
-	// Create Ollama client - try to auto-detect model
-	ollamaClient := NewOllamaClient("", "") // Uses default localhost:11434
-	
-	// Try to get first available model
-	ctx := context.Background()
-	models, err := ollamaClient.GetModels(ctx)
-	if err == nil && len(models) > 0 {
-		// Use first available model
-		ollamaClient = NewOllamaClient("", models[0])
-		log.Printf("[Assistant] Using first available model: %s", models[0])
-	} else {
-		log.Printf("[Assistant] Using default model (mistral:7b-instruct)")
-	}
+	// Users can set FORGE_OLLAMA_MODEL env var to use specific model
+	ollamaClient := NewOllamaClient("", "")
+	log.Printf("[Assistant] Core initialized")
 
 	return &Core{
 		visionRegistry: visionRegistry,

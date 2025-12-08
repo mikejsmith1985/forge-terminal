@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -52,7 +53,11 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 		baseURL = "http://localhost:11434"
 	}
 	if model == "" {
-		model = "mistral:7b-instruct" // More common default
+		// Check environment variable first
+		model = os.Getenv("FORGE_OLLAMA_MODEL")
+		if model == "" {
+			model = "mistral:7b-instruct" // More common default
+		}
 	}
 
 	return &OllamaClient{
