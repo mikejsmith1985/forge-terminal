@@ -18,9 +18,11 @@ import (
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
+	"github.com/mikejsmith1985/forge-terminal/internal/assistant"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
+	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
@@ -32,6 +34,16 @@ var embeddedFS embed.FS
 var preferredPorts = []int{8333, 8080, 9000, 3000, 3333}
 
 func main() {
+	// Migrate storage structure if needed
+	log.Printf("[Forge] Checking storage structure...")
+	if err := storage.MigrateToV2(); err != nil {
+		log.Printf("[Forge] Warning: storage migration failed: %v", err)
+	}
+	if err := storage.EnsureDirectories(); err != nil {
+		log.Printf("[Forge] Warning: failed to ensure directories: %v", err)
+	}
+	log.Printf("[Forge] Storage structure: %s", storage.GetCurrentStructure())
+
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
@@ -49,7 +61,22 @@ func main() {
 	})
 
 	// WebSocket terminal handler
-	termHandler := terminal.NewHandler()
+	// Run AM cleanup on startup and initialize AM system
+	go am.CleanupOldLogs()
+	amSystem := am.InitSystem(am.DefaultAMDir())
+	if err := amSystem.Start(); err != nil {
+		log.Printf("[AM] Failed to start AM system: %v", err)
+	}
+
+	// Initialize assistant core with AM system
+	assistantCore := assistant.NewCore(amSystem)
+	log.Printf("[Assistant] Core initialized")
+
+	// Wrap core in LocalService (v1 implementation)
+	assistantService := assistant.NewLocalService(assistantCore)
+	log.Printf("[Assistant] LocalService initialized")
+
+	termHandler := terminal.NewHandler(assistantService, assistantCore)
 	http.HandleFunc("/ws", termHandler.HandleWebSocket)
 
 	// Commands API
@@ -109,13 +136,6 @@ func main() {
 	http.HandleFunc("/api/files/write", files.HandleWrite)
 	http.HandleFunc("/api/files/delete", files.HandleDelete)
 	http.HandleFunc("/api/files/stream", files.HandleReadStream)
-
-	// Run AM cleanup on startup and initialize AM system
-	go am.CleanupOldLogs()
-	amSystem := am.InitSystem(am.DefaultAMDir())
-	if err := amSystem.Start(); err != nil {
-		log.Printf("[AM] Failed to start AM system: %v", err)
-	}
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()

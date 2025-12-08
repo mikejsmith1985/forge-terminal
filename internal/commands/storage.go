@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+
+	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 )
 
 // Command represents a command card
@@ -71,20 +72,12 @@ var UserHomeDir = os.UserHomeDir
 
 // GetConfigDir returns the Forge configuration directory
 func GetConfigDir() (string, error) {
-	home, err := UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".forge"), nil
+	return storage.GetTerminalDir(), nil
 }
 
 // GetCommandsPath returns the path to the commands JSON file
 func GetCommandsPath() (string, error) {
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(configDir, "commands.json"), nil
+	return storage.GetCommandsPath(), nil
 }
 
 // LoadCommands loads commands from the JSON file, creating defaults if needed
