@@ -136,7 +136,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           <button className="btn-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="modal-body" style={{ padding: '20px' }}>
+        <div className="modal-body">
           <div className="form-group" style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Default Shell</label>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -460,13 +460,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           </div>
         </div>
 
-        <div className="modal-footer" style={{ 
-          padding: '15px 20px', 
-          borderTop: '1px solid #333',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '10px'
-        }}>
+        <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSave}>Save & Restart Terminal</button>
         </div>

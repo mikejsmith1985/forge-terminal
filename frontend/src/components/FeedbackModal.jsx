@@ -267,7 +267,7 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                     </button>
                 </div>
 
-                <div className="modal-body" style={{ padding: '20px' }}>
+                <div className="modal-body">
                     {showSetup ? (
                         <div className="setup-view">
                             <div className="alert alert-info" style={{ marginBottom: '20px', padding: '15px', background: '#1e293b', borderRadius: '6px', border: '1px solid #334155' }}>
@@ -424,7 +424,7 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                                 </div>
                             )}
 
-                            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #333', paddingTop: '20px' }}>
+                            <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
                                 <button
                                     type="button"

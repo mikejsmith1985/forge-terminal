@@ -154,7 +154,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
             <button className="btn-close" onClick={onClose} disabled={isUpdating}>×</button>
           </div>
 
-          <div className="modal-body" style={{ padding: '20px' }}>
+          <div className="modal-body">
           {/* Current Version */}
           <div style={{ 
             display: 'flex', 
@@ -457,13 +457,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
           </div>
         </div>
 
-        <div className="modal-footer" style={{ 
-          padding: '15px 20px', 
-          borderTop: '1px solid #333',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '10px'
-        }}>
+        <div className="modal-footer">
           {hasUpdate ? (
             <>
               <button 

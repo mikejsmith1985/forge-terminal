@@ -205,7 +205,8 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     <h3>{initialData ? 'Edit Command' : 'Add Command'}</h3>
                     <button className="btn-close" onClick={onClose}>×</button>
                 </div>
-                <form onSubmit={handleSubmit}>
+                <div className="modal-body">
+                    <form id="command-form" onSubmit={handleSubmit}>
                     <div className="form-row" style={{ gap: '12px', alignItems: 'flex-end' }}>
                         <div className="form-group" style={{ flex: '0 0 auto' }}>
                             <label>Icon</label>
@@ -335,12 +336,13 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                             </div>
                         )}
                     </div>
+                    </form>
+                </div>
 
-                    <div className="modal-actions">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                        <button type="submit" className="btn btn-primary">Save</button>
-                    </div>
-                </form>
+                <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                    <button type="submit" form="command-form" className="btn btn-primary">Save</button>
+                </div>
 
                 {/* Hooks Wizard Overlay */}
                 {showHooksWizard && (
