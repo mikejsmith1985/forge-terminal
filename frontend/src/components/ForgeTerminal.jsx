@@ -664,6 +664,43 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.open(terminalRef.current);
     xtermRef.current = term;
 
+    // Handle Ctrl+V paste - read from clipboard and send to WebSocket
+    term.attachCustomKeyEventHandler((event) => {
+      // Only intercept Ctrl+V for clipboard paste
+      if (event.ctrlKey && (event.key === 'v' || event.key === 'V')) {
+        console.log('[Terminal] Ctrl+V detected - reading clipboard');
+        event.preventDefault();
+        
+        // Read from clipboard
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          navigator.clipboard.readText()
+            .then((text) => {
+              console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
+              
+              // Send to WebSocket (same as what pasteCommand does)
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                // Sanitize: replace newlines with spaces to prevent auto-execution
+                const sanitized = text.replace(/[\r\n]+/g, ' ').trim();
+                wsRef.current.send(sanitized);
+                console.log('[Terminal] Sent to WebSocket:', sanitized.length, 'chars');
+              } else {
+                console.warn('[Terminal] WebSocket not ready for paste');
+              }
+            })
+            .catch((err) => {
+              console.error('[Terminal] Clipboard read failed:', err);
+            });
+        } else {
+          console.warn('[Terminal] Clipboard API not available');
+        }
+        
+        return false; // Prevent further event propagation
+      }
+      
+      // Allow all other keys to be handled normally
+      return true;
+    });
+
     // Initial fit
     setTimeout(() => fitAddon.fit(), 0);
 
