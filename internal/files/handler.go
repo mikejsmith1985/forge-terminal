@@ -11,6 +11,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+)
+
+// wslHomeCache caches resolved WSL home directories to avoid spawning WSL processes repeatedly
+var (
+	wslHomeCache = make(map[string]string)
+	wslHomeMutex = sync.RWMutex{}
 )
 
 // normalizePath handles cross-platform path normalization
@@ -108,8 +115,26 @@ func resolvePathWithDistro(p string, distro string) (string, error) {
 }
 
 // resolveWSLHome resolves ~ to the actual WSL home directory
+// Caches results to avoid spawning WSL processes repeatedly
 func resolveWSLHome(distro, remainder string) (string, error) {
-	// Try to get the WSL home directory using wsl.exe
+	// Check cache first
+	wslHomeMutex.RLock()
+	if cachedHome, exists := wslHomeCache[distro]; exists {
+		wslHomeMutex.RUnlock()
+		
+		// Build UNC path from cached home
+		fullLinuxPath := cachedHome
+		if remainder != "" {
+			fullLinuxPath = cachedHome + "/" + remainder
+		}
+		
+		linuxPath := strings.TrimPrefix(fullLinuxPath, "/")
+		uncPath := `\\wsl.localhost\` + distro + `\` + strings.ReplaceAll(linuxPath, "/", `\`)
+		return uncPath, nil
+	}
+	wslHomeMutex.RUnlock()
+
+	// Try to get the WSL home directory using wsl.exe (only once per distro)
 	// This runs: wsl -d <distro> -e echo $HOME
 	cmd := exec.Command("wsl", "-d", distro, "-e", "sh", "-c", "echo $HOME")
 	output, err := cmd.Output()
@@ -123,6 +148,11 @@ func resolveWSLHome(distro, remainder string) (string, error) {
 	}
 
 	homePath := strings.TrimSpace(string(output))
+	// Cache the result for this distro
+	wslHomeMutex.Lock()
+	wslHomeCache[distro] = homePath
+	wslHomeMutex.Unlock()
+
 	// homePath is like "/home/mikej"
 	fullLinuxPath := homePath
 	if remainder != "" {
@@ -284,10 +314,22 @@ func HandleRead(w http.ResponseWriter, r *http.Request) {
 		rootPath = "."
 	}
 
-	absPath, err := filepath.Abs(req.Path)
-	if err != nil {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
-		return
+	// Use proper path resolution that handles WSL paths
+	// On Windows, UNC paths (\\wsl.localhost\...) are valid and should not be processed with filepath.Abs
+	var absPath string
+	var err error
+
+	// Check if it's a UNC path (Windows WSL path)
+	if runtime.GOOS == "windows" && strings.HasPrefix(req.Path, "\\\\") {
+		// It's a UNC path, use as-is
+		absPath = req.Path
+	} else {
+		// Regular path, use absolute path
+		absPath, err = filepath.Abs(req.Path)
+		if err != nil {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Validate path is within root
@@ -340,10 +382,21 @@ func HandleWrite(w http.ResponseWriter, r *http.Request) {
 		rootPath = "."
 	}
 
-	absPath, err := filepath.Abs(req.Path)
-	if err != nil {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
-		return
+	// Use proper path resolution that handles WSL paths
+	var absPath string
+	var err error
+
+	// Check if it's a UNC path (Windows WSL path)
+	if runtime.GOOS == "windows" && strings.HasPrefix(req.Path, "\\\\") {
+		// It's a UNC path, use as-is
+		absPath = req.Path
+	} else {
+		// Regular path, use absolute path
+		absPath, err = filepath.Abs(req.Path)
+		if err != nil {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Validate path is within root
@@ -366,8 +419,8 @@ func HandleWrite(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"status": "success",
-		"path":   req.Path,
+		"path":    req.Path,
+		"message": "File saved successfully",
 	})
 }
 
@@ -390,10 +443,21 @@ func HandleDelete(w http.ResponseWriter, r *http.Request) {
 		rootPath = "."
 	}
 
-	absPath, err := filepath.Abs(req.Path)
-	if err != nil {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
-		return
+	// Use proper path resolution that handles WSL paths
+	var absPath string
+	var err error
+
+	// Check if it's a UNC path (Windows WSL path)
+	if runtime.GOOS == "windows" && strings.HasPrefix(req.Path, "\\\\") {
+		// It's a UNC path, use as-is
+		absPath = req.Path
+	} else {
+		// Regular path, use absolute path
+		absPath, err = filepath.Abs(req.Path)
+		if err != nil {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Validate path is within root

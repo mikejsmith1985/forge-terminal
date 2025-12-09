@@ -664,9 +664,25 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.open(terminalRef.current);
     xtermRef.current = term;
 
-    // Handle Ctrl+V paste - read from clipboard and send to WebSocket
+    // Handle Ctrl+C and Ctrl+V keyboard shortcuts
     term.attachCustomKeyEventHandler((event) => {
-      // Only intercept Ctrl+V for clipboard paste
+      // Handle Ctrl+C (SIGINT) - send interrupt signal to shell
+      if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
+        console.log('[Terminal] Ctrl+C pressed - sending SIGINT');
+        event.preventDefault();
+        
+        // Send Ctrl+C (0x03) to the terminal
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send('\x03');
+          console.log('[Terminal] SIGINT sent via WebSocket');
+        } else {
+          console.warn('[Terminal] WebSocket not ready for Ctrl+C');
+        }
+        
+        return false; // Prevent browser default behavior
+      }
+      
+      // Handle Ctrl+V (paste from clipboard)
       if (event.ctrlKey && (event.key === 'v' || event.key === 'V')) {
         console.log('[Terminal] Ctrl+V detected - reading clipboard');
         event.preventDefault();
