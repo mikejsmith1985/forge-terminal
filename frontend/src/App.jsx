@@ -531,6 +531,16 @@ function App() {
                           target.tagName === 'TEXTAREA' || 
                           target.isContentEditable;
       
+      // Check if target is within xterm terminal (for copy/paste support)
+      const isTerminalFocused = target.closest?.('.xterm') || 
+                               target.classList?.contains('xterm') ||
+                               target.closest?.('.terminal-inner');
+      
+      // Allow Ctrl+C and Ctrl+V to pass through to xterm when terminal is focused
+      if (isTerminalFocused && e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V')) {
+        return; // Let xterm handle copy/paste
+      }
+      
       if (isInputField) {
         return; // Let the input field handle the event
       }
