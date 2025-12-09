@@ -537,9 +537,9 @@ function App() {
                                target.closest?.('.terminal-inner');
       
       // Allow Ctrl+C and Ctrl+V to pass through to xterm when terminal is focused
+      // Don't preventDefault - let xterm handle these keys normally with clipboardMode: 'on'
       if (isTerminalFocused && e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V')) {
-        e.preventDefault(); // Prevent browser's default copy/paste behavior
-        return; // Let xterm's custom key handler deal with it
+        return; // Let xterm handle Ctrl+C/V natively
       }
       
       if (isInputField) {
