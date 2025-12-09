@@ -89,8 +89,6 @@ export default function VisionOverlay({ activeOverlay, onAction, onDismiss }) {
           selectedIndex={selectedIndex}
         />
       )}
-        />
-      )}
     </div>
   );
 }

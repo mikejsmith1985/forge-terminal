@@ -129,6 +129,10 @@ func main() {
 	http.HandleFunc("/api/am/apply-hooks", WrapWithMiddleware(handleAMApplyHooks))
 	http.HandleFunc("/api/am/hook", WrapWithMiddleware(handleAMHook))
 	http.HandleFunc("/api/am/restore-hooks", WrapWithMiddleware(handleAMRestoreHooks))
+	
+	// Vision Insights API - pattern detection tracking
+	http.HandleFunc("/api/vision/insights/", WrapWithMiddleware(handleVisionInsights))
+	http.HandleFunc("/api/vision/insights/summary/", WrapWithMiddleware(handleVisionInsightsSummary))
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
@@ -1512,5 +1516,103 @@ log.Printf("[Assistant] Model changed to: %s", req.Model)
 json.NewEncoder(w).Encode(assistant.SetModelResponse{
 Success: true,
 Model:   req.Model,
+})
+}
+
+// Vision Insights handlers
+
+// handleVisionInsights returns insights for a specific tab
+func handleVisionInsights(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodGet {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+w.Header().Set("Content-Type", "application/json")
+
+// Extract tabID from URL path: /api/vision/insights/{tabID}
+tabID := strings.TrimPrefix(r.URL.Path, "/api/vision/insights/")
+if tabID == "" {
+http.Error(w, "Tab ID required", http.StatusBadRequest)
+return
+}
+
+log.Printf("[Vision API] GET /api/vision/insights/%s", tabID)
+
+// Load insights from disk
+amSystem := am.GetSystem()
+if amSystem == nil {
+json.NewEncoder(w).Encode(map[string]interface{}{
+"success":  false,
+"error":    "AM system not initialized",
+"insights": []interface{}{},
+})
+return
+}
+
+insights, err := terminal.LoadVisionInsights(amSystem.AMDir, tabID)
+if err != nil {
+log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
+json.NewEncoder(w).Encode(map[string]interface{}{
+"success":  false,
+"error":    err.Error(),
+"insights": []interface{}{},
+})
+return
+}
+
+log.Printf("[Vision API] Loaded %d insights for tab %s", len(insights), tabID)
+
+json.NewEncoder(w).Encode(map[string]interface{}{
+"success":  true,
+"insights": insights,
+"count":    len(insights),
+})
+}
+
+// handleVisionInsightsSummary returns a summary of insights for a specific tab
+func handleVisionInsightsSummary(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodGet {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+w.Header().Set("Content-Type", "application/json")
+
+// Extract tabID from URL path: /api/vision/insights/summary/{tabID}
+tabID := strings.TrimPrefix(r.URL.Path, "/api/vision/insights/summary/")
+if tabID == "" {
+http.Error(w, "Tab ID required", http.StatusBadRequest)
+return
+}
+
+log.Printf("[Vision API] GET /api/vision/insights/summary/%s", tabID)
+
+// Load insights from disk
+amSystem := am.GetSystem()
+if amSystem == nil {
+json.NewEncoder(w).Encode(map[string]interface{}{
+"success": false,
+"error":   "AM system not initialized",
+})
+return
+}
+
+insights, err := terminal.LoadVisionInsights(amSystem.AMDir, tabID)
+if err != nil {
+log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
+json.NewEncoder(w).Encode(map[string]interface{}{
+"success": false,
+"error":   err.Error(),
+})
+return
+}
+
+summary := terminal.GetVisionInsightSummary(insights)
+log.Printf("[Vision API] Generated summary for tab %s: %d total insights", tabID, summary["total"])
+
+json.NewEncoder(w).Encode(map[string]interface{}{
+"success": true,
+"summary": summary,
 })
 }

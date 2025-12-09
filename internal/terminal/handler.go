@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/assistant"
+	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
 
 // Custom WebSocket close codes (4000-4999 range is for application use)
@@ -137,6 +139,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// CRITICAL: Use tabID (not sessionID) so command card triggers match this logger
 	amSystem := h.assistantCore.GetAMSystem()
 	var llmLogger *am.LLMLogger
+	var insightsTracker *vision.InsightsTracker
 	if amSystem != nil {
 		llmLogger = amSystem.GetLLMLogger(tabID)
 		log.Printf("[Terminal] Using LLM logger for tabID: %s", tabID)
@@ -144,6 +147,18 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if amSystem.HealthMonitor != nil {
 			amSystem.HealthMonitor.RecordPTYHeartbeat()
 		}
+		
+		// Initialize Vision Insights tracker
+		cwd, _ := os.Getwd()
+		sessionInfo := vision.SessionInfo{
+			TabID:      tabID,
+			WorkingDir: cwd,
+			ShellType:  shellConfig.ShellType,
+			InAutoMode: false, // Will be updated when auto-respond starts
+		}
+		insightsTracker = vision.NewInsightsTracker(amSystem.AMDir, sessionInfo)
+		visionParser.SetInsightsTracker(insightsTracker)
+		log.Printf("[Terminal] Vision insights tracker initialized for session %s", sessionID)
 	}
 	detector := h.assistantCore.GetLLMDetector()
 	log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)

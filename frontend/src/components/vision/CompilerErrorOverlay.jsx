@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import '../vision.css';
+import './vision.css';
 
 /**
  * CompilerErrorOverlay - Display compiler/interpreter errors with context

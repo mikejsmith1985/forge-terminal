@@ -59,6 +59,7 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
   - **File Paths**: Detects file paths, validates existence, provides quick view/edit/list actions
   - **Compiler Errors** (NEW): Detects errors from Go, Rust, TypeScript, Python, Java with context and quick actions
   - **Stack Traces** (NEW): Detects panics and exceptions from Go, Python, Java, JavaScript with frame analysis
+   - **Vision-AM Integration** (NEW): All detected errors and warnings are persisted to AM logs. When auto-respond is enabled, Vision can optionally interrupt the workflow on critical errors or silently collect findings for post-session review. Configure in Settings: "Vision-AutoRespond Mode" (strict/lenient)
 
 ## Installation
 
@@ -403,7 +404,14 @@ AM logs are stored in the working directory:
 
 ## Changelog
 
-### v1.19.1 (Current)
+### v1.20.0 (Current)
+- **Vision-AM Integration**: All Vision findings (errors, warnings, patterns) persisted to AM logs
+- **Configurable Vision-AutoRespond**: Choose between strict (interrupt) or lenient (collect) modes
+- **Insights API**: New endpoint for accessing Vision insights from sessions
+- **Post-Session Review**: Review all Vision findings after command execution completes
+- **Error Detection Enhancements**: Improved parsing of compiler errors and stack traces
+
+### v1.19.1
 - **Resizable Sidebar**: Drag sidebar edge horizontally to adjust width (persists)
 - **Dual Font Controls**: Independent font size adjustment for terminal and assistant chat (8-30px range)
 - **Experimental Assistant**: Dev Mode toggle for AI chat panel with Ollama integration
