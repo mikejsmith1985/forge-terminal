@@ -191,73 +191,125 @@ function App() {
     document.documentElement.className = savedTheme;
     applyTheme(savedColorTheme, savedTheme);
     
-    // Set up SSE for real-time update notifications with exponential backoff
+    // Store the current version for post-update detection and trigger page refresh if needed
+    const checkAndRefreshAfterUpdate = async () => {
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        const currentVersion = data.version;
+        const lastKnownVersion = localStorage.getItem('lastKnownVersion');
+        
+        if (currentVersion !== lastKnownVersion && lastKnownVersion) {
+          // Version changed - server was updated, refresh to load new assets and reconnect terminal
+          console.log('[Update] Version changed from', lastKnownVersion, 'to', currentVersion, '- page will refresh');
+          localStorage.setItem('lastKnownVersion', currentVersion);
+          // Give server time to fully start and all connections to stabilize
+          setTimeout(() => {
+            console.log('[Update] Server updated and ready - refreshing page to reconnect terminal and load new assets');
+            window.location.reload();
+          }, 2500);
+        } else {
+          localStorage.setItem('lastKnownVersion', currentVersion);
+        }
+      } catch (err) {
+        console.warn('[Update] Failed to check version:', err.message);
+        // Fallback: store a generic version
+        localStorage.setItem('lastKnownVersion', '1.9.5');
+      }
+    };
+    
+    checkAndRefreshAfterUpdate();
+    
+    // Set up SSE for real-time update notifications with exponential backoff and fallback polling
     let eventSource = null;
     let reconnectAttempt = 0;
     const MAX_RECONNECT_ATTEMPTS = 5;
     const BASE_RECONNECT_DELAY = 5000; // 5 seconds
+    let fallbackPollTimer = null;
+    
+    const startFallbackPolling = () => {
+      // Fallback polling every 5 minutes if SSE fails
+      console.log('[SSE] Starting fallback polling every 5 minutes');
+      fallbackPollTimer = setInterval(() => {
+        checkForUpdates();
+      }, 5 * 60 * 1000);
+    };
+    
+    const stopFallbackPolling = () => {
+      if (fallbackPollTimer) {
+        clearInterval(fallbackPollTimer);
+        fallbackPollTimer = null;
+      }
+    };
     
     const connectSSE = () => {
-      eventSource = new EventSource('/api/update/events');
-      
-      eventSource.addEventListener('connected', (e) => {
-        console.log('[SSE] Connected to update events');
-        reconnectAttempt = 0; // Reset counter on successful connection
-      });
-      
-      eventSource.addEventListener('update', (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          console.log('[SSE] Update notification received:', data);
-          if (data.available) {
-            setUpdateInfo(data);
-            // Show toast notification
-            const dismissedVersion = localStorage.getItem('updateDismissedVersion');
-            if (dismissedVersion !== data.latestVersion) {
-              addToast(
-                `Update available: ${data.latestVersion}`,
-                'update',
-                0,
-                {
-                  action: 'View Update',
-                  onAction: () => setIsUpdateModalOpen(true),
-                  secondaryAction: 'Later',
-                  onSecondaryAction: () => {
-                    localStorage.setItem('updateDismissedAt', Date.now().toString());
-                    localStorage.setItem('updateDismissedVersion', data.latestVersion);
-                  }
-                }
-              );
-            }
-          }
-        } catch (err) {
-          console.error('[SSE] Error parsing update event:', err);
-        }
-      });
-      
-      eventSource.addEventListener('error', (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          console.warn('[SSE] Update check error:', data.message);
-        } catch (err) {
-          // Ignore parse errors for error events
-        }
-      });
-      
-      eventSource.onerror = () => {
-        console.log(`[SSE] Connection error, reconnect attempt ${reconnectAttempt + 1}/${MAX_RECONNECT_ATTEMPTS}`);
-        eventSource.close();
+      try {
+        eventSource = new EventSource('/api/update/events');
         
-        if (reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
-          // Exponential backoff: 5s, 10s, 20s, 40s, 80s
-          const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempt);
-          reconnectAttempt++;
-          console.log(`[SSE] Retrying in ${delay}ms...`);
-          setTimeout(connectSSE, delay);
-        } else {
-          console.error('[SSE] Max reconnection attempts reached, giving up');
-        }
-      };
+        eventSource.addEventListener('connected', (e) => {
+          console.log('[SSE] Connected to update events');
+          reconnectAttempt = 0; // Reset counter on successful connection
+          stopFallbackPolling(); // Stop fallback since SSE is working
+        });
+        
+        eventSource.addEventListener('update', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            console.log('[SSE] Update notification received:', data);
+            if (data.available) {
+              setUpdateInfo(data);
+              // Show toast notification
+              const dismissedVersion = localStorage.getItem('updateDismissedVersion');
+              if (dismissedVersion !== data.latestVersion) {
+                addToast(
+                  `Update available: ${data.latestVersion}`,
+                  'update',
+                  0,
+                  {
+                    action: 'View Update',
+                    onAction: () => setIsUpdateModalOpen(true),
+                    secondaryAction: 'Later',
+                    onSecondaryAction: () => {
+                      localStorage.setItem('updateDismissedAt', Date.now().toString());
+                      localStorage.setItem('updateDismissedVersion', data.latestVersion);
+                    }
+                  }
+                );
+              }
+            }
+          } catch (err) {
+            console.error('[SSE] Error parsing update event:', err);
+          }
+        });
+        
+        eventSource.addEventListener('error', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            console.warn('[SSE] Update check error:', data.message);
+          } catch (err) {
+            // Ignore parse errors for error events
+          }
+        });
+        
+        eventSource.onerror = () => {
+          console.log(`[SSE] Connection error, reconnect attempt ${reconnectAttempt + 1}/${MAX_RECONNECT_ATTEMPTS}`);
+          eventSource.close();
+          startFallbackPolling(); // Start fallback polling on connection error
+          
+          if (reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
+            // Exponential backoff: 5s, 10s, 20s, 40s, 80s
+            const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempt);
+            reconnectAttempt++;
+            console.log(`[SSE] Retrying in ${delay}ms...`);
+            setTimeout(connectSSE, delay);
+          } else {
+            console.error('[SSE] Max reconnection attempts reached, fallback polling will continue');
+          }
+        };
+      } catch (err) {
+        console.error('[SSE] Failed to create EventSource:', err);
+        startFallbackPolling();
+      }
     };
     
     connectSSE();
@@ -266,6 +318,7 @@ function App() {
       if (eventSource) {
         eventSource.close();
       }
+      stopFallbackPolling();
     };
   }, [])
 

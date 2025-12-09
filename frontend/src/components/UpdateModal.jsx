@@ -28,18 +28,53 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
     }
     
     setLoadingVersions(true);
-    try {
-      const res = await fetch('/api/update/versions');
-      const data = await res.json();
-      if (data.releases) {
-        setVersions(data.releases);
-        setShowVersions(true);
+    setErrorMessage('');
+    
+    // Retry logic with exponential backoff
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    const attemptFetch = async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
+        const res = await fetch('/api/update/versions', { signal: controller.signal });
+        clearTimeout(timeout);
+        
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+        }
+        
+        const data = await res.json();
+        if (data.releases && Array.isArray(data.releases)) {
+          setVersions(data.releases);
+          setShowVersions(true);
+          console.log('[UpdateModal] Successfully loaded', data.releases.length, 'versions');
+        } else {
+          throw new Error('Invalid response format - no releases array');
+        }
+      } catch (err) {
+        console.error(`[UpdateModal] Fetch attempt ${retryCount + 1}/${maxRetries} failed:`, err.message);
+        
+        if (retryCount < maxRetries && !(err instanceof TypeError && err.message.includes('aborted'))) {
+          retryCount++;
+          // Exponential backoff: 500ms, 1s, 2s
+          const delay = 500 * Math.pow(2, retryCount - 1);
+          console.log(`[UpdateModal] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return attemptFetch();
+        } else {
+          const message = err.message || 'Failed to fetch versions';
+          setErrorMessage(`Could not load versions: ${message}. Please check your connection.`);
+          console.error('[UpdateModal] Failed to load versions after all retries:', message);
+        }
+      } finally {
+        setLoadingVersions(false);
       }
-    } catch (err) {
-      console.error('Failed to fetch versions:', err);
-    } finally {
-      setLoadingVersions(false);
-    }
+    };
+    
+    return attemptFetch();
   };
 
   /**
@@ -301,6 +336,25 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
               {showVersions ? 'Hide' : 'Show'} Previous Versions
               {showVersions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
+
+            {/* Error message for version loading */}
+            {showVersions && errorMessage && (
+              <div style={{ 
+                marginTop: '15px',
+                padding: '12px',
+                background: '#450a0a',
+                border: '1px solid #ef4444',
+                borderRadius: '6px',
+                color: '#fca5a5',
+                fontSize: '0.85em',
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-start'
+              }}>
+                <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
             {showVersions && versions.length > 0 && (
               <div style={{ 
