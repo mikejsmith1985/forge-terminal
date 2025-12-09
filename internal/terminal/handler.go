@@ -55,7 +55,26 @@ func NewHandler(service assistant.Service, core *assistant.Core) *Handler {
 	return &Handler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				return true // Allow all origins in development
+				// Check allowed origins for GitHub Pages deployment support
+				origin := r.Header.Get("Origin")
+				
+				// Allow localhost for local development
+				if strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") {
+					return true
+				}
+				
+				// Allow GitHub Pages deployments (github.io domain)
+				if strings.Contains(origin, ".github.io") {
+					return true
+				}
+				
+				// Allow GitHub Codespaces
+				if strings.Contains(origin, "app.github.dev") || strings.Contains(origin, ".csb.app") {
+					return true
+				}
+				
+				// Allow any origin for backward compatibility (can be restricted via ALLOWED_ORIGINS env var)
+				return true
 			},
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,

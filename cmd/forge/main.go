@@ -83,68 +83,68 @@ func main() {
 	http.HandleFunc("/ws", termHandler.HandleWebSocket)
 
 	// Commands API
-	http.HandleFunc("/api/commands", handleCommands)
-	http.HandleFunc("/api/commands/restore-defaults", handleRestoreDefaultCommands)
+	http.HandleFunc("/api/commands", WrapWithMiddleware(handleCommands))
+	http.HandleFunc("/api/commands/restore-defaults", WrapWithMiddleware(handleRestoreDefaultCommands))
 
 	// Config API
-	http.HandleFunc("/api/config", handleConfig)
+	http.HandleFunc("/api/config", WrapWithMiddleware(handleConfig))
 
 	// WSL detection API
-	http.HandleFunc("/api/wsl/detect", handleWSLDetect)
+	http.HandleFunc("/api/wsl/detect", WrapWithMiddleware(handleWSLDetect))
 
 	// Shutdown API - allows graceful shutdown from browser
-	http.HandleFunc("/api/shutdown", handleShutdown)
+	http.HandleFunc("/api/shutdown", WrapWithMiddleware(handleShutdown))
 
 	// Update API - check for updates and apply them
-	http.HandleFunc("/api/version", handleVersion)
-	http.HandleFunc("/api/update/check", handleUpdateCheck)
-	http.HandleFunc("/api/update/apply", handleUpdateApply)
-	http.HandleFunc("/api/update/versions", handleListVersions)
-	http.HandleFunc("/api/update/events", handleUpdateEvents)                // SSE for push update notifications
-	http.HandleFunc("/api/update/install-manual", handleInstallManualUpdate) // Install manually downloaded binary
+	http.HandleFunc("/api/version", WrapWithMiddleware(handleVersion))
+	http.HandleFunc("/api/update/check", WrapWithMiddleware(handleUpdateCheck))
+	http.HandleFunc("/api/update/apply", WrapWithMiddleware(handleUpdateApply))
+	http.HandleFunc("/api/update/versions", WrapWithMiddleware(handleListVersions))
+	http.HandleFunc("/api/update/events", WrapWithMiddleware(handleUpdateEvents))                // SSE for push update notifications
+	http.HandleFunc("/api/update/install-manual", WrapWithMiddleware(handleInstallManualUpdate)) // Install manually downloaded binary
 
 	// Sessions API - persist tab state across refreshes
-	http.HandleFunc("/api/sessions", handleSessions)
+	http.HandleFunc("/api/sessions", WrapWithMiddleware(handleSessions))
 
 	// Welcome screen API - track if welcome has been shown
-	http.HandleFunc("/api/welcome", handleWelcome)
+	http.HandleFunc("/api/welcome", WrapWithMiddleware(handleWelcome))
 
 	// AM (Artificial Memory) API - session logging and recovery
-	http.HandleFunc("/api/am/enable", handleAMEnable)
-	http.HandleFunc("/api/am/log", handleAMLog)
-	http.HandleFunc("/api/am/check", handleAMCheck)
-	http.HandleFunc("/api/am/check/enhanced", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/am/enable", WrapWithMiddleware(handleAMEnable))
+	http.HandleFunc("/api/am/log", WrapWithMiddleware(handleAMLog))
+	http.HandleFunc("/api/am/check", WrapWithMiddleware(handleAMCheck))
+	http.HandleFunc("/api/am/check/enhanced", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		handleAMCheckEnhanced(w, r)
-	})
-	http.HandleFunc("/api/am/check/grouped", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	http.HandleFunc("/api/am/check/grouped", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		handleAMCheckGrouped(w, r)
-	})
-	http.HandleFunc("/api/am/content/", handleAMContent)
-	http.HandleFunc("/api/am/archive/", handleAMArchive)
-	http.HandleFunc("/api/am/cleanup", handleAMCleanup)
-	http.HandleFunc("/api/am/install-hooks", handleAMInstallHooks)
-	http.HandleFunc("/api/am/llm/conversations/", handleAMLLMConversations)
-	http.HandleFunc("/api/am/health", handleAMHealth)
-	http.HandleFunc("/api/am/conversations", handleAMActiveConversations)
-	http.HandleFunc("/api/am/apply-hooks", handleAMApplyHooks)
-	http.HandleFunc("/api/am/hook", handleAMHook)
-	http.HandleFunc("/api/am/restore-hooks", handleAMRestoreHooks)
+	}))
+	http.HandleFunc("/api/am/content/", WrapWithMiddleware(handleAMContent))
+	http.HandleFunc("/api/am/archive/", WrapWithMiddleware(handleAMArchive))
+	http.HandleFunc("/api/am/cleanup", WrapWithMiddleware(handleAMCleanup))
+	http.HandleFunc("/api/am/install-hooks", WrapWithMiddleware(handleAMInstallHooks))
+	http.HandleFunc("/api/am/llm/conversations/", WrapWithMiddleware(handleAMLLMConversations))
+	http.HandleFunc("/api/am/health", WrapWithMiddleware(handleAMHealth))
+	http.HandleFunc("/api/am/conversations", WrapWithMiddleware(handleAMActiveConversations))
+	http.HandleFunc("/api/am/apply-hooks", WrapWithMiddleware(handleAMApplyHooks))
+	http.HandleFunc("/api/am/hook", WrapWithMiddleware(handleAMHook))
+	http.HandleFunc("/api/am/restore-hooks", WrapWithMiddleware(handleAMRestoreHooks))
 
 	// Desktop shortcut API
-	http.HandleFunc("/api/desktop-shortcut", handleDesktopShortcut)
+	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
 
 	// File management API
-	http.HandleFunc("/api/files/list", files.HandleList)
-	http.HandleFunc("/api/files/read", files.HandleRead)
-	http.HandleFunc("/api/files/write", files.HandleWrite)
-	http.HandleFunc("/api/files/delete", files.HandleDelete)
-	http.HandleFunc("/api/files/stream", files.HandleReadStream)
+	http.HandleFunc("/api/files/list", WrapWithMiddleware(files.HandleList))
+	http.HandleFunc("/api/files/read", WrapWithMiddleware(files.HandleRead))
+	http.HandleFunc("/api/files/write", WrapWithMiddleware(files.HandleWrite))
+	http.HandleFunc("/api/files/delete", WrapWithMiddleware(files.HandleDelete))
+	http.HandleFunc("/api/files/stream", WrapWithMiddleware(files.HandleReadStream))
 
 	// Assistant API - AI chat and command suggestions (Dev Mode only)
-	http.HandleFunc("/api/assistant/status", handleAssistantStatus)
-	http.HandleFunc("/api/assistant/chat", handleAssistantChat)
-	http.HandleFunc("/api/assistant/execute", handleAssistantExecute)
-	http.HandleFunc("/api/assistant/model", handleAssistantSetModel)
+	http.HandleFunc("/api/assistant/status", WrapWithMiddleware(handleAssistantStatus))
+	http.HandleFunc("/api/assistant/chat", WrapWithMiddleware(handleAssistantChat))
+	http.HandleFunc("/api/assistant/execute", WrapWithMiddleware(handleAssistantExecute))
+	http.HandleFunc("/api/assistant/model", WrapWithMiddleware(handleAssistantSetModel))
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()

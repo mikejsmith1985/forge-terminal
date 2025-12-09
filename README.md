@@ -54,7 +54,29 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 
 ## Installation
 
-Download the latest release for your platform from the [Releases](https://github.com/mikejsmith1985/forge-terminal/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/mikejsmith1985/forge-terminal/releases) page, OR use the **web-based deployment** (no download required).
+
+### 🌐 Web-Based Installation (Recommended for Most Users)
+
+**No installation needed!** Access forge-terminal directly from your browser:
+
+1. **Choose your deployment mode**:
+   - **Local** (fastest): Run binary locally, use browser frontend
+   - **GitHub Codespaces** (cloud-based): No local setup required
+   - **Embedded** (simplest): Single binary with included frontend
+
+2. **Quick Start**:
+   ```bash
+   # Option 1: Local (download binary from releases)
+   ./forge-darwin-arm64  # or .exe / -linux-amd64
+   # Opens at http://localhost:8333
+   
+   # Option 2: GitHub Codespaces (no download)
+   # Create Codespace → make run → configure API at
+   # https://[username].github.io/forge-terminal/
+   ```
+
+3. **Detailed guide**: See [GitHub Pages Deployment Guide](docs/user/github-pages-deployment.md)
 
 ### Windows
 Download `forge-windows-amd64.exe` and double-click it.
