@@ -51,9 +51,16 @@ jobs:
         uses: actions/configure-pages@v4
 
       - name: Upload artifact
+        id: upload
         uses: actions/upload-pages-artifact@v3
         with:
           path: "frontend/dist"
+
+      - name: Debug artifact upload
+        run: |
+          echo "✓ Artifact uploaded successfully"
+          echo "  Name: github-pages"
+          echo "  Path: frontend/dist"
 
   deploy:
     name: Deploy to GitHub Pages
@@ -63,6 +70,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Display deployment info
+        run: |
+          echo "Deploying to GitHub Pages"
+          echo "Artifact name: github-pages"
+          echo "Environment: github-pages"
+          
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
