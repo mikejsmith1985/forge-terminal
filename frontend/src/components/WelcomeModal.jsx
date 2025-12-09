@@ -174,6 +174,33 @@ function WelcomeModal({ isOpen, onClose, version }) {
                 <span>High contrast + colorblind-friendly options</span>
               </div>
             </div>
+
+            {/* Experimental Features Section */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '16px', paddingTop: '16px', opacity: 0.8 }}>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Experimental (Dev Mode)
+              </div>
+              
+              <div className="welcome-feature">
+                <div className="welcome-feature-icon">
+                  🤖
+                </div>
+                <div className="welcome-feature-text">
+                  <strong>Forge Assistant</strong>
+                  <span>AI chat with Ollama • Context-aware suggestions</span>
+                </div>
+              </div>
+
+              <div className="welcome-feature">
+                <div className="welcome-feature-icon">
+                  👁️
+                </div>
+                <div className="welcome-feature-text">
+                  <strong>Vision Detection</strong>
+                  <span>Recognizes JSON • More patterns coming</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="welcome-footer">

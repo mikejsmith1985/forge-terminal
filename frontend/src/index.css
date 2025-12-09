@@ -187,6 +187,17 @@ body {
   transition: background 0.3s, border-color 0.3s;
 }
 
+/* Resizer between terminal and sidebar */
+.sidebar-resizer {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.12s;
+}
+.sidebar-resizer:hover {
+  background: rgba(255,255,255,0.03);
+}
+
 .sidebar-header {
   display: flex;
   justify-content: space-between;

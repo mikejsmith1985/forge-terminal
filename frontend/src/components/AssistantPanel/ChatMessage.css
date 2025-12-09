@@ -60,7 +60,7 @@
 
 .message-content {
   color: #ccc;
-  font-size: 14px;
+  font-size: var(--assistant-font-size, 14px);
   line-height: 1.6;
   white-space: pre-wrap;
   word-wrap: break-word;

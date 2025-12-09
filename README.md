@@ -27,8 +27,9 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **🎨 10 Color Themes**: Molten Metal, Deep Ocean, Emerald Forest, Midnight Purple, Rose Gold, Arctic Frost, plus 4 high-contrast accessibility themes.
 - **🌗 Per-Tab Light/Dark Mode**: Each tab can independently toggle between light and dark modes (10 themes × 2 modes = 20 unique visuals).
 - **♿ High-Contrast Themes**: Includes color-blind friendly themes for visual accessibility.
-- **📏 Font Size Control**: Adjust terminal font size (10-24px).
+- **📏 Dual Font Controls**: Adjust terminal (8-30px) and assistant chat (8-30px) font sizes independently with icon toggle.
 - **📐 Flexible Layout**: Position the command sidebar on the left or right.
+- **↔️ Resizable Sidebar**: Drag the sidebar edge to adjust width (200-800px, persists across sessions).
 - **🎯 Per-Tab Themes**: Each tab can have its own color theme.
 
 ### Windows-Specific Features
@@ -44,6 +45,12 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **📍 Scroll to Bottom**: Quick button to jump to latest output.
 - **🔌 Disconnect Reasons**: Clear messages when terminal sessions end.
 - **🖥️ Desktop Shortcut**: Create a desktop shortcut from Settings for quick access.
+
+### Experimental Features (Dev Mode)
+> Enable Dev Mode in Settings to access experimental features.
+
+- **🤖 Forge Assistant** (Experimental): AI-powered chat panel integrated into the sidebar. Requires local Ollama for model inference. Context-aware suggestions based on terminal state.
+- **👁️ Vision Detection** (Experimental): Automatically detects JSON structures in terminal output. Currently supports JSON pattern matching; visual formatting improvements coming soon.
 
 ## Installation
 
@@ -221,6 +228,12 @@ AM logs are stored in the working directory:
 - `./am_archive/` - Archived logs from completed sessions
 
 ## Changelog
+
+### v1.19.1 (Current)
+- **Resizable Sidebar**: Drag sidebar edge horizontally to adjust width (persists)
+- **Dual Font Controls**: Independent font size adjustment for terminal and assistant chat (8-30px range)
+- **Experimental Assistant**: Dev Mode toggle for AI chat panel with Ollama integration
+- **Experimental Vision**: JSON detection in terminal output (visual improvements pending)
 
 ### v1.16.1
 - **Update Modal Cleanup**: Removed dead hard-refresh code that never executed

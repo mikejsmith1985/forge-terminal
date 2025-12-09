@@ -1,21 +1,19 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './tests/playwright',
   timeout: 60000,
   retries: 1,
   use: {
-    baseURL: 'http://localhost:8333',
+    baseURL: process.env.BASE_URL || 'http://localhost:4173',
     headless: true,
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'cd .. && NO_BROWSER=1 go run ./cmd/forge',
-    url: 'http://localhost:8333',
-    timeout: 60000,
-    reuseExistingServer: !process.env.CI,
-    stdout: 'pipe',
-    stderr: 'pipe',
+    command: 'npm run preview',
+    url: 'http://localhost:4173',
+    reuseExistingServer: true,
+    timeout: 120 * 1000,
   },
   projects: [
     {

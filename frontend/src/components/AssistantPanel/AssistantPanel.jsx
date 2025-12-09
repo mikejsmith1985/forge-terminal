@@ -3,7 +3,7 @@ import ChatMessage from './ChatMessage';
 import CommandPreview from './CommandPreview';
 import './AssistantPanel.css';
 
-const AssistantPanel = ({ isOpen, onClose, currentTabId }) => {
+const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -196,7 +196,7 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="assistant-panel">
+    <div className="assistant-panel" style={{ ['--assistant-font-size']: `${assistantFontSize || 14}px` }}>
       <div className="assistant-header">
         <div className="assistant-title">
           <span className="assistant-icon">🤖</span>

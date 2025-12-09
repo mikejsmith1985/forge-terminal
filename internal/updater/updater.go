@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// Version is set at build time via ldflags (-X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=x.y.z)
-var Version = "dev"
+// Version is set at build time via ldflags
+var Version = "1.9.5"
 
 // GitHub repo info
 const (
