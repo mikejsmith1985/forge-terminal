@@ -139,9 +139,10 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
 
   // Style for the colored tab background - use tab's own mode
   const accentColor = getTabAccentColor(tab.colorTheme, tabMode);
+  const bgOpacity = isActive ? '4d' : '33'; // 30% opacity for active, 20% for inactive
   const tabStyle = accentColor ? {
     '--tab-accent': accentColor,
-    backgroundColor: `${accentColor}33`, // 20% opacity
+    backgroundColor: `${accentColor}${bgOpacity}`,
   } : {};
 
   // Build title with indicators

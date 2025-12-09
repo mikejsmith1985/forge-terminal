@@ -895,12 +895,14 @@ body {
   overflow: hidden;
   transform: scale(0.85);
   opacity: 0.75;
+  box-shadow: none;
 }
 
 .tab:hover {
   background: var(--overlay);
   transform: scale(0.92);
   opacity: 0.9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .tab.waiting {
@@ -913,6 +915,15 @@ body {
   }
   50% { 
     box-shadow: 0 0 8px var(--tab-accent, var(--accent));
+  }
+}
+
+@keyframes tab-activate-pulse {
+  0% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1.08);
   }
 }
 
@@ -950,10 +961,14 @@ body {
 .tab.active {
   background: var(--bg);
   border-color: var(--overlay);
-  border-bottom-color: var(--bg);
+  border-bottom-color: var(--tab-accent, var(--accent));
+  border-bottom-width: 3px;
   margin-bottom: -1px;
+  padding-bottom: 5px;
   transform: scale(1.08);
   opacity: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: tab-activate-pulse 0.3s ease-out;
 }
 
 .tab-icon {
@@ -966,16 +981,23 @@ body {
 
 .tab.active .tab-icon {
   color: var(--accent);
+  text-shadow: 0 0 6px var(--tab-accent, var(--accent));
 }
 
 .tab-title {
   flex: 1;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+.tab.active .tab-title {
+  font-weight: 700;
+  opacity: 1;
 }
 
 .tab-close {
