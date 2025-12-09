@@ -13,14 +13,18 @@
 5. [Command Cards](#-command-cards)
 6. [Keyboard Shortcuts](#-keyboard-shortcuts)
 7. [Themes & Customization](#-themes--customization)
-8. [Windows Features (CMD, PowerShell, WSL)](#-windows-features-cmd-powershell-wsl)
-9. [Search Your Terminal](#-search-your-terminal)
-10. [Auto-Respond (Prompt Watcher)](#-auto-respond-prompt-watcher)
-11. [AM (Artificial Memory) Logging](#-am-artificial-memory-logging)
-12. [Updates & Versions](#-updates--versions)
-13. [Where Settings Are Saved](#-where-settings-are-saved)
-14. [Technical Details](#-technical-details)
-15. [Troubleshooting](#-troubleshooting)
+8. [Font Size Control](#-font-size-control)
+9. [Resizable Sidebar](#-resizable-sidebar)
+10. [Windows Features (CMD, PowerShell, WSL)](#-windows-features-cmd-powershell-wsl)
+11. [Search Your Terminal](#-search-your-terminal)
+12. [Auto-Respond (Prompt Watcher)](#-auto-respond-prompt-watcher)
+13. [AM (Artificial Memory) Logging](#-am-artificial-memory-logging)
+14. [Forge Assistant (Experimental)](#-forge-assistant-experimental)
+15. [Vision Detection (Experimental)](#-vision-detection-experimental)
+16. [Updates & Versions](#-updates--versions)
+17. [Where Settings Are Saved](#-where-settings-are-saved)
+18. [Technical Details](#-technical-details)
+19. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -311,17 +315,40 @@ Each tab can independently be in light or dark mode!
 
 ### Font Size
 
-Adjust how big or small the terminal text is:
+You can independently adjust the terminal and assistant chat font sizes using the font control module in the toolbar.
 
-| Button | What It Does |
-|--------|--------------|
-| **-** | Make text smaller (minimum: 10px) |
-| **+** | Make text larger (maximum: 24px) |
-| **↺** | Reset to default (14px) |
+#### Changing Font Size
+
+1. **Select Target**: Click the icon that represents what you want to adjust:
+   - **⌨️ (Keyboard)** = Terminal font size
+   - **🤖 (Robot)** = Assistant chat font size
+2. **Adjust Size**: Use the **+** and **−** buttons to increase or decrease
+3. **Display**: Shows current size in pixels (8–30px range)
+
+The selected target is highlighted. Font size preference is saved automatically.
+
+#### Font Size Range
+
+- **Minimum**: 8px (for high-density displays)
+- **Maximum**: 30px (for accessibility or large screens)
+- **Default**: 14px
 
 ### Sidebar Position
 
 Click the **panel icon** to move the command cards sidebar between left and right sides of the screen.
+
+### Resizable Sidebar
+
+The sidebar edge can be dragged to adjust its width:
+
+1. **Position cursor** at the left edge of the sidebar (the thin line between terminal and sidebar)
+2. **Drag left or right** to resize (200–800px range)
+3. **Width persists** across sessions automatically
+
+Why resize?
+- Narrow for more terminal space
+- Widen for better chat readability
+- Adapt to your workflow
 
 ### Desktop Shortcut
 
@@ -477,6 +504,91 @@ The default command card "📖 Summarize Last Session" (Ctrl+Shift+5) is a speci
 - Logs are stored as Markdown files - you can read them directly!
 - Old logs (7+ days) are automatically cleaned up to save space
 - Disable AM logging when you don't need it (reduces disk writes)
+
+---
+
+## 🤖 Forge Assistant (Experimental)
+
+> **Status:** Experimental feature, available in Dev Mode  
+> **Enable:** Settings → Toggle "Dev Mode"
+
+The Forge Assistant is an AI-powered chat panel that understands your terminal context and can suggest commands, answer questions, and execute operations with your confirmation.
+
+### What It Does
+
+- **Context-Aware Chat**: Understands your working directory, recent commands, and terminal output
+- **Command Suggestions**: Proposes commands and explains what they do
+- **Local LLM**: Uses Ollama for completely local, private inference (no cloud)
+- **Model Selection**: Switch between different models (Llama, CodeLlama, Mistral, etc.)
+
+### Getting Started
+
+1. **Enable Dev Mode**:
+   - Click ⚙️ Settings
+   - Toggle **"Dev Mode"**
+   - Restart or refresh the page
+
+2. **Install Ollama**:
+   - Download from [ollama.ai](https://ollama.ai)
+   - Run `ollama serve` in a terminal
+   - Pull a model: `ollama pull mistral`
+
+3. **Open Assistant Panel**:
+   - Click the **"Assistant"** tab in the sidebar
+   - Select your model from the dropdown
+
+### Using the Assistant
+
+- **Ask Questions**: "How do I find large files?" → Assistant suggests `find . -size +100M`
+- **Get Help**: "How do I create a git branch?" → Explains the command
+- **Run Commands**: Click "Run" next to suggested commands (they execute in the active tab)
+
+### Limitations (Current)
+
+- Visual improvements coming soon
+- JSON detection from Vision system not yet displayed
+- Command execution confirmation required for safety
+- Dev Mode feature; may change in future versions
+
+---
+
+## 👁️ Vision Detection (Experimental)
+
+> **Status:** Experimental feature, available in Dev Mode  
+> **Enable:** Settings → Toggle "Dev Mode" → Enable for specific tab
+
+Vision Detection automatically recognizes structured patterns in terminal output and makes them available for enhanced interaction.
+
+### What It Detects
+
+**Currently Deployed:**
+- **JSON Objects & Arrays**: Recognizes valid JSON structures in output
+
+**Coming Soon:**
+- File paths and clickable navigation
+- URLs for quick access
+- Error stack traces with line-number navigation
+- Git status and branch information
+
+### Current Behavior
+
+When JSON is detected:
+- Terminal detects and buffers the output
+- Information is passed to the Assistant (when enabled)
+- Visual formatting improvements coming in future versions
+
+### Enabling Vision per Tab
+
+1. **Right-click** on a tab
+2. Select **"Vision"** to toggle detection for that tab
+3. An eye icon (👁️) appears on the tab when enabled
+
+### Limitations (Current)
+
+- JSON detection works; visual improvements pending
+- No clickable links or formatting yet
+- Primarily supports Assistant integration
+- Experimental; behavior may change
 
 ---
 

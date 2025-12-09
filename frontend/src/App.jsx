@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, RotateCcw, Palette, PanelLeft, PanelRight, Download, RefreshCw, Folder, Command } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command } from 'lucide-react';
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -47,6 +47,18 @@ function App() {
     const saved = localStorage.getItem('terminalFontSize');
     return saved ? parseInt(saved, 10) : 14;
   })
+
+  const [chatFontSize, setChatFontSize] = useState(() => {
+    const savedChat = localStorage.getItem('chatFontSize');
+    return savedChat ? parseInt(savedChat, 10) : 14;
+  })
+
+  const [fontTarget, setFontTarget] = useState('terminal');
+
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('sidebarWidth');
+    return saved ? parseInt(saved, 10) : 360;
+  });
   
   // Update state - persists across toast dismissal
   const [updateInfo, setUpdateInfo] = useState(null)
@@ -100,8 +112,8 @@ function App() {
   const { toasts, addToast, removeToast } = useToast()
 
   const DEFAULT_FONT_SIZE = 14;
-  const MIN_FONT_SIZE = 10;
-  const MAX_FONT_SIZE = 24;
+  const MIN_FONT_SIZE = 8;
+  const MAX_FONT_SIZE = 30;
 
   // Get ref for active terminal
   const getActiveTerminalRef = useCallback(() => {
@@ -109,17 +121,22 @@ function App() {
   }, [activeTabId]);
 
   const handleFontSizeChange = (delta) => {
-    setFontSize(prev => {
-      const newSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, prev + delta));
-      localStorage.setItem('terminalFontSize', newSize.toString());
-      return newSize;
-    });
+    if (fontTarget === 'terminal') {
+      setFontSize(prev => {
+        const newSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, prev + delta));
+        localStorage.setItem('terminalFontSize', newSize.toString());
+        return newSize;
+      });
+    } else {
+      setChatFontSize(prev => {
+        const newSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, prev + delta));
+        localStorage.setItem('chatFontSize', newSize.toString());
+        return newSize;
+      });
+    }
   };
 
-  const handleFontSizeReset = () => {
-    setFontSize(DEFAULT_FONT_SIZE);
-    localStorage.setItem('terminalFontSize', DEFAULT_FONT_SIZE.toString());
-  };
+  // No explicit reset button by design (removed refresh icon per UX request)
 
   const cycleColorTheme = () => {
     // Cycle the active tab's color theme
@@ -1001,7 +1018,7 @@ function App() {
   };
 
   const sidebar = (
-    <div className="sidebar">
+    <div className="sidebar" style={{ width: `${sidebarWidth}px` }}>
       {/* Row 1: View toggle tabs */}
       <div className="sidebar-view-tabs">
         <button 
@@ -1097,29 +1114,37 @@ function App() {
         />
         <div className="font-size-controls">
           <button 
+            className={`btn btn-ghost btn-icon btn-sm ${fontTarget === 'terminal' ? 'active' : ''}`} 
+            onClick={() => setFontTarget('terminal')} 
+            title="Set target: Terminal"
+            aria-pressed={fontTarget === 'terminal'}
+          >
+            <span role="img" aria-label="terminal">⌨️</span>
+          </button>
+          <button 
             className="btn btn-ghost btn-icon btn-sm" 
             onClick={() => handleFontSizeChange(-1)} 
             title="Decrease Font Size"
-            disabled={fontSize <= MIN_FONT_SIZE}
+            disabled={(fontTarget === 'terminal' ? fontSize : chatFontSize) <= MIN_FONT_SIZE}
           >
             <Minus size={14} />
           </button>
-          <span className="font-size-display" title="Font Size">{fontSize}px</span>
+          <span className="font-size-display" title="Font Size">{fontTarget === 'terminal' ? `${fontSize}px` : `${chatFontSize}px`}</span>
           <button 
             className="btn btn-ghost btn-icon btn-sm" 
             onClick={() => handleFontSizeChange(1)} 
             title="Increase Font Size"
-            disabled={fontSize >= MAX_FONT_SIZE}
+            disabled={(fontTarget === 'terminal' ? fontSize : chatFontSize) >= MAX_FONT_SIZE}
           >
             <Plus size={14} />
           </button>
           <button 
-            className="btn btn-ghost btn-icon btn-sm" 
-            onClick={handleFontSizeReset} 
-            title="Reset Font Size"
-            disabled={fontSize === DEFAULT_FONT_SIZE}
+            className={`btn btn-ghost btn-icon btn-sm ${fontTarget === 'chat' ? 'active' : ''}`} 
+            onClick={() => setFontTarget('chat')} 
+            title="Set target: Assistant"
+            aria-pressed={fontTarget === 'chat'}
           >
-            <RotateCcw size={12} />
+            <span role="img" aria-label="assistant">🤖</span>
           </button>
         </div>
         <button 
@@ -1175,15 +1200,38 @@ function App() {
             isOpen={true}
             onClose={() => setSidebarView('cards')}
             currentTabId={activeTabId}
+            assistantFontSize={chatFontSize}
           />
         )}
       </div>
     </div>
   );
 
+  // Sidebar resizer handlers
+  const startDrag = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    let lastWidth = startWidth;
+    const onMove = (ev) => {
+      const dx = (sidebarPosition === 'right') ? (startX - ev.clientX) : (ev.clientX - startX);
+      let newWidth = startWidth + dx;
+      newWidth = Math.max(200, Math.min(800, newWidth));
+      lastWidth = newWidth;
+      setSidebarWidth(newWidth);
+    };
+    const onUp = () => {
+      localStorage.setItem('sidebarWidth', String(lastWidth));
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   return (
     <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''} ${showEditor ? 'with-editor' : ''}`}>
-      {sidebarPosition === 'left' && sidebar}
+      {sidebarPosition === 'left' && (<>{sidebar}<div className="sidebar-resizer" onMouseDown={startDrag} /></>)}
       <div className="terminal-pane">
         <TabBar
           tabs={tabs}
@@ -1263,7 +1311,7 @@ function App() {
           />
         </div>
       )}
-      {sidebarPosition === 'right' && sidebar}
+      {sidebarPosition === 'right' && (<><div className="sidebar-resizer" onMouseDown={startDrag} />{sidebar}</>)}
 
       <CommandModal
         isOpen={isModalOpen}
