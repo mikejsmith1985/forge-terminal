@@ -42,6 +42,7 @@ func NewRegistry() *Registry {
 	r.Register(NewJSONDetector())
 	r.Register(NewFilePathDetector())
 	r.Register(NewCompilerErrorDetector())
+	r.Register(NewStackTraceDetector())
 	
 	return r
 }

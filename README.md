@@ -55,9 +55,10 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **🤖 Forge Assistant** (Experimental): AI-powered chat panel integrated into the sidebar. Requires local Ollama for model inference. Context-aware suggestions based on terminal state.
 - **👁️ Vision Detection** (Experimental): Real-time pattern detection with interactive overlays:
   - **Git Status**: Detects `git status` output, shows staged/unstaged/untracked files with quick stage/unstage actions
-  - **JSON Blocks**: Identifies JSON in terminal output, pretty-prints with copy actions  
+  - **JSON Blocks**: Identifies JSON in terminal output, pretty-prints with copy actions
   - **File Paths**: Detects file paths, validates existence, provides quick view/edit/list actions
   - **Compiler Errors** (NEW): Detects errors from Go, Rust, TypeScript, Python, Java with context and quick actions
+  - **Stack Traces** (NEW): Detects panics and exceptions from Go, Python, Java, JavaScript with frame analysis
 
 ## Installation
 
