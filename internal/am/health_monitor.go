@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -29,13 +32,27 @@ type HealthMetrics struct {
 	LastFullScan           time.Time `json:"lastFullScan"`
 	ConversationsStarted   int64     `json:"conversationsStarted"`
 	ConversationsCompleted int64     `json:"conversationsCompleted"`
+	// Content validation metrics
+	ConversationsValidated int       `json:"conversationsValidated"`
+	ConversationsCorrupted int       `json:"conversationsCorrupted"`
+	LastValidationTime     time.Time `json:"lastValidationTime"`
+	ValidationErrors       []string  `json:"validationErrors,omitempty"`
+}
+
+// ContentValidation represents validation results for conversation content.
+type ContentValidation struct {
+	TotalFiles     int      `json:"totalFiles"`
+	ValidFiles     int      `json:"validFiles"`
+	CorruptedFiles int      `json:"corruptedFiles"`
+	Errors         []string `json:"errors,omitempty"`
 }
 
 // SystemHealth represents the complete health status.
 type SystemHealth struct {
-	Layers  []*LayerStatus `json:"layers"`
-	Metrics *HealthMetrics `json:"metrics"`
-	Status  string         `json:"status"`
+	Layers     []*LayerStatus     `json:"layers"`
+	Metrics    *HealthMetrics     `json:"metrics"`
+	Status     string             `json:"status"`
+	Validation *ContentValidation `json:"validation,omitempty"`
 }
 
 // HealthMonitor tracks the health of all AM layers (Layer 5).
@@ -275,4 +292,91 @@ func (hm *HealthMonitor) RecordShellHooksHeartbeat() {
 		Layer:     2,
 		Timestamp: time.Now(),
 	})
+}
+
+// ANSI artifact patterns that indicate corrupted content
+var ansiArtifacts = regexp.MustCompile(`\[\??[0-9;]*[a-zA-Z]|\x1b`)
+
+// ValidateConversationContent checks if a conversation file has valid, clean content.
+func ValidateConversationContent(filePath string) (bool, string) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, "failed to read file: " + err.Error()
+	}
+
+	var conv struct {
+		Turns []struct {
+			Content string `json:"content"`
+		} `json:"turns"`
+	}
+
+	if err := json.Unmarshal(data, &conv); err != nil {
+		return false, "failed to parse JSON: " + err.Error()
+	}
+
+	if len(conv.Turns) == 0 {
+		return false, "no conversation turns found"
+	}
+
+	// Check each turn for ANSI artifacts
+	for i, turn := range conv.Turns {
+		if len(turn.Content) == 0 {
+			continue
+		}
+		if ansiArtifacts.MatchString(turn.Content) {
+			return false, "turn " + string(rune('0'+i)) + " contains ANSI artifacts"
+		}
+	}
+
+	// Check for minimum content quality
+	totalContent := 0
+	for _, turn := range conv.Turns {
+		totalContent += len(strings.TrimSpace(turn.Content))
+	}
+	if totalContent < 10 {
+		return false, "insufficient content (less than 10 characters)"
+	}
+
+	return true, ""
+}
+
+// ValidateAllConversations scans all conversation files and returns validation results.
+func (hm *HealthMonitor) ValidateAllConversations(amDir string) *ContentValidation {
+	validation := &ContentValidation{
+		Errors: make([]string, 0),
+	}
+
+	files, err := filepath.Glob(filepath.Join(amDir, "llm-conv-*.json"))
+	if err != nil {
+		validation.Errors = append(validation.Errors, "failed to list files: "+err.Error())
+		return validation
+	}
+
+	validation.TotalFiles = len(files)
+	for _, file := range files {
+		valid, errMsg := ValidateConversationContent(file)
+		if valid {
+			validation.ValidFiles++
+		} else {
+			validation.CorruptedFiles++
+			validation.Errors = append(validation.Errors, filepath.Base(file)+": "+errMsg)
+		}
+	}
+
+	// Update health metrics
+	hm.mutex.Lock()
+	hm.metrics.ConversationsValidated = validation.ValidFiles
+	hm.metrics.ConversationsCorrupted = validation.CorruptedFiles
+	hm.metrics.LastValidationTime = time.Now()
+	if len(validation.Errors) > 5 {
+		hm.metrics.ValidationErrors = validation.Errors[:5] // Keep first 5 errors
+	} else {
+		hm.metrics.ValidationErrors = validation.Errors
+	}
+	hm.mutex.Unlock()
+
+	log.Printf("[Health Monitor] Content validation complete: %d valid, %d corrupted out of %d files",
+		validation.ValidFiles, validation.CorruptedFiles, validation.TotalFiles)
+
+	return validation
 }
