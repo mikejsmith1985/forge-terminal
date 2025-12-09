@@ -171,6 +171,27 @@ Forge Terminal checks for updates automatically. When an update is available:
 
 If the spacebar or other features don't work in a tab after an update, simply refresh that tab to reconnect with the new server.
 
+## 📚 Documentation
+
+All project documentation is organized by audience and type:
+
+- **[User Documentation](docs/user/)** - For end users using Forge Terminal
+  - Getting started guides
+  - Feature documentation
+  - Troubleshooting and FAQ
+
+- **[Developer Documentation](docs/developer/)** - For developers contributing to Forge Terminal
+  - Development setup and local build guides
+  - Architecture overview
+  - Release process and automation
+  - Contributing guidelines
+
+- **[Release History](https://github.com/mikejsmith1985/forge-terminal/releases)** - All version releases with detailed changelogs
+  - Pre-built binaries for all platforms
+  - Complete release notes and migration guides
+
+See [docs/README.md](docs/README.md) for detailed information about the documentation structure.
+
 ## 🛠️ Development
 
 ### Prerequisites
