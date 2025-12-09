@@ -1,11 +1,11 @@
-name: Deploy Frontend to GitHub Pages
+name: Deploy Frontend to GitHub Pages - Direct
 
 on:
   push:
     branches: ["main"]
     paths:
       - "frontend/**"
-      - ".github/workflows/deploy-pages.yml"
+      - ".github/workflows/deploy-pages-direct.yml"
   workflow_dispatch:
 
 permissions:
@@ -39,28 +39,19 @@ jobs:
         run: |
           cd frontend
           npm ci
-          echo "✓ Dependencies installed"
 
       - name: Build frontend for GitHub Pages
         run: |
           cd frontend
           npm run build -- --config vite.pages.config.js
-          echo "✓ Frontend built to frontend/dist"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - name: Upload artifact
-        id: upload
         uses: actions/upload-pages-artifact@v3
         with:
           path: "frontend/dist"
-
-      - name: Debug artifact upload
-        run: |
-          echo "✓ Artifact uploaded successfully"
-          echo "  Name: github-pages"
-          echo "  Path: frontend/dist"
 
   deploy:
     name: Deploy to GitHub Pages
@@ -70,12 +61,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Display deployment info
-        run: |
-          echo "Deploying to GitHub Pages"
-          echo "Artifact name: github-pages"
-          echo "Environment: github-pages"
-          
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
@@ -91,12 +76,6 @@ jobs:
           if [ "${{ needs.deploy.result }}" = "success" ]; then
             echo "✓ Deployment successful!"
             echo "📍 Frontend available at: ${{ needs.deploy.outputs.page_url }}"
-            echo ""
-            echo "📖 Usage:"
-            echo "  1. Run Go backend: ./forge-terminal (or make run)"
-            echo "  2. Open frontend: ${{ needs.deploy.outputs.page_url }}"
-            echo "  3. Configure API: Click settings → API Configuration"
-            echo "  4. Enter backend URL: http://localhost:8333"
           else
             echo "✗ Deployment failed!"
             exit 1
