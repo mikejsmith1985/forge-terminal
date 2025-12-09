@@ -927,6 +927,15 @@ body {
   }
 }
 
+@keyframes tab-bead-of-light {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 360% 0%;
+  }
+}
+
 .tab.auto-respond {
   border-left: 2px solid var(--tab-accent, var(--accent));
 }
@@ -959,6 +968,7 @@ body {
 }
 
 .tab.active {
+  position: relative;
   background: var(--bg);
   border-color: var(--overlay);
   border-bottom-color: var(--tab-accent, var(--accent));
@@ -969,6 +979,29 @@ body {
   opacity: 1;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   animation: tab-activate-pulse 0.3s ease-out;
+}
+
+.tab.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 6px 6px 0 0;
+  padding: 1px;
+  background: conic-gradient(
+    from 0deg,
+    var(--tab-accent, var(--accent)),
+    #ff6b6b,
+    var(--tab-accent, var(--accent))
+  );
+  background-size: 360% 360%;
+  animation: tab-bead-of-light 3s linear infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .tab-icon {
