@@ -647,6 +647,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
+      clipboardMode: 'on', // Enable clipboard support for copy/paste
     });
 
     // Add fit addon
@@ -662,6 +663,68 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // Open terminal
     term.open(terminalRef.current);
     xtermRef.current = term;
+
+    // Custom key event handler for clipboard and special keys
+    term.attachCustomKeyEventHandler((event) => {
+      // Handle Ctrl+C (SIGINT) - send interrupt signal instead of copying
+      if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
+        console.log('[Terminal] Ctrl+C pressed - sending SIGINT');
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        // Send Ctrl+C (0x03) to the terminal
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send('\x03');
+          console.log('[Terminal] SIGINT sent via WebSocket');
+        } else {
+          console.warn('[Terminal] WebSocket not ready for Ctrl+C');
+        }
+        return false; // Prevent default browser behavior
+      }
+
+      // Handle Ctrl+V (paste from clipboard)
+      if (event.ctrlKey && (event.key === 'v' || event.key === 'V')) {
+        console.log('[Terminal] Ctrl+V pressed - attempting clipboard paste');
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        
+        // Read from clipboard and send to terminal
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          navigator.clipboard.readText()
+            .then((text) => {
+              console.log('[Terminal] Clipboard read successful, pasting', text.length, 'characters');
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(text);
+                console.log('[Terminal] Pasted text sent via WebSocket');
+              } else {
+                console.warn('[Terminal] WebSocket not ready for paste');
+              }
+            })
+            .catch((err) => {
+              console.error('[Terminal] Clipboard paste failed:', err.message, err);
+              // Fallback: try to use document.execCommand if clipboard API fails
+              console.log('[Terminal] Attempting fallback paste using execCommand...');
+              try {
+                const success = document.execCommand('paste');
+                if (success) {
+                  console.log('[Terminal] Fallback paste executed');
+                } else {
+                  console.warn('[Terminal] Fallback paste not supported');
+                }
+              } catch (fallbackErr) {
+                console.error('[Terminal] Fallback paste failed:', fallbackErr.message);
+              }
+            });
+        } else {
+          console.warn('[Terminal] Clipboard API not available');
+        }
+        return false; // Prevent default browser behavior
+      }
+
+      // Allow other key events to proceed normally
+      return true;
+    });
 
     // Initial fit
     setTimeout(() => fitAddon.fit(), 0);

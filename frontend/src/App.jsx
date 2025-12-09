@@ -538,7 +538,8 @@ function App() {
       
       // Allow Ctrl+C and Ctrl+V to pass through to xterm when terminal is focused
       if (isTerminalFocused && e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V')) {
-        return; // Let xterm handle copy/paste
+        e.preventDefault(); // Prevent browser's default copy/paste behavior
+        return; // Let xterm's custom key handler deal with it
       }
       
       if (isInputField) {
