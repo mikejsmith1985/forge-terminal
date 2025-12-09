@@ -6,6 +6,9 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 
 ![Forge Terminal Screenshot](https://via.placeholder.com/800x500?text=Forge+Terminal+Screenshot)
 
+> **🚀 NEW: GitHub Pages Deployment!**  
+> Run forge-terminal from your browser on ANY device (Mac, Linux, Windows). See [Installation](#installation) below or try the **[interactive setup wizard](#-interactive-setup-wizard-recommended)**.
+
 ## ✨ Features
 
 ### Core Terminal
@@ -54,29 +57,152 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 
 ## Installation
 
-Download the latest release for your platform from the [Releases](https://github.com/mikejsmith1985/forge-terminal/releases) page, OR use the **web-based deployment** (no download required).
+Choose your setup method below. **All options are FREE** (Codespaces includes 120 free hours/month).
 
-### 🌐 Web-Based Installation (Recommended for Most Users)
+### 🧙 Interactive Setup Wizard (Recommended)
 
-**No installation needed!** Access forge-terminal directly from your browser:
+**Quickest way to get started:**
+```bash
+# Download and run the setup wizard
+node setup-wizard.js
+```
 
-1. **Choose your deployment mode**:
-   - **Local** (fastest): Run binary locally, use browser frontend
-   - **GitHub Codespaces** (cloud-based): No local setup required
-   - **Embedded** (simplest): Single binary with included frontend
+The wizard will ask you 2 simple questions and generate step-by-step instructions for your setup.
 
-2. **Quick Start**:
-   ```bash
-   # Option 1: Local (download binary from releases)
-   ./forge-darwin-arm64  # or .exe / -linux-amd64
-   # Opens at http://localhost:8333
-   
-   # Option 2: GitHub Codespaces (no download)
-   # Create Codespace → make run → configure API at
-   # https://[username].github.io/forge-terminal/
-   ```
+**No Node.js?** Just follow the sections below for your preferred option.
 
-3. **Detailed guide**: See [GitHub Pages Deployment Guide](docs/user/github-pages-deployment.md)
+---
+
+### 🌐 Web-Based Installation (4 Options)
+
+All options use the GitHub Pages frontend. Choose based on your situation:
+
+#### Option 1️⃣: **LOCAL** (Fastest - Recommended for Daily Use) ✅ FREE
+```bash
+# Step 1: Download binary from releases
+curl -LO https://github.com/mikejsmith1985/forge-terminal/releases/download/v1.x.x/forge-darwin-arm64
+chmod +x forge-darwin-arm64
+
+# Step 2: Start backend
+./forge-darwin-arm64
+# Backend listens on http://localhost:8333
+
+# Step 3: Open frontend
+# Visit: https://[username].github.io/forge-terminal/
+# (replace [username] with your GitHub username)
+
+# Step 4: Configure API in frontend
+# Settings → API Configuration → http://localhost:8333 → Apply
+```
+
+**Best for:** Daily development, fastest performance (< 100ms latency)  
+**Cost:** FREE forever  
+**Works:** As long as your computer is running  
+
+---
+
+#### Option 2️⃣: **EMBEDDED** (Simplest - No Configuration) ✅ FREE
+```bash
+# Step 1: Download binary from releases (same as above)
+curl -LO https://github.com/mikejsmith1985/forge-terminal/releases/download/v1.x.x/forge-darwin-arm64
+chmod +x forge-darwin-arm64
+
+# Step 2: Run
+./forge-darwin-arm64
+# Browser opens automatically at http://localhost:8333
+```
+
+**Best for:** Quick setup, don't want to configure API  
+**Cost:** FREE forever  
+**Works:** As long as your computer is running  
+**Note:** Frontend is embedded in binary (no external website access)
+
+---
+
+#### Option 3️⃣: **GITHUB CODESPACES** (Cloud - No Local Install) ✅ FREE (120 hrs/month)
+```bash
+# Step 1: Create Codespace
+# Visit: https://github.com/mikejsmith1985/forge-terminal
+# Click: Code → Codespaces → Create codespace on main
+# Wait: 2-3 minutes
+
+# Step 2: In Codespace terminal, build & run backend
+cd frontend && npm install && cd ..
+make run
+
+# Step 3: Expose port 8333
+# Press: F1 → Type: "Ports: Expose Port" → Enter 8333
+# Copy the forwarded HTTPS URL
+
+# Step 4: Open frontend & configure
+# Visit: https://[username].github.io/forge-terminal/
+# Settings → API Configuration → [Paste forwarded URL] → Apply
+```
+
+**Best for:** Testing without local installation, cloud-based access  
+**Cost:** FREE (120 hours/month), then $0.18/hour  
+**Works:** In browser from any device  
+**Tip:** If you exceed free hours, fall back to LOCAL mode (same features, FREE)
+
+---
+
+#### Option 4️⃣: **SELF-HOSTED** (Advanced - 24/7 Availability) 💰 Custom Cost
+```bash
+# Step 1: Deploy to your server (DigitalOcean, AWS, etc.)
+git clone https://github.com/mikejsmith1985/forge-terminal.git
+cd forge-terminal
+cd frontend && npm install && npm run build && cd ..
+go build -o bin/forge ./cmd/forge
+
+# Step 2: Run with your domain
+export ALLOWED_ORIGINS="https://your-domain.com"
+./bin/forge
+
+# Step 3: Access from GitHub Pages frontend
+# Visit: https://[username].github.io/forge-terminal/
+# Settings → API Configuration → https://your-domain.com:8333 → Apply
+```
+
+**Best for:** Team sharing, 24/7 availability, production use  
+**Cost:** $5-50/month depending on server  
+**Works:** 24/7 if server stays running  
+**Security:** Full control, custom domain, HTTPS recommended
+
+---
+
+### ⚡ 60-Second Quick Start
+
+**Don't want to read all options?**
+
+1. Download binary: https://github.com/mikejsmith1985/forge-terminal/releases
+2. Run it: `./forge-[your-os]`
+3. Done! (Embedded mode - everything included)
+
+Or try the wizard: `node setup-wizard.js`
+
+---
+
+### 📊 Quick Comparison
+
+| Feature | LOCAL | EMBEDDED | CODESPACES | SELF-HOSTED |
+|---------|-------|----------|-----------|------------|
+| **Cost** | FREE | FREE | FREE* | $5-50/mo |
+| **Setup Time** | 5 min | 1 min | 10 min | 30 min |
+| **Performance** | Excellent | Excellent | Good | Good |
+| **Availability** | While running | While running | 120 hrs/mo | 24/7 |
+| **Multi-device** | Via URL | Local only | Yes | Yes |
+| **Configuration** | Medium | None | Medium | Advanced |
+| **Best For** | Daily work | Quick use | Testing | Teams/Prod |
+
+*120 hours/month free, then paid
+
+---
+
+### 📖 Detailed Guides
+
+- **Full guide:** [GitHub Pages Deployment Guide](docs/user/github-pages-deployment.md)
+- **Choose your mode:** [Detailed comparison](docs/user/github-pages-deployment.md#three-deployment-modes)
+- **Troubleshooting:** [Common issues & fixes](docs/user/github-pages-deployment.md#troubleshooting)
 
 ### Windows
 Download `forge-windows-amd64.exe` and double-click it.
