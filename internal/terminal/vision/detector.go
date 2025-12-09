@@ -41,6 +41,7 @@ func NewRegistry() *Registry {
 	r.Register(NewGitStatusDetector())
 	r.Register(NewJSONDetector())
 	r.Register(NewFilePathDetector())
+	r.Register(NewCompilerErrorDetector())
 	
 	return r
 }

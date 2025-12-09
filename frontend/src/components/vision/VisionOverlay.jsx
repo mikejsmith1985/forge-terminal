@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import CompilerErrorOverlay from './CompilerErrorOverlay';
 import './vision.css';
 
 /**
@@ -78,6 +79,16 @@ export default function VisionOverlay({ activeOverlay, onAction, onDismiss }) {
           onAction={onAction}
           onDismiss={onDismiss}
           selectedIndex={selectedIndex}
+        />
+      )}
+      {activeOverlay.type === 'COMPILER_ERROR' && (
+        <CompilerErrorOverlay 
+          data={activeOverlay.payload}
+          onAction={onAction}
+          onDismiss={onDismiss}
+          selectedIndex={selectedIndex}
+        />
+      )}
         />
       )}
     </div>
