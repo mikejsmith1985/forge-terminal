@@ -1,0 +1,29 @@
+# Jekyll configuration for GitHub Pages
+
+# Exclude temporary session documentation from being processed
+exclude:
+  - docs/sessions/
+  - cmd/
+  - internal/
+  - .github/
+  - frontend/
+  - node_modules/
+  - .gitignore
+  - go.mod
+  - go.sum
+  - Makefile
+  - setup-wizard.js
+
+# Include markdown files in root and docs
+include:
+  - README.md
+  - PROJECT_CHARTER.md
+  - RELEASE_SUMMARY_*.md
+
+# Theme
+theme: jekyll-theme-primer
+
+# Title
+title: Forge Terminal
+description: A Modern Terminal Interface for AI-Assisted Development
+url: https://mikejsmith1985.github.io/forge-terminal
