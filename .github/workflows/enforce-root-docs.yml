@@ -1,0 +1,63 @@
+name: Enforce Root Docs Whitelist
+
+on: [pull_request]
+
+jobs:
+  check-root-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Check for unapproved root .md files
+        run: |
+          # Get list of .md files in root from PR
+          PR_FILES=$(git diff --name-only origin/main...HEAD | grep '\.md$' | grep -v '^docs/' | grep -v '^\.github/' | grep -v '^frontend/' | grep -v '^cmd/' | grep -v '^scripts/' || true)
+          
+          if [ -z "$PR_FILES" ]; then
+            echo "✅ No root .md files added"
+            exit 0
+          fi
+          
+          # Load approved list (skip comments and empty lines)
+          APPROVED=$(cat docs/ROOT_DOCS_APPROVED.txt | grep -v '^#' | grep -v '^$' | awk '{print $1}')
+          
+          echo "Checking PR files against approved list..."
+          FAILED=0
+          for file in $PR_FILES; do
+            FILENAME=$(basename "$file")
+            if ! echo "$APPROVED" | grep -q "^$FILENAME$"; then
+              echo "❌ Unapproved root doc: $file"
+              echo "   This file should be in docs/ directory"
+              echo "   To add it to whitelist: Update docs/ROOT_DOCS_APPROVED.txt"
+              FAILED=1
+            fi
+          done
+          
+          if [ $FAILED -eq 1 ]; then
+            echo ""
+            echo "✅ Approved root files (from docs/ROOT_DOCS_APPROVED.txt):"
+            echo "$APPROVED"
+            exit 1
+          fi
+          
+          echo "✅ All root .md files are approved"
+      
+      - name: Root doc count check
+        run: |
+          COUNT=$(find . -maxdepth 1 -name '*.md' -type f | wc -l)
+          # Also check LICENSE (not .md but allowed)
+          if [ -f "LICENSE" ]; then
+            echo "✅ Found LICENSE"
+          fi
+          
+          if [ $COUNT -gt 4 ]; then
+            echo "❌ Too many root .md files: $COUNT"
+            echo "   Maximum allowed: 4"
+            echo "   Current files:"
+            find . -maxdepth 1 -name '*.md' -type f | sort
+            exit 1
+          fi
+          
+          echo "✅ Root doc count is acceptable: $COUNT/4"

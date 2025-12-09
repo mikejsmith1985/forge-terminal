@@ -1,0 +1,13 @@
+# Approved Root Documentation Files
+# This whitelist prevents documentation sprawl in the repository root
+# Update ONLY with explicit review and approval in a PR
+# 
+# These 4 files are the ONLY markdown/documentation files allowed in root
+# All other documentation must be in docs/ subdirectories
+
+README.md                           # Project entry point and main README
+PROJECT_CHARTER.md                  # Project vision, goals, and scope
+LICENSE                             # Legal: MIT License
+.github/copilot-instructions.md     # Developer copilot rules and guidelines
+
+# Note: .gitignore, Makefile, and other non-doc files are separate from this policy
