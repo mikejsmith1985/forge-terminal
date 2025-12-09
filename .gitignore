@@ -46,4 +46,4 @@ docs/sessions/
 frontend/test-results/
 
 # Build binary
-forge
+/forge
