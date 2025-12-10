@@ -1505,6 +1505,7 @@ function App() {
                   currentDirectory={tab.currentDirectory || null}
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                   onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
+                  onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
                 />
               </div>
             ))}

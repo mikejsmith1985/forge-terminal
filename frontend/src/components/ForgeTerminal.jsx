@@ -340,6 +340,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onConnectionChange = null,
   onWaitingChange = null, // Callback when prompt waiting state changes
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
+  onCopy = null, // Callback when text is copied (for toast notification)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name (for AM logging)
@@ -366,6 +367,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const tabNameRef = useRef(tabName);
   const lastDirectoryRef = useRef(null);
   const onDirectoryChangeRef = useRef(onDirectoryChange);
+  const onCopyRef = useRef(onCopy);
   const amLogBufferRef = useRef('');
   const amLogTimeoutRef = useRef(null);
   const amInputBufferRef = useRef('');
@@ -413,6 +415,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onDirectoryChangeRef.current = onDirectoryChange;
   }, [onDirectoryChange]);
+  
+  // Keep onCopy ref updated
+  useEffect(() => {
+    onCopyRef.current = onCopy;
+  }, [onCopy]);
   
   // Keep visionEnabled ref updated and send control message to backend
   useEffect(() => {
@@ -668,28 +675,62 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.attachCustomKeyEventHandler((event) => {
       // Handle Ctrl+C - Copy if text selected, otherwise send SIGINT
       if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
-        // Check if user has text selected
-        const hasSelection = term.hasSelection();
+        event.preventDefault();
         
-        if (hasSelection) {
-          // Text is selected - allow browser to handle copy
-          console.log('[Terminal] Ctrl+C with selection - allowing copy');
-          return true; // Allow default browser copy behavior
+        // Get selection text directly (more reliable than hasSelection check)
+        const selectedText = term.getSelection();
+        
+        if (selectedText && selectedText.length > 0) {
+          // Text is selected - copy to clipboard
+          console.log('[Terminal] Ctrl+C with selection - copying text');
+          
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(selectedText)
+              .then(() => {
+                console.log('[Terminal] Text copied to clipboard:', selectedText.length, 'chars');
+                // Show success toast
+                if (onCopyRef.current) {
+                  onCopyRef.current();
+                }
+              })
+              .catch((err) => {
+                console.error('[Terminal] Clipboard write failed:', err);
+                // Fallback to execCommand
+                try {
+                  document.execCommand('copy');
+                  console.log('[Terminal] Fallback copy successful');
+                  if (onCopyRef.current) {
+                    onCopyRef.current();
+                  }
+                } catch (e) {
+                  console.error('[Terminal] Fallback copy also failed:', e);
+                }
+              });
+          } else {
+            // Fallback for browsers without clipboard API
+            try {
+              document.execCommand('copy');
+              console.log('[Terminal] Copy via execCommand');
+              if (onCopyRef.current) {
+                onCopyRef.current();
+              }
+            } catch (e) {
+              console.error('[Terminal] Copy failed:', e);
+            }
+          }
         } else {
           // No text selected - send SIGINT to interrupt process
           console.log('[Terminal] Ctrl+C without selection - sending SIGINT');
-          event.preventDefault();
           
-          // Send Ctrl+C (0x03) to the terminal
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send('\x03');
             console.log('[Terminal] SIGINT sent via WebSocket');
           } else {
             console.warn('[Terminal] WebSocket not ready for Ctrl+C');
           }
-          
-          return false; // Prevent browser default behavior
         }
+        
+        return false; // Prevent any default behavior
       }
       
       // Handle Ctrl+V (paste from clipboard)
