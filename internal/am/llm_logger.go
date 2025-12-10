@@ -684,17 +684,52 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 	defer l.mu.Unlock()
 
 	log.Printf("[LLM Logger] GetConversations called for tab %s", l.tabID)
-	log.Printf("[LLM Logger] Conversation map size: %d", len(l.conversations))
+	log.Printf("[LLM Logger] In-memory conversation map size: %d", len(l.conversations))
 	log.Printf("[LLM Logger] Active conversation: '%s'", l.activeConvID)
 
+	// Build map of in-memory conversation IDs for deduplication
+	inMemory := make(map[string]bool)
 	convs := make([]*LLMConversation, 0, len(l.conversations))
+	
+	// First, add all in-memory conversations
 	for convID, conv := range l.conversations {
-		log.Printf("[LLM Logger]   Conversation: ID=%s provider=%s type=%s complete=%v turns=%d", 
-			convID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns))
+		log.Printf("[LLM Logger]   In-memory: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d", 
+			convID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns), len(conv.ScreenSnapshots))
 		convs = append(convs, conv)
+		inMemory[convID] = true
 	}
 	
-	log.Printf("[LLM Logger] Returning %d conversations", len(convs))
+	// Also load any conversations from disk that aren't in memory
+	// This handles cases where conversations were saved but memory was cleared
+	if l.amDir != "" {
+		pattern := filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID))
+		files, err := filepath.Glob(pattern)
+		if err == nil {
+			for _, file := range files {
+				data, err := os.ReadFile(file)
+				if err != nil {
+					continue
+				}
+				
+				var conv LLMConversation
+				if err := json.Unmarshal(data, &conv); err != nil {
+					continue
+				}
+				
+				// Only add if not already in memory
+				if !inMemory[conv.ConversationID] {
+					log.Printf("[LLM Logger]   From disk: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d", 
+						conv.ConversationID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns), len(conv.ScreenSnapshots))
+					convs = append(convs, &conv)
+					// Also add to in-memory map for future calls
+					l.conversations[conv.ConversationID] = &conv
+				}
+			}
+		}
+	}
+	
+	log.Printf("[LLM Logger] Returning %d total conversations (%d from memory, %d loaded from disk)", 
+		len(convs), len(inMemory), len(convs)-len(inMemory))
 	return convs
 }
 
@@ -703,11 +738,30 @@ func (l *LLMLogger) GetConversation(convID string) *LLMConversation {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// First check in-memory
 	conv, exists := l.conversations[convID]
-	if !exists {
-		return nil
+	if exists {
+		return conv
 	}
-	return conv
+	
+	// Not in memory - try loading from disk
+	if l.amDir != "" {
+		filename := fmt.Sprintf("llm-conv-%s-%s.json", l.tabID, convID)
+		filePath := filepath.Join(l.amDir, filename)
+		
+		data, err := os.ReadFile(filePath)
+		if err == nil {
+			var diskConv LLMConversation
+			if err := json.Unmarshal(data, &diskConv); err == nil {
+				log.Printf("[LLM Logger] ✓ Loaded conversation %s from disk", convID)
+				// Cache in memory for future calls
+				l.conversations[convID] = &diskConv
+				return &diskConv
+			}
+		}
+	}
+	
+	return nil
 }
 
 // GetActiveConversations returns all active conversations across all tabs.
@@ -767,6 +821,7 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 	}
 
 	loadedCount := 0
+	incompleteCount := 0
 	for _, file := range files {
 		data, err := os.ReadFile(file)
 		if err != nil {
@@ -780,9 +835,13 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 			continue
 		}
 
-		// Only load incomplete conversations (active sessions)
+		// Load ALL conversations (both complete and incomplete)
+		l.conversations[conv.ConversationID] = &conv
+		loadedCount++
+		
+		// Only restore active state for incomplete conversations
 		if !conv.Complete {
-			l.conversations[conv.ConversationID] = &conv
+			incompleteCount++
 			// Restore the active conversation (most recent incomplete one)
 			if conv.StartTime.After(time.Now().Add(-24 * time.Hour)) {
 				l.activeConvID = conv.ConversationID
@@ -792,14 +851,15 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 					l.lastScreen = conv.ScreenSnapshots[l.snapshotCount-1].CleanedContent
 				}
 			}
-			loadedCount++
-			log.Printf("[LLM Logger] ✓ Loaded conversation %s (%d turns, %d snapshots)", 
-				conv.ConversationID, len(conv.Turns), len(conv.ScreenSnapshots))
 		}
+		
+		log.Printf("[LLM Logger] ✓ Loaded conversation %s (%d turns, %d snapshots, complete=%v)", 
+			conv.ConversationID, len(conv.Turns), len(conv.ScreenSnapshots), conv.Complete)
 	}
 
 	if loadedCount > 0 {
-		log.Printf("[LLM Logger] Loaded %d incomplete conversation(s) from disk for tab %s", loadedCount, l.tabID)
+		log.Printf("[LLM Logger] Loaded %d conversation(s) from disk for tab %s (%d incomplete, %d complete)", 
+			loadedCount, l.tabID, incompleteCount, loadedCount-incompleteCount)
 		if l.activeConvID != "" {
 			log.Printf("[LLM Logger] Restored active conversation: %s", l.activeConvID)
 		}

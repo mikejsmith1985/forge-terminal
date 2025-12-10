@@ -456,24 +456,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     if (!isVisible) return;
     
     const handleWindowFocus = () => {
-      // Longer delay to ensure browser fully settles input focus before terminal takes it
-      setTimeout(() => {
-        if (xtermRef.current && isVisible) {
-          xtermRef.current.focus();
-        }
-      }, 1000);
+      if (xtermRef.current && isVisible) {
+        xtermRef.current.focus();
+      }
     };
 
     const handleVisibilityChange = () => {
       if (!document.hidden && xtermRef.current && isVisible) {
-        setTimeout(() => {
-          xtermRef.current.focus();
-        }, 1000);
+        xtermRef.current.focus();
       }
     };
 
     window.addEventListener('focus', handleWindowFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilitychange);
 
     return () => {
       window.removeEventListener('focus', handleWindowFocus);
