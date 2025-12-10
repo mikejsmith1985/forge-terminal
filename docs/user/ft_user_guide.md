@@ -505,6 +505,19 @@ The default command card "📖 Summarize Last Session" (Ctrl+Shift+5) is a speci
 - Old logs (7+ days) are automatically cleaned up to save space
 - Disable AM logging when you don't need it (reduces disk writes)
 
+### View LLM Conversation Snapshots (Dev Mode)
+
+When using LLM tools like GitHub Copilot CLI, Forge Terminal automatically captures screen snapshots of your conversations:
+
+1. **Enable Dev Mode** in Settings → Toggle "Dev Mode"
+2. Look for the **"AM (3)"** indicator in the bottom-right status bar
+3. **Click on the AM indicator** to open the Conversation Viewer
+4. Navigate through captured snapshots:
+   - **← →** Arrow keys to move between snapshots
+   - **Esc** to close the viewer
+
+Each snapshot preserves the terminal state at that moment, giving you a complete history of your LLM interactions. Conversations persist across server restarts!
+
 ---
 
 ## 🤖 Forge Assistant (Experimental)

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertCircle, Heart } from 'lucide-react';
+import ConversationViewer from './ConversationViewer';
 
 /**
  * AMMonitor - Displays AM system health and LLM conversation activity
@@ -10,6 +11,8 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
   const [hasLLMActivity, setHasLLMActivity] = useState(false);
   const [loading, setLoading] = useState(true);
   const [conversationCount, setConversationCount] = useState(0);
+  const [conversations, setConversations] = useState([]);
+  const [viewingConversation, setViewingConversation] = useState(null);
 
   useEffect(() => {
     if (!devMode) {
@@ -32,7 +35,9 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
         if (convRes && convRes.ok) {
           const convData = await convRes.json();
           const count = convData.count || 0;
+          const convList = convData.conversations || [];
           setConversationCount(count);
+          setConversations(convList);
           setHasLLMActivity(count > 0);
         }
       } catch (err) {
@@ -82,13 +87,35 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     <Activity size={14} />
   );
 
-  const title = `AM System: ${systemStatus}\nActive: ${conversationsActive} | Tracked: ${conversationCount}\nCaptures: ${inputTurns} in / ${outputTurns} out`;
+  const title = `AM System: ${systemStatus}\nActive: ${conversationsActive} | Tracked: ${conversationCount}\nCaptures: ${inputTurns} in / ${outputTurns} out\n\nClick to view conversations`;
+
+  const handleClick = () => {
+    if (conversations.length > 0) {
+      // Open the most recent conversation
+      setViewingConversation(conversations[0]);
+    }
+  };
 
   return (
-    <div className={`am-monitor ${statusClass}`} title={title}>
-      {statusIcon}
-      <span>AM {systemStatus === 'HEALTHY' ? `(${conversationCount})` : systemStatus}</span>
-    </div>
+    <>
+      <div 
+        className={`am-monitor ${statusClass} ${conversationCount > 0 ? 'clickable' : ''}`} 
+        title={title}
+        onClick={conversationCount > 0 ? handleClick : undefined}
+        style={{ cursor: conversationCount > 0 ? 'pointer' : 'default' }}
+      >
+        {statusIcon}
+        <span>AM {systemStatus === 'HEALTHY' ? `(${conversationCount})` : systemStatus}</span>
+      </div>
+
+      {viewingConversation && (
+        <ConversationViewer
+          tabId={tabId}
+          conversationId={viewingConversation.conversationId}
+          onClose={() => setViewingConversation(null)}
+        />
+      )}
+    </>
   );
 };
 

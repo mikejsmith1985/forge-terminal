@@ -124,6 +124,7 @@ func main() {
 	http.HandleFunc("/api/am/archive/", WrapWithMiddleware(handleAMArchive))
 	http.HandleFunc("/api/am/cleanup", WrapWithMiddleware(handleAMCleanup))
 	http.HandleFunc("/api/am/llm/conversations/", WrapWithMiddleware(handleAMLLMConversations))
+	http.HandleFunc("/api/am/llm/conversation/", WrapWithMiddleware(handleAMLLMConversationDetail))
 	http.HandleFunc("/api/am/health", WrapWithMiddleware(handleAMHealth))
 	http.HandleFunc("/api/am/conversations", WrapWithMiddleware(handleAMActiveConversations))
 	http.HandleFunc("/api/am/master-control", WrapWithMiddleware(handleAMMasterControl))
@@ -1242,6 +1243,47 @@ func handleAMLLMConversations(w http.ResponseWriter, r *http.Request) {
 		"success":       true,
 		"conversations": conversations,
 		"count":         count,
+	})
+}
+
+func handleAMLLMConversationDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract tab ID and conversation ID from URL path
+	// Format: /api/am/llm/conversation/{tabID}/{conversationID}
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 7 {
+		http.Error(w, "Tab ID and Conversation ID required", http.StatusBadRequest)
+		return
+	}
+	tabID := pathParts[5]
+	convID := pathParts[6]
+
+	log.Printf("[AM API] GET /api/am/llm/conversation/%s/%s", tabID, convID)
+
+	// Get LLM logger for this tab
+	llmLogger := am.GetLLMLogger(tabID, am.DefaultAMDir())
+	
+	// Get specific conversation
+	conversation := llmLogger.GetConversation(convID)
+	if conversation == nil {
+		log.Printf("[AM API] ⚠️ Conversation %s not found for tab %s", convID, tabID)
+		http.Error(w, "Conversation not found", http.StatusNotFound)
+		return
+	}
+
+	log.Printf("[AM API] ✓ Found conversation: ID=%s provider=%s turns=%d snapshots=%d", 
+		conversation.ConversationID, conversation.Provider, 
+		len(conversation.Turns), len(conversation.ScreenSnapshots))
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":      true,
+		"conversation": conversation,
 	})
 }
 
