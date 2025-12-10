@@ -350,16 +350,32 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 							log.Printf("[Terminal] Detection result: detected=%v", detected.Detected)
 							if detected.Detected {
 								log.Printf("[Terminal] ✓ LLM command DETECTED: provider=%s type=%s", detected.Provider, detected.Type)
-								log.Printf("[Terminal] Starting LLM conversation...")
+								log.Printf("[Terminal] Starting TUI-aware LLM conversation...")
 								
-								convID := llmLogger.StartConversation(detected)
-								log.Printf("[Terminal] ✅ Conversation started: ID='%s'", convID)
+								// Check if this is a TUI-based tool (Copilot, Claude)
+								isTUITool := detected.Provider == "github-copilot" || detected.Provider == "claude"
+								
+								if isTUITool {
+									// Use TUI capture mode
+									log.Printf("[Terminal] TUI tool detected, enabling screen snapshot capture")
+									convID := llmLogger.StartConversationFromProcess(
+										string(detected.Provider),
+										string(detected.Type),
+										0, // PID will be filled if we can detect it
+									)
+									log.Printf("[Terminal] ✅ TUI conversation started: ID='%s'", convID)
+								} else {
+									// Traditional line-based capture
+									log.Printf("[Terminal] Traditional CLI tool, using line-based capture")
+									convID := llmLogger.StartConversation(detected)
+									log.Printf("[Terminal] ✅ Conversation started: ID='%s'", convID)
+								}
 								
 								// Verify active conversation was set
 								activeID := llmLogger.GetActiveConversationID()
 								log.Printf("[Terminal] Active conversation ID: '%s'", activeID)
-								if activeID != convID {
-									log.Printf("[Terminal] ⚠️ WARNING: Active ID mismatch! expected=%s got=%s", convID, activeID)
+								if activeID == "" {
+									log.Printf("[Terminal] ⚠️ WARNING: No active conversation after start!")
 								}
 							} else {
 								log.Printf("[Terminal] ✗ Not an LLM command: '%s'", commandLine)

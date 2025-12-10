@@ -889,16 +889,30 @@ func handleAMLog(w http.ResponseWriter, r *http.Request) {
 				log.Printf("[AM API] Provider inference: explicit='%s' command='%s' → result=%s", req.LLMProvider, req.Content, provider)
 				log.Printf("[AM API] Type inference: explicit='%s' → result=%s", req.LLMType, cmdType)
 
-				detected := &llm.DetectedCommand{
-					Provider: provider,
-					Type:     cmdType,
-					Prompt:   req.Description,
-					RawInput: req.Content,
-					Detected: true,
+				// Check if this is a TUI tool
+				isTUITool := provider == llm.ProviderGitHubCopilot || provider == llm.ProviderClaude
+				
+				if isTUITool {
+					// Use TUI-aware conversation mode
+					log.Printf("[AM API] TUI tool detected, using screen snapshot capture")
+					convID = llmLogger.StartConversationFromProcess(
+						string(provider),
+						string(cmdType),
+						0, // PID unknown from command card
+					)
+				} else {
+					// Traditional conversation mode
+					detected := &llm.DetectedCommand{
+						Provider: provider,
+						Type:     cmdType,
+						Prompt:   req.Description,
+						RawInput: req.Content,
+						Detected: true,
+					}
+					log.Printf("[AM API] Calling StartConversation with provider=%s type=%s", provider, cmdType)
+					convID = llmLogger.StartConversation(detected)
 				}
-
-				log.Printf("[AM API] Calling StartConversation with provider=%s type=%s", provider, cmdType)
-				convID = llmLogger.StartConversation(detected)
+				
 				log.Printf("[AM API] ✅ StartConversation returned: convID='%s'", convID)
 				
 				// Verify conversation was actually created
