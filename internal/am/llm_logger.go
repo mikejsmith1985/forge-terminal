@@ -77,6 +77,7 @@ type LLMLogger struct {
 	inputBuffer       string
 	lastOutputTime    time.Time
 	lastInputTime     time.Time
+	lastSnapshotTime  time.Time // NEW: Track when last snapshot was saved
 	amDir             string
 	autoRespond       bool
 	capture           *ConversationCapture
@@ -312,14 +313,27 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 		return
 	}
 
-	// TUI Capture Mode: Detect screen clears and save snapshots
+	// TUI Capture Mode: Accumulate to screen buffer and trigger snapshots
 	if l.tuiCaptureMode {
 		l.currentScreen.WriteString(rawOutput)
+		l.lastOutputTime = time.Now()
 		
-		// Detect screen clear sequences (ESC[2J or ESC[H or ESC[2J ESC[H)
+		// Trigger snapshot on screen clear (traditional method)
 		if l.detectScreenClear(rawOutput) {
+			log.Printf("[LLM Logger] 📸 Screen clear detected! Saving snapshot (bufferSize=%d)", l.currentScreen.Len())
+			l.saveScreenSnapshotLocked()
+			return
+		}
+		
+		// NEW: Time-based snapshot trigger
+		// Save snapshot if we have output AND enough time has passed
+		timeSinceLastSnapshot := time.Since(l.lastSnapshotTime)
+		if l.currentScreen.Len() > 100 && timeSinceLastSnapshot > 2*time.Second {
+			log.Printf("[LLM Logger] ⏱️  Time-based snapshot trigger (bufferSize=%d, elapsed=%v)", 
+				l.currentScreen.Len(), timeSinceLastSnapshot)
 			l.saveScreenSnapshotLocked()
 		}
+		
 		return
 	}
 
@@ -366,6 +380,7 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 	conv.ScreenSnapshots = append(conv.ScreenSnapshots, snapshot)
 	l.snapshotCount++
 	l.lastScreen = cleanedContent
+	l.lastSnapshotTime = time.Now() // NEW: Track snapshot time
 	l.currentScreen.Reset()
 	
 	log.Printf("[LLM Logger] 📸 Snapshot #%d saved for %s (%d chars, %d total snapshots)", 
@@ -448,6 +463,11 @@ func (l *LLMLogger) AddUserInput(rawInput string) {
 	l.lastInputTime = time.Now()
 
 	// Detect Enter press (user submitted prompt)
+		// NEW: Trigger snapshot after user input in TUI mode
+		if l.tuiCaptureMode && l.currentScreen.Len() > 0 {
+			log.Printf("[LLM Logger] 📸 Post-input snapshot trigger (bufferSize=%d)", l.currentScreen.Len())
+			l.saveScreenSnapshotLocked()
+		}
 	if strings.Contains(rawInput, "\r") || strings.Contains(rawInput, "\n") {
 		l.flushUserInputLocked()
 	}

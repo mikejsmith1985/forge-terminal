@@ -148,7 +148,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	var insightsTracker *vision.InsightsTracker
 	if amSystem != nil {
 		llmLogger = amSystem.GetLLMLogger(tabID)
-		log.Printf("[Terminal] Using LLM logger for tabID: %s", tabID)
+		if llmLogger != nil {
+			activeConv := llmLogger.GetActiveConversationID()
+			log.Printf("[Terminal] Using LLM logger for tabID: %s, activeConv: %s", tabID, activeConv)
+		} else {
+			log.Printf("[Terminal] NO LLM logger available for tabID: %s", tabID)
+		}
 		// Record PTY heartbeat for Layer 1
 		if amSystem.HealthMonitor != nil {
 			amSystem.HealthMonitor.RecordPTYHeartbeat()
@@ -256,6 +261,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 				// Feed output to LLM logger if conversation is active
 				if llmLogger != nil {
+activeConv := llmLogger.GetActiveConversationID()
+if activeConv != "" {
+log.Printf("[Terminal PTY→Logger] TabID=%s ConvID=%s OutputLen=%d", tabID, activeConv, n)
+}
 					if llmLogger.ShouldFlushOutput(flushTimeout) {
 						llmLogger.FlushOutput()
 					}
@@ -328,6 +337,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// ═══ AM v2.0: Capture user input when inside active LLM session ═══
 			// This is the critical fix - capture ALL input after LLM session starts
 			if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
+log.Printf("[Terminal Input→Logger] TabID=%s ConvID=%s InputLen=%d", tabID, llmLogger.GetActiveConversationID(), len(dataStr))
 				llmLogger.AddUserInput(dataStr)
 			}
 
