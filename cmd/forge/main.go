@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -38,6 +39,19 @@ var preferredPorts = []int{8333, 8080, 9000, 3000, 3333}
 var assistantService assistant.Service
 
 func main() {
+	// Set up file-based logging for production diagnostics
+	logFile, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), ".forge", "forge.log"), 
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		// Log to both file and stdout
+		log.SetOutput(os.Stdout) // Keep stdout for console
+		log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+		// Also write to file by wrapping
+		multiWriter := io.MultiWriter(os.Stdout, logFile)
+		log.SetOutput(multiWriter)
+		defer logFile.Close()
+	}
+
 	// Migrate storage structure if needed
 	log.Printf("[Forge] Checking storage structure...")
 	if err := storage.MigrateToV2(); err != nil {
