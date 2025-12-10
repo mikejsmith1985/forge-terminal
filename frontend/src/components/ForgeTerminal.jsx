@@ -468,7 +468,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
 
     window.addEventListener('focus', handleWindowFocus);
-    document.addEventListener('visibilitychange', handleVisibilitychange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('focus', handleWindowFocus);
