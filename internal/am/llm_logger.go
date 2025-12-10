@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,33 +16,59 @@ import (
 
 // ConversationTurn represents a single exchange in an LLM conversation.
 type ConversationTurn struct {
-	Role      string    `json:"role"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
-	Provider  string    `json:"provider"`
+	Role           string    `json:"role"`
+	Content        string    `json:"content"`
+	Timestamp      time.Time `json:"timestamp"`
+	Provider       string    `json:"provider"`
+	Raw            string    `json:"raw,omitempty"`            // Raw PTY data for debugging
+	CaptureMethod  string    `json:"captureMethod,omitempty"`  // "pty_input", "pty_output"
+	ParseConfidence float64  `json:"parseConfidence,omitempty"` // 0.0-1.0 for output parsing
+}
+
+// ConversationRecovery holds recovery metadata for a conversation.
+type ConversationRecovery struct {
+	LastSavedTurn        int    `json:"lastSavedTurn"`
+	InProgressTurn       *int   `json:"inProgressTurn,omitempty"`
+	CanRestore           bool   `json:"canRestore"`
+	SuggestedRestorePrompt string `json:"suggestedRestorePrompt,omitempty"`
+}
+
+// ConversationMetadata holds context about where the conversation happened.
+type ConversationMetadata struct {
+	WorkingDirectory string `json:"workingDirectory,omitempty"`
+	GitBranch        string `json:"gitBranch,omitempty"`
+	ShellType        string `json:"shellType,omitempty"`
 }
 
 // LLMConversation represents a complete LLM conversation session.
 type LLMConversation struct {
-	ConversationID string             `json:"conversationId"`
-	TabID          string             `json:"tabId"`
-	Provider       string             `json:"provider"`
-	CommandType    string             `json:"commandType"`
-	StartTime      time.Time          `json:"startTime"`
-	EndTime        time.Time          `json:"endTime,omitempty"`
-	Turns          []ConversationTurn `json:"turns"`
-	Complete       bool               `json:"complete"`
+	ConversationID string               `json:"conversationId"`
+	TabID          string               `json:"tabId"`
+	Provider       string               `json:"provider"`
+	CommandType    string               `json:"commandType"`
+	StartTime      time.Time            `json:"startTime"`
+	EndTime        time.Time            `json:"endTime,omitempty"`
+	Turns          []ConversationTurn   `json:"turns"`
+	Complete       bool                 `json:"complete"`
+	AutoRespond    bool                 `json:"autoRespond"`
+	Metadata       *ConversationMetadata `json:"metadata,omitempty"`
+	Recovery       *ConversationRecovery `json:"recovery,omitempty"`
 }
 
 // LLMLogger manages LLM conversation logging for a tab.
 type LLMLogger struct {
-	mu             sync.Mutex
-	tabID          string
-	conversations  map[string]*LLMConversation
-	activeConvID   string
-	outputBuffer   string
-	lastOutputTime time.Time
-	amDir          string
+	mu              sync.Mutex
+	tabID           string
+	conversations   map[string]*LLMConversation
+	activeConvID    string
+	outputBuffer    string
+	inputBuffer     string
+	lastOutputTime  time.Time
+	lastInputTime   time.Time
+	amDir           string
+	autoRespond     bool
+	capture         *ConversationCapture
+	onLowConfidence func(raw string) // Callback for Vision notification
 }
 
 var (
@@ -79,6 +106,29 @@ func RemoveLLMLogger(tabID string) {
 	llmLoggersMu.Lock()
 	defer llmLoggersMu.Unlock()
 	delete(llmLoggers, tabID)
+}
+
+// SetAutoRespond updates the auto-respond flag for the logger.
+func (l *LLMLogger) SetAutoRespond(enabled bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.autoRespond = enabled
+	log.Printf("[LLM Logger] Auto-respond set to %v for tab %s", enabled, l.tabID)
+}
+
+// IsAutoRespond returns whether auto-respond is enabled.
+func (l *LLMLogger) IsAutoRespond() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.autoRespond
+}
+
+// SetLowConfidenceCallback sets the callback for low-confidence parsing alerts.
+// This is used to notify the user via Forge Vision when parsing quality is poor.
+func (l *LLMLogger) SetLowConfidenceCallback(callback func(raw string)) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.onLowConfidence = callback
 }
 
 // StartConversation initiates a new LLM conversation.
@@ -167,6 +217,84 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 	l.lastOutputTime = time.Now()
 }
 
+// AddUserInput captures user input during an active LLM conversation.
+// This is the key method that was missing - it captures what the user types
+// AFTER the LLM session has started (e.g., prompts inside copilot TUI).
+func (l *LLMLogger) AddUserInput(rawInput string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.activeConvID == "" {
+		return
+	}
+
+	l.inputBuffer += rawInput
+	l.lastInputTime = time.Now()
+
+	// Detect Enter press (user submitted prompt)
+	if strings.Contains(rawInput, "\r") || strings.Contains(rawInput, "\n") {
+		l.flushUserInputLocked()
+	}
+}
+
+// flushUserInputLocked processes accumulated user input and adds as a turn.
+// Must be called with lock held.
+func (l *LLMLogger) flushUserInputLocked() {
+	raw := l.inputBuffer
+	l.inputBuffer = ""
+
+	if raw == "" {
+		return
+	}
+
+	conv, exists := l.conversations[l.activeConvID]
+	if !exists {
+		return
+	}
+
+	// Clean the input using our new capture functions
+	cleaned := CleanUserInput(raw)
+	if cleaned == "" {
+		return
+	}
+
+	conv.Turns = append(conv.Turns, ConversationTurn{
+		Role:          "user",
+		Content:       cleaned,
+		Timestamp:     time.Now(),
+		Provider:      conv.Provider,
+		Raw:           raw,
+		CaptureMethod: "pty_input",
+	})
+
+	// Update recovery info
+	if conv.Recovery == nil {
+		conv.Recovery = &ConversationRecovery{}
+	}
+	conv.Recovery.LastSavedTurn = len(conv.Turns) - 1
+	conv.Recovery.CanRestore = true
+	conv.Recovery.SuggestedRestorePrompt = "Continue from: " + truncateForRestore(cleaned, 100)
+
+	l.saveConversation(conv)
+	log.Printf("[LLM Logger] Captured user input for %s: '%s' (turns=%d)", l.activeConvID, truncateForLog(cleaned, 50), len(conv.Turns))
+}
+
+// truncateForLog truncates a string for logging purposes.
+func truncateForLog(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// truncateForRestore truncates a string for restore prompts.
+func truncateForRestore(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
 // FlushOutput processes accumulated output and adds it as an assistant turn.
 func (l *LLMLogger) FlushOutput() {
 	l.mu.Lock()
@@ -181,22 +309,43 @@ func (l *LLMLogger) FlushOutput() {
 		return
 	}
 
-	cleanedOutput := llm.ParseLLMOutput(l.outputBuffer, llm.Provider(conv.Provider))
+	raw := l.outputBuffer
+	
+	// Use new parsing with confidence scoring
+	cleanedOutput, confidence := ParseAssistantOutput(raw, conv.Provider)
 	if cleanedOutput == "" {
+		// Fallback to old parser
+		cleanedOutput = llm.ParseLLMOutput(raw, llm.Provider(conv.Provider))
+	}
+	
+	if cleanedOutput == "" {
+		l.outputBuffer = ""
 		return
 	}
 
+	// Handle low confidence
+	if confidence < 0.8 {
+		log.Printf("[LLM Logger] ⚠️ Low parse confidence (%.2f) for assistant output", confidence)
+		if l.autoRespond && l.onLowConfidence != nil {
+			// In auto-respond mode, notify via callback (for Vision)
+			l.onLowConfidence(raw)
+		}
+	}
+
 	conv.Turns = append(conv.Turns, ConversationTurn{
-		Role:      "assistant",
-		Content:   cleanedOutput,
-		Timestamp: time.Now(),
-		Provider:  conv.Provider,
+		Role:            "assistant",
+		Content:         cleanedOutput,
+		Timestamp:       time.Now(),
+		Provider:        conv.Provider,
+		Raw:             raw,
+		CaptureMethod:   "pty_output",
+		ParseConfidence: confidence,
 	})
 
 	l.outputBuffer = ""
 	l.saveConversation(conv)
 
-	log.Printf("[LLM Logger] Flushed output for %s (turns=%d)", l.activeConvID, len(conv.Turns))
+	log.Printf("[LLM Logger] Flushed output for %s (turns=%d, confidence=%.2f)", l.activeConvID, len(conv.Turns), confidence)
 }
 
 // EndConversation marks the active conversation as complete.

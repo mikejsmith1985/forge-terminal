@@ -123,14 +123,12 @@ func main() {
 	http.HandleFunc("/api/am/content/", WrapWithMiddleware(handleAMContent))
 	http.HandleFunc("/api/am/archive/", WrapWithMiddleware(handleAMArchive))
 	http.HandleFunc("/api/am/cleanup", WrapWithMiddleware(handleAMCleanup))
-	http.HandleFunc("/api/am/install-hooks", WrapWithMiddleware(handleAMInstallHooks))
 	http.HandleFunc("/api/am/llm/conversations/", WrapWithMiddleware(handleAMLLMConversations))
 	http.HandleFunc("/api/am/health", WrapWithMiddleware(handleAMHealth))
 	http.HandleFunc("/api/am/conversations", WrapWithMiddleware(handleAMActiveConversations))
-	http.HandleFunc("/api/am/apply-hooks", WrapWithMiddleware(handleAMApplyHooks))
-	http.HandleFunc("/api/am/hook", WrapWithMiddleware(handleAMHook))
-	http.HandleFunc("/api/am/restore-hooks", WrapWithMiddleware(handleAMRestoreHooks))
 	http.HandleFunc("/api/am/master-control", WrapWithMiddleware(handleAMMasterControl))
+	http.HandleFunc("/api/am/restore/sessions", WrapWithMiddleware(handleAMRestoreSessions))
+	http.HandleFunc("/api/am/restore/context/", WrapWithMiddleware(handleAMRestoreContext))
 	
 	// Vision Configuration & Insights API
 	http.HandleFunc("/api/vision/config", WrapWithMiddleware(handleVisionConfig))
@@ -1153,109 +1151,7 @@ func handleAMCleanup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleAMInstallHooks writes a helper script to the user's ~/.forge and returns its path and contents.
-func handleAMInstallHooks(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	path, content, err := am.InstallShellHooks()
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"path":    path,
-		"content": content,
-	})
-}
-
-// handleAMApplyHooks will append hook snippets to the user's shell rc when requested.
-func handleAMApplyHooks(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var req struct {
-		Shell   string `json:"shell"`   // "bash" or "powershell"
-		Preview bool   `json:"preview"` // if true, return the snippet only
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	if req.Preview {
-		snippet := am.GetSnippet(req.Shell)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"snippet": snippet,
-		})
-		return
-	}
-
-	path, backup, err := am.ApplyShellHooks(req.Shell)
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"path":    path,
-		"backup":  backup,
-	})
-}
-
-// handleAMHook receives hook POSTs from user shells and marks Layer 2 healthy when seen.
-func handleAMHook(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var payload map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	// Publish layer 2 event to the AM EventBus
-	am.EventBus.Publish(&am.LayerEvent{
-		Type:      "HOOK",
-		Layer:     2,
-		Timestamp: time.Now(),
-		Metadata:  payload,
-	})
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-	})
-}
-
-// handleAMMasterControl handles global AM enable/disable with automatic hook removal.
+// handleAMMasterControl handles global AM enable/disable.
 func handleAMMasterControl(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1275,94 +1171,19 @@ func handleAMMasterControl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !req.Enabled {
-		// Disable: Remove shell hooks
-		removed, err := am.RemoveShellHooks()
-		if err != nil {
-			log.Printf("[AM Master] Hook removal failed: %v", err)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   fmt.Sprintf("Failed to remove hooks: %v", err),
-			})
-			return
-		}
-
-		log.Printf("[AM Master] Disabled - Removed hooks from %d file(s)", len(removed))
+	if req.Enabled {
+		log.Printf("[AM Master] Enabled")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
-			"message": "AM disabled and shell hooks removed",
-			"removed": removed,
+			"message": "AM enabled",
 		})
 	} else {
-		// Enable: Just confirm (user must configure hooks manually)
-		log.Printf("[AM Master] Enabled - Hooks require manual configuration")
+		log.Printf("[AM Master] Disabled")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
-			"message": "AM enabled (hooks must be configured manually)",
+			"message": "AM disabled",
 		})
 	}
-}
-
-// handleAMRestoreHooks restores a backup file over the target profile.
-func handleAMRestoreHooks(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var req struct {
-		Backup string `json:"backup"`
-		Target string `json:"target"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	// Basic validation: ensure backup file exists and contains the .forge-backup- marker
-	if req.Backup == "" || !strings.Contains(req.Backup, ".forge-backup-") {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "invalid backup path",
-		})
-		return
-	}
-
-	if _, err := os.Stat(req.Backup); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "backup not found",
-		})
-		return
-	}
-
-	// Read backup and overwrite target
-	b, err := os.ReadFile(req.Backup)
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	if err := os.WriteFile(req.Target, b, 0644); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"restored": req.Target,
-	})
 }
 
 func handleAMLLMConversations(w http.ResponseWriter, r *http.Request) {
@@ -1451,6 +1272,93 @@ func handleAMActiveConversations(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"active": convs,
 		"count":  len(convs),
+	})
+}
+
+// handleAMRestoreSessions returns all recoverable sessions.
+func handleAMRestoreSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	amDir := am.DefaultAMDir()
+	cb := am.NewContextBuilder(amDir)
+	
+	sessions, err := cb.GetRecoverableSessions()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  false,
+			"error":    err.Error(),
+			"sessions": []interface{}{},
+		})
+		return
+	}
+
+	log.Printf("[AM Restore] Found %d recoverable sessions", len(sessions))
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"sessions": sessions,
+		"count":    len(sessions),
+	})
+}
+
+// handleAMRestoreContext returns restore context for a specific conversation.
+func handleAMRestoreContext(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract conversation ID from path: /api/am/restore/context/{conversationId}
+	convID := strings.TrimPrefix(r.URL.Path, "/api/am/restore/context/")
+	if convID == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "conversation ID required",
+		})
+		return
+	}
+
+	amDir := am.DefaultAMDir()
+	cb := am.NewContextBuilder(amDir)
+
+	if r.Method == http.MethodPost {
+		// Mark as restored
+		err := cb.MarkAsRestored(convID)
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+		log.Printf("[AM Restore] Marked conversation %s as restored", convID)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "conversation marked as restored",
+		})
+		return
+	}
+
+	// GET - return restore context
+	ctx, err := cb.GetRestoreContextByID(convID)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	log.Printf("[AM Restore] Retrieved context for conversation %s", convID)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"context": ctx,
 	})
 }
 

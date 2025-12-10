@@ -52,6 +52,12 @@ type VisionOverlayMessage struct {
 	Payload     map[string]interface{} `json:"payload"`
 }
 
+// AMControlMessage represents AM control commands from client.
+type AMControlMessage struct {
+	Type        string `json:"type"` // "AM_AUTO_RESPOND"
+	AutoRespond bool   `json:"autoRespond"`
+}
+
 // NewHandler creates a new terminal WebSocket handler.
 func NewHandler(service assistant.Service, core *assistant.Core) *Handler {
 	return &Handler{
@@ -159,6 +165,26 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		insightsTracker = vision.NewInsightsTracker(amSystem.AMDir, sessionInfo)
 		visionParser.SetInsightsTracker(insightsTracker)
 		log.Printf("[Terminal] Vision insights tracker initialized for session %s", sessionID)
+
+		// Set up low-confidence callback for AM v2.0
+		// When parsing confidence is low during auto-respond, notify user via Vision
+		llmLogger.SetLowConfidenceCallback(func(raw string) {
+			log.Printf("[AM] Low confidence parsing detected, sending Vision notification")
+			// Send a Vision overlay to notify the user
+			overlayMsg := VisionOverlayMessage{
+				Type:        "VISION_OVERLAY",
+				OverlayType: "AM_LOW_CONFIDENCE",
+				Payload: map[string]interface{}{
+					"message":     "AM detected low-confidence parsing. Raw data preserved for manual review.",
+					"severity":    "warning",
+					"autoRespond": true,
+					"rawLength":   len(raw),
+				},
+			}
+			if err := conn.WriteJSON(overlayMsg); err != nil {
+				log.Printf("[AM] Failed to send low-confidence notification: %v", err)
+			}
+		})
 	}
 	detector := h.assistantCore.GetLLMDetector()
 	log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
@@ -283,11 +309,27 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 					continue
 				}
+
+				// Check for AM control messages (auto-respond state sync)
+				var amMsg AMControlMessage
+				if err := json.Unmarshal(data, &amMsg); err == nil && amMsg.Type == "AM_AUTO_RESPOND" {
+					if llmLogger != nil {
+						llmLogger.SetAutoRespond(amMsg.AutoRespond)
+						log.Printf("[AM] Auto-respond set to %v for session %s", amMsg.AutoRespond, sessionID)
+					}
+					continue
+				}
 			}
 
 			// Accumulate input for LLM detection
 			dataStr := string(data)
 			inputBuffer.WriteString(dataStr)
+
+			// ═══ AM v2.0: Capture user input when inside active LLM session ═══
+			// This is the critical fix - capture ALL input after LLM session starts
+			if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
+				llmLogger.AddUserInput(dataStr)
+			}
 
 			// Check for newline/enter (command submission)
 			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
@@ -300,26 +342,30 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					log.Printf("[Terminal] Hex dump: % X", []byte(commandLine))
 					
 					if llmLogger != nil {
-						// Detect if this is an LLM command
-						log.Printf("[Terminal] Calling LLM detector...")
-						detected := detector.DetectCommand(commandLine)
-						
-						log.Printf("[Terminal] Detection result: detected=%v", detected.Detected)
-						if detected.Detected {
-							log.Printf("[Terminal] ✓ LLM command DETECTED: provider=%s type=%s", detected.Provider, detected.Type)
-							log.Printf("[Terminal] Starting LLM conversation...")
+						// Only detect new LLM command if no conversation is active
+						if llmLogger.GetActiveConversationID() == "" {
+							log.Printf("[Terminal] Calling LLM detector...")
+							detected := detector.DetectCommand(commandLine)
 							
-							convID := llmLogger.StartConversation(detected)
-							log.Printf("[Terminal] ✅ Conversation started: ID='%s'", convID)
-							
-							// Verify active conversation was set
-							activeID := llmLogger.GetActiveConversationID()
-							log.Printf("[Terminal] Active conversation ID: '%s'", activeID)
-							if activeID != convID {
-								log.Printf("[Terminal] ⚠️ WARNING: Active ID mismatch! expected=%s got=%s", convID, activeID)
+							log.Printf("[Terminal] Detection result: detected=%v", detected.Detected)
+							if detected.Detected {
+								log.Printf("[Terminal] ✓ LLM command DETECTED: provider=%s type=%s", detected.Provider, detected.Type)
+								log.Printf("[Terminal] Starting LLM conversation...")
+								
+								convID := llmLogger.StartConversation(detected)
+								log.Printf("[Terminal] ✅ Conversation started: ID='%s'", convID)
+								
+								// Verify active conversation was set
+								activeID := llmLogger.GetActiveConversationID()
+								log.Printf("[Terminal] Active conversation ID: '%s'", activeID)
+								if activeID != convID {
+									log.Printf("[Terminal] ⚠️ WARNING: Active ID mismatch! expected=%s got=%s", convID, activeID)
+								}
+							} else {
+								log.Printf("[Terminal] ✗ Not an LLM command: '%s'", commandLine)
 							}
 						} else {
-							log.Printf("[Terminal] ✗ Not an LLM command: '%s'", commandLine)
+							log.Printf("[Terminal] Inside active LLM session, input captured via AddUserInput")
 						}
 					} else {
 						log.Printf("[Terminal] LLM logger is nil, skipping detection")
