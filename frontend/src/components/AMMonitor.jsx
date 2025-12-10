@@ -61,26 +61,28 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
   }
 
   const systemStatus = health?.status || 'UNKNOWN';
-  const layersOp = health?.metrics?.layersOperational || 0;
-  const layersTotal = health?.metrics?.layersTotal || 4;
+  const conversationsActive = health?.metrics?.conversationsActive || 0;
+  const inputTurns = health?.metrics?.inputTurnsDetected || 0;
+  const outputTurns = health?.metrics?.outputTurnsDetected || 0;
 
   const statusClass = {
     'HEALTHY': 'am-active',
     'WARNING': 'am-warning',
     'DEGRADED': 'am-warning',
     'CRITICAL': 'am-inactive',
+    'FAILED': 'am-inactive',
     'NOT_INITIALIZED': 'am-disabled'
   }[systemStatus] || 'am-disabled';
 
   const statusIcon = systemStatus === 'HEALTHY' ? (
     <Heart size={14} className="pulse" />
-  ) : systemStatus === 'CRITICAL' ? (
+  ) : (systemStatus === 'CRITICAL' || systemStatus === 'FAILED') ? (
     <AlertCircle size={14} />
   ) : (
     <Activity size={14} />
   );
 
-  const title = `AM System: ${systemStatus}\nLayers: ${layersOp}/${layersTotal} operational\nConversations: ${conversationCount}`;
+  const title = `AM System: ${systemStatus}\nActive: ${conversationsActive} | Tracked: ${conversationCount}\nCaptures: ${inputTurns} in / ${outputTurns} out`;
 
   return (
     <div className={`am-monitor ${statusClass}`} title={title}>
