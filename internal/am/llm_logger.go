@@ -14,6 +14,15 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 )
 
+// ScreenSnapshot represents a captured TUI screen state.
+type ScreenSnapshot struct {
+	Timestamp        time.Time `json:"timestamp"`
+	SequenceNumber   int       `json:"sequenceNumber"`
+	RawContent       string    `json:"rawContent"`
+	CleanedContent   string    `json:"cleanedContent"`
+	DiffFromPrevious string    `json:"diffFromPrevious,omitempty"`
+}
+
 // ConversationTurn represents a single exchange in an LLM conversation.
 type ConversationTurn struct {
 	Role           string    `json:"role"`
@@ -21,7 +30,7 @@ type ConversationTurn struct {
 	Timestamp      time.Time `json:"timestamp"`
 	Provider       string    `json:"provider"`
 	Raw            string    `json:"raw,omitempty"`            // Raw PTY data for debugging
-	CaptureMethod  string    `json:"captureMethod,omitempty"`  // "pty_input", "pty_output"
+	CaptureMethod  string    `json:"captureMethod,omitempty"`  // "pty_input", "pty_output", "tui_snapshot"
 	ParseConfidence float64  `json:"parseConfidence,omitempty"` // 0.0-1.0 for output parsing
 }
 
@@ -42,33 +51,41 @@ type ConversationMetadata struct {
 
 // LLMConversation represents a complete LLM conversation session.
 type LLMConversation struct {
-	ConversationID string               `json:"conversationId"`
-	TabID          string               `json:"tabId"`
-	Provider       string               `json:"provider"`
-	CommandType    string               `json:"commandType"`
-	StartTime      time.Time            `json:"startTime"`
-	EndTime        time.Time            `json:"endTime,omitempty"`
-	Turns          []ConversationTurn   `json:"turns"`
-	Complete       bool                 `json:"complete"`
-	AutoRespond    bool                 `json:"autoRespond"`
-	Metadata       *ConversationMetadata `json:"metadata,omitempty"`
-	Recovery       *ConversationRecovery `json:"recovery,omitempty"`
+	ConversationID   string               `json:"conversationId"`
+	TabID            string               `json:"tabId"`
+	Provider         string               `json:"provider"`
+	CommandType      string               `json:"commandType"`
+	StartTime        time.Time            `json:"startTime"`
+	EndTime          time.Time            `json:"endTime,omitempty"`
+	Turns            []ConversationTurn   `json:"turns"`
+	Complete         bool                 `json:"complete"`
+	AutoRespond      bool                 `json:"autoRespond"`
+	Metadata         *ConversationMetadata `json:"metadata,omitempty"`
+	Recovery         *ConversationRecovery `json:"recovery,omitempty"`
+	TUICaptureMode   bool                 `json:"tuiCaptureMode,omitempty"`
+	ScreenSnapshots  []ScreenSnapshot     `json:"screenSnapshots,omitempty"`
+	ProcessPID       int                  `json:"processPID,omitempty"`
 }
 
 // LLMLogger manages LLM conversation logging for a tab.
 type LLMLogger struct {
-	mu              sync.Mutex
-	tabID           string
-	conversations   map[string]*LLMConversation
-	activeConvID    string
-	outputBuffer    string
-	inputBuffer     string
-	lastOutputTime  time.Time
-	lastInputTime   time.Time
-	amDir           string
-	autoRespond     bool
-	capture         *ConversationCapture
-	onLowConfidence func(raw string) // Callback for Vision notification
+	mu                sync.Mutex
+	tabID             string
+	conversations     map[string]*LLMConversation
+	activeConvID      string
+	outputBuffer      string
+	inputBuffer       string
+	lastOutputTime    time.Time
+	lastInputTime     time.Time
+	amDir             string
+	autoRespond       bool
+	capture           *ConversationCapture
+	onLowConfidence   func(raw string) // Callback for Vision notification
+	tuiCaptureMode    bool
+	currentScreen     strings.Builder
+	lastScreen        string
+	snapshotCount     int
+	onProcessCallback func(pid int, provider string) // Callback when Layer 3 detects process
 }
 
 var (
@@ -129,6 +146,88 @@ func (l *LLMLogger) SetLowConfidenceCallback(callback func(raw string)) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.onLowConfidence = callback
+}
+
+// EnableTUICapture enables or disables TUI screen capture mode.
+// When enabled, full screen snapshots are saved instead of line-by-line parsing.
+func (l *LLMLogger) EnableTUICapture(enabled bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.tuiCaptureMode = enabled
+	if enabled {
+		log.Printf("[LLM Logger] TUI capture mode ENABLED for tab %s", l.tabID)
+	} else {
+		log.Printf("[LLM Logger] TUI capture mode DISABLED for tab %s", l.tabID)
+	}
+}
+
+// IsTUICaptureMode returns whether TUI capture is enabled.
+func (l *LLMLogger) IsTUICaptureMode() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.tuiCaptureMode
+}
+
+// StartConversationFromProcess starts a conversation triggered by Layer 3 process detection.
+// This bridges Layer 3 (process monitoring) with Layer 1 (PTY logging).
+func (l *LLMLogger) StartConversationFromProcess(provider string, cmdType string, pid int) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	log.Printf("[LLM Logger] ═══ START CONVERSATION FROM PROCESS ═══")
+	log.Printf("[LLM Logger] TabID: %s, Provider: %s, Type: %s, PID: %d", l.tabID, provider, cmdType, pid)
+
+	convID := fmt.Sprintf("conv-%d", time.Now().UnixNano())
+	log.Printf("[LLM Logger] Generated conversation ID: '%s'", convID)
+
+	conv := &LLMConversation{
+		ConversationID: convID,
+		TabID:          l.tabID,
+		Provider:       provider,
+		CommandType:    cmdType,
+		StartTime:      time.Now(),
+		Turns:          []ConversationTurn{},
+		Complete:       false,
+		TUICaptureMode: true,
+		ProcessPID:     pid,
+		ScreenSnapshots: []ScreenSnapshot{},
+	}
+
+	// Add initial turn noting process start
+	conv.Turns = append(conv.Turns, ConversationTurn{
+		Role:          "system",
+		Content:       fmt.Sprintf("LLM process started: %s (PID %d)", provider, pid),
+		Timestamp:     time.Now(),
+		Provider:      provider,
+		CaptureMethod: "process_detection",
+	})
+
+	l.conversations[convID] = conv
+	l.activeConvID = convID
+	l.tuiCaptureMode = true
+	l.snapshotCount = 0
+	l.currentScreen.Reset()
+	l.lastScreen = ""
+
+	l.saveConversation(conv)
+
+	EventBus.Publish(&LayerEvent{
+		Type:      "LLM_START",
+		Layer:     1,
+		TabID:     l.tabID,
+		ConvID:    convID,
+		Provider:  provider,
+		Timestamp: time.Now(),
+		Metadata: map[string]interface{}{
+			"pid":            pid,
+			"tuiCaptureMode": true,
+		},
+	})
+
+	log.Printf("[LLM Logger] ✅ CONVERSATION STARTED FROM PROCESS")
+	log.Printf("[LLM Logger] ConvID: %s, TUI Mode: true", convID)
+	log.Printf("[LLM Logger] ═══ END START CONVERSATION FROM PROCESS ═══")
+	return convID
 }
 
 // StartConversation initiates a new LLM conversation.
@@ -213,8 +312,125 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 		return
 	}
 
+	// TUI Capture Mode: Detect screen clears and save snapshots
+	if l.tuiCaptureMode {
+		l.currentScreen.WriteString(rawOutput)
+		
+		// Detect screen clear sequences (ESC[2J or ESC[H or ESC[2J ESC[H)
+		if l.detectScreenClear(rawOutput) {
+			l.saveScreenSnapshotLocked()
+		}
+		return
+	}
+
+	// Traditional line-based capture
 	l.outputBuffer += rawOutput
 	l.lastOutputTime = time.Now()
+}
+
+// detectScreenClear checks if output contains screen clear sequences.
+func (l *LLMLogger) detectScreenClear(output string) bool {
+	// Screen clear: ESC[2J (clear screen) or ESC[H (home cursor)
+	return strings.Contains(output, "\x1b[2J") || 
+	       strings.Contains(output, "\x1b[H") ||
+	       strings.Contains(output, "\x1b[3J") // Clear scrollback
+}
+
+// saveScreenSnapshotLocked saves the current screen buffer as a snapshot.
+// Must be called with lock held.
+func (l *LLMLogger) saveScreenSnapshotLocked() {
+	conv, exists := l.conversations[l.activeConvID]
+	if !exists {
+		return
+	}
+
+	rawContent := l.currentScreen.String()
+	if rawContent == "" {
+		return
+	}
+
+	// Clean ANSI sequences for display
+	cleanedContent := l.stripANSI(rawContent)
+	
+	// Calculate diff from previous snapshot
+	diff := l.calculateDiff(l.lastScreen, cleanedContent)
+	
+	snapshot := ScreenSnapshot{
+		Timestamp:        time.Now(),
+		SequenceNumber:   l.snapshotCount,
+		RawContent:       rawContent,
+		CleanedContent:   cleanedContent,
+		DiffFromPrevious: diff,
+	}
+	
+	conv.ScreenSnapshots = append(conv.ScreenSnapshots, snapshot)
+	l.snapshotCount++
+	l.lastScreen = cleanedContent
+	l.currentScreen.Reset()
+	
+	log.Printf("[LLM Logger] 📸 Snapshot #%d saved for %s (%d chars, %d total snapshots)", 
+		l.snapshotCount, l.activeConvID, len(cleanedContent), len(conv.ScreenSnapshots))
+	
+	// Save to disk
+	l.saveConversation(conv)
+}
+
+// stripANSI removes ANSI escape sequences from text.
+func (l *LLMLogger) stripANSI(text string) string {
+	// Pattern matches ANSI CSI sequences, OSC sequences, etc.
+	re := strings.NewReplacer(
+		"\x1b[2J", "",
+		"\x1b[H", "",
+		"\x1b[3J", "",
+	)
+	cleaned := re.Replace(text)
+	// Remove remaining ANSI sequences
+	for _, seq := range []string{"\x1b[", "\x1b]", "\x1b"} {
+		if strings.Contains(cleaned, seq) {
+			// Simplified removal - just keep printable chars
+			var result strings.Builder
+			inEscape := false
+			for _, r := range cleaned {
+				if r == '\x1b' {
+					inEscape = true
+				} else if inEscape && (r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z') {
+					inEscape = false
+				} else if !inEscape && (r >= 32 || r == '\n' || r == '\t' || r == '\r') {
+					result.WriteRune(r)
+				}
+			}
+			return result.String()
+		}
+	}
+	return cleaned
+}
+
+// calculateDiff computes a simple diff between two screens.
+func (l *LLMLogger) calculateDiff(oldScreen, newScreen string) string {
+	if oldScreen == "" {
+		return "Initial screen"
+	}
+	
+	// Simple line-based diff
+	oldLines := strings.Split(oldScreen, "\n")
+	newLines := strings.Split(newScreen, "\n")
+	
+	var diff strings.Builder
+	diff.WriteString(fmt.Sprintf("Changed %d → %d lines\n", len(oldLines), len(newLines)))
+	
+	// Find new content (simple append detection)
+	if len(newLines) > len(oldLines) {
+		diff.WriteString("New content:\n")
+		for i := len(oldLines); i < len(newLines) && i < len(oldLines)+5; i++ {
+			if newLines[i] != "" {
+				diff.WriteString("+ ")
+				diff.WriteString(newLines[i])
+				diff.WriteString("\n")
+			}
+		}
+	}
+	
+	return diff.String()
 }
 
 // AddUserInput captures user input during an active LLM conversation.
@@ -357,38 +573,67 @@ func (l *LLMLogger) EndConversation() {
 		return
 	}
 
-	if l.outputBuffer != "" {
-		if conv, exists := l.conversations[l.activeConvID]; exists {
-			cleanedOutput := llm.ParseLLMOutput(l.outputBuffer, llm.Provider(conv.Provider))
-			if cleanedOutput != "" {
-				conv.Turns = append(conv.Turns, ConversationTurn{
-					Role:      "assistant",
-					Content:   cleanedOutput,
-					Timestamp: time.Now(),
-					Provider:  conv.Provider,
-				})
-			}
+	conv, exists := l.conversations[l.activeConvID]
+	if !exists {
+		l.activeConvID = ""
+		return
+	}
+
+	// TUI Mode: Save final screen snapshot and parse turns
+	if l.tuiCaptureMode && l.currentScreen.Len() > 0 {
+		l.saveScreenSnapshotLocked()
+		
+		// Parse screen snapshots into conversation turns
+		log.Printf("[LLM Logger] Parsing %d screen snapshots into turns...", len(conv.ScreenSnapshots))
+		parsedTurns := l.parseScreenSnapshotsToTurns(conv.ScreenSnapshots, conv.Provider)
+		
+		// Add parsed turns to conversation
+		for _, turn := range parsedTurns {
+			conv.Turns = append(conv.Turns, turn)
+		}
+		
+		log.Printf("[LLM Logger] Parsed %d turns from TUI snapshots", len(parsedTurns))
+	}
+
+	// Traditional mode: Flush remaining output buffer
+	if !l.tuiCaptureMode && l.outputBuffer != "" {
+		cleanedOutput := llm.ParseLLMOutput(l.outputBuffer, llm.Provider(conv.Provider))
+		if cleanedOutput != "" {
+			conv.Turns = append(conv.Turns, ConversationTurn{
+				Role:      "assistant",
+				Content:   cleanedOutput,
+				Timestamp: time.Now(),
+				Provider:  conv.Provider,
+			})
 		}
 		l.outputBuffer = ""
 	}
 
-	if conv, exists := l.conversations[l.activeConvID]; exists {
-		conv.Complete = true
-		conv.EndTime = time.Now()
-		l.saveConversation(conv)
+	conv.Complete = true
+	conv.EndTime = time.Now()
+	l.saveConversation(conv)
 
-		EventBus.Publish(&LayerEvent{
-			Type:      "LLM_END",
-			Layer:     1,
-			TabID:     l.tabID,
-			ConvID:    l.activeConvID,
-			Timestamp: time.Now(),
-		})
+	EventBus.Publish(&LayerEvent{
+		Type:      "LLM_END",
+		Layer:     1,
+		TabID:     l.tabID,
+		ConvID:    l.activeConvID,
+		Timestamp: time.Now(),
+		Metadata: map[string]interface{}{
+			"tuiMode":    l.tuiCaptureMode,
+			"snapshots":  len(conv.ScreenSnapshots),
+			"turns":      len(conv.Turns),
+		},
+	})
 
-		log.Printf("[LLM Logger] Ended conversation %s", l.activeConvID)
-	}
+	log.Printf("[LLM Logger] Ended conversation %s (TUI:%v, snapshots:%d, turns:%d)", 
+		l.activeConvID, l.tuiCaptureMode, len(conv.ScreenSnapshots), len(conv.Turns))
 
 	l.activeConvID = ""
+	l.tuiCaptureMode = false
+	l.currentScreen.Reset()
+	l.lastScreen = ""
+	l.snapshotCount = 0
 }
 
 // ShouldFlushOutput checks if output buffer should be flushed.

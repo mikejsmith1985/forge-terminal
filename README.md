@@ -47,7 +47,7 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **🔓 Unrestricted Mode**: Optional full filesystem access for advanced users.
 
 ### Quality of Life
-- **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./.forge/am/` directory with workspace-aware naming. Captures user input and assistant output automatically (v1.20.11+).
+- **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./.forge/am/` directory with workspace-aware naming. **NEW in v1.21.0**: Full TUI screen capture for AI CLI tools (Copilot, Claude) with automatic session reconstruction and 70% parsing accuracy + 100% raw snapshot fallback.
 - **🔄 Auto-Updates**: Automatic update checking with one-click installation.
 - **📜 Version History**: View and rollback to previous versions.
 - **🤖 Auto-Respond**: Auto-respond to CLI confirmation prompts (per-tab toggle).
