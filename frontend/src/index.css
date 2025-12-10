@@ -958,6 +958,15 @@ body {
   flex-shrink: 0;
 }
 
+.vision-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3b82f6; /* Blue */
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
 .auto-respond-indicator {
   display: flex;
   align-items: center;

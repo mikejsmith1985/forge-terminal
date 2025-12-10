@@ -3,6 +3,7 @@ package files
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,11 +15,39 @@ import (
 	"sync"
 )
 
+// FileAccessMode represents the file access security level
+type FileAccessMode string
+
+const (
+	FileAccessRestricted   FileAccessMode = "restricted"   // Project-scoped only
+	FileAccessUnrestricted FileAccessMode = "unrestricted" // Full filesystem access
+)
+
+var (
+	fileAccessMode      FileAccessMode = FileAccessRestricted // Default to restricted
+	fileAccessModeMutex sync.RWMutex
+)
+
 // wslHomeCache caches resolved WSL home directories to avoid spawning WSL processes repeatedly
 var (
 	wslHomeCache = make(map[string]string)
 	wslHomeMutex = sync.RWMutex{}
 )
+
+// getFileAccessMode returns true if unrestricted mode is enabled
+func getFileAccessMode() bool {
+	fileAccessModeMutex.RLock()
+	defer fileAccessModeMutex.RUnlock()
+	return fileAccessMode == FileAccessUnrestricted
+}
+
+// SetFileAccessMode updates the file access mode
+func SetFileAccessMode(mode FileAccessMode) {
+	fileAccessModeMutex.Lock()
+	defer fileAccessModeMutex.Unlock()
+	fileAccessMode = mode
+	log.Printf("[Files] File access mode set to: %s", mode)
+}
 
 // normalizePath handles cross-platform path normalization
 // Supports Windows, WSL, and Linux paths
@@ -168,6 +197,43 @@ func resolveWSLHome(distro, remainder string) (string, error) {
 // isPathWithinRoot checks if targetPath is within rootPath
 // Handles cross-platform paths including WSL on Windows
 func isPathWithinRoot(targetPath, rootPath string) (bool, error) {
+	// Check if unrestricted mode is enabled
+	if getFileAccessMode() {
+		log.Printf("[Files] Unrestricted mode: allowing access to %s", targetPath)
+		return true, nil
+	}
+
+	// UNC paths on Windows: Special handling
+	if runtime.GOOS == "windows" && strings.HasPrefix(targetPath, "\\\\") {
+		// If root is also UNC, do prefix comparison
+		if strings.HasPrefix(rootPath, "\\\\") {
+			targetLower := strings.ToLower(filepath.Clean(targetPath))
+			rootLower := strings.ToLower(filepath.Clean(rootPath))
+
+			if targetLower == rootLower {
+				return true, nil
+			}
+
+			// Check if target is under root
+			if !strings.HasSuffix(rootLower, string(os.PathSeparator)) {
+				rootLower += string(os.PathSeparator)
+			}
+
+			allowed := strings.HasPrefix(targetLower, rootLower)
+			log.Printf("[Files] UNC validation: target=%s, root=%s, allowed=%v",
+				targetPath, rootPath, allowed)
+			return allowed, nil
+		}
+
+		// UNC target but non-UNC root: Cannot validate across filesystems
+		// Log warning and deny by default (user should enable unrestricted mode)
+		log.Printf("[Files] WARNING: Cross-filesystem access denied: UNC path %s with non-UNC root %s",
+			targetPath, rootPath)
+		log.Printf("[Files] Enable unrestricted mode in settings to allow this")
+		return false, nil
+	}
+
+	// Existing validation logic for same-filesystem paths
 	// Resolve both paths, handling WSL conversions
 	absTarget, err := resolvePath(targetPath)
 	if err != nil {
@@ -201,7 +267,10 @@ func isPathWithinRoot(targetPath, rootPath string) (bool, error) {
 		absRoot += string(os.PathSeparator)
 	}
 
-	return strings.HasPrefix(absTarget, absRoot), nil
+	allowed := strings.HasPrefix(absTarget, absRoot)
+	log.Printf("[Files] Path validation: target=%s, root=%s, allowed=%v",
+		absTarget, absRoot, allowed)
+	return allowed, nil
 }
 
 type FileNode struct {
@@ -304,9 +373,13 @@ func HandleRead(w http.ResponseWriter, r *http.Request) {
 
 	var req FileReadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("[Files] Failed to decode request: %v", err)
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("[Files] Read request: path=%s, rootPath=%s, runtime=%s, accessMode=%v",
+		req.Path, req.RootPath, runtime.GOOS, getFileAccessMode())
 
 	// Default rootPath if not specified
 	rootPath := req.RootPath
@@ -327,17 +400,28 @@ func HandleRead(w http.ResponseWriter, r *http.Request) {
 		// Regular path, use absolute path
 		absPath, err = filepath.Abs(req.Path)
 		if err != nil {
+			log.Printf("[Files] Invalid path: %v", err)
 			http.Error(w, "Invalid path", http.StatusBadRequest)
 			return
 		}
 	}
 
+	log.Printf("[Files] Validating: absPath=%s, rootPath=%s", absPath, rootPath)
+
 	// Validate path is within root
 	within, err := isPathWithinRoot(absPath, rootPath)
-	if err != nil || !within {
-		http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
+	if err != nil {
+		log.Printf("[Files] Validation error: %v", err)
+		http.Error(w, "Path validation error: "+err.Error(), http.StatusForbidden)
 		return
 	}
+	if !within {
+		log.Printf("[Files] ACCESS DENIED: absPath=%s not within rootPath=%s", absPath, rootPath)
+		http.Error(w, "Access denied: Path is outside allowed directory", http.StatusForbidden)
+		return
+	}
+
+	log.Printf("[Files] Access granted: reading %s", absPath)
 
 	info, err := os.Stat(absPath)
 	if err != nil {
@@ -596,3 +680,44 @@ func HandleReadStream(w http.ResponseWriter, r *http.Request) {
 
 	io.Copy(w, file)
 }
+
+
+// HandleFileAccessMode gets or sets the file access security mode
+func HandleFileAccessMode(w http.ResponseWriter, r *http.Request) {
+w.Header().Set("Content-Type", "application/json")
+
+switch r.Method {
+case http.MethodGet:
+// Return current mode
+mode := FileAccessRestricted
+if getFileAccessMode() {
+mode = FileAccessUnrestricted
+}
+json.NewEncoder(w).Encode(map[string]string{
+"mode": string(mode),
+})
+
+case http.MethodPost:
+// Set mode
+var req struct {
+Mode string `json:"mode"`
+}
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+http.Error(w, "Invalid request", http.StatusBadRequest)
+return
+}
+
+mode := FileAccessMode(req.Mode)
+if mode != FileAccessRestricted && mode != FileAccessUnrestricted {
+http.Error(w, "Invalid mode. Use \"restricted\" or \"unrestricted\"", http.StatusBadRequest)
+return
+}
+
+SetFileAccessMode(mode)
+json.NewEncoder(w).Encode(map[string]bool{"success": true})
+
+default:
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+}
+

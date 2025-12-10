@@ -89,6 +89,14 @@ export default function VisionOverlay({ activeOverlay, onAction, onDismiss }) {
           selectedIndex={selectedIndex}
         />
       )}
+      {activeOverlay.type === 'STACK_TRACE' && (
+        <StackTraceOverlay 
+          data={activeOverlay.payload}
+          onAction={onAction}
+          onDismiss={onDismiss}
+          selectedIndex={selectedIndex}
+        />
+      )}
     </div>
   );
 }
@@ -388,6 +396,193 @@ function FilePathOverlay({ data, onAction, onDismiss, selectedIndex }) {
 
       <div className="vision-overlay-footer">
         <span className="vision-hint">↑↓ Navigate • Enter Select • 1-9 Quick • ESC Close</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * StackTraceOverlay - Stack trace viewer with jump-to-file
+ */
+function StackTraceOverlay({ data, onAction, onDismiss, selectedIndex }) {
+  const { language, errorType, message, frames, rootFrame, frameCount } = data;
+
+  const handleJumpToFile = (file, line) => {
+    onAction({
+      type: 'INJECT_COMMAND',
+      command: `\${EDITOR:-nano} +${line} "${file}"`
+    });
+  };
+
+  const handleCopyError = async () => {
+    try {
+      const errorText = `${language} ${errorType}: ${message}\n\nStack Trace:\n${frames.map((f, i) => 
+        `  ${i + 1}. ${f.function}\n     ${f.file}:${f.line}`
+      ).join('\n')}`;
+      await navigator.clipboard.writeText(errorText);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
+
+  return (
+    <div className="vision-overlay stacktrace-overlay">
+      <div className="vision-overlay-header">
+        <div className="vision-overlay-title">
+          <span className="vision-git-icon">⚠️</span>
+          <span>{language.toUpperCase()} {errorType}</span>
+          <span className="vision-branch-name">{frameCount} frames</span>
+        </div>
+        <button className="vision-close-btn" onClick={onDismiss}>×</button>
+      </div>
+
+      <div className="vision-overlay-content">
+        {/* Error Message */}
+        <div style={{
+          background: '#422006',
+          border: '1px solid #f97316',
+          borderRadius: '8px',
+          padding: '12px',
+          marginBottom: '15px',
+          fontSize: '0.9em',
+          color: '#fed7aa'
+        }}>
+          <strong>Error:</strong> {message}
+        </div>
+
+        {/* Root Cause Highlight */}
+        {rootFrame && rootFrame.isUser && (
+          <div style={{
+            background: '#1a2e1a',
+            border: '1px solid #22c55e',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            marginBottom: '12px',
+            fontSize: '0.85em',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ color: '#22c55e', fontSize: '1.2em' }}>💡</span>
+            <div>
+              <strong style={{ color: '#22c55e' }}>Root Cause:</strong>
+              <div style={{ color: '#86efac', marginTop: '4px' }}>
+                {rootFrame.file}:{rootFrame.line} in {rootFrame.function}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stack Frames */}
+        <div className="stack-frames" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+          {frames.map((frame, idx) => (
+            <div 
+              key={idx} 
+              className={`stack-frame ${frame.isUser ? 'user-code' : 'stdlib'}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 12px',
+                background: frame.isUser ? '#1a2e1a' : '#1a1a1a',
+                border: frame.isUser ? '1px solid #22c55e' : '1px solid #333',
+                borderRadius: '6px',
+                marginBottom: '8px',
+                fontSize: '0.85em'
+              }}
+            >
+              <span 
+                className="frame-number" 
+                style={{
+                  minWidth: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: frame.isUser ? '#22c55e' : '#333',
+                  color: frame.isUser ? '#000' : '#888',
+                  borderRadius: '50%',
+                  fontSize: '0.9em',
+                  fontWeight: 600
+                }}
+              >
+                {idx + 1}
+              </span>
+              <div className="frame-info" style={{ flex: 1, minWidth: 0 }}>
+                <div 
+                  className="frame-function" 
+                  style={{ 
+                    fontWeight: 500, 
+                    color: frame.isUser ? '#22c55e' : '#a3a3a3',
+                    marginBottom: '4px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {frame.function}
+                </div>
+                <div 
+                  className="frame-location"
+                  style={{ 
+                    color: '#888',
+                    fontSize: '0.9em',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {frame.file}:{frame.line}
+                </div>
+              </div>
+              {frame.isUser && (
+                <button 
+                  className="vision-action-btn compact"
+                  data-action="true"
+                  onClick={() => handleJumpToFile(frame.file, frame.line)}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.85em',
+                    background: '#22c55e',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Jump
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="vision-actions" style={{ marginTop: '15px' }}>
+          <button 
+            className="vision-action-btn" 
+            data-action="true"
+            onClick={handleCopyError}
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: '#262626',
+              border: '1px solid #333',
+              borderRadius: '6px',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '0.9em'
+            }}
+          >
+            📋 Copy Error Details
+          </button>
+        </div>
+      </div>
+
+      <div className="vision-overlay-footer">
+        <span className="vision-hint">↑↓ Navigate • Enter Select • ESC Close</span>
       </div>
     </div>
   );

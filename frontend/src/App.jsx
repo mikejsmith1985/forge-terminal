@@ -9,6 +9,7 @@ import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import UpdateModal from './components/UpdateModal'
 import WelcomeModal from './components/WelcomeModal'
+import FileAccessPrompt from './components/FileAccessPrompt'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
 import SearchBar from './components/SearchBar'
@@ -78,6 +79,10 @@ function App() {
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   
+  // File access permission state
+  const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false)
+  const [fileAccessModeReady, setFileAccessModeReady] = useState(false)
+  
   // Tab management
   const {
     tabs,
@@ -101,10 +106,41 @@ function App() {
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
   
+  // AM Master Control state (global kill switch for ALL tabs)
+  const [amMasterEnabled, setAMMasterEnabled] = useState(() => {
+    const saved = localStorage.getItem('amMasterEnabled');
+    return saved !== null ? saved === 'true' : true; // Default to ON
+  });
+  
   // AM Default state (global override for new tabs)
   const [amDefaultEnabled, setAMDefaultEnabled] = useState(() => {
     const saved = localStorage.getItem('amDefaultEnabled');
     return saved !== null ? saved === 'true' : true; // Default to ON for legal compliance
+  });
+  
+  // Vision Config state (global configuration)
+  const [visionConfig, setVisionConfig] = useState(() => {
+    const saved = localStorage.getItem('visionConfig');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse vision config:', e);
+      }
+    }
+    // Default config - enabled when Dev Mode is ON
+    return {
+      enabled: false, // Will be set to true when devMode is enabled
+      detectors: {
+        json: true,
+        compiler_error: true,
+        stack_trace: true,
+        git: true,
+        filepath: true,
+      },
+      jsonMinSize: 30,
+      autoDismiss: true,
+    };
   });
   
   // Store refs for each terminal by tab ID
@@ -183,6 +219,13 @@ function App() {
     checkWSL()
     checkForUpdates()
     checkWelcome()
+    
+    // Check if file access mode has been set
+    const modeSet = localStorage.getItem('fileAccessModeSet');
+    if (modeSet === 'true') {
+      setFileAccessModeReady(true);
+    }
+    
     // Check system preference or saved theme
     const savedTheme = localStorage.getItem('theme') || 'dark';
     const savedColorTheme = localStorage.getItem('colorTheme') || 'molten';
@@ -488,6 +531,25 @@ function App() {
       }
     }, 100);
   }
+
+  // Check and prompt for file access permission if needed
+  const checkFileAccessPermission = () => {
+    const modeSet = localStorage.getItem('fileAccessModeSet');
+    if (modeSet !== 'true') {
+      setShowFileAccessPrompt(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handleFileAccessChoice = (mode) => {
+    setShowFileAccessPrompt(false);
+    setFileAccessModeReady(true);
+    console.log('[App] File access mode set to:', mode);
+    
+    // Now that permission is set, show the files view
+    setSidebarView('files');
+  };
 
   const handleShellToggle = () => {
     // Cycle through available shells
@@ -862,6 +924,82 @@ function App() {
     logger.settings('AM default changed', { enabled });
   }, [addToast]);
 
+  // Handle AM Master Control toggle
+  const handleAMMasterToggle = useCallback(async (enabled) => {
+    if (!enabled) {
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        'Disable AM System?\n\n' +
+        'This will:\n' +
+        '• Stop all AM logging across all tabs\n' +
+        '• Remove shell hooks from ~/.bashrc, ~/.zshrc, etc.\n\n' +
+        'Hooks will need to be re-configured when AM is re-enabled.\n\n' +
+        'Continue?'
+      );
+      
+      if (!confirmed) return;
+      
+      try {
+        const res = await fetch('/api/am/master-control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: false })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          setAMMasterEnabled(false);
+          localStorage.setItem('amMasterEnabled', 'false');
+          
+          // Show success message
+          const removedFiles = data.removed || [];
+          if (removedFiles.length > 0) {
+            addToast(
+              `AM disabled. Hooks removed from:\n${removedFiles.map(r => r.filePath).join('\n')}`,
+              'success',
+              5000
+            );
+          } else {
+            addToast('AM disabled. No hooks found to remove.', 'success', 3000);
+          }
+          
+          logger.settings('AM Master disabled', { removed: removedFiles });
+        } else {
+          addToast('Failed to disable AM: ' + data.error, 'error', 3000);
+        }
+      } catch (err) {
+        console.error('Failed to disable AM:', err);
+        addToast('Failed to disable AM system', 'error', 3000);
+      }
+    } else {
+      // Enable: Simple toggle
+      setAMMasterEnabled(true);
+      localStorage.setItem('amMasterEnabled', 'true');
+      addToast('AM enabled. You will need to configure shell hooks in Settings → Shell Hooks.', 'info', 4000);
+      logger.settings('AM Master enabled', {});
+    }
+  }, [addToast]);
+
+  // Handle Vision config change
+  const handleVisionConfigChange = useCallback((newConfig) => {
+    setVisionConfig(newConfig);
+    localStorage.setItem('visionConfig', JSON.stringify(newConfig));
+    logger.settings('Vision config changed', newConfig);
+  }, []);
+
+  // Sync Vision enabled state with Dev Mode
+  useEffect(() => {
+    if (devModeInitialized) {
+      setVisionConfig(prev => {
+        const newConfig = { ...prev, enabled: devMode };
+        localStorage.setItem('visionConfig', JSON.stringify(newConfig));
+        return newConfig;
+      });
+      logger.settings('Vision synced with Dev Mode', { devMode });
+    }
+  }, [devMode, devModeInitialized]);
+
 
   const loadCommands = () => {
     setCommandsLoading(true);
@@ -1094,7 +1232,17 @@ function App() {
         </button>
         <button 
           className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
-          onClick={() => setSidebarView('files')}
+          onClick={() => {
+            // Check if file access permission is set
+            if (!fileAccessModeReady) {
+              const ready = checkFileAccessPermission();
+              if (!ready) {
+                // Prompt will show, don't switch view yet
+                return;
+              }
+            }
+            setSidebarView('files');
+          }}
         >
           <Folder size={16} />
           Files
@@ -1398,8 +1546,12 @@ function App() {
         onToast={addToast}
         devMode={devMode}
         onDevModeChange={setDevMode}
+        amMasterEnabled={amMasterEnabled}
+        onAMMasterChange={handleAMMasterToggle}
         amDefaultEnabled={amDefaultEnabled}
         onAMDefaultChange={handleAMDefaultChange}
+        visionConfig={visionConfig}
+        onVisionConfigChange={handleVisionConfigChange}
       />
 
       <UpdateModal
@@ -1413,6 +1565,11 @@ function App() {
         isOpen={isWelcomeModalOpen}
         onClose={dismissWelcome}
         version={currentVersion}
+      />
+
+      <FileAccessPrompt
+        isOpen={showFileAccessPrompt}
+        onChoice={handleFileAccessChoice}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />

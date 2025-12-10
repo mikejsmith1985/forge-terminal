@@ -28,27 +28,65 @@ export default function MonacoEditor({
   
   const loadFile = async (path) => {
     setLoading(true);
-    setContent(''); // Reset content while loading
+    setContent('');
+    
+    console.log('[MonacoEditor] ===== FILE LOAD START =====');
+    console.log('[MonacoEditor] Path:', path);
+    console.log('[MonacoEditor] Root:', rootPath);
+    console.log('[MonacoEditor] Platform:', navigator.platform);
+    
     try {
-      console.log('[MonacoEditor] Fetching content for:', path);
+      const requestBody = { path, rootPath };
+      console.log('[MonacoEditor] Sending request:', JSON.stringify(requestBody, null, 2));
+      
       const response = await fetch('/api/files/read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, rootPath })
+        body: JSON.stringify(requestBody)
       });
+      
+      console.log('[MonacoEditor] Response status:', response.status, response.statusText);
       
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to load file: ${response.status} - ${errorText}`);
+        console.error('[MonacoEditor] Server error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('[MonacoEditor] Loaded content, length:', data.content?.length || 0);
+      console.log('[MonacoEditor] Response data:', {
+        hasContent: !!data.content,
+        contentLength: data.content?.length || 0,
+        contentPreview: data.content?.substring(0, 100) || ''
+      });
+      
       setContent(data.content || '');
       setModified(false);
+      console.log('[MonacoEditor] ===== FILE LOAD SUCCESS =====');
     } catch (err) {
-      console.error('Failed to load file:', err);
-      setContent(`// Error loading file: ${err.message}\n// Path: ${path}`);
+      console.error('[MonacoEditor] ===== FILE LOAD FAILED =====');
+      console.error('[MonacoEditor] Error details:', {
+        message: err.message,
+        stack: err.stack,
+        path: path,
+        rootPath: rootPath
+      });
+      
+      setContent(
+        `// ❌ Error loading file\n` +
+        `// \n` +
+        `// Error: ${err.message}\n` +
+        `// Path: ${path}\n` +
+        `// Root: ${rootPath}\n` +
+        `// \n` +
+        `// This file could not be loaded. Possible reasons:\n` +
+        `// 1. File access permissions not set (check Settings → File Access Security)\n` +
+        `// 2. Path is outside allowed directory (enable Full System Access in settings)\n` +
+        `// 3. File does not exist or cannot be read\n` +
+        `// 4. Cross-filesystem access denied (WSL paths on Windows)\n` +
+        `// \n` +
+        `// Check the browser console (F12) and server logs for more details.\n`
+      );
     } finally {
       setLoading(false);
     }

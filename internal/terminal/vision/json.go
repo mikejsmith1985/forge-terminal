@@ -11,12 +11,21 @@ import (
 type JSONDetector struct {
 	mu      sync.RWMutex
 	enabled bool
+	minSize int // Minimum size threshold (default 30)
 }
 
 func NewJSONDetector() *JSONDetector {
 	return &JSONDetector{
 		enabled: true,
+		minSize: 30,
 	}
+}
+
+// SetMinSize sets the minimum JSON size threshold
+func (j *JSONDetector) SetMinSize(minSize int) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.minSize = minSize
 }
 
 func (j *JSONDetector) Name() string {
@@ -63,6 +72,16 @@ func (j *JSONDetector) Detect(buffer []byte) *Match {
 	}
 	
 	if largestJSON == "" {
+		return nil
+	}
+	
+	// Get configured minimum size
+	j.mu.RLock()
+	minSize := j.minSize
+	j.mu.RUnlock()
+	
+	// Ignore trivial JSON like {} or []
+	if largestSize < minSize {
 		return nil
 	}
 	

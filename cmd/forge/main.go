@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -129,8 +130,10 @@ func main() {
 	http.HandleFunc("/api/am/apply-hooks", WrapWithMiddleware(handleAMApplyHooks))
 	http.HandleFunc("/api/am/hook", WrapWithMiddleware(handleAMHook))
 	http.HandleFunc("/api/am/restore-hooks", WrapWithMiddleware(handleAMRestoreHooks))
+	http.HandleFunc("/api/am/master-control", WrapWithMiddleware(handleAMMasterControl))
 	
-	// Vision Insights API - pattern detection tracking
+	// Vision Configuration & Insights API
+	http.HandleFunc("/api/vision/config", WrapWithMiddleware(handleVisionConfig))
 	http.HandleFunc("/api/vision/insights/", WrapWithMiddleware(handleVisionInsights))
 	http.HandleFunc("/api/vision/insights/summary/", WrapWithMiddleware(handleVisionInsightsSummary))
 
@@ -143,6 +146,7 @@ func main() {
 	http.HandleFunc("/api/files/write", WrapWithMiddleware(files.HandleWrite))
 	http.HandleFunc("/api/files/delete", WrapWithMiddleware(files.HandleDelete))
 	http.HandleFunc("/api/files/stream", WrapWithMiddleware(files.HandleReadStream))
+	http.HandleFunc("/api/files/access-mode", WrapWithMiddleware(files.HandleFileAccessMode))
 
 	// Assistant API - AI chat and command suggestions (Dev Mode only)
 	http.HandleFunc("/api/assistant/status", WrapWithMiddleware(handleAssistantStatus))
@@ -510,18 +514,28 @@ func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Updater] Update applied successfully! Restarting...")
+	log.Printf("[Updater] Update applied successfully! Server will restart in 3 seconds...")
 
-	// Send success response
+	// Send success response FIRST
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":    true,
 		"newVersion": info.LatestVersion,
-		"message":    "Update applied. Restarting...",
+		"message":    "Update applied. Server will restart...",
 	})
 
-	// Restart the application
+	// Ensure response is fully sent
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
+	// Restart the application after delay
+	// This gives frontend time to:
+	// 1. Receive the success response
+	// 2. Show success message
+	// 3. Set up server death detection polling
 	go func() {
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(3 * time.Second)
+		log.Printf("[Updater] Restarting now...")
 		restartSelf()
 	}()
 }
@@ -576,17 +590,23 @@ func handleInstallManualUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Updater] Manual update applied successfully! Restarting...")
+	log.Printf("[Updater] Manual update applied successfully! Server will restart in 3 seconds...")
 
-	// Send success response
+	// Send success response FIRST
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"message": "Update applied. Restarting...",
+		"message": "Update applied. Server will restart...",
 	})
 
-	// Restart the application
+	// Ensure response is fully sent
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
+	// Restart the application after delay
 	go func() {
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(3 * time.Second)
+		log.Printf("[Updater] Restarting now...")
 		restartSelf()
 	}()
 }
@@ -1235,6 +1255,54 @@ func handleAMHook(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleAMMasterControl handles global AM enable/disable with automatic hook removal.
+func handleAMMasterControl(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid JSON",
+		})
+		return
+	}
+
+	if !req.Enabled {
+		// Disable: Remove shell hooks
+		removed, err := am.RemoveShellHooks()
+		if err != nil {
+			log.Printf("[AM Master] Hook removal failed: %v", err)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   fmt.Sprintf("Failed to remove hooks: %v", err),
+			})
+			return
+		}
+
+		log.Printf("[AM Master] Disabled - Removed hooks from %d file(s)", len(removed))
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "AM disabled and shell hooks removed",
+			"removed": removed,
+		})
+	} else {
+		// Enable: Just confirm (user must configure hooks manually)
+		log.Printf("[AM Master] Enabled - Hooks require manual configuration")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "AM enabled (hooks must be configured manually)",
+		})
+	}
+}
+
 // handleAMRestoreHooks restores a backup file over the target profile.
 func handleAMRestoreHooks(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1517,6 +1585,86 @@ json.NewEncoder(w).Encode(assistant.SetModelResponse{
 Success: true,
 Model:   req.Model,
 })
+}
+
+// Vision Configuration handler
+
+// handleVisionConfig handles GET and POST for Vision configuration
+func handleVisionConfig(w http.ResponseWriter, r *http.Request) {
+	// TODO: Initialize global vision config manager in main()
+	// For now, use a simple file-based approach
+	
+	forgeDir := os.Getenv("FORGE_DIR")
+	if forgeDir == "" {
+		homeDir, _ := os.UserHomeDir()
+		forgeDir = filepath.Join(homeDir, ".forge")
+	}
+	
+	configPath := filepath.Join(forgeDir, "vision-config.json")
+	
+	w.Header().Set("Content-Type", "application/json")
+	
+	switch r.Method {
+	case http.MethodGet:
+		// Read config
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// Return default config
+				defaultConfig := map[string]interface{}{
+					"enabled": false,
+					"detectors": map[string]bool{
+						"json":           true,
+						"compiler_error": true,
+						"stack_trace":    true,
+						"git":            true,
+						"filepath":       true,
+					},
+					"jsonMinSize": 30,
+					"autoDismiss": true,
+				}
+				json.NewEncoder(w).Encode(defaultConfig)
+				return
+			}
+			http.Error(w, "Failed to read config", http.StatusInternalServerError)
+			return
+		}
+		w.Write(data)
+		
+	case http.MethodPost:
+		// Save config
+		var config map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		
+		// Ensure directory exists
+		if err := os.MkdirAll(forgeDir, 0755); err != nil {
+			http.Error(w, "Failed to create config directory", http.StatusInternalServerError)
+			return
+		}
+		
+		// Write config
+		data, err := json.MarshalIndent(config, "", "  ")
+		if err != nil {
+			http.Error(w, "Failed to encode config", http.StatusInternalServerError)
+			return
+		}
+		
+		if err := os.WriteFile(configPath, data, 0644); err != nil {
+			http.Error(w, "Failed to save config", http.StatusInternalServerError)
+			return
+		}
+		
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "Vision config saved",
+		})
+		
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // Vision Insights handlers

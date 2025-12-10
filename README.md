@@ -38,28 +38,36 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 ### Windows-Specific Features
 - **🐚 Shell Selection**: Switch between CMD, PowerShell, and WSL.
 - **🐧 WSL Integration**: Native WSL support with automatic distro detection.
-- **📂 Path Translation**: Automatic conversion of Windows paths to WSL paths.
+- **📂 Path Translation**: Automatic conversion of Windows paths to WSL paths and UNC path handling.
+
+### Security & File Access
+- **🔐 File Access Modes**: Toggle between restricted (project-scoped) and unrestricted (full filesystem) access.
+- **⚠️ Security Prompts**: Confirmation dialogs for sensitive file operations.
+- **📂 Project-Scoped Access** (default): File operations limited to the project directory for safety.
+- **🔓 Unrestricted Mode**: Optional full filesystem access for advanced users.
 
 ### Quality of Life
-- **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./am/` directory.
+- **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./.forge/am/` directory with workspace-aware naming.
 - **🔄 Auto-Updates**: Automatic update checking with one-click installation.
 - **📜 Version History**: View and rollback to previous versions.
 - **🤖 Auto-Respond**: Auto-respond to CLI confirmation prompts (per-tab toggle).
 - **📍 Scroll to Bottom**: Quick button to jump to latest output.
 - **🔌 Disconnect Reasons**: Clear messages when terminal sessions end.
 - **🖥️ Desktop Shortcut**: Create a desktop shortcut from Settings for quick access.
+- **✨ Active Tab Indicator**: Rotating "bead of light" animation for visual clarity (v1.20.9+).
 
 ### Experimental Features (Dev Mode)
 > Enable Dev Mode in Settings to access experimental features.
 
 - **🤖 Forge Assistant** (Experimental): AI-powered chat panel integrated into the sidebar. Requires local Ollama for model inference. Context-aware suggestions based on terminal state.
-- **👁️ Vision Detection** (Experimental): Real-time pattern detection with interactive overlays:
+- **👁️ Vision Detection** (Experimental): Real-time pattern detection with interactive overlays and configurable detectors:
   - **Git Status**: Detects `git status` output, shows staged/unstaged/untracked files with quick stage/unstage actions
-  - **JSON Blocks**: Identifies JSON in terminal output, pretty-prints with copy actions
+  - **JSON Blocks**: Identifies JSON in terminal output, pretty-prints with copy actions (configurable minimum size)
   - **File Paths**: Detects file paths, validates existence, provides quick view/edit/list actions
   - **Compiler Errors** (NEW): Detects errors from Go, Rust, TypeScript, Python, Java with context and quick actions
   - **Stack Traces** (NEW): Detects panics and exceptions from Go, Python, Java, JavaScript with frame analysis
-   - **Vision-AM Integration** (NEW): All detected errors and warnings are persisted to AM logs. When auto-respond is enabled, Vision can optionally interrupt the workflow on critical errors or silently collect findings for post-session review. Configure in Settings: "Vision-AutoRespond Mode" (strict/lenient)
+  - **Configurable Detectors**: Enable/disable each detector type independently via Vision Settings
+  - **Vision-AM Integration** (NEW): All detected errors and warnings are persisted to AM logs. When auto-respond is enabled, Vision can optionally interrupt the workflow on critical errors or silently collect findings for post-session review. Configure in Settings: "Vision-AutoRespond Mode" (strict/lenient)
 
 ## Installation
 

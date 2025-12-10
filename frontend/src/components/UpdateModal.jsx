@@ -3,12 +3,14 @@ import { Download, RefreshCw, ExternalLink, AlertTriangle, CheckCircle, Clock, C
 
 const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdate }) => {
   const [isUpdating, setIsUpdating] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState(null); // 'downloading' | 'applying' | 'success' | 'error'
+  const [updateStatus, setUpdateStatus] = useState(null); // 'downloading' | 'applying' | 'success' | 'error' | 'restarting' | 'ready'
   const [errorMessage, setErrorMessage] = useState('');
   const [showVersions, setShowVersions] = useState(false);
   const [versions, setVersions] = useState([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [installFromFileInput, setInstallFromFileInput] = useState('');
+  const [pollingInterval, setPollingInterval] = useState(null);
+  const [timeoutTimer, setTimeoutTimer] = useState(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -18,8 +20,18 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       setErrorMessage('');
       setShowVersions(false);
       setInstallFromFileInput('');
+      
+      // Clean up timers
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+      if (timeoutTimer) {
+        clearTimeout(timeoutTimer);
+        setTimeoutTimer(null);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, pollingInterval, timeoutTimer]);
 
   const fetchVersions = async () => {
     if (versions.length > 0) {
@@ -78,20 +90,108 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
   };
 
   /**
+   * Clear all caches and service workers before refreshing.
+   */
+  const performHardRefresh = async () => {
+    console.log('[Update] Performing hard refresh with cache clearing...');
+    
+    // 1. Clear service worker cache
+    if ('caches' in window) {
+      try {
+        const names = await caches.keys();
+        await Promise.all(names.map(name => caches.delete(name)));
+        console.log('[Update] Cleared', names.length, 'cache(s)');
+      } catch (err) {
+        console.warn('[Update] Failed to clear caches:', err);
+      }
+    }
+    
+    // 2. Unregister service workers
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(reg => reg.unregister()));
+        console.log('[Update] Unregistered', registrations.length, 'service worker(s)');
+      } catch (err) {
+        console.warn('[Update] Failed to unregister service workers:', err);
+      }
+    }
+    
+    // 3. Hard navigation reload with cache busting
+    const timestamp = Date.now();
+    window.location.href = window.location.href + '?nocache=' + timestamp;
+    
+    // Fallback: if navigation doesn't work, force reload
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
+  };
+
+  /**
+   * Watch for server death and recovery, then auto-refresh.
+   */
+  const watchForServerDeath = () => {
+    console.log('[Update] Watching for server restart...');
+    setUpdateStatus('restarting');
+    
+    // Poll the version endpoint to detect when server is back
+    const checkInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/version', {
+          cache: 'no-cache',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          console.log('[Update] Server restarted with version:', data.version);
+          clearInterval(checkInterval);
+          setPollingInterval(null);
+          
+          // Clear timeout timer
+          if (timeoutTimer) {
+            clearTimeout(timeoutTimer);
+            setTimeoutTimer(null);
+          }
+          
+          // Server is back - now safe to reload
+          setUpdateStatus('ready');
+          await performHardRefresh();
+        }
+      } catch (err) {
+        // Server not ready yet, keep polling
+        console.log('[Update] Server still restarting...');
+      }
+    }, 500); // Check every 500ms
+    
+    setPollingInterval(checkInterval);
+    
+    // Timeout after 30 seconds
+    const timeout = setTimeout(() => {
+      clearInterval(checkInterval);
+      setPollingInterval(null);
+      console.error('[Update] Server restart timeout - please refresh manually');
+      setUpdateStatus('error');
+      setErrorMessage('Server restart timeout. Please refresh manually (F5).');
+      setIsUpdating(false);
+    }, 30000);
+    
+    setTimeoutTimer(timeout);
+  };
+
+  /**
    * Handle update application.
    * 
    * Backend flow:
    * 1. Backend downloads and applies the new binary to disk
-   * 2. Backend calls restartSelf() which:
-   *    - Kills the current process
-   *    - Starts the new binary on the same port
-   * 3. Backend calls openBrowser() to open a new tab with the new server
-   * 4. Old tab loses WebSocket connection (server process died)
-   * 5. User sees success message and new tab opens
-   * 6. User should switch to new tab or refresh old tab (F5) to resume
+   * 2. Backend sends success response
+   * 3. Backend waits 3 seconds to allow frontend to receive response
+   * 4. Backend calls restartSelf() which kills the process and starts new binary
    * 
-   * Note: Frontend does NOT perform a hard refresh - that was dead code.
-   * The new tab opening is the visual feedback that update is complete.
+   * Frontend flow:
+   * 1. Receive success response
+   * 2. Start polling /api/version to detect server death and recovery
+   * 3. When server responds, perform hard refresh to load new version
    */
   const handleUpdate = async () => {
     setIsUpdating(true);
@@ -104,8 +204,8 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       
       if (data.success) {
         setUpdateStatus('success');
-        // Backend restarts and opens new tab automatically
-        // No hard refresh needed - user will see new tab open
+        // Server is about to die - set up death detection
+        watchForServerDeath();
       } else {
         setUpdateStatus('error');
         setErrorMessage(data.error || 'Unknown error occurred');
@@ -120,7 +220,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
 
   /**
    * Handle manual binary installation from a user-provided file path.
-   * Same update flow as automatic update - backend restarts and opens new tab.
+   * Same update flow as automatic update.
    */
   const handleInstallFromFile = async () => {
     if (!installFromFileInput.trim()) {
@@ -142,8 +242,8 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       
       if (data.success) {
         setUpdateStatus('success');
-        // Backend restarts and opens new tab automatically
-        // No hard refresh needed - user will see new tab open
+        // Server is about to die - set up death detection
+        watchForServerDeath();
       } else {
         setUpdateStatus('error');
         setErrorMessage(data.error || 'Unknown error occurred');
@@ -269,9 +369,11 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
                   borderRadius: '8px',
                   marginBottom: '15px',
                   background: updateStatus === 'error' ? '#450a0a' : 
-                              updateStatus === 'success' ? '#14532d' : '#1e3a5f',
+                              updateStatus === 'success' ? '#14532d' : 
+                              updateStatus === 'ready' ? '#14532d' : '#1e3a5f',
                   border: `1px solid ${updateStatus === 'error' ? '#ef4444' : 
-                                        updateStatus === 'success' ? '#22c55e' : '#3b82f6'}`,
+                                        updateStatus === 'success' ? '#22c55e' : 
+                                        updateStatus === 'ready' ? '#22c55e' : '#3b82f6'}`,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px'
@@ -285,7 +387,19 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
                   {updateStatus === 'success' && (
                     <>
                       <CheckCircle size={18} style={{ color: '#4ade80' }} />
-                      <span style={{ color: '#86efac' }}>Update applied. New version launching in new tab...</span>
+                      <span style={{ color: '#86efac' }}>Update applied successfully!</span>
+                    </>
+                  )}
+                  {updateStatus === 'restarting' && (
+                    <>
+                      <RefreshCw size={18} className="spin" style={{ color: '#60a5fa' }} />
+                      <span style={{ color: '#93c5fd' }}>Server restarting, please wait...</span>
+                    </>
+                  )}
+                  {updateStatus === 'ready' && (
+                    <>
+                      <CheckCircle size={18} style={{ color: '#4ade80' }} />
+                      <span style={{ color: '#86efac' }}>Server ready, refreshing page...</span>
                     </>
                   )}
                   {updateStatus === 'error' && (

@@ -74,7 +74,7 @@ describe('UpdateModal', () => {
       });
     });
 
-    it('should show "New version launching in new tab" message (not "Restarting...")', async () => {
+    it('should show "Update applied successfully!" message', async () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ success: true, newVersion: 'v2.0.0' }),
@@ -86,8 +86,7 @@ describe('UpdateModal', () => {
       fireEvent.click(updateButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/New version launching in new tab/i)).toBeInTheDocument();
-        expect(screen.queryByText(/Restarting/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/Update applied successfully/i)).toBeInTheDocument();
       });
     });
   });
@@ -178,7 +177,7 @@ describe('UpdateModal', () => {
       fireEvent.click(installButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/New version launching in new tab/i)).toBeInTheDocument();
+        expect(screen.getByText(/Update applied successfully/i)).toBeInTheDocument();
       });
     });
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon, MessageCircle } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon, MessageCircle, Eye } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -176,6 +176,11 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
         {devMode && tab.amEnabled && (
           <span className="am-indicator" title="AM Logging enabled">
             <BookOpen size={10} />
+          </span>
+        )}
+        {devMode && tab.visionEnabled && (
+          <span className="vision-indicator" title="Vision enabled">
+            <Eye size={10} />
           </span>
         )}
         {tab.autoRespond && (

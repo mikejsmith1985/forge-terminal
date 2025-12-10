@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield } from 'lucide-react';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amDefaultEnabled = true, onAMDefaultChange }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, visionConfig, onVisionConfigChange }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -10,11 +10,13 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
   const [defaultCards, setDefaultCards] = useState([]);
   const [missingCards, setMissingCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
+  const [fileAccessMode, setFileAccessMode] = useState('restricted');
 
   useEffect(() => {
     if (isOpen) {
       detectWSL();
       checkMissingCards();
+      loadFileAccessMode();
     }
   }, [isOpen]);
 
@@ -45,6 +47,16 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
       setSelectedCards(missing.map(c => c.id)); // Select all by default
     } catch (err) {
       console.error('Failed to check missing cards:', err);
+    }
+  };
+
+  const loadFileAccessMode = async () => {
+    try {
+      const res = await fetch('/api/files/access-mode');
+      const data = await res.json();
+      setFileAccessMode(data.mode || 'restricted');
+    } catch (err) {
+      console.error('Failed to load file access mode:', err);
     }
   };
 
@@ -103,7 +115,21 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Save file access mode
+    try {
+      await fetch('/api/files/access-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: fileAccessMode })
+      });
+      localStorage.setItem('fileAccessMode', fileAccessMode);
+      localStorage.setItem('fileAccessModeSet', 'true');
+    } catch (err) {
+      console.error('Failed to save file access mode:', err);
+      if (onToast) onToast('Failed to save file access mode', 'error', 3000);
+    }
+    
     onSave(config);
     onClose();
   };
@@ -398,6 +424,171 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             )}
           </div>
 
+          {/* Vision Configuration - Show when Dev Mode is enabled */}
+          {devMode && visionConfig && (
+            <div style={{ 
+              marginTop: '20px',
+              paddingTop: '20px',
+              borderTop: '1px solid #333'
+            }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '10px', 
+                marginBottom: '15px',
+                fontWeight: 500 
+              }}>
+                <Eye size={18} style={{ color: '#10b981' }} />
+                <span>Forge Vision Configuration</span>
+              </label>
+              
+              <div style={{ 
+                background: '#1a2e1a', 
+                border: '1px solid #22c55e',
+                borderRadius: '8px',
+                padding: '12px',
+                marginBottom: '15px',
+                fontSize: '0.85em',
+                color: '#86efac'
+              }}>
+                ✓ Vision is enabled (Dev Mode active)
+              </div>
+
+              {/* Detector Toggles */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '10px',
+                  fontSize: '0.9em',
+                  color: '#a3a3a3'
+                }}>
+                  Active Detectors:
+                </label>
+                
+                {[
+                  { key: 'json', label: 'JSON Blocks', icon: '{ }' },
+                  { key: 'compiler_error', label: 'Compiler Errors', icon: '⚠️' },
+                  { key: 'stack_trace', label: 'Stack Traces', icon: '📚' },
+                  { key: 'git', label: 'Git Status', icon: '⎇' },
+                  { key: 'filepath', label: 'File Paths', icon: '📁' },
+                ].map(detector => (
+                  <label 
+                    key={detector.key}
+                    style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 12px',
+                      background: visionConfig.detectors[detector.key] ? '#1a2e1a' : '#1a1a1a',
+                      border: visionConfig.detectors[detector.key] ? '1px solid #22c55e' : '1px solid #333',
+                      borderRadius: '6px',
+                      marginBottom: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visionConfig.detectors[detector.key]}
+                      onChange={(e) => {
+                        const newConfig = {
+                          ...visionConfig,
+                          detectors: {
+                            ...visionConfig.detectors,
+                            [detector.key]: e.target.checked
+                          }
+                        };
+                        onVisionConfigChange(newConfig);
+                      }}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '1.1em', minWidth: '24px' }}>{detector.icon}</span>
+                    <span style={{ flex: 1 }}>{detector.label}</span>
+                    {visionConfig.detectors[detector.key] && (
+                      <span style={{ fontSize: '0.8em', color: '#22c55e' }}>✓</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+
+              {/* JSON Minimum Size Slider */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '8px',
+                  fontSize: '0.9em',
+                  color: '#a3a3a3'
+                }}>
+                  JSON Minimum Size: <strong style={{ color: '#fff' }}>{visionConfig.jsonMinSize} bytes</strong>
+                </label>
+                <input 
+                  type="range" 
+                  min="10" 
+                  max="100" 
+                  value={visionConfig.jsonMinSize}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...visionConfig,
+                      jsonMinSize: parseInt(e.target.value)
+                    };
+                    onVisionConfigChange(newConfig);
+                  }}
+                  style={{ 
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '3px',
+                    outline: 'none',
+                    background: `linear-gradient(to right, #22c55e 0%, #22c55e ${(visionConfig.jsonMinSize - 10) / 90 * 100}%, #333 ${(visionConfig.jsonMinSize - 10) / 90 * 100}%, #333 100%)`,
+                    cursor: 'pointer'
+                  }}
+                />
+                <small style={{ 
+                  display: 'block', 
+                  marginTop: '6px', 
+                  color: '#888', 
+                  fontSize: '0.75em' 
+                }}>
+                  Ignore trivial JSON like {'{}'} or [] (prevents noise)
+                </small>
+              </div>
+
+              {/* Auto-dismiss Toggle */}
+              <label style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 12px',
+                background: '#1a1a1a',
+                border: '1px solid #333',
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={visionConfig.autoDismiss}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...visionConfig,
+                      autoDismiss: e.target.checked
+                    };
+                    onVisionConfigChange(newConfig);
+                  }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ flex: 1 }}>Auto-dismiss info overlays</span>
+              </label>
+              <small style={{ 
+                display: 'block', 
+                marginTop: '6px', 
+                marginLeft: '28px',
+                color: '#888', 
+                fontSize: '0.75em' 
+              }}>
+                Info-level overlays (Git, JSON, Paths) dismiss on next command
+              </small>
+            </div>
+          )}
+
           {/* DevMode Toggle */}
           <div className="form-group" style={{ marginTop: '25px', paddingTop: '15px', borderTop: '1px solid #333' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
@@ -421,43 +612,160 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             </label>
           </div>
 
-          {/* AM Default Toggle - Legal Compliance */}
+          {/* AM Master Control - Global Kill Switch */}
           <div className="form-group" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #333' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '10px' }}>
               <input
                 type="checkbox"
-                name="amDefaultEnabled"
-                checked={amDefaultEnabled}
+                name="amMasterEnabled"
+                checked={amMasterEnabled}
                 onChange={(e) => {
-                  if (onAMDefaultChange) {
-                    onAMDefaultChange(e.target.checked);
+                  if (onAMMasterChange) {
+                    onAMMasterChange(e.target.checked);
                   }
                 }}
                 style={{ cursor: 'pointer', width: '18px', height: '18px' }}
               />
-              <span style={{ fontWeight: 500, userSelect: 'none' }}>
-                Enable AM Logging by Default
+              <span style={{ fontWeight: 600, userSelect: 'none' }}>
+                Master AM Control
               </span>
               <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '4px' }}>
-                (For legal compliance & disaster recovery)
+                (Enable/disable AM system globally)
               </span>
             </label>
-            <small style={{ 
-              display: 'block', 
-              marginTop: '8px', 
-              marginLeft: '28px',
-              color: '#888', 
-              fontSize: '0.8em',
-              lineHeight: '1.4'
-            }}>
-              When enabled, new tabs will have AM logging ON by default. You can still toggle individual tabs via right-click.
-              {!amDefaultEnabled && (
-                <strong style={{ color: '#f97316', display: 'block', marginTop: '4px' }}>
-                  ⚠️ Disabling may compromise legal compliance
-                </strong>
-              )}
-            </small>
+            
+            {amMasterEnabled && (
+              <div style={{ 
+                background: '#1a2e1a', 
+                border: '1px solid #22c55e',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                marginTop: '8px',
+                fontSize: '0.85em',
+                color: '#86efac'
+              }}>
+                ✓ AM System Active - Logging enabled across all tabs
+              </div>
+            )}
+            
+            {!amMasterEnabled && (
+              <div style={{ 
+                background: '#422006', 
+                border: '1px solid #f97316',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                marginTop: '8px',
+                fontSize: '0.85em',
+                color: '#fed7aa'
+              }}>
+                ⚠️ AM System Disabled - No logging on any tab
+              </div>
+            )}
           </div>
+
+          {/* AM Default Toggle - Only show if Master is ON */}
+          {amMasterEnabled && (
+            <div className="form-group" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #333' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="amDefaultEnabled"
+                  checked={amDefaultEnabled}
+                  onChange={(e) => {
+                    if (onAMDefaultChange) {
+                      onAMDefaultChange(e.target.checked);
+                    }
+                  }}
+                  style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                />
+                <span style={{ fontWeight: 500, userSelect: 'none' }}>
+                  Enable AM Logging by Default
+                </span>
+                <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '4px' }}>
+                  (For legal compliance & disaster recovery)
+                </span>
+              </label>
+              <small style={{ 
+                display: 'block', 
+                marginTop: '8px', 
+                marginLeft: '28px',
+                color: '#888', 
+                fontSize: '0.8em',
+                lineHeight: '1.4'
+              }}>
+                When enabled, new tabs will have AM logging ON by default. You can still toggle individual tabs via right-click.
+                {!amDefaultEnabled && (
+                  <strong style={{ color: '#f97316', display: 'block', marginTop: '4px' }}>
+                    ⚠️ Disabling may compromise legal compliance
+                  </strong>
+                )}
+              </small>
+            </div>
+          )}
+        </div>
+
+        {/* File Access Security */}
+        <div className="form-group" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '2px solid #333' }}>
+          <h4 style={{ marginBottom: '12px', color: '#888', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Shield size={16} />
+            File Access Security
+          </h4>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'flex-start',
+              padding: '12px',
+              border: `2px solid ${fileAccessMode === 'restricted' ? '#8b5cf6' : '#333'}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              background: fileAccessMode === 'restricted' ? '#1e1b4b' : 'transparent'
+            }}>
+              <input
+                type="radio"
+                name="fileAccessMode"
+                value="restricted"
+                checked={fileAccessMode === 'restricted'}
+                onChange={(e) => setFileAccessMode(e.target.value)}
+                style={{ marginTop: '2px', marginRight: '10px', cursor: 'pointer' }}
+              />
+              <div>
+                <strong>Project-Scoped (Recommended)</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85em', color: '#aaa' }}>
+                  Only access files within terminal's working directory
+                </p>
+              </div>
+            </label>
+            
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'flex-start',
+              padding: '12px',
+              border: `2px solid ${fileAccessMode === 'unrestricted' ? '#8b5cf6' : '#333'}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              background: fileAccessMode === 'unrestricted' ? '#1e1b4b' : 'transparent'
+            }}>
+              <input
+                type="radio"
+                name="fileAccessMode"
+                value="unrestricted"
+                checked={fileAccessMode === 'unrestricted'}
+                onChange={(e) => setFileAccessMode(e.target.value)}
+                style={{ marginTop: '2px', marginRight: '10px', cursor: 'pointer' }}
+              />
+              <div>
+                <strong>Full System Access</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85em', color: '#aaa' }}>
+                  Access any file your user account can read
+                </p>
+              </div>
+            </label>
+          </div>
+          
+          <p style={{ marginTop: '12px', fontSize: '0.85em', color: '#888', fontStyle: 'italic' }}>
+            Used by the File Explorer and Monaco Editor. Changes apply immediately.
+          </p>
         </div>
 
         <div className="modal-footer">

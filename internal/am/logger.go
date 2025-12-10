@@ -81,15 +81,24 @@ func NewLogger(tabID, tabName, workspace string) (*Logger, error) {
 		return nil, fmt.Errorf("failed to create AM directory: %w", err)
 	}
 
-	date := time.Now().Format("2006-01-02")
-	logPath := filepath.Join(GetAMDir(), fmt.Sprintf("session-%s-%s.md", tabID, date))
+	// Extract workspace name from path (fallback to tabName if no workspace)
+	workspaceName := extractWorkspaceName(workspace, tabName)
+	
+	// Format with date, time, workspace
+	now := time.Now()
+	date := now.Format("2006-01-02")
+	timeStr := now.Format("15-04") // HH-MM
+	
+	// Filename format: YYYY-MM-DD_HH-MM_workspace_session.md
+	filename := fmt.Sprintf("%s_%s_%s_session.md", date, timeStr, workspaceName)
+	logPath := filepath.Join(GetAMDir(), filename)
 
 	session := &SessionLog{
 		TabID:       tabID,
 		TabName:     tabName,
 		Workspace:   workspace,
-		StartTime:   time.Now(),
-		LastUpdated: time.Now(),
+		StartTime:   now,
+		LastUpdated: now,
 		Entries:     []LogEntry{},
 		Ended:       false,
 	}
@@ -680,4 +689,56 @@ func GroupSessionsByWorkspace(sessions []SessionInfo) []SessionGroup {
 	}
 
 	return result
+}
+
+
+// extractWorkspaceName sanitizes workspace path for filename.
+// Falls back to tabName if workspace is empty.
+func extractWorkspaceName(workspace, tabName string) string {
+name := ""
+
+// Try workspace path first
+if workspace != "" {
+// Get last component of path
+parts := strings.Split(strings.TrimSuffix(workspace, "/"), "/")
+if len(parts) > 0 {
+name = parts[len(parts)-1]
+// If last part is empty (trailing slash), use second-to-last
+if name == "" && len(parts) > 1 {
+name = parts[len(parts)-2]
+}
+}
+}
+
+// Fallback to tab title if no workspace name
+if name == "" && tabName != "" {
+name = tabName
+}
+
+// Default fallback
+if name == "" {
+return "unknown"
+}
+
+// Sanitize: lowercase, replace spaces/special chars with hyphen
+name = strings.ToLower(name)
+name = strings.Map(func(r rune) rune {
+if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+return r
+}
+return '-'
+}, name)
+
+// Trim hyphens, limit length
+name = strings.Trim(name, "-")
+if len(name) > 30 {
+name = name[:30]
+}
+
+// Final check
+if name == "" {
+return "unknown"
+}
+
+return name
 }
