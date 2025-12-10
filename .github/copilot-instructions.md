@@ -1,5 +1,44 @@
 # Copilot Instructions for forge-terminal
 
+**CRITICAL: Last Updated 2025-12-10 22:05 UTC**
+
+## 🚨 MOCK DATA POLICY - NEVER IGNORE THIS
+
+### THE RULE
+**NEVER validate, test, or assess systems using MOCK DATA or UNIT TESTS alone.**
+
+**ALWAYS verify against real production data:**
+- Check actual file timestamps (`stat`, `ls -ltr`)
+- Look at production directories (`~/.forge/am/`, `/var/log/`, etc.)
+- Examine actual output files, not test fixtures
+- Cross-reference logs with current activity timestamps
+
+### WHY THIS MATTERS
+Mock data tests ALWAYS pass - they're designed to. Real production data reveals actual problems:
+- ANSI codes NOT being cleaned despite passing tests
+- Response extraction working at 8% (1 of 12) despite "passing" unit tests
+- No logging activity for 6+ hours despite claims of "full functionality"
+
+### THE HOOK - Check for These RED FLAGS
+When assessing ANY system, STOP and investigate if you see:
+1. **Same test results every run** - "26 snapshots captured" from 6 hours ago
+2. **No recent file modifications** - Last changed 16:23, now it's 22:05
+3. **Cached log entries** - Logs from hours ago, nothing new
+4. **100% pass rate on tests** - Real systems have failures or edge cases
+5. **No verification of current state** - Didn't check if service is actually running
+
+### BEFORE DECLARING SUCCESS
+```bash
+# ALWAYS do these checks:
+1. find ~/.<app> -mmin -30          # Any files modified in last 30 min?
+2. stat <file>                       # When was it REALLY last modified?
+3. grep "$(date +'%H:%M')" log.txt  # Any log entries from NOW?
+4. Check if service is actually running (ps aux | grep <process>)
+5. Examine REAL production data, not test fixtures
+```
+
+---
+
 ## 📋 Documentation Policy
 
 ### Where to Put Documentation
