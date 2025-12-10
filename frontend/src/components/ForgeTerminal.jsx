@@ -666,20 +666,30 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // Handle Ctrl+C and Ctrl+V keyboard shortcuts
     term.attachCustomKeyEventHandler((event) => {
-      // Handle Ctrl+C (SIGINT) - send interrupt signal to shell
+      // Handle Ctrl+C - Copy if text selected, otherwise send SIGINT
       if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
-        console.log('[Terminal] Ctrl+C pressed - sending SIGINT');
-        event.preventDefault();
+        // Check if user has text selected
+        const hasSelection = term.hasSelection();
         
-        // Send Ctrl+C (0x03) to the terminal
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send('\x03');
-          console.log('[Terminal] SIGINT sent via WebSocket');
+        if (hasSelection) {
+          // Text is selected - allow browser to handle copy
+          console.log('[Terminal] Ctrl+C with selection - allowing copy');
+          return true; // Allow default browser copy behavior
         } else {
-          console.warn('[Terminal] WebSocket not ready for Ctrl+C');
+          // No text selected - send SIGINT to interrupt process
+          console.log('[Terminal] Ctrl+C without selection - sending SIGINT');
+          event.preventDefault();
+          
+          // Send Ctrl+C (0x03) to the terminal
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send('\x03');
+            console.log('[Terminal] SIGINT sent via WebSocket');
+          } else {
+            console.warn('[Terminal] WebSocket not ready for Ctrl+C');
+          }
+          
+          return false; // Prevent browser default behavior
         }
-        
-        return false; // Prevent browser default behavior
       }
       
       // Handle Ctrl+V (paste from clipboard)
