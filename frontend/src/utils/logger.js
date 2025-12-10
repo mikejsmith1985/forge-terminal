@@ -67,4 +67,7 @@ export const logger = {
     terminal: (action, data = {}) => {
         console.log(`[Terminal] ${action}`, data);
     },
+    settings: (action, data = {}) => {
+        console.log(`[Settings] ${action}`, data);
+    },
 };
