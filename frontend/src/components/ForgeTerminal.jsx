@@ -357,6 +357,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const wsRef = useRef(null);
   const fitAddonRef = useRef(null);
   const searchAddonRef = useRef(null);
+  const keydownHandlerRef = useRef(null);
   const shellConfigRef = useRef(shellConfig);
   const currentDirectoryRef = useRef(currentDirectory);
   const connectFnRef = useRef(null);
@@ -666,13 +667,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.open(terminalRef.current);
     xtermRef.current = term;
 
-    // Handle Ctrl+C and Ctrl+V keyboard shortcuts
-    term.attachCustomKeyEventHandler((event) => {
+    // Handle Ctrl+C and Ctrl+V keyboard shortcuts using DOM listeners
+    // This avoids intercepting ALL keys and interfering with normal xterm key handling
+    const handleKeyDown = (event) => {
       // Handle Ctrl+C - Copy if text selected, otherwise send SIGINT
       if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
         event.preventDefault();
+        event.stopPropagation();
         
-        // Get selection text directly (more reliable than hasSelection check)
+        // Get selection text directly
         const selectedText = term.getSelection();
         
         if (selectedText && selectedText.length > 0) {
@@ -683,26 +686,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             navigator.clipboard.writeText(selectedText)
               .then(() => {
                 console.log('[Terminal] Text copied to clipboard:', selectedText.length, 'chars');
-                // Show success toast
                 if (onCopyRef.current) {
                   onCopyRef.current();
                 }
               })
               .catch((err) => {
                 console.error('[Terminal] Clipboard write failed:', err);
-                // Fallback to execCommand
-                try {
-                  document.execCommand('copy');
-                  console.log('[Terminal] Fallback copy successful');
-                  if (onCopyRef.current) {
-                    onCopyRef.current();
-                  }
-                } catch (e) {
-                  console.error('[Terminal] Fallback copy also failed:', e);
-                }
               });
           } else {
-            // Fallback for browsers without clipboard API
             try {
               document.execCommand('copy');
               console.log('[Terminal] Copy via execCommand');
@@ -724,14 +715,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             console.warn('[Terminal] WebSocket not ready for Ctrl+C');
           }
         }
-        
-        return false; // Prevent any default behavior
+        return;
       }
       
       // Handle Ctrl+V (paste from clipboard)
       if (event.ctrlKey && (event.key === 'v' || event.key === 'V')) {
         console.log('[Terminal] Ctrl+V detected - reading clipboard');
         event.preventDefault();
+        event.stopPropagation();
         
         // Read from clipboard
         if (navigator.clipboard && navigator.clipboard.readText) {
@@ -739,9 +730,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             .then((text) => {
               console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
               
-              // Send to WebSocket (same as what pasteCommand does)
+              // Send to WebSocket
               if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                // Sanitize: replace newlines with spaces to prevent auto-execution
                 const sanitized = text.replace(/[\r\n]+/g, ' ').trim();
                 wsRef.current.send(sanitized);
                 console.log('[Terminal] Sent to WebSocket:', sanitized.length, 'chars');
@@ -755,13 +745,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         } else {
           console.warn('[Terminal] Clipboard API not available');
         }
-        
-        return false; // Prevent further event propagation
+        return;
       }
       
-      // Allow all other keys to be handled normally
-      return true;
-    });
+      // All other keys pass through to xterm normally
+    };
+    
+    // Store handler in ref for cleanup
+    keydownHandlerRef.current = handleKeyDown;
+    terminalRef.current.addEventListener('keydown', handleKeyDown);
 
     // Initial fit
     setTimeout(() => fitAddon.fit(), 0);
@@ -1174,6 +1166,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     resizeObserver.observe(terminalRef.current);
 
     return () => {
+      // Remove Ctrl+C/Ctrl+V keyboard event listener
+      if (terminalRef.current && keydownHandlerRef.current) {
+        terminalRef.current.removeEventListener('keydown', keydownHandlerRef.current);
+      }
+      
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();
       if (waitingCheckTimeoutRef.current) {

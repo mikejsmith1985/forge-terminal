@@ -58,8 +58,8 @@ var DefaultCommands = []Command{
 	},
 	{
 		ID:          5,
-		Description: "📖 Summarize Last Session",
-		Command:     "Read and analyze the AM (Artificial Memory) session log located in the ./.forge/am/ directory. Find the most recent session-*.md file and provide a concise 200-word-or-less summary covering:\n\n1. What tasks or commands were being worked on\n2. The last significant action or output\n3. Any errors or issues encountered\n4. What the user should continue with or investigate next\n\nBe direct and actionable. Focus on helping me pick up where I left off.\n\nThe AM log is in: ./.forge/am/\n",
+		Description: "📖 Summarize Last Conversation",
+		Command:     "Read and analyze the most recent LLM conversation from the AM (Artificial Memory) system located in ~/.forge/am/ directory.\n\nLook for the most recent llm-conv-*.json file. The file contains:\n- conversation turns (user prompts and assistant responses)\n- screen snapshots from TUI sessions\n- metadata (provider, timestamps, etc.)\n\nProvide a concise summary covering:\n1. What was discussed or worked on\n2. Key insights or outputs from the conversation\n3. Any issues or incomplete tasks\n4. Suggested next steps\n\nKeep it under 200 words. Be direct and actionable.\n\nThe conversation logs are in: ~/.forge/am/llm-conv-*.json\n",
 		KeyBinding:  "Ctrl+Shift+5",
 		PasteOnly:   false,
 		Favorite:    false,

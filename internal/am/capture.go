@@ -268,7 +268,8 @@ func (c *ConversationCapture) Reset() {
 // --- Input Cleaning Functions ---
 
 // ANSI escape sequence pattern - comprehensive pattern for terminal escape codes
-var ansiPattern = regexp.MustCompile(`\x1b\[[\?0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[PX^_][^\x1b]*\x1b\\|\x1b.`)
+// Matches: CSI sequences, OSC sequences (including rgb colors), DCS, PM, APC, and single-char escapes
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[PX^_][^\x1b]*\x1b\\|\x1b.`)
 
 // CleanUserInput processes raw PTY input into clean user prompt text.
 func CleanUserInput(raw string) string {

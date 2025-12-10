@@ -390,6 +390,9 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 	log.Printf("[LLM Logger] 📸 Snapshot #%d saved for %s (%d chars, %d total snapshots)", 
 		l.snapshotCount, l.activeConvID, len(cleanedContent), len(conv.ScreenSnapshots))
 	
+	// NEW: Parse snapshots incrementally to extract assistant responses
+	l.parseLatestSnapshotToTurns(conv, snapshot)
+	
 	// Save to disk
 	l.saveConversation(conv)
 }
@@ -450,6 +453,180 @@ func (l *LLMLogger) calculateDiff(oldScreen, newScreen string) string {
 	}
 	
 	return diff.String()
+}
+
+// parseLatestSnapshotToTurns attempts to extract assistant responses from the latest snapshot.
+// This enables real-time turn detection rather than waiting until conversation ends.
+// Must be called with lock held.
+func (l *LLMLogger) parseLatestSnapshotToTurns(conv *LLMConversation, snapshot ScreenSnapshot) {
+	// Only parse if we have previous snapshots to compare against
+	if len(conv.ScreenSnapshots) < 2 {
+		return
+	}
+	
+	// Try to detect if this snapshot contains an assistant response
+	// by looking for content that wasn't in the previous snapshot
+	content := snapshot.CleanedContent
+	
+	// Provider-specific assistant response detection
+	var response string
+	switch conv.Provider {
+	case "github-copilot":
+		response = l.extractCopilotResponseFromSnapshot(content)
+	case "claude":
+		response = l.extractClaudeResponseFromSnapshot(content)
+	case "aider":
+		response = l.extractAiderResponseFromSnapshot(content)
+	default:
+		response = l.extractGenericResponseFromSnapshot(content)
+	}
+	
+	// If we found a response and it's not a duplicate of the last turn
+	if response != "" && len(response) > 20 {
+		// Check if this is a duplicate of the last turn
+		if len(conv.Turns) > 0 {
+			lastTurn := conv.Turns[len(conv.Turns)-1]
+			if lastTurn.Role == "assistant" && strings.Contains(lastTurn.Content, response[:min(50, len(response))]) {
+				// Duplicate, skip
+				return
+			}
+		}
+		
+		// Add assistant turn
+		conv.Turns = append(conv.Turns, ConversationTurn{
+			Role:            "assistant",
+			Content:         response,
+			Timestamp:       snapshot.Timestamp,
+			Provider:        conv.Provider,
+			CaptureMethod:   "tui_snapshot",
+			ParseConfidence: 0.75,
+		})
+		
+		log.Printf("[LLM Logger] ✨ Extracted assistant response from snapshot #%d (%d chars)", 
+			snapshot.SequenceNumber, len(response))
+	}
+}
+
+// min returns the minimum of two integers.
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// extractCopilotResponseFromSnapshot extracts assistant response from Copilot TUI screen.
+func (l *LLMLogger) extractCopilotResponseFromSnapshot(content string) string {
+	lines := strings.Split(content, "\n")
+	var response strings.Builder
+	inResponse := false
+	
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		// Skip empty lines and UI chrome
+		if len(trimmed) == 0 || 
+		   strings.Contains(trimmed, "────") || 
+		   strings.Contains(trimmed, "Ctrl+") ||
+		   strings.Contains(trimmed, "Welcome to GitHub Copilot") ||
+		   strings.Contains(trimmed, "Enter @ to mention") {
+			continue
+		}
+		
+		// Skip the user prompt line
+		if strings.HasPrefix(trimmed, ">") && len(trimmed) < 100 {
+			inResponse = false
+			continue
+		}
+		
+		// Skip status lines
+		if strings.Contains(trimmed, "gpt-") || strings.Contains(trimmed, "claude-") {
+			continue
+		}
+		
+		// Collect substantial content lines (likely assistant response)
+		if len(trimmed) > 30 {
+			if inResponse && response.Len() > 0 {
+				response.WriteString("\n")
+			}
+			response.WriteString(trimmed)
+			inResponse = true
+		}
+	}
+	
+	return strings.TrimSpace(response.String())
+}
+
+// extractClaudeResponseFromSnapshot extracts assistant response from Claude TUI screen.
+func (l *LLMLogger) extractClaudeResponseFromSnapshot(content string) string {
+	lines := strings.Split(content, "\n")
+	var response strings.Builder
+	
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		// Skip UI elements
+		if len(trimmed) == 0 || 
+		   strings.Contains(trimmed, "Claude") ||
+		   strings.HasPrefix(trimmed, ">") {
+			continue
+		}
+		
+		// Collect content
+		if len(trimmed) > 20 {
+			if response.Len() > 0 {
+				response.WriteString("\n")
+			}
+			response.WriteString(trimmed)
+		}
+	}
+	
+	return strings.TrimSpace(response.String())
+}
+
+// extractAiderResponseFromSnapshot extracts assistant response from Aider output.
+func (l *LLMLogger) extractAiderResponseFromSnapshot(content string) string {
+	lines := strings.Split(content, "\n")
+	var response strings.Builder
+	
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		// Skip prompts
+		if strings.HasPrefix(trimmed, ">") || len(trimmed) == 0 {
+			continue
+		}
+		
+		// Collect responses
+		if len(trimmed) > 15 {
+			if response.Len() > 0 {
+				response.WriteString("\n")
+			}
+			response.WriteString(trimmed)
+		}
+	}
+	
+	return strings.TrimSpace(response.String())
+}
+
+// extractGenericResponseFromSnapshot attempts generic response extraction.
+func (l *LLMLogger) extractGenericResponseFromSnapshot(content string) string {
+	lines := strings.Split(content, "\n")
+	var response strings.Builder
+	
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		// Collect any substantial content
+		if len(trimmed) > 25 && !strings.HasPrefix(trimmed, ">") {
+			if response.Len() > 0 {
+				response.WriteString("\n")
+			}
+			response.WriteString(trimmed)
+		}
+	}
+	
+	return strings.TrimSpace(response.String())
 }
 
 // AddUserInput captures user input during an active LLM conversation.

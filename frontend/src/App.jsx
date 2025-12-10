@@ -1519,7 +1519,7 @@ function App() {
             onClose={handleEditorClose}
             onSave={handleEditorSave}
             theme={activeTab?.mode || theme}
-            rootPath={activeTab?.currentDirectory}
+            rootPath={activeTab?.currentDirectory || '.'}
             terminalRef={getActiveTerminalRef()}
           />
         </div>
