@@ -56,7 +56,7 @@ func NewDetector() *Detector {
 			// Exact command patterns (highest priority)
 			{
 				Name:  "copilot-standalone",
-				Regex: regexp.MustCompile(`(?i)^copilot\s*$`),
+				Regex: regexp.MustCompile(`(?i)^copilot(\s|$)`),
 				Extract: func(cmd string) (Provider, CommandType) {
 					return ProviderGitHubCopilot, CommandChat
 				},

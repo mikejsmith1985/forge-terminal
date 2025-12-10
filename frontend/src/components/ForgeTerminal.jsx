@@ -456,19 +456,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     if (!isVisible) return;
     
     const handleWindowFocus = () => {
-      // Small delay to let browser settle focus
+      // Longer delay to ensure browser fully settles input focus before terminal takes it
       setTimeout(() => {
         if (xtermRef.current && isVisible) {
           xtermRef.current.focus();
         }
-      }, 100);
+      }, 1000);
     };
 
     const handleVisibilityChange = () => {
       if (!document.hidden && xtermRef.current && isVisible) {
         setTimeout(() => {
           xtermRef.current.focus();
-        }, 100);
+        }, 1000);
       }
     };
 
