@@ -438,6 +438,18 @@ log.Printf("[Terminal Input→Logger] TabID=%s ConvID=%s InputLen=%d", tabID, ll
 		finalReason = closeReason{CloseCodeTimeout, "Session timed out after 24 hours"}
 	}
 
+	// CRITICAL: Clean up LLM logger when session ends
+	if llmLogger != nil {
+		// End any active conversation
+		if activeConv := llmLogger.GetActiveConversationID(); activeConv != "" {
+			log.Printf("[Terminal] Ending active conversation %s on session close", activeConv)
+			llmLogger.EndConversation()
+		}
+		// Remove the logger from global map to prevent memory leaks
+		am.RemoveLLMLogger(tabID)
+		log.Printf("[Terminal] LLM logger cleaned up for tab %s", tabID)
+	}
+
 	// Send close message with reason
 	closeMessage := websocket.FormatCloseMessage(finalReason.code, finalReason.reason)
 	_ = conn.WriteControl(websocket.CloseMessage, closeMessage, time.Now().Add(time.Second))

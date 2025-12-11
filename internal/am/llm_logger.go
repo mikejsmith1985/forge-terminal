@@ -14,6 +14,13 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 )
 
+// Memory limits to prevent unbounded growth
+const (
+	maxTurnsPerConversation = 500
+	maxSnapshotsPerConversation = 100
+	maxConversationsInMemory = 10
+)
+
 // ScreenSnapshot represents a captured TUI screen state.
 type ScreenSnapshot struct {
 	Timestamp        time.Time `json:"timestamp"`
@@ -317,6 +324,14 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 		return
 	}
 
+	// CRITICAL: Detect if shell prompt returned (LLM TUI exited)
+	// This ends the conversation to prevent unbounded growth
+	if l.detectShellPromptReturn(rawOutput) {
+		log.Printf("[LLM Logger] 🛑 Shell prompt detected - ending conversation %s", l.activeConvID)
+		l.endConversationLocked()
+		return
+	}
+
 	// TUI Capture Mode: Accumulate to screen buffer and trigger snapshots
 	if l.tuiCaptureMode {
 		l.currentScreen.WriteString(rawOutput)
@@ -354,6 +369,106 @@ func (l *LLMLogger) detectScreenClear(output string) bool {
 	       strings.Contains(output, "\x1b[3J") // Clear scrollback
 }
 
+// detectShellPromptReturn checks if output contains a shell prompt,
+// indicating the LLM TUI has exited and we're back at the shell.
+func (l *LLMLogger) detectShellPromptReturn(output string) bool {
+	// Strip ANSI codes for pattern matching
+	clean := l.stripANSI(output)
+	
+	// Common shell prompt patterns that indicate TUI exited:
+	// PowerShell: "PS C:\...>" or "PS /home/...>"
+	// CMD: "C:\...>"
+	// Bash: "user@host:~$" or "$ " at end of line
+	// WSL: "user@host:/mnt/c/..."
+	
+	patterns := []string{
+		"PS ", // PowerShell prompt prefix
+		">", // Common prompt suffix (but need context)
+		"$ ", // Bash prompt
+		"# ", // Root prompt
+	}
+	
+	// Check if output ends with a prompt-like pattern
+	lines := strings.Split(clean, "\n")
+	if len(lines) == 0 {
+		return false
+	}
+	
+	lastLine := strings.TrimSpace(lines[len(lines)-1])
+	if lastLine == "" && len(lines) > 1 {
+		lastLine = strings.TrimSpace(lines[len(lines)-2])
+	}
+	
+	// PowerShell prompt: "PS C:\Users\foo>" or "PS /home/user>"
+	if strings.HasPrefix(lastLine, "PS ") && strings.HasSuffix(lastLine, ">") {
+		return true
+	}
+	
+	// CMD prompt: "C:\Users\foo>" (letter followed by colon)
+	if len(lastLine) > 3 && lastLine[1] == ':' && strings.HasSuffix(lastLine, ">") {
+		return true
+	}
+	
+	// Bash prompt: ends with "$ " or "# "
+	if strings.HasSuffix(lastLine, "$ ") || strings.HasSuffix(lastLine, "# ") {
+		return true
+	}
+	
+	// User@host:path$ pattern
+	if strings.Contains(lastLine, "@") && (strings.HasSuffix(lastLine, "$") || strings.HasSuffix(lastLine, "#")) {
+		return true
+	}
+	
+	_ = patterns // Suppress unused warning
+	return false
+}
+
+// endConversationLocked ends the active conversation.
+// Must be called with lock held.
+func (l *LLMLogger) endConversationLocked() {
+	if l.activeConvID == "" {
+		return
+	}
+
+	conv, exists := l.conversations[l.activeConvID]
+	if !exists {
+		l.activeConvID = ""
+		return
+	}
+
+	// TUI Mode: Save final screen snapshot and parse turns
+	if l.tuiCaptureMode && l.currentScreen.Len() > 0 {
+		l.saveScreenSnapshotLocked()
+	}
+
+	conv.Complete = true
+	conv.EndTime = time.Now()
+	l.saveConversation(conv)
+
+	EventBus.Publish(&LayerEvent{
+		Type:      "LLM_END",
+		Layer:     1,
+		TabID:     l.tabID,
+		ConvID:    l.activeConvID,
+		Timestamp: time.Now(),
+		Metadata: map[string]interface{}{
+			"tuiMode":    l.tuiCaptureMode,
+			"snapshots":  len(conv.ScreenSnapshots),
+			"turns":      len(conv.Turns),
+			"autoEnded":  true,
+		},
+	})
+
+	log.Printf("[LLM Logger] Ended conversation %s (TUI:%v, snapshots:%d, turns:%d)", 
+		l.activeConvID, l.tuiCaptureMode, len(conv.ScreenSnapshots), len(conv.Turns))
+
+	l.activeConvID = ""
+	l.tuiCaptureMode = false
+	l.currentScreen.Reset()
+	l.lastScreen = ""
+	l.snapshotCount = 0
+}
+
 // saveScreenSnapshotLocked saves the current screen buffer as a snapshot.
 // Must be called with lock held.
 func (l *LLMLogger) saveScreenSnapshotLocked() {
@@ -365,6 +480,13 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 	rawContent := l.currentScreen.String()
 	if rawContent == "" {
 		return
+	}
+
+	// MEMORY LIMIT: Cap snapshots to prevent unbounded growth
+	if len(conv.ScreenSnapshots) >= maxSnapshotsPerConversation {
+		// Remove oldest snapshots, keep recent ones
+		conv.ScreenSnapshots = conv.ScreenSnapshots[len(conv.ScreenSnapshots)-maxSnapshotsPerConversation+10:]
+		log.Printf("[LLM Logger] ⚠️ Snapshot limit reached, trimmed old snapshots")
 	}
 
 	// Clean ANSI sequences for display
@@ -666,6 +788,13 @@ func (l *LLMLogger) flushUserInputLocked() {
 
 	conv, exists := l.conversations[l.activeConvID]
 	if !exists {
+		return
+	}
+
+	// MEMORY LIMIT: Cap turns to prevent unbounded growth
+	if len(conv.Turns) >= maxTurnsPerConversation {
+		log.Printf("[LLM Logger] ⚠️ Turn limit reached (%d), ending conversation", len(conv.Turns))
+		l.endConversationLocked()
 		return
 	}
 
@@ -985,6 +1114,7 @@ func (l *LLMLogger) saveConversation(conv *LLMConversation) {
 }
 
 // loadConversationsFromDisk loads existing conversations from disk for this tab.
+// Only loads recent incomplete conversations to prevent memory bloat.
 func (l *LLMLogger) loadConversationsFromDisk() {
 	if l.amDir == "" {
 		return
@@ -999,7 +1129,18 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 
 	loadedCount := 0
 	incompleteCount := 0
+	
+	// MEMORY OPTIMIZATION: Only load recent conversations (last 24 hours)
+	// Older conversations can be loaded on-demand via GetConversation
+	cutoffTime := time.Now().Add(-24 * time.Hour)
+	
 	for _, file := range files {
+		// Check file modification time first to skip old files
+		info, err := os.Stat(file)
+		if err != nil || info.ModTime().Before(cutoffTime) {
+			continue
+		}
+		
 		data, err := os.ReadFile(file)
 		if err != nil {
 			log.Printf("[LLM Logger] Failed to read %s: %v", file, err)
@@ -1012,30 +1153,32 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 			continue
 		}
 
-		// Load ALL conversations (both complete and incomplete)
-		l.conversations[conv.ConversationID] = &conv
-		loadedCount++
-		
-		// Only restore active state for incomplete conversations
-		if !conv.Complete {
-			incompleteCount++
-			// Restore the active conversation (most recent incomplete one)
-			if conv.StartTime.After(time.Now().Add(-24 * time.Hour)) {
-				l.activeConvID = conv.ConversationID
-				l.tuiCaptureMode = conv.TUICaptureMode
-				l.snapshotCount = len(conv.ScreenSnapshots)
-				if l.snapshotCount > 0 {
-					l.lastScreen = conv.ScreenSnapshots[l.snapshotCount-1].CleanedContent
+		// Only load incomplete conversations or very recent complete ones
+		if !conv.Complete || conv.EndTime.After(cutoffTime) {
+			l.conversations[conv.ConversationID] = &conv
+			loadedCount++
+			
+			// Only restore active state for incomplete conversations
+			if !conv.Complete {
+				incompleteCount++
+				// Restore the active conversation (most recent incomplete one)
+				if conv.StartTime.After(cutoffTime) {
+					l.activeConvID = conv.ConversationID
+					l.tuiCaptureMode = conv.TUICaptureMode
+					l.snapshotCount = len(conv.ScreenSnapshots)
+					if l.snapshotCount > 0 {
+						l.lastScreen = conv.ScreenSnapshots[l.snapshotCount-1].CleanedContent
+					}
 				}
 			}
+			
+			log.Printf("[LLM Logger] ✓ Loaded conversation %s (%d turns, %d snapshots, complete=%v)", 
+				conv.ConversationID, len(conv.Turns), len(conv.ScreenSnapshots), conv.Complete)
 		}
-		
-		log.Printf("[LLM Logger] ✓ Loaded conversation %s (%d turns, %d snapshots, complete=%v)", 
-			conv.ConversationID, len(conv.Turns), len(conv.ScreenSnapshots), conv.Complete)
 	}
 
 	if loadedCount > 0 {
-		log.Printf("[LLM Logger] Loaded %d conversation(s) from disk for tab %s (%d incomplete, %d complete)", 
+		log.Printf("[LLM Logger] Loaded %d recent conversation(s) from disk for tab %s (%d incomplete, %d complete)", 
 			loadedCount, l.tabID, incompleteCount, loadedCount-incompleteCount)
 		if l.activeConvID != "" {
 			log.Printf("[LLM Logger] Restored active conversation: %s", l.activeConvID)
