@@ -1,0 +1,100 @@
+{
+  "tests": [
+    {
+      "id": "q1",
+      "question": "How do I enable AM logging in Forge?",
+      "expected_keywords": ["right-click", "tab", "AM Logging", ".forge/am"],
+      "category": "features",
+      "difficulty": "easy",
+      "source": "docs/features/am-logging.md"
+    },
+    {
+      "id": "q2",
+      "question": "What are the keyboard shortcuts for switching tabs?",
+      "expected_keywords": ["Tab", "Shift+Tab", "Ctrl+Tab", "Alt+Tab"],
+      "category": "shortcuts",
+      "difficulty": "easy",
+      "source": "docs/user/keyboard-shortcuts.md"
+    },
+    {
+      "id": "q3",
+      "question": "How do I use vision detection in the assistant?",
+      "expected_keywords": ["Vision", "experimental", "image", "camera"],
+      "category": "features",
+      "difficulty": "medium",
+      "source": "docs/features/vision.md"
+    },
+    {
+      "id": "q4",
+      "question": "Can I use Forge in WSL and how?",
+      "expected_keywords": ["WSL", "Windows", "shell", "integration"],
+      "category": "features",
+      "difficulty": "medium",
+      "source": "docs/features/wsl-support.md"
+    },
+    {
+      "id": "q5",
+      "question": "What deployment modes are available?",
+      "expected_keywords": ["LOCAL", "EMBEDDED", "CODESPACES", "SELF-HOSTED"],
+      "category": "deployment",
+      "difficulty": "medium",
+      "source": "docs/deployment/modes.md"
+    },
+    {
+      "id": "q6",
+      "question": "How do I configure custom themes and colors?",
+      "expected_keywords": ["theme", "settings", "colors", "fonts", "customize"],
+      "category": "configuration",
+      "difficulty": "hard",
+      "source": "docs/configuration/theming.md"
+    },
+    {
+      "id": "q7",
+      "question": "What is a command card and how do I create one?",
+      "expected_keywords": ["command card", "save", "shortcuts", "execute"],
+      "category": "features",
+      "difficulty": "easy",
+      "source": "docs/features/command-cards.md"
+    },
+    {
+      "id": "q8",
+      "question": "How do I troubleshoot connection issues with Forge?",
+      "expected_keywords": ["connection", "troubleshoot", "logs", "server", "error"],
+      "category": "troubleshooting",
+      "difficulty": "hard",
+      "source": "docs/troubleshooting/connection-issues.md"
+    },
+    {
+      "id": "q9",
+      "question": "What features does the Forge Assistant have?",
+      "expected_keywords": ["assistant", "chat", "context", "terminal", "commands"],
+      "category": "features",
+      "difficulty": "medium",
+      "source": "docs/features/assistant.md"
+    },
+    {
+      "id": "q10",
+      "question": "How do I access the Forge API?",
+      "expected_keywords": ["API", "REST", "endpoints", "HTTP", "localhost"],
+      "category": "api",
+      "difficulty": "hard",
+      "source": "docs/developer/api.md"
+    },
+    {
+      "id": "q11",
+      "question": "What is session persistence and how does it work?",
+      "expected_keywords": ["session", "persistence", "save", "restore", "state"],
+      "category": "features",
+      "difficulty": "medium",
+      "source": "docs/features/session-persistence.md"
+    },
+    {
+      "id": "q12",
+      "question": "How do I use the terminal search feature?",
+      "expected_keywords": ["search", "terminal", "find", "history", "grep"],
+      "category": "features",
+      "difficulty": "easy",
+      "source": "docs/features/terminal-search.md"
+    }
+  ]
+}

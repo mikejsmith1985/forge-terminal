@@ -1,0 +1,14 @@
+version: 2
+static:
+  cleanUrls: true
+  include: '**/*.html'
+  exclude: 
+    - node_modules/**/*
+
+discovery:
+  network-idle-timeout: 750
+
+uploads:
+  files: 
+    - dist/**/*
+    

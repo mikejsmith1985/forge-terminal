@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -90,6 +91,37 @@ func main() {
 	assistantCore := assistant.NewCore(amSystem)
 	log.Printf("[Assistant] Core initialized")
 
+	// Index documentation for RAG
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		
+		ragEngine := assistantCore.GetRAGEngine()
+		if ragEngine == nil {
+			log.Printf("[RAG] RAG engine not available")
+			return
+		}
+
+		// Ensure embedding model is available
+		if !ragEngine.EnsureEmbeddingsAvailable(ctx) {
+			log.Printf("[RAG] Warning: Embedding model unavailable, using hash-based fallback (accuracy will be degraded)")
+		}
+
+		// Index documentation
+		docsPath := filepath.Join(os.Getenv("HOME"), "projects", "forge-terminal", "docs")
+		if _, err := os.Stat(docsPath); err == nil {
+			log.Printf("[RAG] Starting document indexing from %s", docsPath)
+			if err := ragEngine.IndexDocuments(ctx, docsPath); err != nil {
+				log.Printf("[RAG] Warning: Failed to index documents: %v", err)
+			} else {
+				stats := ragEngine.GetStats()
+				log.Printf("[RAG] Indexing complete: %v", stats)
+			}
+		} else {
+			log.Printf("[RAG] Docs path not found: %s", docsPath)
+		}
+	}()
+
 	// Wrap core in LocalService (v1 implementation)
 	assistantService = assistant.NewLocalService(assistantCore)
 	log.Printf("[Assistant] LocalService initialized")
@@ -125,8 +157,6 @@ func main() {
 	http.HandleFunc("/api/welcome", WrapWithMiddleware(handleWelcome))
 
 	// AM (Artificial Memory) API - session logging and recovery
-	http.HandleFunc("/api/am/enable", WrapWithMiddleware(handleAMEnable))
-	http.HandleFunc("/api/am/log", WrapWithMiddleware(handleAMLog))
 	http.HandleFunc("/api/am/check", WrapWithMiddleware(handleAMCheck))
 	http.HandleFunc("/api/am/check/enhanced", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		handleAMCheckEnhanced(w, r)
@@ -795,171 +825,6 @@ func handleWelcome(w http.ResponseWriter, r *http.Request) {
 
 // AM (Artificial Memory) handlers
 
-func handleAMEnable(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var req am.EnableRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	registry := am.GetRegistry()
-	logger, err := registry.Get(req.TabID, req.TabName, req.Workspace)
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	if req.Enabled {
-		if err := logger.Enable(); err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-			})
-			return
-		}
-		log.Printf("[AM] Logging enabled for tab %s", req.TabID)
-	} else {
-		if err := logger.Disable(); err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-			})
-			return
-		}
-		log.Printf("[AM] Logging disabled for tab %s", req.TabID)
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"enabled": req.Enabled,
-		"logPath": logger.GetLogPath(),
-	})
-}
-
-func handleAMLog(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var req am.AppendLogRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	registry := am.GetRegistry()
-	logger, err := registry.Get(req.TabID, req.TabName, req.Workspace)
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	if err := logger.Log(req.EntryType, req.Content); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	// If triggerAM is set, start LLM conversation tracking
-	var convID string
-	if req.TriggerAM {
-		log.Printf("[AM API] ═══ COMMAND CARD TRIGGER ═══")
-		log.Printf("[AM API] triggerAM=true, tabID=%s, command='%s'", req.TabID, req.Content)
-		log.Printf("[AM API] llmProvider='%s', description='%s'", req.LLMProvider, req.Description)
-		
-		amSystem := am.GetSystem()
-		if amSystem == nil {
-			log.Printf("[AM API] ❌ CRITICAL: AM System is nil!")
-		} else {
-			log.Printf("[AM API] ✓ AM System exists")
-			
-			llmLogger := amSystem.GetLLMLogger(req.TabID)
-			if llmLogger == nil {
-				log.Printf("[AM API] ❌ CRITICAL: LLM Logger is nil for tab %s", req.TabID)
-			} else {
-				log.Printf("[AM API] ✓ LLM Logger exists for tab %s", req.TabID)
-				
-				// Determine provider from explicit field or infer from command
-				provider := inferLLMProvider(req.LLMProvider, req.Content)
-				cmdType := inferLLMType(req.LLMType)
-				
-				log.Printf("[AM API] Provider inference: explicit='%s' command='%s' → result=%s", req.LLMProvider, req.Content, provider)
-				log.Printf("[AM API] Type inference: explicit='%s' → result=%s", req.LLMType, cmdType)
-
-				// Check if this is a TUI tool
-				isTUITool := provider == llm.ProviderGitHubCopilot || provider == llm.ProviderClaude
-				
-				if isTUITool {
-					// Use TUI-aware conversation mode
-					log.Printf("[AM API] TUI tool detected, using screen snapshot capture")
-					convID = llmLogger.StartConversationFromProcess(
-						string(provider),
-						string(cmdType),
-						0, // PID unknown from command card
-					)
-				} else {
-					// Traditional conversation mode
-					detected := &llm.DetectedCommand{
-						Provider: provider,
-						Type:     cmdType,
-						Prompt:   req.Description,
-						RawInput: req.Content,
-						Detected: true,
-					}
-					log.Printf("[AM API] Calling StartConversation with provider=%s type=%s", provider, cmdType)
-					convID = llmLogger.StartConversation(detected)
-				}
-				
-				log.Printf("[AM API] ✅ StartConversation returned: convID='%s'", convID)
-				
-				// Verify conversation was actually created
-				convs := llmLogger.GetConversations()
-				log.Printf("[AM API] Verification: GetConversations() returned %d conversations", len(convs))
-				if len(convs) > 0 {
-					log.Printf("[AM API] ✓ Latest conversation: ID=%s provider=%s type=%s", 
-						convs[len(convs)-1].ConversationID, 
-						convs[len(convs)-1].Provider, 
-						convs[len(convs)-1].CommandType)
-				}
-				
-				activeID := llmLogger.GetActiveConversationID()
-				log.Printf("[AM API] Active conversation ID: '%s'", activeID)
-				
-				if activeID != convID {
-					log.Printf("[AM API] ⚠️ WARNING: Active ID (%s) != returned ID (%s)", activeID, convID)
-				} else {
-					log.Printf("[AM API] ✓ Active conversation matches returned ID")
-				}
-			}
-		}
-		log.Printf("[AM API] ═══ END COMMAND CARD TRIGGER ═══")
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":        true,
-		"conversationId": convID,
-	})
-}
-
-// inferLLMProvider determines the LLM provider from explicit field or command text
 func inferLLMProvider(explicit string, command string) llm.Provider {
 	// Use explicit provider if specified
 	switch strings.ToLower(explicit) {
@@ -1151,8 +1016,7 @@ func handleAMArchive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Remove from registry
-	am.GetRegistry().Remove(tabID)
+	// No longer need to remove from registry (old Logger system removed)
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,

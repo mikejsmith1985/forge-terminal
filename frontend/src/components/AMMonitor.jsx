@@ -67,8 +67,9 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
 
   const systemStatus = health?.status || 'UNKNOWN';
   const conversationsActive = health?.metrics?.conversationsActive || 0;
-  const inputTurns = health?.metrics?.inputTurnsDetected || 0;
-  const outputTurns = health?.metrics?.outputTurnsDetected || 0;
+  const snapshotsCaptured = health?.metrics?.snapshotsCaptured || 0;
+  const inputBytes = health?.metrics?.inputBytesCaptured || 0;
+  const outputBytes = health?.metrics?.outputBytesCaptured || 0;
 
   const statusClass = {
     'HEALTHY': 'am-active',
@@ -87,7 +88,15 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     <Activity size={14} />
   );
 
-  const title = `AM System: ${systemStatus}\nActive: ${conversationsActive} | Tracked: ${conversationCount}\nCaptures: ${inputTurns} in / ${outputTurns} out\n\nClick to view conversations`;
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
+  };
+
+  const title = `AM System: ${systemStatus}\nActive: ${conversationsActive} | Tracked: ${conversationCount}\nSnapshots: ${snapshotsCaptured} | Input: ${formatBytes(inputBytes)} | Output: ${formatBytes(outputBytes)}\n\nClick to view conversations`;
 
   const handleClick = () => {
     if (conversations.length > 0) {

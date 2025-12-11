@@ -135,6 +135,14 @@ func (hm *HealthMonitor) GetSystemHealth() *SystemHealth {
 		LastCaptureTime:          hm.metrics.LastCaptureTime,
 	}
 
+	// Calculate snapshot count from active conversations
+	convs := GetActiveConversations()
+	for _, conv := range convs {
+		if conv != nil {
+			metrics.SnapshotsCaptured += len(conv.ScreenSnapshots)
+		}
+	}
+
 	status := hm.computeStatus()
 
 	return &SystemHealth{
@@ -148,7 +156,7 @@ func (hm *HealthMonitor) GetMetrics() *CaptureMetrics {
 	hm.mutex.RLock()
 	defer hm.mutex.RUnlock()
 
-	return &CaptureMetrics{
+	metrics := &CaptureMetrics{
 		InputBytesCaptured:       hm.metrics.InputBytesCaptured,
 		InputTurnsDetected:       hm.metrics.InputTurnsDetected,
 		InputParseFailures:       hm.metrics.InputParseFailures,
@@ -162,6 +170,16 @@ func (hm *HealthMonitor) GetMetrics() *CaptureMetrics {
 		LowConfidenceParses:      hm.metrics.LowConfidenceParses,
 		LastCaptureTime:          hm.metrics.LastCaptureTime,
 	}
+
+	// Calculate snapshot count from active conversations
+	convs := GetActiveConversations()
+	for _, conv := range convs {
+		if conv != nil {
+			metrics.SnapshotsCaptured += len(conv.ScreenSnapshots)
+		}
+	}
+
+	return metrics
 }
 
 func (hm *HealthMonitor) computeStatus() string {

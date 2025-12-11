@@ -51,6 +51,14 @@ func (s *LocalService) VisionEnabled(ctx context.Context) (bool, error) {
 
 // Chat sends a message to the assistant and gets a response.
 func (s *LocalService) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, error) {
+	// Use RAG engine only if it has documents indexed
+	ragEngine := s.core.GetRAGEngine()
+	if ragEngine != nil && ragEngine.IsReady() {
+		config := DefaultRAGConfig()
+		return ragEngine.ContextualChat(ctx, req.Message, config)
+	}
+	
+	// Fallback to simple knowledge base + ollama
 	// Get terminal context if requested
 	var termCtx *TerminalContext
 	if req.IncludeContext {
@@ -70,9 +78,6 @@ func (s *LocalService) Chat(ctx context.Context, req *ChatRequest) (*ChatRespons
 		return nil, err
 	}
 
-	// Parse response for command suggestions
-	// For v1, we'll return the raw response
-	// Command detection can be enhanced later
 	return &ChatResponse{
 		Message: response,
 	}, nil

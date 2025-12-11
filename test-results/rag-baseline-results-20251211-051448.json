@@ -1,0 +1,118 @@
+{
+  "timestamp": "2025-12-11T10:16:16Z",
+  "phase": "Phase 1 - System Prompt Only",
+  "total_tests": 0,
+  "passed_tests": 0,
+  "failed_tests": 0,
+  "overall_accuracy": 0,
+  "results": [
+    {
+      "test_id": "q1",
+      "score": 100,
+      "matched_keywords": 5,
+      "total_keywords": 5,
+      "result": "PASS",
+      "category": "features",
+      "difficulty": "easy"
+    },
+    {
+      "test_id": "q2",
+      "score": 100,
+      "matched_keywords": 4,
+      "total_keywords": 4,
+      "result": "PASS",
+      "category": "shortcuts",
+      "difficulty": "easy"
+    },
+    {
+      "test_id": "q3",
+      "score": 100,
+      "matched_keywords": 4,
+      "total_keywords": 4,
+      "result": "PASS",
+      "category": "features",
+      "difficulty": "medium"
+    },
+    {
+      "test_id": "q4",
+      "score": 75,
+      "matched_keywords": 3,
+      "total_keywords": 4,
+      "result": "FAIL",
+      "category": "features",
+      "difficulty": "medium"
+    },
+    {
+      "test_id": "q5",
+      "score": 100,
+      "matched_keywords": 4,
+      "total_keywords": 4,
+      "result": "PASS",
+      "category": "deployment",
+      "difficulty": "medium"
+    },
+    {
+      "test_id": "q6",
+      "score": 60,
+      "matched_keywords": 3,
+      "total_keywords": 5,
+      "result": "FAIL",
+      "category": "configuration",
+      "difficulty": "hard"
+    },
+    {
+      "test_id": "q7",
+      "score": 80,
+      "matched_keywords": 4,
+      "total_keywords": 5,
+      "result": "PASS",
+      "category": "features",
+      "difficulty": "easy"
+    },
+    {
+      "test_id": "q8",
+      "score": 100,
+      "matched_keywords": 5,
+      "total_keywords": 5,
+      "result": "PASS",
+      "category": "troubleshooting",
+      "difficulty": "hard"
+    },
+    {
+      "test_id": "q9",
+      "score": 100,
+      "matched_keywords": 5,
+      "total_keywords": 5,
+      "result": "PASS",
+      "category": "features",
+      "difficulty": "medium"
+    },
+    {
+      "test_id": "q10",
+      "score": 80,
+      "matched_keywords": 4,
+      "total_keywords": 5,
+      "result": "PASS",
+      "category": "api",
+      "difficulty": "hard"
+    },
+    {
+      "test_id": "q11",
+      "score": 100,
+      "matched_keywords": 5,
+      "total_keywords": 5,
+      "result": "PASS",
+      "category": "features",
+      "difficulty": "medium"
+    },
+    {
+      "test_id": "q12",
+      "score": 60,
+      "matched_keywords": 3,
+      "total_keywords": 5,
+      "result": "FAIL",
+      "category": "features",
+      "difficulty": "easy"
+    }
+  ]
+}

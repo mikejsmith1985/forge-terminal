@@ -163,21 +163,10 @@ func (c *OllamaClient) Chat(ctx context.Context, messages []OllamaMessage) (stri
 	return chatResp.Message.Content, nil
 }
 
-// BuildSystemPrompt creates a system prompt for the assistant.
+// BuildSystemPrompt creates a system prompt using the knowledge base.
 func BuildSystemPrompt() string {
-	return `You are a helpful terminal assistant integrated into Forge Terminal.
-You help users with command-line tasks by:
-1. Understanding their terminal context (current directory, recent commands, output)
-2. Suggesting appropriate commands
-3. Explaining command-line concepts clearly
-
-When suggesting commands:
-- Provide a single, clear command
-- Explain what it does briefly
-- Only suggest safe, common commands
-- If a task requires multiple steps, list them clearly
-
-Keep responses concise and actionable. Focus on being helpful and accurate.`
+	kb := NewKnowledgeBase()
+	return kb.GetSystemPrompt()
 }
 
 // BuildContextPrompt creates a context-aware prompt from terminal state.

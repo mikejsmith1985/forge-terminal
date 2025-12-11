@@ -1,0 +1,15 @@
+Q1: How do I enable session logging in Forge?
+null
+
+Q2: How do I open multiple tabs in Forge Terminal?
+null
+
+Q3: How do I search for text in the terminal?
+null
+
+Q4: What does the disconnect reasons feature do?
+null
+
+Q5: Do my Forge tabs stay open when I restart?
+null
+

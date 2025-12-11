@@ -60,6 +60,7 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 > Enable Dev Mode in Settings to access experimental features.
 
 - **🤖 Forge Assistant** (Experimental): AI-powered chat panel integrated into the sidebar. Requires local Ollama for model inference. Context-aware suggestions based on terminal state.
+  - **📚 RAG Knowledge Base** (NEW in v1.22.0): Assistant now includes Retrieval-Augmented Generation for accurate project-specific answers. Indexes documentation from `docs/` directory on startup, with cosine similarity search for relevant context retrieval. Supports markdown files with configurable relevance thresholds.
 - **👁️ Vision Detection** (Experimental): Real-time pattern detection with interactive overlays and configurable detectors:
   - **Git Status**: Detects `git status` output, shows staged/unstaged/untracked files with quick stage/unstage actions
   - **JSON Blocks**: Identifies JSON in terminal output, pretty-prints with copy actions (configurable minimum size)
@@ -68,6 +69,13 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
   - **Stack Traces** (NEW): Detects panics and exceptions from Go, Python, Java, JavaScript with frame analysis
   - **Configurable Detectors**: Enable/disable each detector type independently via Vision Settings
   - **Vision-AM Integration** (NEW): All detected errors and warnings are persisted to AM logs. When auto-respond is enabled, Vision can optionally interrupt the workflow on critical errors or silently collect findings for post-session review. Configure in Settings: "Vision-AutoRespond Mode" (strict/lenient)
+
+### Terminal Improvements (v1.22.0)
+- **⌨️ Smart Keyboard Shortcuts**: Ctrl+C and Ctrl+V now work exactly like VS Code:
+  - **Ctrl+C with selection**: Copies text to clipboard (no SIGINT)
+  - **Ctrl+C without selection**: Sends SIGINT to interrupt processes
+  - **Ctrl+V**: Pastes from clipboard seamlessly
+  - Uses xterm's `attachCustomKeyEventHandler` for reliable, native-like behavior
 
 ## Installation
 

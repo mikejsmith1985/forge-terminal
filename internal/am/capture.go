@@ -26,6 +26,7 @@ type CaptureMetrics struct {
 	OutputBytesCaptured      int64     `json:"outputBytesCaptured"`
 	OutputTurnsDetected      int64     `json:"outputTurnsDetected"`
 	OutputParseFailures      int64     `json:"outputParseFailures"`
+	SnapshotsCaptured        int       `json:"snapshotsCaptured"`
 	ConversationsActive      int       `json:"conversationsActive"`
 	ConversationsComplete    int       `json:"conversationsComplete"`
 	ConversationsCorrupted   int       `json:"conversationsCorrupted"`

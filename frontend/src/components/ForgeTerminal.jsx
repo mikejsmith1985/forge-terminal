@@ -667,93 +667,62 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.open(terminalRef.current);
     xtermRef.current = term;
 
-    // Handle Ctrl+C and Ctrl+V keyboard shortcuts using DOM listeners
-    // This avoids intercepting ALL keys and interfering with normal xterm key handling
-    const handleKeyDown = (event) => {
-      // Handle Ctrl+C - Copy if text selected, otherwise send SIGINT
-      if (event.ctrlKey && (event.key === 'c' || event.key === 'C')) {
-        event.preventDefault();
-        event.stopPropagation();
+    // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
+    // This runs BEFORE xterm processes the key and allows conditional intercept
+    term.attachCustomKeyEventHandler((arg) => {
+      // Handle Ctrl+C (Copy vs Interrupt)
+      if (arg.ctrlKey && arg.code === 'KeyC' && arg.type === 'keydown') {
+        const selection = term.getSelection();
         
-        // Get selection text directly
-        const selectedText = term.getSelection();
-        
-        if (selectedText && selectedText.length > 0) {
-          // Text is selected - copy to clipboard
-          console.log('[Terminal] Ctrl+C with selection - copying text');
-          
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(selectedText)
-              .then(() => {
-                console.log('[Terminal] Text copied to clipboard:', selectedText.length, 'chars');
-                if (onCopyRef.current) {
-                  onCopyRef.current();
-                }
-              })
-              .catch((err) => {
-                console.error('[Terminal] Clipboard write failed:', err);
-              });
-          } else {
-            try {
-              document.execCommand('copy');
-              console.log('[Terminal] Copy via execCommand');
+        if (selection) {
+          // If there is a selection, COPY it
+          console.log('[Terminal] Ctrl+C with selection - copying to clipboard');
+          navigator.clipboard.writeText(selection)
+            .then(() => {
+              console.log('[Terminal] Copied to clipboard:', selection.length, 'chars');
               if (onCopyRef.current) {
                 onCopyRef.current();
               }
-            } catch (e) {
-              console.error('[Terminal] Copy failed:', e);
-            }
-          }
-        } else {
-          // No text selected - send SIGINT to interrupt process
-          console.log('[Terminal] Ctrl+C without selection - sending SIGINT');
-          
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send('\x03');
-            console.log('[Terminal] SIGINT sent via WebSocket');
-          } else {
-            console.warn('[Terminal] WebSocket not ready for Ctrl+C');
-          }
-        }
-        return;
-      }
-      
-      // Handle Ctrl+V (paste from clipboard)
-      if (event.ctrlKey && (event.key === 'v' || event.key === 'V')) {
-        console.log('[Terminal] Ctrl+V detected - reading clipboard');
-        event.preventDefault();
-        event.stopPropagation();
-        
-        // Read from clipboard
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          navigator.clipboard.readText()
-            .then((text) => {
-              console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
-              
-              // Send to WebSocket
-              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                const sanitized = text.replace(/[\r\n]+/g, ' ').trim();
-                wsRef.current.send(sanitized);
-                console.log('[Terminal] Sent to WebSocket:', sanitized.length, 'chars');
-              } else {
-                console.warn('[Terminal] WebSocket not ready for paste');
-              }
             })
             .catch((err) => {
-              console.error('[Terminal] Clipboard read failed:', err);
+              console.error('[Terminal] Clipboard write failed:', err);
             });
-        } else {
-          console.warn('[Terminal] Clipboard API not available');
+          
+          return false; // Prevent xterm from handling (blocking the SIGINT)
         }
-        return;
+        
+        // If NO selection, return true to let xterm handle it
+        // xterm will send the standard \x03 (SIGINT) to your Go backend
+        console.log('[Terminal] Ctrl+C without selection - letting xterm send SIGINT');
+        return true;
       }
-      
-      // All other keys pass through to xterm normally
-    };
-    
-    // Store handler in ref for cleanup
-    keydownHandlerRef.current = handleKeyDown;
-    terminalRef.current.addEventListener('keydown', handleKeyDown);
+
+      // Handle Ctrl+V (Paste)
+      if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
+        console.log('[Terminal] Ctrl+V detected - reading from clipboard');
+        
+        navigator.clipboard.readText()
+          .then((text) => {
+            console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
+            
+            // Send the pasted text to Go backend via WebSocket
+            // Do NOT term.write(text) here - it will duplicate if backend echoes back
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(text);
+              console.log('[Terminal] Sent pasted text to backend:', text.length, 'chars');
+            } else {
+              console.warn('[Terminal] WebSocket not ready for paste');
+            }
+          })
+          .catch((err) => {
+            console.error('[Terminal] Clipboard read failed:', err);
+          });
+
+        return false; // Prevent xterm from handling this event
+      }
+
+      return true; // Let all other keys pass through standard xterm processing
+    });
 
     // Initial fit
     setTimeout(() => fitAddon.fit(), 0);
@@ -1166,10 +1135,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     resizeObserver.observe(terminalRef.current);
 
     return () => {
-      // Remove Ctrl+C/Ctrl+V keyboard event listener
-      if (terminalRef.current && keydownHandlerRef.current) {
-        terminalRef.current.removeEventListener('keydown', keydownHandlerRef.current);
-      }
+      // No cleanup needed for attachCustomKeyEventHandler - xterm handles it
       
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();

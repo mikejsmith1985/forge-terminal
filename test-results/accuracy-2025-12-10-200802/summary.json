@@ -1,0 +1,8 @@
+{
+  "phase": "phase1",
+  "method": "system_prompt_injection",
+  "model": "mistral:7b-instruct",
+  "timestamp": "2025-12-10T20:08:02-05:00",
+  "questions_tested": 5,
+  "average_accuracy_percent": 0
+}

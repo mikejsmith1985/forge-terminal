@@ -17,6 +17,8 @@ type Core struct {
 	llmDetector    *llm.Detector
 	amSystem       *am.System
 	ollamaClient   *OllamaClient
+	knowledgeBase  *KnowledgeBase
+	ragEngine      *RAGEngine
 }
 
 // NewCore creates a new assistant core with all AI features.
@@ -27,6 +29,15 @@ func NewCore(amSystem *am.System) *Core {
 	// Initialize Ollama client with defaults
 	// Users can set FORGE_OLLAMA_MODEL env var to use specific model
 	ollamaClient := NewOllamaClient("", "")
+	
+	// Initialize knowledge base
+	knowledgeBase := NewKnowledgeBase()
+	
+	// Initialize RAG components
+	embeddingsClient := NewEmbeddingsClient("", "")
+	vectorStore := NewVectorStore()
+	ragEngine := NewRAGEngine(embeddingsClient, vectorStore, ollamaClient, knowledgeBase)
+	
 	log.Printf("[Assistant] Core initialized")
 
 	return &Core{
@@ -35,6 +46,8 @@ func NewCore(amSystem *am.System) *Core {
 		llmDetector:    llm.NewDetector(),
 		amSystem:       amSystem,
 		ollamaClient:   ollamaClient,
+		knowledgeBase:  knowledgeBase,
+		ragEngine:      ragEngine,
 	}
 }
 
@@ -98,4 +111,15 @@ func (c *Core) VisionEnabled() bool {
 func (c *Core) GetOllamaClient() *OllamaClient {
 	return c.ollamaClient
 }
+
+// GetRAGEngine returns the RAG engine for external use.
+func (c *Core) GetRAGEngine() *RAGEngine {
+	return c.ragEngine
+}
+
+// GetKnowledgeBase returns the knowledge base for external use.
+func (c *Core) GetKnowledgeBase() *KnowledgeBase {
+	return c.knowledgeBase
+}
+
 

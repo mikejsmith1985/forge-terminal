@@ -225,12 +225,11 @@ func isPathWithinRoot(targetPath, rootPath string) (bool, error) {
 			return allowed, nil
 		}
 
-		// UNC target but non-UNC root: Cannot validate across filesystems
-		// Log warning and deny by default (user should enable unrestricted mode)
-		log.Printf("[Files] WARNING: Cross-filesystem access denied: UNC path %s with non-UNC root %s",
-			targetPath, rootPath)
-		log.Printf("[Files] Enable unrestricted mode in settings to allow this")
-		return false, nil
+		// UNC target with non-UNC root: Allow UNC paths
+		// Rationale: UNC paths (\\wsl.localhost\...) have Windows-level permission checks
+		// Users cannot access files they don't have permission for at the OS level
+		log.Printf("[Files] UNC path allowed (Windows OS-level permissions apply): %s", targetPath)
+		return true, nil
 	}
 
 	// Existing validation logic for same-filesystem paths

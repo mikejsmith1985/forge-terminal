@@ -1,0 +1,30 @@
+Q1: How do I enable session logging in Forge?
+Answer:  To enable session logging in Forge Terminal, you can use the Artificial Memory (AM) logging feature. Here's how:
+
+1. Open a tab in Forge Terminal if you haven't already.
+
+2. Click on the gear icon located at the top-right corner of the terminal window to open the settings menu.
+
+3. In the settings, go to the "General" tab.
+
+4. Under the "Artificial Memory (AM) Logging" section, toggle the switch to enable AM logging for that specific tab. Once enabled, a log file will be created and appended with the terminal output as well as screenshots during your session.
+
+5. If you want to disable AM logging, simply go back to the settings and toggle off the switch in the "General" tab.
+------------------------------------------------------------
+
+Q2: How do I open multiple tabs in Forge Terminal?
+Answer:  To open multiple tabs in Forge Terminal, you can use the keyboard shortcut Ctrl+T. This will create a new tab each time you press the combination. You can have up to 20 tabs open at once. To rearrange your tabs, simply drag and drop them to your desired order.
+------------------------------------------------------------
+
+Q3: How do I search for text in the terminal?
+Answer:  To search for text in the terminal output within Forge Terminal, you can press `Ctrl+F` on your keyboard. This will activate the search function and allow you to input the text you want to find. If the searched text is found in the terminal history, it will be highlighted for easier viewing. When you're done searching, press `Enter` to clear the search box and continue using Forge Terminal as usual.
+------------------------------------------------------------
+
+Q4: What does the disconnect reasons feature do?
+Answer:  The Disconnect Reasons feature in Forge Terminal is designed to provide you with information about why your connection dropped or was interrupted. This can help you understand if there are any network issues, server problems, or other factors that caused the disruption. By knowing the reason for the disconnection, you can take appropriate actions to prevent or resolve similar issues in the future.
+------------------------------------------------------------
+
+Q5: Do my Forge tabs stay open when I restart the application?
+Answer:  Yes, your Forge tabs maintain their state even when you close and reopen the application. This feature is known as Session Persistence, which ensures that all of your open tabs are saved and restored on startup. If you need to close a tab, you can use the Ctrl+W shortcut. Enjoy using Forge Terminal!
+------------------------------------------------------------
+

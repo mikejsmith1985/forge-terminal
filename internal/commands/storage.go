@@ -59,7 +59,7 @@ var DefaultCommands = []Command{
 	{
 		ID:          5,
 		Description: "📖 Summarize Last Conversation",
-		Command:     "Read and analyze the most recent LLM conversation from the AM (Artificial Memory) system located in ~/.forge/am/ directory.\n\nLook for the most recent llm-conv-*.json file. The file contains:\n- conversation turns (user prompts and assistant responses)\n- screen snapshots from TUI sessions\n- metadata (provider, timestamps, etc.)\n\nProvide a concise summary covering:\n1. What was discussed or worked on\n2. Key insights or outputs from the conversation\n3. Any issues or incomplete tasks\n4. Suggested next steps\n\nKeep it under 200 words. Be direct and actionable.\n\nThe conversation logs are in: ~/.forge/am/llm-conv-*.json\n",
+		Command:     "Read and analyze the most recent LLM conversation from the AM (Artificial Memory) system.\n\nFor the conversation JSON logs:\n- Location: ~/.forge/am/llm-conv-*.json\n- Each file contains: conversation turns, screen snapshots, metadata (provider, timestamps)\n\nFor production logs:\n- Location: ~/.forge/forge.log (streaming logs from the running instance)\n- Use: tail -f ~/.forge/forge.log to monitor in real-time\n- Filter: grep -E \"AM API|LLM Logger|StartConversation\" to find relevant entries\n\nProvide a concise summary covering:\n1. What was discussed or worked on\n2. Key insights or outputs from the conversation\n3. Any issues or incomplete tasks\n4. Suggested next steps\n\nKeep it under 200 words. Be direct and actionable.\n",
 		KeyBinding:  "Ctrl+Shift+5",
 		PasteOnly:   false,
 		Favorite:    false,
