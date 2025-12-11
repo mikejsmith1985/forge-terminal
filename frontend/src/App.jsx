@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command } from 'lucide-react';
+import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -1556,4 +1557,10 @@ function App() {
   )
 }
 
-export default App
+export default function AppWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  )
+}
