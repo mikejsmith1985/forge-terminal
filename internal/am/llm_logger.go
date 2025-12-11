@@ -1320,9 +1320,12 @@ func getGitBranch(dir string) string {
 		return strings.TrimPrefix(content, "ref: refs/heads/")
 	}
 	
-	// Detached HEAD - return short SHA
-	if len(content) >= 7 {
-		return content[:7]
+	// Detached HEAD - return short SHA or entire content if short
+	if len(content) > 0 {
+		if len(content) >= 7 {
+			return content[:7]
+		}
+		return content
 	}
 	
 	return ""
@@ -1414,6 +1417,11 @@ func sanitizeProjectName(name string) string {
 		return '-'
 	}, name)
 	
+	// Remove consecutive hyphens
+	for strings.Contains(name, "--") {
+		name = strings.ReplaceAll(name, "--", "-")
+	}
+	
 	// Remove leading/trailing hyphens
 	name = strings.Trim(name, "-")
 	
@@ -1446,12 +1454,16 @@ func (l *LLMLogger) generateConversationFilename(conv *LLMConversation) string {
 	
 	// Get short ID (first 8 chars of conversation ID)
 	shortID := conv.ConversationID
-	if len(shortID) > 13 && strings.HasPrefix(shortID, "conv-") {
-		// For "conv-1234567890123456789", extract a portion after "conv-"
-		shortID = shortID[5:] // Remove "conv-" prefix
+	if strings.HasPrefix(shortID, "conv-") {
+		// Remove "conv-" prefix
+		shortID = shortID[5:]
+		// Take first 8 chars if longer
 		if len(shortID) > 8 {
 			shortID = shortID[:8]
 		}
+	} else if len(shortID) > 8 {
+		// No prefix but still long, truncate
+		shortID = shortID[:8]
 	}
 	
 	return fmt.Sprintf("%s-conv-%s-%s.json", project, timestamp, shortID)
