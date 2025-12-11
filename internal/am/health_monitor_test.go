@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // TestValidateConversationContent_CleanContent tests validation of clean conversation files
@@ -171,5 +172,105 @@ func TestHealthMonitor_ValidateAllConversations(t *testing.T) {
 	}
 	if len(validation.Errors) != 1 {
 		t.Errorf("Expected 1 error, got %d", len(validation.Errors))
+	}
+}
+
+// TestHealthMonitor_GetMetrics_OnlyCountsIncompleteConversations is a TDD test
+// for the snapshot counting fix. It verifies that only incomplete (active)
+// conversations are counted in the snapshot metrics, not completed ones.
+func TestHealthMonitor_GetMetrics_OnlyCountsIncompleteConversations(t *testing.T) {
+	// Enable test mode
+	SetTestMode(true)
+	defer SetTestMode(false)
+
+	// Setup: Create mock conversations
+	mockConvs := make(map[string]*LLMConversation)
+
+	// Incomplete (active) conversation with 2 snapshots
+	incompleteConv := &LLMConversation{
+		ConversationID: "conv-active-1",
+		TabID:          "tab-1",
+		Provider:       "github-copilot",
+		CommandType:    "ask",
+		Complete:       false, // ACTIVE
+		Turns:          []ConversationTurn{{Role: "user", Content: "test"}},
+		ScreenSnapshots: []ScreenSnapshot{
+			{Timestamp: time.Now(), SequenceNumber: 0, CleanedContent: "screen1"},
+			{Timestamp: time.Now(), SequenceNumber: 1, CleanedContent: "screen2"},
+		},
+	}
+
+	// Completed (idle) conversation with 1 snapshot
+	completedConv := &LLMConversation{
+		ConversationID: "conv-complete-1",
+		TabID:          "tab-1",
+		Provider:       "github-copilot",
+		CommandType:    "ask",
+		Complete:       true, // COMPLETED
+		Turns:          []ConversationTurn{{Role: "user", Content: "old"}},
+		ScreenSnapshots: []ScreenSnapshot{
+			{Timestamp: time.Now(), SequenceNumber: 0, CleanedContent: "old_screen"},
+		},
+	}
+
+	mockConvs["conv-active-1"] = incompleteConv
+	mockConvs["conv-complete-1"] = completedConv
+
+	// Inject mock conversations
+	SetTestConversations(mockConvs)
+
+	// Create health monitor
+	hm := NewHealthMonitor()
+
+	// Get metrics
+	metrics := hm.GetMetrics()
+
+	// ASSERTION: Should count only 2 snapshots (from incomplete conversation)
+	// NOT 3 (from both complete and incomplete)
+	if metrics.SnapshotsCaptured != 2 {
+		t.Errorf("Expected 2 snapshots (only from incomplete conv), got %d", metrics.SnapshotsCaptured)
+	}
+}
+
+// TestHealthMonitor_GetSystemHealth_OnlyCountsIncompleteConversations is a TDD test
+// verifying that GetSystemHealth() also correctly filters conversations
+func TestHealthMonitor_GetSystemHealth_OnlyCountsIncompleteConversations(t *testing.T) {
+	// Enable test mode
+	SetTestMode(true)
+	defer SetTestMode(false)
+
+	// Setup: Create mock conversations
+	mockConvs := make(map[string]*LLMConversation)
+
+	incompleteConv := &LLMConversation{
+		ConversationID: "conv-active-2",
+		TabID:          "tab-2",
+		Provider:       "claude",
+		CommandType:    "ask",
+		Complete:       false,
+		Turns:          []ConversationTurn{{Role: "user", Content: "test"}},
+		ScreenSnapshots: []ScreenSnapshot{
+			{Timestamp: time.Now(), SequenceNumber: 0, CleanedContent: "screen1"},
+			{Timestamp: time.Now(), SequenceNumber: 1, CleanedContent: "screen2"},
+			{Timestamp: time.Now(), SequenceNumber: 2, CleanedContent: "screen3"},
+		},
+	}
+
+	mockConvs["conv-active-2"] = incompleteConv
+
+	// Inject mock conversations
+	SetTestConversations(mockConvs)
+
+	hm := NewHealthMonitor()
+	health := hm.GetSystemHealth()
+
+	// Should count only 3 snapshots from the one incomplete conversation
+	if health.Metrics.SnapshotsCaptured != 3 {
+		t.Errorf("Expected 3 snapshots, got %d", health.Metrics.SnapshotsCaptured)
+	}
+
+	// Status should be HEALTHY when we have activity
+	if health.Status != "HEALTHY" {
+		t.Errorf("Expected HEALTHY status, got %s", health.Status)
 	}
 }

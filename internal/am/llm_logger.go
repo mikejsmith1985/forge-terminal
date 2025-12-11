@@ -337,20 +337,11 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 		l.currentScreen.WriteString(rawOutput)
 		l.lastOutputTime = time.Now()
 		
-		// Trigger snapshot on screen clear (traditional method)
+		// Trigger snapshot on screen clear (event-based trigger)
 		if l.detectScreenClear(rawOutput) {
 			log.Printf("[LLM Logger] 📸 Screen clear detected! Saving snapshot (bufferSize=%d)", l.currentScreen.Len())
 			l.saveScreenSnapshotLocked()
 			return
-		}
-		
-		// NEW: Time-based snapshot trigger
-		// Save snapshot if we have output AND enough time has passed
-		timeSinceLastSnapshot := time.Since(l.lastSnapshotTime)
-		if l.currentScreen.Len() > 100 && timeSinceLastSnapshot > 2*time.Second {
-			log.Printf("[LLM Logger] ⏱️  Time-based snapshot trigger (bufferSize=%d, elapsed=%v)", 
-				l.currentScreen.Len(), timeSinceLastSnapshot)
-			l.saveScreenSnapshotLocked()
 		}
 		
 		return
@@ -1072,6 +1063,11 @@ func (l *LLMLogger) GetConversation(convID string) *LLMConversation {
 
 // GetActiveConversations returns all active conversations across all tabs.
 func GetActiveConversations() map[string]*LLMConversation {
+	// Support test mode with injected mocks
+	if testModeEnabled {
+		return GetTestConversations()
+	}
+
 	llmLoggersMu.RLock()
 	defer llmLoggersMu.RUnlock()
 
@@ -1184,4 +1180,50 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 			log.Printf("[LLM Logger] Restored active conversation: %s", l.activeConvID)
 		}
 	}
+}
+
+// ============================================================================
+// TEST HELPERS - Only used in tests to inject mock data
+// ============================================================================
+
+var (
+	testModeEnabled         = false
+	testMockConversations   map[string]*LLMConversation
+	testMockConversationsMu sync.Mutex
+)
+
+// SetTestMode enables test mode for dependency injection
+func SetTestMode(enabled bool) {
+	if enabled {
+		testModeEnabled = true
+		testMockConversationsMu.Lock()
+		testMockConversations = make(map[string]*LLMConversation)
+		testMockConversationsMu.Unlock()
+	} else {
+		testModeEnabled = false
+		testMockConversationsMu.Lock()
+		testMockConversations = nil
+		testMockConversationsMu.Unlock()
+	}
+}
+
+// SetTestConversations sets conversations for testing (only in test mode)
+func SetTestConversations(convs map[string]*LLMConversation) {
+	if !testModeEnabled {
+		log.Printf("[TEST] SetTestConversations called outside test mode - ignoring")
+		return
+	}
+	testMockConversationsMu.Lock()
+	defer testMockConversationsMu.Unlock()
+	testMockConversations = convs
+}
+
+// GetTestConversations retrieves test conversations (only in test mode)
+func GetTestConversations() map[string]*LLMConversation {
+	if !testModeEnabled {
+		return nil
+	}
+	testMockConversationsMu.Lock()
+	defer testMockConversationsMu.Unlock()
+	return testMockConversations
 }

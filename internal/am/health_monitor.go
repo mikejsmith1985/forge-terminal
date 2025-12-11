@@ -136,9 +136,10 @@ func (hm *HealthMonitor) GetSystemHealth() *SystemHealth {
 	}
 
 	// Calculate snapshot count from active conversations
+	// FIXED: Only count incomplete (active) conversations, not completed ones
 	convs := GetActiveConversations()
 	for _, conv := range convs {
-		if conv != nil {
+		if conv != nil && !conv.Complete {
 			metrics.SnapshotsCaptured += len(conv.ScreenSnapshots)
 		}
 	}
@@ -172,9 +173,10 @@ func (hm *HealthMonitor) GetMetrics() *CaptureMetrics {
 	}
 
 	// Calculate snapshot count from active conversations
+	// FIXED: Only count incomplete (active) conversations, not completed ones
 	convs := GetActiveConversations()
 	for _, conv := range convs {
-		if conv != nil {
+		if conv != nil && !conv.Complete {
 			metrics.SnapshotsCaptured += len(conv.ScreenSnapshots)
 		}
 	}
