@@ -238,37 +238,35 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if n > 0 {
-				// Vision: Feed data to parser (non-blocking, async detection)
-				if match := visionParser.Feed(buf[:n]); match != nil {
-					log.Printf("[Vision] Detected pattern: %s", match.Type)
-					// Send overlay message to frontend (JSON text message)
-					overlayMsg := VisionOverlayMessage{
-						Type:        "VISION_OVERLAY",
-						OverlayType: match.Type,
-						Payload:     match.Payload,
-					}
-					if err := conn.WriteJSON(overlayMsg); err != nil {
-						log.Printf("[Vision] Failed to send overlay: %v", err)
-					}
-				}
-
-				// Send output to browser (binary message - unchanged)
+				// ═══ CRITICAL PERFORMANCE: Send to browser FIRST ═══
+				// This ensures terminal output is immediately visible
 				err = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
 				if err != nil {
 					log.Printf("[Terminal] WebSocket write error: %v", err)
 					return
 				}
 
-				// Feed output to LLM logger if conversation is active
+				// Vision: Feed data to parser asynchronously (non-blocking)
+				if visionParser.Enabled() {
+					go func(data []byte) {
+						if match := visionParser.Feed(data); match != nil {
+							overlayMsg := VisionOverlayMessage{
+								Type:        "VISION_OVERLAY",
+								OverlayType: match.Type,
+								Payload:     match.Payload,
+							}
+							conn.WriteJSON(overlayMsg) // Best effort, ignore errors
+						}
+					}(buf[:n])
+				}
+
+				// Feed output to LLM logger asynchronously (non-blocking)
 				if llmLogger != nil {
-activeConv := llmLogger.GetActiveConversationID()
-if activeConv != "" {
-log.Printf("[Terminal PTY→Logger] TabID=%s ConvID=%s OutputLen=%d", tabID, activeConv, n)
-}
-					if llmLogger.ShouldFlushOutput(flushTimeout) {
-						llmLogger.FlushOutput()
-					}
-					llmLogger.AddOutput(string(buf[:n]))
+					go func(data string) {
+						if llmLogger.GetActiveConversationID() != "" {
+							llmLogger.AddOutput(data)
+						}
+					}(string(buf[:n]))
 				}
 			}
 		}
@@ -330,85 +328,8 @@ log.Printf("[Terminal PTY→Logger] TabID=%s ConvID=%s OutputLen=%d", tabID, act
 				}
 			}
 
-			// Accumulate input for LLM detection
-			dataStr := string(data)
-			inputBuffer.WriteString(dataStr)
-
-			// ═══ AM v2.0: Capture user input when inside active LLM session ═══
-			// This is the critical fix - capture ALL input after LLM session starts
-			if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
-log.Printf("[Terminal Input→Logger] TabID=%s ConvID=%s InputLen=%d", tabID, llmLogger.GetActiveConversationID(), len(dataStr))
-				llmLogger.AddUserInput(dataStr)
-			}
-
-			// Check for newline/enter (command submission)
-			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
-				commandLine := strings.TrimSpace(inputBuffer.String())
-				inputBuffer.Reset()
-
-				if commandLine != "" {
-					log.Printf("[Terminal] ═══ COMMAND ENTERED ═══")
-					log.Printf("[Terminal] Raw command: '%s' (len=%d)", commandLine, len(commandLine))
-					log.Printf("[Terminal] Hex dump: % X", []byte(commandLine))
-					
-					if llmLogger != nil {
-						// Only detect new LLM command if no conversation is active
-						if llmLogger.GetActiveConversationID() == "" {
-							log.Printf("[Terminal] Calling LLM detector...")
-							detected := detector.DetectCommand(commandLine)
-							
-							log.Printf("[Terminal] Detection result: detected=%v", detected.Detected)
-							if detected.Detected {
-								log.Printf("[Terminal] ✓ LLM command DETECTED: provider=%s type=%s", detected.Provider, detected.Type)
-								log.Printf("[Terminal] Starting TUI-aware LLM conversation...")
-								
-								// Check if this is a TUI-based tool (Copilot, Claude)
-								isTUITool := detected.Provider == "github-copilot" || detected.Provider == "claude"
-								
-								if isTUITool {
-									// Use TUI capture mode
-									log.Printf("[Terminal] TUI tool detected, enabling screen snapshot capture")
-									convID := llmLogger.StartConversationFromProcess(
-										string(detected.Provider),
-										string(detected.Type),
-										0, // PID will be filled if we can detect it
-									)
-									log.Printf("[Terminal] ✅ TUI conversation started: ID='%s'", convID)
-								} else {
-									// Traditional line-based capture
-									log.Printf("[Terminal] Traditional CLI tool, using line-based capture")
-									convID := llmLogger.StartConversation(detected)
-									log.Printf("[Terminal] ✅ Conversation started: ID='%s'", convID)
-								}
-								
-								// Verify active conversation was set
-								activeID := llmLogger.GetActiveConversationID()
-								log.Printf("[Terminal] Active conversation ID: '%s'", activeID)
-								if activeID == "" {
-									log.Printf("[Terminal] ⚠️ WARNING: No active conversation after start!")
-								}
-							} else {
-								log.Printf("[Terminal] ✗ Not an LLM command: '%s'", commandLine)
-							}
-						} else {
-							log.Printf("[Terminal] Inside active LLM session, input captured via AddUserInput")
-						}
-					} else {
-						log.Printf("[Terminal] LLM logger is nil, skipping detection")
-					}
-					log.Printf("[Terminal] ═══ END COMMAND ENTERED ═══")
-				}
-			}
-
-			// Periodic flush check for LLM output
-			if llmLogger != nil && time.Since(lastFlushCheck) > flushTimeout {
-				if llmLogger.ShouldFlushOutput(flushTimeout) {
-					llmLogger.FlushOutput()
-				}
-				lastFlushCheck = time.Now()
-			}
-
-			// Regular input - write to PTY
+			// ═══ CRITICAL PERFORMANCE: Write to PTY FIRST, process later ═══
+			// This ensures keyboard input is immediately responsive
 			if _, err := session.Write(data); err != nil {
 				log.Printf("[Terminal] PTY write error: %v", err)
 				select {
@@ -416,6 +337,56 @@ log.Printf("[Terminal Input→Logger] TabID=%s ConvID=%s InputLen=%d", tabID, ll
 				default:
 				}
 				return
+			}
+
+			// Accumulate input for LLM detection (after PTY write)
+			dataStr := string(data)
+			inputBuffer.WriteString(dataStr)
+
+			// AM: Capture user input when inside active LLM session (async, non-blocking)
+			if llmLogger != nil {
+				activeConv := llmLogger.GetActiveConversationID()
+				if activeConv != "" {
+					// Fire and forget - don't block on this
+					go llmLogger.AddUserInput(dataStr)
+				}
+			}
+
+			// Check for newline/enter (command submission)
+			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
+				commandLine := strings.TrimSpace(inputBuffer.String())
+				inputBuffer.Reset()
+
+				if commandLine != "" && llmLogger != nil {
+					// Only detect new LLM command if no conversation is active
+					activeConv := llmLogger.GetActiveConversationID()
+					if activeConv == "" {
+						detected := detector.DetectCommand(commandLine)
+						
+						if detected.Detected {
+							// Check if this is a TUI-based tool (Copilot, Claude)
+							isTUITool := detected.Provider == "github-copilot" || detected.Provider == "claude"
+							
+							if isTUITool {
+								llmLogger.StartConversationFromProcess(
+									string(detected.Provider),
+									string(detected.Type),
+									0,
+								)
+							} else {
+								llmLogger.StartConversation(detected)
+							}
+						}
+					}
+				}
+			}
+
+			// Periodic flush check for LLM output (reduced frequency)
+			if llmLogger != nil && time.Since(lastFlushCheck) > flushTimeout {
+				if llmLogger.ShouldFlushOutput(flushTimeout) {
+					go llmLogger.FlushOutput() // Async flush
+				}
+				lastFlushCheck = time.Now()
 			}
 		}
 	}()
