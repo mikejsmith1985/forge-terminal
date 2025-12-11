@@ -163,6 +163,17 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
         </div>
 
         <div className="modal-body">
+          <div style={{ 
+            fontSize: '0.75rem', 
+            color: '#666', 
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <span>⬇ Scroll for more options ⬇</span>
+          </div>
+
           <div className="form-group" style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Default Shell</label>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -702,70 +713,70 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               </small>
             </div>
           )}
-        </div>
 
-        {/* File Access Security */}
-        <div className="form-group" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '2px solid #333' }}>
-          <h4 style={{ marginBottom: '12px', color: '#888', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Shield size={16} />
-            File Access Security
-          </h4>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'flex-start',
-              padding: '12px',
-              border: `2px solid ${fileAccessMode === 'restricted' ? '#8b5cf6' : '#333'}`,
-              borderRadius: '8px',
-              cursor: 'pointer',
-              background: fileAccessMode === 'restricted' ? '#1e1b4b' : 'transparent'
-            }}>
-              <input
-                type="radio"
-                name="fileAccessMode"
-                value="restricted"
-                checked={fileAccessMode === 'restricted'}
-                onChange={(e) => setFileAccessMode(e.target.value)}
-                style={{ marginTop: '2px', marginRight: '10px', cursor: 'pointer' }}
-              />
-              <div>
-                <strong>Project-Scoped (Recommended)</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.85em', color: '#aaa' }}>
-                  Only access files within terminal's working directory
-                </p>
-              </div>
-            </label>
+          {/* File Access Security - Now inside modal-body for proper scrolling */}
+          <div className="form-group" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '2px solid #333' }}>
+            <h4 style={{ marginBottom: '12px', color: '#888', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Shield size={16} />
+              File Access Security
+            </h4>
             
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'flex-start',
-              padding: '12px',
-              border: `2px solid ${fileAccessMode === 'unrestricted' ? '#8b5cf6' : '#333'}`,
-              borderRadius: '8px',
-              cursor: 'pointer',
-              background: fileAccessMode === 'unrestricted' ? '#1e1b4b' : 'transparent'
-            }}>
-              <input
-                type="radio"
-                name="fileAccessMode"
-                value="unrestricted"
-                checked={fileAccessMode === 'unrestricted'}
-                onChange={(e) => setFileAccessMode(e.target.value)}
-                style={{ marginTop: '2px', marginRight: '10px', cursor: 'pointer' }}
-              />
-              <div>
-                <strong>Full System Access</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.85em', color: '#aaa' }}>
-                  Access any file your user account can read
-                </p>
-              </div>
-            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start',
+                padding: '12px',
+                border: `2px solid ${fileAccessMode === 'restricted' ? '#8b5cf6' : '#333'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background: fileAccessMode === 'restricted' ? '#1e1b4b' : 'transparent'
+              }}>
+                <input
+                  type="radio"
+                  name="fileAccessMode"
+                  value="restricted"
+                  checked={fileAccessMode === 'restricted'}
+                  onChange={(e) => setFileAccessMode(e.target.value)}
+                  style={{ marginTop: '2px', marginRight: '10px', cursor: 'pointer' }}
+                />
+                <div>
+                  <strong>Project-Scoped (Recommended)</strong>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85em', color: '#aaa' }}>
+                    Only access files within terminal's working directory
+                  </p>
+                </div>
+              </label>
+              
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start',
+                padding: '12px',
+                border: `2px solid ${fileAccessMode === 'unrestricted' ? '#8b5cf6' : '#333'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background: fileAccessMode === 'unrestricted' ? '#1e1b4b' : 'transparent'
+              }}>
+                <input
+                  type="radio"
+                  name="fileAccessMode"
+                  value="unrestricted"
+                  checked={fileAccessMode === 'unrestricted'}
+                  onChange={(e) => setFileAccessMode(e.target.value)}
+                  style={{ marginTop: '2px', marginRight: '10px', cursor: 'pointer' }}
+                />
+                <div>
+                  <strong>Full System Access</strong>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85em', color: '#aaa' }}>
+                    Access any file your user account can read
+                  </p>
+                </div>
+              </label>
+            </div>
+            
+            <p style={{ marginTop: '12px', fontSize: '0.85em', color: '#888', fontStyle: 'italic' }}>
+              Used by the File Explorer and Monaco Editor. Changes apply immediately.
+            </p>
           </div>
-          
-          <p style={{ marginTop: '12px', fontSize: '0.85em', color: '#888', fontStyle: 'italic' }}>
-            Used by the File Explorer and Monaco Editor. Changes apply immediately.
-          </p>
         </div>
 
         <div className="modal-footer">
