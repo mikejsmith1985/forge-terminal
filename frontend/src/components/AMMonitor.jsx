@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertCircle, Heart } from 'lucide-react';
 import ConversationViewer from './ConversationViewer';
+import { AM_CONFIG } from '../config';
 
 /**
  * AMMonitor - Displays AM system health and LLM conversation activity
@@ -14,6 +15,7 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
   const [conversations, setConversations] = useState([]);
   const [viewingConversation, setViewingConversation] = useState(null);
   const [projectName, setProjectName] = useState('');
+  const [pollingInterval] = useState(() => AM_CONFIG.getPollingInterval());
 
   // Helper to detect project from metadata
   const detectProject = (metadata) => {
@@ -66,9 +68,9 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     };
 
     checkHealth();
-    const interval = setInterval(checkHealth, 10000);
+    const interval = setInterval(checkHealth, pollingInterval);
     return () => clearInterval(interval);
-  }, [tabId, amEnabled, devMode]);
+  }, [tabId, amEnabled, devMode, pollingInterval]);
 
   if (!devMode) {
     return null;

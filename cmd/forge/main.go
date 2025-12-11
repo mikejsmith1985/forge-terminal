@@ -174,6 +174,7 @@ func main() {
 	http.HandleFunc("/api/am/master-control", WrapWithMiddleware(handleAMMasterControl))
 	http.HandleFunc("/api/am/restore/sessions", WrapWithMiddleware(handleAMRestoreSessions))
 	http.HandleFunc("/api/am/restore/context/", WrapWithMiddleware(handleAMRestoreContext))
+	http.HandleFunc("/api/am/log", WrapWithMiddleware(handleAMLog))
 	
 	// Vision Configuration & Insights API
 	http.HandleFunc("/api/vision/config", WrapWithMiddleware(handleVisionConfig))
@@ -1294,6 +1295,80 @@ func handleAMRestoreContext(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"context": ctx,
+	})
+}
+
+// handleAMLog handles command card and sendCommand AM log entries.
+// This starts/associates conversations when commands are triggered from the UI.
+func handleAMLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		TabID       string `json:"tabId"`
+		TabName     string `json:"tabName"`
+		Workspace   string `json:"workspace"`
+		EntryType   string `json:"entryType"`
+		CommandID   int    `json:"commandId,omitempty"`
+		Description string `json:"description,omitempty"`
+		Content     string `json:"content"`
+		TriggerAM   bool   `json:"triggerAM,omitempty"`
+		LLMProvider string `json:"llmProvider,omitempty"`
+		LLMType     string `json:"llmType,omitempty"`
+		Timestamp   string `json:"timestamp,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "invalid request body",
+		})
+		return
+	}
+
+	log.Printf("[AM Log] Received: tabId=%s, entryType=%s, triggerAM=%v, provider=%s",
+		req.TabID, req.EntryType, req.TriggerAM, req.LLMProvider)
+
+	// Normalize provider names
+	provider := req.LLMProvider
+	switch strings.ToLower(provider) {
+	case "copilot", "gh-copilot":
+		provider = "github-copilot"
+	}
+
+	// If this is a command card with triggerAM, start a conversation
+	if req.TriggerAM && provider != "" {
+		amSystem := am.GetSystem()
+		if amSystem != nil {
+			logger := amSystem.GetLLMLogger(req.TabID)
+			if logger != nil {
+				// Only start if no active conversation
+				if logger.GetActiveConversationID() == "" {
+					convID := logger.StartConversationFromProcess(
+						provider,
+						req.LLMType,
+						0,
+					)
+					log.Printf("[AM Log] Started conversation %s for tab %s (provider: %s)",
+						convID, req.TabID, provider)
+					json.NewEncoder(w).Encode(map[string]interface{}{
+						"success":        true,
+						"conversationId": convID,
+					})
+					return
+				} else {
+					log.Printf("[AM Log] Conversation already active for tab %s", req.TabID)
+				}
+			}
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
 	})
 }
 

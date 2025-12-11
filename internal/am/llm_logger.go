@@ -85,6 +85,7 @@ type LLMLogger struct {
 	lastOutputTime    time.Time
 	lastInputTime     time.Time
 	lastSnapshotTime  time.Time // NEW: Track when last snapshot was saved
+	lastDiskLoadTime  time.Time // Track when we last loaded from disk
 	amDir             string
 	autoRespond       bool
 	capture           *ConversationCapture
@@ -998,9 +999,18 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 		inMemory[convID] = true
 	}
 	
+	// Skip disk reads if we loaded recently (within 60 seconds) - performance optimization
+	diskLoadCooldown := 60 * time.Second
+	if time.Since(l.lastDiskLoadTime) < diskLoadCooldown {
+		log.Printf("[LLM Logger] Skipping disk read (last load: %v ago)", time.Since(l.lastDiskLoadTime))
+		log.Printf("[LLM Logger] Returning %d conversations from memory only", len(convs))
+		return convs
+	}
+	
 	// Also load any conversations from disk that aren't in memory
 	// This handles cases where conversations were saved but memory was cleared
 	if l.amDir != "" {
+		l.lastDiskLoadTime = time.Now()
 		patterns := []string{
 			filepath.Join(l.amDir, "*-conv-*.json"),                               // New format
 			filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID)),   // Legacy format
@@ -1027,8 +1037,8 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 				continue
 			}
 			
-			// Only add if not already in memory
-			if !inMemory[conv.ConversationID] {
+			// Only add if not already in memory AND belongs to this tab
+			if !inMemory[conv.ConversationID] && conv.TabID == l.tabID {
 				log.Printf("[LLM Logger]   From disk: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d", 
 					conv.ConversationID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns), len(conv.ScreenSnapshots))
 				convs = append(convs, &conv)
@@ -1079,8 +1089,8 @@ func (l *LLMLogger) GetConversation(convID string) *LLMConversation {
 					continue
 				}
 				
-				// Check if this is the conversation we're looking for
-				if diskConv.ConversationID == convID {
+				// Check if this is the conversation we're looking for AND belongs to this tab
+				if diskConv.ConversationID == convID && diskConv.TabID == l.tabID {
 					log.Printf("[LLM Logger] ✓ Loaded conversation %s from disk", convID)
 					// Cache in memory for future calls
 					l.conversations[convID] = &diskConv
@@ -1091,6 +1101,47 @@ func (l *LLMLogger) GetConversation(convID string) *LLMConversation {
 	}
 	
 	return nil
+}
+
+// GetAllConversations returns all conversations from disk across all tabs.
+// Used for recovery/restore scenarios where you need to access conversations from other tabs.
+func GetAllConversations(amDir string) ([]*LLMConversation, error) {
+	if amDir == "" {
+		amDir = DefaultAMDir()
+	}
+
+	patterns := []string{
+		filepath.Join(amDir, "*-conv-*.json"),                  // New format
+		filepath.Join(amDir, "llm-conv-*.json"),                // Legacy format
+	}
+	
+	allFiles := make(map[string]bool)
+	for _, pattern := range patterns {
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, file := range files {
+			allFiles[file] = true
+		}
+	}
+	
+	conversations := make([]*LLMConversation, 0)
+	for file := range allFiles {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		
+		var conv LLMConversation
+		if err := json.Unmarshal(data, &conv); err != nil {
+			continue
+		}
+		
+		conversations = append(conversations, &conv)
+	}
+	
+	return conversations, nil
 }
 
 // GetActiveConversations returns all active conversations across all tabs.
@@ -1189,6 +1240,11 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 		var conv LLMConversation
 		if err := json.Unmarshal(data, &conv); err != nil {
 			log.Printf("[LLM Logger] Failed to unmarshal %s: %v", file, err)
+			continue
+		}
+
+		// Skip conversations that don't belong to this tab
+		if conv.TabID != l.tabID {
 			continue
 		}
 

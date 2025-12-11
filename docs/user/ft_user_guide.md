@@ -518,6 +518,20 @@ When using LLM tools like GitHub Copilot CLI, Forge Terminal automatically captu
 
 Each snapshot preserves the terminal state at that moment, giving you a complete history of your LLM interactions. Conversations persist across server restarts!
 
+### Performance Tuning
+
+If you experience keyboard latency, you can adjust how often AM polls for updates:
+
+```javascript
+// In browser console (F12):
+window.__forgeAMConfig?.setPollingInterval(60000)  // 60 seconds
+```
+
+**Common settings:**
+- `10000` - Very frequent monitoring (may impact performance)
+- `30000` - **Default** (balanced)
+- `60000` - Reduced monitoring (best if typing feels slow)
+
 ---
 
 ## 🤖 Forge Assistant (Experimental)

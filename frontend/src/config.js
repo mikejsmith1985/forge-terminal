@@ -70,3 +70,44 @@ export const setAPIBase = (url) => {
 export const clearAPIBase = () => {
   localStorage.removeItem('forge_api_base')
 }
+
+// AM Monitoring Configuration
+const getAMPollingInterval = () => {
+  // 1. Check environment variable (set during build)
+  const envVar = import.meta.env.VITE_AM_POLLING_INTERVAL
+  if (envVar) {
+    const interval = parseInt(envVar, 10)
+    if (!isNaN(interval) && interval > 0) {
+      return interval
+    }
+  }
+
+  // 2. Check localStorage (user configured)
+  const stored = localStorage.getItem('forge_am_polling_interval')
+  if (stored) {
+    const interval = parseInt(stored, 10)
+    if (!isNaN(interval) && interval > 0) {
+      return interval
+    }
+  }
+
+  // 3. Default to 30000ms (30 seconds) - reduced from 10s for better performance
+  return 30000
+}
+
+export const AM_CONFIG = {
+  getPollingInterval: getAMPollingInterval,
+}
+
+// Allow runtime AM configuration via window
+if (typeof window !== 'undefined') {
+  window.__forgeAMConfig = {
+    setPollingInterval: (ms) => {
+      if (ms > 0) {
+        localStorage.setItem('forge_am_polling_interval', ms.toString())
+        window.location.reload()
+      }
+    },
+    getPollingInterval: getAMPollingInterval,
+  }
+}

@@ -306,3 +306,28 @@ rm ~/.forge/am/llm-conv-*.json
 - Technical details: See `LLM_LOGGING_IMPLEMENTATION.md`
 - Problem context: See `ISSUE_23_ANALYSIS.md`
 - API docs: See `cmd/forge/main.go` → `handleAMLLMConversations`
+
+---
+
+## Performance Tuning (Advanced)
+
+### AM Monitoring Polling Interval
+
+By default, the AM Monitor polls every 30 seconds. If you experience keyboard latency or want more frequent updates:
+
+**Via Browser Console:**
+```javascript
+// Check current interval
+window.__forgeAMConfig?.getPollingInterval()
+
+// Set new interval (milliseconds)
+window.__forgeAMConfig?.setPollingInterval(60000)  // 60 seconds
+window.__forgeAMConfig?.setPollingInterval(10000)  // 10 seconds
+```
+
+**Common Intervals:**
+- `10000` - Very frequent (high I/O, may cause latency)
+- `30000` - **Default** (balanced performance)
+- `60000` - Reduced monitoring (best for typing)
+
+The setting persists in browser localStorage and survives page reloads.

@@ -218,15 +218,26 @@ func (cb *ContextBuilder) buildFullContext(conv *LLMConversation) string {
 
 // GetRecoverableSessions finds all sessions that can be recovered.
 func (cb *ContextBuilder) GetRecoverableSessions() ([]*RecoverableSession, error) {
-	pattern := filepath.Join(cb.amDir, "llm-conv-*.json")
-	files, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list conversation files: %w", err)
+	// Support both new and legacy file patterns
+	patterns := []string{
+		filepath.Join(cb.amDir, "*-conv-*.json"),     // New format
+		filepath.Join(cb.amDir, "llm-conv-*.json"),   // Legacy format
+	}
+	
+	allFiles := make(map[string]bool)
+	for _, pattern := range patterns {
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, file := range files {
+			allFiles[file] = true
+		}
 	}
 
 	var sessions []*RecoverableSession
 
-	for _, file := range files {
+	for file := range allFiles {
 		conv, err := cb.loadConversation(file)
 		if err != nil {
 			continue
