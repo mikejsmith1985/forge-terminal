@@ -124,15 +124,6 @@ function detectMenuPrompt(cleanText, debugLog = false) {
   const hasQuestion = QUESTION_PATTERNS.some(p => p.test(cleanText));
   const hasTuiFrame = TUI_FRAME_INDICATORS.some(p => p.test(cleanText));
   
-  if (debugLog) {
-    console.log('[AutoRespond] Menu detection:', { 
-      hasYesSelected, 
-      hasMenuContext, 
-      hasQuestion, 
-      hasTuiFrame 
-    });
-  }
-  
   // High confidence: Yes is selected AND we see menu instructions or TUI frame
   if (hasYesSelected && (hasMenuContext || hasTuiFrame)) {
     return { detected: true, confidence: 'high' };
@@ -165,10 +156,6 @@ function detectYnPrompt(cleanText, debugLog = false) {
   
   const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(lastLines));
   
-  if (debugLog && hasYnPrompt) {
-    console.log('[AutoRespond] Y/N prompt detected in:', lastLines.slice(-100));
-  }
-  
   return { detected: hasYnPrompt };
 }
 
@@ -186,26 +173,12 @@ function detectCliPrompt(text, debugLog = false) {
   // Strip ANSI escape codes
   const cleanText = stripAnsi(text);
   
-  // Use larger buffer for TUI apps that redraw the screen
-  const bufferToCheck = cleanText.slice(-2000);
-  
-  if (debugLog) {
-    // Log a summary of what we're checking
-    const lines = bufferToCheck.split(/[\r\n]/).filter(l => l.trim());
-    console.log('[AutoRespond] Checking buffer:', {
-      bufferLength: bufferToCheck.length,
-      lineCount: lines.length,
-      lastLine: lines[lines.length - 1]?.slice(0, 100) || '(empty)',
-      sample: bufferToCheck.slice(-300)
-    });
-  }
+  // Use smaller buffer for performance (reduced from 2000)
+  const bufferToCheck = cleanText.slice(-800);
   
   // Priority 1: Check for menu-style prompts (Copilot, Claude, etc.)
   const menuResult = detectMenuPrompt(bufferToCheck, debugLog);
   if (menuResult.detected && menuResult.confidence !== 'low') {
-    if (debugLog) {
-      console.log('[AutoRespond] ✓ Menu prompt detected, confidence:', menuResult.confidence);
-    }
     return { 
       waiting: true, 
       responseType: 'enter', 
@@ -216,9 +189,6 @@ function detectCliPrompt(text, debugLog = false) {
   // Priority 2: Check for Y/N style prompts
   const ynResult = detectYnPrompt(bufferToCheck, debugLog);
   if (ynResult.detected) {
-    if (debugLog) {
-      console.log('[AutoRespond] ✓ Y/N prompt detected');
-    }
     return { 
       waiting: true, 
       responseType: 'y-enter', 
@@ -228,9 +198,6 @@ function detectCliPrompt(text, debugLog = false) {
   
   // Priority 3: Low confidence menu detection (still report as waiting but may not auto-respond)
   if (menuResult.detected && menuResult.confidence === 'low') {
-    if (debugLog) {
-      console.log('[AutoRespond] ? Low confidence menu detection');
-    }
     return { 
       waiting: true, 
       responseType: 'enter', 
@@ -769,18 +736,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         const reconnectLabel = reconnectAttemptsRef.current > 0 ? ' [Reconnected]' : '';
         term.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}${reconnectLabel}.\r\n\r\n`);
 
-        // Initialize AM logging session for this tab (always enabled for crash recovery)
-        fetch('/api/am/enable', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tabId: tabId,
-            tabName: tabNameRef.current || 'Terminal',
-            workspace: window.location.pathname,
-            enabled: true, // Always enable for crash recovery
-          }),
-        }).catch(err => console.warn('[AM] Failed to initialize session:', err));
-
         // Send initial size
         const { cols, rows } = term;
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
@@ -855,15 +810,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           textData = event.data;
         }
         
-        // Accumulate recent output for prompt detection (larger buffer for TUI apps)
-        lastOutputRef.current = (lastOutputRef.current + textData).slice(-3000);
+        // Accumulate recent output for prompt detection (smaller buffer for performance)
+        lastOutputRef.current = (lastOutputRef.current + textData).slice(-1000);
         
-        // AM logging: ALWAYS accumulate output for crash recovery
-        // The amEnabled flag only controls visibility/archiving, not capture
-        if (textData) {
+        // AM logging: Optimized for performance
+        // Only log when AM is explicitly enabled for the tab
+        if (amEnabledRef.current && textData) {
           amLogBufferRef.current += textData;
           
-          // Debounce AM log writes - flush every 2 seconds
+          // Debounce AM log writes - flush every 5 seconds (reduced frequency)
           if (amLogTimeoutRef.current) {
             clearTimeout(amLogTimeoutRef.current);
           }
@@ -871,7 +826,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             if (amLogBufferRef.current) {
               const cleanContent = stripAnsi(amLogBufferRef.current);
               if (cleanContent.trim()) {
-                // Send to AM API - always log for recovery
+                // Send to AM API
                 fetch('/api/am/log', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -880,22 +835,22 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                     tabName: tabNameRef.current || 'Terminal',
                     workspace: window.location.pathname,
                     entryType: 'AGENT_OUTPUT',
-                    content: cleanContent.slice(-2000), // Limit content size
+                    content: cleanContent.slice(-1500), // Reduced size
                   }),
-                }).catch(err => console.warn('[AM] Failed to log:', err));
+                }).catch(() => {}); // Silent fail for performance
               }
               amLogBufferRef.current = '';
             }
-          }, 2000);
+          }, 5000); // Increased from 2s to 5s
         }
         
-        // Debounce waiting check - wait 500ms after last output for TUI to fully render
+        // Debounce waiting check - reduced frequency for performance
         if (waitingCheckTimeoutRef.current) {
           clearTimeout(waitingCheckTimeoutRef.current);
         }
         waitingCheckTimeoutRef.current = setTimeout(() => {
-          // Enable debug logging when auto-respond is on
-          const debugMode = autoRespondRef.current;
+          // Disable debug logging in production for performance
+          const debugMode = false;
           
           const { waiting, responseType, confidence } = detectCliPrompt(lastOutputRef.current, debugMode);
           
@@ -942,11 +897,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             if (onWaitingChange) {
               onWaitingChange(false);
             }
-          } else if (waiting && !autoRespondRef.current && debugMode === false) {
-            // Log when waiting is detected but auto-respond is off (for debugging)
-            logger.terminal('Prompt detected, waiting for user input', { tabId, responseType, confidence });
           }
-        }, 500);
+        }, 1500); // Increased from 500ms to 1500ms for performance
       };
 
       ws.onerror = (error) => {
@@ -1052,36 +1004,37 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
           
-          // AM logging: Capture user keyboard input for crash recovery
-          // Buffer and debounce to avoid logging every keystroke
-          amInputBufferRef.current += data;
-          
-          if (amInputTimeoutRef.current) {
-            clearTimeout(amInputTimeoutRef.current);
-          }
-          amInputTimeoutRef.current = setTimeout(() => {
-            if (amInputBufferRef.current) {
-              // Clean the input - strip control chars but keep meaningful content
-              const cleanInput = amInputBufferRef.current
-                .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // Strip ANSI
-                .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ''); // Strip control chars except \r\n\t
-              
-              if (cleanInput.trim() || cleanInput.includes('\r') || cleanInput.includes('\n')) {
-                fetch('/api/am/log', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    tabId: tabId,
-                    tabName: tabNameRef.current || 'Terminal',
-                    workspace: window.location.pathname,
-                    entryType: 'USER_INPUT',
-                    content: cleanInput.slice(-500), // Limit size
-                  }),
-                }).catch(err => console.warn('[AM] Failed to log input:', err));
-              }
-              amInputBufferRef.current = '';
+          // AM logging: Optimized input capture - only when AM enabled
+          if (amEnabledRef.current) {
+            amInputBufferRef.current += data;
+            
+            if (amInputTimeoutRef.current) {
+              clearTimeout(amInputTimeoutRef.current);
             }
-          }, 1000); // 1 second debounce for input
+            amInputTimeoutRef.current = setTimeout(() => {
+              if (amInputBufferRef.current) {
+                // Clean the input - strip control chars but keep meaningful content
+                const cleanInput = amInputBufferRef.current
+                  .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // Strip ANSI
+                  .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ''); // Strip control chars except \r\n\t
+                
+                if (cleanInput.trim() || cleanInput.includes('\r') || cleanInput.includes('\n')) {
+                  fetch('/api/am/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      tabId: tabId,
+                      tabName: tabNameRef.current || 'Terminal',
+                      workspace: window.location.pathname,
+                      entryType: 'USER_INPUT',
+                      content: cleanInput.slice(-500), // Limit size
+                    }),
+                  }).catch(() => {}); // Silent fail for performance
+                }
+                amInputBufferRef.current = '';
+              }
+            }, 2000); // Increased from 1s to 2s for better batching
+          }
           
           // Clear waiting state when user types (they're responding to the prompt)
           if (isWaiting) {
