@@ -101,14 +101,24 @@ const ConversationViewer = ({ tabId, conversationId, onClose }) => {
   const snapshots = conversation?.screenSnapshots || [];
   const currentSnapshot = snapshots[currentSnapshotIndex];
   const turns = conversation?.turns || [];
+  
+  // Detect project from metadata
+  const projectName = conversation?.metadata?.workingDirectory 
+    ? conversation.metadata.workingDirectory.split('/').pop() 
+    : 'Unknown Project';
 
   return (
     <div className="conversation-viewer-overlay" onClick={onClose}>
       <div className="conversation-viewer" onClick={(e) => e.stopPropagation()}>
         <div className="conversation-viewer-header">
           <div className="header-info">
-            <h3>Conversation: {conversation?.provider}</h3>
+            <h3>{projectName} - {conversation?.provider}</h3>
             <div className="conversation-meta">
+              {conversation?.metadata?.gitBranch && (
+                <span className="meta-item" title="Git Branch">
+                  🌿 {conversation.metadata.gitBranch}
+                </span>
+              )}
               <span className="meta-item">
                 <MessageSquare size={14} />
                 {turns.length} turns

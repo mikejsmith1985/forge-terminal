@@ -203,6 +203,7 @@ func (l *LLMLogger) StartConversationFromProcess(provider string, cmdType string
 		TUICaptureMode: true,
 		ProcessPID:     pid,
 		ScreenSnapshots: []ScreenSnapshot{},
+		Metadata:       l.captureMetadata(),
 	}
 
 	// Add initial turn noting process start
@@ -266,6 +267,7 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 		StartTime:      time.Now(),
 		Turns:          []ConversationTurn{},
 		Complete:       false,
+		Metadata:       l.captureMetadata(),
 	}
 	log.Printf("[LLM Logger] Created conversation struct")
 
@@ -999,28 +1001,39 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 	// Also load any conversations from disk that aren't in memory
 	// This handles cases where conversations were saved but memory was cleared
 	if l.amDir != "" {
-		pattern := filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID))
-		files, err := filepath.Glob(pattern)
-		if err == nil {
-			for _, file := range files {
-				data, err := os.ReadFile(file)
-				if err != nil {
-					continue
+		patterns := []string{
+			filepath.Join(l.amDir, "*-conv-*.json"),                               // New format
+			filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID)),   // Legacy format
+		}
+		
+		allFiles := make(map[string]bool)
+		for _, pattern := range patterns {
+			files, err := filepath.Glob(pattern)
+			if err == nil {
+				for _, file := range files {
+					allFiles[file] = true
 				}
-				
-				var conv LLMConversation
-				if err := json.Unmarshal(data, &conv); err != nil {
-					continue
-				}
-				
-				// Only add if not already in memory
-				if !inMemory[conv.ConversationID] {
-					log.Printf("[LLM Logger]   From disk: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d", 
-						conv.ConversationID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns), len(conv.ScreenSnapshots))
-					convs = append(convs, &conv)
-					// Also add to in-memory map for future calls
-					l.conversations[conv.ConversationID] = &conv
-				}
+			}
+		}
+		
+		for file := range allFiles {
+			data, err := os.ReadFile(file)
+			if err != nil {
+				continue
+			}
+			
+			var conv LLMConversation
+			if err := json.Unmarshal(data, &conv); err != nil {
+				continue
+			}
+			
+			// Only add if not already in memory
+			if !inMemory[conv.ConversationID] {
+				log.Printf("[LLM Logger]   From disk: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d", 
+					conv.ConversationID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns), len(conv.ScreenSnapshots))
+				convs = append(convs, &conv)
+				// Also add to in-memory map for future calls
+				l.conversations[conv.ConversationID] = &conv
 			}
 		}
 	}
@@ -1041,19 +1054,38 @@ func (l *LLMLogger) GetConversation(convID string) *LLMConversation {
 		return conv
 	}
 	
-	// Not in memory - try loading from disk
+	// Not in memory - try loading from disk with both patterns
 	if l.amDir != "" {
-		filename := fmt.Sprintf("llm-conv-%s-%s.json", l.tabID, convID)
-		filePath := filepath.Join(l.amDir, filename)
+		// Try new format first - glob all conversation files and find by ID
+		patterns := []string{
+			filepath.Join(l.amDir, "*-conv-*.json"),
+			filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-%s.json", l.tabID, convID)), // Legacy exact match
+		}
 		
-		data, err := os.ReadFile(filePath)
-		if err == nil {
-			var diskConv LLMConversation
-			if err := json.Unmarshal(data, &diskConv); err == nil {
-				log.Printf("[LLM Logger] ✓ Loaded conversation %s from disk", convID)
-				// Cache in memory for future calls
-				l.conversations[convID] = &diskConv
-				return &diskConv
+		for _, pattern := range patterns {
+			files, err := filepath.Glob(pattern)
+			if err != nil {
+				continue
+			}
+			
+			for _, file := range files {
+				data, err := os.ReadFile(file)
+				if err != nil {
+					continue
+				}
+				
+				var diskConv LLMConversation
+				if err := json.Unmarshal(data, &diskConv); err != nil {
+					continue
+				}
+				
+				// Check if this is the conversation we're looking for
+				if diskConv.ConversationID == convID {
+					log.Printf("[LLM Logger] ✓ Loaded conversation %s from disk", convID)
+					// Cache in memory for future calls
+					l.conversations[convID] = &diskConv
+					return &diskConv
+				}
 			}
 		}
 	}
@@ -1094,7 +1126,7 @@ func (l *LLMLogger) saveConversation(conv *LLMConversation) {
 		return
 	}
 
-	filename := fmt.Sprintf("llm-conv-%s-%s.json", l.tabID, conv.ConversationID)
+	filename := l.generateConversationFilename(conv)
 	filePath := filepath.Join(l.amDir, filename)
 
 	data, err := json.MarshalIndent(conv, "", "  ")
@@ -1116,11 +1148,22 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 		return
 	}
 
-	pattern := filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID))
-	files, err := filepath.Glob(pattern)
-	if err != nil {
-		log.Printf("[LLM Logger] Failed to glob conversations: %v", err)
-		return
+	// Support both new and legacy file patterns
+	patterns := []string{
+		filepath.Join(l.amDir, "*-conv-*.json"),                               // New format
+		filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID)),   // Legacy format
+	}
+	
+	allFiles := make(map[string]bool)
+	for _, pattern := range patterns {
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			log.Printf("[LLM Logger] Failed to glob pattern %s: %v", pattern, err)
+			continue
+		}
+		for _, file := range files {
+			allFiles[file] = true
+		}
 	}
 
 	loadedCount := 0
@@ -1130,7 +1173,7 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 	// Older conversations can be loaded on-demand via GetConversation
 	cutoffTime := time.Now().Add(-24 * time.Hour)
 	
-	for _, file := range files {
+	for file := range allFiles {
 		// Check file modification time first to skip old files
 		info, err := os.Stat(file)
 		if err != nil || info.ModTime().Before(cutoffTime) {
@@ -1226,4 +1269,198 @@ func GetTestConversations() map[string]*LLMConversation {
 	testMockConversationsMu.Lock()
 	defer testMockConversationsMu.Unlock()
 	return testMockConversations
+}
+
+// ============================================================================
+// METADATA AND PROJECT DETECTION HELPERS
+// ============================================================================
+
+// captureMetadata captures the current working directory, git branch, and shell type.
+func (l *LLMLogger) captureMetadata() *ConversationMetadata {
+	metadata := &ConversationMetadata{}
+	
+	// Capture working directory
+	if cwd, err := os.Getwd(); err == nil {
+		metadata.WorkingDirectory = cwd
+	}
+	
+	// Try to get git branch
+	if branch := getGitBranch(metadata.WorkingDirectory); branch != "" {
+		metadata.GitBranch = branch
+	}
+	
+	// Detect shell type
+	metadata.ShellType = detectShell()
+	
+	return metadata
+}
+
+// getGitBranch attempts to get the current git branch for a directory.
+func getGitBranch(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	
+	// Try to find .git directory
+	gitRoot := findGitRoot(dir)
+	if gitRoot == "" {
+		return ""
+	}
+	
+	// Read HEAD file to get branch
+	headPath := filepath.Join(gitRoot, ".git", "HEAD")
+	data, err := os.ReadFile(headPath)
+	if err != nil {
+		return ""
+	}
+	
+	// HEAD file format: "ref: refs/heads/main\n"
+	content := strings.TrimSpace(string(data))
+	if strings.HasPrefix(content, "ref: refs/heads/") {
+		return strings.TrimPrefix(content, "ref: refs/heads/")
+	}
+	
+	// Detached HEAD - return short SHA
+	if len(content) >= 7 {
+		return content[:7]
+	}
+	
+	return ""
+}
+
+// findGitRoot searches upward from dir to find the git repository root.
+func findGitRoot(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	
+	current := dir
+	for {
+		gitPath := filepath.Join(current, ".git")
+		if info, err := os.Stat(gitPath); err == nil {
+			if info.IsDir() {
+				return current
+			}
+			// .git might be a file (submodule or worktree)
+			return current
+		}
+		
+		parent := filepath.Dir(current)
+		if parent == current {
+			// Reached root
+			return ""
+		}
+		current = parent
+	}
+}
+
+// detectShell attempts to detect the current shell type.
+func detectShell() string {
+	// Check SHELL environment variable
+	if shell := os.Getenv("SHELL"); shell != "" {
+		return filepath.Base(shell)
+	}
+	return "unknown"
+}
+
+// detectProject attempts to automatically detect the project name from working directory.
+func detectProject(workingDir string) string {
+	if workingDir == "" {
+		return "adhoc"
+	}
+	
+	// 1. Check for git repo - use repo name
+	if gitRoot := findGitRoot(workingDir); gitRoot != "" {
+		base := filepath.Base(gitRoot)
+		if base != "" && base != "." && base != "/" {
+			return sanitizeProjectName(base)
+		}
+	}
+	
+	// 2. Check for common project markers (package.json, go.mod, etc.)
+	markers := []string{
+		"package.json", "go.mod", "Cargo.toml", "pom.xml",
+		"pyproject.toml", "composer.json", "Gemfile",
+	}
+	for _, marker := range markers {
+		if _, err := os.Stat(filepath.Join(workingDir, marker)); err == nil {
+			base := filepath.Base(workingDir)
+			if base != "" && base != "." && base != "/" {
+				return sanitizeProjectName(base)
+			}
+		}
+	}
+	
+	// 3. Use basename of working directory if not home
+	home := os.Getenv("HOME")
+	if workingDir != home && workingDir != "" {
+		base := filepath.Base(workingDir)
+		if base != "" && base != "." && base != "/" {
+			return sanitizeProjectName(base)
+		}
+	}
+	
+	// 4. Fallback to "adhoc"
+	return "adhoc"
+}
+
+// sanitizeProjectName makes a project name safe for use in filenames.
+func sanitizeProjectName(name string) string {
+	// Replace spaces and special chars with hyphens
+	name = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return '-'
+	}, name)
+	
+	// Remove leading/trailing hyphens
+	name = strings.Trim(name, "-")
+	
+	// Convert to lowercase
+	name = strings.ToLower(name)
+	
+	// Limit length
+	if len(name) > 50 {
+		name = name[:50]
+	}
+	
+	if name == "" {
+		return "adhoc"
+	}
+	
+	return name
+}
+
+// generateConversationFilename creates a filename for a conversation using project-based naming.
+// New format: {project}-conv-{timestamp}-{short-id}.json
+func (l *LLMLogger) generateConversationFilename(conv *LLMConversation) string {
+	// Detect project from metadata
+	project := "adhoc"
+	if conv.Metadata != nil && conv.Metadata.WorkingDirectory != "" {
+		project = detectProject(conv.Metadata.WorkingDirectory)
+	}
+	
+	// Format timestamp as YYYY-MM-DD-HHmm
+	timestamp := conv.StartTime.Format("2006-01-02-1504")
+	
+	// Get short ID (first 8 chars of conversation ID)
+	shortID := conv.ConversationID
+	if len(shortID) > 13 && strings.HasPrefix(shortID, "conv-") {
+		// For "conv-1234567890123456789", extract a portion after "conv-"
+		shortID = shortID[5:] // Remove "conv-" prefix
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+	}
+	
+	return fmt.Sprintf("%s-conv-%s-%s.json", project, timestamp, shortID)
+}
+
+// GetProjectName returns the project name for a conversation (derived from metadata).
+func (conv *LLMConversation) GetProjectName() string {
+	if conv.Metadata != nil && conv.Metadata.WorkingDirectory != "" {
+		return detectProject(conv.Metadata.WorkingDirectory)
+	}
+	return "adhoc"
 }

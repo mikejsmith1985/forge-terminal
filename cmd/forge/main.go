@@ -185,6 +185,7 @@ func main() {
 
 	// File management API
 	http.HandleFunc("/api/files/list", WrapWithMiddleware(files.HandleList))
+	http.HandleFunc("/api/files/stats", WrapWithMiddleware(files.HandleStats))
 	http.HandleFunc("/api/files/read", WrapWithMiddleware(files.HandleRead))
 	http.HandleFunc("/api/files/write", WrapWithMiddleware(files.HandleWrite))
 	http.HandleFunc("/api/files/delete", WrapWithMiddleware(files.HandleDelete))

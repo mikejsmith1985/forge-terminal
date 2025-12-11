@@ -13,6 +13,19 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
   const [conversationCount, setConversationCount] = useState(0);
   const [conversations, setConversations] = useState([]);
   const [viewingConversation, setViewingConversation] = useState(null);
+  const [projectName, setProjectName] = useState('');
+
+  // Helper to detect project from metadata
+  const detectProject = (metadata) => {
+    if (!metadata || !metadata.workingDirectory) return 'adhoc';
+    
+    const path = metadata.workingDirectory;
+    const parts = path.split('/');
+    const dirName = parts[parts.length - 1];
+    
+    // Simple heuristic - use last directory name
+    return dirName || 'adhoc';
+  };
 
   useEffect(() => {
     if (!devMode) {
@@ -39,6 +52,11 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
           setConversationCount(count);
           setConversations(convList);
           setHasLLMActivity(count > 0);
+          
+          // Detect project from most recent conversation
+          if (convList.length > 0 && convList[0].metadata) {
+            setProjectName(detectProject(convList[0].metadata));
+          }
         }
       } catch (err) {
         console.error('[AMMonitor] Health check failed:', err);
@@ -96,7 +114,7 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     return Math.round(bytes / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
   };
 
-  const title = `AM System: ${systemStatus}\nActive: ${conversationsActive} | Tracked: ${conversationCount}\nSnapshots: ${snapshotsCaptured} | Input: ${formatBytes(inputBytes)} | Output: ${formatBytes(outputBytes)}\n\nClick to view conversations`;
+  const title = `AM System: ${systemStatus}\nProject: ${projectName || 'adhoc'}\nActive: ${conversationsActive} | Tracked: ${conversationCount}\nSnapshots: ${snapshotsCaptured} | Input: ${formatBytes(inputBytes)} | Output: ${formatBytes(outputBytes)}\n\nClick to view conversations`;
 
   const handleClick = () => {
     if (conversations.length > 0) {
@@ -114,7 +132,11 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
         style={{ cursor: conversationCount > 0 ? 'pointer' : 'default' }}
       >
         {statusIcon}
-        <span>AM {systemStatus === 'HEALTHY' ? `(${conversationCount})` : systemStatus}</span>
+        <span>
+          {systemStatus === 'HEALTHY' 
+            ? `${projectName || 'AM'} (${conversationCount})` 
+            : `AM ${systemStatus}`}
+        </span>
       </div>
 
       {viewingConversation && (

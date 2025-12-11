@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Folder, 
   FolderOpen, 
@@ -7,7 +7,8 @@ import {
   FileCode,
   FileJson,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 import './FileExplorer.css';
 
@@ -157,11 +158,78 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
   const [expandedDirs, setExpandedDirs] = useState(new Set());
   const [contextMenu, setContextMenu] = useState(null);
   const [lastValidPath, setLastValidPath] = useState(null);
+  const [lastStats, setLastStats] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const statsCheckInterval = useRef(null);
   
+  // Load file tree when path changes
   useEffect(() => {
     const pathToLoad = currentPath || lastValidPath || rootPath || '.';
     loadFileTree(pathToLoad);
+    
+    // Start stats monitoring
+    startStatsMonitoring(pathToLoad);
+    
+    return () => {
+      // Clean up interval on unmount or path change
+      if (statsCheckInterval.current) {
+        clearInterval(statsCheckInterval.current);
+        statsCheckInterval.current = null;
+      }
+    };
   }, [currentPath, rootPath]);
+  
+  // Check directory stats for changes
+  const checkDirectoryStats = async (path) => {
+    try {
+      const root = rootPath || '.';
+      const params = new URLSearchParams();
+      params.set('path', path);
+      params.set('rootPath', root);
+      
+      if (shellConfig?.shellType) {
+        params.set('shell', shellConfig.shellType);
+        if (shellConfig.shellType === 'wsl' && shellConfig.wslDistro) {
+          params.set('distro', shellConfig.wslDistro);
+        }
+      }
+      
+      const response = await fetch(`/api/files/stats?${params.toString()}`);
+      if (!response.ok) return null;
+      
+      const stats = await response.json();
+      
+      // If stats changed, refresh the tree
+      if (lastStats && stats.totalCount !== lastStats.totalCount) {
+        console.log('[FileExplorer] Directory changed, refreshing...', { 
+          old: lastStats.totalCount, 
+          new: stats.totalCount 
+        });
+        loadFileTree(path);
+      }
+      
+      setLastStats(stats);
+    } catch (err) {
+      // Silent fail for stats check
+      console.debug('[FileExplorer] Stats check failed:', err.message);
+    }
+  };
+  
+  // Start monitoring directory for changes
+  const startStatsMonitoring = (path) => {
+    // Clear any existing interval
+    if (statsCheckInterval.current) {
+      clearInterval(statsCheckInterval.current);
+    }
+    
+    // Check stats every 3 seconds
+    statsCheckInterval.current = setInterval(() => {
+      checkDirectoryStats(path);
+    }, 3000);
+    
+    // Do initial stats check
+    checkDirectoryStats(path);
+  };
   
   const loadFileTree = async (path) => {
     setLoading(true);
@@ -210,11 +278,19 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
   
   const handleRetry = () => {
     loadFileTree(currentPath || rootPath || '.');
+  };
+  
+  const handleManualRefresh = () => {
+    setRefreshing(true);
+    loadFileTree(currentPath || rootPath || '.');
+    // Also reset stats to force fresh check
+    setLastStats(null);
   };
   
   const toggleExpanded = (path) => {
@@ -312,6 +388,14 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
       <div className="file-explorer-header">
         <Folder size={16} />
         <span>Files</span>
+        <button 
+          className="file-explorer-refresh-btn"
+          onClick={handleManualRefresh}
+          disabled={loading || refreshing}
+          title="Refresh file list"
+        >
+          <RefreshCw size={14} className={refreshing ? 'spinning' : ''} />
+        </button>
       </div>
       
       <div className="file-explorer-tree">

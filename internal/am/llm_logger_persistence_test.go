@@ -76,8 +76,12 @@ func TestLLMLogger_SnapshotsPersisted_OnConversationEnd(t *testing.T) {
 		Provider:       "github-copilot",
 		CommandType:    "ask",
 		Complete:       false,
+		StartTime:      time.Now(),
 		Turns:          []ConversationTurn{},
 		ScreenSnapshots: []ScreenSnapshot{},
+		Metadata:       &ConversationMetadata{
+			WorkingDirectory: tmpDir,
+		},
 	}
 
 	logger.conversations["conv-persist-1"] = conv
@@ -105,13 +109,16 @@ func TestLLMLogger_SnapshotsPersisted_OnConversationEnd(t *testing.T) {
 		t.Errorf("Snapshots lost during end: had %d, now %d", snapshots, len(conv.ScreenSnapshots))
 	}
 
-	// Verify conversation was persisted to disk
-	expectedFile := filepath.Join(tmpDir, "llm-conv-persist-test-1-conv-persist-1.json")
-	if _, err := os.Stat(expectedFile); err != nil {
-		t.Errorf("Conversation file not persisted: %v", err)
+	// Verify conversation was persisted to disk (check for any matching file)
+	files, err := filepath.Glob(filepath.Join(tmpDir, "*conv*.json"))
+	if err != nil || len(files) == 0 {
+		t.Errorf("Conversation file not persisted: %v (found %d files)", err, len(files))
 		return
 	}
-
+	
+	// Use the first matching file
+	expectedFile := files[0]
+	
 	// Verify file contains all snapshots
 	data, err := os.ReadFile(expectedFile)
 	if err != nil {

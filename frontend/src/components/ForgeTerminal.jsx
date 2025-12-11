@@ -414,7 +414,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // Small delay to ensure the container is properly sized
       setTimeout(() => {
         fitAddonRef.current.fit();
-        xtermRef.current.focus();
+        // Critical fix: Re-focus after fit on visibility change
+        queueMicrotask(() => {
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        });
       }, 50);
     }
   }, [isVisible]);
@@ -425,13 +430,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     
     const handleWindowFocus = () => {
       if (xtermRef.current && isVisible) {
-        xtermRef.current.focus();
+        // Use queueMicrotask for more reliable focus recovery
+        queueMicrotask(() => {
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        });
       }
     };
 
     const handleVisibilityChange = () => {
       if (!document.hidden && xtermRef.current && isVisible) {
-        xtermRef.current.focus();
+        // Use queueMicrotask for more reliable focus recovery
+        queueMicrotask(() => {
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        });
       }
     };
 
@@ -624,19 +639,41 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     fitAddonRef.current = fitAddon;
+    
+    // Critical fix: Re-focus after fit addon loads (it steals focus during init)
+    queueMicrotask(() => {
+      term.focus();
+    });
 
     // Add search addon
     const searchAddon = new SearchAddon();
     term.loadAddon(searchAddon);
     searchAddonRef.current = searchAddon;
+    
+    // Critical fix: Re-focus after search addon loads
+    queueMicrotask(() => {
+      term.focus();
+    });
 
     // Open terminal
     term.open(terminalRef.current);
     xtermRef.current = term;
+    
+    // Critical fix: Force focus immediately after terminal.open()
+    // This ensures the terminal textarea receives focus before React re-renders
+    queueMicrotask(() => {
+      term.focus();
+    });
 
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
     // This runs BEFORE xterm processes the key and allows conditional intercept
     term.attachCustomKeyEventHandler((arg) => {
+      // CRITICAL FIX: Explicitly allow spacebar no matter what
+      // This prevents xterm from blocking spacebar due to event bubbling issues
+      if (arg.code === 'Space') {
+        return true;
+      }
+      
       // Handle Ctrl+C (Copy vs Interrupt)
       if (arg.ctrlKey && arg.code === 'KeyC' && arg.type === 'keydown') {
         const selection = term.getSelection();
@@ -692,7 +729,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     });
 
     // Initial fit
-    setTimeout(() => fitAddon.fit(), 0);
+    setTimeout(() => {
+      fitAddon.fit();
+      // Critical fix: Re-focus after fit() call (fit triggers hidden re-render)
+      queueMicrotask(() => {
+        term.focus();
+      });
+    }, 0);
 
     // Connect to WebSocket
     const connectWebSocket = () => {

@@ -681,6 +681,88 @@ func HandleReadStream(w http.ResponseWriter, r *http.Request) {
 }
 
 
+// HandleStats returns quick directory statistics for change detection
+// Returns count of files and directories without building full tree
+func HandleStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	dirPath := r.URL.Query().Get("path")
+	if dirPath == "" {
+		dirPath = "."
+	}
+
+	rootPath := r.URL.Query().Get("rootPath")
+	if rootPath == "" {
+		rootPath = "."
+	}
+
+	// Get shell type and WSL distro for path resolution
+	shellType := r.URL.Query().Get("shell")
+	distro := r.URL.Query().Get("distro")
+
+	// Resolve path with distro support
+	absPath, err := resolvePathWithDistro(dirPath, distro)
+	if err != nil {
+		http.Error(w, "Invalid path: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Resolve root path for validation
+	absRootPath, err := resolvePathWithDistro(rootPath, distro)
+	if err != nil {
+		absRootPath = rootPath // fallback
+	}
+
+	// Validate path is within root (skip for WSL)
+	if shellType != "wsl" {
+		within, err := isPathWithinRoot(absPath, absRootPath)
+		if err != nil || !within {
+			http.Error(w, "Path is outside allowed root directory", http.StatusForbidden)
+			return
+		}
+	}
+
+	// Check if path exists and is a directory
+	info, err := os.Stat(absPath)
+	if err != nil {
+		http.Error(w, "Path not found: "+absPath, http.StatusNotFound)
+		return
+	}
+
+	if !info.IsDir() {
+		http.Error(w, "Path is not a directory", http.StatusBadRequest)
+		return
+	}
+
+	// Read directory entries (1 level only, no recursion)
+	entries, err := os.ReadDir(absPath)
+	if err != nil {
+		http.Error(w, "Failed to read directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Count files and directories
+	fileCount := 0
+	dirCount := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirCount++
+		} else {
+			fileCount++
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{
+		"totalCount": len(entries),
+		"fileCount":  fileCount,
+		"dirCount":   dirCount,
+	})
+}
+
 // HandleFileAccessMode gets or sets the file access security mode
 func HandleFileAccessMode(w http.ResponseWriter, r *http.Request) {
 w.Header().Set("Content-Type", "application/json")
