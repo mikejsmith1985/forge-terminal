@@ -4,11 +4,13 @@ package terminal
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 // ShellConfig contains shell configuration options
@@ -176,7 +178,7 @@ func (s *TerminalSession) Resize(cols, rows uint16) error {
 	return resizePTY(s.PTY, cols, rows)
 }
 
-// Close terminates the terminal session.
+// Close terminates the terminal session and cleans up all resources.
 func (s *TerminalSession) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -185,11 +187,53 @@ func (s *TerminalSession) Close() error {
 	}
 	s.closed = true
 
-	// Kill process if we have one (Unix only)
+	// Kill process if we have one
 	if s.Cmd != nil && s.Cmd.Process != nil {
-		_ = s.Cmd.Process.Kill()
+		pid := s.Cmd.Process.Pid
+		log.Printf("[Terminal] Cleaning up process (PID %d) for session %s", pid, s.ID)
+		
+		// Attempt graceful termination first
+		if err := s.Cmd.Process.Kill(); err != nil {
+			log.Printf("[Terminal] Warning: Failed to kill process (PID %d): %v", pid, err)
+		} else {
+			log.Printf("[Terminal] Process (PID %d) terminated", pid)
+		}
+		
+		// Wait for process to exit (with timeout)
+		done := make(chan error, 1)
+		go func() {
+			_, err := s.Cmd.Process.Wait()
+			done <- err
+		}()
+		
+		select {
+		case <-done:
+			// Process exited
+		case <-time.After(2 * time.Second):
+			// Timeout - process might still be running
+			log.Printf("[Terminal] Process cleanup timeout for PID %d", pid)
+		}
 	}
-	return s.PTY.Close()
+	
+	// Close PTY (will release file descriptors)
+	if s.PTY != nil {
+		log.Printf("[Terminal] Closing PTY for session %s", s.ID)
+		if err := s.PTY.Close(); err != nil {
+			log.Printf("[Terminal] Warning: Failed to close PTY: %v", err)
+			return err
+		}
+		log.Printf("[Terminal] PTY closed successfully for session %s", s.ID)
+	}
+	
+	// Signal that session is done
+	select {
+	case <-s.doneChan:
+		// Already closed
+	default:
+		close(s.doneChan)
+	}
+	
+	return nil
 }
 
 // Done returns a channel that's closed when the session terminates.
