@@ -11,6 +11,10 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
   const [installFromFileInput, setInstallFromFileInput] = useState('');
   const [pollingInterval, setPollingInterval] = useState(null);
   const [timeoutTimer, setTimeoutTimer] = useState(null);
+  const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
+  const [checkStatus, setCheckStatus] = useState(null); // 'checking' | 'success' | 'error'
+  const [lastCheckedTime, setLastCheckedTime] = useState(null);
+  const [freshUpdateInfo, setFreshUpdateInfo] = useState(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -20,6 +24,9 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       setErrorMessage('');
       setShowVersions(false);
       setInstallFromFileInput('');
+      setIsCheckingForUpdates(false);
+      setCheckStatus(null);
+      setFreshUpdateInfo(null);
       
       // Clean up timers
       if (pollingInterval) {
@@ -87,6 +94,59 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
     };
     
     return attemptFetch();
+  };
+
+  const checkForUpdatesManually = async () => {
+    setIsCheckingForUpdates(true);
+    setCheckStatus('checking');
+    setErrorMessage('');
+    
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    const attemptCheck = async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
+        const res = await fetch('/api/update/check', { signal: controller.signal });
+        clearTimeout(timeout);
+        
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+        }
+        
+        const data = await res.json();
+        setFreshUpdateInfo(data);
+        setLastCheckedTime(new Date());
+        setCheckStatus('success');
+        console.log('[UpdateModal] Successfully checked for updates:', data);
+        
+        // Auto-dismiss success message after 3 seconds
+        setTimeout(() => {
+          setCheckStatus(null);
+        }, 3000);
+      } catch (err) {
+        console.error(`[UpdateModal] Check attempt ${retryCount + 1}/${maxRetries} failed:`, err.message);
+        
+        if (retryCount < maxRetries && !(err instanceof TypeError && err.message.includes('aborted'))) {
+          retryCount++;
+          const delay = 500 * Math.pow(2, retryCount - 1);
+          console.log(`[UpdateModal] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return attemptCheck();
+        } else {
+          const message = err.message || 'Failed to check for updates';
+          setErrorMessage(`Could not check for updates: ${message}. Please check your connection.`);
+          setCheckStatus('error');
+          console.error('[UpdateModal] Failed to check for updates after all retries:', message);
+        }
+      } finally {
+        setIsCheckingForUpdates(false);
+      }
+    };
+    
+    return attemptCheck();
   };
 
   /**
@@ -300,9 +360,103 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
             background: '#1a1a1a',
             borderRadius: '8px'
           }}>
-            <span style={{ color: '#888' }}>Current Version</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>v{currentVersion}</span>
+            <div>
+              <span style={{ color: '#888' }}>Current Version</span>
+              <div style={{ fontFamily: 'monospace', fontWeight: 600, marginTop: '4px' }}>v{currentVersion}</div>
+              {lastCheckedTime && (
+                <div style={{ fontSize: '0.75em', color: '#666', marginTop: '4px' }}>
+                  Last checked: {lastCheckedTime.toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={checkForUpdatesManually}
+              disabled={isCheckingForUpdates || isUpdating}
+              style={{
+                padding: '8px 12px',
+                background: checkStatus === 'error' ? '#dc2626' : '#1e40af',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#fff',
+                cursor: isCheckingForUpdates || isUpdating ? 'not-allowed' : 'pointer',
+                opacity: isCheckingForUpdates || isUpdating ? 0.5 : 1,
+                fontSize: '0.85em',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap'
+              }}
+              title="Manually check for updates from GitHub"
+            >
+              {isCheckingForUpdates ? (
+                <>
+                  <RefreshCw size={14} className="spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={14} />
+                  Check Now
+                </>
+              )}
+            </button>
           </div>
+
+          {/* Check for Updates Feedback */}
+          {checkStatus && (
+            <div style={{ 
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '15px',
+              background: checkStatus === 'error' ? '#450a0a' : 
+                          checkStatus === 'success' ? '#14532d' : '#1e3a5f',
+              border: `1px solid ${checkStatus === 'error' ? '#ef4444' : 
+                                    checkStatus === 'success' ? '#22c55e' : '#3b82f6'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              {checkStatus === 'checking' && (
+                <>
+                  <RefreshCw size={18} className="spin" style={{ color: '#60a5fa' }} />
+                  <span style={{ color: '#93c5fd' }}>Checking for updates...</span>
+                </>
+              )}
+              {checkStatus === 'success' && (
+                <>
+                  <CheckCircle size={18} style={{ color: '#4ade80' }} />
+                  <span style={{ color: '#86efac' }}>
+                    {freshUpdateInfo?.available ? `Update available: ${freshUpdateInfo.latestVersion}` : 'You\'re up to date!'}
+                  </span>
+                </>
+              )}
+              {checkStatus === 'error' && (
+                <>
+                  <AlertTriangle size={18} style={{ color: '#f87171' }} />
+                  <span style={{ color: '#fca5a5' }}>{errorMessage}</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {freshUpdateInfo?.available && freshUpdateInfo.latestVersion !== updateInfo?.latestVersion && (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '20px',
+              padding: '12px',
+              background: '#1e1b4b',
+              borderRadius: '8px',
+              border: '1px solid #8b5cf6'
+            }}>
+              <span style={{ color: '#a78bfa' }}>Latest Update Found</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#c4b5fd' }}>
+                {freshUpdateInfo.latestVersion}
+              </span>
+            </div>
+          )}
 
           {hasUpdate ? (
             <>
