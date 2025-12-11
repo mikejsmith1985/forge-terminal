@@ -877,37 +877,15 @@ function App() {
     addToast(`Saved: ${file.name}`, 'success', 2000);
   }, [addToast]);
 
-  // Handle AM toggle - enable/disable AM logging via backend API
-  const handleToggleAM = useCallback(async (tabId) => {
+  // Handle AM toggle - toggle in state (no backend API needed)
+  const handleToggleAM = useCallback((tabId) => {
     const tab = tabs.find(t => t.id === tabId);
     if (!tab) return;
 
     const newEnabled = !tab.amEnabled;
-    
-    try {
-      const response = await fetch('/api/am/enable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tabId: tabId,
-          tabName: tab.title,
-          workspace: window.location.pathname,
-          enabled: newEnabled,
-        }),
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        toggleTabAM(tabId);
-        addToast(newEnabled ? 'AM Logging enabled' : 'AM Logging disabled', 'info', 2000);
-        logger.tabs('AM toggled', { tabId, enabled: newEnabled, logPath: result.logPath });
-      } else {
-        addToast('Failed to toggle AM: ' + result.error, 'error', 3000);
-      }
-    } catch (err) {
-      console.error('Failed to toggle AM:', err);
-      addToast('Failed to toggle AM logging', 'error', 3000);
-    }
+    toggleTabAM(tabId);
+    addToast(newEnabled ? 'AM Logging enabled' : 'AM Logging disabled', 'info', 2000);
+    logger.tabs('AM toggled', { tabId, enabled: newEnabled });
   }, [tabs, toggleTabAM, addToast]);
 
   // Handle global AM default change
