@@ -1,0 +1,137 @@
+{
+  "id": "llm-model-test",
+  "name": "🧪 Test LLM Model",
+  "description": "Run LLM model comparison against baseline (20 questions)",
+  "category": "testing",
+  "tags": ["testing", "llm", "benchmark", "model", "ai"],
+  "command": "bash",
+  "script": "scripts/test-model-comparison.sh",
+  "interactive": false,
+  "arguments": [
+    {
+      "name": "model",
+      "description": "Model name (e.g., mistral:7b-instruct, neural-chat:7b)",
+      "required": true,
+      "type": "string",
+      "default": "mistral:7b-instruct",
+      "examples": [
+        "mistral:7b-instruct",
+        "neural-chat:7b",
+        "llama:13b",
+        "your-model:tag"
+      ]
+    }
+  ],
+  "usage": {
+    "basic": "./scripts/test-model-comparison.sh your-model:tag",
+    "example1": "./scripts/test-model-comparison.sh neural-chat:7b",
+    "example2": "./scripts/test-model-comparison.sh your-model:tag mistral:7b-instruct",
+    "example3": "./scripts/test-model-comparison.sh --compare-last-two",
+    "example4": "./scripts/test-model-comparison.sh --list-results"
+  },
+  "output": "JSON results in test-results/model-comparisons/",
+  "expectedOutput": {
+    "format": "json",
+    "fields": [
+      "overall_accuracy",
+      "passed_tests",
+      "total_tests",
+      "average_score",
+      "results[]"
+    ]
+  },
+  "prerequisites": [
+    "Forge Terminal running on port 8080 or 8333",
+    "Ollama running with the target model available",
+    "test-data/rag-test-questions.json (20-question dataset)"
+  ],
+  "documentation": {
+    "quick": "docs/developer/model-testing-quick-ref.md",
+    "full": "docs/developer/model-testing-baseline.md",
+    "baseline": "docs/developer/baseline-metrics-2025-12-11.md"
+  },
+  "features": [
+    "Test single model: script model:tag",
+    "Compare two models: script model1:tag model2:tag",
+    "Compare last two runs: script --compare-last-two",
+    "List all results: script --list-results",
+    "Baseline only: script --baseline-only model:tag"
+  ],
+  "scoring": {
+    "method": "keyword matching",
+    "threshold": "80%",
+    "passThreshold": "80%",
+    "calculation": "(matched keywords / total keywords) × 100%"
+  },
+  "baselines": {
+    "phase1": {
+      "model": "mistral:7b-instruct",
+      "accuracy": "87%",
+      "questions": 5,
+      "method": "system prompt only"
+    },
+    "phase2": {
+      "model": "ollama default",
+      "accuracy": "66.7%",
+      "questions": 20,
+      "method": "rag framework"
+    }
+  },
+  "testCoverage": {
+    "totalQuestions": 20,
+    "byDifficulty": {
+      "easy": 6,
+      "medium": 7,
+      "hard": 7
+    },
+    "byCategory": {
+      "features": 7,
+      "configuration": 4,
+      "shortcuts": 1,
+      "deployment": 1,
+      "troubleshooting": 1,
+      "api": 1,
+      "other": 4
+    }
+  },
+  "hints": [
+    "Ensure Forge is running: ./forge --port 8080",
+    "Check model availability: ollama list",
+    "Pull a model first: ollama pull neural-chat:7b",
+    "Results stored in: test-results/model-comparisons/",
+    "Compare easily with: --compare-last-two",
+    "See history with: --list-results"
+  ],
+  "troubleshooting": {
+    "forgeNotRunning": "Start with: ./forge --port 8080",
+    "modelNotFound": "Pull with: ollama pull model:tag",
+    "noResponse": "Check Forge API: curl http://localhost:8080/",
+    "emptyMessage": "Check model output format and API endpoint"
+  },
+  "createdDate": "2025-12-11T20:23:54Z",
+  "version": "1.0",
+  "author": "forge-assistant",
+  "features": [
+    "Test single model: script model:tag",
+    "Compare two models: script model1:tag model2:tag",
+    "Compare last two runs: script --compare-last-two",
+    "List all results: script --list-results",
+    "Baseline only: script --baseline-only model:tag",
+    "Generate visual report: scripts/generate-test-visual.sh"
+  ],
+  "visualReporting": {
+    "enabled": true,
+    "format": "HTML",
+    "description": "Automatically generates beautiful visual dashboard on test completion",
+    "displays": [
+      "Accuracy percentage with circular progress",
+      "Pass/fail counts",
+      "Average score",
+      "Performance by difficulty (Easy/Medium/Hard)",
+      "Status badge (Excellent/Good/Fair/Poor)",
+      "Test metadata and timestamp"
+    ],
+    "autoOpen": true,
+    "script": "scripts/generate-test-visual.sh"
+  }
+}

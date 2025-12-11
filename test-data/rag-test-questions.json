@@ -95,6 +95,70 @@
       "category": "features",
       "difficulty": "easy",
       "source": "docs/features/terminal-search.md"
+    },
+    {
+      "id": "q13",
+      "question": "How do I split the terminal window into multiple panes?",
+      "expected_keywords": ["split", "pane", "horizontal", "vertical", "layout"],
+      "category": "features",
+      "difficulty": "medium",
+      "source": "docs/features/split-panes.md"
+    },
+    {
+      "id": "q14",
+      "question": "What are the system requirements to run Forge?",
+      "expected_keywords": ["system", "requirements", "CPU", "memory", "OS", "platform"],
+      "category": "configuration",
+      "difficulty": "easy",
+      "source": "docs/user/system-requirements.md"
+    },
+    {
+      "id": "q15",
+      "question": "How do I export or backup my Forge configuration?",
+      "expected_keywords": ["export", "backup", "configuration", "save", "profile"],
+      "category": "configuration",
+      "difficulty": "medium",
+      "source": "docs/configuration/backup.md"
+    },
+    {
+      "id": "q16",
+      "question": "What monitoring and logging features are available?",
+      "expected_keywords": ["monitoring", "logging", "metrics", "dashboard", "analytics"],
+      "category": "features",
+      "difficulty": "hard",
+      "source": "docs/features/monitoring.md"
+    },
+    {
+      "id": "q17",
+      "question": "How do I integrate Forge with external tools and services?",
+      "expected_keywords": ["integration", "plugins", "external", "API", "webhook"],
+      "category": "features",
+      "difficulty": "hard",
+      "source": "docs/features/integrations.md"
+    },
+    {
+      "id": "q18",
+      "question": "What are the privacy and security features in Forge?",
+      "expected_keywords": ["security", "privacy", "encryption", "authentication", "permissions"],
+      "category": "configuration",
+      "difficulty": "hard",
+      "source": "docs/security/privacy.md"
+    },
+    {
+      "id": "q19",
+      "question": "How do I customize keybindings and create macros?",
+      "expected_keywords": ["keybinding", "macro", "shortcut", "custom", "sequence"],
+      "category": "configuration",
+      "difficulty": "medium",
+      "source": "docs/configuration/keybindings.md"
+    },
+    {
+      "id": "q20",
+      "question": "How do I get help and find documentation for Forge?",
+      "expected_keywords": ["help", "documentation", "manual", "guide", "support"],
+      "category": "features",
+      "difficulty": "easy",
+      "source": "docs/user/getting-help.md"
     }
   ]
 }
