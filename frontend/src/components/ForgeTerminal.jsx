@@ -10,6 +10,17 @@ import VisionOverlay from './vision/VisionOverlay';
 import { executeCommand } from '../commands';
 import DiagnosticsButton from './DiagnosticsButton';
 
+// HMR Cleanup: Prevent zombie xterm instances during hot reload
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    // Force cleanup of orphaned xterm helper textareas
+    document.querySelectorAll('.xterm-helper-textarea').forEach(el => {
+      el.remove();
+    });
+    console.log('[HMR] Cleaned up orphaned xterm elements');
+  });
+}
+
 // Debounce helper for resize events
 function debounce(fn, ms) {
   let timeoutId;
@@ -328,6 +339,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onWaitingChange = null, // Callback when prompt waiting state changes
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
   onCopy = null, // Callback when text is copied (for toast notification)
+  onShowToast = null, // Callback to show toast notifications
   onFeedbackClick = null, // Callback to open feedback modal
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
@@ -366,6 +378,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const maxReconnectAttempts = 5;
   const commandBufferRef = useRef(''); // Buffer for slash command detection
   const browserDefaultsHandlerRef = useRef(null); // Ref to prevent zombie listener
+  const lastWsMessageTimeRef = useRef(Date.now()); // Track last WS message for idle detection
+  const healthCheckScheduledRef = useRef(false); // Prevent multiple health checks
+  const onShowToastRef = useRef(onShowToast); // Ref for toast callback
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -412,6 +427,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     onCopyRef.current = onCopy;
   }, [onCopy]);
   
+  // Keep onShowToast ref updated
+  useEffect(() => {
+    onShowToastRef.current = onShowToast;
+  }, [onShowToast]);
+
   // Keep visionEnabled ref updated and send control message to backend
   useEffect(() => {
     visionEnabledRef.current = visionEnabled;
@@ -838,6 +858,61 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         setReconnecting(false);
         setIsConnected(true);
         
+        // Schedule keyboard health check after terminal is idle
+        if (!healthCheckScheduledRef.current) {
+          healthCheckScheduledRef.current = true;
+          
+          const runHealthCheck = () => {
+            const timeSinceLastMessage = Date.now() - lastWsMessageTimeRef.current;
+            
+            // Wait until terminal is idle (no messages for 1.5 seconds)
+            if (timeSinceLastMessage < 1500) {
+              // Still receiving output, check again later
+              setTimeout(runHealthCheck, 500);
+              return;
+            }
+            
+            // Terminal is idle - verify keyboard input is working
+            const textarea = document.querySelector('.xterm-helper-textarea');
+            const activeElement = document.activeElement;
+            const focusOnBody = activeElement === document.body;
+            const noTextarea = !textarea;
+            
+            // Check for refresh loop prevention (localStorage guard)
+            const lastRefreshTime = parseInt(localStorage.getItem('forge-keyboard-refresh') || '0', 10);
+            const timeSinceLastRefresh = Date.now() - lastRefreshTime;
+            const recentlyRefreshed = timeSinceLastRefresh < 30000; // 30 second guard
+            
+            if ((focusOnBody || noTextarea) && !recentlyRefreshed) {
+              console.warn('[Terminal] Keyboard health check failed', {
+                focusOnBody,
+                noTextarea,
+                activeElement: activeElement?.tagName
+              });
+              
+              // Set refresh guard
+              localStorage.setItem('forge-keyboard-refresh', Date.now().toString());
+              
+              // Show toast if available
+              if (onShowToastRef.current) {
+                onShowToastRef.current('Fixing keyboard input...', 'info', 2000);
+              }
+              
+              // Reload after brief delay to show toast
+              setTimeout(() => {
+                window.location.reload();
+              }, 300);
+            } else {
+              // Clear refresh guard on successful health check
+              localStorage.removeItem('forge-keyboard-refresh');
+              console.log('[Terminal] Keyboard health check passed');
+            }
+          };
+          
+          // Initial delay before first check (allow shell to fully start)
+          setTimeout(runHealthCheck, 2000);
+        }
+        
         // Use orange for the welcome message to match theme
         const shellLabel = cfg?.shellType ? ` (${cfg.shellType.toUpperCase()})` : '';
         const reconnectLabel = reconnectAttemptsRef.current > 0 ? ' [Reconnected]' : '';
@@ -890,6 +965,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       };
 
       ws.onmessage = (event) => {
+        // Track message time for idle detection (keyboard health check)
+        lastWsMessageTimeRef.current = Date.now();
+        
         let textData = '';
         if (event.data instanceof ArrayBuffer) {
           // Binary data from PTY

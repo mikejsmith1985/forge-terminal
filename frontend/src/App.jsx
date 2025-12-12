@@ -1482,6 +1482,7 @@ function App() {
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                   onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                   onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
+                  onShowToast={(msg, type, duration) => addToast(msg, type, duration)}
                   onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                 />
               </div>

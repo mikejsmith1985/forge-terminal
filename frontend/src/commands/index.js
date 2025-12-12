@@ -1,8 +1,23 @@
 // Command registry for Forge Terminal
 import { diagnosticMode } from './diagnosticMode';
 
+// Manual refresh command as escape hatch for keyboard issues
+const refreshCommand = {
+  name: 'refresh',
+  description: 'Force page refresh to fix keyboard input issues',
+  async run({ print }) {
+    print('\x1b[33mRefreshing to fix keyboard issues...\x1b[0m');
+    // Clear the refresh guard so health check passes after reload
+    localStorage.removeItem('forge-keyboard-refresh');
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  }
+};
+
 export const commands = {
   diagnose: diagnosticMode,
+  refresh: refreshCommand,
 };
 
 // Parse and execute slash commands
