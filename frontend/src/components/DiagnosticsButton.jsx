@@ -220,9 +220,16 @@ const DiagnosticsButton = ({
       {/* Main diagnostic button */}
       <button
         className={`diagnostics-button ${lockoutWarning ? 'warning' : ''}`}
-        onClick={() => {
+        tabIndex={-1}
+        onClick={(e) => {
+          // Prevent button from capturing focus - return to terminal
+          e.currentTarget.blur();
           captureDiagnostics();
           setIsExpanded(true);
+          // Refocus terminal after capture
+          if (terminalRef?.current?.focus) {
+            setTimeout(() => terminalRef.current.focus(), 10);
+          }
         }}
         title="Click when keyboard is locked to capture diagnostics"
       >
@@ -240,10 +247,10 @@ const DiagnosticsButton = ({
           <div className="diagnostics-header">
             <h4>🔍 Keyboard Diagnostics</h4>
             <div className="diagnostics-actions">
-              <button onClick={copyToClipboard} title="Copy to clipboard">
+              <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); copyToClipboard(); }} title="Copy to clipboard">
                 <ClipboardCopy size={14} />
               </button>
-              <button onClick={() => setIsExpanded(false)} title="Close">
+              <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); setIsExpanded(false); }} title="Close">
                 <X size={14} />
               </button>
             </div>
@@ -309,7 +316,7 @@ const DiagnosticsButton = ({
           
           <div className="diagnostics-footer">
             <small>Captured: {new Date(lastDiagnostic.capturedAt).toLocaleTimeString()}</small>
-            <button onClick={captureDiagnostics} className="btn-refresh">
+            <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); captureDiagnostics(); }} className="btn-refresh">
               Refresh
             </button>
           </div>
