@@ -181,6 +181,9 @@ func main() {
 	http.HandleFunc("/api/vision/insights/", WrapWithMiddleware(handleVisionInsights))
 	http.HandleFunc("/api/vision/insights/summary/", WrapWithMiddleware(handleVisionInsightsSummary))
 
+	// Diagnostics API - keyboard lockout debugging
+	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
+
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
 
@@ -1826,4 +1829,90 @@ json.NewEncoder(w).Encode(map[string]interface{}{
 "success": true,
 "summary": summary,
 })
+}
+
+// handleDiagnosticsKeyboard logs keyboard diagnostic snapshots for debugging lockout issues
+func handleDiagnosticsKeyboard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Read and log the diagnostic data
+	var diagnostic map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&diagnostic); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid JSON",
+		})
+		return
+	}
+
+	// Log to both console and file for debugging
+	log.Printf("[Diagnostics] ========== KEYBOARD LOCKOUT SNAPSHOT ==========")
+	
+	// Extract key metrics for logging
+	if capturedAt, ok := diagnostic["capturedAt"].(string); ok {
+		log.Printf("[Diagnostics] Captured at: %s", capturedAt)
+	}
+	if tabId, ok := diagnostic["tabId"].(string); ok {
+		log.Printf("[Diagnostics] Tab ID: %s", tabId)
+	}
+	
+	// WebSocket state
+	if wsState, ok := diagnostic["wsState"].(map[string]interface{}); ok {
+		log.Printf("[Diagnostics] WebSocket: state=%v buffered=%v", 
+			wsState["readyStateText"], wsState["bufferedAmount"])
+	}
+	
+	// Focus state
+	if focusState, ok := diagnostic["focusState"].(map[string]interface{}); ok {
+		log.Printf("[Diagnostics] Focus: activeElement=%v hasFocus=%v visibility=%v",
+			focusState["activeElement"], focusState["hasFocus"], focusState["visibilityState"])
+	}
+	
+	// Main thread health
+	if mainThreadBusy, ok := diagnostic["mainThreadBusy"].(bool); ok {
+		delay := diagnostic["mainThreadDelayMs"]
+		log.Printf("[Diagnostics] Main Thread: busy=%v delay=%vms", mainThreadBusy, delay)
+	}
+	
+	// Event stats
+	if eventStats, ok := diagnostic["eventStats"].(map[string]interface{}); ok {
+		log.Printf("[Diagnostics] Events: total=%v timeSinceLast=%vms pendingKeys=%v",
+			eventStats["totalKeyEvents"], 
+			eventStats["timeSinceLastEvent"],
+			len(eventStats["pendingKeys"].([]interface{})))
+			
+		// Log recent events for detailed debugging
+		if recentEvents, ok := eventStats["recentEvents"].([]interface{}); ok && len(recentEvents) > 0 {
+			log.Printf("[Diagnostics] Last %d keyboard events:", len(recentEvents))
+			for i, ev := range recentEvents {
+				if event, ok := ev.(map[string]interface{}); ok {
+					log.Printf("[Diagnostics]   [%d] type=%s key=%s gap=%vms target=%s",
+						i, event["type"], event["key"], event["timeSinceLast"], event["target"])
+				}
+			}
+		}
+	}
+	
+	log.Printf("[Diagnostics] ================================================")
+	
+	// Also save to diagnostics log file for later analysis
+	diagDir := filepath.Join(os.Getenv("HOME"), ".forge", "diagnostics")
+	if err := os.MkdirAll(diagDir, 0755); err == nil {
+		diagFile := filepath.Join(diagDir, fmt.Sprintf("keyboard-%s.json", 
+			time.Now().Format("2006-01-02_15-04-05")))
+		if data, err := json.MarshalIndent(diagnostic, "", "  "); err == nil {
+			os.WriteFile(diagFile, data, 0644)
+			log.Printf("[Diagnostics] Saved to: %s", diagFile)
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Diagnostic logged",
+	})
 }

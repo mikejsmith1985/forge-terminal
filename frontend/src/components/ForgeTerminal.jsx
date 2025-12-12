@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
+import DiagnosticsButton from './DiagnosticsButton';
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -298,6 +299,24 @@ function getFolderName(path) {
   return lastPart || normalized;
 }
 
+/**
+ * Robust focus helper - tries multiple strategies to ensure terminal gets focus
+ * @param {HTMLElement} termEl - Terminal container element
+ * @param {Terminal} termInstance - xterm.js Terminal instance
+ */
+function robustFocus(termEl, termInstance) {
+  try { termInstance?.focus(); } catch (e) {}
+  queueMicrotask(() => {
+    try { termInstance?.focus(); } catch (e) {}
+    if (termEl && document.activeElement !== termEl) {
+      try { termEl?.focus(); } catch (e) {}
+    }
+  });
+  requestAnimationFrame(() => {
+    try { termInstance?.focus(); } catch (e) {}
+  });
+}
+
 const ForgeTerminal = forwardRef(function ForgeTerminal({
   className,
   style,
@@ -413,50 +432,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     if (isVisible && fitAddonRef.current && xtermRef.current) {
       // Small delay to ensure the container is properly sized
       setTimeout(() => {
-        fitAddonRef.current.fit();
-        // BATTLE-TESTED: setTimeout(0) after fit to reclaim focus
-        setTimeout(() => {
-          if (xtermRef.current) {
-            xtermRef.current.focus();
-          }
-        }, 0);
+        if (fitAddonRef.current && xtermRef.current) {
+          try {
+            fitAddonRef.current.fit();
+          } catch (e) {}
+          // Use robust focus strategy after fit
+          queueMicrotask(() => {
+            try { xtermRef.current?.focus(); } catch (e) {}
+            if (terminalRef.current && document.activeElement !== terminalRef.current) {
+              terminalRef.current?.focus();
+            }
+          });
+        }
       }, 50);
     }
-  }, [isVisible]);
-
-  // Fix spacebar issue: Focus terminal on window focus
-  useEffect(() => {
-    if (!isVisible) return;
-    
-    const handleWindowFocus = () => {
-      if (xtermRef.current && isVisible) {
-        // BATTLE-TESTED: Use setTimeout(0) for reliable focus recovery
-        setTimeout(() => {
-          if (xtermRef.current) {
-            xtermRef.current.focus();
-          }
-        }, 0);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden && xtermRef.current && isVisible) {
-        // BATTLE-TESTED: Use setTimeout(0) for reliable focus recovery
-        setTimeout(() => {
-          if (xtermRef.current) {
-            xtermRef.current.focus();
-          }
-        }, 0);
-      }
-    };
-
-    window.addEventListener('focus', handleWindowFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('focus', handleWindowFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
   }, [isVisible]);
 
   // Expose methods to parent via ref
@@ -644,38 +633,60 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
-      clipboardMode: 'on', // Enable clipboard support for copy/paste
+      clipboardMode: 'on',
     });
 
-    // Add fit addon
     const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    fitAddonRef.current = fitAddon;
-
-    // Add search addon
     const searchAddon = new SearchAddon();
+
+    term.loadAddon(fitAddon);
     term.loadAddon(searchAddon);
+    
+    fitAddonRef.current = fitAddon;
     searchAddonRef.current = searchAddon;
 
-    // Open terminal
+    // Make container focusable in case something else grabs focus
+    if (terminalRef.current && !terminalRef.current.hasAttribute('tabindex')) {
+      terminalRef.current.setAttribute('tabindex', '-1');
+      terminalRef.current.setAttribute('role', 'application');
+    }
+
     term.open(terminalRef.current);
     xtermRef.current = term;
-    
-    // BATTLE-TESTED FIX (Warp, Tabby, OSS terminals):
-    // Use setTimeout(0) to ensure focus happens AFTER the current event loop
-    // This is critical for spacebar to work on first load
-    setTimeout(() => {
-      if (xtermRef.current) {
-        xtermRef.current.focus();
+
+    // IMPORTANT: run fit BEFORE forcing focus to avoid fit() stealing focus afterward
+    try {
+      fitAddon.fit();
+    } catch (err) {
+      console.warn('[Terminal] fit error', err);
+    }
+
+    // Focus recovery strategy: queueMicrotask -> requestAnimationFrame
+    // for robust ordering across browsers and React re-renders
+    queueMicrotask(() => {
+      try { term.focus(); } catch (e) {}
+      if (document.activeElement !== terminalRef.current) {
+        terminalRef.current?.focus();
       }
-    }, 0);
+      // Debug log (can be removed after issue is fixed)
+      console.log('[Terminal] activeElement after init:', document.activeElement?.className || document.activeElement?.tagName);
+    });
+
+    requestAnimationFrame(() => {
+      try { term.focus(); } catch (e) {}
+    });
+
+    // Guard against addons or later resizes stealing focus
+    const ensureFocus = () => {
+      try { term.focus(); } catch (e) {}
+    };
 
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
     // This runs BEFORE xterm processes the key and allows conditional intercept
     term.attachCustomKeyEventHandler((arg) => {
       // CRITICAL FIX: Explicitly allow spacebar no matter what
-      // This prevents xterm from blocking spacebar due to event bubbling issues
-      if (arg.code === 'Space') {
+      // Always let the Space key through
+      if (arg.code === 'Space' || arg.key === ' ') {
         return true;
       }
       
@@ -733,13 +744,28 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       return true; // Let all other keys pass through standard xterm processing
     });
 
-    // Initial fit - then re-focus (fit triggers hidden re-render that steals focus)
-    fitAddon.fit();
-    setTimeout(() => {
-      if (xtermRef.current) {
-        xtermRef.current.focus();
+    // Focus recovery on window/tab events
+    const onWindowFocus = () => {
+      if (isVisible) ensureFocus();
+    };
+    window.addEventListener('focus', onWindowFocus);
+
+    // Visibility change (switching tabs inside app or browser tab)
+    const onVisibilityChange = () => {
+      if (isVisible) {
+        try { fitAddon.fit(); } catch (e) {}
+        queueMicrotask(ensureFocus);
       }
-    }, 0);
+    };
+    window.addEventListener('visibilitychange', onVisibilityChange);
+
+    // Debug: Global keydown listener to track spacebar events
+    const debugKeyHandler = (e) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        console.log('[Terminal] Space keydown at:', document.activeElement?.className || document.activeElement?.tagName);
+      }
+    };
+    window.addEventListener('keydown', debugKeyHandler);
 
     // Connect to WebSocket
     const connectWebSocket = () => {
@@ -824,6 +850,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
 
         if (onConnectionChange) onConnectionChange(true);
+        
+        // Ensure focus after WebSocket connection
+        robustFocus(terminalRef.current, term);
       };
 
       ws.onmessage = (event) => {
@@ -1136,8 +1165,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     resizeObserver.observe(terminalRef.current);
 
     return () => {
-      // No cleanup needed for attachCustomKeyEventHandler - xterm handles it
-      
+      // Cleanup event handlers
+      window.removeEventListener('focus', onWindowFocus);
+      window.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('keydown', debugKeyHandler);
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();
       if (waitingCheckTimeoutRef.current) {
@@ -1262,6 +1293,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           onDismiss={handleVisionDismiss}
         />
       )}
+      
+      {/* Keyboard Diagnostics Button - appears when keyboard issues detected */}
+      <DiagnosticsButton
+        terminalRef={{ current: { 
+          isConnected: () => wsRef.current?.readyState === WebSocket.OPEN,
+          isWaitingForPrompt: () => isWaiting 
+        }}}
+        wsRef={wsRef}
+        tabId={tabId}
+        isVisible={isVisible}
+        onDiagnosticCapture={(diagnostic) => {
+          logger.terminal('Diagnostic captured', { tabId, mainThreadDelay: diagnostic.mainThreadDelayMs });
+        }}
+      />
       
       {showScrollButton && isVisible && (
         <button
