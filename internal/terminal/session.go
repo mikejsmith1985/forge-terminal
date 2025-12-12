@@ -151,7 +151,17 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	if cmd != nil {
 		go func() {
 			_ = cmd.Wait()
-			close(session.doneChan)
+			// Use select to safely close channel (avoid double-close panic)
+			session.mu.Lock()
+			if !session.closed {
+				select {
+				case <-session.doneChan:
+					// Already closed
+				default:
+					close(session.doneChan)
+				}
+			}
+			session.mu.Unlock()
 		}()
 	}
 

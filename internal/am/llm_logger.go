@@ -100,7 +100,15 @@ type LLMLogger struct {
 var (
 	llmLoggers   = make(map[string]*LLMLogger)
 	llmLoggersMu sync.RWMutex
+	
+	// pendingAsyncWrites tracks async disk writes for test synchronization
+	pendingAsyncWrites sync.WaitGroup
 )
+
+// WaitForPendingWrites waits for all async writes to complete (for testing)
+func WaitForPendingWrites() {
+	pendingAsyncWrites.Wait()
+}
 
 // GetLLMLogger returns or creates an LLM logger for a tab.
 func GetLLMLogger(tabID string, amDir string) *LLMLogger {
@@ -509,8 +517,14 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 	// NEW: Parse snapshots incrementally to extract assistant responses
 	l.parseLatestSnapshotToTurns(conv, snapshot)
 	
-	// Save to disk
-	l.saveConversation(conv)
+	// Save to disk ASYNC - don't block on disk I/O while holding mutex
+	// Make a copy of data needed for save to avoid race conditions
+	convCopy := *conv
+	pendingAsyncWrites.Add(1)
+	go func() {
+		defer pendingAsyncWrites.Done()
+		l.saveConversationAsync(&convCopy)
+	}()
 }
 
 // stripANSI removes ANSI escape sequences from text.
@@ -759,13 +773,14 @@ func (l *LLMLogger) AddUserInput(rawInput string) {
 	l.inputBuffer += rawInput
 	l.lastInputTime = time.Now()
 
-	// Detect Enter press (user submitted prompt)
-		// NEW: Trigger snapshot after user input in TUI mode
+	// Only trigger snapshot on Enter press (user submitted prompt), not every keystroke
+	// This prevents blocking disk I/O on every keystroke which caused 30-second keyboard lag
+	if strings.Contains(rawInput, "\r") || strings.Contains(rawInput, "\n") {
+		// Save snapshot ONLY on Enter press in TUI mode
 		if l.tuiCaptureMode && l.currentScreen.Len() > 0 {
-			log.Printf("[LLM Logger] 📸 Post-input snapshot trigger (bufferSize=%d)", l.currentScreen.Len())
+			log.Printf("[LLM Logger] 📸 Post-enter snapshot trigger (bufferSize=%d)", l.currentScreen.Len())
 			l.saveScreenSnapshotLocked()
 		}
-	if strings.Contains(rawInput, "\r") || strings.Contains(rawInput, "\n") {
 		l.flushUserInputLocked()
 	}
 }
@@ -1167,13 +1182,15 @@ func GetActiveConversations() map[string]*LLMConversation {
 	return result
 }
 
-func (l *LLMLogger) saveConversation(conv *LLMConversation) {
+// saveConversationAsync saves conversation to disk without blocking.
+// Used for snapshot saves to prevent keyboard lag.
+func (l *LLMLogger) saveConversationAsync(conv *LLMConversation) {
 	if l.amDir == "" {
 		return
 	}
 
 	if err := os.MkdirAll(l.amDir, 0755); err != nil {
-		log.Printf("[LLM Logger] Failed to create AM dir: %v", err)
+		log.Printf("[LLM Logger] ❌ Failed to create AM dir %s: %v", l.amDir, err)
 		return
 	}
 
@@ -1182,14 +1199,46 @@ func (l *LLMLogger) saveConversation(conv *LLMConversation) {
 
 	data, err := json.MarshalIndent(conv, "", "  ")
 	if err != nil {
-		log.Printf("[LLM Logger] Failed to marshal conversation: %v", err)
+		log.Printf("[LLM Logger] ❌ Failed to marshal conversation %s: %v", conv.ConversationID, err)
 		return
 	}
 
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		log.Printf("[LLM Logger] Failed to write conversation: %v", err)
+		log.Printf("[LLM Logger] ❌ Failed to write conversation to %s: %v", filePath, err)
 		return
 	}
+	
+	log.Printf("[LLM Logger] ✅ Async saved conversation %s to %s (%d bytes)", 
+		conv.ConversationID, filename, len(data))
+}
+
+func (l *LLMLogger) saveConversation(conv *LLMConversation) {
+	if l.amDir == "" {
+		log.Printf("[LLM Logger] ⚠️ saveConversation skipped: amDir is empty")
+		return
+	}
+
+	if err := os.MkdirAll(l.amDir, 0755); err != nil {
+		log.Printf("[LLM Logger] ❌ Failed to create AM dir %s: %v", l.amDir, err)
+		return
+	}
+
+	filename := l.generateConversationFilename(conv)
+	filePath := filepath.Join(l.amDir, filename)
+
+	data, err := json.MarshalIndent(conv, "", "  ")
+	if err != nil {
+		log.Printf("[LLM Logger] ❌ Failed to marshal conversation %s: %v", conv.ConversationID, err)
+		return
+	}
+
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		log.Printf("[LLM Logger] ❌ Failed to write conversation to %s: %v", filePath, err)
+		return
+	}
+	
+	log.Printf("[LLM Logger] ✅ Saved conversation %s to %s (%d bytes, %d turns, %d snapshots)", 
+		conv.ConversationID, filename, len(data), len(conv.Turns), len(conv.ScreenSnapshots))
 }
 
 // loadConversationsFromDisk loads existing conversations from disk for this tab.
@@ -1428,6 +1477,9 @@ func detectProject(workingDir string) string {
 		return "adhoc"
 	}
 	
+	// Normalize Windows paths to Unix-style
+	workingDir = normalizePath(workingDir)
+	
 	// 1. Check for git repo - use repo name
 	if gitRoot := findGitRoot(workingDir); gitRoot != "" {
 		base := filepath.Base(gitRoot)
@@ -1494,6 +1546,17 @@ func sanitizeProjectName(name string) string {
 	}
 	
 	return name
+}
+
+// normalizePath converts Windows-style paths to Unix-style for consistent handling.
+func normalizePath(path string) string {
+	// Replace Windows backslashes with forward slashes
+	path = strings.ReplaceAll(path, "\\", "/")
+	// Clean up any double slashes
+	for strings.Contains(path, "//") {
+		path = strings.ReplaceAll(path, "//", "/")
+	}
+	return path
 }
 
 // generateConversationFilename creates a filename for a conversation using project-based naming.

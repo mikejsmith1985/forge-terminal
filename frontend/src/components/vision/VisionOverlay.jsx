@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import CompilerErrorOverlay from './CompilerErrorOverlay';
+import SessionRecoveryOverlay from './SessionRecoveryOverlay';
 import './vision.css';
 
 /**
@@ -91,6 +92,14 @@ export default function VisionOverlay({ activeOverlay, onAction, onDismiss }) {
       )}
       {activeOverlay.type === 'STACK_TRACE' && (
         <StackTraceOverlay 
+          data={activeOverlay.payload}
+          onAction={onAction}
+          onDismiss={onDismiss}
+          selectedIndex={selectedIndex}
+        />
+      )}
+      {activeOverlay.type === 'SESSION_RECOVERY' && (
+        <SessionRecoveryOverlay 
           data={activeOverlay.payload}
           onAction={onAction}
           onDismiss={onDismiss}

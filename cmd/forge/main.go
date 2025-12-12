@@ -198,6 +198,9 @@ func main() {
 	http.HandleFunc("/api/assistant/chat", WrapWithMiddleware(handleAssistantChat))
 	http.HandleFunc("/api/assistant/execute", WrapWithMiddleware(handleAssistantExecute))
 	http.HandleFunc("/api/assistant/model", WrapWithMiddleware(handleAssistantSetModel))
+	http.HandleFunc("/api/assistant/run-tests", WrapWithMiddleware(handleAssistantRunTests))
+	http.HandleFunc("/api/assistant/train-model", WrapWithMiddleware(handleAssistantTrainModel))
+	http.HandleFunc("/api/assistant/training-status/", WrapWithMiddleware(handleAssistantTrainingStatus))
 
 	// Find an available port
 	addr, listener, err := findAvailablePort()
@@ -1503,6 +1506,148 @@ json.NewEncoder(w).Encode(assistant.SetModelResponse{
 Success: true,
 Model:   req.Model,
 })
+}
+
+// handleAssistantRunTests runs the model test suite asynchronously
+func handleAssistantRunTests(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Model string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Model == "" {
+		http.Error(w, "Model name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Run tests asynchronously
+	go runModelTests(req.Model)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Tests started in background",
+		"model":   req.Model,
+	})
+}
+
+// runModelTests executes the model test suite using the test-model-comparison.sh script
+func runModelTests(model string) {
+	cmd := exec.Command("bash", "scripts/test-model-comparison.sh", "--baseline-only", model)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("[Model Tests] Error running tests for %s: %v\n%s", model, err, string(output))
+		return
+	}
+
+	log.Printf("[Model Tests] Tests completed for %s\n%s", model, string(output))
+}
+
+// Training state tracking (in-memory)
+var trainingStatus = make(map[string]map[string]interface{})
+
+// handleAssistantTrainModel initiates model training
+func handleAssistantTrainModel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Model string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Model == "" {
+		http.Error(w, "Model name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Initialize training status
+	trainingStatus[req.Model] = map[string]interface{}{
+		"status":             "in_progress",
+		"started_at":         time.Now(),
+		"examples_processed": 0,
+		"completed":          false,
+	}
+
+	// Run training asynchronously
+	go trainModel(req.Model)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Training started in background",
+		"model":   req.Model,
+	})
+}
+
+// trainModel executes model training using the train-model.sh script
+func trainModel(model string) {
+	cmd := exec.Command("bash", "scripts/train-model.sh", model)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("[Model Training] Error training %s: %v\n%s", model, err, string(output))
+		trainingStatus[model]["completed"] = true
+		trainingStatus[model]["status"] = "failed"
+		return
+	}
+
+	log.Printf("[Model Training] Training completed for %s\n%s", model, string(output))
+	
+	// Update training status
+	trainingStatus[model]["completed"] = true
+	trainingStatus[model]["status"] = "completed"
+	trainingStatus[model]["examples_processed"] = 50 // We have 50 training examples
+}
+
+// handleAssistantTrainingStatus returns training progress
+func handleAssistantTrainingStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract model name from URL path
+	model := strings.TrimPrefix(r.URL.Path, "/api/assistant/training-status/")
+	if model == "" {
+		http.Error(w, "Model name required", http.StatusBadRequest)
+		return
+	}
+
+	status, exists := trainingStatus[model]
+	if !exists {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"completed": false,
+			"status":    "not_started",
+			"model":     model,
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"completed":          status["completed"],
+		"status":             status["status"],
+		"examples_processed": status["examples_processed"],
+		"model":              model,
+	})
 }
 
 // Vision Configuration handler

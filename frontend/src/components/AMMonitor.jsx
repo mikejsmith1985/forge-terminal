@@ -1,33 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, AlertCircle, Heart } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Activity, Circle, Eye, EyeOff, MessageSquare } from 'lucide-react';
 import ConversationViewer from './ConversationViewer';
 import { AM_CONFIG } from '../config';
 
 /**
- * AMMonitor - Displays AM system health and LLM conversation activity
+ * AMMonitor - Simplified AM status indicator
+ * 
+ * Design principles:
+ * 1. Simple status: Recording ON/OFF
+ * 2. Activity indicator when capturing
+ * 3. Click to view conversations
+ * 4. No confusing metrics
+ * 
  * Only visible in Dev Mode
  */
 const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
-  const [health, setHealth] = useState(null);
-  const [hasLLMActivity, setHasLLMActivity] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [hasActivity, setHasActivity] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [conversationCount, setConversationCount] = useState(0);
   const [conversations, setConversations] = useState([]);
   const [viewingConversation, setViewingConversation] = useState(null);
-  const [projectName, setProjectName] = useState('');
+  const [lastActivityTime, setLastActivityTime] = useState(null);
   const [pollingInterval] = useState(() => AM_CONFIG.getPollingInterval());
 
-  // Helper to detect project from metadata
-  const detectProject = (metadata) => {
-    if (!metadata || !metadata.workingDirectory) return 'adhoc';
-    
-    const path = metadata.workingDirectory;
-    const parts = path.split('/');
-    const dirName = parts[parts.length - 1];
-    
-    // Simple heuristic - use last directory name
-    return dirName || 'adhoc';
-  };
+  // Normalize paths for display (handle Windows backslashes)
+  const normalizePath = useCallback((path) => {
+    if (!path) return '';
+    // Replace Windows backslashes with forward slashes
+    return path.replace(/\\/g, '/');
+  }, []);
+
+  // Get project name from path
+  const getProjectName = useCallback((path) => {
+    if (!path) return null;
+    const normalized = normalizePath(path);
+    const parts = normalized.split('/').filter(Boolean);
+    // Get the last non-empty part
+    return parts.length > 0 ? parts[parts.length - 1] : null;
+  }, [normalizePath]);
 
   useEffect(() => {
     if (!devMode) {
@@ -35,7 +45,7 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
       return;
     }
 
-    const checkHealth = async () => {
+    const checkStatus = async () => {
       try {
         const [healthRes, convRes] = await Promise.all([
           fetch('/api/am/health'),
@@ -44,31 +54,35 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
 
         if (healthRes.ok) {
           const healthData = await healthRes.json();
-          setHealth(healthData);
+          const status = healthData?.status || 'UNKNOWN';
+          setIsRecording(status === 'HEALTHY' && amEnabled);
+          
+          // Check for recent activity (within last 30 seconds)
+          const lastCapture = healthData?.metrics?.lastCaptureTime;
+          if (lastCapture) {
+            const lastTime = new Date(lastCapture);
+            const now = new Date();
+            const diffSeconds = (now - lastTime) / 1000;
+            setHasActivity(diffSeconds < 30);
+            setLastActivityTime(lastTime);
+          }
         }
 
         if (convRes && convRes.ok) {
           const convData = await convRes.json();
-          const count = convData.count || 0;
           const convList = convData.conversations || [];
-          setConversationCount(count);
           setConversations(convList);
-          setHasLLMActivity(count > 0);
-          
-          // Detect project from most recent conversation
-          if (convList.length > 0 && convList[0].metadata) {
-            setProjectName(detectProject(convList[0].metadata));
-          }
         }
       } catch (err) {
-        console.error('[AMMonitor] Health check failed:', err);
+        console.error('[AMMonitor] Status check failed:', err);
+        setIsRecording(false);
       } finally {
         setLoading(false);
       }
     };
 
-    checkHealth();
-    const interval = setInterval(checkHealth, pollingInterval);
+    checkStatus();
+    const interval = setInterval(checkStatus, pollingInterval);
     return () => clearInterval(interval);
   }, [tabId, amEnabled, devMode, pollingInterval]);
 
@@ -78,67 +92,108 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
 
   if (loading) {
     return (
-      <div className="am-monitor am-loading" title="Checking AM system...">
+      <div className="am-monitor am-loading" title="Checking AM status...">
         <Activity size={14} />
-        <span>AM...</span>
+        <span>AM</span>
       </div>
     );
   }
 
-  const systemStatus = health?.status || 'UNKNOWN';
-  const conversationsActive = health?.metrics?.conversationsActive || 0;
-  const snapshotsCaptured = health?.metrics?.snapshotsCaptured || 0;
-  const inputBytes = health?.metrics?.inputBytesCaptured || 0;
-  const outputBytes = health?.metrics?.outputBytesCaptured || 0;
+  // Determine display state
+  const hasConversations = conversations.length > 0;
+  const activeConversation = conversations.find(c => !c.complete);
+  const projectName = activeConversation?.metadata?.workingDirectory 
+    ? getProjectName(activeConversation.metadata.workingDirectory)
+    : null;
 
-  const statusClass = {
-    'HEALTHY': 'am-active',
-    'WARNING': 'am-warning',
-    'DEGRADED': 'am-warning',
-    'CRITICAL': 'am-inactive',
-    'FAILED': 'am-inactive',
-    'NOT_INITIALIZED': 'am-disabled'
-  }[systemStatus] || 'am-disabled';
+  // Build status class
+  let statusClass = 'am-disabled';
+  if (!amEnabled) {
+    statusClass = 'am-disabled';
+  } else if (hasActivity) {
+    statusClass = 'am-recording';
+  } else if (isRecording) {
+    statusClass = 'am-active';
+  }
 
-  const statusIcon = systemStatus === 'HEALTHY' ? (
-    <Heart size={14} className="pulse" />
-  ) : (systemStatus === 'CRITICAL' || systemStatus === 'FAILED') ? (
-    <AlertCircle size={14} />
-  ) : (
-    <Activity size={14} />
-  );
-
-  const formatBytes = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
+  // Build tooltip
+  const buildTooltip = () => {
+    const lines = [];
+    
+    if (!amEnabled) {
+      lines.push('Conversation logging: OFF');
+      lines.push('Enable via tab context menu');
+    } else if (hasActivity) {
+      lines.push('🔴 Recording conversation');
+      if (projectName) lines.push(`Project: ${projectName}`);
+      if (activeConversation) {
+        const provider = activeConversation.provider || 'unknown';
+        lines.push(`Provider: ${provider}`);
+      }
+    } else if (isRecording) {
+      lines.push('Logging: Ready');
+      lines.push('Waiting for LLM activity');
+    } else {
+      lines.push('Logging: Initializing...');
+    }
+    
+    if (hasConversations) {
+      lines.push('');
+      lines.push(`${conversations.length} conversation${conversations.length !== 1 ? 's' : ''} this session`);
+      lines.push('Click to view');
+    }
+    
+    return lines.join('\n');
   };
 
-  const title = `AM System: ${systemStatus}\nProject: ${projectName || 'adhoc'}\nActive: ${conversationsActive} | Tracked: ${conversationCount}\nSnapshots: ${snapshotsCaptured} | Input: ${formatBytes(inputBytes)} | Output: ${formatBytes(outputBytes)}\n\nClick to view conversations`;
-
   const handleClick = () => {
-    if (conversations.length > 0) {
+    if (hasConversations) {
       // Open the most recent conversation
       setViewingConversation(conversations[0]);
     }
   };
 
+  // Build display text
+  const getDisplayText = () => {
+    if (!amEnabled) {
+      return 'Log Off';
+    }
+    if (hasActivity && projectName) {
+      return projectName;
+    }
+    if (hasActivity) {
+      return 'Recording';
+    }
+    if (hasConversations) {
+      return `${conversations.length} log${conversations.length !== 1 ? 's' : ''}`;
+    }
+    return 'Log On';
+  };
+
+  // Build icon
+  const getIcon = () => {
+    if (!amEnabled) {
+      return <EyeOff size={14} />;
+    }
+    if (hasActivity) {
+      return <Circle size={14} className="recording-dot" fill="currentColor" />;
+    }
+    if (hasConversations) {
+      return <MessageSquare size={14} />;
+    }
+    return <Eye size={14} />;
+  };
+
   return (
     <>
       <div 
-        className={`am-monitor ${statusClass} ${conversationCount > 0 ? 'clickable' : ''}`} 
-        title={title}
-        onClick={conversationCount > 0 ? handleClick : undefined}
-        style={{ cursor: conversationCount > 0 ? 'pointer' : 'default' }}
+        className={`am-monitor ${statusClass} ${hasConversations ? 'clickable' : ''}`} 
+        title={buildTooltip()}
+        onClick={hasConversations ? handleClick : undefined}
+        style={{ cursor: hasConversations ? 'pointer' : 'default' }}
       >
-        {statusIcon}
-        <span>
-          {systemStatus === 'HEALTHY' 
-            ? `${projectName || 'AM'} (${conversationCount})` 
-            : `AM ${systemStatus}`}
-        </span>
+        {getIcon()}
+        <span>{getDisplayText()}</span>
       </div>
 
       {viewingConversation && (

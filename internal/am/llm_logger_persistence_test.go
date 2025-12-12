@@ -54,6 +54,8 @@ func TestLLMLogger_BatchPersistence_SavesAfterThreshold(t *testing.T) {
 		// For now, we're just checking implementation exists
 	}
 
+	// Wait for async writes to complete before test cleanup
+	WaitForPendingWrites()
 	t.Logf("Created 3 snapshots, file checked")
 }
 
@@ -108,6 +110,9 @@ func TestLLMLogger_SnapshotsPersisted_OnConversationEnd(t *testing.T) {
 	if len(conv.ScreenSnapshots) < snapshots {
 		t.Errorf("Snapshots lost during end: had %d, now %d", snapshots, len(conv.ScreenSnapshots))
 	}
+
+	// Wait for async writes to complete before checking disk
+	WaitForPendingWrites()
 
 	// Verify conversation was persisted to disk (check for any matching file)
 	files, err := filepath.Glob(filepath.Join(tmpDir, "*conv*.json"))
@@ -187,6 +192,7 @@ func TestLLMLogger_MultipleSnapshots_AllPreserved(t *testing.T) {
 	}
 
 	t.Logf("✓ All %d snapshots unique and preserved", expectedCount)
+	WaitForPendingWrites()
 }
 
 // TestLLMLogger_SnapshotSave_PreservesOrdering tests that snapshots maintain order
@@ -240,4 +246,5 @@ func TestLLMLogger_SnapshotSave_PreservesOrdering(t *testing.T) {
 	}
 
 	t.Logf("✓ All %d snapshots in correct order with proper sequence numbers", len(contents))
+	WaitForPendingWrites()
 }

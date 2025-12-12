@@ -1,0 +1,45 @@
+{
+  "id": "session-recovery",
+  "name": "🔄 Restore Session",
+  "description": "Recover an interrupted AI conversation and continue with Copilot or Claude",
+  "category": "productivity",
+  "tags": ["recovery", "restore", "session", "copilot", "claude", "am", "conversation"],
+  "command": "vision",
+  "visionType": "SESSION_RECOVERY",
+  "interactive": true,
+  "arguments": [],
+  "usage": {
+    "basic": "Click to open session recovery overlay",
+    "description": "Shows all recoverable sessions organized by project with preview and restore options"
+  },
+  "output": "Vision overlay with recoverable sessions",
+  "prerequisites": [
+    "AM Logging enabled for at least one tab",
+    "Previous AI conversations (Copilot, Claude, Aider) that were interrupted"
+  ],
+  "features": [
+    "View all recoverable sessions across all projects",
+    "Preview last exchange before restoring",
+    "Choose provider: Copilot or Claude",
+    "See session metadata: turns, duration, git branch",
+    "Keyboard navigation: ↑↓ to navigate, Enter to select"
+  ],
+  "workflow": [
+    "1. Click 'Restore Session' command card",
+    "2. Session Recovery overlay appears",
+    "3. Browse sessions by project",
+    "4. Click 'Preview' to see context",
+    "5. Click 'Copilot' or 'Claude' to restore",
+    "6. AI command with context is injected into terminal"
+  ],
+  "hints": [
+    "Sessions are stored by project name, not tab ID",
+    "You can restore sessions in any tab",
+    "Recovery works across Forge restarts",
+    "Enable Dev Mode to see AM Monitor in status bar"
+  ],
+  "relatedCommands": [
+    "AM Logging (right-click tab)",
+    "Conversation Viewer (click AM Monitor)"
+  ]
+}

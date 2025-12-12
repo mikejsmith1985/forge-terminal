@@ -571,6 +571,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
     },
     isWaitingForPrompt: () => isWaiting,
+    // Vision overlay control methods
+    showVisionOverlay: (overlayConfig) => {
+      setActiveVisionOverlay(overlayConfig);
+    },
+    hideVisionOverlay: () => {
+      setActiveVisionOverlay(null);
+    },
   }));
   
   // Vision action handler
@@ -581,6 +588,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         logger.terminal('Vision command injected', { tabId, command: action.command });
         // Dismiss overlay after action
         setActiveVisionOverlay(null);
+      }
+    } else if (action.type === 'SHOW_ERROR' && action.message) {
+      // Show error via terminal write
+      if (xtermRef.current) {
+        xtermRef.current.writeln(`\r\n\x1b[31mError: ${action.message}\x1b[0m\r\n`);
       }
     }
   }, [tabId]);

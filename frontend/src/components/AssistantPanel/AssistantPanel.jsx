@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
 import CommandPreview from './CommandPreview';
+import ModelTestModal from './ModelTestModal';
+import ModelTestStatus from './ModelTestStatus';
+import TrainModelModal from './TrainModelModal';
+import TrainModelStatus from './TrainModelStatus';
 import './AssistantPanel.css';
 
 const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) => {
@@ -13,6 +17,21 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+
+  // Model test state
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [pendingModel, setPendingModel] = useState(null);
+  const [testInProgress, setTestInProgress] = useState(false);
+  const [testProgress, setTestProgress] = useState(0);
+  const [testMessage, setTestMessage] = useState('Running baseline tests...');
+  const [testCanChat, setTestCanChat] = useState(true);
+
+  // Model training state
+  const [showTrainModal, setShowTrainModal] = useState(false);
+  const [trainingInProgress, setTrainingInProgress] = useState(false);
+  const [trainingProgress, setTrainingProgress] = useState(0);
+  const [trainingMessage, setTrainingMessage] = useState('Starting training...');
+  const [trainingModel, setTrainingModel] = useState(null);
 
   // Check Ollama status on mount
   useEffect(() => {
@@ -144,6 +163,7 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
     
     setIsChangingModel(true);
     setError(null);
+    setPendingModel(newModel);
     
     try {
       const response = await fetch('/api/assistant/model', {
@@ -165,6 +185,15 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
           content: `Switched to ${getModelDisplayName(newModel)}`,
           timestamp: new Date().toISOString(),
         }]);
+        
+        // Show test modal
+        setShowTestModal(true);
+        
+        // Also show training modal after showing test modal
+        setTimeout(() => {
+          setShowTrainModal(true);
+          setTrainingModel(newModel);
+        }, 500);
       } else {
         setError(data.error || 'Failed to change model');
       }
@@ -188,6 +217,141 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
     return parts.join(' • ');
   };
 
+  const handleTestModalConfirm = async () => {
+    if (!pendingModel) return;
+    
+    setShowTestModal(false);
+    setTestInProgress(true);
+    setTestProgress(0);
+    setTestMessage('Running baseline tests...');
+    setTestCanChat(false);
+    
+    try {
+      const response = await fetch('/api/assistant/run-tests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: pendingModel }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setTestMessage('Tests completed! Generating report...');
+        setTestProgress(100);
+        setTestCanChat(true);
+        
+        // Show success message
+        setMessages(prev => [...prev, {
+          role: 'system',
+          content: `✓ Model tests completed! Results: ${data.accuracy || 'N/A'}% accuracy. ${data.reportPath ? 'Opening report...' : ''}`,
+          timestamp: new Date().toISOString(),
+        }]);
+        
+        // Auto-open report if available
+        if (data.reportPath) {
+          window.open(data.reportPath, '_blank');
+        }
+      } else {
+        setTestMessage('Tests failed - see error below');
+        setError(data.error || 'Failed to run tests');
+        setTestCanChat(true);
+      }
+    } catch (err) {
+      console.error('Test error:', err);
+      setTestMessage('Tests error - see message');
+      setError(`Failed to run tests: ${err.message}`);
+      setTestCanChat(true);
+    } finally {
+      // Keep status bar visible for 5 seconds after completion
+      setTimeout(() => {
+        setTestInProgress(false);
+      }, 5000);
+    }
+  };
+
+  const handleTestModalCancel = () => {
+    setShowTestModal(false);
+    setPendingModel(null);
+  };
+
+  const handleTrainModalConfirm = async () => {
+    if (!trainingModel) return;
+    
+    setShowTrainModal(false);
+    setTrainingInProgress(true);
+    setTrainingProgress(0);
+    setTrainingMessage('Starting model training...');
+    
+    try {
+      const response = await fetch('/api/assistant/train-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: trainingModel }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setTrainingMessage('Training in progress: Processing knowledge base...');
+        setTrainingProgress(50);
+        
+        // Simulate progress during training
+        const progressInterval = setInterval(() => {
+          setTrainingProgress(prev => {
+            if (prev >= 90) {
+              clearInterval(progressInterval);
+              return prev;
+            }
+            return prev + Math.random() * 15;
+          });
+        }, 2000);
+        
+        // Poll for completion
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await fetch(`/api/assistant/training-status/${trainingModel}`);
+            const statusData = await statusRes.json();
+            
+            if (statusData.completed) {
+              clearInterval(pollInterval);
+              clearInterval(progressInterval);
+              
+              setTrainingProgress(100);
+              setTrainingMessage(`Training complete! Model learned ${statusData.examples_processed} concepts about Forge Terminal.`);
+              
+              // Show success message
+              setMessages(prev => [...prev, {
+                role: 'system',
+                content: `✓ Model training complete! ${trainingModel} has been trained on 50 Forge Terminal knowledge examples.`,
+                timestamp: new Date().toISOString(),
+              }]);
+              
+              // Auto-dismiss after 10 seconds
+              setTimeout(() => {
+                setTrainingInProgress(false);
+              }, 10000);
+            }
+          } catch (err) {
+            console.error('Status check error:', err);
+          }
+        }, 3000);
+      } else {
+        setTrainingMessage('Training failed - see error');
+        setError(data.error || 'Failed to train model');
+      }
+    } catch (err) {
+      console.error('Training error:', err);
+      setTrainingMessage('Training error - see message');
+      setError(`Failed to train model: ${err.message}`);
+      setTrainingInProgress(false);
+    }
+  };
+
+  const handleTrainModalCancel = () => {
+    setShowTrainModal(false);
+    setTrainingModel(null);
+  };
+
   const getCurrentModelInfo = () => {
     if (!selectedModel) return null;
     return ollamaStatus.models.find(m => m.name === selectedModel);
@@ -197,6 +361,40 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
 
   return (
     <div className="assistant-panel" style={{ ['--assistant-font-size']: `${assistantFontSize || 14}px` }}>
+      {/* Model Test Modal */}
+      <ModelTestModal
+        modelName={pendingModel ? getModelDisplayName(pendingModel) : ''}
+        isOpen={showTestModal}
+        onConfirm={handleTestModalConfirm}
+        onCancel={handleTestModalCancel}
+        isLoading={false}
+      />
+
+      {/* Model Test Status Bar */}
+      <ModelTestStatus
+        isActive={testInProgress}
+        progress={testProgress}
+        message={testMessage}
+        canChat={testCanChat}
+      />
+
+      {/* Model Training Modal */}
+      <TrainModelModal
+        modelName={trainingModel ? getModelDisplayName(trainingModel) : ''}
+        isOpen={showTrainModal}
+        onConfirm={handleTrainModalConfirm}
+        onCancel={handleTrainModalCancel}
+        isLoading={false}
+      />
+
+      {/* Model Training Status Bar */}
+      <TrainModelStatus
+        isActive={trainingInProgress}
+        progress={trainingProgress}
+        message={trainingMessage}
+        isTraining={trainingInProgress}
+      />
+
       <div className="assistant-header">
         <div className="assistant-title">
           <span className="assistant-icon">🤖</span>

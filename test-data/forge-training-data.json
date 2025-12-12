@@ -1,0 +1,322 @@
+{
+  "model_training_data": {
+    "version": "1.0",
+    "created": "2025-12-11",
+    "total_examples": 50,
+    "description": "Comprehensive training dataset for Forge Terminal knowledge",
+    "categories": {
+      "core_features": "Essential terminal features and capabilities",
+      "command_cards": "Command card creation and usage",
+      "theming": "Color themes and visual customization",
+      "shortcuts": "Keyboard shortcuts and productivity",
+      "windows_specific": "WSL and Windows-only features",
+      "security": "File access and security features",
+      "assistant": "Forge Assistant and AI features",
+      "troubleshooting": "Common issues and solutions",
+      "configuration": "Settings and configuration",
+      "deployment": "Installation and deployment options"
+    }
+  },
+  "training_examples": [
+    {
+      "id": "train_001",
+      "category": "core_features",
+      "question": "What is Forge Terminal?",
+      "answer": "Forge Terminal is a standalone, cross-platform terminal application designed for AI-assisted development. It combines a full-featured terminal with command cards - saved commands that can be executed or pasted with a single click or keyboard shortcut. One of its key strengths is that it requires only a single binary - no Docker, Node.js, or complex configuration needed."
+    },
+    {
+      "id": "train_002",
+      "category": "core_features",
+      "question": "What is the full PTY terminal?",
+      "answer": "Forge Terminal features a full PTY (pseudo-terminal) using xterm.js for real interactive terminal support. This means you can run fully interactive CLI applications like vim, htop, node REPL, Python interactive shell, and any other terminal-based tool that requires real PTY support."
+    },
+    {
+      "id": "train_003",
+      "category": "core_features",
+      "question": "How many tabs can I have open at once?",
+      "answer": "Forge Terminal supports up to 20 terminal tabs open simultaneously. Each tab runs independently, can have its own theme, and maintains its own working directory and shell state. Tabs are persisted across sessions, so when you close and reopen Forge, your tabs will be restored exactly as you left them."
+    },
+    {
+      "id": "train_004",
+      "category": "core_features",
+      "question": "What is session persistence?",
+      "answer": "Session persistence automatically saves and restores your Forge Terminal state, including: all open tabs, their working directories, chosen themes per tab, sidebar position and width, font sizes, and search history. The state is saved in ~/.forge/sessions.json and loaded automatically when you restart Forge."
+    },
+    {
+      "id": "train_005",
+      "category": "core_features",
+      "question": "How do I search in the terminal output?",
+      "answer": "Use Ctrl+F to open the search dialog in Forge Terminal. Type your search query to find matching text in the terminal buffer. Use Enter or the down arrow to navigate to the next match, and Shift+Enter or the up arrow for the previous match. Press Escape to close the search dialog. All matches are highlighted in the output."
+    },
+    {
+      "id": "train_006",
+      "category": "command_cards",
+      "question": "What are command cards?",
+      "answer": "Command cards are saved commands that you can execute or paste with a single click or keyboard shortcut. They're perfect for frequently used commands like 'npm run build', 'git commit', or 'docker ps'. Each card can have a description, emoji or icon for visual identification, and can be customized to either execute immediately or paste for editing."
+    },
+    {
+      "id": "train_007",
+      "category": "command_cards",
+      "question": "How do I create a new command card?",
+      "answer": "Click the '+Add' button in the Commands sidebar, or use the menu. Enter the command text, give it a description, choose an icon (emoji or Lucide icon), and select whether to paste or execute it. Command cards are stored in ~/.forge/commands.json and can be exported/imported across machines."
+    },
+    {
+      "id": "train_008",
+      "category": "command_cards",
+      "question": "What keyboard shortcuts are available for command cards?",
+      "answer": "Forge Terminal provides 35+ keyboard shortcuts for command cards. The first 9 cards use Ctrl+Shift+1 through Ctrl+Shift+9. Card 11-36 use Ctrl+Shift+A through Ctrl+Shift+Z (skipping I and O for clarity). Each shortcut is configurable per card, making it easy to execute your most-used commands instantly."
+    },
+    {
+      "id": "train_009",
+      "category": "command_cards",
+      "question": "What's the difference between paste and execute mode?",
+      "answer": "In execute mode, the command runs immediately when you press the shortcut. In paste mode, the command is pasted into the terminal but not executed, allowing you to add parameters or modify it before pressing Enter. For example, use paste mode for 'git commit -m' so you can add your commit message, but execute mode for 'git status' since it needs no parameters."
+    },
+    {
+      "id": "train_010",
+      "category": "command_cards",
+      "question": "Can I reorder my command cards?",
+      "answer": "Yes! Command cards can be reordered using drag and drop. Simply click and drag a card to move it to a new position in the sidebar. The new order is saved automatically to ~/.forge/commands.json, so your arrangement persists across sessions."
+    },
+    {
+      "id": "train_011",
+      "category": "theming",
+      "question": "How many color themes are available?",
+      "answer": "Forge Terminal includes 10 built-in color themes: Molten Metal, Deep Ocean, Emerald Forest, Midnight Purple, Rose Gold, Arctic Frost, plus 4 high-contrast accessibility themes designed for color-blind users. Each theme comes in both light and dark modes, giving you 20 unique visual options."
+    },
+    {
+      "id": "train_012",
+      "category": "theming",
+      "question": "Can I have different themes in different tabs?",
+      "answer": "Yes! Each tab can independently choose its own color theme. This is useful for visually distinguishing different projects or contexts. You can cycle through themes using the theme selector button in the toolbar, and each tab maintains its own preference across sessions."
+    },
+    {
+      "id": "train_013",
+      "category": "theming",
+      "question": "Can each tab have its own light/dark mode setting?",
+      "answer": "Yes! Each tab independently supports both light and dark modes. You can right-click on a tab to toggle between light and dark mode. This is saved per-tab, so tab 1 might be in dark mode while tab 2 is in light mode. Combined with the 10 color themes, you get ultimate visual flexibility."
+    },
+    {
+      "id": "train_014",
+      "category": "theming",
+      "question": "How do I adjust font sizes?",
+      "answer": "Forge Terminal provides dual font size controls accessible from the toolbar. The terminal font size (for shell output) and the assistant chat font size are controlled independently, ranging from 8px to 30px. Changes apply immediately and are saved for your next session. Use the +/- buttons or keyboard shortcuts to adjust."
+    },
+    {
+      "id": "train_015",
+      "category": "shortcuts",
+      "question": "What are the tab navigation shortcuts?",
+      "answer": "Navigate between tabs using: Ctrl+Tab to go to the next tab, Shift+Ctrl+Tab to go to the previous tab. You can also use Ctrl+1 through Ctrl+9 to jump directly to tabs 1-9. Ctrl+T creates a new tab, and Ctrl+W closes the current tab. These shortcuts make tab switching fast and intuitive."
+    },
+    {
+      "id": "train_016",
+      "category": "shortcuts",
+      "question": "How do I control the command card sidebar?",
+      "answer": "Use Ctrl+Alt+S to toggle the command card sidebar visibility. You can also drag the right edge of the sidebar to resize it (200-800px). The sidebar can be positioned on the left or right side using the sidebar position button in the toolbar. Width and position are saved across sessions."
+    },
+    {
+      "id": "train_017",
+      "category": "shortcuts",
+      "question": "What clipboard shortcuts work in Forge?",
+      "answer": "Ctrl+C copies selected text to clipboard (or sends SIGINT if no selection). Ctrl+V pastes from clipboard. Ctrl+A selects all terminal text. Unlike some terminals, Forge intelligently distinguishes between copy intent (when text is selected) and interrupt intent (when nothing is selected), matching VS Code's behavior."
+    },
+    {
+      "id": "train_018",
+      "category": "windows_specific",
+      "question": "Does Forge work on Windows?",
+      "answer": "Yes! Forge is cross-platform and fully supports Windows. It can run with CMD, PowerShell, or WSL shells. The shell selector in settings lets you choose which shell to use. Path translation is automatic, so Windows paths are converted to WSL format when needed."
+    },
+    {
+      "id": "train_019",
+      "category": "windows_specific",
+      "question": "How do I use WSL with Forge?",
+      "answer": "Forge has native WSL integration. Go to Settings and select WSL from the shell type dropdown. Forge will automatically detect your installed WSL distros and let you choose which one to use. It handles path translation automatically, converting Windows paths to WSL format seamlessly. Your working directory is preserved across shell types."
+    },
+    {
+      "id": "train_020",
+      "category": "windows_specific",
+      "question": "Can I switch between CMD, PowerShell, and WSL?",
+      "answer": "Yes! The shell selector in Settings lets you switch between CMD, PowerShell, and WSL at any time. When you switch, Forge starts a new terminal session with the selected shell. Each tab can use a different shell, allowing you to run different shell types simultaneously."
+    },
+    {
+      "id": "train_021",
+      "category": "security",
+      "question": "What are file access modes?",
+      "answer": "Forge Terminal has two file access modes: Restricted (default) limits file operations to your project directory for safety, and Unrestricted allows full filesystem access. You can toggle this in Settings. Security prompts appear for sensitive file operations, and there's full audit logging of all file access."
+    },
+    {
+      "id": "train_022",
+      "category": "security",
+      "question": "What is project-scoped file access?",
+      "answer": "In project-scoped (restricted) mode, the file explorer can only access files within your project directory. This prevents accidental deletion or modification of system files. However, the terminal itself still has full access - you can run any command you want. This is a UI safety feature, not a security boundary."
+    },
+    {
+      "id": "train_023",
+      "category": "security",
+      "question": "How does Forge handle sensitive file operations?",
+      "answer": "When you attempt sensitive file operations like delete or modify, Forge shows a confirmation dialog. The file access mode also affects this behavior. In restricted mode, operations outside the project directory require explicit confirmation. All file operations are logged to ~/.forge/audit.log for your records."
+    },
+    {
+      "id": "train_024",
+      "category": "assistant",
+      "question": "What is the Forge Assistant?",
+      "answer": "The Forge Assistant is an experimental AI-powered chat panel integrated into the Forge sidebar. It provides context-aware suggestions based on your terminal state and can answer questions about the Forge Terminal application itself. To use it, you need Ollama running locally (download from ollama.ai) with a compatible model like mistral or neural-chat."
+    },
+    {
+      "id": "train_025",
+      "category": "assistant",
+      "question": "How do I enable the Forge Assistant?",
+      "answer": "Enable Dev Mode in Settings (checkbox at bottom), then look for the 'Assistant' tab in the sidebar. To use it, you need Ollama running: 'ollama serve' in a terminal. Then pull a model like 'ollama pull mistral:7b'. The assistant will appear in the sidebar when Ollama is running."
+    },
+    {
+      "id": "train_026",
+      "category": "assistant",
+      "question": "What models work with Forge Assistant?",
+      "answer": "Any Ollama model can be used with Forge Assistant. Popular options include mistral:7b-instruct for speed, neural-chat:7b for balance, and llama2:13b for more capability. The model selector in the assistant panel shows all available models. You can switch models anytime by selecting a new one from the dropdown."
+    },
+    {
+      "id": "train_027",
+      "category": "assistant",
+      "question": "What is RAG (Retrieval-Augmented Generation)?",
+      "answer": "RAG is a technique where the assistant retrieves relevant documentation before generating responses. Forge Assistant uses RAG to index your project's documentation (files in docs/ directory) and provide accurate, project-specific answers. This makes it much more helpful than a generic AI model, since it knows about your actual codebase and features."
+    },
+    {
+      "id": "train_028",
+      "category": "assistant",
+      "question": "Can the assistant see my terminal output?",
+      "answer": "The Forge Assistant is context-aware and can see limited information about your terminal state when you ask questions about your work. However, it doesn't have access to your sensitive data. When you ask questions like 'What's wrong with this error?', you can paste the error message into the chat, and it will help analyze it."
+    },
+    {
+      "id": "train_029",
+      "category": "troubleshooting",
+      "question": "Why is my terminal not responding?",
+      "answer": "If the terminal appears frozen, press Ctrl+C to send SIGINT to any running process. If that doesn't work, close the tab (Ctrl+W) and create a new one. Check that your shell command isn't waiting for input. You can also enable AM (Artificial Memory) to capture terminal state for debugging."
+    },
+    {
+      "id": "train_030",
+      "category": "troubleshooting",
+      "question": "How do I recover a closed tab's session?",
+      "answer": "Forge automatically persists your session in ~/.forge/sessions.json. When you close Forge, all open tabs are saved. When you restart, your tabs will be restored exactly as you left them, including working directory and recent commands. If you want to recover an older session, check the test-results/ directory for backups."
+    },
+    {
+      "id": "train_031",
+      "category": "configuration",
+      "question": "Where are Forge settings stored?",
+      "answer": "Forge stores all configuration in ~/.forge/ directory: sessions.json for tab state, commands.json for command cards, settings.json for app settings, and am/ subdirectory for activity monitoring logs. These are plain JSON files you can view or backup manually if needed."
+    },
+    {
+      "id": "train_032",
+      "category": "configuration",
+      "question": "Can I export my command cards?",
+      "answer": "Yes! Your command cards are stored in ~/.forge/commands.json as plain JSON. You can copy this file to transfer your cards to another machine or backup location. Similarly, settings.json contains your preferences. Simply copy the entire ~/.forge directory to backup or migrate your setup."
+    },
+    {
+      "id": "train_033",
+      "category": "configuration",
+      "question": "How do I reset Forge to defaults?",
+      "answer": "To reset Forge to defaults, close the application and rename or delete ~/.forge/sessions.json. This removes your saved tabs. To reset all settings including commands and preferences, delete the entire ~/.forge directory and restart Forge. It will create a fresh configuration with defaults."
+    },
+    {
+      "id": "train_034",
+      "category": "deployment",
+      "question": "What deployment modes does Forge support?",
+      "answer": "Forge supports multiple deployment modes: LOCAL (download single binary and run), EMBEDDED (run from web browser via GitHub Pages), CODESPACES (run in GitHub Codespaces), and SELF-HOSTED (deploy on your own server). Each mode has different setup requirements and capabilities."
+    },
+    {
+      "id": "train_035",
+      "category": "deployment",
+      "question": "Can I run Forge in my browser?",
+      "answer": "Yes! Forge can run in your browser using the GitHub Pages deployment. This works on any device with a web browser - Mac, Linux, Windows, iPhone, iPad, etc. The setup wizard will guide you through the browser-based installation. It's perfect for accessing a terminal from any device without installing anything locally."
+    },
+    {
+      "id": "train_036",
+      "category": "core_features",
+      "question": "What is AM (Artificial Memory)?",
+      "answer": "AM is Forge's session logging feature that captures all terminal activity, including commands, output, and even TUI screen captures. AM logs are stored in ~/.forge/am/ and can be used for crash recovery, session review, and AI-assisted debugging. Enable AM per-tab by right-clicking and selecting 'AM Logging'."
+    },
+    {
+      "id": "train_037",
+      "category": "core_features",
+      "question": "How do I enable AM logging?",
+      "answer": "Right-click on a tab (when Dev Mode is enabled) and select 'AM Logging' to toggle it on or off for that tab. When enabled, all terminal activity is logged. You'll see an 'AM Logging' indicator on the tab. The logs are stored in ~/.forge/am/ with workspace-aware naming like 'workspace-name-YYYY-MM-DD.log'."
+    },
+    {
+      "id": "train_038",
+      "category": "core_features",
+      "question": "What is auto-respond mode?",
+      "answer": "Auto-respond automatically answers confirmation prompts in interactive CLI tools. For example, npm prompts asking 'Are you sure? (y/n)' can be auto-responded. Enable it per-tab by right-clicking and selecting 'Auto-respond' when Dev Mode is on. The response (yes/no) can be configured in settings."
+    },
+    {
+      "id": "train_039",
+      "category": "assistant",
+      "question": "What is Vision detection?",
+      "answer": "Vision detection is an experimental feature that automatically detects patterns in terminal output and shows interactive overlays. It can detect: git status with stage/unstage buttons, JSON blocks with pretty-printing, file paths with quick view/edit actions, compiler errors with context, and stack traces with frame analysis. Enable it in Dev Mode settings."
+    },
+    {
+      "id": "train_040",
+      "category": "assistant",
+      "question": "How do I configure Vision detectors?",
+      "answer": "In Settings (Dev Mode enabled), open Vision Configuration to toggle individual detectors on/off: JSON detection, Compiler error detection, Stack trace detection, Git detection, and File path detection. You can also adjust JSON minimum size and auto-dismiss behavior. Changes apply immediately to new terminal output."
+    },
+    {
+      "id": "train_041",
+      "category": "core_features",
+      "question": "Is there a desktop shortcut?",
+      "answer": "Yes! In Settings, click 'Create Desktop Shortcut' to add Forge to your desktop (Windows/Linux) or Applications folder (macOS). This lets you launch Forge by double-clicking, just like any native application. The shortcut links to your Forge binary, so it always runs the latest version."
+    },
+    {
+      "id": "train_042",
+      "category": "core_features",
+      "question": "How do I update Forge?",
+      "answer": "Forge checks for updates automatically and notifies you when a new version is available. Click the update notification to download the new binary. You can also check for updates manually via Settings > Check for Updates. The update process is seamless - just download and replace your binary."
+    },
+    {
+      "id": "train_043",
+      "category": "core_features",
+      "question": "Can I view previous Forge versions?",
+      "answer": "Yes! In the Update modal, you can view version history and rollback to previous releases if needed. This is useful if a newer version has issues - you can download an older, stable version. All releases are available in the Forge GitHub repository's releases page."
+    },
+    {
+      "id": "train_044",
+      "category": "troubleshooting",
+      "question": "How do I view AM logs?",
+      "answer": "AM logs are stored in ~/.forge/am/ directory. You can view them with any text editor or use 'cat ~/.forge/am/workspace-name-YYYY-MM-DD.log' in the terminal. Logs include all commands, output, and timestamps. For TUI apps like vim or htop, AM captures full screen snapshots periodically."
+    },
+    {
+      "id": "train_045",
+      "category": "troubleshooting",
+      "question": "Why is my assistant chat slow?",
+      "answer": "If the Forge Assistant is slow, check: 1) Is Ollama running? ('ollama serve' in a terminal), 2) How large is your model? (7B is faster than 13B), 3) How much RAM do you have? (Models need sufficient memory), 4) Is your disk full? (Can cause slowdowns). Try a smaller model like mistral:7b-instruct for better speed."
+    },
+    {
+      "id": "train_046",
+      "category": "troubleshooting",
+      "question": "How do I clear Forge data?",
+      "answer": "All Forge data is in ~/.forge/ directory. To clear specific data: delete sessions.json for tabs, commands.json for cards, settings.json for preferences. To completely reset, delete the entire ~/.forge/ directory. Forge will recreate it with defaults on next launch. Be sure to backup important data first!"
+    },
+    {
+      "id": "train_047",
+      "category": "configuration",
+      "question": "How do I customize keyboard shortcuts?",
+      "answer": "Command card shortcuts are configured per-card in the card editor. Click the card to edit it and set the desired shortcut (e.g., Ctrl+Shift+1, Ctrl+Shift+A). The system validates shortcuts to prevent conflicts. Other Forge shortcuts are built-in and not customizable currently, but feature requests are welcome!"
+    },
+    {
+      "id": "train_048",
+      "category": "deployment",
+      "question": "How do I get Forge from GitHub?",
+      "answer": "Visit https://github.com/mikejsmith1985/forge-terminal and click 'Releases' to find the latest version. Download the binary for your OS: forge-darwin (macOS), forge-linux (Linux), or forge.exe (Windows). Then make it executable ('chmod +x forge' on Mac/Linux) and run it. The interactive setup wizard helps with initial configuration."
+    },
+    {
+      "id": "train_049",
+      "category": "core_features",
+      "question": "What makes Forge different from other terminals?",
+      "answer": "Forge combines: 1) Single-binary simplicity (no Docker/config), 2) Full PTY terminal (interactive apps), 3) Command cards (saved commands), 4) AI-powered assistance, 5) Multi-tab support with persistence, 6) 10 beautiful themes, 7) Cross-platform (Mac/Linux/Windows), 8) No installation required. Just download and run!"
+    },
+    {
+      "id": "train_050",
+      "category": "configuration",
+      "question": "Can I sync Forge between multiple computers?",
+      "answer": "Yes! Copy your ~/.forge/ directory to backup or sync across machines using cloud storage (iCloud, Google Drive, OneDrive, Dropbox) or your own server. When you restore ~/.forge/ on another computer and start Forge, all your settings, command cards, and sessions will be available. Be careful not to sync while Forge is running on both machines simultaneously."
+    }
+  ]
+}

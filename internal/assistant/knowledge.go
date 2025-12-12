@@ -164,6 +164,13 @@ func (kb *KnowledgeBase) loadFeatures() {
 			Example:     "Right-click tab → AM Logging, then use 'Summarize' to review session",
 		},
 		{
+			Name:        "Session Recovery",
+			Description: "Restore interrupted AI conversations across tabs and sessions",
+			Category:    "Quality of Life",
+			Details:     "AM logs conversations by project name. When you return to a project, Forge detects recoverable sessions and offers to restore context with Copilot or Claude.",
+			Example:     "If Copilot session was interrupted, use /restore or click the recovery notification to continue where you left off",
+		},
+		{
 			Name:        "Auto-Respond",
 			Description: "Auto-respond to CLI confirmation prompts",
 			Category:    "Quality of Life",

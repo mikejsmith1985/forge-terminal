@@ -13,7 +13,7 @@ export default defineConfig({
     command: 'npm run preview',
     url: 'http://127.0.0.1:8333',
     reuseExistingServer: true,
-    timeout: 120 * 1000,
+    timeout: 10 * 1000, // Short timeout since we reuse existing server
   },
   projects: [
     {

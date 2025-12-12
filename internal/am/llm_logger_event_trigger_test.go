@@ -257,4 +257,7 @@ func TestLLMLogger_EventTriggers_Summary(t *testing.T) {
 		t.Errorf("Too many snapshots (%d) - suggests time-based trigger still active",
 			len(conv.ScreenSnapshots))
 	}
+	
+	// Wait for async writes before test cleanup
+	WaitForPendingWrites()
 }
