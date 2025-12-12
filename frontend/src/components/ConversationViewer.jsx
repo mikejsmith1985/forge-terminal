@@ -47,20 +47,20 @@ const ConversationViewer = ({ tabId, conversationId, onClose }) => {
     setCurrentSnapshotIndex(Math.min(maxIndex, currentSnapshotIndex + 1));
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Escape') {
-      onClose();
-    } else if (e.key === 'ArrowLeft') {
-      handlePrevious();
-    } else if (e.key === 'ArrowRight') {
-      handleNext();
-    }
-  };
-
   useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowLeft') {
+        handlePrevious();
+      } else if (e.key === 'ArrowRight') {
+        handleNext();
+      }
+    };
+    
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSnapshotIndex, conversation]);
+  }, [currentSnapshotIndex, conversation, onClose]);
 
   if (loading) {
     return (
