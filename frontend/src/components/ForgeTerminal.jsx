@@ -414,12 +414,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // Small delay to ensure the container is properly sized
       setTimeout(() => {
         fitAddonRef.current.fit();
-        // Critical fix: Re-focus after fit on visibility change
-        queueMicrotask(() => {
-          if (xtermRef.current) {
-            xtermRef.current.focus();
-          }
-        });
+        // Direct focus after fit (no nested microtask needed)
+        if (xtermRef.current) {
+          xtermRef.current.focus();
+        }
       }, 50);
     }
   }, [isVisible]);
@@ -430,23 +428,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     
     const handleWindowFocus = () => {
       if (xtermRef.current && isVisible) {
-        // Use queueMicrotask for more reliable focus recovery
-        queueMicrotask(() => {
-          if (xtermRef.current) {
-            xtermRef.current.focus();
-          }
-        });
+        // Direct focus - no queueMicrotask needed since we're already in event handler
+        xtermRef.current.focus();
       }
     };
 
     const handleVisibilityChange = () => {
       if (!document.hidden && xtermRef.current && isVisible) {
-        // Use queueMicrotask for more reliable focus recovery
-        queueMicrotask(() => {
-          if (xtermRef.current) {
-            xtermRef.current.focus();
-          }
-        });
+        // Direct focus - no queueMicrotask needed since we're already in event handler
+        xtermRef.current.focus();
       }
     };
 
@@ -651,30 +641,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     fitAddonRef.current = fitAddon;
-    
-    // Critical fix: Re-focus after fit addon loads (it steals focus during init)
-    queueMicrotask(() => {
-      term.focus();
-    });
 
     // Add search addon
     const searchAddon = new SearchAddon();
     term.loadAddon(searchAddon);
     searchAddonRef.current = searchAddon;
-    
-    // Critical fix: Re-focus after search addon loads
-    queueMicrotask(() => {
-      term.focus();
-    });
 
     // Open terminal
     term.open(terminalRef.current);
     xtermRef.current = term;
     
-    // Critical fix: Force focus immediately after terminal.open()
-    // This ensures the terminal textarea receives focus before React re-renders
-    queueMicrotask(() => {
-      term.focus();
+    // PERFORMANCE FIX: Single focus call after all initialization is complete
+    // Using requestAnimationFrame ensures DOM is fully rendered before focusing
+    // This replaces multiple scattered queueMicrotask calls that caused race conditions
+    requestAnimationFrame(() => {
+      if (xtermRef.current) {
+        xtermRef.current.focus();
+      }
     });
 
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
@@ -742,10 +725,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // Initial fit - PERFORMANCE FIX: Call directly instead of setTimeout(0)
     fitAddon.fit();
-    // Critical fix: Re-focus after fit() call (fit triggers hidden re-render)
-    queueMicrotask(() => {
-      term.focus();
-    });
 
     // Connect to WebSocket
     const connectWebSocket = () => {
