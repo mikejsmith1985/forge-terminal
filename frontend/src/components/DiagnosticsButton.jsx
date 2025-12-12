@@ -78,6 +78,24 @@ const DiagnosticsButton = ({
     };
   }, [isVisible]);
   
+  // Periodic focus restoration - aggressively restore focus when panel is open
+  useEffect(() => {
+    if (!isVisible || !isExpanded) return;
+    
+    const focusInterval = setInterval(() => {
+      // If diagnostics panel is open and terminal doesn't have focus, restore it
+      const activeEl = document.activeElement;
+      const isTerminalFocused = activeEl?.classList?.contains('xterm-helper-textarea');
+      
+      if (!isTerminalFocused && terminalRef?.current?.focus) {
+        console.log('[Diagnostics] Auto-restoring terminal focus from:', activeEl?.tagName);
+        terminalRef.current.focus();
+      }
+    }, 100); // Check every 100ms
+    
+    return () => clearInterval(focusInterval);
+  }, [isVisible, isExpanded, terminalRef]);
+  
   // Lockout detector - check for suspicious gaps in keyboard events
   useEffect(() => {
     if (!isVisible) return;
@@ -307,7 +325,14 @@ const DiagnosticsButton = ({
           <div className="diagnostics-header">
             <h4>🔍 Keyboard Diagnostics</h4>
             <div className="diagnostics-actions">
-              <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); copyToClipboard(); }} title="Copy to clipboard">
+              <button tabIndex={-1} onClick={(e) => { 
+                e.currentTarget.blur(); 
+                copyToClipboard();
+                // Restore focus to terminal after copy
+                if (terminalRef?.current?.focus) {
+                  setTimeout(() => terminalRef.current.focus(), 50);
+                }
+              }} title="Copy to clipboard">
                 <ClipboardCopy size={14} />
               </button>
               <button tabIndex={-1} onClick={(e) => { 
@@ -389,7 +414,8 @@ const DiagnosticsButton = ({
                   tabIndex={-1}
                   onClick={(e) => { 
                     e.currentTarget.blur(); 
-                    testSpacebar(); 
+                    testSpacebar();
+                    // Focus will be restored after test completes or times out
                   }}
                 >
                   Test Spacebar Now
@@ -427,6 +453,10 @@ const DiagnosticsButton = ({
                     onClick={(e) => { 
                       e.currentTarget.blur(); 
                       setSpacebarTest({ active: false, result: null });
+                      // Restore focus to terminal
+                      if (terminalRef?.current?.focus) {
+                        setTimeout(() => terminalRef.current.focus(), 50);
+                      }
                     }}
                   >
                     Test Again
@@ -459,7 +489,14 @@ const DiagnosticsButton = ({
                   Feedback
                 </button>
               )}
-              <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); captureDiagnostics(); }} className="btn-refresh">
+              <button tabIndex={-1} onClick={(e) => { 
+                e.currentTarget.blur(); 
+                captureDiagnostics();
+                // Restore focus to terminal after refresh
+                if (terminalRef?.current?.focus) {
+                  setTimeout(() => terminalRef.current.focus(), 50);
+                }
+              }} className="btn-refresh">
                 Refresh
               </button>
             </div>
