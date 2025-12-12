@@ -239,6 +239,11 @@ const DiagnosticsButton = ({
         });
         
         cleanup();
+        
+        // Restore focus to terminal after test
+        if (terminalRef?.current?.focus) {
+          setTimeout(() => terminalRef.current.focus(), 50);
+        }
       }
     };
     
@@ -304,7 +309,14 @@ const DiagnosticsButton = ({
               <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); copyToClipboard(); }} title="Copy to clipboard">
                 <ClipboardCopy size={14} />
               </button>
-              <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); setIsExpanded(false); }} title="Close">
+              <button tabIndex={-1} onClick={(e) => { 
+                e.currentTarget.blur(); 
+                setIsExpanded(false);
+                // Restore focus to terminal when closing panel
+                if (terminalRef?.current?.focus) {
+                  setTimeout(() => terminalRef.current.focus(), 50);
+                }
+              }} title="Close">
                 <X size={14} />
               </button>
             </div>
