@@ -414,10 +414,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // Small delay to ensure the container is properly sized
       setTimeout(() => {
         fitAddonRef.current.fit();
-        // Direct focus after fit (no nested microtask needed)
-        if (xtermRef.current) {
-          xtermRef.current.focus();
-        }
+        // BATTLE-TESTED: setTimeout(0) after fit to reclaim focus
+        setTimeout(() => {
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        }, 0);
       }, 50);
     }
   }, [isVisible]);
@@ -428,15 +430,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     
     const handleWindowFocus = () => {
       if (xtermRef.current && isVisible) {
-        // Direct focus - no queueMicrotask needed since we're already in event handler
-        xtermRef.current.focus();
+        // BATTLE-TESTED: Use setTimeout(0) for reliable focus recovery
+        setTimeout(() => {
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        }, 0);
       }
     };
 
     const handleVisibilityChange = () => {
       if (!document.hidden && xtermRef.current && isVisible) {
-        // Direct focus - no queueMicrotask needed since we're already in event handler
-        xtermRef.current.focus();
+        // BATTLE-TESTED: Use setTimeout(0) for reliable focus recovery
+        setTimeout(() => {
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        }, 0);
       }
     };
 
@@ -651,14 +661,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.open(terminalRef.current);
     xtermRef.current = term;
     
-    // PERFORMANCE FIX: Single focus call after all initialization is complete
-    // Using requestAnimationFrame ensures DOM is fully rendered before focusing
-    // This replaces multiple scattered queueMicrotask calls that caused race conditions
-    requestAnimationFrame(() => {
+    // BATTLE-TESTED FIX (Warp, Tabby, OSS terminals):
+    // Use setTimeout(0) to ensure focus happens AFTER the current event loop
+    // This is critical for spacebar to work on first load
+    setTimeout(() => {
       if (xtermRef.current) {
         xtermRef.current.focus();
       }
-    });
+    }, 0);
 
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
     // This runs BEFORE xterm processes the key and allows conditional intercept
@@ -723,8 +733,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       return true; // Let all other keys pass through standard xterm processing
     });
 
-    // Initial fit - PERFORMANCE FIX: Call directly instead of setTimeout(0)
+    // Initial fit - then re-focus (fit triggers hidden re-render that steals focus)
     fitAddon.fit();
+    setTimeout(() => {
+      if (xtermRef.current) {
+        xtermRef.current.focus();
+      }
+    }, 0);
 
     // Connect to WebSocket
     const connectWebSocket = () => {
