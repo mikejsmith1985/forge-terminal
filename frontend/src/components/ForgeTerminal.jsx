@@ -670,7 +670,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       
       if (isTerminalFocused && (e.key === ' ' || e.key === 'Enter')) {
         e.preventDefault();
-        e.stopPropagation();
+        // NOTE: Do NOT call stopPropagation() - xterm.js needs the event to reach its handlers
       }
     };
     
