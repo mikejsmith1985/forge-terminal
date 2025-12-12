@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
+import { executeCommand } from '../commands';
 import DiagnosticsButton from './DiagnosticsButton';
 
 // Debounce helper for resize events
@@ -362,6 +363,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 5;
+  const commandBufferRef = useRef(''); // Buffer for slash command detection
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -1077,7 +1079,39 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       };
 
       // Handle terminal input
-      term.onData((data) => {
+      term.onData(async (data) => {
+        // Check for slash command execution (Enter key after slash command)
+        if (data === '\r') {
+          const command = commandBufferRef.current.trim();
+          console.log('[Command] Buffer on Enter:', JSON.stringify(command));
+          if (command.startsWith('/')) {
+            // Execute slash command
+            const result = await executeCommand(command, {
+              print: (text) => term.writeln('\r\n' + text),
+              term: term,
+              tabId: tabId
+            });
+            
+            if (result.handled) {
+              commandBufferRef.current = ''; // Clear buffer
+              if (result.error) {
+                term.writeln('\r\n\x1b[31mError: ' + result.error + '\x1b[0m\r\n');
+              }
+              return; // Don't send to WebSocket
+            }
+          }
+          commandBufferRef.current = ''; // Clear buffer on Enter
+        } else if (data === '\x7f' || data === '\b') {
+          // Backspace - remove last char from buffer
+          commandBufferRef.current = commandBufferRef.current.slice(0, -1);
+        } else if (data === '\x03') {
+          // Ctrl+C - clear buffer
+          commandBufferRef.current = '';
+        } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
+          // Printable character - add to buffer
+          commandBufferRef.current += data;
+        }
+        
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
           
