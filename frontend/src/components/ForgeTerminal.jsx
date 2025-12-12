@@ -328,6 +328,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onWaitingChange = null, // Callback when prompt waiting state changes
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
   onCopy = null, // Callback when text is copied (for toast notification)
+  onFeedbackClick = null, // Callback to open feedback modal
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name (for AM logging)
@@ -1340,6 +1341,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         onDiagnosticCapture={(diagnostic) => {
           logger.terminal('Diagnostic captured', { tabId, mainThreadDelay: diagnostic.mainThreadDelayMs });
         }}
+        onFeedbackClick={onFeedbackClick}
       />
       
       {showScrollButton && isVisible && (

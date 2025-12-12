@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Bug, AlertTriangle, X, ClipboardCopy } from 'lucide-react';
+import { Bug, AlertTriangle, X, ClipboardCopy, MessageSquare } from 'lucide-react';
 
 /**
  * DiagnosticsButton - A floating button to capture system state when keyboard lockout occurs
@@ -12,7 +12,8 @@ const DiagnosticsButton = ({
   wsRef, 
   tabId, 
   isVisible = true,
-  onDiagnosticCapture = null 
+  onDiagnosticCapture = null,
+  onFeedbackClick = null
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [lastDiagnostic, setLastDiagnostic] = useState(null);
@@ -436,10 +437,32 @@ const DiagnosticsButton = ({
           </div>
           
           <div className="diagnostics-footer">
-            <small>Captured: {new Date(lastDiagnostic.capturedAt).toLocaleTimeString()}</small>
-            <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); captureDiagnostics(); }} className="btn-refresh">
-              Refresh
-            </button>
+            <div className="footer-left">
+              <small>Captured: {new Date(lastDiagnostic.capturedAt).toLocaleTimeString()}</small>
+            </div>
+            <div className="footer-actions">
+              {onFeedbackClick && (
+                <button 
+                  tabIndex={-1} 
+                  onClick={(e) => { 
+                    e.currentTarget.blur(); 
+                    onFeedbackClick();
+                    // Restore focus to terminal after opening feedback
+                    if (terminalRef?.current?.focus) {
+                      setTimeout(() => terminalRef.current.focus(), 50);
+                    }
+                  }} 
+                  className="btn-feedback-diag"
+                  title="Send Feedback"
+                >
+                  <MessageSquare size={14} />
+                  Feedback
+                </button>
+              )}
+              <button tabIndex={-1} onClick={(e) => { e.currentTarget.blur(); captureDiagnostics(); }} className="btn-refresh">
+                Refresh
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -620,6 +643,16 @@ const DiagnosticsButton = ({
           padding: 8px 16px;
           border-top: 1px solid rgba(255, 255, 255, 0.1);
           background: rgba(20, 20, 20, 0.5);
+          gap: 12px;
+        }
+        
+        .footer-left {
+          flex: 1;
+        }
+        
+        .footer-actions {
+          display: flex;
+          gap: 8px;
         }
         
         .diagnostics-footer small {
@@ -635,11 +668,32 @@ const DiagnosticsButton = ({
           color: #ccc;
           font-size: 12px;
           cursor: pointer;
+          transition: all 0.2s;
         }
         
         .btn-refresh:hover {
           background: rgba(255, 255, 255, 0.2);
           color: #fff;
+        }
+        
+        .btn-feedback-diag {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 12px;
+          background: rgba(59, 130, 246, 0.2);
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          border-radius: 4px;
+          color: #60a5fa;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        
+        .btn-feedback-diag:hover {
+          background: rgba(59, 130, 246, 0.3);
+          border-color: rgba(59, 130, 246, 0.5);
+          color: #93c5fd;
         }
         
         /* Spacebar Test Styles */

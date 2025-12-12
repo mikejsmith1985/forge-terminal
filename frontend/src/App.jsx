@@ -1345,9 +1345,6 @@ function App() {
         >
           <Settings size={18} />
         </button>
-        <button className="btn btn-feedback btn-icon" onClick={() => setIsFeedbackModalOpen(true)} title="Send Feedback">
-          <MessageSquare size={18} />
-        </button>
       </div>
 
       {/* AM Monitor - Shows LLM activity status (Dev Mode only) */}
@@ -1485,6 +1482,7 @@ function App() {
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                   onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                   onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
+                  onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                 />
               </div>
             ))}
