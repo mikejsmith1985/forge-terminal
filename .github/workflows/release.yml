@@ -62,7 +62,9 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
           mkdir -p bin
-          LDFLAGS="-X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=${VERSION}"
+          # -s strips symbol table, -w strips DWARF debug info
+          # This reduces binary size and avoids AV false positives
+          LDFLAGS="-s -w -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=${VERSION}"
           
           # Linux AMD64
           GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-linux-amd64 ./cmd/forge
@@ -75,7 +77,8 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
           mkdir -p bin
-          LDFLAGS="-X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=${VERSION}"
+          # -s strips symbol table, -w strips DWARF debug info
+          LDFLAGS="-s -w -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=${VERSION}"
           
           # macOS AMD64
           GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-darwin-amd64 ./cmd/forge

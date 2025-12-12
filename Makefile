@@ -2,8 +2,9 @@
 
 # Version is extracted from git tag or set to dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS := -ldflags "-X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$(VERSION)"
-LDFLAGS_WIN := -ldflags "-X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$(VERSION) -H windowsgui"
+# -s strips symbol table, -w strips DWARF debug info (reduces size, avoids AV false positives)
+LDFLAGS := -ldflags "-s -w -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$(VERSION)"
+LDFLAGS_WIN := -ldflags "-s -w -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$(VERSION) -H windowsgui"
 
 # Default target
 build: frontend-build
