@@ -518,8 +518,24 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 	l.parseLatestSnapshotToTurns(conv, snapshot)
 	
 	// Save to disk ASYNC - don't block on disk I/O while holding mutex
-	// Make a copy of data needed for save to avoid race conditions
-	convCopy := *conv
+	// Make a DEEP copy to avoid race conditions with slice modifications
+	convCopy := LLMConversation{
+		ConversationID:    conv.ConversationID,
+		TabID:             conv.TabID,
+		Provider:          conv.Provider,
+		CommandType:       conv.CommandType,
+		StartTime:         conv.StartTime,
+		EndTime:           conv.EndTime,
+		Complete:          conv.Complete,
+		AutoRespond:       conv.AutoRespond,
+		TUICaptureMode:    conv.TUICaptureMode,
+		ProcessPID:        conv.ProcessPID,
+		Metadata:          conv.Metadata,
+		Recovery:          conv.Recovery,
+		Turns:             append([]ConversationTurn(nil), conv.Turns...),
+		ScreenSnapshots:   append([]ScreenSnapshot(nil), conv.ScreenSnapshots...),
+	}
+	
 	pendingAsyncWrites.Add(1)
 	go func() {
 		defer pendingAsyncWrites.Done()
