@@ -18,6 +18,7 @@ const DiagnosticsButton = ({
   const [lastDiagnostic, setLastDiagnostic] = useState(null);
   const [lockoutWarning, setLockoutWarning] = useState(false);
   const [eventLog, setEventLog] = useState([]);
+  const [spacebarTest, setSpacebarTest] = useState({ active: false, result: null });
   
   // Track keyboard events to detect lockouts
   const lastKeyTimeRef = useRef(Date.now());
@@ -213,6 +214,59 @@ const DiagnosticsButton = ({
     }
   }, [lastDiagnostic]);
   
+  // Test spacebar responsiveness
+  const testSpacebar = useCallback(() => {
+    setSpacebarTest({ active: true, result: null });
+    
+    const startTime = performance.now();
+    let detected = false;
+    let responseTime = null;
+    
+    const handler = (e) => {
+      if (e.code === 'Space' && !detected) {
+        detected = true;
+        responseTime = Math.round(performance.now() - startTime);
+        
+        setSpacebarTest({
+          active: false,
+          result: {
+            detected: true,
+            responseTime,
+            prevented: e.defaultPrevented,
+            target: e.target?.tagName || 'unknown',
+            timestamp: new Date().toISOString(),
+          }
+        });
+        
+        cleanup();
+      }
+    };
+    
+    const cleanup = () => {
+      window.removeEventListener('keydown', handler, true);
+      clearTimeout(timeout);
+    };
+    
+    // Listen for 5 seconds
+    window.addEventListener('keydown', handler, true);
+    
+    const timeout = setTimeout(() => {
+      if (!detected) {
+        setSpacebarTest({
+          active: false,
+          result: {
+            detected: false,
+            timedOut: true,
+            timestamp: new Date().toISOString(),
+          }
+        });
+      }
+      cleanup();
+    }, 5000);
+    
+    return cleanup;
+  }, []);
+  
   if (!isVisible) return null;
   
   return (
@@ -311,6 +365,61 @@ const DiagnosticsButton = ({
                   </div>
                 ))}
               </div>
+            </div>
+            
+            {/* Spacebar Test Section */}
+            <div className="diagnostic-section spacebar-test-section">
+              <h5>⌨️ Spacebar Test</h5>
+              {!spacebarTest.active && !spacebarTest.result && (
+                <button 
+                  className="btn-test-spacebar" 
+                  tabIndex={-1}
+                  onClick={(e) => { 
+                    e.currentTarget.blur(); 
+                    testSpacebar(); 
+                  }}
+                >
+                  Test Spacebar Now
+                </button>
+              )}
+              
+              {spacebarTest.active && (
+                <div className="spacebar-waiting">
+                  <div className="pulse-indicator">⏳</div>
+                  <p className="waiting-text">Press Spacebar...</p>
+                  <small>Listening for 5 seconds</small>
+                </div>
+              )}
+              
+              {spacebarTest.result && (
+                <div className={`spacebar-result ${spacebarTest.result.detected ? 'success' : 'failure'}`}>
+                  {spacebarTest.result.detected ? (
+                    <>
+                      <div className="result-icon">✅</div>
+                      <p><strong>Spacebar Detected!</strong></p>
+                      <p className="result-detail">Response: <strong>{spacebarTest.result.responseTime}ms</strong></p>
+                      <p className="result-detail">Target: {spacebarTest.result.target}</p>
+                      <p className="result-detail">Prevented: {spacebarTest.result.prevented ? 'Yes' : 'No'}</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="result-icon">❌</div>
+                      <p><strong>No Spacebar Detected</strong></p>
+                      <p className="result-detail">Timed out after 5 seconds</p>
+                    </>
+                  )}
+                  <button 
+                    className="btn-test-again" 
+                    tabIndex={-1}
+                    onClick={(e) => { 
+                      e.currentTarget.blur(); 
+                      setSpacebarTest({ active: false, result: null });
+                    }}
+                  >
+                    Test Again
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           
@@ -517,6 +626,111 @@ const DiagnosticsButton = ({
         }
         
         .btn-refresh:hover {
+          background: rgba(255, 255, 255, 0.2);
+          color: #fff;
+        }
+        
+        /* Spacebar Test Styles */
+        .spacebar-test-section {
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          padding-top: 16px;
+        }
+        
+        .btn-test-spacebar {
+          width: 100%;
+          padding: 10px 16px;
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.8));
+          border: none;
+          border-radius: 8px;
+          color: #fff;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        
+        .btn-test-spacebar:hover {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 1), rgba(37, 99, 235, 1));
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+        
+        .spacebar-waiting {
+          text-align: center;
+          padding: 20px;
+          background: rgba(59, 130, 246, 0.1);
+          border-radius: 8px;
+          border: 2px dashed rgba(59, 130, 246, 0.3);
+        }
+        
+        .pulse-indicator {
+          font-size: 32px;
+          animation: pulse-scale 1s infinite;
+        }
+        
+        @keyframes pulse-scale {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.2); }
+        }
+        
+        .waiting-text {
+          margin: 8px 0 4px 0;
+          font-size: 14px;
+          font-weight: 500;
+          color: #fff;
+        }
+        
+        .spacebar-waiting small {
+          color: #888;
+          font-size: 11px;
+        }
+        
+        .spacebar-result {
+          text-align: center;
+          padding: 16px;
+          border-radius: 8px;
+        }
+        
+        .spacebar-result.success {
+          background: rgba(34, 197, 94, 0.1);
+          border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        
+        .spacebar-result.failure {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        
+        .result-icon {
+          font-size: 40px;
+          margin-bottom: 8px;
+        }
+        
+        .spacebar-result p {
+          margin: 4px 0;
+        }
+        
+        .spacebar-result strong {
+          color: #fff;
+        }
+        
+        .result-detail {
+          font-size: 12px;
+          color: #aaa;
+        }
+        
+        .btn-test-again {
+          margin-top: 12px;
+          padding: 6px 16px;
+          background: rgba(255, 255, 255, 0.1);
+          border: none;
+          border-radius: 4px;
+          color: #ccc;
+          font-size: 12px;
+          cursor: pointer;
+        }
+        
+        .btn-test-again:hover {
           background: rgba(255, 255, 255, 0.2);
           color: #fff;
         }
