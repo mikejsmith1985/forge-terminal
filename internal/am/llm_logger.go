@@ -16,9 +16,9 @@ import (
 
 // Memory limits to prevent unbounded growth
 const (
-	maxTurnsPerConversation = 500
+	maxTurnsPerConversation     = 500
 	maxSnapshotsPerConversation = 100
-	maxConversationsInMemory = 10
+	maxConversationsInMemory    = 10
 )
 
 // ScreenSnapshot represents a captured TUI screen state.
@@ -32,20 +32,20 @@ type ScreenSnapshot struct {
 
 // ConversationTurn represents a single exchange in an LLM conversation.
 type ConversationTurn struct {
-	Role           string    `json:"role"`
-	Content        string    `json:"content"`
-	Timestamp      time.Time `json:"timestamp"`
-	Provider       string    `json:"provider"`
-	Raw            string    `json:"raw,omitempty"`            // Raw PTY data for debugging
-	CaptureMethod  string    `json:"captureMethod,omitempty"`  // "pty_input", "pty_output", "tui_snapshot"
-	ParseConfidence float64  `json:"parseConfidence,omitempty"` // 0.0-1.0 for output parsing
+	Role            string    `json:"role"`
+	Content         string    `json:"content"`
+	Timestamp       time.Time `json:"timestamp"`
+	Provider        string    `json:"provider"`
+	Raw             string    `json:"raw,omitempty"`             // Raw PTY data for debugging
+	CaptureMethod   string    `json:"captureMethod,omitempty"`   // "pty_input", "pty_output", "tui_snapshot"
+	ParseConfidence float64   `json:"parseConfidence,omitempty"` // 0.0-1.0 for output parsing
 }
 
 // ConversationRecovery holds recovery metadata for a conversation.
 type ConversationRecovery struct {
-	LastSavedTurn        int    `json:"lastSavedTurn"`
-	InProgressTurn       *int   `json:"inProgressTurn,omitempty"`
-	CanRestore           bool   `json:"canRestore"`
+	LastSavedTurn          int    `json:"lastSavedTurn"`
+	InProgressTurn         *int   `json:"inProgressTurn,omitempty"`
+	CanRestore             bool   `json:"canRestore"`
 	SuggestedRestorePrompt string `json:"suggestedRestorePrompt,omitempty"`
 }
 
@@ -58,20 +58,20 @@ type ConversationMetadata struct {
 
 // LLMConversation represents a complete LLM conversation session.
 type LLMConversation struct {
-	ConversationID   string               `json:"conversationId"`
-	TabID            string               `json:"tabId"`
-	Provider         string               `json:"provider"`
-	CommandType      string               `json:"commandType"`
-	StartTime        time.Time            `json:"startTime"`
-	EndTime          time.Time            `json:"endTime,omitempty"`
-	Turns            []ConversationTurn   `json:"turns"`
-	Complete         bool                 `json:"complete"`
-	AutoRespond      bool                 `json:"autoRespond"`
-	Metadata         *ConversationMetadata `json:"metadata,omitempty"`
-	Recovery         *ConversationRecovery `json:"recovery,omitempty"`
-	TUICaptureMode   bool                 `json:"tuiCaptureMode,omitempty"`
-	ScreenSnapshots  []ScreenSnapshot     `json:"screenSnapshots,omitempty"`
-	ProcessPID       int                  `json:"processPID,omitempty"`
+	ConversationID  string                `json:"conversationId"`
+	TabID           string                `json:"tabId"`
+	Provider        string                `json:"provider"`
+	CommandType     string                `json:"commandType"`
+	StartTime       time.Time             `json:"startTime"`
+	EndTime         time.Time             `json:"endTime,omitempty"`
+	Turns           []ConversationTurn    `json:"turns"`
+	Complete        bool                  `json:"complete"`
+	AutoRespond     bool                  `json:"autoRespond"`
+	Metadata        *ConversationMetadata `json:"metadata,omitempty"`
+	Recovery        *ConversationRecovery `json:"recovery,omitempty"`
+	TUICaptureMode  bool                  `json:"tuiCaptureMode,omitempty"`
+	ScreenSnapshots []ScreenSnapshot      `json:"screenSnapshots,omitempty"`
+	ProcessPID      int                   `json:"processPID,omitempty"`
 }
 
 // LLMLogger manages LLM conversation logging for a tab.
@@ -100,7 +100,7 @@ type LLMLogger struct {
 var (
 	llmLoggers   = make(map[string]*LLMLogger)
 	llmLoggersMu sync.RWMutex
-	
+
 	// pendingAsyncWrites tracks async disk writes for test synchronization
 	pendingAsyncWrites sync.WaitGroup
 )
@@ -129,10 +129,10 @@ func GetLLMLogger(tabID string, amDir string) *LLMLogger {
 		conversations: make(map[string]*LLMConversation),
 		amDir:         amDir,
 	}
-	
+
 	// Load existing conversations from disk
 	logger.loadConversationsFromDisk()
-	
+
 	llmLoggers[tabID] = logger
 	log.Printf("[LLM Logger] ✓ Logger created and registered for tab %s", tabID)
 	log.Printf("[LLM Logger] Global logger map size now: %d", len(llmLoggers))
@@ -202,17 +202,17 @@ func (l *LLMLogger) StartConversationFromProcess(provider string, cmdType string
 	log.Printf("[LLM Logger] Generated conversation ID: '%s'", convID)
 
 	conv := &LLMConversation{
-		ConversationID: convID,
-		TabID:          l.tabID,
-		Provider:       provider,
-		CommandType:    cmdType,
-		StartTime:      time.Now(),
-		Turns:          []ConversationTurn{},
-		Complete:       false,
-		TUICaptureMode: true,
-		ProcessPID:     pid,
+		ConversationID:  convID,
+		TabID:           l.tabID,
+		Provider:        provider,
+		CommandType:     cmdType,
+		StartTime:       time.Now(),
+		Turns:           []ConversationTurn{},
+		Complete:        false,
+		TUICaptureMode:  true,
+		ProcessPID:      pid,
 		ScreenSnapshots: []ScreenSnapshot{},
-		Metadata:       l.captureMetadata(),
+		Metadata:        l.captureMetadata(),
 	}
 
 	// Add initial turn noting process start
@@ -296,11 +296,11 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 	log.Printf("[LLM Logger] Adding conversation to map with key '%s'", convID)
 	l.conversations[convID] = conv
 	log.Printf("[LLM Logger] ✓ Conversation added to map, new size: %d", len(l.conversations))
-	
+
 	log.Printf("[LLM Logger] Setting active conversation ID to '%s'", convID)
 	l.activeConvID = convID
 	log.Printf("[LLM Logger] ✓ Active conversation set")
-	
+
 	l.outputBuffer = ""
 	l.lastOutputTime = time.Now()
 	log.Printf("[LLM Logger] Output buffer reset")
@@ -347,14 +347,14 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 	if l.tuiCaptureMode {
 		l.currentScreen.WriteString(rawOutput)
 		l.lastOutputTime = time.Now()
-		
+
 		// Trigger snapshot on screen clear (event-based trigger)
 		if l.detectScreenClear(rawOutput) {
 			log.Printf("[LLM Logger] 📸 Screen clear detected! Saving snapshot (bufferSize=%d)", l.currentScreen.Len())
 			l.saveScreenSnapshotLocked()
 			return
 		}
-		
+
 		return
 	}
 
@@ -366,9 +366,9 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 // detectScreenClear checks if output contains screen clear sequences.
 func (l *LLMLogger) detectScreenClear(output string) bool {
 	// Screen clear: ESC[2J (clear screen) or ESC[H (home cursor)
-	return strings.Contains(output, "\x1b[2J") || 
-	       strings.Contains(output, "\x1b[H") ||
-	       strings.Contains(output, "\x1b[3J") // Clear scrollback
+	return strings.Contains(output, "\x1b[2J") ||
+		strings.Contains(output, "\x1b[H") ||
+		strings.Contains(output, "\x1b[3J") // Clear scrollback
 }
 
 // detectShellPromptReturn checks if output contains a shell prompt,
@@ -376,51 +376,51 @@ func (l *LLMLogger) detectScreenClear(output string) bool {
 func (l *LLMLogger) detectShellPromptReturn(output string) bool {
 	// Strip ANSI codes for pattern matching
 	clean := l.stripANSI(output)
-	
+
 	// Common shell prompt patterns that indicate TUI exited:
 	// PowerShell: "PS C:\...>" or "PS /home/...>"
 	// CMD: "C:\...>"
 	// Bash: "user@host:~$" or "$ " at end of line
 	// WSL: "user@host:/mnt/c/..."
-	
+
 	patterns := []string{
 		"PS ", // PowerShell prompt prefix
-		">", // Common prompt suffix (but need context)
-		"$ ", // Bash prompt
-		"# ", // Root prompt
+		">",   // Common prompt suffix (but need context)
+		"$ ",  // Bash prompt
+		"# ",  // Root prompt
 	}
-	
+
 	// Check if output ends with a prompt-like pattern
 	lines := strings.Split(clean, "\n")
 	if len(lines) == 0 {
 		return false
 	}
-	
+
 	lastLine := strings.TrimSpace(lines[len(lines)-1])
 	if lastLine == "" && len(lines) > 1 {
 		lastLine = strings.TrimSpace(lines[len(lines)-2])
 	}
-	
+
 	// PowerShell prompt: "PS C:\Users\foo>" or "PS /home/user>"
 	if strings.HasPrefix(lastLine, "PS ") && strings.HasSuffix(lastLine, ">") {
 		return true
 	}
-	
+
 	// CMD prompt: "C:\Users\foo>" (letter followed by colon)
 	if len(lastLine) > 3 && lastLine[1] == ':' && strings.HasSuffix(lastLine, ">") {
 		return true
 	}
-	
+
 	// Bash prompt: ends with "$ " or "# "
 	if strings.HasSuffix(lastLine, "$ ") || strings.HasSuffix(lastLine, "# ") {
 		return true
 	}
-	
+
 	// User@host:path$ pattern
 	if strings.Contains(lastLine, "@") && (strings.HasSuffix(lastLine, "$") || strings.HasSuffix(lastLine, "#")) {
 		return true
 	}
-	
+
 	_ = patterns // Suppress unused warning
 	return false
 }
@@ -454,14 +454,14 @@ func (l *LLMLogger) endConversationLocked() {
 		ConvID:    l.activeConvID,
 		Timestamp: time.Now(),
 		Metadata: map[string]interface{}{
-			"tuiMode":    l.tuiCaptureMode,
-			"snapshots":  len(conv.ScreenSnapshots),
-			"turns":      len(conv.Turns),
-			"autoEnded":  true,
+			"tuiMode":   l.tuiCaptureMode,
+			"snapshots": len(conv.ScreenSnapshots),
+			"turns":     len(conv.Turns),
+			"autoEnded": true,
 		},
 	})
 
-	log.Printf("[LLM Logger] Ended conversation %s (TUI:%v, snapshots:%d, turns:%d)", 
+	log.Printf("[LLM Logger] Ended conversation %s (TUI:%v, snapshots:%d, turns:%d)",
 		l.activeConvID, l.tuiCaptureMode, len(conv.ScreenSnapshots), len(conv.Turns))
 
 	l.activeConvID = ""
@@ -493,10 +493,10 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 
 	// Clean ANSI sequences for display
 	cleanedContent := l.stripANSI(rawContent)
-	
+
 	// Calculate diff from previous snapshot
 	diff := l.calculateDiff(l.lastScreen, cleanedContent)
-	
+
 	snapshot := ScreenSnapshot{
 		Timestamp:        time.Now(),
 		SequenceNumber:   l.snapshotCount,
@@ -504,38 +504,38 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 		CleanedContent:   cleanedContent,
 		DiffFromPrevious: diff,
 	}
-	
+
 	conv.ScreenSnapshots = append(conv.ScreenSnapshots, snapshot)
 	l.snapshotCount++
 	l.lastScreen = cleanedContent
 	l.lastSnapshotTime = time.Now() // NEW: Track snapshot time
 	l.currentScreen.Reset()
-	
-	log.Printf("[LLM Logger] 📸 Snapshot #%d saved for %s (%d chars, %d total snapshots)", 
+
+	log.Printf("[LLM Logger] 📸 Snapshot #%d saved for %s (%d chars, %d total snapshots)",
 		l.snapshotCount, l.activeConvID, len(cleanedContent), len(conv.ScreenSnapshots))
-	
+
 	// NEW: Parse snapshots incrementally to extract assistant responses
 	l.parseLatestSnapshotToTurns(conv, snapshot)
-	
+
 	// Save to disk ASYNC - don't block on disk I/O while holding mutex
 	// Make a DEEP copy to avoid race conditions with slice modifications
 	convCopy := LLMConversation{
-		ConversationID:    conv.ConversationID,
-		TabID:             conv.TabID,
-		Provider:          conv.Provider,
-		CommandType:       conv.CommandType,
-		StartTime:         conv.StartTime,
-		EndTime:           conv.EndTime,
-		Complete:          conv.Complete,
-		AutoRespond:       conv.AutoRespond,
-		TUICaptureMode:    conv.TUICaptureMode,
-		ProcessPID:        conv.ProcessPID,
-		Metadata:          conv.Metadata,
-		Recovery:          conv.Recovery,
-		Turns:             append([]ConversationTurn(nil), conv.Turns...),
-		ScreenSnapshots:   append([]ScreenSnapshot(nil), conv.ScreenSnapshots...),
+		ConversationID:  conv.ConversationID,
+		TabID:           conv.TabID,
+		Provider:        conv.Provider,
+		CommandType:     conv.CommandType,
+		StartTime:       conv.StartTime,
+		EndTime:         conv.EndTime,
+		Complete:        conv.Complete,
+		AutoRespond:     conv.AutoRespond,
+		TUICaptureMode:  conv.TUICaptureMode,
+		ProcessPID:      conv.ProcessPID,
+		Metadata:        conv.Metadata,
+		Recovery:        conv.Recovery,
+		Turns:           append([]ConversationTurn(nil), conv.Turns...),
+		ScreenSnapshots: append([]ScreenSnapshot(nil), conv.ScreenSnapshots...),
 	}
-	
+
 	pendingAsyncWrites.Add(1)
 	go func() {
 		defer pendingAsyncWrites.Done()
@@ -578,14 +578,14 @@ func (l *LLMLogger) calculateDiff(oldScreen, newScreen string) string {
 	if oldScreen == "" {
 		return "Initial screen"
 	}
-	
+
 	// Simple line-based diff
 	oldLines := strings.Split(oldScreen, "\n")
 	newLines := strings.Split(newScreen, "\n")
-	
+
 	var diff strings.Builder
 	diff.WriteString(fmt.Sprintf("Changed %d → %d lines\n", len(oldLines), len(newLines)))
-	
+
 	// Find new content (simple append detection)
 	if len(newLines) > len(oldLines) {
 		diff.WriteString("New content:\n")
@@ -597,7 +597,7 @@ func (l *LLMLogger) calculateDiff(oldScreen, newScreen string) string {
 			}
 		}
 	}
-	
+
 	return diff.String()
 }
 
@@ -609,11 +609,11 @@ func (l *LLMLogger) parseLatestSnapshotToTurns(conv *LLMConversation, snapshot S
 	if len(conv.ScreenSnapshots) < 2 {
 		return
 	}
-	
+
 	// Try to detect if this snapshot contains an assistant response
 	// by looking for content that wasn't in the previous snapshot
 	content := snapshot.CleanedContent
-	
+
 	// Provider-specific assistant response detection
 	var response string
 	switch conv.Provider {
@@ -626,7 +626,7 @@ func (l *LLMLogger) parseLatestSnapshotToTurns(conv *LLMConversation, snapshot S
 	default:
 		response = l.extractGenericResponseFromSnapshot(content)
 	}
-	
+
 	// If we found a response and it's not a duplicate of the last turn
 	if response != "" && len(response) > 20 {
 		// Check if this is a duplicate of the last turn
@@ -637,7 +637,7 @@ func (l *LLMLogger) parseLatestSnapshotToTurns(conv *LLMConversation, snapshot S
 				return
 			}
 		}
-		
+
 		// Add assistant turn
 		conv.Turns = append(conv.Turns, ConversationTurn{
 			Role:            "assistant",
@@ -647,8 +647,8 @@ func (l *LLMLogger) parseLatestSnapshotToTurns(conv *LLMConversation, snapshot S
 			CaptureMethod:   "tui_snapshot",
 			ParseConfidence: 0.75,
 		})
-		
-		log.Printf("[LLM Logger] ✨ Extracted assistant response from snapshot #%d (%d chars)", 
+
+		log.Printf("[LLM Logger] ✨ Extracted assistant response from snapshot #%d (%d chars)",
 			snapshot.SequenceNumber, len(response))
 	}
 }
@@ -666,30 +666,30 @@ func (l *LLMLogger) extractCopilotResponseFromSnapshot(content string) string {
 	lines := strings.Split(content, "\n")
 	var response strings.Builder
 	inResponse := false
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Skip empty lines and UI chrome
-		if len(trimmed) == 0 || 
-		   strings.Contains(trimmed, "────") || 
-		   strings.Contains(trimmed, "Ctrl+") ||
-		   strings.Contains(trimmed, "Welcome to GitHub Copilot") ||
-		   strings.Contains(trimmed, "Enter @ to mention") {
+		if len(trimmed) == 0 ||
+			strings.Contains(trimmed, "────") ||
+			strings.Contains(trimmed, "Ctrl+") ||
+			strings.Contains(trimmed, "Welcome to GitHub Copilot") ||
+			strings.Contains(trimmed, "Enter @ to mention") {
 			continue
 		}
-		
+
 		// Skip the user prompt line
 		if strings.HasPrefix(trimmed, ">") && len(trimmed) < 100 {
 			inResponse = false
 			continue
 		}
-		
+
 		// Skip status lines
 		if strings.Contains(trimmed, "gpt-") || strings.Contains(trimmed, "claude-") {
 			continue
 		}
-		
+
 		// Collect substantial content lines (likely assistant response)
 		if len(trimmed) > 30 {
 			if inResponse && response.Len() > 0 {
@@ -699,7 +699,7 @@ func (l *LLMLogger) extractCopilotResponseFromSnapshot(content string) string {
 			inResponse = true
 		}
 	}
-	
+
 	return strings.TrimSpace(response.String())
 }
 
@@ -707,17 +707,17 @@ func (l *LLMLogger) extractCopilotResponseFromSnapshot(content string) string {
 func (l *LLMLogger) extractClaudeResponseFromSnapshot(content string) string {
 	lines := strings.Split(content, "\n")
 	var response strings.Builder
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Skip UI elements
-		if len(trimmed) == 0 || 
-		   strings.Contains(trimmed, "Claude") ||
-		   strings.HasPrefix(trimmed, ">") {
+		if len(trimmed) == 0 ||
+			strings.Contains(trimmed, "Claude") ||
+			strings.HasPrefix(trimmed, ">") {
 			continue
 		}
-		
+
 		// Collect content
 		if len(trimmed) > 20 {
 			if response.Len() > 0 {
@@ -726,7 +726,7 @@ func (l *LLMLogger) extractClaudeResponseFromSnapshot(content string) string {
 			response.WriteString(trimmed)
 		}
 	}
-	
+
 	return strings.TrimSpace(response.String())
 }
 
@@ -734,15 +734,15 @@ func (l *LLMLogger) extractClaudeResponseFromSnapshot(content string) string {
 func (l *LLMLogger) extractAiderResponseFromSnapshot(content string) string {
 	lines := strings.Split(content, "\n")
 	var response strings.Builder
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Skip prompts
 		if strings.HasPrefix(trimmed, ">") || len(trimmed) == 0 {
 			continue
 		}
-		
+
 		// Collect responses
 		if len(trimmed) > 15 {
 			if response.Len() > 0 {
@@ -751,7 +751,7 @@ func (l *LLMLogger) extractAiderResponseFromSnapshot(content string) string {
 			response.WriteString(trimmed)
 		}
 	}
-	
+
 	return strings.TrimSpace(response.String())
 }
 
@@ -759,10 +759,10 @@ func (l *LLMLogger) extractAiderResponseFromSnapshot(content string) string {
 func (l *LLMLogger) extractGenericResponseFromSnapshot(content string) string {
 	lines := strings.Split(content, "\n")
 	var response strings.Builder
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Collect any substantial content
 		if len(trimmed) > 25 && !strings.HasPrefix(trimmed, ">") {
 			if response.Len() > 0 {
@@ -771,7 +771,7 @@ func (l *LLMLogger) extractGenericResponseFromSnapshot(content string) string {
 			response.WriteString(trimmed)
 		}
 	}
-	
+
 	return strings.TrimSpace(response.String())
 }
 
@@ -881,14 +881,14 @@ func (l *LLMLogger) FlushOutput() {
 	}
 
 	raw := l.outputBuffer
-	
+
 	// Use new parsing with confidence scoring
 	cleanedOutput, confidence := ParseAssistantOutput(raw, conv.Provider)
 	if cleanedOutput == "" {
 		// Fallback to old parser
 		cleanedOutput = llm.ParseLLMOutput(raw, llm.Provider(conv.Provider))
 	}
-	
+
 	if cleanedOutput == "" {
 		l.outputBuffer = ""
 		return
@@ -937,16 +937,16 @@ func (l *LLMLogger) EndConversation() {
 	// TUI Mode: Save final screen snapshot and parse turns
 	if l.tuiCaptureMode && l.currentScreen.Len() > 0 {
 		l.saveScreenSnapshotLocked()
-		
+
 		// Parse screen snapshots into conversation turns
 		log.Printf("[LLM Logger] Parsing %d screen snapshots into turns...", len(conv.ScreenSnapshots))
 		parsedTurns := l.parseScreenSnapshotsToTurns(conv.ScreenSnapshots, conv.Provider)
-		
+
 		// Add parsed turns to conversation
 		for _, turn := range parsedTurns {
 			conv.Turns = append(conv.Turns, turn)
 		}
-		
+
 		log.Printf("[LLM Logger] Parsed %d turns from TUI snapshots", len(parsedTurns))
 	}
 
@@ -975,13 +975,13 @@ func (l *LLMLogger) EndConversation() {
 		ConvID:    l.activeConvID,
 		Timestamp: time.Now(),
 		Metadata: map[string]interface{}{
-			"tuiMode":    l.tuiCaptureMode,
-			"snapshots":  len(conv.ScreenSnapshots),
-			"turns":      len(conv.Turns),
+			"tuiMode":   l.tuiCaptureMode,
+			"snapshots": len(conv.ScreenSnapshots),
+			"turns":     len(conv.Turns),
 		},
 	})
 
-	log.Printf("[LLM Logger] Ended conversation %s (TUI:%v, snapshots:%d, turns:%d)", 
+	log.Printf("[LLM Logger] Ended conversation %s (TUI:%v, snapshots:%d, turns:%d)",
 		l.activeConvID, l.tuiCaptureMode, len(conv.ScreenSnapshots), len(conv.Turns))
 
 	l.activeConvID = ""
@@ -1021,15 +1021,15 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 	// Build map of in-memory conversation IDs for deduplication
 	inMemory := make(map[string]bool)
 	convs := make([]*LLMConversation, 0, len(l.conversations))
-	
+
 	// First, add all in-memory conversations
 	for convID, conv := range l.conversations {
-		log.Printf("[LLM Logger]   In-memory: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d", 
+		log.Printf("[LLM Logger]   In-memory: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d",
 			convID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns), len(conv.ScreenSnapshots))
 		convs = append(convs, conv)
 		inMemory[convID] = true
 	}
-	
+
 	// Skip disk reads if we loaded recently (within 60 seconds) - performance optimization
 	diskLoadCooldown := 60 * time.Second
 	if time.Since(l.lastDiskLoadTime) < diskLoadCooldown {
@@ -1037,16 +1037,16 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 		log.Printf("[LLM Logger] Returning %d conversations from memory only", len(convs))
 		return convs
 	}
-	
+
 	// Also load any conversations from disk that aren't in memory
 	// This handles cases where conversations were saved but memory was cleared
 	if l.amDir != "" {
 		l.lastDiskLoadTime = time.Now()
 		patterns := []string{
-			filepath.Join(l.amDir, "*-conv-*.json"),                               // New format
-			filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID)),   // Legacy format
+			filepath.Join(l.amDir, "*-conv-*.json"),                            // New format
+			filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID)), // Legacy format
 		}
-		
+
 		allFiles := make(map[string]bool)
 		for _, pattern := range patterns {
 			files, err := filepath.Glob(pattern)
@@ -1056,21 +1056,21 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 				}
 			}
 		}
-		
+
 		for file := range allFiles {
 			data, err := os.ReadFile(file)
 			if err != nil {
 				continue
 			}
-			
+
 			var conv LLMConversation
 			if err := json.Unmarshal(data, &conv); err != nil {
 				continue
 			}
-			
+
 			// Only add if not already in memory AND belongs to this tab
 			if !inMemory[conv.ConversationID] && conv.TabID == l.tabID {
-				log.Printf("[LLM Logger]   From disk: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d", 
+				log.Printf("[LLM Logger]   From disk: ID=%s provider=%s type=%s complete=%v turns=%d snapshots=%d",
 					conv.ConversationID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns), len(conv.ScreenSnapshots))
 				convs = append(convs, &conv)
 				// Also add to in-memory map for future calls
@@ -1078,8 +1078,8 @@ func (l *LLMLogger) GetConversations() []*LLMConversation {
 			}
 		}
 	}
-	
-	log.Printf("[LLM Logger] Returning %d total conversations (%d from memory, %d loaded from disk)", 
+
+	log.Printf("[LLM Logger] Returning %d total conversations (%d from memory, %d loaded from disk)",
 		len(convs), len(inMemory), len(convs)-len(inMemory))
 	return convs
 }
@@ -1094,7 +1094,7 @@ func (l *LLMLogger) GetConversation(convID string) *LLMConversation {
 	if exists {
 		return conv
 	}
-	
+
 	// Not in memory - try loading from disk with both patterns
 	if l.amDir != "" {
 		// Try new format first - glob all conversation files and find by ID
@@ -1102,24 +1102,24 @@ func (l *LLMLogger) GetConversation(convID string) *LLMConversation {
 			filepath.Join(l.amDir, "*-conv-*.json"),
 			filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-%s.json", l.tabID, convID)), // Legacy exact match
 		}
-		
+
 		for _, pattern := range patterns {
 			files, err := filepath.Glob(pattern)
 			if err != nil {
 				continue
 			}
-			
+
 			for _, file := range files {
 				data, err := os.ReadFile(file)
 				if err != nil {
 					continue
 				}
-				
+
 				var diskConv LLMConversation
 				if err := json.Unmarshal(data, &diskConv); err != nil {
 					continue
 				}
-				
+
 				// Check if this is the conversation we're looking for AND belongs to this tab
 				if diskConv.ConversationID == convID && diskConv.TabID == l.tabID {
 					log.Printf("[LLM Logger] ✓ Loaded conversation %s from disk", convID)
@@ -1130,7 +1130,7 @@ func (l *LLMLogger) GetConversation(convID string) *LLMConversation {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1142,10 +1142,10 @@ func GetAllConversations(amDir string) ([]*LLMConversation, error) {
 	}
 
 	patterns := []string{
-		filepath.Join(amDir, "*-conv-*.json"),                  // New format
-		filepath.Join(amDir, "llm-conv-*.json"),                // Legacy format
+		filepath.Join(amDir, "*-conv-*.json"),   // New format
+		filepath.Join(amDir, "llm-conv-*.json"), // Legacy format
 	}
-	
+
 	allFiles := make(map[string]bool)
 	for _, pattern := range patterns {
 		files, err := filepath.Glob(pattern)
@@ -1156,22 +1156,22 @@ func GetAllConversations(amDir string) ([]*LLMConversation, error) {
 			allFiles[file] = true
 		}
 	}
-	
+
 	conversations := make([]*LLMConversation, 0)
 	for file := range allFiles {
 		data, err := os.ReadFile(file)
 		if err != nil {
 			continue
 		}
-		
+
 		var conv LLMConversation
 		if err := json.Unmarshal(data, &conv); err != nil {
 			continue
 		}
-		
+
 		conversations = append(conversations, &conv)
 	}
-	
+
 	return conversations, nil
 }
 
@@ -1223,8 +1223,8 @@ func (l *LLMLogger) saveConversationAsync(conv *LLMConversation) {
 		log.Printf("[LLM Logger] ❌ Failed to write conversation to %s: %v", filePath, err)
 		return
 	}
-	
-	log.Printf("[LLM Logger] ✅ Async saved conversation %s to %s (%d bytes)", 
+
+	log.Printf("[LLM Logger] ✅ Async saved conversation %s to %s (%d bytes)",
 		conv.ConversationID, filename, len(data))
 }
 
@@ -1252,8 +1252,8 @@ func (l *LLMLogger) saveConversation(conv *LLMConversation) {
 		log.Printf("[LLM Logger] ❌ Failed to write conversation to %s: %v", filePath, err)
 		return
 	}
-	
-	log.Printf("[LLM Logger] ✅ Saved conversation %s to %s (%d bytes, %d turns, %d snapshots)", 
+
+	log.Printf("[LLM Logger] ✅ Saved conversation %s to %s (%d bytes, %d turns, %d snapshots)",
 		conv.ConversationID, filename, len(data), len(conv.Turns), len(conv.ScreenSnapshots))
 }
 
@@ -1266,10 +1266,10 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 
 	// Support both new and legacy file patterns
 	patterns := []string{
-		filepath.Join(l.amDir, "*-conv-*.json"),                               // New format
-		filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID)),   // Legacy format
+		filepath.Join(l.amDir, "*-conv-*.json"),                            // New format
+		filepath.Join(l.amDir, fmt.Sprintf("llm-conv-%s-*.json", l.tabID)), // Legacy format
 	}
-	
+
 	allFiles := make(map[string]bool)
 	for _, pattern := range patterns {
 		files, err := filepath.Glob(pattern)
@@ -1284,18 +1284,18 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 
 	loadedCount := 0
 	incompleteCount := 0
-	
+
 	// MEMORY OPTIMIZATION: Only load recent conversations (last 24 hours)
 	// Older conversations can be loaded on-demand via GetConversation
 	cutoffTime := time.Now().Add(-24 * time.Hour)
-	
+
 	for file := range allFiles {
 		// Check file modification time first to skip old files
 		info, err := os.Stat(file)
 		if err != nil || info.ModTime().Before(cutoffTime) {
 			continue
 		}
-		
+
 		data, err := os.ReadFile(file)
 		if err != nil {
 			log.Printf("[LLM Logger] Failed to read %s: %v", file, err)
@@ -1317,7 +1317,7 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 		if !conv.Complete || conv.EndTime.After(cutoffTime) {
 			l.conversations[conv.ConversationID] = &conv
 			loadedCount++
-			
+
 			// Only restore active state for incomplete conversations
 			if !conv.Complete {
 				incompleteCount++
@@ -1331,14 +1331,14 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 					}
 				}
 			}
-			
-			log.Printf("[LLM Logger] ✓ Loaded conversation %s (%d turns, %d snapshots, complete=%v)", 
+
+			log.Printf("[LLM Logger] ✓ Loaded conversation %s (%d turns, %d snapshots, complete=%v)",
 				conv.ConversationID, len(conv.Turns), len(conv.ScreenSnapshots), conv.Complete)
 		}
 	}
 
 	if loadedCount > 0 {
-		log.Printf("[LLM Logger] Loaded %d recent conversation(s) from disk for tab %s (%d incomplete, %d complete)", 
+		log.Printf("[LLM Logger] Loaded %d recent conversation(s) from disk for tab %s (%d incomplete, %d complete)",
 			loadedCount, l.tabID, incompleteCount, loadedCount-incompleteCount)
 		if l.activeConvID != "" {
 			log.Printf("[LLM Logger] Restored active conversation: %s", l.activeConvID)
@@ -1399,20 +1399,20 @@ func GetTestConversations() map[string]*LLMConversation {
 // captureMetadata captures the current working directory, git branch, and shell type.
 func (l *LLMLogger) captureMetadata() *ConversationMetadata {
 	metadata := &ConversationMetadata{}
-	
+
 	// Capture working directory
 	if cwd, err := os.Getwd(); err == nil {
 		metadata.WorkingDirectory = cwd
 	}
-	
+
 	// Try to get git branch
 	if branch := getGitBranch(metadata.WorkingDirectory); branch != "" {
 		metadata.GitBranch = branch
 	}
-	
+
 	// Detect shell type
 	metadata.ShellType = detectShell()
-	
+
 	return metadata
 }
 
@@ -1421,26 +1421,26 @@ func getGitBranch(dir string) string {
 	if dir == "" {
 		return ""
 	}
-	
+
 	// Try to find .git directory
 	gitRoot := findGitRoot(dir)
 	if gitRoot == "" {
 		return ""
 	}
-	
+
 	// Read HEAD file to get branch
 	headPath := filepath.Join(gitRoot, ".git", "HEAD")
 	data, err := os.ReadFile(headPath)
 	if err != nil {
 		return ""
 	}
-	
+
 	// HEAD file format: "ref: refs/heads/main\n"
 	content := strings.TrimSpace(string(data))
 	if strings.HasPrefix(content, "ref: refs/heads/") {
 		return strings.TrimPrefix(content, "ref: refs/heads/")
 	}
-	
+
 	// Detached HEAD - return short SHA or entire content if short
 	if len(content) > 0 {
 		if len(content) >= 7 {
@@ -1448,7 +1448,7 @@ func getGitBranch(dir string) string {
 		}
 		return content
 	}
-	
+
 	return ""
 }
 
@@ -1457,7 +1457,7 @@ func findGitRoot(dir string) string {
 	if dir == "" {
 		return ""
 	}
-	
+
 	current := dir
 	for {
 		gitPath := filepath.Join(current, ".git")
@@ -1468,7 +1468,7 @@ func findGitRoot(dir string) string {
 			// .git might be a file (submodule or worktree)
 			return current
 		}
-		
+
 		parent := filepath.Dir(current)
 		if parent == current {
 			// Reached root
@@ -1492,10 +1492,10 @@ func detectProject(workingDir string) string {
 	if workingDir == "" {
 		return "adhoc"
 	}
-	
+
 	// Normalize Windows paths to Unix-style
 	workingDir = normalizePath(workingDir)
-	
+
 	// 1. Check for git repo - use repo name
 	if gitRoot := findGitRoot(workingDir); gitRoot != "" {
 		base := filepath.Base(gitRoot)
@@ -1503,7 +1503,7 @@ func detectProject(workingDir string) string {
 			return sanitizeProjectName(base)
 		}
 	}
-	
+
 	// 2. Check for common project markers (package.json, go.mod, etc.)
 	markers := []string{
 		"package.json", "go.mod", "Cargo.toml", "pom.xml",
@@ -1517,7 +1517,7 @@ func detectProject(workingDir string) string {
 			}
 		}
 	}
-	
+
 	// 3. Use basename of working directory if not home
 	home := os.Getenv("HOME")
 	if workingDir != home && workingDir != "" {
@@ -1526,7 +1526,7 @@ func detectProject(workingDir string) string {
 			return sanitizeProjectName(base)
 		}
 	}
-	
+
 	// 4. Fallback to "adhoc"
 	return "adhoc"
 }
@@ -1540,27 +1540,27 @@ func sanitizeProjectName(name string) string {
 		}
 		return '-'
 	}, name)
-	
+
 	// Remove consecutive hyphens
 	for strings.Contains(name, "--") {
 		name = strings.ReplaceAll(name, "--", "-")
 	}
-	
+
 	// Remove leading/trailing hyphens
 	name = strings.Trim(name, "-")
-	
+
 	// Convert to lowercase
 	name = strings.ToLower(name)
-	
+
 	// Limit length
 	if len(name) > 50 {
 		name = name[:50]
 	}
-	
+
 	if name == "" {
 		return "adhoc"
 	}
-	
+
 	return name
 }
 
@@ -1583,10 +1583,10 @@ func (l *LLMLogger) generateConversationFilename(conv *LLMConversation) string {
 	if conv.Metadata != nil && conv.Metadata.WorkingDirectory != "" {
 		project = detectProject(conv.Metadata.WorkingDirectory)
 	}
-	
+
 	// Format timestamp as YYYY-MM-DD-HHmm
 	timestamp := conv.StartTime.Format("2006-01-02-1504")
-	
+
 	// Get short ID (first 8 chars of conversation ID)
 	shortID := conv.ConversationID
 	if strings.HasPrefix(shortID, "conv-") {
@@ -1600,7 +1600,7 @@ func (l *LLMLogger) generateConversationFilename(conv *LLMConversation) string {
 		// No prefix but still long, truncate
 		shortID = shortID[:8]
 	}
-	
+
 	return fmt.Sprintf("%s-conv-%s-%s.json", project, timestamp, shortID)
 }
 

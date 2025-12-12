@@ -253,8 +253,21 @@ export function initKeyboardDiagnostics() {
   
   isInitialized = true;
   
+  // Expose to window for console access (must be after initialization)
+  if (typeof window !== 'undefined') {
+    window.kbDiag = {
+      init: initKeyboardDiagnostics,
+      cleanup: cleanupKeyboardDiagnostics,
+      summary: getDiagnosticSummary,
+      report: printDiagnosticReport,
+      events: getRecentEvents,
+      stats: () => ({ ...stats }),
+    };
+  }
+  
   console.log('%c[KB Diagnostics] Initialized - tracking Space, Enter, Backspace', 'color: #4ecdc4; font-weight: bold');
   console.log('%c[KB Diagnostics] Focus currently on:', 'color: #4ecdc4', getFocusInfo());
+  console.log('%c[KB Diagnostics] Available via window.kbDiag.report()', 'color: #888');
 }
 
 /**
@@ -391,16 +404,4 @@ export function printDiagnosticReport() {
   return summary;
 }
 
-// Expose to window for console access
-if (typeof window !== 'undefined') {
-  window.kbDiag = {
-    init: initKeyboardDiagnostics,
-    cleanup: cleanupKeyboardDiagnostics,
-    summary: getDiagnosticSummary,
-    report: printDiagnosticReport,
-    events: getRecentEvents,
-    stats: () => ({ ...stats }),
-  };
-  
-  console.log('%c[KB Diagnostics] Available via window.kbDiag.report()', 'color: #888');
-}
+// Note: window.kbDiag is set up in initKeyboardDiagnostics() to ensure all functions are available

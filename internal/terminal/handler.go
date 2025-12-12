@@ -65,22 +65,22 @@ func NewHandler(service assistant.Service, core *assistant.Core) *Handler {
 			CheckOrigin: func(r *http.Request) bool {
 				// Check allowed origins for GitHub Pages deployment support
 				origin := r.Header.Get("Origin")
-				
+
 				// Allow localhost for local development
 				if strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") {
 					return true
 				}
-				
+
 				// Allow GitHub Pages deployments (github.io domain)
 				if strings.Contains(origin, ".github.io") {
 					return true
 				}
-				
+
 				// Allow GitHub Codespaces
 				if strings.Contains(origin, "app.github.dev") || strings.Contains(origin, ".csb.app") {
 					return true
 				}
-				
+
 				// Allow any origin for backward compatibility (can be restricted via ALLOWED_ORIGINS env var)
 				return true
 			},
@@ -139,13 +139,13 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Get Vision parser from assistant core
 	visionParser := h.assistantCore.GetVisionParser()
-	
+
 	// PERFORMANCE FIX: Initialize AM/Vision/LLM systems asynchronously
 	// These don't need to block the terminal from becoming interactive
 	var llmLogger *am.LLMLogger
 	var insightsTracker *vision.InsightsTracker
 	amSystem := h.assistantCore.GetAMSystem()
-	
+
 	// Launch async initialization - doesn't block terminal readiness
 	go func() {
 		if amSystem != nil {
@@ -160,7 +160,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			if amSystem.HealthMonitor != nil {
 				amSystem.HealthMonitor.RecordPTYHeartbeat()
 			}
-			
+
 			// Initialize Vision Insights tracker
 			cwd, _ := os.Getwd()
 			sessionInfo := vision.SessionInfo{
@@ -197,7 +197,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
 		}
 	}()
-	
+
 	detector := h.assistantCore.GetLLMDetector()
 	var inputBuffer strings.Builder
 	const flushTimeout = 2 * time.Second
@@ -368,11 +368,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					activeConv := llmLogger.GetActiveConversationID()
 					if activeConv == "" {
 						detected := detector.DetectCommand(commandLine)
-						
+
 						if detected.Detected {
 							// Check if this is a TUI-based tool (Copilot, Claude)
 							isTUITool := detected.Provider == "github-copilot" || detected.Provider == "claude"
-							
+
 							if isTUITool {
 								llmLogger.StartConversationFromProcess(
 									string(detected.Provider),
