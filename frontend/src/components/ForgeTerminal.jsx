@@ -365,6 +365,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 5;
   const commandBufferRef = useRef(''); // Buffer for slash command detection
+  const browserDefaultsHandlerRef = useRef(null); // Ref to prevent zombie listener
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -656,6 +657,28 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     term.open(terminalRef.current);
     xtermRef.current = term;
+
+    // CRITICAL FIX: Prevent browser defaults for Space/Enter on terminal container
+    // This stops Space from scrolling the page and Enter from triggering form submits
+    const preventBrowserDefaults = (e) => {
+      // Only prevent if terminal is focused or if target is inside terminal
+      const terminalElement = terminalRef.current;
+      if (!terminalElement) return;
+      
+      const isTerminalFocused = terminalElement.contains(document.activeElement) ||
+                                document.activeElement?.classList.contains('xterm-helper-textarea');
+      
+      if (isTerminalFocused && (e.key === ' ' || e.key === 'Enter')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    
+    // Store handler in ref to prevent zombie listeners
+    browserDefaultsHandlerRef.current = preventBrowserDefaults;
+    
+    // Attach at capture phase to intercept before any other handlers
+    document.addEventListener('keydown', preventBrowserDefaults, true);
 
     // IMPORTANT: run fit BEFORE forcing focus to avoid fit() stealing focus afterward
     try {
@@ -1208,7 +1231,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     resizeObserver.observe(terminalRef.current);
 
     return () => {
-      // Cleanup event handlers
+      // Cleanup event handlers - CRITICAL: Remove zombie listener
+      if (browserDefaultsHandlerRef.current) {
+        document.removeEventListener('keydown', browserDefaultsHandlerRef.current, true);
+        browserDefaultsHandlerRef.current = null;
+      }
       document.body.removeEventListener('click', preventFocusDrift);
       window.removeEventListener('focus', onWindowFocus);
       window.removeEventListener('visibilitychange', onVisibilityChange);
