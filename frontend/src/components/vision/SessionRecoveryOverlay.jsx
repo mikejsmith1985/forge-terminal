@@ -64,9 +64,12 @@ export default function SessionRecoveryOverlay({
       const context = await response.json();
 
       // Build the restore command
+      // NOTE: Use standalone "copilot" not "gh copilot"
       let command;
       if (provider === 'copilot') {
-        command = `gh copilot suggest "${context.restorePrompt}"`;
+        // Just launch copilot - user can paste the context themselves
+        // The copilot CLI doesn't support command-line prompts
+        command = 'copilot';
       } else if (provider === 'claude') {
         command = `claude "${context.restorePrompt}"`;
       }

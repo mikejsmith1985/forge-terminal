@@ -100,11 +100,13 @@ export function useSessionRecovery({
       const context = await response.json();
 
       // Build restore command based on provider
+      // NOTE: Use standalone "copilot" not "gh copilot"
       let command;
       const prompt = context.restorePrompt || 'Continue from where we left off';
       
       if (provider === 'copilot') {
-        command = `gh copilot suggest "${prompt.replace(/"/g, '\\"')}"`;
+        // Copilot CLI doesn't support command-line prompts, just launch it
+        command = 'copilot';
       } else if (provider === 'claude') {
         command = `claude "${prompt.replace(/"/g, '\\"')}"`;
       } else {
