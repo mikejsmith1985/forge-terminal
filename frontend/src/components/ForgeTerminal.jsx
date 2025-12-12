@@ -7,6 +7,12 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
+import { 
+  initKeyboardDiagnostics, 
+  cleanupKeyboardDiagnostics, 
+  logOnDataReceived,
+  printDiagnosticReport 
+} from '../utils/keyboardDiagnostics';
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -671,6 +677,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.open(terminalRef.current);
     xtermRef.current = term;
     
+    // Initialize keyboard diagnostics for debugging
+    initKeyboardDiagnostics();
+    console.log('[Terminal] Keyboard diagnostics initialized - use window.kbDiag.report() to see status');
+    
     // Critical fix: Force focus immediately after terminal.open()
     // This ensures the terminal textarea receives focus before React re-renders
     queueMicrotask(() => {
@@ -1055,6 +1065,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
       // Handle terminal input
       term.onData((data) => {
+        // Log keyboard events reaching xterm for diagnostics
+        logOnDataReceived(data);
+        
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
           
@@ -1142,6 +1155,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     resizeObserver.observe(terminalRef.current);
 
     return () => {
+      // Cleanup keyboard diagnostics
+      cleanupKeyboardDiagnostics();
+      
       // No cleanup needed for attachCustomKeyEventHandler - xterm handles it
       
       window.removeEventListener('resize', debouncedFit);
