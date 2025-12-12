@@ -762,6 +762,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
     window.addEventListener('visibilitychange', onVisibilityChange);
 
+    // Focus drift prevention: Reclaim focus if it drifts to BODY
+    const preventFocusDrift = (e) => {
+      if (isVisible && document.activeElement === document.body && xtermRef.current) {
+        robustFocus(terminalRef.current, xtermRef.current);
+      }
+    };
+    document.body.addEventListener('click', preventFocusDrift);
+    
     // Debug: Global keydown listener to track spacebar events
     const debugKeyHandler = (e) => {
       if (e.code === 'Space' || e.key === ' ') {
@@ -1201,6 +1209,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     return () => {
       // Cleanup event handlers
+      document.body.removeEventListener('click', preventFocusDrift);
       window.removeEventListener('focus', onWindowFocus);
       window.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('keydown', debugKeyHandler);
