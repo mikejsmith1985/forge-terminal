@@ -307,25 +307,10 @@ function App() {
             const data = JSON.parse(e.data);
             console.log('[SSE] Update notification received:', data);
             if (data.available) {
-              setUpdateInfo(data);
-              // Show toast notification
-              const dismissedVersion = localStorage.getItem('updateDismissedVersion');
-              if (dismissedVersion !== data.latestVersion) {
-                addToast(
-                  `Update available: ${data.latestVersion}`,
-                  'update',
-                  0,
-                  {
-                    action: 'View Update',
-                    onAction: () => setIsUpdateModalOpen(true),
-                    secondaryAction: 'Later',
-                    onSecondaryAction: () => {
-                      localStorage.setItem('updateDismissedAt', Date.now().toString());
-                      localStorage.setItem('updateDismissedVersion', data.latestVersion);
-                    }
-                  }
-                );
-              }
+              // CRITICAL: Auto-refresh immediately to load new binary
+              console.log('[Update] New version detected:', data.latestVersion, '- refreshing page to load new binary');
+              localStorage.setItem('lastKnownVersion', data.latestVersion);
+              window.location.reload();
             }
           } catch (err) {
             console.error('[SSE] Error parsing update event:', err);
