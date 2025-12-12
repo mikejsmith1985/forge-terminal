@@ -690,6 +690,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
     // This runs BEFORE xterm processes the key and allows conditional intercept
     term.attachCustomKeyEventHandler((arg) => {
+      // Log EVERY key that xterm sees
+      if (arg.code === 'Space' || arg.key === ' ') {
+        console.log('[XTERM attachCustomKeyEventHandler] Space key received!', arg);
+      }
+      
       // CRITICAL FIX: Explicitly allow spacebar no matter what
       // This prevents xterm from blocking spacebar due to event bubbling issues
       if (arg.code === 'Space') {

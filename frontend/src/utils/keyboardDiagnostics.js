@@ -139,7 +139,11 @@ function handleKeydownCapture(e) {
   if (!shouldTrack) return;
   
   // Track specific keys
-  if (e.code === 'Space' || e.key === ' ') stats.spaceKeydowns++;
+  if (e.code === 'Space' || e.key === ' ') {
+    stats.spaceKeydowns++;
+    // Log target details for Space key
+    console.log('[KB CAPTURE] Space key - target:', e.target.tagName, e.target.className, 'defaultPrevented:', e.defaultPrevented);
+  }
   if (e.key === 'Enter') stats.enterKeydowns++;
   if (e.key === 'Backspace') stats.backspaceKeydowns++;
   
@@ -157,6 +161,11 @@ function handleKeydownBubble(e) {
     CONFIG.TRACK_KEYS.includes(e.code);
   
   if (!shouldTrack) return;
+  
+  // Log if Space was prevented between capture and bubble
+  if ((e.code === 'Space' || e.key === ' ') && e.defaultPrevented) {
+    console.log('[KB BUBBLE] Space PREVENTED between capture→bubble! Target:', e.target.tagName, e.target.className);
+  }
   
   const snapshot = createEventSnapshot('keydown', e, 'doc-bubble');
   logEvent(snapshot);
