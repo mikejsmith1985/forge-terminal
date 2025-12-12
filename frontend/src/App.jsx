@@ -66,6 +66,9 @@ function App() {
   const [updateInfo, setUpdateInfo] = useState(null)
   const [currentVersion, setCurrentVersion] = useState('')
   
+  // Version verification - blocks terminal until we confirm no auto-refresh needed
+  const [versionReady, setVersionReady] = useState(false)
+  
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -245,20 +248,23 @@ function App() {
         
         if (currentVersion !== lastKnownVersion && lastKnownVersion) {
           // Version changed - server was updated, refresh to load new assets and reconnect terminal
-          console.log('[Update] Version changed from', lastKnownVersion, 'to', currentVersion, '- page will refresh');
+          console.log('[Update] Version changed from', lastKnownVersion, 'to', currentVersion, '- refreshing NOW');
           localStorage.setItem('lastKnownVersion', currentVersion);
-          // Give server time to fully start and all connections to stabilize
-          setTimeout(() => {
-            console.log('[Update] Server updated and ready - refreshing page to reconnect terminal and load new assets');
-            window.location.reload();
-          }, 2500);
+          // DON'T set versionReady - we're about to refresh
+          // Refresh immediately - no delay, don't let stale JS initialize terminal
+          window.location.reload();
+          return; // Never reached, but explicit
         } else {
           localStorage.setItem('lastKnownVersion', currentVersion);
+          // Version verified - safe to render terminals
+          console.log('[Update] Version verified:', currentVersion);
+          setVersionReady(true);
         }
       } catch (err) {
         console.warn('[Update] Failed to check version:', err.message);
-        // Fallback: store a generic version
+        // Fallback: store a generic version and proceed
         localStorage.setItem('lastKnownVersion', '1.9.5');
+        setVersionReady(true); // Allow rendering on error (better than blocking forever)
       }
     };
     
@@ -1456,7 +1462,18 @@ function App() {
         />
         <div className="terminal-pane-content">
           <div className="terminal-container">
-            {tabs.map((tab) => (
+            {/* Block terminal rendering until version is verified to prevent stale JS issues */}
+            {!versionReady ? (
+              <div className="terminal-loading" style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                height: '100%',
+                color: '#888'
+              }}>
+                Loading...
+              </div>
+            ) : tabs.map((tab) => (
               <div
                 key={tab.id}
                 className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
@@ -1482,7 +1499,6 @@ function App() {
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                   onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                   onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
-                  onShowToast={(msg, type, duration) => addToast(msg, type, duration)}
                   onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                 />
               </div>
