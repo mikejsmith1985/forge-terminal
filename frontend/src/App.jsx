@@ -646,6 +646,13 @@ function App() {
 
   // Keyboard shortcuts
   useEffect(() => {
+    // CRITICAL: Don't register keyboard handlers until version is verified
+    // This prevents stale JS from registering broken handlers before auto-refresh
+    if (!versionReady) {
+      console.log('[Keyboard] Waiting for version verification before registering handlers');
+      return;
+    }
+    
     const handleKeyDown = (e) => {
       // CRITICAL: Check if this is xterm's helper textarea FIRST
       // xterm-helper-textarea must be allowed to handle ALL keys
@@ -769,7 +776,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [commands, tabs, activeTabId, closeTab, switchTab, getActiveTerminalRef]);
+  }, [versionReady, commands, tabs, activeTabId, closeTab, switchTab, getActiveTerminalRef]);
 
   // Handle new tab creation
   const handleNewTab = useCallback(() => {
