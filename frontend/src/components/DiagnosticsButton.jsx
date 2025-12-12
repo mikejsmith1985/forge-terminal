@@ -129,6 +129,25 @@ const DiagnosticsButton = ({
   const captureDiagnostics = useCallback(async () => {
     const now = Date.now();
     
+    // Count xterm textareas (should be 1 per visible terminal)
+    const textareaCount = document.querySelectorAll('.xterm-helper-textarea').length;
+    
+    // Check for overlapping elements
+    const termEl = terminalRef?.current;
+    let overlappingElement = null;
+    if (termEl) {
+      const rect = termEl.getBoundingClientRect();
+      const topElement = document.elementFromPoint(rect.left + 2, rect.top + 2);
+      if (topElement && !topElement.closest('.terminal-inner') && !topElement.classList.contains('xterm')) {
+        overlappingElement = {
+          tag: topElement.tagName,
+          class: topElement.className?.slice?.(0, 100) || '',
+          id: topElement.id || '',
+          pointerEvents: window.getComputedStyle(topElement).pointerEvents
+        };
+      }
+    }
+    
     // Gather WebSocket state
     const ws = wsRef?.current;
     const wsState = ws ? {
@@ -154,6 +173,18 @@ const DiagnosticsButton = ({
       isConnected: term.isConnected?.() ?? 'unknown',
       isWaiting: term.isWaitingForPrompt?.() ?? 'unknown',
     } : { status: 'NO_TERMINAL_REF' };
+    
+    // Check for iframe context
+    const iframeContext = {
+      inIframe: window.self !== window.top,
+      parentAccessible: (() => {
+        try {
+          return window.parent !== window && !!window.parent.document;
+        } catch (e) {
+          return false;
+        }
+      })()
+    };
     
     // Gather performance metrics
     const perfMetrics = {
@@ -192,6 +223,11 @@ const DiagnosticsButton = ({
       capturedAtMs: now,
       tabId,
       userAgent: navigator.userAgent,
+      // Critical xterm diagnostics
+      xtermTextareaCount: textareaCount,
+      overlappingElement,
+      iframeContext,
+      // Standard diagnostics
       wsState,
       focusState,
       terminalState,
@@ -349,6 +385,22 @@ const DiagnosticsButton = ({
           </div>
           
           <div className="diagnostics-content">
+            {/* XTerm Health Check Section */}
+            <div className="diagnostic-section">
+              <h5>🔧 XTerm Health</h5>
+              <p>Textareas: <strong className={lastDiagnostic.xtermTextareaCount === 1 ? '' : 'warning'}>
+                {lastDiagnostic.xtermTextareaCount}
+              </strong> {lastDiagnostic.xtermTextareaCount !== 1 && '⚠️ Should be 1'}</p>
+              {lastDiagnostic.overlappingElement && (
+                <p className="warning">Overlay detected: <strong>{lastDiagnostic.overlappingElement.tag}</strong> 
+                  {lastDiagnostic.overlappingElement.class && ` .${lastDiagnostic.overlappingElement.class.slice(0, 30)}`}
+                </p>
+              )}
+              {lastDiagnostic.iframeContext?.inIframe && (
+                <p className="warning">⚠️ Running in iframe</p>
+              )}
+            </div>
+            
             <div className="diagnostic-section">
               <h5>WebSocket</h5>
               <p>State: <strong>{lastDiagnostic.wsState.readyStateText || 'N/A'}</strong></p>
