@@ -72,6 +72,12 @@ func main() {
 	// Wrap file server with cache-control headers
 	fileServer := http.FileServer(http.FS(webFS))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Serve index.html with version-busted asset URLs
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			serveIndexWithVersion(w, r, webFS)
+			return
+		}
+		
 		// Prevent caching to avoid stale WebSocket connection issues
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
@@ -1915,4 +1921,37 @@ func handleDiagnosticsKeyboard(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": "Diagnostic logged",
 	})
+}
+
+// serveIndexWithVersion serves index.html with cache-busted asset URLs
+func serveIndexWithVersion(w http.ResponseWriter, r *http.Request, webFS fs.FS) {
+	version := updater.GetVersion()
+	
+	// Read the index.html file
+	indexFile, err := webFS.Open("index.html")
+	if err != nil {
+		http.Error(w, "Failed to load index.html", http.StatusInternalServerError)
+		return
+	}
+	defer indexFile.Close()
+	
+	content, err := io.ReadAll(indexFile)
+	if err != nil {
+		http.Error(w, "Failed to read index.html", http.StatusInternalServerError)
+		return
+	}
+	
+	// Replace asset URLs with versioned ones
+	html := string(content)
+	html = strings.ReplaceAll(html, `src="/assets/`, `src="/assets/`)
+	html = strings.ReplaceAll(html, `.js"`, `.js?v=`+version+`"`)
+	html = strings.ReplaceAll(html, `.css">`, `.css?v=`+version+`">`)
+	
+	// Set headers
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	
+	w.Write([]byte(html))
 }
