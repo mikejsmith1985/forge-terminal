@@ -28,7 +28,7 @@ func TestNewOllamaClient(t *testing.T) {
 			baseURL:     "",
 			model:       "",
 			wantBaseURL: "http://localhost:11434",
-			wantModel:   "codellama:7b",
+			wantModel:   "mistral:7b-instruct",
 		},
 	}
 
@@ -93,10 +93,12 @@ func TestOllamaClient_GetModels(t *testing.T) {
 
 		resp := OllamaTagsResponse{
 			Models: []struct {
-				Name string `json:"name"`
+				Name       string `json:"name"`
+				Size       int64  `json:"size"`
+				ModifiedAt string `json:"modified_at"`
 			}{
-				{Name: "llama2"},
-				{Name: "codellama:7b"},
+				{Name: "llama2", Size: 1024, ModifiedAt: "2023-01-01"},
+				{Name: "codellama:7b", Size: 2048, ModifiedAt: "2023-01-02"},
 			},
 		}
 
@@ -117,8 +119,8 @@ func TestOllamaClient_GetModels(t *testing.T) {
 		t.Errorf("GetModels() returned %d models, want 2", len(models))
 	}
 
-	if models[0] != "llama2" {
-		t.Errorf("models[0] = %v, want llama2", models[0])
+	if models[0].Name != "llama2" {
+		t.Errorf("models[0].Name = %v, want llama2", models[0].Name)
 	}
 }
 
@@ -176,8 +178,8 @@ func TestBuildSystemPrompt(t *testing.T) {
 	}
 
 	// Check for key phrases
-	if !contains(prompt, "terminal assistant") {
-		t.Error("system prompt should mention 'terminal assistant'")
+	if !contains(prompt, "Forge Assistant") && !contains(prompt, "terminal assistant") {
+		t.Error("system prompt should mention 'Forge Assistant' or 'terminal assistant'")
 	}
 	if !contains(prompt, "command") {
 		t.Error("system prompt should mention 'command'")

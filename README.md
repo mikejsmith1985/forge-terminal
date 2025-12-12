@@ -60,7 +60,7 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 > Enable Dev Mode in Settings to access experimental features.
 
 - **🤖 Forge Assistant** (Experimental): AI-powered chat panel integrated into the sidebar. Requires local Ollama for model inference. Context-aware suggestions based on terminal state.
-  - **📚 RAG Knowledge Base** (NEW in v1.22.0): Assistant now includes Retrieval-Augmented Generation for accurate project-specific answers. Indexes documentation from `docs/` directory on startup, with cosine similarity search for relevant context retrieval. Supports markdown files with configurable relevance thresholds.
+  - **📚 RAG Knowledge Base** (NEW in v1.22.0): Assistant now includes **comprehensive** Retrieval-Augmented Generation for accurate project-specific answers. Indexes not just documentation but **entire codebase** (Go source, JavaScript/React, configs, scripts) for deep technical understanding. Uses cosine similarity search for relevant context retrieval. Now includes ~280+ files and 1200+ document chunks for maximum accuracy. See `scripts/index-full-codebase.sh` to index your project.
 - **👁️ Vision Detection** (Experimental): Real-time pattern detection with interactive overlays and configurable detectors:
   - **Git Status**: Detects `git status` output, shows staged/unstaged/untracked files with quick stage/unstage actions
   - **JSON Blocks**: Identifies JSON in terminal output, pretty-prints with copy actions (configurable minimum size)

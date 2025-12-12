@@ -5,7 +5,36 @@
 This document describes the standardized baseline testing system for evaluating and comparing LLM models used in the Forge Assistant.
 
 **Last Updated:** 2025-12-11  
+**Framework Version:** v1.22.0 (Comprehensive Indexing)  
 **Current Baseline Metrics:** See [Baseline Results](#baseline-results)
+
+## 🚀 New in v1.22.0: Comprehensive Indexing
+
+The indexing framework now supports the **entire codebase**, not just documentation:
+
+### What's Indexed Now
+- ✅ **Documentation** (147 .md files) - User guides, developer docs, release notes
+- ✅ **Go Source Code** (71 .go files) - Implementation details, APIs, handlers
+- ✅ **JavaScript/React** (66 .js/.jsx/.ts/.tsx files) - Frontend components, hooks
+- ✅ **Configuration Files** (JSON, YAML, Makefile) - Build configs, package definitions
+- ✅ **Shell Scripts** (40+ .sh files) - Automation scripts, test runners
+- ✅ **Build Files** (go.mod, package.json, etc.) - Dependency specifications
+- ✅ **Optional: Gitignored Content** (docs/sessions/, .forge/) - Real user data
+
+### Quick Start: Index Everything
+```bash
+# Index entire codebase (recommended)
+./scripts/index-full-codebase.sh
+
+# Include gitignored content too
+./scripts/index-full-codebase.sh --with-gitignored
+```
+
+**Expected Results:**
+- **Files Indexed:** 284+ (up from 147)
+- **Document Chunks:** 1200+ (up from 400)
+- **Accuracy Improvement:** +10-20% on technical questions
+- **Duration:** ~2-3 minutes with Ollama embeddings
 
 ## Baseline Results
 

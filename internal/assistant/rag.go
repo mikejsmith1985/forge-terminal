@@ -182,6 +182,7 @@ func (r *RAGEngine) retrieveContext(
 }
 
 // IndexDocuments indexes documents from a file system path.
+// DEPRECATED: Use IndexAllContent for comprehensive indexing.
 func (r *RAGEngine) IndexDocuments(ctx context.Context, docPath string) error {
 	if r.embeddingsClient == nil || r.vectorStore == nil {
 		return fmt.Errorf("RAG engine not fully initialized")
@@ -197,6 +198,30 @@ func (r *RAGEngine) IndexDocuments(ctx context.Context, docPath string) error {
 
 	stats := indexer.GetStats()
 	log.Printf("[RAG] Indexing complete: %d files, %d chunks, avg size %d bytes",
+		stats.TotalFiles,
+		stats.TotalChunks,
+		stats.AverageChunkSize,
+	)
+
+	return nil
+}
+
+// IndexAllContent indexes entire codebase including docs, code, configs, and optionally gitignored content.
+func (r *RAGEngine) IndexAllContent(ctx context.Context, rootPath string, includeGitignored bool) error {
+	if r.embeddingsClient == nil || r.vectorStore == nil {
+		return fmt.Errorf("RAG engine not fully initialized")
+	}
+
+	indexer := NewIndexer(r.embeddingsClient, r.vectorStore)
+
+	log.Printf("[RAG] Starting comprehensive indexing from %s (includeGitignored=%v)", rootPath, includeGitignored)
+	err := indexer.IndexAllContent(ctx, rootPath, includeGitignored)
+	if err != nil {
+		return fmt.Errorf("failed to index all content: %w", err)
+	}
+
+	stats := indexer.GetStats()
+	log.Printf("[RAG] Comprehensive indexing complete: %d files, %d chunks, avg size %d bytes",
 		stats.TotalFiles,
 		stats.TotalChunks,
 		stats.AverageChunkSize,

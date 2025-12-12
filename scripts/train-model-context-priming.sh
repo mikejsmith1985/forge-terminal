@@ -1,11 +1,15 @@
 #!/bin/bash
 
-# Forge Terminal LLM Model Training Script
-# Trains an Ollama model on Forge Terminal knowledge
+# Forge Terminal LLM Model Context Priming Script
+# NOTE: This script does NOT actually fine-tune models. It primes the model's context
+# by sending training examples through the API. For real fine-tuning, see:
+#   - scripts/export-training-data-jsonl.sh (export to JSONL for fine-tuning)
+#   - docs/developer/model-fine-tuning.md (fine-tuning guide)
+#
 # Usage:
-#   ./scripts/train-model.sh <model-name>
-#   ./scripts/train-model.sh mistral:7b-instruct
-#   ./scripts/train-model.sh neural-chat:7b
+#   ./scripts/train-model-context-priming.sh <model-name>
+#   ./scripts/train-model-context-priming.sh mistral:7b-instruct
+#   ./scripts/train-model-context-priming.sh neural-chat:7b
 
 set -e
 
@@ -55,7 +59,8 @@ TRAINING_LOG="$TRAINING_LOGS_DIR/training-${MODEL//":""-"}_${TIMESTAMP}.log"
 TRAINING_RESULT="$TRAINING_LOGS_DIR/training-${MODEL//":""-"}_${TIMESTAMP}.json"
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}   Forge Terminal LLM Model Training${NC}"
+echo -e "${BLUE}   Forge Terminal LLM Model Context Priming${NC}"
+echo -e "${BLUE}   (NOT real fine-tuning - see docs for that)${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "${CYAN}Model:${NC} $MODEL"

@@ -87,3 +87,9 @@ func (s *RemoteService) GetStatus(ctx context.Context) (*OllamaStatusResponse, e
 	return nil, fmt.Errorf("remote service not implemented yet (v2 feature)")
 }
 
+// SetModel changes the current Ollama model via HTTP API.
+func (s *RemoteService) SetModel(ctx context.Context, model string) error {
+	// TODO: Implement in v2
+	// POST to s.baseURL + "/api/assistant/model"
+	return fmt.Errorf("remote service not implemented yet (v2 feature)")
+}
