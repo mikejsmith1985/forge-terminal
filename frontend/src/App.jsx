@@ -647,6 +647,13 @@ function App() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // CRITICAL: Check if this is xterm's helper textarea FIRST
+      // xterm-helper-textarea must be allowed to handle ALL keys
+      const isXtermTextarea = e.target?.classList?.contains('xterm-helper-textarea');
+      if (isXtermTextarea) {
+        return; // Let xterm handle ALL keys natively
+      }
+      
       // Skip keyboard shortcuts when user is typing in input fields
       const target = e.target;
       const isInputField = target.tagName === 'INPUT' || 
