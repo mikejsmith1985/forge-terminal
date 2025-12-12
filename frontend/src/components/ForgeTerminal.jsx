@@ -740,14 +740,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       return true; // Let all other keys pass through standard xterm processing
     });
 
-    // Initial fit
-    setTimeout(() => {
-      fitAddon.fit();
-      // Critical fix: Re-focus after fit() call (fit triggers hidden re-render)
-      queueMicrotask(() => {
-        term.focus();
-      });
-    }, 0);
+    // Initial fit - PERFORMANCE FIX: Call directly instead of setTimeout(0)
+    fitAddon.fit();
+    // Critical fix: Re-focus after fit() call (fit triggers hidden re-render)
+    queueMicrotask(() => {
+      term.focus();
+    });
 
     // Connect to WebSocket
     const connectWebSocket = () => {
@@ -801,7 +799,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           const dir = currentDirectoryRef.current;
           logger.terminal('Restoring directory', { tabId, directory: dir });
           
-          // Wait a bit for the shell to be ready, then send cd command
+          // PERFORMANCE FIX: Reduce delay from 500ms to 100ms
+          // Modern shells are ready almost immediately after PTY connection
           setTimeout(() => {
             if (ws.readyState === WebSocket.OPEN) {
               // Different cd command syntax for different shells
@@ -827,7 +826,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               ws.send(cdCommand);
               logger.terminal('Directory restore command sent', { tabId, command: cdCommand.trim() });
             }
-          }, 500);
+          }, 100);
         }
 
         if (onConnectionChange) onConnectionChange(true);

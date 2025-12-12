@@ -139,60 +139,66 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Get Vision parser from assistant core
 	visionParser := h.assistantCore.GetVisionParser()
-	log.Printf("[Terminal] Vision parser initialized for session %s (disabled by default)", sessionID)
-
-	// Get LLM logger for this session (will be used if LLM commands detected)
-	// CRITICAL: Use tabID (not sessionID) so command card triggers match this logger
-	amSystem := h.assistantCore.GetAMSystem()
+	
+	// PERFORMANCE FIX: Initialize AM/Vision/LLM systems asynchronously
+	// These don't need to block the terminal from becoming interactive
 	var llmLogger *am.LLMLogger
 	var insightsTracker *vision.InsightsTracker
-	if amSystem != nil {
-		llmLogger = amSystem.GetLLMLogger(tabID)
-		if llmLogger != nil {
-			activeConv := llmLogger.GetActiveConversationID()
-			log.Printf("[Terminal] Using LLM logger for tabID: %s, activeConv: %s", tabID, activeConv)
-		} else {
-			log.Printf("[Terminal] NO LLM logger available for tabID: %s", tabID)
-		}
-		// Record PTY heartbeat for Layer 1
-		if amSystem.HealthMonitor != nil {
-			amSystem.HealthMonitor.RecordPTYHeartbeat()
-		}
-		
-		// Initialize Vision Insights tracker
-		cwd, _ := os.Getwd()
-		sessionInfo := vision.SessionInfo{
-			TabID:      tabID,
-			WorkingDir: cwd,
-			ShellType:  shellConfig.ShellType,
-			InAutoMode: false, // Will be updated when auto-respond starts
-		}
-		insightsTracker = vision.NewInsightsTracker(amSystem.AMDir, sessionInfo)
-		visionParser.SetInsightsTracker(insightsTracker)
-		log.Printf("[Terminal] Vision insights tracker initialized for session %s", sessionID)
+	amSystem := h.assistantCore.GetAMSystem()
+	
+	// Launch async initialization - doesn't block terminal readiness
+	go func() {
+		if amSystem != nil {
+			llmLogger = amSystem.GetLLMLogger(tabID)
+			if llmLogger != nil {
+				activeConv := llmLogger.GetActiveConversationID()
+				log.Printf("[Terminal] Using LLM logger for tabID: %s, activeConv: %s", tabID, activeConv)
+			} else {
+				log.Printf("[Terminal] NO LLM logger available for tabID: %s", tabID)
+			}
+			// Record PTY heartbeat for Layer 1
+			if amSystem.HealthMonitor != nil {
+				amSystem.HealthMonitor.RecordPTYHeartbeat()
+			}
+			
+			// Initialize Vision Insights tracker
+			cwd, _ := os.Getwd()
+			sessionInfo := vision.SessionInfo{
+				TabID:      tabID,
+				WorkingDir: cwd,
+				ShellType:  shellConfig.ShellType,
+				InAutoMode: false, // Will be updated when auto-respond starts
+			}
+			insightsTracker = vision.NewInsightsTracker(amSystem.AMDir, sessionInfo)
+			visionParser.SetInsightsTracker(insightsTracker)
+			log.Printf("[Terminal] Vision insights tracker initialized for session %s", sessionID)
 
-		// Set up low-confidence callback for AM v2.0
-		// When parsing confidence is low during auto-respond, notify user via Vision
-		llmLogger.SetLowConfidenceCallback(func(raw string) {
-			log.Printf("[AM] Low confidence parsing detected, sending Vision notification")
-			// Send a Vision overlay to notify the user
-			overlayMsg := VisionOverlayMessage{
-				Type:        "VISION_OVERLAY",
-				OverlayType: "AM_LOW_CONFIDENCE",
-				Payload: map[string]interface{}{
-					"message":     "AM detected low-confidence parsing. Raw data preserved for manual review.",
-					"severity":    "warning",
-					"autoRespond": true,
-					"rawLength":   len(raw),
-				},
+			// Set up low-confidence callback for AM v2.0
+			// When parsing confidence is low during auto-respond, notify user via Vision
+			if llmLogger != nil {
+				llmLogger.SetLowConfidenceCallback(func(raw string) {
+					log.Printf("[AM] Low confidence parsing detected, sending Vision notification")
+					// Send a Vision overlay to notify the user
+					overlayMsg := VisionOverlayMessage{
+						Type:        "VISION_OVERLAY",
+						OverlayType: "AM_LOW_CONFIDENCE",
+						Payload: map[string]interface{}{
+							"message":     "AM detected low-confidence parsing. Raw data preserved for manual review.",
+							"severity":    "warning",
+							"autoRespond": true,
+							"rawLength":   len(raw),
+						},
+					}
+					if err := conn.WriteJSON(overlayMsg); err != nil {
+						log.Printf("[AM] Failed to send low-confidence notification: %v", err)
+					}
+				})
 			}
-			if err := conn.WriteJSON(overlayMsg); err != nil {
-				log.Printf("[AM] Failed to send low-confidence notification: %v", err)
-			}
-		})
-	}
+			log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
+		}
+	}()
+	
 	detector := h.assistantCore.GetLLMDetector()
-	log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
 	var inputBuffer strings.Builder
 	const flushTimeout = 2 * time.Second
 	lastFlushCheck := time.Now()
