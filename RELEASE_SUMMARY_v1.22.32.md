@@ -2,106 +2,157 @@
 
 **Release Date:** December 13, 2025  
 **Version:** v1.22.32  
-**Type:** Diagnostic Release
+**Type:** Diagnostic Enhancement Release
 
 ## 🎯 Overview
 
-Adding comprehensive event listener diagnostic tool to identify the root cause of spacebar input issues. This release includes no code fixes - purely diagnostic tooling to gather data for fixing the underlying problem.
+Re-enabled comprehensive in-app diagnostics with enhanced event listener analysis. Replaced unusable browser console diagnostic with integrated UI diagnostics button and enhanced slash command.
 
 ## 📊 What's New
 
-### Comprehensive Event Listener Diagnostics
+### Re-enabled In-App Diagnostics
 
-**New File:** `diagnose-event-listeners.js`
+**DiagnosticsButton Component** - Floating diagnostic panel (bottom-left corner)
 
-A browser console diagnostic tool that:
-1. **Scans all document-level listeners** - Identifies competing keydown/keypress/keyup handlers
-2. **Detects xterm textarea** - Confirms the hidden input element exists and properties
-3. **Maps all keyboard listeners** - Shows every element with key event handlers
-4. **Live spacebar test** - Records actual spacebar events during diagnostic run
-5. **Focus state monitoring** - Tracks focus changes over 10 seconds
-6. **Overlay detection** - Checks if anything is blocking the textarea
-7. **Event flow analysis** - Shows where spacebar events originate and propagate
+Features:
+1. **Live Spacebar Test** - One-click test for spacebar responsiveness
+2. **Keyboard Event Tracking** - Monitors all keydown/keyup events with timing
+3. **XTerm Health Check** - Validates textarea count and detects overlays
+4. **Focus Monitoring** - Tracks focus changes and detects drift
+5. **Performance Metrics** - Main thread delay and memory usage
+6. **Auto-Detection** - Warns when keyboard lockout detected
+7. **Export** - Copy diagnostics to clipboard for bug reports
+
+### Enhanced `/diagnose` Slash Command
+
+**New Test Mode:** `listeners`
+
+```bash
+/diagnose all           # Run all diagnostics (includes listeners)
+/diagnose listeners     # Check event listener counts only
+/diagnose keyboard      # Test keyboard events
+/diagnose focus         # Monitor focus state
+/diagnose overlays      # Detect blocking overlays
+/diagnose terminal      # Check terminal DOM state
+```
+
+**Event Listener Diagnostics:**
+- Document-level keyboard listener counts
+- xterm textarea listener inventory  
+- Total elements with keyboard listeners
+- Detects competing event handlers
+- Requires Chrome DevTools API (`getEventListeners`)
 
 ## 🚀 How to Use
 
-### From Browser Console
-```javascript
-// 1. Open DevTools (F12)
-// 2. Go to Console tab
-// 3. Copy this entire script and paste:
+### Option 1: Diagnostics Button (Recommended)
 
-// [Paste contents of diagnose-event-listeners.js here]
+1. Look for **bug icon** in bottom-left corner of terminal
+2. Click to capture diagnostic snapshot
+3. Click **"Test Spacebar Now"** to verify spacebar responsiveness
+4. View results: detection time, target element, prevented status
+5. Use **"Copy"** button to export diagnostics
+6. Use **"Refresh"** to capture new snapshot
 
-// 4. Press SPACEBAR when prompted
-// 5. Review console output for findings
+### Option 2: Slash Command
+
+Type in terminal:
+```bash
+/diagnose all
 ```
-
-### Expected Output
-The diagnostic produces a detailed analysis including:
-- ✅ or ❌ Spacebar detection status
-- List of all keyboard event listeners in the document
-- xterm textarea location, focus state, and visibility
-- Complete event flow when spacebar is pressed
-- Focus change history
-- Any overlays blocking input
 
 ## 🔍 Key Diagnostic Sections
 
-1. **Document & Body Level Listeners**
-   - Reveals if document-level handlers are preventing spacebar propagation
+### 1. XTerm Health
+- ✅ Textarea count (should be 1)
+- ⚠️ Overlay detection
+- 🔧 Focus state validation
 
-2. **XTerm Textarea Detection**
-   - Confirms textarea is rendered and in the DOM
-   - Shows focus state
-   - Displays position and dimensions
+### 2. Spacebar Test
+- Response time measurement
+- Target element identification
+- preventDefault detection
+- 5-second listening window
 
-3. **All Elements With Keyboard Listeners**
-   - Complete inventory of all keydown/keypress/keyup handlers
-   - Helps identify competing listeners
+### 3. Event Listeners
+- Document/body keyboard listeners
+- xterm textarea listeners
+- Total elements with listeners
+- Competing handler detection
 
-4. **Live Spacebar Test**
-   - Records if spacebar events fire at all
-   - Shows target element and event properties
-   - Indicates if default is being prevented
+### 4. Keyboard Events
+- Total events tracked
+- Time since last event
+- Pending keys (keydown without keyup)
+- Recent event log with gaps
 
-5. **Focus State Monitor**
-   - Tracks every focus change during the test
-   - Shows if focus drifts away from textarea
+### 5. Focus Distribution
+- Time on xterm textarea
+- Time on BODY element
+- Time elsewhere
+- Focus drift detection
 
-6. **Overlay Detection**
-   - Uses `elementFromPoint` to check if something covers the textarea
-   - Critical for identifying modal/overlay interference
+### 6. Performance
+- Main thread delay
+- Memory usage
+- WebSocket state
+- Buffer amounts
 
-## 📋 Next Steps
+## 📋 Why This is Better
 
-1. **Run the diagnostic** from production
-2. **Share console output** with complete event listener information
-3. Based on findings:
-   - If competing listeners found → Fix event handler cleanup
-   - If spacebar not detected → xterm.js core issue or terminal migration needed
-   - If focus drifts → Enhance focus management
-   - If overlay detected → Fix modal/overlay z-index or lifecycle
+| Console Diagnostic | In-App Diagnostic |
+|-------------------|-------------------|
+| Manual copy/paste | One-click capture |
+| DevTools required | Built into UI |
+| Static snapshot | Live monitoring |
+| No automation | Auto-detects issues |
+| Limited context | Full system state |
+| Not user-friendly | Intuitive UI |
 
 ## 🛠️ Technical Details
 
-- **No code changes** to main application
-- **Pure diagnostic** - Does not modify xterm or event handlers
-- **Non-destructive** - Safely removes its own listeners after 10 seconds
-- **Browser console native** - Uses only `getEventListeners()` and DOM APIs
+### Files Modified
+- `frontend/src/components/ForgeTerminal.jsx` - Added DiagnosticsButton
+- `frontend/src/commands/diagnosticMode.js` - Added listeners test
+- Both components designed to not interfere with keyboard input
+
+### Design Principles
+1. **Non-intrusive** - All buttons have `tabIndex={-1}`
+2. **Focus preservation** - Auto-restores focus to terminal
+3. **Always available** - Visible even during keyboard issues
+4. **Self-contained** - No external dependencies
+5. **Exportable** - Easy sharing for bug reports
 
 ## 📝 Notes
 
-This release is diagnostic-only and will help us understand:
-- Whether this is xterm.js core issue
-- Whether migration to alternative terminal is necessary
-- Whether architectural changes to event handling are needed
+- Diagnostics button appears when terminal is active
+- All diagnostic interactions restore terminal focus
+- `/diagnose` command works even with partial keyboard breakage
+- Event listener diagnostics limited to Chrome/Chromium browsers
+- Legacy `diagnose-event-listeners.js` retained for reference
 
-The tool is self-contained and can be run repeatedly without affecting application state.
+## 🎓 User Experience Improvements
+
+1. **Immediate feedback** - No need to open DevTools
+2. **Visual warnings** - Button pulses orange during suspected lockouts
+3. **One-click testing** - Spacebar test validates responsiveness
+4. **Actionable data** - Clear indicators of what's wrong
+5. **Easy reporting** - Copy button for sharing with developers
+
+## 📊 Diagnostic Accuracy
+
+The diagnostics capture:
+- **Timing precision** - Millisecond-accurate event gaps
+- **Complete context** - Focus, overlays, listeners, performance
+- **Real-time state** - Captures exact moment of issue
+- **No interference** - Read-only, non-destructive analysis
 
 ---
 
 **Related Issue:** Spacebar input requiring manual refresh
 
-**Track:** Keyboard Input / Terminal Input
+**Track:** Keyboard Input / Diagnostic Tools / User Experience
+
+**Previous Approach:** Browser console script (unusable)  
+**New Approach:** Integrated UI diagnostics (production-ready)
 

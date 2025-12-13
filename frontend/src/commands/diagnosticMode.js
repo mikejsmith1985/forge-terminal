@@ -3,8 +3,8 @@
 // ==========================================
 export const diagnosticMode = {
   name: "diagnose",
-  description: "Diagnose keyboard, focus, overlays, and terminal DOM state",
-  usage: "/diagnose [keyboard|focus|overlays|terminal|all]",
+  description: "Diagnose keyboard, focus, overlays, terminal DOM state, and event listeners",
+  usage: "/diagnose [keyboard|focus|overlays|terminal|listeners|all]",
   
   async run({ args, print }) {
     const mode = args[0] || "all";
@@ -13,7 +13,8 @@ export const diagnosticMode = {
       keyboard: null,
       focus: null,
       overlays: null,
-      terminal: null
+      terminal: null,
+      listeners: null
     };
 
     // ---- Helper: get xterm textarea ----
@@ -136,6 +137,62 @@ export const diagnosticMode = {
       };
     }
 
+    // ---- TEST: Event listeners ----
+    function testEventListeners() {
+      const textareas = getTextarea();
+      const xtermTextarea = textareas[0];
+      
+      // Check if getEventListeners is available (Chrome DevTools API)
+      const hasGetEventListeners = typeof getEventListeners !== 'undefined';
+      
+      if (!hasGetEventListeners) {
+        return {
+          error: "getEventListeners API not available (Chrome DevTools only)",
+          recommendation: "Use DiagnosticsButton spacebar test instead"
+        };
+      }
+
+      const docListeners = {
+        document: {
+          keydown: getEventListeners(document)?.keydown?.length || 0,
+          keyup: getEventListeners(document)?.keyup?.length || 0,
+          keypress: getEventListeners(document)?.keypress?.length || 0,
+        },
+        body: {
+          keydown: getEventListeners(document.body)?.keydown?.length || 0,
+          keyup: getEventListeners(document.body)?.keyup?.length || 0,
+          keypress: getEventListeners(document.body)?.keypress?.length || 0,
+        }
+      };
+
+      const xtermTextareaListeners = xtermTextarea ? {
+        keydown: getEventListeners(xtermTextarea)?.keydown?.length || 0,
+        keyup: getEventListeners(xtermTextarea)?.keyup?.length || 0,
+        keypress: getEventListeners(xtermTextarea)?.keypress?.length || 0,
+        input: getEventListeners(xtermTextarea)?.input?.length || 0,
+      } : null;
+
+      // Count all elements with keyboard listeners
+      let elementsWithKeyListeners = 0;
+      try {
+        document.querySelectorAll('*').forEach(el => {
+          const listeners = getEventListeners(el);
+          if (listeners.keydown?.length || listeners.keyup?.length || listeners.keypress?.length) {
+            elementsWithKeyListeners++;
+          }
+        });
+      } catch (e) {
+        // Ignore errors from scanning all elements
+      }
+
+      return {
+        documentLevel: docListeners,
+        xtermTextarea: xtermTextareaListeners,
+        totalElementsWithKeyListeners: elementsWithKeyListeners,
+        xtermTextareaFound: !!xtermTextarea,
+      };
+    }
+
     // ==========================================
     // EXECUTION
     // ==========================================
@@ -150,6 +207,9 @@ export const diagnosticMode = {
     }
     if (mode === "terminal" || mode === "all") {
       results.terminal = testTerminal();
+    }
+    if (mode === "listeners" || mode === "all") {
+      results.listeners = testEventListeners();
     }
 
     // ==========================================
@@ -169,6 +229,10 @@ export const diagnosticMode = {
     if (results.terminal)
       print("\n[Terminal Mount Test]\n" + JSON.stringify(results.terminal, null, 2));
 
+    if (results.listeners)
+      print("\n[Event Listeners Test]\n" + JSON.stringify(results.listeners, null, 2));
+
     print("\n=== End of Report ===");
+    print("\nTIP: Use the floating diagnostics button (bottom-left) to test spacebar responsiveness");
   }
 };

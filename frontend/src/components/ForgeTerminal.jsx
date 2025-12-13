@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
+import DiagnosticsButton from './DiagnosticsButton';
 import { 
   initKeyboardDiagnostics, 
   cleanupKeyboardDiagnostics, 
@@ -1300,6 +1301,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           <ArrowDownToLine size={16} />
         </button>
       )}
+      
+      {/* Diagnostics Button - Always visible for debugging keyboard issues */}
+      <DiagnosticsButton
+        terminalRef={xtermRef}
+        wsRef={wsRef}
+        tabId={tabId}
+        isVisible={isVisible}
+      />
     </div>
   );
 });
