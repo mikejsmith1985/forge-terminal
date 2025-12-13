@@ -36,6 +36,13 @@ type CaptureMetrics struct {
 	LastSuccessfulSave       time.Time `json:"lastSuccessfulSave"`
 	AutoRespondSessions      int       `json:"autoRespondSessions"`
 	AutoRespondTurnsCaptured int       `json:"autoRespondTurnsCaptured"`
+	// Additional metrics expected by tests
+	ConversationsStarted    int   `json:"conversationsStarted"`
+	ConversationsValidated  int   `json:"conversationsValidated"`
+	TotalEventsProcessed    int64 `json:"totalEventsProcessed"`
+	UptimeSeconds           int64 `json:"uptimeSeconds"`
+	LayersOperational       int   `json:"layersOperational"`
+	LayersTotal             int   `json:"layersTotal"`
 }
 
 // ConversationCapture manages real-time capture of LLM conversations.

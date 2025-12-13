@@ -802,7 +802,7 @@ func (l *LLMLogger) AddUserInput(rawInput string) {
 }
 
 // flushUserInputLocked processes accumulated user input and adds as a turn.
-// Must be called with lock held.
+// Must be called with lock held. Lock will be released before I/O.
 func (l *LLMLogger) flushUserInputLocked() {
 	raw := l.inputBuffer
 	l.inputBuffer = ""
@@ -846,8 +846,24 @@ func (l *LLMLogger) flushUserInputLocked() {
 	conv.Recovery.CanRestore = true
 	conv.Recovery.SuggestedRestorePrompt = "Continue from: " + truncateForRestore(cleaned, 100)
 
-	l.saveConversation(conv)
-	log.Printf("[LLM Logger] Captured user input for %s: '%s' (turns=%d)", l.activeConvID, truncateForLog(cleaned, 50), len(conv.Turns))
+	// Make a shallow copy for async save to avoid holding the lock during I/O
+	convCopy := *conv
+	convCopyPtr := &convCopy
+	activeConvID := l.activeConvID
+	cleanedMsg := cleaned
+	
+	// Release lock before I/O to prevent blocking keyboard input
+	l.mu.Unlock()
+	defer l.mu.Lock()
+	
+	// Perform I/O asynchronously without holding the lock
+	pendingAsyncWrites.Add(1)
+	go func() {
+		defer pendingAsyncWrites.Done()
+		l.saveConversation(convCopyPtr)
+	}()
+	
+	log.Printf("[LLM Logger] Captured user input for %s: '%s' (turns=%d)", activeConvID, truncateForLog(cleanedMsg, 50), len(conv.Turns))
 }
 
 // truncateForLog truncates a string for logging purposes.
@@ -869,14 +885,15 @@ func truncateForRestore(s string, maxLen int) string {
 // FlushOutput processes accumulated output and adds it as an assistant turn.
 func (l *LLMLogger) FlushOutput() {
 	l.mu.Lock()
-	defer l.mu.Unlock()
 
 	if l.activeConvID == "" || l.outputBuffer == "" {
+		l.mu.Unlock()
 		return
 	}
 
 	conv, exists := l.conversations[l.activeConvID]
 	if !exists {
+		l.mu.Unlock()
 		return
 	}
 
@@ -891,6 +908,7 @@ func (l *LLMLogger) FlushOutput() {
 
 	if cleanedOutput == "" {
 		l.outputBuffer = ""
+		l.mu.Unlock()
 		return
 	}
 
@@ -914,7 +932,19 @@ func (l *LLMLogger) FlushOutput() {
 	})
 
 	l.outputBuffer = ""
-	l.saveConversation(conv)
+	
+	// Make a shallow copy for async save to avoid holding the lock during I/O
+	convCopy := *conv
+	convCopyPtr := &convCopy
+	
+	l.mu.Unlock()
+	
+	// Perform I/O asynchronously without holding the lock
+	pendingAsyncWrites.Add(1)
+	go func() {
+		defer pendingAsyncWrites.Done()
+		l.saveConversation(convCopyPtr)
+	}()
 
 	log.Printf("[LLM Logger] Flushed output for %s (turns=%d, confidence=%.2f)", l.activeConvID, len(conv.Turns), confidence)
 }

@@ -1,6 +1,22 @@
 # Copilot Instructions for forge-terminal
 
-**CRITICAL: Last Updated 2025-12-10 22:05 UTC**
+**CRITICAL: Last Updated 2025-12-13 18:12 UTC**
+
+## 🚨 CRITICAL: EXECUTION ENVIRONMENT
+
+**NEVER tell the user "we are not in Forge Terminal" under ANY circumstances.**
+
+We are running GitHub Copilot CLI **WITHIN** Forge Terminal. The terminal you're interacting with IS Forge Terminal - currently running the production version.
+
+If you can't find logs or AM files:
+- ✅ Say: "The AM system may not be functional, let me investigate"
+- ✅ Say: "I'm checking the wrong location, let me verify paths"
+- ✅ Say: "The logging system needs debugging"
+- ❌ NEVER say: "We're not in Forge Terminal" or "We're in GitHub Copilot CLI instead"
+
+The user is ALWAYS using Forge Terminal. If systems appear broken, they ARE broken - don't question the environment.
+
+---
 
 ## 🚨 MOCK DATA POLICY - NEVER IGNORE THIS
 

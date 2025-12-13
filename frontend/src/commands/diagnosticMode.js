@@ -1,10 +1,12 @@
 // ==========================================
 //  FORGE TERMINAL DIAGNOSTIC MODE
 // ==========================================
+import { spacebarDebugger } from '../utils/spacebarDebugger.js';
+
 export const diagnosticMode = {
   name: "diagnose",
   description: "Diagnose keyboard, focus, overlays, terminal DOM state, and event listeners",
-  usage: "/diagnose [keyboard|focus|overlays|terminal|listeners|all]",
+  usage: "/diagnose [keyboard|focus|overlays|terminal|listeners|spacebar|all]",
   
   async run({ args, print }) {
     const mode = args[0] || "all";
@@ -14,7 +16,8 @@ export const diagnosticMode = {
       focus: null,
       overlays: null,
       terminal: null,
-      listeners: null
+      listeners: null,
+      spacebar: null
     };
 
     // ---- Helper: get xterm textarea ----
@@ -137,6 +140,55 @@ export const diagnosticMode = {
       };
     }
 
+    // ---- TEST: Spacebar debugger ----
+    async function testSpacebar() {
+      print("\nStarting spacebar debugger... Press keys including spacebar (will capture 20 events)");
+      
+      spacebarDebugger.start();
+      
+      // Wait for capture to complete
+      await new Promise(resolve => {
+        const checkInterval = setInterval(() => {
+          if (!spacebarDebugger.isActive) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+        
+        // Timeout after 30 seconds
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          spacebarDebugger.stop();
+          resolve();
+        }, 30000);
+      });
+      
+      const report = spacebarDebugger.getReport();
+      
+      // Save report to file
+      const reportJSON = spacebarDebugger.exportJSON();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `spacebar-debug-${timestamp}.json`;
+      
+      try {
+        const blob = new Blob([reportJSON], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        print(`\n✓ Spacebar debug report saved to: ${filename}`);
+      } catch (err) {
+        print(`\n✗ Failed to save report: ${err.message}`);
+      }
+      
+      return report;
+    }
+
     // ---- TEST: Event listeners ----
     function testEventListeners() {
       const textareas = getTextarea();
@@ -196,20 +248,26 @@ export const diagnosticMode = {
     // ==========================================
     // EXECUTION
     // ==========================================
-    if (mode === "keyboard" || mode === "all") {
-      results.keyboard = await testKeyboard();
-    }
-    if (mode === "focus" || mode === "all") {
-      results.focus = await testFocus();
-    }
-    if (mode === "overlays" || mode === "all") {
-      results.overlays = testOverlays();
-    }
-    if (mode === "terminal" || mode === "all") {
-      results.terminal = testTerminal();
-    }
-    if (mode === "listeners" || mode === "all") {
-      results.listeners = testEventListeners();
+    if (mode === "spacebar") {
+      // Spacebar mode runs ONLY the spacebar test
+      results.spacebar = await testSpacebar();
+    } else {
+      // All other modes run their respective tests
+      if (mode === "keyboard" || mode === "all") {
+        results.keyboard = await testKeyboard();
+      }
+      if (mode === "focus" || mode === "all") {
+        results.focus = await testFocus();
+      }
+      if (mode === "overlays" || mode === "all") {
+        results.overlays = testOverlays();
+      }
+      if (mode === "terminal" || mode === "all") {
+        results.terminal = testTerminal();
+      }
+      if (mode === "listeners" || mode === "all") {
+        results.listeners = testEventListeners();
+      }
     }
 
     // ==========================================
@@ -232,7 +290,20 @@ export const diagnosticMode = {
     if (results.listeners)
       print("\n[Event Listeners Test]\n" + JSON.stringify(results.listeners, null, 2));
 
+    if (results.spacebar) {
+      print("\n[Spacebar Debugger]\n" + JSON.stringify(results.spacebar, null, 2));
+    }
+
     print("\n=== End of Report ===");
-    print("\nTIP: Use the floating diagnostics button (bottom-left) to test spacebar responsiveness");
+    
+    if (mode === "spacebar") {
+      print("\nSpacebar debugger analysis:");
+      print(`Status: ${results.spacebar?.analysis?.status}`);
+      print(`Message: ${results.spacebar?.analysis?.message}`);
+      print("\nReport saved as JSON file in your downloads folder.");
+    } else {
+      print("\nTIP: Use '/diagnose spacebar' for detailed spacebar debugging");
+      print("TIP: Use the floating diagnostics button (bottom-left) to test spacebar responsiveness");
+    }
   }
 };

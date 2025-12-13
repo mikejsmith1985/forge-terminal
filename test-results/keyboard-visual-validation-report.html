@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keyboard Visual Validation Test Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 40px 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+    .header .subtitle {
+      font-size: 18px;
+      opacity: 0.9;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      padding: 40px;
+      background: #f8f9fa;
+    }
+    .summary-card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .summary-card .value {
+      font-size: 36px;
+      font-weight: bold;
+      color: #667eea;
+      margin: 10px 0;
+    }
+    .summary-card .label {
+      font-size: 14px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .summary-card.success .value { color: #10b981; }
+    .summary-card.failure .value { color: #ef4444; }
+    .section {
+      padding: 40px;
+    }
+    .section-title {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #667eea;
+      border-bottom: 3px solid #667eea;
+      padding-bottom: 10px;
+    }
+    .snapshot-grid {
+      display: grid;
+      gap: 20px;
+    }
+    .snapshot-item {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      border-left: 4px solid #10b981;
+    }
+    .snapshot-item.failed {
+      border-left-color: #ef4444;
+      background: #fef2f2;
+    }
+    .snapshot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .snapshot-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .snapshot-time {
+      font-size: 12px;
+      color: #666;
+    }
+    .snapshot-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+    .snapshot-detail {
+      display: flex;
+      justify-content: space-between;
+    }
+    .snapshot-detail .key { color: #666; }
+    .snapshot-detail .value { font-weight: 600; }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .badge.failure {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .code {
+      background: #1f2937;
+      color: #f3f4f6;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      margin-top: 10px;
+      overflow-x: auto;
+    }
+    .failures {
+      background: #fef2f2;
+      border: 2px solid #ef4444;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .failures-title {
+      color: #991b1b;
+      font-size: 20px;
+      margin-bottom: 15px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎹 Keyboard Visual Validation Test Report</h1>
+      <div class="subtitle">5-Minute Continuous Input Test with Percy Visual Snapshots</div>
+    </div>
+    
+    <div class="summary">
+      <div class="summary-card">
+        <div class="label">Duration</div>
+        <div class="value">5m 0s</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Total Snapshots</div>
+        <div class="value">38</div>
+      </div>
+      <div class="summary-card success">
+        <div class="label">Success Rate</div>
+        <div class="value">100.0%</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Inputs Tested</div>
+        <div class="value">5331</div>
+      </div>
+      <div class="summary-card success">
+        <div class="label">Failed</div>
+        <div class="value">0</div>
+      </div>
+      <div class="summary-card success">
+        <div class="label">Visual Validations</div>
+        <div class="value">36</div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2 class="section-title">📸 Visual Snapshots Timeline</h2>
+      <div class="snapshot-grid">
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#1 Continuous Typing Snapshot 1</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:08:07.852Z</div>
+            <div class="code">[Typing continuously at 13s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-1-at-13s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8029ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55290 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55290 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#2 Continuous Typing Snapshot 2</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:08:15.870Z</div>
+            <div class="code">[Typing continuously at 21s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-2-at-21s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8018ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55435 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55435 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#3 Continuous Typing Snapshot 3</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:08:23.879Z</div>
+            <div class="code">[Typing continuously at 29s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-3-at-29s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8009ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55584 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55584 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#4 Continuous Typing Snapshot 4</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:08:31.892Z</div>
+            <div class="code">[Typing continuously at 37s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-4-at-37s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8013ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55733 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55733 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#5 Continuous Typing Snapshot 5</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:08:39.939Z</div>
+            <div class="code">[Typing continuously at 45s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-5-at-45s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8048ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55883 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55883 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#6 Continuous Typing Snapshot 6</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:08:47.994Z</div>
+            <div class="code">[Typing continuously at 53s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-6-at-53s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8054ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">56025 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">56025 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#7 Continuous Typing Snapshot 7</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:08:56.040Z</div>
+            <div class="code">[Typing continuously at 61s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-7-at-61s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8046ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">56160 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">56160 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#8 Continuous Typing Snapshot 8</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:09:04.065Z</div>
+            <div class="code">[Typing continuously at 69s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-8-at-69s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8025ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">56298 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">56298 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#9 Continuous Typing Snapshot 9</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:09:12.094Z</div>
+            <div class="code">[Typing continuously at 77s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-9-at-77s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8029ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">56440 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">56440 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#10 Continuous Typing Snapshot 10</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:09:20.137Z</div>
+            <div class="code">[Typing continuously at 85s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-10-at-85s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8043ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">56588 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">56588 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#11 Continuous Typing Snapshot 11</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:09:28.197Z</div>
+            <div class="code">[Typing continuously at 93s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-11-at-93s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8060ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55223 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55223 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#12 Continuous Typing Snapshot 12</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:09:36.227Z</div>
+            <div class="code">[Typing continuously at 101s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-12-at-101s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8030ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55364 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55364 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#13 Continuous Typing Snapshot 13</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:09:44.259Z</div>
+            <div class="code">[Typing continuously at 109s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-13-at-109s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8032ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55509 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55509 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#14 Continuous Typing Snapshot 14</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:09:52.301Z</div>
+            <div class="code">[Typing continuously at 117s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-14-at-117s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8042ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55662 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55662 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#15 Continuous Typing Snapshot 15</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:10:00.334Z</div>
+            <div class="code">[Typing continuously at 125s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-15-at-125s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8033ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55273 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55273 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#16 Continuous Typing Snapshot 16</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:10:08.368Z</div>
+            <div class="code">[Typing continuously at 133s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-16-at-133s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8034ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55422 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55422 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#17 Continuous Typing Snapshot 17</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:10:16.423Z</div>
+            <div class="code">[Typing continuously at 141s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-17-at-141s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8055ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55572 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55572 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#18 Continuous Typing Snapshot 18</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:10:24.470Z</div>
+            <div class="code">[Typing continuously at 149s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-18-at-149s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8047ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55717 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55717 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#19 Continuous Typing Snapshot 19</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:10:32.513Z</div>
+            <div class="code">[Typing continuously at 157s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-19-at-157s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8043ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55309 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55309 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#20 Continuous Typing Snapshot 20</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:10:40.551Z</div>
+            <div class="code">[Typing continuously at 165s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-20-at-165s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8038ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55450 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55450 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#21 Continuous Typing Snapshot 21</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:10:48.565Z</div>
+            <div class="code">[Typing continuously at 174s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-21-at-174s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8014ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55595 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55595 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#22 Continuous Typing Snapshot 22</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:10:56.596Z</div>
+            <div class="code">[Typing continuously at 182s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-22-at-182s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8031ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55192 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55192 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#23 Continuous Typing Snapshot 23</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:11:04.648Z</div>
+            <div class="code">[Typing continuously at 190s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-23-at-190s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8052ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55342 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55342 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#24 Continuous Typing Snapshot 24</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:11:12.687Z</div>
+            <div class="code">[Typing continuously at 198s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-24-at-198s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8039ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55492 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55492 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#25 Continuous Typing Snapshot 25</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:11:20.888Z</div>
+            <div class="code">[Typing continuously at 206s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-25-at-206s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8201ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55636 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55636 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#26 Continuous Typing Snapshot 26</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:11:28.898Z</div>
+            <div class="code">[Typing continuously at 214s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-26-at-214s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8010ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55223 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55223 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#27 Continuous Typing Snapshot 27</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:11:36.917Z</div>
+            <div class="code">[Typing continuously at 222s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-27-at-222s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8019ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55364 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55364 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#28 Continuous Typing Snapshot 28</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:11:44.932Z</div>
+            <div class="code">[Typing continuously at 230s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-28-at-230s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8015ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55502 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55502 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#29 Continuous Typing Snapshot 29</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:11:52.981Z</div>
+            <div class="code">[Typing continuously at 238s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-29-at-238s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8049ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55652 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55652 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#30 Continuous Typing Snapshot 30</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:12:01.017Z</div>
+            <div class="code">[Typing continuously at 246s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-30-at-246s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8036ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55230 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55230 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#31 Continuous Typing Snapshot 31</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:12:09.049Z</div>
+            <div class="code">[Typing continuously at 254s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-31-at-254s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8032ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55368 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55368 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#32 Continuous Typing Snapshot 32</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:12:17.081Z</div>
+            <div class="code">[Typing continuously at 262s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-32-at-262s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8032ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55518 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55518 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#33 Continuous Typing Snapshot 33</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:12:25.117Z</div>
+            <div class="code">[Typing continuously at 270s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-33-at-270s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8036ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55667 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55667 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#34 Continuous Typing Snapshot 34</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:12:33.146Z</div>
+            <div class="code">[Typing continuously at 278s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-34-at-278s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8029ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55306 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55306 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#35 Continuous Typing Snapshot 35</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:12:41.196Z</div>
+            <div class="code">[Typing continuously at 286s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-35-at-286s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8050ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55455 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55455 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+          <div class="snapshot-item ">
+            <div class="snapshot-header">
+              <div class="snapshot-title">#36 Continuous Typing Snapshot 36</div>
+              <span class="badge success">
+                ✅ SUCCESS
+              </span>
+            </div>
+            <div class="snapshot-time">2025-12-13T23:12:49.241Z</div>
+            <div class="code">[Typing continuously at 294s]</div>
+            <div class="snapshot-details">
+              <div class="snapshot-detail">
+                <span class="key">Percy Snapshot:</span>
+                <span class="value">Continuous-Typing-36-at-294s</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Duration:</span>
+                <span class="value">8045ms</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Before:</span>
+                <span class="value">55605 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">After:</span>
+                <span class="value">55605 chars</span>
+              </div>
+              <div class="snapshot-detail">
+                <span class="key">Delta:</span>
+                <span class="value">+0 chars</span>
+              </div>
+            </div>
+          </div>
+        
+      </div>
+    </div>
+    
+    
+    
+    <div class="section" style="background: #f8f9fa; text-align: center; color: #666;">
+      <p>Generated: 2025-12-13T23:12:54.718Z</p>
+      <p style="margin-top: 10px;">Test executed with Playwright + Percy visual validation</p>
+    </div>
+  </div>
+</body>
+</html>

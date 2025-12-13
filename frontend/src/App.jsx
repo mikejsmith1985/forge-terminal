@@ -1248,7 +1248,7 @@ function App() {
             onClick={() => setSidebarView('assistant')}
           >
             <MessageSquare size={16} />
-            Assistant
+            AI
           </button>
         )}
         <button 

@@ -228,16 +228,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 4px;
+  padding: 6px 8px;
   border: 1px solid var(--overlay);
   background: transparent;
   color: var(--subtext);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .sidebar-view-tab:hover {

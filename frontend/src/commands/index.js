@@ -1,5 +1,6 @@
 // Command registry for Forge Terminal
 import { diagnosticMode } from './diagnosticMode';
+import { saveConversation } from './saveConversation';
 
 // Manual refresh command as escape hatch for keyboard issues
 const refreshCommand = {
@@ -18,6 +19,7 @@ const refreshCommand = {
 export const commands = {
   diagnose: diagnosticMode,
   refresh: refreshCommand,
+  save: saveConversation,
 };
 
 // Parse and execute slash commands
@@ -37,7 +39,7 @@ export async function executeCommand(input, context) {
   if (!command) {
     return { 
       handled: true, 
-      error: `Unknown command: /${commandName}. Try /diagnose` 
+      error: `Unknown command: /${commandName}. Available: /diagnose, /refresh, /save` 
     };
   }
 
