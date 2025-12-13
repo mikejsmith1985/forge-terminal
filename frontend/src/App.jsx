@@ -240,8 +240,17 @@ function App() {
     
     // Store the current version for post-update detection and trigger page refresh if needed
     const checkAndRefreshAfterUpdate = async () => {
+      // CRITICAL FIX: Add 3-second timeout to prevent infinite loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn('[Update] Version check timed out after 3s - proceeding anyway');
+        controller.abort();
+      }, 3000);
+      
       try {
-        const res = await fetch('/api/version');
+        const res = await fetch('/api/version', { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
         const data = await res.json();
         const currentVersion = data.version;
         const lastKnownVersion = localStorage.getItem('lastKnownVersion');
@@ -261,8 +270,9 @@ function App() {
           setVersionReady(true);
         }
       } catch (err) {
+        clearTimeout(timeoutId);
         console.warn('[Update] Failed to check version:', err.message);
-        // Fallback: store a generic version and proceed
+        // Fallback: store a generic version and proceed - NEVER block terminal loading
         localStorage.setItem('lastKnownVersion', '1.9.5');
         setVersionReady(true); // Allow rendering on error (better than blocking forever)
       }
