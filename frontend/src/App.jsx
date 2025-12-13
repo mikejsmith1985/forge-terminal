@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
@@ -18,6 +18,7 @@ import FileExplorer from './components/FileExplorer'
 import MonacoEditor from './components/MonacoEditor'
 import AMMonitor from './components/AMMonitor'
 import AssistantPanel from './components/AssistantPanel/AssistantPanel'
+import DebugPanel from './components/DebugPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -79,7 +80,7 @@ function App() {
   const [waitingTabs, setWaitingTabs] = useState({})
   
   // File explorer and editor state
-  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', or 'assistant'
+  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', 'assistant', or 'debug'
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   
@@ -1250,6 +1251,13 @@ function App() {
             Assistant
           </button>
         )}
+        <button 
+          className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
+          onClick={() => setSidebarView('debug')}
+        >
+          <Bug size={16} />
+          Debug
+        </button>
       </div>
 
       {/* Row 2: Header - context-aware based on view */}
@@ -1265,6 +1273,11 @@ function App() {
           <>
             <h3>📁 Files</h3>
             <span className="sidebar-path-hint">{activeTab?.currentDirectory ? getFolderNameFromPath(activeTab.currentDirectory) : 'Root'}</span>
+          </>
+        ) : sidebarView === 'debug' ? (
+          <>
+            <h3>🐛 Debug</h3>
+            <span className="sidebar-path-hint">System Info</span>
           </>
         ) : (
           <>
@@ -1371,7 +1384,7 @@ function App() {
         />
       )}
 
-      {/* Content area - Cards, Files, or Assistant */}
+      {/* Content area - Cards, Files, Assistant, or Debug */}
       <div className="sidebar-content">
         {sidebarView === 'cards' ? (
           <DndContext
@@ -1397,6 +1410,12 @@ function App() {
             onFileOpen={handleFileOpen}
             terminalRef={getActiveTerminalRef()}
             shellConfig={activeTab?.shellConfig || shellConfig}
+          />
+        ) : sidebarView === 'debug' ? (
+          <DebugPanel
+            terminalRef={getActiveTerminalRef()}
+            tabId={activeTabId}
+            onFeedbackClick={() => setIsFeedbackModalOpen(true)}
           />
         ) : (
           <AssistantPanel

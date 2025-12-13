@@ -41,7 +41,7 @@ var assistantService assistant.Service
 
 func main() {
 	// Set up file-based logging for production diagnostics
-	logFile, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), ".forge", "forge.log"), 
+	logFile, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), ".forge", "forge.log"),
 		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
 		// Log to both file and stdout
@@ -77,7 +77,7 @@ func main() {
 			serveIndexWithVersion(w, r, webFS)
 			return
 		}
-		
+
 		// Prevent caching to avoid stale WebSocket connection issues
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
@@ -101,7 +101,7 @@ func main() {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel()
-		
+
 		ragEngine := assistantCore.GetRAGEngine()
 		if ragEngine == nil {
 			log.Printf("[RAG] RAG engine not available")
@@ -181,7 +181,7 @@ func main() {
 	http.HandleFunc("/api/am/restore/sessions", WrapWithMiddleware(handleAMRestoreSessions))
 	http.HandleFunc("/api/am/restore/context/", WrapWithMiddleware(handleAMRestoreContext))
 	http.HandleFunc("/api/am/log", WrapWithMiddleware(handleAMLog))
-	
+
 	// Vision Configuration & Insights API
 	http.HandleFunc("/api/vision/config", WrapWithMiddleware(handleVisionConfig))
 	http.HandleFunc("/api/vision/insights/", WrapWithMiddleware(handleVisionInsights))
@@ -363,7 +363,22 @@ func openBrowser(url string) {
 	case "linux":
 		cmd = exec.Command("xdg-open", url)
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", url)
+		// Use Chrome on Windows, fall back to system default if not found
+		chromeExe := "chrome.exe"
+		if _, err := exec.LookPath(chromeExe); err != nil {
+			// Try common installation path
+			chromeExe = filepath.Join(os.Getenv("ProgramFiles"), "Google", "Chrome", "Application", "chrome.exe")
+			if _, err := os.Stat(chromeExe); err != nil {
+				// Try 32-bit path
+				chromeExe = filepath.Join(os.Getenv("ProgramFiles(x86)"), "Google", "Chrome", "Application", "chrome.exe")
+				if _, err := os.Stat(chromeExe); err != nil {
+					// Fall back to system default
+					cmd = exec.Command("cmd", "/c", "start", url)
+					break
+				}
+			}
+		}
+		cmd = exec.Command(chromeExe, url)
 	}
 	if cmd != nil {
 		_ = cmd.Start()
@@ -1114,19 +1129,19 @@ func handleAMLLMConversations(w http.ResponseWriter, r *http.Request) {
 	// Get LLM logger for this tab
 	llmLogger := am.GetLLMLogger(tabID, am.DefaultAMDir())
 	log.Printf("[AM API] Retrieved LLM logger for tab %s", tabID)
-	
+
 	conversations := llmLogger.GetConversations()
 	count := len(conversations)
-	
+
 	log.Printf("[AM API] GetConversations() returned %d conversations for tab %s", count, tabID)
-	
+
 	if count == 0 {
 		log.Printf("[AM API] ⚠️ ZERO conversations found for tab %s", tabID)
 		log.Printf("[AM API] Active conversation ID: '%s'", llmLogger.GetActiveConversationID())
 	} else {
 		log.Printf("[AM API] ✓ Found %d conversations:", count)
 		for i, conv := range conversations {
-			log.Printf("[AM API]   [%d] ID=%s provider=%s type=%s complete=%v turns=%d", 
+			log.Printf("[AM API]   [%d] ID=%s provider=%s type=%s complete=%v turns=%d",
 				i, conv.ConversationID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns))
 		}
 	}
@@ -1160,7 +1175,7 @@ func handleAMLLMConversationDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Get LLM logger for this tab
 	llmLogger := am.GetLLMLogger(tabID, am.DefaultAMDir())
-	
+
 	// Get specific conversation
 	conversation := llmLogger.GetConversation(convID)
 	if conversation == nil {
@@ -1169,8 +1184,8 @@ func handleAMLLMConversationDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[AM API] ✓ Found conversation: ID=%s provider=%s turns=%d snapshots=%d", 
-		conversation.ConversationID, conversation.Provider, 
+	log.Printf("[AM API] ✓ Found conversation: ID=%s provider=%s turns=%d snapshots=%d",
+		conversation.ConversationID, conversation.Provider,
 		len(conversation.Turns), len(conversation.ScreenSnapshots))
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1234,7 +1249,7 @@ func handleAMRestoreSessions(w http.ResponseWriter, r *http.Request) {
 
 	amDir := am.DefaultAMDir()
 	cb := am.NewContextBuilder(amDir)
-	
+
 	sessions, err := cb.GetRecoverableSessions()
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1411,110 +1426,110 @@ func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
 
 // handleAssistantStatus checks if Ollama is available.
 func handleAssistantStatus(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodGet {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-w.Header().Set("Content-Type", "application/json")
-ctx := r.Context()
+	w.Header().Set("Content-Type", "application/json")
+	ctx := r.Context()
 
-status, err := assistantService.GetStatus(ctx)
-if err != nil {
-http.Error(w, err.Error(), http.StatusInternalServerError)
-return
-}
+	status, err := assistantService.GetStatus(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-json.NewEncoder(w).Encode(status)
+	json.NewEncoder(w).Encode(status)
 }
 
 // handleAssistantChat processes chat messages.
 func handleAssistantChat(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodPost {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-w.Header().Set("Content-Type", "application/json")
-ctx := r.Context()
+	w.Header().Set("Content-Type", "application/json")
+	ctx := r.Context()
 
-var req assistant.ChatRequest
-if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-http.Error(w, "Invalid request body", http.StatusBadRequest)
-return
-}
+	var req assistant.ChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 
-response, err := assistantService.Chat(ctx, &req)
-if err != nil {
-log.Printf("[Assistant] Chat error: %v", err)
-http.Error(w, err.Error(), http.StatusInternalServerError)
-return
-}
+	response, err := assistantService.Chat(ctx, &req)
+	if err != nil {
+		log.Printf("[Assistant] Chat error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(response)
 }
 
 // handleAssistantExecute executes a command.
 func handleAssistantExecute(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodPost {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-w.Header().Set("Content-Type", "application/json")
-ctx := r.Context()
+	w.Header().Set("Content-Type", "application/json")
+	ctx := r.Context()
 
-var req assistant.ExecuteCommandRequest
-if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-http.Error(w, "Invalid request body", http.StatusBadRequest)
-return
-}
+	var req assistant.ExecuteCommandRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 
-response, err := assistantService.ExecuteCommand(ctx, &req)
-if err != nil {
-log.Printf("[Assistant] Execute error: %v", err)
-http.Error(w, err.Error(), http.StatusInternalServerError)
-return
-}
+	response, err := assistantService.ExecuteCommand(ctx, &req)
+	if err != nil {
+		log.Printf("[Assistant] Execute error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(response)
 }
 
 // handleAssistantSetModel changes the current Ollama model.
 func handleAssistantSetModel(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodPost {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-w.Header().Set("Content-Type", "application/json")
-ctx := r.Context()
+	w.Header().Set("Content-Type", "application/json")
+	ctx := r.Context()
 
-var req assistant.SetModelRequest
-if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-http.Error(w, "Invalid request body", http.StatusBadRequest)
-return
-}
+	var req assistant.SetModelRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 
-if req.Model == "" {
-http.Error(w, "Model name is required", http.StatusBadRequest)
-return
-}
+	if req.Model == "" {
+		http.Error(w, "Model name is required", http.StatusBadRequest)
+		return
+	}
 
-if err := assistantService.SetModel(ctx, req.Model); err != nil {
-log.Printf("[Assistant] SetModel error: %v", err)
-json.NewEncoder(w).Encode(assistant.SetModelResponse{
-Success: false,
-Error:   err.Error(),
-})
-return
-}
+	if err := assistantService.SetModel(ctx, req.Model); err != nil {
+		log.Printf("[Assistant] SetModel error: %v", err)
+		json.NewEncoder(w).Encode(assistant.SetModelResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
 
-log.Printf("[Assistant] Model changed to: %s", req.Model)
-json.NewEncoder(w).Encode(assistant.SetModelResponse{
-Success: true,
-Model:   req.Model,
-})
+	log.Printf("[Assistant] Model changed to: %s", req.Model)
+	json.NewEncoder(w).Encode(assistant.SetModelResponse{
+		Success: true,
+		Model:   req.Model,
+	})
 }
 
 // handleAssistantRunTests runs the model test suite asynchronously
@@ -1618,7 +1633,7 @@ func trainModel(model string) {
 	}
 
 	log.Printf("[Model Training] Training completed for %s\n%s", model, string(output))
-	
+
 	// Update training status
 	trainingStatus[model]["completed"] = true
 	trainingStatus[model]["status"] = "completed"
@@ -1665,17 +1680,17 @@ func handleAssistantTrainingStatus(w http.ResponseWriter, r *http.Request) {
 func handleVisionConfig(w http.ResponseWriter, r *http.Request) {
 	// TODO: Initialize global vision config manager in main()
 	// For now, use a simple file-based approach
-	
+
 	forgeDir := os.Getenv("FORGE_DIR")
 	if forgeDir == "" {
 		homeDir, _ := os.UserHomeDir()
 		forgeDir = filepath.Join(homeDir, ".forge")
 	}
-	
+
 	configPath := filepath.Join(forgeDir, "vision-config.json")
-	
+
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	switch r.Method {
 	case http.MethodGet:
 		// Read config
@@ -1702,7 +1717,7 @@ func handleVisionConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Write(data)
-		
+
 	case http.MethodPost:
 		// Save config
 		var config map[string]interface{}
@@ -1710,30 +1725,30 @@ func handleVisionConfig(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
-		
+
 		// Ensure directory exists
 		if err := os.MkdirAll(forgeDir, 0755); err != nil {
 			http.Error(w, "Failed to create config directory", http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Write config
 		data, err := json.MarshalIndent(config, "", "  ")
 		if err != nil {
 			http.Error(w, "Failed to encode config", http.StatusInternalServerError)
 			return
 		}
-		
+
 		if err := os.WriteFile(configPath, data, 0644); err != nil {
 			http.Error(w, "Failed to save config", http.StatusInternalServerError)
 			return
 		}
-		
+
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"message": "Vision config saved",
 		})
-		
+
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -1743,98 +1758,98 @@ func handleVisionConfig(w http.ResponseWriter, r *http.Request) {
 
 // handleVisionInsights returns insights for a specific tab
 func handleVisionInsights(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodGet {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 
-// Extract tabID from URL path: /api/vision/insights/{tabID}
-tabID := strings.TrimPrefix(r.URL.Path, "/api/vision/insights/")
-if tabID == "" {
-http.Error(w, "Tab ID required", http.StatusBadRequest)
-return
-}
+	// Extract tabID from URL path: /api/vision/insights/{tabID}
+	tabID := strings.TrimPrefix(r.URL.Path, "/api/vision/insights/")
+	if tabID == "" {
+		http.Error(w, "Tab ID required", http.StatusBadRequest)
+		return
+	}
 
-log.Printf("[Vision API] GET /api/vision/insights/%s", tabID)
+	log.Printf("[Vision API] GET /api/vision/insights/%s", tabID)
 
-// Load insights from disk
-amSystem := am.GetSystem()
-if amSystem == nil {
-json.NewEncoder(w).Encode(map[string]interface{}{
-"success":  false,
-"error":    "AM system not initialized",
-"insights": []interface{}{},
-})
-return
-}
+	// Load insights from disk
+	amSystem := am.GetSystem()
+	if amSystem == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  false,
+			"error":    "AM system not initialized",
+			"insights": []interface{}{},
+		})
+		return
+	}
 
-insights, err := terminal.LoadVisionInsights(amSystem.AMDir, tabID)
-if err != nil {
-log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
-json.NewEncoder(w).Encode(map[string]interface{}{
-"success":  false,
-"error":    err.Error(),
-"insights": []interface{}{},
-})
-return
-}
+	insights, err := terminal.LoadVisionInsights(amSystem.AMDir, tabID)
+	if err != nil {
+		log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  false,
+			"error":    err.Error(),
+			"insights": []interface{}{},
+		})
+		return
+	}
 
-log.Printf("[Vision API] Loaded %d insights for tab %s", len(insights), tabID)
+	log.Printf("[Vision API] Loaded %d insights for tab %s", len(insights), tabID)
 
-json.NewEncoder(w).Encode(map[string]interface{}{
-"success":  true,
-"insights": insights,
-"count":    len(insights),
-})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"insights": insights,
+		"count":    len(insights),
+	})
 }
 
 // handleVisionInsightsSummary returns a summary of insights for a specific tab
 func handleVisionInsightsSummary(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodGet {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 
-// Extract tabID from URL path: /api/vision/insights/summary/{tabID}
-tabID := strings.TrimPrefix(r.URL.Path, "/api/vision/insights/summary/")
-if tabID == "" {
-http.Error(w, "Tab ID required", http.StatusBadRequest)
-return
-}
+	// Extract tabID from URL path: /api/vision/insights/summary/{tabID}
+	tabID := strings.TrimPrefix(r.URL.Path, "/api/vision/insights/summary/")
+	if tabID == "" {
+		http.Error(w, "Tab ID required", http.StatusBadRequest)
+		return
+	}
 
-log.Printf("[Vision API] GET /api/vision/insights/summary/%s", tabID)
+	log.Printf("[Vision API] GET /api/vision/insights/summary/%s", tabID)
 
-// Load insights from disk
-amSystem := am.GetSystem()
-if amSystem == nil {
-json.NewEncoder(w).Encode(map[string]interface{}{
-"success": false,
-"error":   "AM system not initialized",
-})
-return
-}
+	// Load insights from disk
+	amSystem := am.GetSystem()
+	if amSystem == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "AM system not initialized",
+		})
+		return
+	}
 
-insights, err := terminal.LoadVisionInsights(amSystem.AMDir, tabID)
-if err != nil {
-log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
-json.NewEncoder(w).Encode(map[string]interface{}{
-"success": false,
-"error":   err.Error(),
-})
-return
-}
+	insights, err := terminal.LoadVisionInsights(amSystem.AMDir, tabID)
+	if err != nil {
+		log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
 
-summary := terminal.GetVisionInsightSummary(insights)
-log.Printf("[Vision API] Generated summary for tab %s: %d total insights", tabID, summary["total"])
+	summary := terminal.GetVisionInsightSummary(insights)
+	log.Printf("[Vision API] Generated summary for tab %s: %d total insights", tabID, summary["total"])
 
-json.NewEncoder(w).Encode(map[string]interface{}{
-"success": true,
-"summary": summary,
-})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"summary": summary,
+	})
 }
 
 // handleDiagnosticsKeyboard logs keyboard diagnostic snapshots for debugging lockout issues
@@ -1858,7 +1873,7 @@ func handleDiagnosticsKeyboard(w http.ResponseWriter, r *http.Request) {
 
 	// Log to both console and file for debugging
 	log.Printf("[Diagnostics] ========== KEYBOARD LOCKOUT SNAPSHOT ==========")
-	
+
 	// Extract key metrics for logging
 	if capturedAt, ok := diagnostic["capturedAt"].(string); ok {
 		log.Printf("[Diagnostics] Captured at: %s", capturedAt)
@@ -1866,32 +1881,32 @@ func handleDiagnosticsKeyboard(w http.ResponseWriter, r *http.Request) {
 	if tabId, ok := diagnostic["tabId"].(string); ok {
 		log.Printf("[Diagnostics] Tab ID: %s", tabId)
 	}
-	
+
 	// WebSocket state
 	if wsState, ok := diagnostic["wsState"].(map[string]interface{}); ok {
-		log.Printf("[Diagnostics] WebSocket: state=%v buffered=%v", 
+		log.Printf("[Diagnostics] WebSocket: state=%v buffered=%v",
 			wsState["readyStateText"], wsState["bufferedAmount"])
 	}
-	
+
 	// Focus state
 	if focusState, ok := diagnostic["focusState"].(map[string]interface{}); ok {
 		log.Printf("[Diagnostics] Focus: activeElement=%v hasFocus=%v visibility=%v",
 			focusState["activeElement"], focusState["hasFocus"], focusState["visibilityState"])
 	}
-	
+
 	// Main thread health
 	if mainThreadBusy, ok := diagnostic["mainThreadBusy"].(bool); ok {
 		delay := diagnostic["mainThreadDelayMs"]
 		log.Printf("[Diagnostics] Main Thread: busy=%v delay=%vms", mainThreadBusy, delay)
 	}
-	
+
 	// Event stats
 	if eventStats, ok := diagnostic["eventStats"].(map[string]interface{}); ok {
 		log.Printf("[Diagnostics] Events: total=%v timeSinceLast=%vms pendingKeys=%v",
-			eventStats["totalKeyEvents"], 
+			eventStats["totalKeyEvents"],
 			eventStats["timeSinceLastEvent"],
 			len(eventStats["pendingKeys"].([]interface{})))
-			
+
 		// Log recent events for detailed debugging
 		if recentEvents, ok := eventStats["recentEvents"].([]interface{}); ok && len(recentEvents) > 0 {
 			log.Printf("[Diagnostics] Last %d keyboard events:", len(recentEvents))
@@ -1903,13 +1918,13 @@ func handleDiagnosticsKeyboard(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	
+
 	log.Printf("[Diagnostics] ================================================")
-	
+
 	// Also save to diagnostics log file for later analysis
 	diagDir := filepath.Join(os.Getenv("HOME"), ".forge", "diagnostics")
 	if err := os.MkdirAll(diagDir, 0755); err == nil {
-		diagFile := filepath.Join(diagDir, fmt.Sprintf("keyboard-%s.json", 
+		diagFile := filepath.Join(diagDir, fmt.Sprintf("keyboard-%s.json",
 			time.Now().Format("2006-01-02_15-04-05")))
 		if data, err := json.MarshalIndent(diagnostic, "", "  "); err == nil {
 			os.WriteFile(diagFile, data, 0644)
@@ -1926,7 +1941,7 @@ func handleDiagnosticsKeyboard(w http.ResponseWriter, r *http.Request) {
 // serveIndexWithVersion serves index.html with cache-busted asset URLs
 func serveIndexWithVersion(w http.ResponseWriter, r *http.Request, webFS fs.FS) {
 	version := updater.GetVersion()
-	
+
 	// Read the index.html file
 	indexFile, err := webFS.Open("index.html")
 	if err != nil {
@@ -1934,24 +1949,24 @@ func serveIndexWithVersion(w http.ResponseWriter, r *http.Request, webFS fs.FS) 
 		return
 	}
 	defer indexFile.Close()
-	
+
 	content, err := io.ReadAll(indexFile)
 	if err != nil {
 		http.Error(w, "Failed to read index.html", http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Replace asset URLs with versioned ones
 	html := string(content)
 	html = strings.ReplaceAll(html, `src="/assets/`, `src="/assets/`)
 	html = strings.ReplaceAll(html, `.js"`, `.js?v=`+version+`"`)
 	html = strings.ReplaceAll(html, `.css">`, `.css?v=`+version+`">`)
-	
+
 	// Set headers
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
-	
+
 	w.Write([]byte(html))
 }

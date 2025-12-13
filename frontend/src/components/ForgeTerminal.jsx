@@ -7,7 +7,6 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
-import DiagnosticsButton from './DiagnosticsButton';
 import { 
   initKeyboardDiagnostics, 
   cleanupKeyboardDiagnostics, 
@@ -592,6 +591,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     hideVisionOverlay: () => {
       setActiveVisionOverlay(null);
     },
+    // Expose internal refs for debugging
+    wsRef: wsRef,
+    terminal: xtermRef.current,
   }));
   
   // Vision action handler
@@ -1334,13 +1336,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           <ArrowDownToLine size={16} />
         </button>
       )}
-
-      <DiagnosticsButton
-        terminalRef={xtermRef}
-        wsRef={wsRef}
-        tabId={tabId}
-        isVisible={isVisible}
-      />
     </div>
   );
 });
