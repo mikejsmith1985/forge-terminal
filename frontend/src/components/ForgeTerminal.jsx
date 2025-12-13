@@ -15,6 +15,13 @@ import {
   printDiagnosticReport 
 } from '../utils/keyboardDiagnostics';
 
+// Browser detection for Edge-specific workarounds
+const isEdge = /Edg\//.test(navigator.userAgent);
+const isChrome = /Chrome\//.test(navigator.userAgent) && !isEdge;
+if (isEdge) {
+  console.log('[Terminal] Edge browser detected - applying focus workarounds');
+}
+
 // Debounce helper for resize events
 function debounce(fn, ms) {
   let timeoutId;
@@ -763,6 +770,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       term.focus();
     });
 
+    // EDGE-SPECIFIC FIX: Edge has aggressive focus stealing, apply multiple focus calls
+    if (isEdge) {
+      // Edge needs extra focus nudges after initialization
+      setTimeout(() => term.focus(), 50);
+      setTimeout(() => term.focus(), 150);
+      setTimeout(() => term.focus(), 300);
+      console.log('[Terminal] Edge focus workarounds applied');
+    }
+
     // Connect to WebSocket
     const connectWebSocket = () => {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1160,9 +1176,26 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     });
     resizeObserver.observe(terminalRef.current);
 
+    // EDGE-SPECIFIC: Handle visibility changes (Edge Sleeping Tabs can break focus)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isVisible && xtermRef.current) {
+        console.log('[Terminal] Tab became visible, restoring focus');
+        // Delay focus to let Edge finish its tab activation
+        setTimeout(() => {
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        }, isEdge ? 100 : 10);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       // Cleanup keyboard diagnostics
       cleanupKeyboardDiagnostics();
+      
+      // Cleanup visibility handler
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       
       // No cleanup needed for attachCustomKeyEventHandler - xterm handles it
       
