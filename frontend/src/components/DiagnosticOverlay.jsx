@@ -127,28 +127,10 @@ const DiagnosticOverlay = ({ isOpen, onClose, position = 'right' }) => {
     const detectProblems = async () => {
       const currentEvents = diagnosticCore.getEvents();
       
-      // Also fetch backend AM status for comparison
-      try {
-        const response = await fetch('/api/diagnostics/am-status');
-        if (response.ok) {
-          const backendStatus = await response.json();
-          // Record AM status as an event for visibility
-          if (backendStatus.lastFileWrite) {
-            const lastWrite = new Date(backendStatus.lastFileWrite);
-            const ageMs = Date.now() - lastWrite.getTime();
-            const ageMinutes = Math.floor(ageMs / 60000);
-            if (ageMinutes > 5) {
-              diagnosticCore.recordAMEvent('backend_status', {
-                action: 'stale_warning',
-                lastWriteAge: `${ageMinutes} minutes ago`,
-                totalFiles: backendStatus.totalFiles,
-              });
-            }
-          }
-        }
-      } catch (err) {
-        // Backend not available, continue with frontend-only detection
-      }
+      // Note: We removed the AM backend polling here because it was flooding
+      // the diagnostic buffer with "backend_status" events every 2 seconds,
+      // pushing out all keyboard/paste/focus events that users need to debug.
+      // AM health should be checked separately, not via the diagnostic event stream.
       
       const summary = problemDetectorManager.getSummary(currentEvents);
       setProblems(summary.problems);
