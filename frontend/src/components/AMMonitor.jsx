@@ -21,6 +21,7 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
   const [conversations, setConversations] = useState([]);
   const [viewingConversation, setViewingConversation] = useState(null);
   const [lastActivityTime, setLastActivityTime] = useState(null);
+  const [lastConvUpdateTime, setLastConvUpdateTime] = useState(null);
   const [pollingInterval] = useState(() => AM_CONFIG.getPollingInterval());
 
   // Normalize paths for display (handle Windows backslashes)
@@ -72,6 +73,7 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
           const convData = await convRes.json();
           const convList = convData.conversations || [];
           setConversations(convList);
+          setLastConvUpdateTime(new Date());
         }
       } catch (err) {
         console.error('[AMMonitor] Status check failed:', err);
@@ -102,9 +104,22 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
   // Determine display state
   const hasConversations = conversations.length > 0;
   const activeConversation = conversations.find(c => !c.complete);
-  const projectName = activeConversation?.metadata?.workingDirectory 
-    ? getProjectName(activeConversation.metadata.workingDirectory)
-    : null;
+  
+  // Check if conversations are stale (not updated in last 2 minutes)
+  const isDataStale = lastConvUpdateTime && 
+    (new Date() - lastConvUpdateTime) > 120000; // 2 minutes
+  
+  // Format time difference for display
+  const formatTimeDiff = (date) => {
+    if (!date) return null;
+    const diffMs = new Date() - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return 'stale';
+  };
 
   // Build status class
   let statusClass = 'am-disabled';
@@ -112,6 +127,8 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     statusClass = 'am-disabled';
   } else if (hasActivity) {
     statusClass = 'am-recording';
+  } else if (isDataStale && hasConversations) {
+    statusClass = 'am-stale';
   } else if (isRecording) {
     statusClass = 'am-active';
   }
@@ -125,21 +142,25 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
       lines.push('Enable via tab context menu');
     } else if (hasActivity) {
       lines.push('🔴 Recording conversation');
-      if (projectName) lines.push(`Project: ${projectName}`);
       if (activeConversation) {
         const provider = activeConversation.provider || 'unknown';
         lines.push(`Provider: ${provider}`);
       }
+    } else if (isDataStale && hasConversations) {
+      lines.push('⚠️ Logging: No recent activity');
+      const timeDiff = formatTimeDiff(lastConvUpdateTime);
+      lines.push(`Last update: ${timeDiff}`);
     } else if (isRecording) {
-      lines.push('Logging: Ready');
-      lines.push('Waiting for LLM activity');
+      lines.push('✓ Logging: Idle');
+      lines.push('Ready to capture LLM activity');
     } else {
       lines.push('Logging: Initializing...');
     }
     
     if (hasConversations) {
       lines.push('');
-      lines.push(`${conversations.length} conversation${conversations.length !== 1 ? 's' : ''} this session`);
+      lines.push(`${conversations.length} conversation${conversations.length !== 1 ? 's' : ''} logged`);
+      lines.push(`Storage: ~/.forge/am/`);
       lines.push('Click to view');
     }
     
@@ -158,16 +179,17 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     if (!amEnabled) {
       return 'Log Off';
     }
-    if (hasActivity && projectName) {
-      return projectName;
-    }
     if (hasActivity) {
-      return 'Recording';
+      return '● Recording';
+    }
+    if (isDataStale && hasConversations) {
+      const timeDiff = formatTimeDiff(lastConvUpdateTime);
+      return `${conversations.length} (${timeDiff})`;
     }
     if (hasConversations) {
       return `${conversations.length} log${conversations.length !== 1 ? 's' : ''}`;
     }
-    return 'Log On';
+    return 'Ready';
   };
 
   // Build icon

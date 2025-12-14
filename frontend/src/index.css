@@ -1769,6 +1769,13 @@ body {
   color: #888;
 }
 
+/* AM Stale - Data not updated recently (orange warning) */
+.am-monitor.am-stale {
+  background: #2e2419;
+  color: #f97316;
+  border: 1px solid #ea580c40;
+}
+
 /* AM Warning state (yellow) */
 .am-monitor.am-warning {
   background: #2e2a1a;

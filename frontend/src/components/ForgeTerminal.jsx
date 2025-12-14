@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
+import { diagnosticCore } from '../utils/diagnosticCore';
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -635,6 +636,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     if (!terminalRef.current) return;
 
+    // Record init event for diagnostics
+    diagnosticCore.recordInitEvent('terminal_mounting', { tabId });
+
     // Initialize xterm.js
     const initialTheme = getTerminalTheme(colorTheme, theme);
     const term = new Terminal({
@@ -670,6 +674,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // Open terminal
     term.open(terminalRef.current);
     xtermRef.current = term;
+    diagnosticCore.recordInitEvent('xterm_created', { tabId });
     
     // Critical fix: Force focus immediately after terminal.open()
     // This ensures the terminal textarea receives focus before React re-renders
@@ -680,6 +685,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
     // This runs BEFORE xterm processes the key and allows conditional intercept
     term.attachCustomKeyEventHandler((arg) => {
+      // Record keyboard event for diagnostics
+      diagnosticCore.recordKeyboardEvent(arg);
+      
       // CRITICAL FIX: Explicitly allow spacebar no matter what
       // This prevents xterm from blocking spacebar due to event bubbling issues
       if (arg.code === 'Space') {
@@ -716,18 +724,22 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // Handle Ctrl+V (Paste)
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
         console.log('[Terminal] Ctrl+V detected - reading from clipboard');
+        diagnosticCore.recordPasteEvent('', 'ctrl-v-triggered');
         
         navigator.clipboard.readText()
           .then((text) => {
             console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
+            diagnosticCore.recordPasteEvent(text, 'clipboard-read');
             
             // Send the pasted text to Go backend via WebSocket
             // Do NOT term.write(text) here - it will duplicate if backend echoes back
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              diagnosticCore.recordWebSocketEvent('send', { length: text.length, content: text });
               wsRef.current.send(text);
               console.log('[Terminal] Sent pasted text to backend:', text.length, 'chars');
             } else {
               console.warn('[Terminal] WebSocket not ready for paste');
+              diagnosticCore.recordWebSocketEvent('error', { reason: 'not-ready-for-paste' });
             }
           })
           .catch((err) => {
@@ -746,6 +758,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     queueMicrotask(() => {
       term.focus();
     });
+
+    // Record that handlers are now attached
+    diagnosticCore.recordInitEvent('handlers_attached', { tabId });
 
     // Connect to WebSocket
     const connectWebSocket = () => {
@@ -1055,6 +1070,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
       // Handle terminal input
       term.onData((data) => {
+        // Record terminal data for diagnostics
+        diagnosticCore.recordTerminalData(data);
+        
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
           

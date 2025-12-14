@@ -19,6 +19,7 @@ import MonacoEditor from './components/MonacoEditor'
 import AMMonitor from './components/AMMonitor'
 import AssistantPanel from './components/AssistantPanel/AssistantPanel'
 import DebugPanel from './components/DebugPanel'
+import DiagnosticOverlay from './components/DiagnosticOverlay'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -36,6 +37,7 @@ function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false)
+  const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
   const [colorTheme, setColorTheme] = useState(() => {
@@ -241,6 +243,14 @@ function App() {
     
     // Store the current version for post-update detection and trigger page refresh if needed
     const checkAndRefreshAfterUpdate = async () => {
+      // BYPASS: Don't auto-refresh in development mode (port 5173 = Vite dev server)
+      const isDevMode = window.location.port === '5173' || window.location.hostname === 'localhost';
+      if (isDevMode) {
+        console.log('[Update] Dev mode detected - skipping auto-refresh logic');
+        setVersionReady(true);
+        return;
+      }
+      
       // CRITICAL FIX: Add 3-second timeout to prevent infinite loading
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
@@ -280,6 +290,13 @@ function App() {
     };
     
     checkAndRefreshAfterUpdate();
+    
+    // BYPASS: Don't set up SSE in development mode
+    const isDevMode = window.location.port === '5173' || window.location.hostname === 'localhost';
+    if (isDevMode) {
+      console.log('[SSE] Dev mode detected - skipping SSE update notifications');
+      return; // Skip SSE setup in dev
+    }
     
     // Set up SSE for real-time update notifications with exponential backoff and fallback polling
     let eventSource = null;
@@ -1277,7 +1294,12 @@ function App() {
         ) : sidebarView === 'debug' ? (
           <>
             <h3>🐛 Debug</h3>
-            <span className="sidebar-path-hint">System Info</span>
+            <button 
+              className="btn btn-primary"
+              onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
+            >
+              {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
+            </button>
           </>
         ) : (
           <>
@@ -1596,6 +1618,13 @@ function App() {
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+      {/* Diagnostic Overlay - toggle via debug panel */}
+      <DiagnosticOverlay
+        isOpen={isDiagnosticOverlayOpen}
+        onClose={() => setIsDiagnosticOverlayOpen(false)}
+        position={sidebarPosition === 'right' ? 'left' : 'right'}
+      />
     </div>
   )
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/assistant"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
+	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
@@ -189,6 +190,9 @@ func main() {
 
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
+	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))
+	http.HandleFunc("/api/diagnostics/am-status", WrapWithMiddleware(handleDiagnosticsAMStatus))
+	http.HandleFunc("/api/diagnostics/platform", WrapWithMiddleware(handleDiagnosticsPlatform))
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
@@ -1936,6 +1940,58 @@ func handleDiagnosticsKeyboard(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": "Diagnostic logged",
 	})
+}
+
+// handleDiagnosticsStatus returns current diagnostic system status.
+func handleDiagnosticsStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	
+	svc := diagnostic.GetService()
+	amStatus := svc.GetAMStatus()
+	platform := svc.GetPlatformInfo()
+	events := svc.GetEvents(50)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":       "ok",
+		"amStatus":     amStatus,
+		"platform":     platform,
+		"recentEvents": len(events),
+	})
+}
+
+// handleDiagnosticsAMStatus returns detailed AM system status with file verification.
+func handleDiagnosticsAMStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	
+	svc := diagnostic.GetService()
+	status := svc.GetAMStatus()
+
+	json.NewEncoder(w).Encode(status)
+}
+
+// handleDiagnosticsPlatform returns platform detection information.
+func handleDiagnosticsPlatform(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	
+	svc := diagnostic.GetService()
+	platform := svc.GetPlatformInfo()
+
+	json.NewEncoder(w).Encode(platform)
 }
 
 // serveIndexWithVersion serves index.html with cache-busted asset URLs

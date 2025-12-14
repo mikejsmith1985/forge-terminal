@@ -47,7 +47,7 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **🔓 Unrestricted Mode**: Optional full filesystem access for advanced users.
 
 ### Quality of Life
-- **🐛 Debug Panel**: Integrated debug panel in the ribbon with real-time system diagnostics, auto-refresh capability, and one-click feedback reporting. Includes Terminal Info, Focus State, WebSocket status, and viewport details. **Send Feedback** button opens GitHub issue creation with automatic screenshot capture.
+- **🐛 Debug Panel**: Integrated debug panel in the ribbon with real-time system diagnostics, auto-refresh capability, and one-click feedback reporting. Includes Terminal Info, Focus State, WebSocket status, and viewport details. **Send Feedback** button opens GitHub issue creation with automatic screenshot capture. **NEW in v1.23.0**: Comprehensive **Diagnostic Overlay** for troubleshooting. Captures all keyboard, paste, websocket, and AM events in real-time. 4 intelligent problem detectors identify root causes: double-paste issues, spacebar blocking, stale AM output, and hydration delays. Session export to `~/.forge/diagnostics/` for offline analysis.
 - **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./.forge/am/` directory with workspace-aware naming. **NEW in v1.21.0**: Full TUI screen capture for AI CLI tools (Copilot, Claude) with automatic session reconstruction and 70% parsing accuracy + 100% raw snapshot fallback.
 - **🔄 Auto-Updates**: Automatic update checking with one-click installation.
 - **📜 Version History**: View and rollback to previous versions.
