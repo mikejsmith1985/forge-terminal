@@ -13,6 +13,8 @@ type Config struct {
 	ShellType   string `json:"shellType"`   // "powershell", "cmd", or "wsl"
 	WSLDistro   string `json:"wslDistro"`   // e.g., "Ubuntu-24.04"
 	WSLHomePath string `json:"wslHomePath"` // e.g., "/home/mikej" (auto-detected if empty)
+	CmdHomePath string `json:"cmdHomePath"` // CMD default working directory
+	PsHomePath  string `json:"psHomePath"`  // PowerShell default working directory
 }
 
 // DefaultConfig returns default configuration
