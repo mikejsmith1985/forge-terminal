@@ -24,7 +24,7 @@ func startPTY(cmd *exec.Cmd) (io.ReadWriteCloser, error) {
 }
 
 // startPTYWithShell starts a PTY session with a specific shell and arguments.
-func startPTYWithShell(shell string, args []string) (io.ReadWriteCloser, error) {
+func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadWriteCloser, error) {
 	// Build command line
 	commandLine := shell
 	if len(args) > 0 {
@@ -35,6 +35,19 @@ func startPTYWithShell(shell string, args []string) (io.ReadWriteCloser, error) 
 	if err != nil {
 		return nil, fmt.Errorf("conpty start failed for %s: %w", commandLine, err)
 	}
+	
+	// For Windows shells, send a CD command to set working directory
+	// This is done immediately after starting to ensure we're in the right directory
+	if workingDir != "" && (shell == "cmd.exe" || shell == "powershell.exe") {
+		if shell == "cmd.exe" {
+			// CMD: use "cd /d" to change directory across drives
+			cpty.Write([]byte("cd /d \"" + workingDir + "\"\r"))
+		} else if shell == "powershell.exe" {
+			// PowerShell: use Set-Location
+			cpty.Write([]byte("Set-Location \"" + workingDir + "\"\r"))
+		}
+	}
+	
 	return cpty, nil
 }
 

@@ -46,7 +46,7 @@ function App() {
   const [sidebarPosition, setSidebarPosition] = useState(() => {
     return localStorage.getItem('sidebarPosition') || 'right';
   })
-  const [shellConfig, setShellConfig] = useState({ shellType: 'powershell', wslDistro: '', wslHomePath: '' })
+  const [shellConfig, setShellConfig] = useState({ shellType: 'powershell', wslDistro: '', wslHomePath: '', cmdHomePath: '', psHomePath: '' })
   const [wslAvailable, setWslAvailable] = useState(false)
   const [fontSize, setFontSize] = useState(() => {
     const saved = localStorage.getItem('terminalFontSize');
@@ -405,11 +405,13 @@ function App() {
       const data = await res.json();
       if (data && data.shellType) {
         // Check if config differs from the initial default
-        const defaultConfig = { shellType: 'powershell', wslDistro: '', wslHomePath: '' };
+        const defaultConfig = { shellType: 'powershell', wslDistro: '', wslHomePath: '', cmdHomePath: '', psHomePath: '' };
         const configDiffers = 
           data.shellType !== defaultConfig.shellType ||
           data.wslDistro !== defaultConfig.wslDistro ||
-          data.wslHomePath !== defaultConfig.wslHomePath;
+          data.wslHomePath !== defaultConfig.wslHomePath ||
+          data.cmdHomePath !== defaultConfig.cmdHomePath ||
+          data.psHomePath !== defaultConfig.psHomePath;
         
         setShellConfig(data);
         // Update the first tab's shell config to match loaded settings

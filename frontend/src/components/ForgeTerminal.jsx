@@ -648,7 +648,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
-      clipboardMode: 'on', // Enable clipboard support for copy/paste
+      clipboardMode: 'off', // Disabled: we handle Ctrl+V ourselves in custom handler
     });
 
     // Add fit addon
@@ -776,7 +776,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         params.set('shell', cfg.shellType);
         if (cfg.shellType === 'wsl') {
           if (cfg.wslDistro) params.set('distro', cfg.wslDistro);
-          if (cfg.wslHomePath) params.set('home', cfg.wslHomePath);
+          if (cfg.wslHomePath) params.set('wslHome', cfg.wslHomePath);
+        } else if (cfg.shellType === 'cmd') {
+          if (cfg.cmdHomePath) params.set('cmdHome', cfg.cmdHomePath);
+        } else if (cfg.shellType === 'powershell') {
+          if (cfg.psHomePath) params.set('psHome', cfg.psHomePath);
         }
       }
       wsUrl += '?' + params.toString();

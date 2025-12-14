@@ -15,9 +15,11 @@ import (
 
 // ShellConfig contains shell configuration options
 type ShellConfig struct {
-	ShellType   string // "cmd", "powershell", or "wsl"
-	WSLDistro   string // WSL distribution name (e.g., "Ubuntu-24.04")
-	WSLHomePath string // WSL home directory (e.g., "/home/mikej")
+	ShellType      string // "cmd", "powershell", or "wsl"
+	WSLDistro      string // WSL distribution name (e.g., "Ubuntu-24.04")
+	WSLHomePath    string // WSL home directory (e.g., "/home/mikej")
+	CmdHomePath    string // CMD home directory (e.g., "C:\ProjectsWin")
+	PSHomePath     string // PowerShell home directory (e.g., "C:\ProjectsWin")
 }
 
 // TerminalSession represents a single PTY terminal session.
@@ -98,8 +100,16 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 			shellArgs = append(shellArgs, "-e", "bash", "-l")
 		} else if config != nil && config.ShellType == "powershell" {
 			shell = "powershell.exe"
+			// Set working directory for PowerShell
+			if config.PSHomePath != "" {
+				workingDir = config.PSHomePath
+			}
 		} else {
 			shell = "cmd.exe"
+			// Set working directory for CMD
+			if config.CmdHomePath != "" {
+				workingDir = config.CmdHomePath
+			}
 		}
 	} else {
 		// Unix shell (including WSL running natively)
@@ -132,7 +142,7 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	var ptmx io.ReadWriteCloser
 	var err error
 	if runtime.GOOS == "windows" {
-		ptmx, err = startPTYWithShell(shell, shellArgs)
+		ptmx, err = startPTYWithShell(shell, shellArgs, workingDir)
 	} else {
 		ptmx, err = startPTY(cmd)
 	}

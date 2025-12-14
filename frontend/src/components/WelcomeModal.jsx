@@ -17,7 +17,7 @@ function WelcomeModal({ isOpen, onClose, version }) {
     if (!isOpen) return;
     
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+      if (e.key === 'Escape' || e.key === 'Enter') {
         e.preventDefault();
         onClose();
       }

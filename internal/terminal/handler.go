@@ -107,7 +107,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	shellConfig := &ShellConfig{
 		ShellType:   query.Get("shell"),
 		WSLDistro:   query.Get("distro"),
-		WSLHomePath: query.Get("home"),
+		WSLHomePath: query.Get("wslHome"),
+		CmdHomePath: query.Get("cmdHome"),
+		PSHomePath:  query.Get("psHome"),
 	}
 
 	// Get tabID from query params (for AM/LLM logging)

@@ -258,6 +258,54 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             </>
           )}
 
+          {config.shellType === 'cmd' && (
+            <div className="form-group" style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Home Directory</label>
+              <input
+                type="text"
+                value={config.cmdHomePath || ''}
+                onChange={(e) => setConfig({ ...config, cmdHomePath: e.target.value })}
+                placeholder="e.g., C:\ProjectsWin"
+                className="form-control"
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #333', 
+                  background: '#1a1a1a', 
+                  color: '#fff' 
+                }}
+              />
+              <small style={{ color: '#888', fontSize: '0.8em' }}>
+                Windows CMD default working directory (e.g., C:\ProjectsWin)
+              </small>
+            </div>
+          )}
+
+          {config.shellType === 'powershell' && (
+            <div className="form-group" style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Home Directory</label>
+              <input
+                type="text"
+                value={config.psHomePath || ''}
+                onChange={(e) => setConfig({ ...config, psHomePath: e.target.value })}
+                placeholder="e.g., C:\ProjectsWin"
+                className="form-control"
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #333', 
+                  background: '#1a1a1a', 
+                  color: '#fff' 
+                }}
+              />
+              <small style={{ color: '#888', fontSize: '0.8em' }}>
+                PowerShell default working directory (e.g., C:\ProjectsWin)
+              </small>
+            </div>
+          )}
+
           <div style={{ 
             background: '#262626', 
             padding: '12px', 
