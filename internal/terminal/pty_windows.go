@@ -8,6 +8,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/UserExistsError/conpty"
 )
@@ -37,15 +38,22 @@ func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadW
 	}
 	
 	// For Windows shells, send a CD command to set working directory
-	// This is done immediately after starting to ensure we're in the right directory
+	// This is done after a brief delay to ensure the shell is ready
 	if workingDir != "" && (shell == "cmd.exe" || shell == "powershell.exe") {
-		if shell == "cmd.exe" {
-			// CMD: use "cd /d" to change directory across drives
-			cpty.Write([]byte("cd /d \"" + workingDir + "\"\r"))
-		} else if shell == "powershell.exe" {
-			// PowerShell: use Set-Location
-			cpty.Write([]byte("Set-Location \"" + workingDir + "\"\r"))
-		}
+		// Wait for shell to initialize before sending cd command
+		go func() {
+			// Brief delay to let the shell start and be ready for input
+			// 100ms is enough for cmd.exe/powershell.exe to initialize
+			time.Sleep(100 * time.Millisecond)
+			
+			if shell == "cmd.exe" {
+				// CMD: use "cd /d" to change directory across drives
+				cpty.Write([]byte("cd /d \"" + workingDir + "\"\r"))
+			} else if shell == "powershell.exe" {
+				// PowerShell: use Set-Location
+				cpty.Write([]byte("Set-Location \"" + workingDir + "\"\r"))
+			}
+		}()
 	}
 	
 	return cpty, nil
