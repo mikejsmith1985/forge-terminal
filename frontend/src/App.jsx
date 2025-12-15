@@ -26,6 +26,7 @@ import { useTabManager } from './hooks/useTabManager'
 import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
+import { performanceInstrumentation } from './utils/performanceInstrumentation'
 
 const MAX_TABS = 20;
 
@@ -227,6 +228,16 @@ function App() {
     checkWSL()
     checkForUpdates()
     checkWelcome()
+    
+    // Start performance instrumentation for freeze detection
+    performanceInstrumentation.start((freezeCapture) => {
+      // Show toast notification when freeze detected
+      const durationSec = (freezeCapture.duration / 1000).toFixed(1);
+      addToast(`UI freeze detected: ${durationSec}s. Check console (F12) for details.`, 'error', 5000);
+      console.error('[FREEZE DETECTED]', freezeCapture);
+      // Store in global for easy access
+      window.__lastFreezeCapture = freezeCapture;
+    })
     
     // Check if file access mode has been set
     const modeSet = localStorage.getItem('fileAccessModeSet');
