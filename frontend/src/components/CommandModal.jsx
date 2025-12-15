@@ -1,44 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import IconPicker, { iconMap, emojiMap } from './IconPicker';
 import { ChevronDown } from 'lucide-react';
-
-// Smart keybinding generator - matches logic in App.jsx
-const generateSmartKeybinding = (position, existingCommands) => {
-    // Cards 1-10: Ctrl+Shift+1, Ctrl+Shift+2, ... Ctrl+Shift+0
-    if (position <= 10) {
-        const key = position === 10 ? '0' : String(position);
-        return `Ctrl+Shift+${key}`;
-    }
-    
-    // Card 11+: Try to auto-increment from previous card
-    if (existingCommands.length > 0) {
-        const lastCmd = existingCommands[existingCommands.length - 1];
-        if (lastCmd.keyBinding) {
-            const match = lastCmd.keyBinding.match(/Ctrl\+Shift\+(.+)$/i);
-            if (match) {
-                const lastKey = match[1];
-                // Increment key
-                if (/^[0-9]$/.test(lastKey)) {
-                    const num = parseInt(lastKey);
-                    if (num < 9) return `Ctrl+Shift+${num + 1}`;
-                    return 'Ctrl+Shift+A';
-                }
-                if (/^[A-Z]$/i.test(lastKey)) {
-                    const upper = lastKey.toUpperCase();
-                    if (upper < 'Z') return `Ctrl+Shift+${String.fromCharCode(upper.charCodeAt(0) + 1)}`;
-                }
-            }
-        }
-    }
-    
-    // Fallback: use letters starting from A for 11+
-    const letterIndex = position - 11;
-    if (letterIndex < 26) {
-        return `Ctrl+Shift+${String.fromCharCode(65 + letterIndex)}`;
-    }
-    
-    return '';
-};
+import { 
+  getNextAvailableKeybinding, 
+  validateKeybinding, 
+  getKeybindingAvailability,
+  isDuplicateKeybinding 
+} from '../utils/keybindingManager';
 
 const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) => {
     const [formData, setFormData] = useState({
@@ -53,6 +21,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         icon: null
     });
     const [showIconPicker, setShowIconPicker] = useState(false);
+    const [keybindingError, setKeybindingError] = useState(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -81,6 +50,16 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }));
+        
+        // Validate keybinding on change
+        if (name === 'keyBinding') {
+            if (value && value.trim() !== '') {
+                const validation = validateKeybinding(value, commands, initialData?.id);
+                setKeybindingError(validation.valid ? null : validation.error);
+            } else {
+                setKeybindingError(null);
+            }
+        }
     };
 
     const handleIconSelect = (iconName) => {
@@ -98,11 +77,19 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
     const selectedEmoji = isEmoji ? emojiMap[formData.icon] : null;
     const SelectedIcon = !isEmoji && formData.icon ? iconMap[formData.icon] : null;
 
-    // Calculate the smart keybinding that will be auto-assigned
-    const smartKeybinding = useMemo(() => {
-        if (initialData) return ''; // Editing existing command
-        const position = commands.length + 1;
-        return generateSmartKeybinding(position, commands);
+    // Calculate the smart keybinding that will be auto-assigned and availability
+    const keybindingInfo = useMemo(() => {
+        const availability = getKeybindingAvailability(
+            initialData ? commands.filter(c => c.id !== initialData.id) : commands
+        );
+        const nextKeybinding = initialData 
+            ? null 
+            : getNextAvailableKeybinding(commands);
+        
+        return {
+            availability,
+            nextKeybinding,
+        };
     }, [commands, initialData]);
 
     if (!isOpen) return null;
@@ -173,9 +160,25 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                             name="keyBinding"
                             value={formData.keyBinding}
                             onChange={handleChange}
-                            placeholder={smartKeybinding ? `Auto: ${smartKeybinding}` : 'e.g. Ctrl+Shift+1'}
+                            placeholder={keybindingInfo.nextKeybinding ? `Auto: ${keybindingInfo.nextKeybinding}` : 'e.g. Ctrl+Shift+1'}
+                            className={keybindingError ? 'error' : ''}
                         />
-                        <small>{smartKeybinding && !initialData ? `Will auto-assign: ${smartKeybinding}` : 'Supported: Ctrl+Shift+[0-9, A-Z]'}</small>
+                        {keybindingError && (
+                            <small style={{ color: '#ef4444' }}>{keybindingError}</small>
+                        )}
+                        {!keybindingError && keybindingInfo.nextKeybinding && !initialData && (
+                            <small>Will auto-assign: {keybindingInfo.nextKeybinding}</small>
+                        )}
+                        {!keybindingError && keybindingInfo.availability.allTaken && !initialData && (
+                            <small style={{ color: '#f59e0b' }}>
+                                ⚠️ All 20 default slots taken. Please assign a custom keybinding.
+                            </small>
+                        )}
+                        {!keybindingError && !initialData && !keybindingInfo.availability.allTaken && (
+                            <small style={{ color: '#666' }}>
+                                Available: {keybindingInfo.availability.available}/{keybindingInfo.availability.total} default keybindings
+                            </small>
+                        )}
                     </div>
 
                     <div className="form-row">
@@ -250,7 +253,14 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
 
                 <div className="modal-footer">
                     <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                    <button type="submit" form="command-form" className="btn btn-primary">Save</button>
+                    <button 
+                        type="submit" 
+                        form="command-form" 
+                        className="btn btn-primary"
+                        disabled={!!keybindingError}
+                    >
+                        Save
+                    </button>
                 </div>
 
             </div>

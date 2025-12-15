@@ -25,6 +25,7 @@ import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
 import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
+import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 
 const MAX_TABS = 20;
 
@@ -600,65 +601,6 @@ function App() {
     applyTheme(colorTheme, newTheme);
   };
 
-  // Smart keybinding generator
-  // First 10 cards: Ctrl+Shift+0-9
-  // Card 11+: Auto-increment from previous card's keybinding
-  const generateSmartKeybinding = (position, existingCommands) => {
-    // Cards 1-10: Ctrl+Shift+0, Ctrl+Shift+1, ... Ctrl+Shift+9
-    if (position <= 10) {
-      const key = position === 10 ? '0' : String(position);
-      return `Ctrl+Shift+${key}`;
-    }
-    
-    // Card 11+: Try to auto-increment from previous card
-    if (existingCommands.length > 0) {
-      const lastCmd = existingCommands[existingCommands.length - 1];
-      if (lastCmd.keyBinding) {
-        const match = lastCmd.keyBinding.match(/Ctrl\+Shift\+(.+)$/i);
-        if (match) {
-          const lastKey = match[1];
-          const nextKey = incrementKey(lastKey);
-          if (nextKey) {
-            return `Ctrl+Shift+${nextKey}`;
-          }
-        }
-      }
-    }
-    
-    // Fallback: use letters starting from A for 11+
-    const letterIndex = position - 11;
-    if (letterIndex < 26) {
-      return `Ctrl+Shift+${String.fromCharCode(65 + letterIndex)}`;
-    }
-    
-    return '';
-  };
-  
-  // Increment a key (letter or number)
-  const incrementKey = (key) => {
-    // If it's a single digit
-    if (/^[0-9]$/.test(key)) {
-      const num = parseInt(key);
-      if (num < 9) {
-        return String(num + 1);
-      }
-      // After 9, switch to letters
-      return 'A';
-    }
-    
-    // If it's a single letter
-    if (/^[A-Z]$/i.test(key)) {
-      const upper = key.toUpperCase();
-      if (upper < 'Z') {
-        return String.fromCharCode(upper.charCodeAt(0) + 1);
-      }
-      // Wrapped around, no more keys
-      return null;
-    }
-    
-    return null;
-  };
-
   // Keyboard shortcuts
   useEffect(() => {
     // CRITICAL: Don't register keyboard handlers until version is verified
@@ -1198,6 +1140,18 @@ function App() {
   }
 
   const handleSaveCommand = (commandData) => {
+    // Validate keybinding if manually specified
+    const validation = validateKeybinding(
+      commandData.keyBinding, 
+      commands, 
+      editingCommand?.id
+    );
+    
+    if (!validation.valid) {
+      addToast(validation.error, 'error', 5000);
+      return;
+    }
+    
     let newCommands;
     if (editingCommand) {
       // Update existing
@@ -1207,12 +1161,18 @@ function App() {
     } else {
       // Add new with smart keybinding
       const newId = Math.max(0, ...commands.map(c => c.id)) + 1
-      const cardPosition = commands.length + 1; // Position of new card (1-indexed)
       
       // Auto-assign keybinding if not already set
       let finalData = { ...commandData };
-      if (!finalData.keyBinding) {
-        finalData.keyBinding = generateSmartKeybinding(cardPosition, commands);
+      if (!finalData.keyBinding || finalData.keyBinding.trim() === '') {
+        const nextKeybinding = getNextAvailableKeybinding(commands);
+        if (nextKeybinding) {
+          finalData.keyBinding = nextKeybinding;
+        } else {
+          // All 20 slots taken - alert user
+          addToast('⚠️ All 20 default keybindings are assigned. Please assign a custom keybinding before saving.', 'error', 7000);
+          return;
+        }
       }
       
       newCommands = [...commands, { ...finalData, id: newId }]
