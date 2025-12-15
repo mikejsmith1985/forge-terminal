@@ -367,22 +367,8 @@ func openBrowser(url string) {
 	case "linux":
 		cmd = exec.Command("xdg-open", url)
 	case "windows":
-		// Use Chrome on Windows, fall back to system default if not found
-		chromeExe := "chrome.exe"
-		if _, err := exec.LookPath(chromeExe); err != nil {
-			// Try common installation path
-			chromeExe = filepath.Join(os.Getenv("ProgramFiles"), "Google", "Chrome", "Application", "chrome.exe")
-			if _, err := os.Stat(chromeExe); err != nil {
-				// Try 32-bit path
-				chromeExe = filepath.Join(os.Getenv("ProgramFiles(x86)"), "Google", "Chrome", "Application", "chrome.exe")
-				if _, err := os.Stat(chromeExe); err != nil {
-					// Fall back to system default
-					cmd = exec.Command("cmd", "/c", "start", url)
-					break
-				}
-			}
-		}
-		cmd = exec.Command(chromeExe, url)
+		// Use system default browser on Windows (do not force Chrome)
+		cmd = exec.Command("cmd", "/c", "start", url)
 	}
 	if cmd != nil {
 		_ = cmd.Start()
