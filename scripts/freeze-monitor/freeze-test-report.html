@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Freeze Detection Report - Forge Terminal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #00d4ff; margin-bottom: 20px; }
+    h2 { color: #ff6b6b; margin: 30px 0 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric { background: #16213e; border-radius: 10px; padding: 20px; }
+    .metric-value { font-size: 36px; font-weight: bold; color: #00d4ff; }
+    .metric-label { color: #888; margin-top: 5px; }
+    .metric.danger .metric-value { color: #ff6b6b; }
+    .metric.success .metric-value { color: #4ade80; }
+    .freeze-item { background: #2a1a1a; border-left: 4px solid #ff6b6b; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    .freeze-time { color: #888; }
+    .freeze-duration { color: #ff6b6b; font-weight: bold; margin-left: 20px; }
+    .freeze-screenshot { max-width: 400px; margin-top: 10px; border: 1px solid #333; border-radius: 5px; }
+    .screenshot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .screenshot-item { background: #16213e; padding: 15px; border-radius: 10px; }
+    .screenshot-item img { width: 100%; border-radius: 5px; }
+    .screenshot-item p { margin-top: 10px; color: #888; font-size: 12px; }
+    .screenshot-item.freeze { border: 2px solid #ff6b6b; }
+    .screenshot-item.critical_freeze { border: 2px solid #ff0000; background: #2a1a1a; }
+    .no-freezes { background: #1a2a1a; border: 2px solid #4ade80; padding: 30px; border-radius: 10px; text-align: center; }
+    .no-freezes h3 { color: #4ade80; font-size: 24px; }
+    .chart { height: 200px; background: #16213e; border-radius: 10px; padding: 15px; margin: 20px 0; position: relative; overflow: hidden; }
+    .chart-bar { position: absolute; bottom: 30px; width: 2px; background: #00d4ff; }
+    .chart-bar.freeze { background: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Freeze Detection Report</h1>
+    <p style="color: #888; margin-bottom: 20px;">Forge Terminal UI Responsiveness Test</p>
+    
+    <div class="summary">
+      <div class="metric">
+        <div class="metric-value">308.9s</div>
+        <div class="metric-label">Test Duration</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">585</div>
+        <div class="metric-label">Heartbeats</div>
+      </div>
+      <div class="metric success">
+        <div class="metric-value">0</div>
+        <div class="metric-label">Freezes Detected</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">7ms</div>
+        <div class="metric-label">Avg Latency</div>
+      </div>
+      <div class="metric ">
+        <div class="metric-value">121ms</div>
+        <div class="metric-label">Max Latency</div>
+      </div>
+    </div>
+    
+    <h2>Latency Timeline</h2>
+    <div class="chart" id="latencyChart">
+      <div class="chart-bar " style="left: 0%; height: 0.9px;"></div><div class="chart-bar " style="left: 0.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 1%; height: 0.2px;"></div><div class="chart-bar " style="left: 1.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 2%; height: 0.7px;"></div><div class="chart-bar " style="left: 2.5%; height: 1.1px;"></div><div class="chart-bar " style="left: 3%; height: 0.5px;"></div><div class="chart-bar " style="left: 3.5000000000000004%; height: 0.7px;"></div><div class="chart-bar " style="left: 4%; height: 0.3px;"></div><div class="chart-bar " style="left: 4.5%; height: 0.5px;"></div><div class="chart-bar " style="left: 5%; height: 0.7px;"></div><div class="chart-bar " style="left: 5.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 6%; height: 0.3px;"></div><div class="chart-bar " style="left: 6.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 7.000000000000001%; height: 0.8px;"></div><div class="chart-bar " style="left: 7.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 8%; height: 1.5px;"></div><div class="chart-bar " style="left: 8.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 9%; height: 0.9px;"></div><div class="chart-bar " style="left: 9.5%; height: 1.1px;"></div><div class="chart-bar " style="left: 10%; height: 0.6px;"></div><div class="chart-bar " style="left: 10.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 11%; height: 0.6px;"></div><div class="chart-bar " style="left: 11.5%; height: 0.3px;"></div><div class="chart-bar " style="left: 12%; height: 1.5px;"></div><div class="chart-bar " style="left: 12.5%; height: 0.3px;"></div><div class="chart-bar " style="left: 13%; height: 0.6px;"></div><div class="chart-bar " style="left: 13.5%; height: 0.3px;"></div><div class="chart-bar " style="left: 14.000000000000002%; height: 0.8px;"></div><div class="chart-bar " style="left: 14.499999999999998%; height: 0.5px;"></div><div class="chart-bar " style="left: 15%; height: 0.5px;"></div><div class="chart-bar " style="left: 15.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 16%; height: 0.7px;"></div><div class="chart-bar " style="left: 16.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 17%; height: 0.9px;"></div><div class="chart-bar " style="left: 17.5%; height: 1.1px;"></div><div class="chart-bar " style="left: 18%; height: 0.6px;"></div><div class="chart-bar " style="left: 18.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 19%; height: 0.9px;"></div><div class="chart-bar " style="left: 19.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 20%; height: 0.7px;"></div><div class="chart-bar " style="left: 20.5%; height: 0.2px;"></div><div class="chart-bar " style="left: 21%; height: 0.7px;"></div><div class="chart-bar " style="left: 21.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 22%; height: 0.2px;"></div><div class="chart-bar " style="left: 22.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 23%; height: 0.3px;"></div><div class="chart-bar " style="left: 23.5%; height: 0.3px;"></div><div class="chart-bar " style="left: 24%; height: 0.6px;"></div><div class="chart-bar " style="left: 24.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 25%; height: 0.7px;"></div><div class="chart-bar " style="left: 25.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 26%; height: 0.3px;"></div><div class="chart-bar " style="left: 26.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 27%; height: 0.3px;"></div><div class="chart-bar " style="left: 27.500000000000004%; height: 0.5px;"></div><div class="chart-bar " style="left: 28.000000000000004%; height: 0.3px;"></div><div class="chart-bar " style="left: 28.499999999999996%; height: 0.4px;"></div><div class="chart-bar " style="left: 28.999999999999996%; height: 12.1px;"></div><div class="chart-bar " style="left: 29.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 30%; height: 0.6px;"></div><div class="chart-bar " style="left: 30.5%; height: 1.2px;"></div><div class="chart-bar " style="left: 31%; height: 0.6px;"></div><div class="chart-bar " style="left: 31.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 32%; height: 0.9px;"></div><div class="chart-bar " style="left: 32.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 33%; height: 1.3px;"></div><div class="chart-bar " style="left: 33.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 34%; height: 0.2px;"></div><div class="chart-bar " style="left: 34.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 35%; height: 0.6px;"></div><div class="chart-bar " style="left: 35.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 36%; height: 0.8px;"></div><div class="chart-bar " style="left: 36.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 37%; height: 0.9px;"></div><div class="chart-bar " style="left: 37.5%; height: 1.1px;"></div><div class="chart-bar " style="left: 38%; height: 0.5px;"></div><div class="chart-bar " style="left: 38.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 39%; height: 0.6px;"></div><div class="chart-bar " style="left: 39.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 40%; height: 1.2px;"></div><div class="chart-bar " style="left: 40.5%; height: 1px;"></div><div class="chart-bar " style="left: 41%; height: 0.5px;"></div><div class="chart-bar " style="left: 41.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 42%; height: 1px;"></div><div class="chart-bar " style="left: 42.5%; height: 1.2px;"></div><div class="chart-bar " style="left: 43%; height: 1.1px;"></div><div class="chart-bar " style="left: 43.5%; height: 1px;"></div><div class="chart-bar " style="left: 44%; height: 0.8px;"></div><div class="chart-bar " style="left: 44.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 45%; height: 0.8px;"></div><div class="chart-bar " style="left: 45.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 46%; height: 1.7px;"></div><div class="chart-bar " style="left: 46.5%; height: 1.1px;"></div><div class="chart-bar " style="left: 47%; height: 0.6px;"></div><div class="chart-bar " style="left: 47.5%; height: 1.2px;"></div><div class="chart-bar " style="left: 48%; height: 0.7px;"></div><div class="chart-bar " style="left: 48.5%; height: 0.5px;"></div><div class="chart-bar " style="left: 49%; height: 0.7px;"></div><div class="chart-bar " style="left: 49.5%; height: 0.5px;"></div><div class="chart-bar " style="left: 50%; height: 0.4px;"></div><div class="chart-bar " style="left: 50.5%; height: 1.2px;"></div><div class="chart-bar " style="left: 51%; height: 0.8px;"></div><div class="chart-bar " style="left: 51.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 52%; height: 0.6px;"></div><div class="chart-bar " style="left: 52.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 53%; height: 0.6px;"></div><div class="chart-bar " style="left: 53.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 54%; height: 0.6px;"></div><div class="chart-bar " style="left: 54.50000000000001%; height: 0.7px;"></div><div class="chart-bar " style="left: 55.00000000000001%; height: 0.7px;"></div><div class="chart-bar " style="left: 55.50000000000001%; height: 0.7px;"></div><div class="chart-bar " style="left: 56.00000000000001%; height: 0.6px;"></div><div class="chart-bar " style="left: 56.49999999999999%; height: 0.6px;"></div><div class="chart-bar " style="left: 56.99999999999999%; height: 0.6px;"></div><div class="chart-bar " style="left: 57.49999999999999%; height: 0.6px;"></div><div class="chart-bar " style="left: 57.99999999999999%; height: 0.5px;"></div><div class="chart-bar " style="left: 58.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 59%; height: 0.8px;"></div><div class="chart-bar " style="left: 59.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 60%; height: 0.6px;"></div><div class="chart-bar " style="left: 60.5%; height: 0.5px;"></div><div class="chart-bar " style="left: 61%; height: 0.8px;"></div><div class="chart-bar " style="left: 61.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 62%; height: 0.5px;"></div><div class="chart-bar " style="left: 62.5%; height: 0.5px;"></div><div class="chart-bar " style="left: 63%; height: 0.6px;"></div><div class="chart-bar " style="left: 63.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 64%; height: 0.8px;"></div><div class="chart-bar " style="left: 64.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 65%; height: 0.7px;"></div><div class="chart-bar " style="left: 65.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 66%; height: 0.8px;"></div><div class="chart-bar " style="left: 66.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 67%; height: 0.4px;"></div><div class="chart-bar " style="left: 67.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 68%; height: 0.7px;"></div><div class="chart-bar " style="left: 68.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 69%; height: 0.4px;"></div><div class="chart-bar " style="left: 69.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 70%; height: 1px;"></div><div class="chart-bar " style="left: 70.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 71%; height: 0.7px;"></div><div class="chart-bar " style="left: 71.5%; height: 0.3px;"></div><div class="chart-bar " style="left: 72%; height: 0.6px;"></div><div class="chart-bar " style="left: 72.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 73%; height: 0.4px;"></div><div class="chart-bar " style="left: 73.5%; height: 0.5px;"></div><div class="chart-bar " style="left: 74%; height: 0.7px;"></div><div class="chart-bar " style="left: 74.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 75%; height: 0.7px;"></div><div class="chart-bar " style="left: 75.5%; height: 0.3px;"></div><div class="chart-bar " style="left: 76%; height: 0.5px;"></div><div class="chart-bar " style="left: 76.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 77%; height: 0.2px;"></div><div class="chart-bar " style="left: 77.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 78%; height: 0.4px;"></div><div class="chart-bar " style="left: 78.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 79%; height: 0.5px;"></div><div class="chart-bar " style="left: 79.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 80%; height: 1.1px;"></div><div class="chart-bar " style="left: 80.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 81%; height: 0.6px;"></div><div class="chart-bar " style="left: 81.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 82%; height: 0.9px;"></div><div class="chart-bar " style="left: 82.5%; height: 1.1px;"></div><div class="chart-bar " style="left: 83%; height: 0.4px;"></div><div class="chart-bar " style="left: 83.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 84%; height: 0.6px;"></div><div class="chart-bar " style="left: 84.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 85%; height: 0.6px;"></div><div class="chart-bar " style="left: 85.5%; height: 0.3px;"></div><div class="chart-bar " style="left: 86%; height: 0.4px;"></div><div class="chart-bar " style="left: 86.5%; height: 0.4px;"></div><div class="chart-bar " style="left: 87%; height: 1px;"></div><div class="chart-bar " style="left: 87.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 88%; height: 0.5px;"></div><div class="chart-bar " style="left: 88.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 89%; height: 0.6px;"></div><div class="chart-bar " style="left: 89.5%; height: 0.2px;"></div><div class="chart-bar " style="left: 90%; height: 0.8px;"></div><div class="chart-bar " style="left: 90.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 91%; height: 1.1px;"></div><div class="chart-bar " style="left: 91.5%; height: 0.7px;"></div><div class="chart-bar " style="left: 92%; height: 0.7px;"></div><div class="chart-bar " style="left: 92.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 93%; height: 0.7px;"></div><div class="chart-bar " style="left: 93.5%; height: 0.6px;"></div><div class="chart-bar " style="left: 94%; height: 0.9px;"></div><div class="chart-bar " style="left: 94.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 95%; height: 0.4px;"></div><div class="chart-bar " style="left: 95.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 96%; height: 0.7px;"></div><div class="chart-bar " style="left: 96.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 97%; height: 1.1px;"></div><div class="chart-bar " style="left: 97.5%; height: 0.9px;"></div><div class="chart-bar " style="left: 98%; height: 0.9px;"></div><div class="chart-bar " style="left: 98.5%; height: 0.8px;"></div><div class="chart-bar " style="left: 99%; height: 0.8px;"></div><div class="chart-bar " style="left: 99.5%; height: 0.6px;"></div>
+    </div>
+    
+    <h2>Freezes</h2>
+    <div class="no-freezes"><h3>✓ No Freezes Detected</h3><p>The UI remained responsive throughout the test.</p></div>
+    
+    <h2>Screenshots</h2>
+    <div class="screenshot-grid">
+      
+    <div class="screenshot-item initial">
+      <img src="freeze-test-start.png" />
+      <p>initial - 2025-12-16T10:25:54.420Z</p>
+    </div>
+  
+    <div class="screenshot-item final">
+      <img src="freeze-test-end.png" />
+      <p>final - 2025-12-16T10:30:54.829Z</p>
+    </div>
+  
+    </div>
+    
+    <p style="color: #666; margin-top: 40px; text-align: center;">
+      Generated 2025-12-16T10:30:54.830Z | Forge Terminal Freeze Monitor
+    </p>
+  </div>
+</body>
+</html>

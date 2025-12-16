@@ -1,0 +1,21 @@
+{
+  "startTime": 1765880166604,
+  "heartbeats": {
+    "total": 440,
+    "successful": 440,
+    "failed": 0,
+    "avgLatency": 1.15
+  },
+  "websocket": {
+    "connected": false,
+    "messages": 0,
+    "errors": 112,
+    "lastMessage": null
+  },
+  "process": {
+    "pid": null,
+    "cpuHistory": [],
+    "memoryHistory": []
+  },
+  "freezes": []
+}

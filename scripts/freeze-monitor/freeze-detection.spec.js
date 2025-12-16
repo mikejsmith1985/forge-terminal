@@ -11,7 +11,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
 
-const FORGE_URL = process.env.FORGE_URL || 'http://localhost:8080';
+const FORGE_URL = process.env.FORGE_URL || 'http://localhost:8333';
 const TEST_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 const HEARTBEAT_INTERVAL_MS = 500;
 const FREEZE_THRESHOLD_MS = 2000;

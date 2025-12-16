@@ -1,0 +1,2944 @@
+{
+  "startTime": 1765880745741,
+  "endTime": 1765881054686,
+  "heartbeats": [
+    {
+      "time": 1765880754429,
+      "latency": 6,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880754946,
+      "latency": 7,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880755455,
+      "latency": 6,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880755962,
+      "latency": 5,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880756487,
+      "latency": 7,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880757000,
+      "latency": 9,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880757512,
+      "latency": 3,
+      "frameLatency": 0.5999999642372131
+    },
+    {
+      "time": 1765880758025,
+      "latency": 6,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880758537,
+      "latency": 5,
+      "frameLatency": 1.7000000476837158
+    },
+    {
+      "time": 1765880759045,
+      "latency": 4,
+      "frameLatency": 1.5999999642372131
+    },
+    {
+      "time": 1765880759553,
+      "latency": 4,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880760070,
+      "latency": 15,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765880760591,
+      "latency": 8,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880761099,
+      "latency": 7,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880761612,
+      "latency": 3,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880762124,
+      "latency": 3,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880762637,
+      "latency": 9,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765880763145,
+      "latency": 7,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880763658,
+      "latency": 8,
+      "frameLatency": 0.7000000476837158
+    },
+    {
+      "time": 1765880764165,
+      "latency": 2,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880764674,
+      "latency": 5,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765880765177,
+      "latency": 2,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880765690,
+      "latency": 6,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880766203,
+      "latency": 6,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880766711,
+      "latency": 3,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765880767228,
+      "latency": 5,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880767733,
+      "latency": 4,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880768240,
+      "latency": 3,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880768752,
+      "latency": 5,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880769261,
+      "latency": 4,
+      "frameLatency": 1.9000000357627869
+    },
+    {
+      "time": 1765880769769,
+      "latency": 3,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880770277,
+      "latency": 7,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880770785,
+      "latency": 7,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880771293,
+      "latency": 2,
+      "frameLatency": 0.3999999761581421
+    },
+    {
+      "time": 1765880771810,
+      "latency": 10,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880772328,
+      "latency": 6,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880772844,
+      "latency": 9,
+      "frameLatency": 3.400000035762787
+    },
+    {
+      "time": 1765880773360,
+      "latency": 8,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880773869,
+      "latency": 4,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880774376,
+      "latency": 3,
+      "frameLatency": 0.5999999642372131
+    },
+    {
+      "time": 1765880774894,
+      "latency": 9,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765880775410,
+      "latency": 3,
+      "frameLatency": 0
+    },
+    {
+      "time": 1765880775926,
+      "latency": 5,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880776443,
+      "latency": 6,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880776964,
+      "latency": 10,
+      "frameLatency": 3.400000035762787
+    },
+    {
+      "time": 1765880777472,
+      "latency": 5,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880777980,
+      "latency": 6,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880778488,
+      "latency": 6,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880779006,
+      "latency": 7,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880779524,
+      "latency": 8,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880780029,
+      "latency": 3,
+      "frameLatency": 0.40000003576278687
+    },
+    {
+      "time": 1765880780547,
+      "latency": 11,
+      "frameLatency": 4
+    },
+    {
+      "time": 1765880781056,
+      "latency": 5,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880781572,
+      "latency": 11,
+      "frameLatency": 1.9000000357627869
+    },
+    {
+      "time": 1765880782079,
+      "latency": 5,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880782591,
+      "latency": 9,
+      "frameLatency": 4.199999988079071
+    },
+    {
+      "time": 1765880783099,
+      "latency": 6,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765880783618,
+      "latency": 9,
+      "frameLatency": 1.2999999523162842
+    },
+    {
+      "time": 1765880784130,
+      "latency": 11,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880784642,
+      "latency": 4,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765880785165,
+      "latency": 7,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880785675,
+      "latency": 3,
+      "frameLatency": 0.2999999523162842
+    },
+    {
+      "time": 1765880786187,
+      "latency": 4,
+      "frameLatency": 0.800000011920929
+    },
+    {
+      "time": 1765880786706,
+      "latency": 9,
+      "frameLatency": 1.100000023841858
+    },
+    {
+      "time": 1765880787221,
+      "latency": 11,
+      "frameLatency": 2.700000047683716
+    },
+    {
+      "time": 1765880787731,
+      "latency": 6,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880788242,
+      "latency": 7,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880788754,
+      "latency": 8,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765880789264,
+      "latency": 7,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880789773,
+      "latency": 5,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880790287,
+      "latency": 5,
+      "frameLatency": 1.9000000357627869
+    },
+    {
+      "time": 1765880790796,
+      "latency": 6,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880791312,
+      "latency": 8,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880791832,
+      "latency": 5,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765880792349,
+      "latency": 8,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765880792862,
+      "latency": 8,
+      "frameLatency": 1.7999999523162842
+    },
+    {
+      "time": 1765880793375,
+      "latency": 10,
+      "frameLatency": 2.600000023841858
+    },
+    {
+      "time": 1765880793887,
+      "latency": 5,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880794400,
+      "latency": 4,
+      "frameLatency": 1.100000023841858
+    },
+    {
+      "time": 1765880794920,
+      "latency": 9,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880795433,
+      "latency": 8,
+      "frameLatency": 1.899999976158142
+    },
+    {
+      "time": 1765880795945,
+      "latency": 7,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880796461,
+      "latency": 9,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880796970,
+      "latency": 7,
+      "frameLatency": 0.2999999523162842
+    },
+    {
+      "time": 1765880797486,
+      "latency": 11,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765880797998,
+      "latency": 5,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880798516,
+      "latency": 15,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880799028,
+      "latency": 6,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880799544,
+      "latency": 6,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880800061,
+      "latency": 4,
+      "frameLatency": 1.7999999523162842
+    },
+    {
+      "time": 1765880800578,
+      "latency": 8,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880801086,
+      "latency": 5,
+      "frameLatency": 0.09999996423721313
+    },
+    {
+      "time": 1765880801602,
+      "latency": 6,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880802115,
+      "latency": 8,
+      "frameLatency": 1.7999999523162842
+    },
+    {
+      "time": 1765880802625,
+      "latency": 6,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880803142,
+      "latency": 11,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880803657,
+      "latency": 9,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765880804169,
+      "latency": 7,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765880804683,
+      "latency": 8,
+      "frameLatency": 0.9000000357627869
+    },
+    {
+      "time": 1765880805194,
+      "latency": 4,
+      "frameLatency": 0.7000000476837158
+    },
+    {
+      "time": 1765880805710,
+      "latency": 7,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765880806223,
+      "latency": 8,
+      "frameLatency": 3.699999988079071
+    },
+    {
+      "time": 1765880806740,
+      "latency": 8,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880807252,
+      "latency": 6,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880807765,
+      "latency": 8,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880808275,
+      "latency": 9,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880808793,
+      "latency": 4,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880809306,
+      "latency": 5,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765880809819,
+      "latency": 5,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880810331,
+      "latency": 6,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765880810851,
+      "latency": 8,
+      "frameLatency": 0.8999999761581421
+    },
+    {
+      "time": 1765880811359,
+      "latency": 4,
+      "frameLatency": 0.2999999523162842
+    },
+    {
+      "time": 1765880811873,
+      "latency": 6,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880812387,
+      "latency": 10,
+      "frameLatency": 1.399999976158142
+    },
+    {
+      "time": 1765880812897,
+      "latency": 6,
+      "frameLatency": 2.599999964237213
+    },
+    {
+      "time": 1765880813411,
+      "latency": 9,
+      "frameLatency": 2.600000023841858
+    },
+    {
+      "time": 1765880813935,
+      "latency": 7,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880814447,
+      "latency": 4,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880814955,
+      "latency": 4,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880815464,
+      "latency": 6,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765880815980,
+      "latency": 4,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765880816488,
+      "latency": 3,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880816997,
+      "latency": 3,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880817513,
+      "latency": 8,
+      "frameLatency": 3.400000035762787
+    },
+    {
+      "time": 1765880818025,
+      "latency": 7,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880818534,
+      "latency": 6,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880819055,
+      "latency": 10,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880819568,
+      "latency": 8,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880820075,
+      "latency": 4,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880820588,
+      "latency": 4,
+      "frameLatency": 0.800000011920929
+    },
+    {
+      "time": 1765880821105,
+      "latency": 8,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880821613,
+      "latency": 4,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880822134,
+      "latency": 6,
+      "frameLatency": 2.400000035762787
+    },
+    {
+      "time": 1765880822646,
+      "latency": 6,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880823158,
+      "latency": 9,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880823667,
+      "latency": 3,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880824179,
+      "latency": 9,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880824687,
+      "latency": 5,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880825200,
+      "latency": 7,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880825716,
+      "latency": 3,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880826230,
+      "latency": 5,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765880826740,
+      "latency": 4,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880827254,
+      "latency": 7,
+      "frameLatency": 2.099999964237213
+    },
+    {
+      "time": 1765880827766,
+      "latency": 7,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880828276,
+      "latency": 6,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880828850,
+      "latency": 72,
+      "frameLatency": 48.5
+    },
+    {
+      "time": 1765880829361,
+      "latency": 5,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880829874,
+      "latency": 8,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880830383,
+      "latency": 4,
+      "frameLatency": 1.100000023841858
+    },
+    {
+      "time": 1765880830895,
+      "latency": 9,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880831403,
+      "latency": 6,
+      "frameLatency": 3.400000035762787
+    },
+    {
+      "time": 1765880831916,
+      "latency": 4,
+      "frameLatency": 0.9000000357627869
+    },
+    {
+      "time": 1765880832432,
+      "latency": 3,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880832941,
+      "latency": 4,
+      "frameLatency": 1.399999976158142
+    },
+    {
+      "time": 1765880833453,
+      "latency": 8,
+      "frameLatency": 2.799999952316284
+    },
+    {
+      "time": 1765880833961,
+      "latency": 3,
+      "frameLatency": 0.8999999761581421
+    },
+    {
+      "time": 1765880834478,
+      "latency": 7,
+      "frameLatency": 2.900000035762787
+    },
+    {
+      "time": 1765880834998,
+      "latency": 7,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880835515,
+      "latency": 4,
+      "frameLatency": 0.8999999761581421
+    },
+    {
+      "time": 1765880836027,
+      "latency": 5,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880836536,
+      "latency": 6,
+      "frameLatency": 3.700000047683716
+    },
+    {
+      "time": 1765880837044,
+      "latency": 5,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765880837573,
+      "latency": 10,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880838090,
+      "latency": 7,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880838606,
+      "latency": 4,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880839116,
+      "latency": 4,
+      "frameLatency": 1.399999976158142
+    },
+    {
+      "time": 1765880839623,
+      "latency": 3,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880840135,
+      "latency": 6,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880840647,
+      "latency": 7,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880841160,
+      "latency": 7,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880841668,
+      "latency": 5,
+      "frameLatency": 1.4000000357627869
+    },
+    {
+      "time": 1765880842177,
+      "latency": 4,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880842686,
+      "latency": 5,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880843193,
+      "latency": 4,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880843702,
+      "latency": 7,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880844205,
+      "latency": 2,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765880844721,
+      "latency": 10,
+      "frameLatency": 2.400000035762787
+    },
+    {
+      "time": 1765880845243,
+      "latency": 9,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880845751,
+      "latency": 6,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880846272,
+      "latency": 7,
+      "frameLatency": 5
+    },
+    {
+      "time": 1765880846785,
+      "latency": 11,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880847301,
+      "latency": 5,
+      "frameLatency": 2.700000047683716
+    },
+    {
+      "time": 1765880847816,
+      "latency": 7,
+      "frameLatency": 1.9000000357627869
+    },
+    {
+      "time": 1765880848326,
+      "latency": 8,
+      "frameLatency": 2.299999952316284
+    },
+    {
+      "time": 1765880848834,
+      "latency": 5,
+      "frameLatency": 0.5999999642372131
+    },
+    {
+      "time": 1765880849351,
+      "latency": 9,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765880849859,
+      "latency": 6,
+      "frameLatency": 1.399999976158142
+    },
+    {
+      "time": 1765880850375,
+      "latency": 9,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880850880,
+      "latency": 4,
+      "frameLatency": 1.399999976158142
+    },
+    {
+      "time": 1765880851392,
+      "latency": 6,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880851900,
+      "latency": 6,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880852419,
+      "latency": 11,
+      "frameLatency": 3.800000011920929
+    },
+    {
+      "time": 1765880852929,
+      "latency": 9,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880853448,
+      "latency": 4,
+      "frameLatency": 1.399999976158142
+    },
+    {
+      "time": 1765880853954,
+      "latency": 4,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880854459,
+      "latency": 3,
+      "frameLatency": 0.2999999523162842
+    },
+    {
+      "time": 1765880854975,
+      "latency": 5,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880855483,
+      "latency": 2,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880856000,
+      "latency": 6,
+      "frameLatency": 3.699999988079071
+    },
+    {
+      "time": 1765880856525,
+      "latency": 7,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880857037,
+      "latency": 7,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880857546,
+      "latency": 6,
+      "frameLatency": 0.5999999642372131
+    },
+    {
+      "time": 1765880858058,
+      "latency": 7,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880858577,
+      "latency": 15,
+      "frameLatency": 6.800000011920929
+    },
+    {
+      "time": 1765880859091,
+      "latency": 3,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880859604,
+      "latency": 7,
+      "frameLatency": 4
+    },
+    {
+      "time": 1765880860122,
+      "latency": 10,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880860633,
+      "latency": 8,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880861147,
+      "latency": 7,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880861664,
+      "latency": 14,
+      "frameLatency": 4
+    },
+    {
+      "time": 1765880862180,
+      "latency": 14,
+      "frameLatency": 4.5
+    },
+    {
+      "time": 1765880862695,
+      "latency": 7,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880863212,
+      "latency": 8,
+      "frameLatency": 3.800000011920929
+    },
+    {
+      "time": 1765880863725,
+      "latency": 8,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880864232,
+      "latency": 2,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880864754,
+      "latency": 11,
+      "frameLatency": 5.199999988079071
+    },
+    {
+      "time": 1765880865270,
+      "latency": 7,
+      "frameLatency": 2.400000035762787
+    },
+    {
+      "time": 1765880865778,
+      "latency": 3,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880866291,
+      "latency": 7,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880866802,
+      "latency": 6,
+      "frameLatency": 2.700000047683716
+    },
+    {
+      "time": 1765880867312,
+      "latency": 4,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880867824,
+      "latency": 5,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880868336,
+      "latency": 7,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880868849,
+      "latency": 8,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880869357,
+      "latency": 3,
+      "frameLatency": 0.6000000238418579
+    },
+    {
+      "time": 1765880869873,
+      "latency": 6,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880870387,
+      "latency": 9,
+      "frameLatency": 2.900000035762787
+    },
+    {
+      "time": 1765880870894,
+      "latency": 5,
+      "frameLatency": 1.2999999523162842
+    },
+    {
+      "time": 1765880871408,
+      "latency": 8,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880871918,
+      "latency": 7,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765880872431,
+      "latency": 7,
+      "frameLatency": 0.800000011920929
+    },
+    {
+      "time": 1765880872944,
+      "latency": 7,
+      "frameLatency": 0.800000011920929
+    },
+    {
+      "time": 1765880873462,
+      "latency": 9,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880873973,
+      "latency": 8,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880874493,
+      "latency": 13,
+      "frameLatency": 6.899999976158142
+    },
+    {
+      "time": 1765880875001,
+      "latency": 6,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880875518,
+      "latency": 8,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880876032,
+      "latency": 9,
+      "frameLatency": 3.699999988079071
+    },
+    {
+      "time": 1765880876543,
+      "latency": 6,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880877051,
+      "latency": 6,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880877568,
+      "latency": 11,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880878078,
+      "latency": 8,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880878593,
+      "latency": 9,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880879101,
+      "latency": 6,
+      "frameLatency": 2.200000047683716
+    },
+    {
+      "time": 1765880879615,
+      "latency": 7,
+      "frameLatency": 0.20000004768371582
+    },
+    {
+      "time": 1765880880126,
+      "latency": 7,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880880639,
+      "latency": 8,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765880881155,
+      "latency": 6,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880881667,
+      "latency": 9,
+      "frameLatency": 6.100000023841858
+    },
+    {
+      "time": 1765880882180,
+      "latency": 7,
+      "frameLatency": 3.299999952316284
+    },
+    {
+      "time": 1765880882688,
+      "latency": 6,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880883201,
+      "latency": 7,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765880883708,
+      "latency": 3,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765880884225,
+      "latency": 8,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880884738,
+      "latency": 9,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765880885255,
+      "latency": 5,
+      "frameLatency": 2.600000023841858
+    },
+    {
+      "time": 1765880885762,
+      "latency": 4,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880886275,
+      "latency": 4,
+      "frameLatency": 1.100000023841858
+    },
+    {
+      "time": 1765880886789,
+      "latency": 8,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765880887304,
+      "latency": 9,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880887813,
+      "latency": 7,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880888321,
+      "latency": 5,
+      "frameLatency": 1.100000023841858
+    },
+    {
+      "time": 1765880888837,
+      "latency": 7,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765880889350,
+      "latency": 9,
+      "frameLatency": 1.9000000357627869
+    },
+    {
+      "time": 1765880889863,
+      "latency": 4,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880890371,
+      "latency": 7,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880890876,
+      "latency": 4,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765880891391,
+      "latency": 8,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880891899,
+      "latency": 5,
+      "frameLatency": 2.400000035762787
+    },
+    {
+      "time": 1765880892412,
+      "latency": 6,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880892919,
+      "latency": 6,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880893429,
+      "latency": 8,
+      "frameLatency": 2.200000047683716
+    },
+    {
+      "time": 1765880893936,
+      "latency": 5,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765880894449,
+      "latency": 4,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880894968,
+      "latency": 14,
+      "frameLatency": 6.299999952316284
+    },
+    {
+      "time": 1765880895478,
+      "latency": 5,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880895986,
+      "latency": 3,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765880896499,
+      "latency": 6,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880897007,
+      "latency": 4,
+      "frameLatency": 1.7999999523162842
+    },
+    {
+      "time": 1765880897515,
+      "latency": 7,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765880898028,
+      "latency": 4,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880898545,
+      "latency": 4,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880899070,
+      "latency": 10,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765880899582,
+      "latency": 3,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765880900094,
+      "latency": 4,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880900603,
+      "latency": 4,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765880901114,
+      "latency": 7,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880901631,
+      "latency": 3,
+      "frameLatency": 0.8999999761581421
+    },
+    {
+      "time": 1765880902140,
+      "latency": 4,
+      "frameLatency": 1.0999999642372131
+    },
+    {
+      "time": 1765880902652,
+      "latency": 7,
+      "frameLatency": 2.099999964237213
+    },
+    {
+      "time": 1765880903160,
+      "latency": 5,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880903669,
+      "latency": 6,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880904177,
+      "latency": 5,
+      "frameLatency": 2.200000047683716
+    },
+    {
+      "time": 1765880904698,
+      "latency": 5,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880905210,
+      "latency": 6,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880905727,
+      "latency": 11,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880906239,
+      "latency": 4,
+      "frameLatency": 1.4000000357627869
+    },
+    {
+      "time": 1765880906751,
+      "latency": 5,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880907264,
+      "latency": 3,
+      "frameLatency": 0.3999999761581421
+    },
+    {
+      "time": 1765880907772,
+      "latency": 4,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880908281,
+      "latency": 5,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765880908797,
+      "latency": 4,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880909302,
+      "latency": 4,
+      "frameLatency": 1.100000023841858
+    },
+    {
+      "time": 1765880909813,
+      "latency": 4,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765880910327,
+      "latency": 5,
+      "frameLatency": 2.599999964237213
+    },
+    {
+      "time": 1765880910839,
+      "latency": 7,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880911351,
+      "latency": 11,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880911859,
+      "latency": 7,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880912370,
+      "latency": 6,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880912890,
+      "latency": 12,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880913405,
+      "latency": 5,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765880913922,
+      "latency": 6,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880914439,
+      "latency": 7,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880914960,
+      "latency": 4,
+      "frameLatency": 1.4000000357627869
+    },
+    {
+      "time": 1765880915480,
+      "latency": 12,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880915992,
+      "latency": 5,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880916505,
+      "latency": 4,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765880917013,
+      "latency": 4,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765880917538,
+      "latency": 11,
+      "frameLatency": 6.799999952316284
+    },
+    {
+      "time": 1765880918047,
+      "latency": 7,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880918559,
+      "latency": 8,
+      "frameLatency": 1.5999999642372131
+    },
+    {
+      "time": 1765880919071,
+      "latency": 7,
+      "frameLatency": 3.400000035762787
+    },
+    {
+      "time": 1765880919584,
+      "latency": 8,
+      "frameLatency": 5.600000023841858
+    },
+    {
+      "time": 1765880920102,
+      "latency": 11,
+      "frameLatency": 5.199999988079071
+    },
+    {
+      "time": 1765880920626,
+      "latency": 8,
+      "frameLatency": 3.400000035762787
+    },
+    {
+      "time": 1765880921143,
+      "latency": 10,
+      "frameLatency": 3.899999976158142
+    },
+    {
+      "time": 1765880921666,
+      "latency": 14,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880922179,
+      "latency": 6,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880922691,
+      "latency": 3,
+      "frameLatency": 1.0999999642372131
+    },
+    {
+      "time": 1765880923204,
+      "latency": 3,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880923724,
+      "latency": 8,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880924242,
+      "latency": 10,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880924753,
+      "latency": 7,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880925270,
+      "latency": 9,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880925778,
+      "latency": 6,
+      "frameLatency": 1.2999999523162842
+    },
+    {
+      "time": 1765880926286,
+      "latency": 3,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765880926803,
+      "latency": 9,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880927319,
+      "latency": 6,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880927823,
+      "latency": 3,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880928336,
+      "latency": 12,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765880928844,
+      "latency": 4,
+      "frameLatency": 1.4000000357627869
+    },
+    {
+      "time": 1765880929348,
+      "latency": 3,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880929861,
+      "latency": 8,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880930378,
+      "latency": 9,
+      "frameLatency": 2.900000035762787
+    },
+    {
+      "time": 1765880930898,
+      "latency": 3,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880931402,
+      "latency": 3,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880931910,
+      "latency": 2,
+      "frameLatency": 0.09999996423721313
+    },
+    {
+      "time": 1765880932423,
+      "latency": 6,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880932941,
+      "latency": 9,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880933452,
+      "latency": 8,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880933969,
+      "latency": 11,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880934481,
+      "latency": 9,
+      "frameLatency": 1.5999999642372131
+    },
+    {
+      "time": 1765880935000,
+      "latency": 13,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880935509,
+      "latency": 2,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765880936022,
+      "latency": 8,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880936536,
+      "latency": 12,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880937043,
+      "latency": 3,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880937556,
+      "latency": 3,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880938077,
+      "latency": 5,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765880938590,
+      "latency": 10,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765880939097,
+      "latency": 5,
+      "frameLatency": 0.9000000357627869
+    },
+    {
+      "time": 1765880939609,
+      "latency": 3,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880940125,
+      "latency": 5,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880940630,
+      "latency": 3,
+      "frameLatency": 0.7999999523162842
+    },
+    {
+      "time": 1765880941142,
+      "latency": 7,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880941654,
+      "latency": 8,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880942171,
+      "latency": 4,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880942680,
+      "latency": 4,
+      "frameLatency": 1.7999999523162842
+    },
+    {
+      "time": 1765880943188,
+      "latency": 4,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880943701,
+      "latency": 5,
+      "frameLatency": 2.099999964237213
+    },
+    {
+      "time": 1765880944213,
+      "latency": 6,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880944725,
+      "latency": 5,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880945235,
+      "latency": 5,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765880945742,
+      "latency": 3,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880946259,
+      "latency": 6,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880946771,
+      "latency": 3,
+      "frameLatency": 0.800000011920929
+    },
+    {
+      "time": 1765880947284,
+      "latency": 7,
+      "frameLatency": 2.600000023841858
+    },
+    {
+      "time": 1765880947796,
+      "latency": 6,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880948305,
+      "latency": 5,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880948816,
+      "latency": 4,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765880949330,
+      "latency": 5,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880949841,
+      "latency": 2,
+      "frameLatency": 0.800000011920929
+    },
+    {
+      "time": 1765880950354,
+      "latency": 6,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880950879,
+      "latency": 7,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880951397,
+      "latency": 8,
+      "frameLatency": 2.299999952316284
+    },
+    {
+      "time": 1765880951908,
+      "latency": 9,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880952420,
+      "latency": 7,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765880952928,
+      "latency": 2,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880953446,
+      "latency": 9,
+      "frameLatency": 2.200000047683716
+    },
+    {
+      "time": 1765880953957,
+      "latency": 7,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880954470,
+      "latency": 11,
+      "frameLatency": 2.599999964237213
+    },
+    {
+      "time": 1765880954986,
+      "latency": 5,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880955500,
+      "latency": 7,
+      "frameLatency": 4
+    },
+    {
+      "time": 1765880956011,
+      "latency": 3,
+      "frameLatency": 1.4000000357627869
+    },
+    {
+      "time": 1765880956524,
+      "latency": 5,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765880957041,
+      "latency": 7,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765880957561,
+      "latency": 4,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765880958073,
+      "latency": 3,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765880958591,
+      "latency": 7,
+      "frameLatency": 1.899999976158142
+    },
+    {
+      "time": 1765880959105,
+      "latency": 8,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765880959616,
+      "latency": 6,
+      "frameLatency": 2.600000023841858
+    },
+    {
+      "time": 1765880960136,
+      "latency": 15,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765880960653,
+      "latency": 6,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880961174,
+      "latency": 9,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880961690,
+      "latency": 11,
+      "frameLatency": 3.599999964237213
+    },
+    {
+      "time": 1765880962198,
+      "latency": 6,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880962715,
+      "latency": 9,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880963228,
+      "latency": 6,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880963735,
+      "latency": 3,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880964257,
+      "latency": 15,
+      "frameLatency": 3.699999988079071
+    },
+    {
+      "time": 1765880964769,
+      "latency": 3,
+      "frameLatency": 0.800000011920929
+    },
+    {
+      "time": 1765880965285,
+      "latency": 6,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880965793,
+      "latency": 3,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880966314,
+      "latency": 8,
+      "frameLatency": 2.400000035762787
+    },
+    {
+      "time": 1765880966827,
+      "latency": 5,
+      "frameLatency": 2.600000023841858
+    },
+    {
+      "time": 1765880967337,
+      "latency": 5,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880967844,
+      "latency": 4,
+      "frameLatency": 0.40000003576278687
+    },
+    {
+      "time": 1765880968352,
+      "latency": 7,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880968865,
+      "latency": 6,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880969382,
+      "latency": 9,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880969897,
+      "latency": 11,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765880970418,
+      "latency": 6,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880970926,
+      "latency": 4,
+      "frameLatency": 2.400000035762787
+    },
+    {
+      "time": 1765880971447,
+      "latency": 9,
+      "frameLatency": 3.299999952316284
+    },
+    {
+      "time": 1765880971971,
+      "latency": 6,
+      "frameLatency": 2.400000035762787
+    },
+    {
+      "time": 1765880972484,
+      "latency": 7,
+      "frameLatency": 2.799999952316284
+    },
+    {
+      "time": 1765880972988,
+      "latency": 2,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880973501,
+      "latency": 7,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765880974013,
+      "latency": 4,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880974521,
+      "latency": 2,
+      "frameLatency": 0.2999999523162842
+    },
+    {
+      "time": 1765880975027,
+      "latency": 4,
+      "frameLatency": 0.699999988079071
+    },
+    {
+      "time": 1765880975538,
+      "latency": 3,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765880976050,
+      "latency": 3,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765880976563,
+      "latency": 6,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880977081,
+      "latency": 8,
+      "frameLatency": 2.400000035762787
+    },
+    {
+      "time": 1765880977593,
+      "latency": 7,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765880978105,
+      "latency": 6,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880978612,
+      "latency": 3,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880979123,
+      "latency": 8,
+      "frameLatency": 3.900000035762787
+    },
+    {
+      "time": 1765880979630,
+      "latency": 3,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880980146,
+      "latency": 5,
+      "frameLatency": 2.200000047683716
+    },
+    {
+      "time": 1765880980662,
+      "latency": 3,
+      "frameLatency": 0.7999999523162842
+    },
+    {
+      "time": 1765880981171,
+      "latency": 4,
+      "frameLatency": 1.5999999642372131
+    },
+    {
+      "time": 1765880981800,
+      "latency": 121,
+      "frameLatency": 118.09999996423721
+    },
+    {
+      "time": 1765880982309,
+      "latency": 7,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765880982816,
+      "latency": 6,
+      "frameLatency": 2.599999964237213
+    },
+    {
+      "time": 1765880983342,
+      "latency": 12,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880983862,
+      "latency": 6,
+      "frameLatency": 0.6000000238418579
+    },
+    {
+      "time": 1765880984380,
+      "latency": 7,
+      "frameLatency": 2.799999952316284
+    },
+    {
+      "time": 1765880984894,
+      "latency": 9,
+      "frameLatency": 5
+    },
+    {
+      "time": 1765880985404,
+      "latency": 4,
+      "frameLatency": 0.3999999761581421
+    },
+    {
+      "time": 1765880985926,
+      "latency": 13,
+      "frameLatency": 6
+    },
+    {
+      "time": 1765880986445,
+      "latency": 6,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880986949,
+      "latency": 2,
+      "frameLatency": 0.3999999761581421
+    },
+    {
+      "time": 1765880987472,
+      "latency": 7,
+      "frameLatency": 0.3999999761581421
+    },
+    {
+      "time": 1765880987987,
+      "latency": 6,
+      "frameLatency": 0.3999999761581421
+    },
+    {
+      "time": 1765880988500,
+      "latency": 8,
+      "frameLatency": 2.099999964237213
+    },
+    {
+      "time": 1765880989012,
+      "latency": 8,
+      "frameLatency": 3.200000047683716
+    },
+    {
+      "time": 1765880989526,
+      "latency": 8,
+      "frameLatency": 2.099999964237213
+    },
+    {
+      "time": 1765880990041,
+      "latency": 9,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765880990554,
+      "latency": 11,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765880991063,
+      "latency": 5,
+      "frameLatency": 0.20000004768371582
+    },
+    {
+      "time": 1765880991579,
+      "latency": 9,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765880992087,
+      "latency": 6,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880992601,
+      "latency": 9,
+      "frameLatency": 2.799999952316284
+    },
+    {
+      "time": 1765880993128,
+      "latency": 12,
+      "frameLatency": 3.800000011920929
+    },
+    {
+      "time": 1765880993654,
+      "latency": 10,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880994162,
+      "latency": 5,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765880994682,
+      "latency": 8,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765880995197,
+      "latency": 10,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765880995714,
+      "latency": 12,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765880996227,
+      "latency": 11,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765880996741,
+      "latency": 10,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880997252,
+      "latency": 8,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765880997767,
+      "latency": 7,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765880998283,
+      "latency": 8,
+      "frameLatency": 1.5
+    },
+    {
+      "time": 1765880998795,
+      "latency": 8,
+      "frameLatency": 1.399999976158142
+    },
+    {
+      "time": 1765880999315,
+      "latency": 17,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765880999839,
+      "latency": 11,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765881000353,
+      "latency": 6,
+      "frameLatency": 0.8999999761581421
+    },
+    {
+      "time": 1765881000869,
+      "latency": 12,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765881001394,
+      "latency": 7,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765881001902,
+      "latency": 5,
+      "frameLatency": 1.9000000357627869
+    },
+    {
+      "time": 1765881002414,
+      "latency": 7,
+      "frameLatency": 1.7000000476837158
+    },
+    {
+      "time": 1765881002922,
+      "latency": 5,
+      "frameLatency": 1.899999976158142
+    },
+    {
+      "time": 1765881003435,
+      "latency": 4,
+      "frameLatency": 1.0999999642372131
+    },
+    {
+      "time": 1765881003960,
+      "latency": 12,
+      "frameLatency": 3.399999976158142
+    },
+    {
+      "time": 1765881004477,
+      "latency": 8,
+      "frameLatency": 3.200000047683716
+    },
+    {
+      "time": 1765881004997,
+      "latency": 7,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765881005506,
+      "latency": 6,
+      "frameLatency": 1.899999976158142
+    },
+    {
+      "time": 1765881006018,
+      "latency": 7,
+      "frameLatency": 2.699999988079071
+    },
+    {
+      "time": 1765881006526,
+      "latency": 6,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765881007035,
+      "latency": 7,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765881007551,
+      "latency": 6,
+      "frameLatency": 2.800000011920929
+    },
+    {
+      "time": 1765881008067,
+      "latency": 7,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765881008580,
+      "latency": 7,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765881009094,
+      "latency": 7,
+      "frameLatency": 2.199999988079071
+    },
+    {
+      "time": 1765881009605,
+      "latency": 6,
+      "frameLatency": 0
+    },
+    {
+      "time": 1765881010112,
+      "latency": 6,
+      "frameLatency": 0.20000004768371582
+    },
+    {
+      "time": 1765881010626,
+      "latency": 6,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765881011139,
+      "latency": 6,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765881011646,
+      "latency": 5,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765881012159,
+      "latency": 8,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765881012671,
+      "latency": 8,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765881013179,
+      "latency": 4,
+      "frameLatency": 1.399999976158142
+    },
+    {
+      "time": 1765881013692,
+      "latency": 6,
+      "frameLatency": 1.5999999642372131
+    },
+    {
+      "time": 1765881014205,
+      "latency": 5,
+      "frameLatency": 0.09999996423721313
+    },
+    {
+      "time": 1765881014721,
+      "latency": 8,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765881015234,
+      "latency": 9,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765881015742,
+      "latency": 5,
+      "frameLatency": 1
+    },
+    {
+      "time": 1765881016250,
+      "latency": 5,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765881016767,
+      "latency": 6,
+      "frameLatency": 1.9000000357627869
+    },
+    {
+      "time": 1765881017279,
+      "latency": 7,
+      "frameLatency": 3.299999952316284
+    },
+    {
+      "time": 1765881017800,
+      "latency": 8,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765881018320,
+      "latency": 4,
+      "frameLatency": 0.10000002384185791
+    },
+    {
+      "time": 1765881018829,
+      "latency": 7,
+      "frameLatency": 3.199999988079071
+    },
+    {
+      "time": 1765881019341,
+      "latency": 6,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765881019854,
+      "latency": 8,
+      "frameLatency": 4
+    },
+    {
+      "time": 1765881020370,
+      "latency": 4,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765881020883,
+      "latency": 4,
+      "frameLatency": 0.30000001192092896
+    },
+    {
+      "time": 1765881021391,
+      "latency": 4,
+      "frameLatency": 0.5
+    },
+    {
+      "time": 1765881021904,
+      "latency": 7,
+      "frameLatency": 2.599999964237213
+    },
+    {
+      "time": 1765881022420,
+      "latency": 9,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765881022928,
+      "latency": 4,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765881023445,
+      "latency": 8,
+      "frameLatency": 3.700000047683716
+    },
+    {
+      "time": 1765881023960,
+      "latency": 10,
+      "frameLatency": 3.699999988079071
+    },
+    {
+      "time": 1765881024469,
+      "latency": 4,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765881024982,
+      "latency": 7,
+      "frameLatency": 1.100000023841858
+    },
+    {
+      "time": 1765881025486,
+      "latency": 3,
+      "frameLatency": 0.6000000238418579
+    },
+    {
+      "time": 1765881025999,
+      "latency": 6,
+      "frameLatency": 1.899999976158142
+    },
+    {
+      "time": 1765881026511,
+      "latency": 6,
+      "frameLatency": 1.800000011920929
+    },
+    {
+      "time": 1765881027023,
+      "latency": 4,
+      "frameLatency": 1.899999976158142
+    },
+    {
+      "time": 1765881027531,
+      "latency": 5,
+      "frameLatency": 1.600000023841858
+    },
+    {
+      "time": 1765881028045,
+      "latency": 7,
+      "frameLatency": 1.199999988079071
+    },
+    {
+      "time": 1765881028562,
+      "latency": 8,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765881029070,
+      "latency": 7,
+      "frameLatency": 3.299999952316284
+    },
+    {
+      "time": 1765881029581,
+      "latency": 3,
+      "frameLatency": 2.200000047683716
+    },
+    {
+      "time": 1765881030095,
+      "latency": 5,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765881030607,
+      "latency": 8,
+      "frameLatency": 3.600000023841858
+    },
+    {
+      "time": 1765881031114,
+      "latency": 2,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765881031636,
+      "latency": 9,
+      "frameLatency": 2.700000047683716
+    },
+    {
+      "time": 1765881032152,
+      "latency": 4,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765881032660,
+      "latency": 4,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765881033169,
+      "latency": 5,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765881033677,
+      "latency": 4,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765881034190,
+      "latency": 11,
+      "frameLatency": 2.799999952316284
+    },
+    {
+      "time": 1765881034698,
+      "latency": 6,
+      "frameLatency": 3.400000035762787
+    },
+    {
+      "time": 1765881035206,
+      "latency": 6,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765881035718,
+      "latency": 7,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765881036232,
+      "latency": 9,
+      "frameLatency": 1.699999988079071
+    },
+    {
+      "time": 1765881036744,
+      "latency": 11,
+      "frameLatency": 3.800000011920929
+    },
+    {
+      "time": 1765881037256,
+      "latency": 4,
+      "frameLatency": 1.9000000357627869
+    },
+    {
+      "time": 1765881037776,
+      "latency": 9,
+      "frameLatency": 0.20000004768371582
+    },
+    {
+      "time": 1765881038298,
+      "latency": 6,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765881038805,
+      "latency": 4,
+      "frameLatency": 1.2000000476837158
+    },
+    {
+      "time": 1765881039318,
+      "latency": 6,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765881039826,
+      "latency": 3,
+      "frameLatency": 0.9000000357627869
+    },
+    {
+      "time": 1765881040335,
+      "latency": 4,
+      "frameLatency": 1.100000023841858
+    },
+    {
+      "time": 1765881040842,
+      "latency": 4,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765881041360,
+      "latency": 10,
+      "frameLatency": 3.400000035762787
+    },
+    {
+      "time": 1765881041868,
+      "latency": 7,
+      "frameLatency": 2.899999976158142
+    },
+    {
+      "time": 1765881042376,
+      "latency": 5,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765881042897,
+      "latency": 9,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765881043417,
+      "latency": 6,
+      "frameLatency": 2.100000023841858
+    },
+    {
+      "time": 1765881043921,
+      "latency": 2,
+      "frameLatency": 0.19999998807907104
+    },
+    {
+      "time": 1765881044434,
+      "latency": 8,
+      "frameLatency": 1.4000000357627869
+    },
+    {
+      "time": 1765881044945,
+      "latency": 7,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765881045462,
+      "latency": 11,
+      "frameLatency": 3.600000023841858
+    },
+    {
+      "time": 1765881045976,
+      "latency": 7,
+      "frameLatency": 4.399999976158142
+    },
+    {
+      "time": 1765881046487,
+      "latency": 7,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765881046996,
+      "latency": 6,
+      "frameLatency": 3.300000011920929
+    },
+    {
+      "time": 1765881047504,
+      "latency": 7,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765881048016,
+      "latency": 6,
+      "frameLatency": 3.100000023841858
+    },
+    {
+      "time": 1765881048534,
+      "latency": 9,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765881049046,
+      "latency": 9,
+      "frameLatency": 3.5
+    },
+    {
+      "time": 1765881049557,
+      "latency": 4,
+      "frameLatency": 1.7000000476837158
+    },
+    {
+      "time": 1765881050074,
+      "latency": 8,
+      "frameLatency": 2.399999976158142
+    },
+    {
+      "time": 1765881050587,
+      "latency": 7,
+      "frameLatency": 0.6000000238418579
+    },
+    {
+      "time": 1765881051103,
+      "latency": 9,
+      "frameLatency": 2.5
+    },
+    {
+      "time": 1765881051616,
+      "latency": 11,
+      "frameLatency": 3.099999964237213
+    },
+    {
+      "time": 1765881052129,
+      "latency": 9,
+      "frameLatency": 3
+    },
+    {
+      "time": 1765881052641,
+      "latency": 9,
+      "frameLatency": 2.300000011920929
+    },
+    {
+      "time": 1765881053153,
+      "latency": 8,
+      "frameLatency": 2
+    },
+    {
+      "time": 1765881053665,
+      "latency": 8,
+      "frameLatency": 1.300000011920929
+    },
+    {
+      "time": 1765881054178,
+      "latency": 6,
+      "frameLatency": 1.4000000357627869
+    }
+  ],
+  "freezes": [],
+  "screenshots": [
+    {
+      "time": 1765880754420,
+      "path": "freeze-test-start.png",
+      "type": "initial"
+    },
+    {
+      "time": 1765881054829,
+      "path": "freeze-test-end.png",
+      "type": "final"
+    }
+  ]
+}

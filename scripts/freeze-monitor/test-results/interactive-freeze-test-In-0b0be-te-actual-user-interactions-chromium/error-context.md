@@ -1,0 +1,193 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - tablist [ref=e5]:
+      - generic [ref=e6]:
+        - tab "ProjectsWin Close tab" [selected] [ref=e7] [cursor=pointer]:
+          - img [ref=e9]
+          - generic "Auto-respond enabled" [ref=e12]:
+            - img [ref=e13]
+          - generic [ref=e15]: ProjectsWin
+          - button "Close tab" [ref=e16]:
+            - img [ref=e17]
+        - tab "jira-html-parser Close tab" [ref=e20] [cursor=pointer]:
+          - img [ref=e22]
+          - generic "Auto-respond enabled" [ref=e25]:
+            - img [ref=e26]
+          - generic [ref=e28]: jira-html-parser
+          - button "Close tab" [ref=e29]:
+            - img [ref=e30]
+      - button "New tab" [ref=e33] [cursor=pointer]:
+        - img [ref=e34]
+    - generic [ref=e42]:
+      - textbox "Terminal input" [active] [ref=e43]
+      - generic [ref=e44]:
+        - generic [ref=e46]: Microsoft Windows [Version 10.0.26200.7462]
+        - generic [ref=e48]: (c) Microsoft Corporation. All rights reserved.
+        - generic [ref=e51]: C:\Users\mikej\Downloads>cd /d "C:\ProjectsWin"
+        - generic [ref=e54]: C:\ProjectsWin>git status && git diff
+        - generic [ref=e56]: "fatal: not a git repository (or any of the parent directories): .git"
+        - generic [ref=e59]: C:\ProjectsWin>echo "Testing freeze 1"
+        - generic [ref=e61]: "\"Testing freeze 1\""
+        - generic [ref=e64]: C:\ProjectsWin>ls -la /some/long/
+  - generic [ref=e94]:
+    - generic [ref=e95]:
+      - button "Cards" [ref=e96] [cursor=pointer]:
+        - img [ref=e97]
+        - text: Cards
+      - button "Files" [ref=e99] [cursor=pointer]:
+        - img [ref=e100]
+        - text: Files
+      - button "Debug" [ref=e102] [cursor=pointer]:
+        - img [ref=e103]
+        - text: Debug
+    - generic [ref=e112]:
+      - heading "⚡ Commands" [level=3] [ref=e113]
+      - button "Add" [ref=e114] [cursor=pointer]:
+        - img [ref=e115]
+        - text: Add
+    - generic [ref=e116]:
+      - 'button "Theme: Deep Ocean" [ref=e117] [cursor=pointer]':
+        - img [ref=e118]
+      - button "Toggle Light/Dark" [ref=e124] [cursor=pointer]:
+        - img [ref=e125]
+      - button "Move sidebar to left" [ref=e127] [cursor=pointer]:
+        - img [ref=e128]
+      - button "Version v1.23.9" [ref=e130] [cursor=pointer]:
+        - img [ref=e131]
+      - button "Quit Forge" [ref=e134] [cursor=pointer]:
+        - img [ref=e135]
+    - generic [ref=e137]:
+      - button "CMD" [ref=e138] [cursor=pointer]:
+        - img [ref=e139]
+        - generic [ref=e141]: CMD
+      - generic [ref=e142]:
+        - button "terminal" [pressed] [ref=e143] [cursor=pointer]:
+          - img "terminal" [ref=e144]: ⌨️
+        - button "Decrease Font Size" [ref=e145] [cursor=pointer]:
+          - img [ref=e146]
+        - generic "Font Size" [ref=e147]: 14px
+        - button "Increase Font Size" [ref=e148] [cursor=pointer]:
+          - img [ref=e149]
+        - button "assistant" [ref=e150] [cursor=pointer]:
+          - img "assistant" [ref=e151]: 🤖
+      - button "Shell Settings" [ref=e152] [cursor=pointer]:
+        - img [ref=e153]
+    - generic [ref=e156]:
+      - generic [ref=e157]:
+        - generic [ref=e158]:
+          - generic [ref=e159]:
+            - generic [ref=e161]: Ctrl+Shift+0
+            - generic [ref=e162]:
+              - button "Drag to reorder" [ref=e163]:
+                - img [ref=e164]
+              - generic "Edit Command" [ref=e171] [cursor=pointer]:
+                - img [ref=e172]
+              - generic "Delete Command" [ref=e174] [cursor=pointer]:
+                - img [ref=e175]
+          - generic "cd forge-terminal" [ref=e179]:
+            - img [ref=e180]
+            - text: Switch to Forge-Terminal DIR
+          - generic [ref=e182]:
+            - button "Paste" [ref=e183] [cursor=pointer]:
+              - img [ref=e184]
+              - text: Paste
+            - button "Run" [ref=e187] [cursor=pointer]:
+              - img [ref=e188]
+              - text: Run
+        - generic [ref=e190]:
+          - generic [ref=e191]:
+            - generic [ref=e193]: Ctrl+Shift+1
+            - generic [ref=e194]:
+              - button "Drag to reorder" [ref=e195]:
+                - img [ref=e196]
+              - generic "Edit Command" [ref=e203] [cursor=pointer]:
+                - img [ref=e204]
+              - generic "Delete Command" [ref=e206] [cursor=pointer]:
+                - img [ref=e207]
+          - generic "copilot" [ref=e211]: 🤖 Run Copilot
+          - generic [ref=e212]:
+            - button "Paste" [ref=e213] [cursor=pointer]:
+              - img [ref=e214]
+              - text: Paste
+            - button "Run" [ref=e217] [cursor=pointer]:
+              - img [ref=e218]
+              - text: Run
+        - generic [ref=e220]:
+          - generic [ref=e221]:
+            - generic [ref=e223]: Ctrl+Shift+2
+            - generic [ref=e224]:
+              - button "Drag to reorder" [ref=e225]:
+                - img [ref=e226]
+              - generic "Edit Command" [ref=e233] [cursor=pointer]:
+                - img [ref=e234]
+              - generic "Delete Command" [ref=e236] [cursor=pointer]:
+                - img [ref=e237]
+          - 'generic "You are an expert software architect. Produce a clear, actionable design specification. Requirements: - Specific file paths and names - Interface definitions before implementations - Data structures with field types - Edge cases identified upfront - No implementation code yet Design the following:" [ref=e241]': 📝 Design Command
+          - button "Paste" [ref=e243] [cursor=pointer]:
+            - img [ref=e244]
+            - text: Paste
+        - generic [ref=e247]:
+          - generic [ref=e248]:
+            - generic [ref=e250]: Ctrl+Shift+3
+            - generic [ref=e251]:
+              - button "Drag to reorder" [ref=e252]:
+                - img [ref=e253]
+              - generic "Edit Command" [ref=e260] [cursor=pointer]:
+                - img [ref=e261]
+              - generic "Delete Command" [ref=e263] [cursor=pointer]:
+                - img [ref=e264]
+          - 'generic "Implement the design from our last conversation. Follow these rules exactly: 1. Write tests FIRST (TDD) - failing tests before any implementation 2. Implement minimal code to pass each test 3. Production-ready code, not stubs or pseudocode 4. Handle errors explicitly - no silent failures 5. One file at a time, complete each before moving on Start with the first test file now." [ref=e268]': ⚡ Execute Command
+          - button "Paste" [ref=e270] [cursor=pointer]:
+            - img [ref=e271]
+            - text: Paste
+        - generic [ref=e274]:
+          - generic [ref=e275]:
+            - generic [ref=e277]: Ctrl+Shift+4
+            - generic [ref=e278]:
+              - button "Drag to reorder" [ref=e279]:
+                - img [ref=e280]
+              - generic "Edit Command" [ref=e287] [cursor=pointer]:
+                - img [ref=e288]
+              - generic "Delete Command" [ref=e290] [cursor=pointer]:
+                - img [ref=e291]
+          - 'generic "STOP. You are stuck in a loop or not following instructions. Take a breath. Here''s what I need you to do: 1. Acknowledge what went wrong (one sentence) 2. State the ACTUAL goal we''re trying to achieve 3. Propose ONE concrete next step 4. Wait for my confirmation before proceeding Do not apologize. Do not repeat previous attempts. Do not continue what you were doing. The task is:" [ref=e295]': 🛑 F*** THIS!
+          - button "Paste" [ref=e297] [cursor=pointer]:
+            - img [ref=e298]
+            - text: Paste
+        - generic [ref=e301]:
+          - generic [ref=e302]:
+            - generic [ref=e304]: Ctrl+Shift+5
+            - generic [ref=e305]:
+              - button "Drag to reorder" [ref=e306]:
+                - img [ref=e307]
+              - generic "Edit Command" [ref=e314] [cursor=pointer]:
+                - img [ref=e315]
+              - generic "Delete Command" [ref=e317] [cursor=pointer]:
+                - img [ref=e318]
+          - 'generic "Read and analyze the most recent LLM conversation from the AM (Artificial Memory) system. For the conversation JSON logs: - Location: ~/.forge/am/llm-conv-*.json - Each file contains: conversation turns, screen snapshots, metadata (provider, timestamps) For production logs: - Location: ~/.forge/forge.log (streaming logs from the running instance) - Use: tail -f ~/.forge/forge.log to monitor in real-time - Filter: grep -E \"AM API|LLM Logger|StartConversation\" to find relevant entries Provide a concise summary covering: 1. What was discussed or worked on 2. Key insights or outputs from the conversation 3. Any issues or incomplete tasks 4. Suggested next steps Keep it under 200 words. Be direct and actionable." [ref=e322]': 👀📖 Summarize Last Conversation
+          - generic [ref=e323]:
+            - button "Paste" [ref=e324] [cursor=pointer]:
+              - img [ref=e325]
+              - text: Paste
+            - button "Run" [ref=e328] [cursor=pointer]:
+              - img [ref=e329]
+              - text: Run
+        - generic [ref=e331]:
+          - generic [ref=e332]:
+            - generic [ref=e334]: Ctrl+Shift+6
+            - generic [ref=e335]:
+              - button "Drag to reorder" [ref=e336]:
+                - img [ref=e337]
+              - generic "Edit Command" [ref=e344] [cursor=pointer]:
+                - img [ref=e345]
+              - generic "Delete Command" [ref=e347] [cursor=pointer]:
+                - img [ref=e348]
+          - generic [ref=e352]: 💯E2E Command
+          - button "Paste" [ref=e354] [cursor=pointer]:
+            - img [ref=e355]
+            - text: Paste
+      - status [ref=e358]
+```
