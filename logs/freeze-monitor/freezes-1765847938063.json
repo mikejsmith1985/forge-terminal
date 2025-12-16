@@ -1,0 +1,1640 @@
+[
+  {
+    "timestamp": 1765847938926,
+    "type": "server_unresponsive",
+    "duration": 856,
+    "context": {
+      "consecutiveFailures": 3
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847939183,
+    "type": "server_unresponsive",
+    "duration": 1118,
+    "context": {
+      "consecutiveFailures": 4
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847939433,
+    "type": "server_unresponsive",
+    "duration": 1369,
+    "context": {
+      "consecutiveFailures": 5
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847939700,
+    "type": "server_unresponsive",
+    "duration": 1635,
+    "context": {
+      "consecutiveFailures": 6
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847939963,
+    "type": "server_unresponsive",
+    "duration": 1899,
+    "context": {
+      "consecutiveFailures": 7
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847940217,
+    "type": "server_unresponsive",
+    "duration": 2153,
+    "context": {
+      "consecutiveFailures": 8
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847940481,
+    "type": "server_unresponsive",
+    "duration": 2417,
+    "context": {
+      "consecutiveFailures": 9
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847940733,
+    "type": "server_unresponsive",
+    "duration": 2669,
+    "context": {
+      "consecutiveFailures": 10
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847940980,
+    "type": "server_unresponsive",
+    "duration": 2916,
+    "context": {
+      "consecutiveFailures": 11
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847941251,
+    "type": "server_unresponsive",
+    "duration": 3184,
+    "context": {
+      "consecutiveFailures": 12
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847941513,
+    "type": "server_unresponsive",
+    "duration": 3449,
+    "context": {
+      "consecutiveFailures": 13
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847941774,
+    "type": "server_unresponsive",
+    "duration": 3710,
+    "context": {
+      "consecutiveFailures": 14
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847942028,
+    "type": "server_unresponsive",
+    "duration": 3964,
+    "context": {
+      "consecutiveFailures": 15
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847942280,
+    "type": "server_unresponsive",
+    "duration": 4216,
+    "context": {
+      "consecutiveFailures": 16
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847942544,
+    "type": "server_unresponsive",
+    "duration": 4480,
+    "context": {
+      "consecutiveFailures": 17
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847942808,
+    "type": "server_unresponsive",
+    "duration": 4743,
+    "context": {
+      "consecutiveFailures": 18
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847943057,
+    "type": "server_unresponsive",
+    "duration": 4993,
+    "context": {
+      "consecutiveFailures": 19
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847943323,
+    "type": "server_unresponsive",
+    "duration": 5258,
+    "context": {
+      "consecutiveFailures": 20
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847943575,
+    "type": "server_unresponsive",
+    "duration": 5511,
+    "context": {
+      "consecutiveFailures": 21
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847943836,
+    "type": "server_unresponsive",
+    "duration": 5772,
+    "context": {
+      "consecutiveFailures": 22
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847944088,
+    "type": "server_unresponsive",
+    "duration": 6024,
+    "context": {
+      "consecutiveFailures": 23
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847944338,
+    "type": "server_unresponsive",
+    "duration": 6273,
+    "context": {
+      "consecutiveFailures": 24
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847944605,
+    "type": "server_unresponsive",
+    "duration": 6541,
+    "context": {
+      "consecutiveFailures": 25
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847944867,
+    "type": "server_unresponsive",
+    "duration": 6803,
+    "context": {
+      "consecutiveFailures": 26
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847945120,
+    "type": "server_unresponsive",
+    "duration": 7056,
+    "context": {
+      "consecutiveFailures": 27
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847945370,
+    "type": "server_unresponsive",
+    "duration": 7306,
+    "context": {
+      "consecutiveFailures": 28
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847945638,
+    "type": "server_unresponsive",
+    "duration": 7572,
+    "context": {
+      "consecutiveFailures": 29
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847945896,
+    "type": "server_unresponsive",
+    "duration": 7832,
+    "context": {
+      "consecutiveFailures": 30
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847946150,
+    "type": "server_unresponsive",
+    "duration": 8085,
+    "context": {
+      "consecutiveFailures": 31
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847946414,
+    "type": "server_unresponsive",
+    "duration": 8350,
+    "context": {
+      "consecutiveFailures": 32
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847946671,
+    "type": "server_unresponsive",
+    "duration": 8606,
+    "context": {
+      "consecutiveFailures": 33
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847946920,
+    "type": "server_unresponsive",
+    "duration": 8856,
+    "context": {
+      "consecutiveFailures": 34
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847947169,
+    "type": "server_unresponsive",
+    "duration": 9104,
+    "context": {
+      "consecutiveFailures": 35
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847947421,
+    "type": "server_unresponsive",
+    "duration": 9357,
+    "context": {
+      "consecutiveFailures": 36
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847947687,
+    "type": "server_unresponsive",
+    "duration": 9622,
+    "context": {
+      "consecutiveFailures": 37
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847947939,
+    "type": "server_unresponsive",
+    "duration": 9875,
+    "context": {
+      "consecutiveFailures": 38
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847948207,
+    "type": "server_unresponsive",
+    "duration": 10143,
+    "context": {
+      "consecutiveFailures": 39
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847948458,
+    "type": "server_unresponsive",
+    "duration": 10393,
+    "context": {
+      "consecutiveFailures": 40
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847948710,
+    "type": "server_unresponsive",
+    "duration": 10646,
+    "context": {
+      "consecutiveFailures": 41
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847948962,
+    "type": "server_unresponsive",
+    "duration": 10898,
+    "context": {
+      "consecutiveFailures": 42
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847949214,
+    "type": "server_unresponsive",
+    "duration": 11149,
+    "context": {
+      "consecutiveFailures": 43
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847949460,
+    "type": "server_unresponsive",
+    "duration": 11396,
+    "context": {
+      "consecutiveFailures": 44
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847949716,
+    "type": "server_unresponsive",
+    "duration": 11652,
+    "context": {
+      "consecutiveFailures": 45
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847949984,
+    "type": "server_unresponsive",
+    "duration": 11920,
+    "context": {
+      "consecutiveFailures": 46
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847950235,
+    "type": "server_unresponsive",
+    "duration": 12171,
+    "context": {
+      "consecutiveFailures": 47
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847950488,
+    "type": "server_unresponsive",
+    "duration": 12423,
+    "context": {
+      "consecutiveFailures": 48
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847950742,
+    "type": "server_unresponsive",
+    "duration": 12677,
+    "context": {
+      "consecutiveFailures": 49
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847950992,
+    "type": "server_unresponsive",
+    "duration": 12928,
+    "context": {
+      "consecutiveFailures": 50
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847951248,
+    "type": "server_unresponsive",
+    "duration": 13182,
+    "context": {
+      "consecutiveFailures": 51
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847951502,
+    "type": "server_unresponsive",
+    "duration": 13437,
+    "context": {
+      "consecutiveFailures": 52
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847951755,
+    "type": "server_unresponsive",
+    "duration": 13690,
+    "context": {
+      "consecutiveFailures": 53
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847952004,
+    "type": "server_unresponsive",
+    "duration": 13939,
+    "context": {
+      "consecutiveFailures": 54
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847952255,
+    "type": "server_unresponsive",
+    "duration": 14191,
+    "context": {
+      "consecutiveFailures": 55
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847952509,
+    "type": "server_unresponsive",
+    "duration": 14445,
+    "context": {
+      "consecutiveFailures": 56
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847952757,
+    "type": "server_unresponsive",
+    "duration": 14693,
+    "context": {
+      "consecutiveFailures": 57
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847953012,
+    "type": "server_unresponsive",
+    "duration": 14947,
+    "context": {
+      "consecutiveFailures": 58
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847953267,
+    "type": "server_unresponsive",
+    "duration": 15202,
+    "context": {
+      "consecutiveFailures": 59
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847953519,
+    "type": "server_unresponsive",
+    "duration": 15454,
+    "context": {
+      "consecutiveFailures": 60
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847953769,
+    "type": "server_unresponsive",
+    "duration": 15705,
+    "context": {
+      "consecutiveFailures": 61
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847954017,
+    "type": "server_unresponsive",
+    "duration": 15953,
+    "context": {
+      "consecutiveFailures": 62
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847954275,
+    "type": "server_unresponsive",
+    "duration": 16211,
+    "context": {
+      "consecutiveFailures": 63
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847954523,
+    "type": "server_unresponsive",
+    "duration": 16458,
+    "context": {
+      "consecutiveFailures": 64
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847954774,
+    "type": "server_unresponsive",
+    "duration": 16710,
+    "context": {
+      "consecutiveFailures": 65
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847955030,
+    "type": "server_unresponsive",
+    "duration": 16965,
+    "context": {
+      "consecutiveFailures": 66
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847955279,
+    "type": "server_unresponsive",
+    "duration": 17215,
+    "context": {
+      "consecutiveFailures": 67
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847955536,
+    "type": "server_unresponsive",
+    "duration": 17471,
+    "context": {
+      "consecutiveFailures": 68
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847955789,
+    "type": "server_unresponsive",
+    "duration": 17724,
+    "context": {
+      "consecutiveFailures": 69
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847956040,
+    "type": "server_unresponsive",
+    "duration": 17976,
+    "context": {
+      "consecutiveFailures": 70
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847956293,
+    "type": "server_unresponsive",
+    "duration": 18229,
+    "context": {
+      "consecutiveFailures": 71
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847956555,
+    "type": "server_unresponsive",
+    "duration": 18491,
+    "context": {
+      "consecutiveFailures": 72
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847956820,
+    "type": "server_unresponsive",
+    "duration": 18756,
+    "context": {
+      "consecutiveFailures": 73
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847957070,
+    "type": "server_unresponsive",
+    "duration": 19005,
+    "context": {
+      "consecutiveFailures": 74
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847957320,
+    "type": "server_unresponsive",
+    "duration": 19255,
+    "context": {
+      "consecutiveFailures": 75
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847957574,
+    "type": "server_unresponsive",
+    "duration": 19510,
+    "context": {
+      "consecutiveFailures": 76
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847957833,
+    "type": "server_unresponsive",
+    "duration": 19769,
+    "context": {
+      "consecutiveFailures": 77
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847958099,
+    "type": "server_unresponsive",
+    "duration": 20035,
+    "context": {
+      "consecutiveFailures": 78
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847958345,
+    "type": "server_unresponsive",
+    "duration": 20282,
+    "context": {
+      "consecutiveFailures": 79
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847958600,
+    "type": "server_unresponsive",
+    "duration": 20536,
+    "context": {
+      "consecutiveFailures": 80
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847958866,
+    "type": "server_unresponsive",
+    "duration": 20800,
+    "context": {
+      "consecutiveFailures": 81
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847959131,
+    "type": "server_unresponsive",
+    "duration": 21066,
+    "context": {
+      "consecutiveFailures": 82
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847959391,
+    "type": "server_unresponsive",
+    "duration": 21327,
+    "context": {
+      "consecutiveFailures": 83
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847959642,
+    "type": "server_unresponsive",
+    "duration": 21577,
+    "context": {
+      "consecutiveFailures": 84
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847959891,
+    "type": "server_unresponsive",
+    "duration": 21827,
+    "context": {
+      "consecutiveFailures": 85
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847960146,
+    "type": "server_unresponsive",
+    "duration": 22082,
+    "context": {
+      "consecutiveFailures": 86
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847960396,
+    "type": "server_unresponsive",
+    "duration": 22333,
+    "context": {
+      "consecutiveFailures": 87
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847960665,
+    "type": "server_unresponsive",
+    "duration": 22599,
+    "context": {
+      "consecutiveFailures": 88
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847960927,
+    "type": "server_unresponsive",
+    "duration": 22863,
+    "context": {
+      "consecutiveFailures": 89
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847961193,
+    "type": "server_unresponsive",
+    "duration": 23128,
+    "context": {
+      "consecutiveFailures": 90
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847961447,
+    "type": "server_unresponsive",
+    "duration": 23383,
+    "context": {
+      "consecutiveFailures": 91
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847961696,
+    "type": "server_unresponsive",
+    "duration": 23631,
+    "context": {
+      "consecutiveFailures": 92
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847961943,
+    "type": "server_unresponsive",
+    "duration": 23879,
+    "context": {
+      "consecutiveFailures": 93
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847962197,
+    "type": "server_unresponsive",
+    "duration": 24133,
+    "context": {
+      "consecutiveFailures": 94
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847962459,
+    "type": "server_unresponsive",
+    "duration": 24395,
+    "context": {
+      "consecutiveFailures": 95
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847962711,
+    "type": "server_unresponsive",
+    "duration": 24647,
+    "context": {
+      "consecutiveFailures": 96
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847962958,
+    "type": "server_unresponsive",
+    "duration": 24894,
+    "context": {
+      "consecutiveFailures": 97
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847963211,
+    "type": "server_unresponsive",
+    "duration": 25147,
+    "context": {
+      "consecutiveFailures": 98
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847963465,
+    "type": "server_unresponsive",
+    "duration": 25399,
+    "context": {
+      "consecutiveFailures": 99
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847963710,
+    "type": "server_unresponsive",
+    "duration": 25646,
+    "context": {
+      "consecutiveFailures": 100
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847963978,
+    "type": "server_unresponsive",
+    "duration": 25914,
+    "context": {
+      "consecutiveFailures": 101
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847964243,
+    "type": "server_unresponsive",
+    "duration": 26179,
+    "context": {
+      "consecutiveFailures": 102
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847964492,
+    "type": "server_unresponsive",
+    "duration": 26427,
+    "context": {
+      "consecutiveFailures": 103
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847964741,
+    "type": "server_unresponsive",
+    "duration": 26678,
+    "context": {
+      "consecutiveFailures": 104
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847964997,
+    "type": "server_unresponsive",
+    "duration": 26933,
+    "context": {
+      "consecutiveFailures": 105
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847965262,
+    "type": "server_unresponsive",
+    "duration": 27198,
+    "context": {
+      "consecutiveFailures": 106
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847965517,
+    "type": "server_unresponsive",
+    "duration": 27452,
+    "context": {
+      "consecutiveFailures": 107
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847965769,
+    "type": "server_unresponsive",
+    "duration": 27704,
+    "context": {
+      "consecutiveFailures": 108
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847966034,
+    "type": "server_unresponsive",
+    "duration": 27969,
+    "context": {
+      "consecutiveFailures": 109
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847966285,
+    "type": "server_unresponsive",
+    "duration": 28220,
+    "context": {
+      "consecutiveFailures": 110
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847966547,
+    "type": "server_unresponsive",
+    "duration": 28483,
+    "context": {
+      "consecutiveFailures": 111
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847966810,
+    "type": "server_unresponsive",
+    "duration": 28746,
+    "context": {
+      "consecutiveFailures": 112
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847967074,
+    "type": "server_unresponsive",
+    "duration": 29010,
+    "context": {
+      "consecutiveFailures": 113
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847967340,
+    "type": "server_unresponsive",
+    "duration": 29275,
+    "context": {
+      "consecutiveFailures": 114
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847967606,
+    "type": "server_unresponsive",
+    "duration": 29542,
+    "context": {
+      "consecutiveFailures": 115
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847967856,
+    "type": "server_unresponsive",
+    "duration": 29791,
+    "context": {
+      "consecutiveFailures": 116
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847968111,
+    "type": "server_unresponsive",
+    "duration": 30047,
+    "context": {
+      "consecutiveFailures": 117
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847968360,
+    "type": "server_unresponsive",
+    "duration": 30296,
+    "context": {
+      "consecutiveFailures": 118
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847968611,
+    "type": "server_unresponsive",
+    "duration": 30547,
+    "context": {
+      "consecutiveFailures": 119
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847968874,
+    "type": "server_unresponsive",
+    "duration": 30811,
+    "context": {
+      "consecutiveFailures": 120
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847969124,
+    "type": "server_unresponsive",
+    "duration": 31060,
+    "context": {
+      "consecutiveFailures": 121
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847969372,
+    "type": "server_unresponsive",
+    "duration": 31309,
+    "context": {
+      "consecutiveFailures": 122
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847969626,
+    "type": "server_unresponsive",
+    "duration": 31561,
+    "context": {
+      "consecutiveFailures": 123
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847969877,
+    "type": "server_unresponsive",
+    "duration": 31812,
+    "context": {
+      "consecutiveFailures": 124
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847970126,
+    "type": "server_unresponsive",
+    "duration": 32061,
+    "context": {
+      "consecutiveFailures": 125
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847970380,
+    "type": "server_unresponsive",
+    "duration": 32315,
+    "context": {
+      "consecutiveFailures": 126
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847970632,
+    "type": "server_unresponsive",
+    "duration": 32568,
+    "context": {
+      "consecutiveFailures": 127
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  },
+  {
+    "timestamp": 1765847970882,
+    "type": "server_unresponsive",
+    "duration": 32818,
+    "context": {
+      "consecutiveFailures": 128
+    },
+    "metrics": {
+      "heartbeatAvgLatency": 0,
+      "wsConnected": false,
+      "wsMessages": 0
+    }
+  }
+]

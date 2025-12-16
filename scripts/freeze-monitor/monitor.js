@@ -70,25 +70,30 @@ async function sendHeartbeat() {
   
   return new Promise((resolve) => {
     const req = http.request({
-      hostname: 'localhost',
+      hostname: '127.0.0.1',  // Use IP instead of localhost to avoid DNS/IPv6 delays
       port: config.port,
       path: '/api/version',
       method: 'GET',
-      timeout: 5000,
+      timeout: 2000,  // Reduced timeout to 2 seconds
     }, (res) => {
       const latency = Date.now() - start;
-      metrics.heartbeats.total++;
-      metrics.heartbeats.successful++;
       
-      latencyHistory.push(latency);
-      if (latencyHistory.length > 100) latencyHistory.shift();
-      metrics.heartbeats.avgLatency = latencyHistory.reduce((a, b) => a + b, 0) / latencyHistory.length;
-      
-      if (latency > 500) {
-        log('WARN', 'Slow heartbeat response', { latency });
-      }
-      
-      resolve({ success: true, latency });
+      // IMPORTANT: Consume response body to prevent socket hang
+      res.on('data', () => {});
+      res.on('end', () => {
+        metrics.heartbeats.total++;
+        metrics.heartbeats.successful++;
+        
+        latencyHistory.push(latency);
+        if (latencyHistory.length > 100) latencyHistory.shift();
+        metrics.heartbeats.avgLatency = latencyHistory.reduce((a, b) => a + b, 0) / latencyHistory.length;
+        
+        if (latency > 500) {
+          log('WARN', 'Slow heartbeat response', { latency });
+        }
+        
+        resolve({ success: true, latency });
+      });
     });
     
     req.on('error', (err) => {
