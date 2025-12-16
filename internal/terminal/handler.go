@@ -235,8 +235,20 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer closeOnce.Do(func() { close(done) })
 		buf := make([]byte, 4096)
+		var messageCount int64
+		var totalWriteTime time.Duration
+		var maxWriteTime time.Duration
+		lastStatsReport := time.Now()
+		
 		for {
+			// FREEZE INSTRUMENTATION: Time PTY reads
+			readStart := time.Now()
 			n, err := session.Read(buf)
+			readDuration := time.Since(readStart)
+			if readDuration > 100*time.Millisecond {
+				log.Printf("[FREEZE-DEBUG] Slow PTY read: %v for %d bytes", readDuration, n)
+			}
+			
 			if err != nil {
 				log.Printf("[Terminal] PTY read error: %v", err)
 				select {
@@ -246,9 +258,38 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if n > 0 {
+				messageCount++
 				// ═══ CRITICAL PERFORMANCE: Send to browser FIRST ═══
 				// This ensures terminal output is immediately visible
+				
+				// FREEZE INSTRUMENTATION: Time WebSocket writes
+				writeStart := time.Now()
 				err = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+				writeDuration := time.Since(writeStart)
+				
+				// Track cumulative stats
+				totalWriteTime += writeDuration
+				if writeDuration > maxWriteTime {
+					maxWriteTime = writeDuration
+				}
+				
+				if writeDuration > 50*time.Millisecond {
+					log.Printf("[FREEZE-DEBUG] Slow WebSocket write: %v for %d bytes", writeDuration, n)
+				}
+				if writeDuration > 500*time.Millisecond {
+					log.Printf("[FREEZE-CRITICAL] WebSocket write blocked for %v - %d bytes", writeDuration, n)
+				}
+				
+				// Periodic stats report (every 30 seconds)
+				if time.Since(lastStatsReport) > 30*time.Second {
+					avgWrite := time.Duration(0)
+					if messageCount > 0 {
+						avgWrite = totalWriteTime / time.Duration(messageCount)
+					}
+					log.Printf("[FREEZE-STATS] Messages: %d, AvgWrite: %v, MaxWrite: %v", messageCount, avgWrite, maxWriteTime)
+					lastStatsReport = time.Now()
+				}
+				
 				if err != nil {
 					log.Printf("[Terminal] WebSocket write error: %v", err)
 					return

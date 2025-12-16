@@ -1,0 +1,17 @@
+{
+  "name": "forge-freeze-monitor",
+  "version": "1.0.0",
+  "description": "External freeze monitor for Forge Terminal",
+  "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js",
+    "monitor": "node monitor.js",
+    "test-playwright": "npx playwright test freeze-detection.spec.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

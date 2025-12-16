@@ -852,19 +852,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       };
 
       ws.onmessage = (event) => {
-        // FREEZE INSTRUMENTATION - Added by add-freeze-instrumentation.js
-        const messageStart = performance.now();
-        const dataSize = event.data instanceof ArrayBuffer ? event.data.byteLength :
-                         typeof event.data === 'string' ? event.data.length : 0;
-        
-        // Track message processing
-        if (!window.__wsMessageStats) {
-          window.__wsMessageStats = { count: 0, totalTime: 0, maxTime: 0 };
-        }
-        window.__wsMessageStats.count++;
-        
-        try {
-
         let textData = '';
         if (event.data instanceof ArrayBuffer) {
           // Binary data from PTY
@@ -985,31 +972,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
         }, 1500); // Increased from 500ms to 1500ms for performance
-      
-        } finally {
-          // Record timing
-          const duration = performance.now() - messageStart;
-          window.__wsMessageStats.totalTime += duration;
-          window.__wsMessageStats.maxTime = Math.max(window.__wsMessageStats.maxTime, duration);
-          
-          // Log slow messages immediately
-          if (duration > 50) {
-            console.warn(`[Freeze Debug] Slow message: ${duration.toFixed(0)}ms, size: ${dataSize} bytes`);
-          }
-          
-          // Critical freeze detection - RED ALERT
-          if (duration > 500) {
-            console.error(`%c🔴 FREEZE DETECTED: ${duration.toFixed(0)}ms message processing`, 
-              'background: red; color: white; font-size: 16px; padding: 8px;');
-            window.__lastFreezeCause = {
-              type: 'websocket_message',
-              duration,
-              dataSize,
-              timestamp: Date.now()
-            };
-          }
-        }
-};
+      };
 
       ws.onerror = (error) => {
         logger.terminal('WebSocket error', { tabId, error: error.message || 'unknown' });
