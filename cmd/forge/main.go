@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	_ "net/http/pprof" // CPU/memory profiling - access at /debug/pprof/
 	"os"
 	"os/exec"
 	"os/signal"
@@ -226,6 +227,17 @@ func main() {
 	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))
 	http.HandleFunc("/api/diagnostics/am-status", WrapWithMiddleware(handleDiagnosticsAMStatus))
 	http.HandleFunc("/api/diagnostics/platform", WrapWithMiddleware(handleDiagnosticsPlatform))
+
+	// Freeze detection API - comprehensive runtime monitoring
+	http.HandleFunc("/api/diagnostics/freeze/metrics", WrapWithMiddleware(diagnostic.HandleFreezeMetrics))
+	http.HandleFunc("/api/diagnostics/freeze/current", WrapWithMiddleware(diagnostic.HandleFreezeCurrent))
+	http.HandleFunc("/api/diagnostics/freeze/stats", WrapWithMiddleware(diagnostic.HandleFreezeStats))
+	http.HandleFunc("/api/diagnostics/freeze/gc", WrapWithMiddleware(diagnostic.HandleForceGC))
+	http.HandleFunc("/api/diagnostics/freeze/goroutines", WrapWithMiddleware(diagnostic.HandleGoroutines))
+	http.HandleFunc("/api/diagnostics/runtime", WrapWithMiddleware(diagnostic.HandleRuntimeStats))
+
+	// Start freeze detector on startup
+	_ = diagnostic.GetFreezeDetector() // Auto-starts on first access
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
@@ -1097,6 +1109,7 @@ func handleAMCleanup(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAMMasterControl handles global AM enable/disable.
+// FIXED: Now actually calls system.Start() and system.Stop()
 func handleAMMasterControl(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1116,17 +1129,35 @@ func handleAMMasterControl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	system := am.GetSystem()
+	if system == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "AM system not initialized",
+		})
+		return
+	}
+
 	if req.Enabled {
-		log.Printf("[AM Master] Enabled")
+		if err := system.Start(); err != nil {
+			log.Printf("[AM Master] Failed to start: %v", err)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+		log.Printf("[AM Master] Enabled - AM system STARTED")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
-			"message": "AM enabled",
+			"message": "AM enabled and system started",
 		})
 	} else {
-		log.Printf("[AM Master] Disabled")
+		system.Stop()
+		log.Printf("[AM Master] Disabled - AM system STOPPED")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
-			"message": "AM disabled",
+			"message": "AM disabled and system stopped",
 		})
 	}
 }
