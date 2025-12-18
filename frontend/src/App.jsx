@@ -317,6 +317,7 @@ function App() {
     const MAX_RECONNECT_ATTEMPTS = 5;
     const BASE_RECONNECT_DELAY = 5000; // 5 seconds
     let fallbackPollTimer = null;
+    let reconnectTimer = null; // Track reconnection timer
     
     const startFallbackPolling = () => {
       // Fallback polling every 5 minutes if SSE fails
@@ -377,7 +378,7 @@ function App() {
             const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempt);
             reconnectAttempt++;
             console.log(`[SSE] Retrying in ${delay}ms...`);
-            setTimeout(connectSSE, delay);
+            reconnectTimer = setTimeout(connectSSE, delay);
           } else {
             console.error('[SSE] Max reconnection attempts reached, fallback polling will continue');
           }
@@ -393,6 +394,9 @@ function App() {
     return () => {
       if (eventSource) {
         eventSource.close();
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
       }
       stopFallbackPolling();
     };

@@ -46,6 +46,8 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
       return;
     }
 
+    let isMounted = true;
+
     const checkStatus = async () => {
       try {
         const [healthRes, convRes] = await Promise.all([
@@ -53,8 +55,12 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
           tabId && amEnabled ? fetch(`/api/am/llm/conversations/${tabId}`) : Promise.resolve(null)
         ]);
 
+        if (!isMounted) return;
+
         if (healthRes.ok) {
           const healthData = await healthRes.json();
+          if (!isMounted) return;
+          
           const status = healthData?.status || 'UNKNOWN';
           setIsRecording(status === 'HEALTHY' && amEnabled);
           
@@ -71,21 +77,29 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
 
         if (convRes && convRes.ok) {
           const convData = await convRes.json();
+          if (!isMounted) return;
+          
           const convList = convData.conversations || [];
           setConversations(convList);
           setLastConvUpdateTime(new Date());
         }
       } catch (err) {
+        if (!isMounted) return;
         console.error('[AMMonitor] Status check failed:', err);
         setIsRecording(false);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     checkStatus();
     const interval = setInterval(checkStatus, pollingInterval);
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [tabId, amEnabled, devMode, pollingInterval]);
 
   if (!devMode) {

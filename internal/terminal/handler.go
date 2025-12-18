@@ -344,6 +344,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// Feed output to LLM logger - THROTTLED to reduce CPU load
 				// Accumulate output and flush every 200ms to prevent lock contention
 				if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
+					// BOUNDED BUFFER: Prevent OOM
+					if llmOutputBuffer.Len() > 65536 { // 64KB limit
+						llmOutputBuffer.Reset()
+					}
 					llmOutputBuffer.Write(buf[:n])
 					now := time.Now()
 					if now.Sub(lastLLMFlush) > 200*time.Millisecond {
@@ -427,10 +431,18 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// Accumulate input for LLM detection (after PTY write)
 			dataStr := string(data)
+			
+			// BOUNDED BUFFER: Prevent OOM attacks
+			if inputBuffer.Len() > 8192 { // 8KB limit
+				inputBuffer.Reset()
+			}
 			inputBuffer.WriteString(dataStr)
 
 			// AM: Capture user input when inside active LLM session
 			// Batch checks to avoid main thread contention (100ms intervals)
+			if amInputAccumulator.Len() > 8192 { // 8KB limit
+				amInputAccumulator.Reset()
+			}
 			amInputAccumulator.WriteString(dataStr)
 			if time.Since(lastAMCheck) > 100*time.Millisecond {
 				if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
