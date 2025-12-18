@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Copy, Play } from 'lucide-react';
 import { useVersionIncrement } from '../hooks/useVersionIncrement';
 import './ReleaseManagerCard.css';
 
-const ReleaseManagerCard = ({ onExecuteCommand, onToast }) => {
+const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
   const [currentVersion, setCurrentVersion] = useState('v1.23.10');
   const [selectedIncrement, setSelectedIncrement] = useState('fix');
   const [showCommand, setShowCommand] = useState(false);
@@ -56,8 +56,16 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast }) => {
 
   const generateReleaseCommand = useCallback(() => {
     if (!next) return '';
-    return `git push origin release/${next} && gh release create ${next} --title "${next} - Release" --target main && echo "Release ${next} created successfully!"`;
-  }, [next]);
+    
+    // Generate command based on shell type
+    if (shellType === 'powershell') {
+      // PowerShell 5.1 compatible syntax (no &&)
+      return `git push origin release/${next}; if ($?) { gh release create ${next} --title "${next} - Release" --target main; if ($?) { echo "Release ${next} created successfully!" } }`;
+    } else {
+      // Bash, CMD, and PowerShell 7+ support &&
+      return `git push origin release/${next} && gh release create ${next} --title "${next} - Release" --target main && echo "Release ${next} created successfully!"`;
+    }
+  }, [next, shellType]);
 
   const releaseCommand = generateReleaseCommand();
 

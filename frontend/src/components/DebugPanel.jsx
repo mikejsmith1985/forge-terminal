@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Bug, RefreshCw, MessageSquare } from 'lucide-react';
+import { Bug, RefreshCw, MessageSquare, Activity } from 'lucide-react';
 
 /**
  * DebugPanel - System diagnostics and feedback in sidebar
  */
 const DebugPanel = ({ terminalRef, tabId, onFeedbackClick }) => {
   const [diagnostics, setDiagnostics] = useState(null);
+  const [freezeMetrics, setFreezeMetrics] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+
+  const fetchFreezeMetrics = async () => {
+    try {
+      const res = await fetch('/api/diagnostics/freeze/current');
+      const data = await res.json();
+      if (data.success) {
+        setFreezeMetrics(data.current);
+      }
+    } catch (e) {
+      console.error('Failed to fetch freeze metrics', e);
+    }
+  };
 
   const captureDiagnostics = () => {
     console.log('[DebugPanel] Capturing snapshot...');
@@ -43,10 +56,14 @@ const DebugPanel = ({ terminalRef, tabId, onFeedbackClick }) => {
   useEffect(() => {
     // Initial capture
     captureDiagnostics();
+    fetchFreezeMetrics();
 
     // Auto-refresh if enabled
     if (autoRefresh) {
-      const interval = setInterval(captureDiagnostics, 2000);
+      const interval = setInterval(() => {
+        captureDiagnostics();
+        fetchFreezeMetrics();
+      }, 2000);
       return () => clearInterval(interval);
     }
   }, [autoRefresh, tabId]);
@@ -87,7 +104,10 @@ const DebugPanel = ({ terminalRef, tabId, onFeedbackClick }) => {
             Auto {autoRefresh ? 'ON' : 'OFF'}
           </button>
           <button
-            onClick={captureDiagnostics}
+            onClick={() => {
+              captureDiagnostics();
+              fetchFreezeMetrics();
+            }}
             style={{
               padding: '4px 8px',
               background: 'rgba(255, 255, 255, 0.05)',
@@ -168,6 +188,62 @@ const DebugPanel = ({ terminalRef, tabId, onFeedbackClick }) => {
               <MessageSquare size={16} />
               Send Feedback
             </button>
+          </div>
+
+          <div style={{
+            padding: '12px',
+            background: 'rgba(255, 255, 255, 0.03)',
+            borderRadius: '8px',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              marginBottom: '8px',
+            }}>
+              <h4 style={{ margin: 0, color: '#fff', fontSize: '12px' }}>Freeze Monitor</h4>
+              <Activity size={14} color="#888" />
+            </div>
+            
+            {freezeMetrics ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div><strong>Goroutines:</strong> {freezeMetrics.goroutineCount}</div>
+                <div><strong>Heap:</strong> {freezeMetrics.heapAllocMB.toFixed(1)}MB</div>
+                <div><strong>GC Pause:</strong> {freezeMetrics.gcLastPauseMs.toFixed(1)}ms</div>
+                
+                {freezeMetrics.alerts && freezeMetrics.alerts.length > 0 && (
+                  <div style={{ 
+                    marginTop: '8px', 
+                    padding: '8px', 
+                    background: 'rgba(239, 68, 68, 0.1)', 
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '4px',
+                    color: '#fca5a5'
+                  }}>
+                    <strong>Alerts:</strong>
+                    <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
+                      {freezeMetrics.alerts.map((alert, i) => (
+                        <li key={i}>{alert}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div style={{ 
+                  marginTop: '8px', 
+                  fontSize: '10px', 
+                  color: '#888',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                  paddingTop: '8px'
+                }}>
+                  <strong>Log file:</strong><br/>
+                  ~/.forge/logs/freeze-monitor/
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: '#888', fontStyle: 'italic' }}>Loading metrics...</div>
+            )}
           </div>
 
           <div style={{

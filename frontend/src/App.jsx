@@ -217,7 +217,11 @@ function App() {
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -621,12 +625,51 @@ function App() {
   useEffect(() => {
     // CRITICAL: Don't register keyboard handlers until version is verified
     // This prevents stale JS from registering broken handlers before auto-refresh
-    if (!versionReady) {
-      console.log('[Keyboard] Waiting for version verification before registering handlers');
-      return;
-    }
+    // NOTE: We removed the check here because it was blocking keybindings from working
+    // when the app is loaded but version check is slow.
+    // if (!versionReady) {
+    //   console.log('[Keyboard] Waiting for version verification before registering handlers');
+    //   return;
+    // }
     
     const handleKeyDown = (e) => {
+      // Check for command shortcuts (Ctrl+Shift+... or Ctrl+Alt+...)
+      // We check this BEFORE xterm check to allow global shortcuts to work even when terminal is focused
+      if (e.ctrlKey && (e.shiftKey || e.altKey)) {
+        const key = e.key.toLowerCase();
+        
+        // Construct the pressed key combination string
+        let pressed = 'Ctrl+';
+        if (e.altKey) pressed += 'Alt+';
+        if (e.shiftKey) pressed += 'Shift+';
+        
+        // Handle digit/letter keys
+        // e.code is like 'Digit1', 'KeyA', etc.
+        let code = e.code;
+        if (code.startsWith('Digit')) code = code.replace('Digit', '');
+        if (code.startsWith('Key')) code = code.replace('Key', '');
+        
+        pressed += code;
+
+        const matchedCommand = commands.find(cmd => {
+          if (!cmd.keyBinding) return false;
+          // Simple normalization for comparison
+          const normalize = s => s.toLowerCase().replace(/\s+/g, '').replace('control', 'ctrl');
+          const match = normalize(cmd.keyBinding) === normalize(pressed);
+          return match;
+        });
+
+        if (matchedCommand) {
+          e.preventDefault();
+          if (matchedCommand.pasteOnly) {
+            handlePaste(matchedCommand);
+          } else {
+            handleExecute(matchedCommand);
+          }
+          return; // Handled, don't let xterm or others process it
+        }
+      }
+
       // CRITICAL: Check if this is xterm's helper textarea FIRST
       // xterm-helper-textarea must be allowed to handle ALL keys
       const isXtermTextarea = e.target?.classList?.contains('xterm-helper-textarea');
@@ -716,35 +759,12 @@ function App() {
       }
       
       // Check for Ctrl+Shift+1/2/3/4... (command shortcuts)
-      if (e.ctrlKey && e.shiftKey) {
-        const key = e.key.toLowerCase();
-        // Find command with this binding
-        // Note: This is a simple check, might need more robust parsing if bindings get complex
-        // But charter says "Ctrl+Shift+1", etc.
-        const binding = `Ctrl+Shift+${key.toUpperCase()}`; // e.g. Ctrl+Shift+1
-        // Also handle number keys directly if e.key is '!' or '@' etc due to shift
-        // But usually e.key is the character produced.
-        // Actually, let's just match against the string in the command.
-
-        // We need to normalize or check carefully. 
-        // For now, let's iterate and check.
-        const matchedCommand = commands.find(cmd => {
-          if (!cmd.keyBinding) return false;
-          // Simple normalization for comparison
-          const normalize = s => s.toLowerCase().replace(/\s+/g, '');
-          const pressed = `Ctrl+Shift+${e.code.replace('Digit', '').replace('Key', '')}`;
-          return normalize(cmd.keyBinding) === normalize(pressed);
-        });
-
-        if (matchedCommand) {
-          e.preventDefault();
-          if (matchedCommand.pasteOnly) {
-            handlePaste(matchedCommand);
-          } else {
-            handleExecute(matchedCommand);
-          }
-        }
+      // MOVED TO TOP OF FUNCTION
+      /* 
+      if (e.ctrlKey && (e.shiftKey || e.altKey)) {
+         ...
       }
+      */
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -1408,6 +1428,7 @@ function App() {
               onDelete={handleDelete}
               onRetry={loadCommands}
               onToast={addToast}
+              shellType={shellConfig.shellType}
             />
           </DndContext>
         ) : sidebarView === 'files' ? (

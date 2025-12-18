@@ -6,7 +6,7 @@ import SystemCommandCard from './SystemCommandCard';
 import { RefreshCw, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { isReleaseManagerCard, isSystemCard } from '../utils/defaultCommandCards';
 
-const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast }) => {
+const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType }) => {
   const [isSystemCollapsed, setIsSystemCollapsed] = useState(() => {
     return localStorage.getItem('systemCardsCollapsed') === 'true';
   });
@@ -93,6 +93,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
               key={cmd.id}
               onExecuteCommand={onExecute}
               onToast={onToast}
+              shellType={shellType}
             />
           );
         }
