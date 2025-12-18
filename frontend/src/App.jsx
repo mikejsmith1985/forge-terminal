@@ -27,7 +27,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { getMergedCommandCards } from './utils/defaultCommandCards'
+import { getMergedCommandCards, getUserDefinedCards } from './utils/defaultCommandCards'
 
 const MAX_TABS = 20;
 
@@ -1030,10 +1030,14 @@ function App() {
 
   const saveCommands = async (newCommands) => {
     try {
+      // Filter out system cards before saving to backend
+      // System cards have string IDs and are generated on the client side
+      const userCardsOnly = getUserDefinedCards(newCommands);
+      
       await fetch('/api/commands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCommands)
+        body: JSON.stringify(userCardsOnly)
       })
       setCommands(newCommands)
     } catch (err) {

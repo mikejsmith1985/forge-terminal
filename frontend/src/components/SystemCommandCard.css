@@ -175,3 +175,60 @@
     width: 100%;
   }
 }
+
+/* Light Mode Overrides */
+.light .system-command-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 245, 245, 0.8) 100%);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.light .system-command-card:hover {
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.light .system-card-title {
+  color: #333333;
+}
+
+.light .system-card-description {
+  color: #666666;
+}
+
+.light .system-card-command-display {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.light .system-card-command-text {
+  color: #2e7d32; /* Darker green for readability */
+}
+
+.light .system-card-action {
+  background: rgba(255, 255, 255, 0.8);
+  color: #333333;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.light .system-card-action:hover {
+  background: rgba(240, 240, 240, 1);
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+.light .system-card-config-btn {
+  background: rgba(100, 150, 255, 0.1);
+  border-color: rgba(100, 150, 255, 0.3);
+  color: #0056b3;
+}
+
+.light .system-card-config-btn:hover {
+  background: rgba(100, 150, 255, 0.2);
+}
+
+/* Adjust theme borders for light mode */
+.light .system-card-blue { border-left-color: #2196f3; }
+.light .system-card-purple { border-left-color: #9c27b0; }
+.light .system-card-orange { border-left-color: #ff9800; }
+.light .system-card-green { border-left-color: #4caf50; }
+
