@@ -1,8 +1,8 @@
 .command-preview {
   margin-top: 8px;
   padding: 12px;
-  background: #2a2a2a;
-  border: 1px solid #444;
+  background: var(--surface);
+  border: 1px solid var(--overlay);
   border-radius: 6px;
 }
 
@@ -20,7 +20,7 @@
 
 .command-label {
   font-weight: 600;
-  color: #fff;
+  color: var(--text);
 }
 
 .command-badge {
@@ -34,20 +34,20 @@
 }
 
 .command-safe {
-  background: #1f3a1f;
-  color: #4caf50;
-  border: 1px solid #2f4a2f;
+  background: color-mix(in srgb, var(--green) 15%, var(--surface));
+  color: var(--green);
+  border: 1px solid color-mix(in srgb, var(--green) 25%, var(--overlay));
 }
 
 .command-review {
-  background: #3a2f1f;
-  color: #ffa726;
-  border: 1px solid #4a3f2f;
+  background: color-mix(in srgb, var(--yellow) 15%, var(--surface));
+  color: var(--yellow);
+  border: 1px solid color-mix(in srgb, var(--yellow) 25%, var(--overlay));
 }
 
 .command-description {
   margin-bottom: 8px;
-  color: #999;
+  color: var(--subtext);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -55,14 +55,14 @@
 .command-code {
   margin-bottom: 12px;
   padding: 10px;
-  background: #1e1e1e;
-  border: 1px solid #333;
+  background: var(--bg);
+  border: 1px solid var(--overlay);
   border-radius: 4px;
   overflow-x: auto;
 }
 
 .command-code code {
-  color: #61dafb;
+  color: var(--accent);
   font-family: 'Courier New', monospace;
   font-size: 13px;
   white-space: pre;
@@ -85,12 +85,13 @@
 }
 
 .command-execute {
-  background: #61dafb;
-  color: #1e1e1e;
+  background: var(--accent);
+  color: var(--bg);
 }
 
 .command-execute:hover:not(:disabled) {
-  background: #4fc3f7;
+  filter: brightness(1.1);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .command-execute:disabled {
@@ -99,10 +100,10 @@
 }
 
 .command-copy {
-  background: #444;
-  color: #fff;
+  background: var(--overlay);
+  color: var(--text);
 }
 
 .command-copy:hover {
-  background: #555;
+  background: color-mix(in srgb, var(--text) 15%, var(--overlay));
 }

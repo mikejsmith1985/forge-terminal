@@ -6,10 +6,10 @@ const ThinkingBlock = ({ content }) => {
 
   return (
     <div className="thinking-block" style={{ 
-      border: '1px solid #333', 
+      border: '1px solid var(--overlay)', 
       borderRadius: '4px', 
       margin: '8px 0',
-      backgroundColor: '#1e1e1e'
+      backgroundColor: 'var(--surface)'
     }}>
       <div 
         className="thinking-header" 
@@ -19,7 +19,7 @@ const ThinkingBlock = ({ content }) => {
           alignItems: 'center',
           padding: '8px',
           cursor: 'pointer',
-          color: '#888',
+          color: 'var(--subtext)',
           fontSize: '0.9em'
         }}
       >
@@ -31,8 +31,8 @@ const ThinkingBlock = ({ content }) => {
       {isOpen && (
         <div className="thinking-content" style={{
           padding: '8px 12px',
-          borderTop: '1px solid #333',
-          color: '#aaa',
+          borderTop: '1px solid var(--overlay)',
+          color: 'var(--text)',
           fontFamily: 'monospace',
           fontSize: '0.85em',
           whiteSpace: 'pre-wrap'

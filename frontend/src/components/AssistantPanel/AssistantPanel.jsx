@@ -8,6 +8,7 @@ import './AssistantPanel.css';
 
 const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFullScreen = false }) => {
   const [input, setInput] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef(null);
   
   // Use the new hook for streaming events
@@ -46,6 +47,12 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
     console.log('Denied tool:', tool);
   };
 
+  const handleSettingsClick = () => {
+    setShowSettings(true);
+    // TODO: Implement settings modal in future enhancement
+    console.log('Settings clicked - modal will be implemented');
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -58,11 +65,21 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
           </span>
         </div>
         <div className="header-actions">
-          <button className="icon-button" title="Settings">
+          <button 
+            className="header-icon-btn" 
+            onClick={handleSettingsClick}
+            title="Settings"
+            aria-label="Open assistant settings"
+          >
             <Settings size={16} />
           </button>
           {!isFullScreen && (
-            <button className="icon-button" onClick={onClose} title="Close">
+            <button 
+              className="header-icon-btn" 
+              onClick={onClose} 
+              title="Close"
+              aria-label="Close assistant panel"
+            >
               <X size={16} />
             </button>
           )}

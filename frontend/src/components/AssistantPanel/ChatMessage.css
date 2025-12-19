@@ -4,23 +4,23 @@
   gap: 8px;
   padding: 12px;
   border-radius: 8px;
-  background: #252525;
-  border: 1px solid #333;
+  background: var(--surface);
+  border: 1px solid var(--overlay);
 }
 
 .chat-message-user {
-  background: #1a2332;
-  border-color: #2a3342;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 15%, var(--overlay));
 }
 
 .chat-message-assistant {
-  background: #2a2520;
-  border-color: #3a3530;
+  background: color-mix(in srgb, var(--accent-secondary) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent-secondary) 15%, var(--overlay));
 }
 
 .chat-message-error {
-  background: #3a1f1f;
-  border-color: #5a2f2f;
+  background: color-mix(in srgb, var(--red) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--red) 20%, var(--overlay));
 }
 
 .message-header {
@@ -37,29 +37,30 @@
 
 .message-role {
   font-weight: 600;
-  color: #fff;
+  color: var(--text);
 }
 
 .chat-message-user .message-role {
-  color: #61dafb;
+  color: var(--accent);
 }
 
 .chat-message-assistant .message-role {
-  color: #ffa726;
+  color: var(--accent-secondary);
 }
 
 .chat-message-error .message-role {
-  color: #ff6b6b;
+  color: var(--red);
 }
 
 .message-time {
   margin-left: auto;
-  color: #666;
+  color: var(--subtext);
   font-size: 11px;
+  opacity: 0.7;
 }
 
 .message-content {
-  color: #ccc;
+  color: var(--text);
   font-size: var(--assistant-font-size, 14px);
   line-height: 1.6;
   white-space: pre-wrap;
@@ -67,5 +68,5 @@
 }
 
 .chat-message-error .message-content {
-  color: #ff6b6b;
+  color: var(--red);
 }
