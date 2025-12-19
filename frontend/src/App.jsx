@@ -125,7 +125,7 @@ function App() {
   // AM Default state (global override for new tabs)
   const [amDefaultEnabled, setAMDefaultEnabled] = useState(() => {
     const saved = localStorage.getItem('amDefaultEnabled');
-    return saved !== null ? saved === 'true' : true; // Default to ON for legal compliance
+    return saved !== null ? saved === 'true' : false; // Default to OFF as requested
   });
   
   // Vision Config state (global configuration)
@@ -496,6 +496,12 @@ function App() {
   }
 
   const checkForUpdates = async () => {
+    // Skip update check in local development
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      console.log('[Update] Skipping update check in local development');
+      return;
+    }
+
     try {
       // Get current version
       const versionRes = await fetch('/api/version');
@@ -983,12 +989,13 @@ function App() {
   // Sync Vision enabled state with Dev Mode
   useEffect(() => {
     if (devModeInitialized) {
-      setVisionConfig(prev => {
-        const newConfig = { ...prev, enabled: devMode };
-        localStorage.setItem('visionConfig', JSON.stringify(newConfig));
-        return newConfig;
-      });
-      logger.settings('Vision synced with Dev Mode', { devMode });
+      // User requested Vision to be disabled by default even in dev mode
+      // setVisionConfig(prev => {
+      //   const newConfig = { ...prev, enabled: devMode };
+      //   localStorage.setItem('visionConfig', JSON.stringify(newConfig));
+      //   return newConfig;
+      // });
+      // logger.settings('Vision synced with Dev Mode', { devMode });
     }
   }, [devMode, devModeInitialized]);
 

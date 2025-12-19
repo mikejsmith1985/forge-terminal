@@ -85,7 +85,17 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
         }
       } catch (err) {
         if (!isMounted) return;
-        console.error('[AMMonitor] Status check failed:', err);
+        // Only log error if not in dev mode or if it's not a connection refused error
+        // to avoid spamming the console during server restarts
+        const isConnectionError = err.message && (
+          err.message.includes('Failed to fetch') || 
+          err.message.includes('NetworkError') ||
+          err.message.includes('Connection refused')
+        );
+        
+        if (!isConnectionError || !devMode) {
+          console.error('[AMMonitor] Status check failed:', err);
+        }
         setIsRecording(false);
       } finally {
         if (isMounted) {

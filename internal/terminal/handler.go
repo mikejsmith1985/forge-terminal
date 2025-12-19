@@ -264,6 +264,29 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	// Subscribe to AM EventBus for Assistant events
+	unsubscribe := am.EventBus.Subscribe(func(event *am.LayerEvent) {
+		// Only forward events for this tab
+		if event.TabID != "" && event.TabID != tabID {
+			return
+		}
+
+		// Only forward assistant events (Layer 2)
+		if event.Layer != 2 {
+			return
+		}
+
+		// Send to WebSocket
+		// Note: conn.WriteJSON is thread-safe via mutex
+		conn.WriteJSON(map[string]interface{}{
+			"type":      event.Type,
+			"timestamp": event.Timestamp,
+			"metadata":  event.Metadata,
+			"tabId":     event.TabID,
+		})
+	})
+	defer unsubscribe()
+
 	// PTY -> WebSocket (read from terminal, send to browser)
 	go func() {
 		defer closeOnce.Do(func() { close(done) })

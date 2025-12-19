@@ -49,27 +49,27 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
   if (!isOpen) return null;
 
   return (
-    <div className='assistant-panel' style={{ fontSize: \\px\ }}>
-      <div className='assistant-header'>
-        <div className='header-title'>
+    <div className="assistant-panel" style={{ fontSize: `${assistantFontSize}px` }}>
+      <div className="assistant-header">
+        <div className="header-title">
           <h3>Forge Assistant</h3>
-          <span className={\connection-status \\}>
+          <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
         </div>
-        <div className='header-actions'>
-          <button className='icon-button' title='Settings'>
+        <div className="header-actions">
+          <button className="icon-button" title="Settings">
             <Settings size={16} />
           </button>
-          <button className='icon-button' onClick={onClose} title='Close'>
+          <button className="icon-button" onClick={onClose} title="Close">
             <X size={16} />
           </button>
         </div>
       </div>
 
-      <div className='messages-container'>
+      <div className="messages-container">
         {messages.length === 0 && !isThinking && (
-          <div className='empty-state'>
+          <div className="empty-state">
             <p>How can I help you with your terminal tasks today?</p>
           </div>
         )}
@@ -103,15 +103,15 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
         <div ref={messagesEndRef} />
       </div>
 
-      <form className='input-area' onSubmit={handleSubmit}>
+      <form className="input-area" onSubmit={handleSubmit}>
         <input
-          type='text'
+          type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder='Ask Forge...'
+          placeholder="Ask Forge..."
           disabled={!isConnected}
         />
-        <button type='submit' disabled={!input.trim() || !isConnected}>
+        <button type="submit" disabled={!input.trim() || !isConnected}>
           <Send size={16} />
         </button>
       </form>

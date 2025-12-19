@@ -36,7 +36,7 @@ import (
 var embeddedFS embed.FS
 
 // Preferred ports to try, in order
-var preferredPorts = []int{8333, 8080, 9000, 3000, 3333}
+var preferredPorts = []int{3005, 8333, 8080, 9000, 3000, 3333}
 
 // Global assistant service (initialized in main)
 var assistantService assistant.Service
@@ -780,6 +780,24 @@ func handleUpdateEvents(w http.ResponseWriter, r *http.Request) {
 	// Check for updates every 30 seconds (more frequent for better UX)
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
+
+	// Skip update checks in dev mode
+	if strings.Contains(os.Getenv("HOME"), "dev-data") {
+		log.Printf("[SSE] Dev mode detected (HOME=%s), disabling auto-update checks", os.Getenv("HOME"))
+		// Just keep the connection open without checking
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case <-ticker.C:
+				// Send heartbeat to keep connection alive
+				fmt.Fprintf(w, "event: heartbeat\ndata: {}\n\n")
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+			}
+		}
+	}
 
 	// Track last known version to avoid duplicate notifications
 	lastNotifiedVersion := ""
