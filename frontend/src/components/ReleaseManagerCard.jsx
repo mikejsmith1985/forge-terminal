@@ -60,10 +60,10 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
     // Generate command based on shell type
     if (shellType === 'powershell') {
       // PowerShell 5.1 compatible syntax (no &&)
-      return `git push origin release/${next}; if ($?) { gh release create ${next} --title "${next} - Release" --target main; if ($?) { echo "Release ${next} created successfully!" } }`;
+      return \`$b = git branch --show-current; git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b; if ($?) { git push origin main; if ($?) { gh release create \${next} --title "\${next} - Release" --target main --generate-notes; if ($?) { git checkout $b; echo "Release \${next} created successfully!" } } } } }\`;
     } else {
       // Bash, CMD, and PowerShell 7+ support &&
-      return `git push origin release/${next} && gh release create ${next} --title "${next} - Release" --target main && echo "Release ${next} created successfully!"`;
+      return \`b=$(git branch --show-current) && git checkout main && git pull origin main && git merge $b && git push origin main && gh release create \${next} --title "\${next} - Release" --target main --generate-notes && git checkout $b && echo "Release \${next} created successfully!"\`;
     }
   }, [next, shellType]);
 
