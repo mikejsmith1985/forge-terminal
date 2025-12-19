@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/assistant/parsers"
-	"github.com/mikejsmith1985/forge-terminal/internal/assistant/providers"
+	"github.com/mikejsmith1985/forge-terminal/internal/assistant/types"
 )
 
 // This script simulates the "User Perspective" by taking raw log lines
@@ -41,6 +41,7 @@ func main() {
 	fmt.Println("\n=== Verification Complete ===")
 }
 
-func printEvent(event *providers.StreamEvent) {
+func printEvent(event *types.StreamEvent) {
 	fmt.Printf("EVENT: Type=%-10s Content=%-20q Meta=%v\n", event.Type, event.Content, event.Meta)
 }
+

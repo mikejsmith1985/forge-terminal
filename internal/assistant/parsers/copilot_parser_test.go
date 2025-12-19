@@ -3,7 +3,7 @@ package parsers
 import (
 	"testing"
 
-	"github.com/mikejsmith1985/forge-terminal/internal/assistant/providers"
+	"github.com/mikejsmith1985/forge-terminal/internal/assistant/types"
 )
 
 func TestCopilotParser_ParseLine(t *testing.T) {
@@ -12,12 +12,12 @@ func TestCopilotParser_ParseLine(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected *providers.StreamEvent
+		expected *types.StreamEvent
 	}{
 		{
 			name:  "Standard Text",
 			input: "Here is some code:",
-			expected: &providers.StreamEvent{
+			expected: &types.StreamEvent{
 				Type:    "text",
 				Content: "Here is some code:\n", // Copilot is line-based, so we preserve newlines
 			},
@@ -25,7 +25,7 @@ func TestCopilotParser_ParseLine(t *testing.T) {
 		{
 			name:  "Empty Line",
 			input: "",
-			expected: &providers.StreamEvent{
+			expected: &types.StreamEvent{
 				Type:    "text",
 				Content: "\n",
 			},

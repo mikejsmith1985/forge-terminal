@@ -3,7 +3,7 @@ package parsers
 import (
 	"testing"
 
-	"github.com/mikejsmith1985/forge-terminal/internal/assistant/providers"
+	"github.com/mikejsmith1985/forge-terminal/internal/assistant/types"
 )
 
 func TestClaudeParser_ParseLine(t *testing.T) {
@@ -12,12 +12,12 @@ func TestClaudeParser_ParseLine(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected *providers.StreamEvent
+		expected *types.StreamEvent
 	}{
 		{
 			name:  "Text Delta",
 			input: `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}`,
-			expected: &providers.StreamEvent{
+			expected: &types.StreamEvent{
 				Type:    "text",
 				Content: "Hello",
 			},
@@ -25,7 +25,7 @@ func TestClaudeParser_ParseLine(t *testing.T) {
 		{
 			name:  "Thinking Delta",
 			input: `{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Analyzing request..."}}`,
-			expected: &providers.StreamEvent{
+			expected: &types.StreamEvent{
 				Type:    "thinking",
 				Content: "Analyzing request...",
 			},
@@ -33,7 +33,7 @@ func TestClaudeParser_ParseLine(t *testing.T) {
 		{
 			name:  "Tool Use Start",
 			input: `{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tool_1","name":"bash_execute","input":{}}}`,
-			expected: &providers.StreamEvent{
+			expected: &types.StreamEvent{
 				Type: "tool_use",
 				Meta: map[string]interface{}{
 					"id":   "tool_1",
@@ -44,7 +44,7 @@ func TestClaudeParser_ParseLine(t *testing.T) {
 		{
 			name:  "Message Stop",
 			input: `{"type":"message_stop"}`,
-			expected: &providers.StreamEvent{
+			expected: &types.StreamEvent{
 				Type: "done",
 			},
 		},

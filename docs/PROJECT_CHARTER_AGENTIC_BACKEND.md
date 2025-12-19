@@ -74,18 +74,20 @@ Store every prompt/response in a local SQLite database (or JSONL) indexed by the
 *   **GREP and CURL are NOT testing.**
 *   Tests must be executed from the **User Perspective**.
 *   If the user can't perform the actions the code enables, the code doesn't work.
+*   **NO MOCK DATA**: Integration tests must use **REAL** CLI execution with **REAL** prompts.
+*   **Copilot Model**: Use the `GPT-4.1 (0x)` model for all Copilot interactions to ensure high-quality reasoning.
 *   Use Go unit tests for parsers and logic.
-*   Use Integration tests with mocked CLI output for Providers.
+*   Use Live Integration tests for Providers (invoking the actual binaries).
 
 ### Phase 1: Interface & Parsers
 1.  Define `AIProvider` interface.
-2.  Implement `ClaudeParser` with TDD (feed it sample JSON chunks).
+2.  Implement `ClaudeParser` with TDD.
 3.  Implement `CopilotParser` with TDD.
 
 ### Phase 2: Providers
 1.  Implement `ClaudeProvider` using `os/exec`.
 2.  Implement `CopilotProvider` using `os/exec`.
-3.  Verify process management (start, stop, signal handling).
+3.  **Verification**: Run a real prompt ("Hello, are you working?") against the installed CLIs.
 
 ### Phase 3: Integration
 1.  Update `internal/assistant/core.go` to use `AIProvider`.

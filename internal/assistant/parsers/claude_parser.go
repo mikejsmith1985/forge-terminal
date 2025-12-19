@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/mikejsmith1985/forge-terminal/internal/assistant/providers"
+	"github.com/mikejsmith1985/forge-terminal/internal/assistant/types"
 )
 
 // ClaudeParser handles parsing of Claude's stream-json output format.
@@ -38,7 +38,7 @@ type ClaudeContent struct {
 }
 
 // ParseLine takes a single line of JSON output and converts it to a StreamEvent.
-func (p *ClaudeParser) ParseLine(line string) (*providers.StreamEvent, error) {
+func (p *ClaudeParser) ParseLine(line string) (*types.StreamEvent, error) {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return nil, nil
@@ -55,12 +55,12 @@ func (p *ClaudeParser) ParseLine(line string) (*providers.StreamEvent, error) {
 		if event.Delta != nil {
 			switch event.Delta.Type {
 			case "text_delta":
-				return &providers.StreamEvent{
+				return &types.StreamEvent{
 					Type:    "text",
 					Content: event.Delta.Text,
 				}, nil
 			case "thinking_delta":
-				return &providers.StreamEvent{
+				return &types.StreamEvent{
 					Type:    "thinking",
 					Content: event.Delta.Thinking,
 				}, nil
@@ -68,7 +68,7 @@ func (p *ClaudeParser) ParseLine(line string) (*providers.StreamEvent, error) {
 		}
 	case "content_block_start":
 		if event.ContentBlock != nil && event.ContentBlock.Type == "tool_use" {
-			return &providers.StreamEvent{
+			return &types.StreamEvent{
 				Type: "tool_use",
 				Meta: map[string]interface{}{
 					"id":   event.ContentBlock.ID,
@@ -77,7 +77,7 @@ func (p *ClaudeParser) ParseLine(line string) (*providers.StreamEvent, error) {
 			}, nil
 		}
 	case "message_stop":
-		return &providers.StreamEvent{
+		return &types.StreamEvent{
 			Type: "done",
 		}, nil
 	}
