@@ -9,11 +9,11 @@ export function useAssistantStream(tabId) {
   useEffect(() => {
     if (!tabId) return;
 
-    // Connect to WebSocket
-    // In a real app, this might be a shared connection or context
-    // For now, we assume a direct connection to the backend
+    // Connect to WebSocket for terminal (NOT assistant-specific yet)
+    // The terminal WebSocket handles both terminal data and control messages
+    // TODO: In future, create dedicated /ws/assistant endpoint for chat
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?tabId=${tabId}`;
     
     const ws = new WebSocket(wsUrl);
 
@@ -29,67 +29,72 @@ export function useAssistantStream(tabId) {
 
     ws.addEventListener('message', (event) => {
       try {
+        // Terminal WebSocket sends different types of messages:
+        // - Binary (terminal output)
+        // - JSON control messages (RESIZE, VISION_*, AM_*, etc.)
+        
+        // Skip binary messages (terminal output)
+        if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+          return;
+        }
+
         const data = JSON.parse(event.data);
         
-        // Filter events for this tab
-        if (data.tabId && data.tabId !== tabId) return;
-
-        switch (data.type) {
-          case 'assistant_thinking':
-            setIsThinking(true);
-            setThinkingContent(prev => prev + data.metadata.content);
-            break;
-            
-          case 'assistant_response':
-            setIsThinking(false);
-            setThinkingContent(''); // Clear thinking when response starts? Or keep it?
-            // For now, we append to messages
-            setMessages(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.isComplete) {
-                // Append to last message if it's streaming
-                return [
-                  ...prev.slice(0, -1),
-                  { ...lastMsg, content: lastMsg.content + data.metadata.content }
-                ];
-              } else {
-                // New message
-                return [
-                  ...prev,
-                  { role: 'assistant', content: data.metadata.content, isComplete: false }
-                ];
-              }
-            });
-            break;
-
-          case 'assistant_done':
-            setMessages(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg) {
-                return [
-                  ...prev.slice(0, -1),
-                  { ...lastMsg, isComplete: true }
-                ];
-              }
-              return prev;
-            });
-            break;
-            
-          case 'assistant_tool_use':
-            // Handle tool use request
-            setMessages(prev => [
-              ...prev,
-              { 
-                role: 'tool_request', 
-                tool: data.metadata.tool, 
-                params: data.metadata.params,
-                isComplete: true 
-              }
-            ]);
-            break;
+        // Filter to only process assistant-related messages
+        // For now, we don't have a dedicated message type, so we'll ignore most
+        // In future enhancement, backend should send:
+        // { type: 'ASSISTANT_THINKING', content: '...' }
+        // { type: 'ASSISTANT_RESPONSE', content: '...' }
+        // { type: 'ASSISTANT_DONE' }
+        
+        if (data.type === 'ASSISTANT_THINKING') {
+          setIsThinking(true);
+          setThinkingContent(prev => prev + data.content);
+        } else if (data.type === 'ASSISTANT_RESPONSE') {
+          setIsThinking(false);
+          setThinkingContent('');
+          setMessages(prev => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.isComplete) {
+              return [
+                ...prev.slice(0, -1),
+                { ...lastMsg, content: lastMsg.content + data.content }
+              ];
+            } else {
+              return [
+                ...prev,
+                { role: 'assistant', content: data.content, isComplete: false }
+              ];
+            }
+          });
+        } else if (data.type === 'ASSISTANT_DONE') {
+          setMessages(prev => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg) {
+              return [
+                ...prev.slice(0, -1),
+                { ...lastMsg, isComplete: true }
+              ];
+            }
+            return prev;
+          });
+        } else if (data.type === 'ASSISTANT_TOOL_USE') {
+          setMessages(prev => [
+            ...prev,
+            { 
+              role: 'tool_request', 
+              tool: data.tool, 
+              params: data.params,
+              isComplete: true 
+            }
+          ]);
         }
+        // Ignore other message types (RESIZE, VISION_*, etc.)
       } catch (err) {
-        console.error('[Assistant] Error parsing message:', err);
+        // Only log if it's actually a JSON parsing error, not binary data
+        if (typeof event.data === 'string') {
+          console.error('[Assistant] Error parsing message:', err);
+        }
       }
     });
 
@@ -98,12 +103,41 @@ export function useAssistantStream(tabId) {
     };
   }, [tabId]);
 
-  const sendMessage = useCallback((content) => {
-    // This would send via HTTP POST to /api/assistant/chat
-    // which then triggers the backend process
-    // For now, we just update local state to show user message
+  const sendMessage = useCallback(async (content) => {
+    // Add user message to UI immediately
     setMessages(prev => [...prev, { role: 'user', content, isComplete: true }]);
-  }, []);
+    
+    // TODO: Send via HTTP POST to /api/assistant/chat
+    // For now, this is a placeholder
+    try {
+      const response = await fetch('/api/assistant/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tabId,
+          message: content,
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      // Backend will stream responses via WebSocket
+      // Messages will be received in the message event listener above
+    } catch (error) {
+      console.error('[Assistant] Failed to send message:', error);
+      setMessages(prev => [
+        ...prev,
+        { 
+          role: 'assistant', 
+          content: `Error: Unable to reach assistant. ${error.message}`,
+          isComplete: true,
+          error: true
+        }
+      ]);
+    }
+  }, [tabId]);
 
   return {
     messages,
