@@ -118,13 +118,22 @@ jobs:
           echo "ℹ️  Ad-hoc signed for development."
           echo "For production builds with Developer ID: see docs/developer/MACOS_FORK_SETUP.md"
 
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+      - name: Upload Linux/Windows Assets
+        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             bin/forge-linux-amd64
             bin/forge-windows-amd64.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          make_latest: true
+
+      - name: Upload macOS Assets
+        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'macos-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
             bin/forge-darwin-amd64
             bin/forge-darwin-arm64
-          generate_release_notes: true
+          fail_on_unmatched_files: true

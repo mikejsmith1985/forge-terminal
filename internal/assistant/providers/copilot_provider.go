@@ -34,11 +34,26 @@ func (p *CopilotProvider) Ask(ctx context.Context, prompt string, opts AskOption
 	// We might need to handle the model selection if the CLI supports it via flags,
 	// otherwise it might be an env var or config.
 	// For now, we pass the prompt via -p.
+	// Use "gh copilot suggest" or "gh copilot explain" wrapper if "copilot" binary isn't direct
+	// But assuming "copilot" is the alias/binary name as per charter.
+	
+	// IMPORTANT: We use 'gh copilot suggest' for now as it's the standard CLI interface
+	// If the user has a standalone 'copilot' binary, we can switch to that.
+	// For now, let's try to detect or default to 'gh copilot suggest' style if needed,
+	// but the charter implies a direct 'copilot' command.
+	// We'll stick to 'copilot' binary for now as per existing code, but add error handling.
+	
 	args := []string{"-p", prompt, "--allow-all-tools"}
 	
-	// NOTE: The charter mentions "GPT-4.1 (0x)" model. 
-	// If the CLI supports a --model flag, we would add it here.
-	// Assuming standard `copilot` CLI usage for now.
+	// Support for specific models (e.g., "copilot-opus", "copilot-haiku")
+	// If opts.Model is provided and not "default", pass it to the CLI
+	if opts.Model != "" && opts.Model != "default" && opts.Model != "copilot-chat" {
+		// Assuming the CLI supports a --model flag
+		// If the model name contains "copilot-", strip it (e.g. "copilot-opus" -> "opus")
+		// or pass as is if the CLI expects full names.
+		// For now, we pass it as --model <model>
+		args = append(args, "--model", opts.Model)
+	}
 	
 	cmd := exec.CommandContext(ctx, "copilot", args...)
 

@@ -44,8 +44,8 @@ ragEngine := NewRAGEngine(embeddingsClient, vectorStore, ollamaClient, knowledge
 
 log.Printf("[Assistant] Core initialized")
 
-// Default to Claude provider
-defaultProvider := providers.NewClaudeProvider()
+// Default to Copilot provider as requested by user
+defaultProvider := providers.NewCopilotProvider()
 
 return &Core{
 visionRegistry: visionRegistry,

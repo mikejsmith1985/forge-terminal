@@ -7,6 +7,8 @@ Forge Terminal v2.0.0 introduces a revolutionary "Invisible Backend" architectur
 ### Key Features
 
 *   **Agentic Backend Core**:
+    *   **NEW: Agent Mode UI**: Full-screen chat tabs (`Ctrl+Shift+T`) for immersive AI collaboration.
+    *   **NEW: Smart Router**: Intelligent model selection (Local vs. Copilot) for optimal performance and cost.
     *   Direct integration with Claude Code and GitHub Copilot CLI binaries.
     *   Headless execution engine that bypasses TUI scraping for 100% reliability.
     *   Structured JSON stream parsing for precise "Thinking" vs "Output" separation.

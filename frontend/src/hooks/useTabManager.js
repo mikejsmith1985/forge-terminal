@@ -37,8 +37,9 @@ function generateId() {
  * @param {string} colorTheme - Optional color theme override
  * @param {string} mode - Optional mode override ('dark' or 'light')
  * @param {string} currentDirectory - Optional current directory path
+ * @param {string} type - Optional tab type ('terminal' or 'agent')
  */
-function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, currentDirectory = null) {
+function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, currentDirectory = null, type = 'terminal') {
   // Auto-assign next theme in cycle if not specified
   const assignedTheme = colorTheme || themeOrder[themeIndex % themeOrder.length];
   // Alternate mode for visual variety: even tabs dark, odd tabs light (if not specified)
@@ -47,7 +48,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
   
   const newTab = {
     id: generateId(),
-    title: `Terminal ${tabNumber}`,
+    title: type === 'agent' ? `Agent ${tabNumber}` : `Terminal ${tabNumber}`,
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
@@ -56,6 +57,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
     assistantEnabled: false, // Forge Assistant panel - DEFAULT OFF (Dev Mode feature)
     currentDirectory: currentDirectory || null, // Current working directory
+    type: type, // 'terminal' or 'agent'
     createdAt: Date.now(),
   };
   
@@ -65,6 +67,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     colorTheme: assignedTheme,
     mode: assignedMode,
     currentDirectory,
+    type,
     themeIndex: themeIndex - 1
   });
   
@@ -91,6 +94,7 @@ function tabsToSession(tabs, activeTabId) {
       visionEnabled: tab.visionEnabled || false,
       assistantEnabled: tab.assistantEnabled || false,
       currentDirectory: tab.currentDirectory || null,
+      type: tab.type || 'terminal',
     })),
     activeTabId: activeTabId,
   };
@@ -195,6 +199,7 @@ export function useTabManager(initialShellConfig) {
           autoRespond: tabState.autoRespond || false,
           amEnabled: tabState.amEnabled || false,
           currentDirectory: tabState.currentDirectory || null,
+          type: tabState.type || 'terminal',
           createdAt: Date.now(),
         }));
 
@@ -259,12 +264,14 @@ export function useTabManager(initialShellConfig) {
 
       const config = shellConfig || configRef.current;
       const newTabNumber = prev.tabs.length + 1;
-      const newTab = createTab(config, newTabNumber);
+      const type = config.type || 'terminal';
+      const newTab = createTab(config, newTabNumber, null, null, null, type);
       
       logger.tabs('Tab created successfully', { 
         tabId: newTab.id, 
         newTabCount: prev.tabs.length + 1,
-        colorTheme: newTab.colorTheme
+        colorTheme: newTab.colorTheme,
+        type
       });
       
       // Store result for return - setState callback runs synchronously

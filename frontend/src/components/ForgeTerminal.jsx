@@ -8,6 +8,7 @@ import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
 import { diagnosticCore } from '../utils/diagnosticCore';
+import AssistantPanel from './AssistantPanel/AssistantPanel'; // Import AssistantPanel
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -354,6 +355,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   currentDirectory = null, // Current working directory to restore on connect
   visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
   assistantEnabled = false, // Forge Assistant panel enabled (Dev Mode)
+  isAgentMode = false, // New prop: Agent Mode (full screen chat)
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -1331,6 +1333,21 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     }
   };
 
+  // If in Agent Mode, render the AssistantPanel full screen
+  if (isAgentMode) {
+    return (
+      <div className={`forge-terminal-container ${className || ''}`} style={{ ...style, height: '100%', width: '100%', position: 'relative' }}>
+        <AssistantPanel 
+          isOpen={true} 
+          onClose={() => {}} // Cannot close in agent mode
+          currentTabId={tabId}
+          assistantFontSize={fontSize}
+          isFullScreen={true} // Pass full screen prop
+        />
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef} className={`terminal-outer-container ${className || ''}`} style={style}>
       {/* Connection Status Indicator */}
@@ -1345,7 +1362,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             ) : (
               <>
                 <span style={{ color: '#ef4444', fontWeight: 600 }}>⚠ Disconnected</span>
-                <button 
+                <button
                   className="btn btn-primary" 
                   onClick={() => {
                     if (xtermRef.current) {

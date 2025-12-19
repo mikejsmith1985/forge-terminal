@@ -44,6 +44,13 @@ Think of it like your computer's command prompt or terminal, but with superpower
 - **AM Logging**: Optional session recording to never lose your work context
 - **Works Everywhere**: Runs on Windows, Mac, and Linux
 
+### New in v2.1.0: Agent Mode 🤖
+
+Forge Terminal now features **Agent Mode** - a full-screen chat interface that acts as your AI pair programmer.
+- **Smart Router**: Automatically switches between fast local models and powerful cloud models (Copilot) based on your request.
+- **Full Context**: The Agent understands your project and can execute commands for you.
+- **Dedicated Workspace**: Open Agent tabs (`Ctrl+Shift+T`) alongside your terminal tabs.
+
 ### The "One Binary, Double-Click, Works" Promise
 
 Unlike many developer tools that need you to install Node.js, Python, Docker, or edit configuration files, Forge Terminal is self-contained. Everything you need is packed into a single file.

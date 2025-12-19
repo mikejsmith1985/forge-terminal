@@ -6,7 +6,7 @@ import { useAssistantStream } from '../../hooks/useAssistantStream';
 import { Send, X, Settings, RefreshCw } from 'lucide-react';
 import './AssistantPanel.css';
 
-const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) => {
+const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFullScreen = false }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   
@@ -49,7 +49,7 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
   if (!isOpen) return null;
 
   return (
-    <div className="assistant-panel" style={{ fontSize: `${assistantFontSize}px` }}>
+    <div className={`assistant-panel ${isFullScreen ? 'full-screen' : ''}`} style={{ fontSize: `${assistantFontSize}px` }}>
       <div className="assistant-header">
         <div className="header-title">
           <h3>Forge Assistant</h3>
@@ -61,9 +61,11 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize }) =>
           <button className="icon-button" title="Settings">
             <Settings size={16} />
           </button>
-          <button className="icon-button" onClick={onClose} title="Close">
-            <X size={16} />
-          </button>
+          {!isFullScreen && (
+            <button className="icon-button" onClick={onClose} title="Close">
+              <X size={16} />
+            </button>
+          )}
         </div>
       </div>
 

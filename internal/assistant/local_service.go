@@ -3,7 +3,9 @@ package assistant
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/mikejsmith1985/forge-terminal/internal/assistant/providers"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
@@ -66,6 +68,47 @@ func (s *LocalService) Chat(ctx context.Context, req *ChatRequest) (*ChatRespons
 		if err == nil {
 			termCtx = termCtxResult
 		}
+	}
+
+	// ROUTER LOGIC: Check if we should use Copilot
+	// For now, we default to Copilot if available, as requested by user
+	// In the future, we'll use a local model to decide
+	if s.core.activeProvider != nil {
+		// Determine model based on request or router logic
+		// If the user explicitly requested a model in the message (e.g. "use opus"), we could parse it here
+		// For now, we default to standard chat, but this field is ready for the Router to populate
+		targetModel := "copilot-chat"
+		
+		// Example Router Logic (Placeholder):
+		// if strings.Contains(req.Message, "complex") { targetModel = "claude-3.5-sonnet" }
+		
+		// Create a channel to receive stream events
+		eventChan, err := s.core.activeProvider.Ask(ctx, req.Message, providers.AskOptions{
+			Model: targetModel, 
+		})
+		
+		if err == nil {
+			// Stream response from provider
+			fullContent := ""
+			reasoning := ""
+			
+			for event := range eventChan {
+				switch event.Type {
+				case "text":
+					fullContent += event.Content
+				case "thinking":
+					reasoning += event.Content
+				case "error":
+					return nil, fmt.Errorf("provider error: %s", event.Content)
+				}
+			}
+			
+			return &ChatResponse{
+				Message:   fullContent,
+				Reasoning: reasoning,
+			}, nil
+		}
+		// If provider fails, fall back to Ollama below
 	}
 
 	// Build messages with context

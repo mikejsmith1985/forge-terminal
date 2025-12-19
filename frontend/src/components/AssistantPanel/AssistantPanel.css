@@ -7,6 +7,35 @@
   flex-direction: column;
 }
 
+.assistant-panel.full-screen {
+  background: #1e1e1e;
+  border: none;
+}
+
+.assistant-panel.full-screen .assistant-header {
+  padding: 16px 24px;
+  background: #1a1a1a;
+}
+
+.assistant-panel.full-screen .messages-container {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.assistant-panel.full-screen .input-area {
+  padding: 24px;
+  background: #1a1a1a;
+  border-top: 1px solid #333;
+}
+
+.assistant-panel.full-screen .input-area form {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
 .assistant-header {
   display: flex;
   align-items: center;

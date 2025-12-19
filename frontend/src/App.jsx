@@ -778,10 +778,13 @@ function App() {
   }, [versionReady, commands, tabs, activeTabId, closeTab, switchTab, getActiveTerminalRef]);
 
   // Handle new tab creation
-  const handleNewTab = useCallback(() => {
-    logger.tabs('New tab button clicked');
+  const handleNewTab = useCallback((options = {}) => {
+    logger.tabs('New tab button clicked', options);
     
-    const result = createTab(shellConfig);
+    const result = createTab({
+      ...shellConfig,
+      type: options.type || 'terminal' // 'terminal' or 'agent'
+    });
     
     if (!result.success) {
       if (result.error === 'max_tabs') {
@@ -799,7 +802,7 @@ function App() {
       toggleTabAM(result.tabId); // Toggle it off if global default is off
     }
     
-    logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme, amEnabled: amDefaultEnabled });
+    logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme, amEnabled: amDefaultEnabled, type: options.type });
     // Theme will be applied by the activeTab useEffect below
   }, [createTab, shellConfig, addToast, amDefaultEnabled, toggleTabAM]);
 
@@ -1557,6 +1560,7 @@ function App() {
                   amEnabled={tab.amEnabled || false}
                   visionEnabled={tab.visionEnabled || false}
                   assistantEnabled={tab.assistantEnabled || false}
+                  isAgentMode={tab.type === 'agent'} // Pass agent mode prop
                   tabName={tab.title}
                   currentDirectory={tab.currentDirectory || null}
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}

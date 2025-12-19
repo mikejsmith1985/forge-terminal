@@ -16,7 +16,7 @@ func TestCopilotProvider_RealExecution(t *testing.T) {
 	// 2. Define a real prompt
 	prompt := "Reply with exactly the word 'Pong'"
 	opts := AskOptions{
-		Model:  "GPT-4.1 (0x)", // As requested in the charter
+		Model:  "gpt-4.1", // Use a valid model name
 		Stream: true,
 	}
 
