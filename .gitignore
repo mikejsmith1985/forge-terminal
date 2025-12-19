@@ -49,3 +49,35 @@ frontend/test-results/
 
 # Build binary
 /forge
+
+# Tool configurations
+.claude/
+
+# Temporary documentation and status files
+PR_DESCRIPTION*.md
+*_SUMMARY.md
+*_STATUS.md
+*_INDEX.md
+*_CHECKLIST.md
+*_COMPLETE.md
+*_READY.md
+*_LOG.md
+*_KICKOFF.md
+*_FIXES.md
+*_START.md
+*_GUIDE.md
+*_PLAN.md
+*_RESULTS.md
+*_VERIFICATION.md
+VERIFICATION_*.md
+*_CHARTER.md
+Freeze-Fix-Data.md
+
+# Logs and monitoring
+logs/
+scripts/freeze-monitor/
+perfmon-data.csv
+MIKESDELL_*/
+
+# Temporary files
+nul
