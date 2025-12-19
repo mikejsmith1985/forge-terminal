@@ -1082,7 +1082,7 @@ function App() {
   const handleExecute = (cmd) => {
     const termRef = getActiveTerminalRef();
     if (termRef) {
-      termRef.sendCommand(cmd.command)
+      termRef.sendCommand(cmd.command, cmd.delay)
       termRef.focus()
 
       // If this command card is configured to trigger AM, send an AM log entry

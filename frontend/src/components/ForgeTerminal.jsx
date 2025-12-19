@@ -506,12 +506,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
-    sendCommand: (command) => {
+    sendCommand: (command, delay) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Send the command and Enter key separately with a small delay.
         // This ensures proper execution in both regular shells and TUI applications.
         // In TUI contexts (Claude CLI, Copilot CLI), the TUI needs time to process
         // the pasted text before receiving the Enter key.
+
+        // Use provided delay or default to 15ms
+        // If delay is explicitly 0, we still use it (fast execution)
+        const executionDelay = (delay !== undefined && delay !== null) ? parseInt(delay, 10) : 15;
 
         // First, send the command text
         wsRef.current.send(command);
@@ -522,7 +526,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send('\r');
           }
-        }, 15);
+        }, executionDelay);
 
         // Always log commands to AM for crash recovery
         if (command) {

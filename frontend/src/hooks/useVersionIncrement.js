@@ -24,7 +24,7 @@ export function useVersionIncrement() {
    * @returns {string} - Version string like "1.23.10"
    */
   const formatVersion = (version) => {
-    return `${version.major}.${version.minor}.${version.fix}`;
+    return `v${version.major}.${version.minor}.${version.fix}`;
   };
 
   /**

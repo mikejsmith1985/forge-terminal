@@ -18,7 +18,8 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         triggerAM: false,
         llmProvider: '',
         llmType: 'chat',
-        icon: null
+        icon: null,
+        delay: 0
     });
     const [showIconPicker, setShowIconPicker] = useState(false);
     const [keybindingError, setKeybindingError] = useState(null);
@@ -37,7 +38,8 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     triggerAM: false,
                     llmProvider: '',
                     llmType: 'chat',
-                    icon: null
+                    icon: null,
+                    delay: 0
                 });
             }
             setShowIconPicker(false);
@@ -48,7 +50,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         const { name, value, type, checked } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: type === 'checkbox' ? checked : (type === 'number' ? parseInt(value, 10) || 0 : value)
         }));
         
         // Validate keybinding on change
@@ -153,32 +155,46 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                         />
                     </div>
 
-                    <div className="form-group">
-                        <label>Key Binding</label>
-                        <input
-                            type="text"
-                            name="keyBinding"
-                            value={formData.keyBinding}
-                            onChange={handleChange}
-                            placeholder={keybindingInfo.nextKeybinding ? `Auto: ${keybindingInfo.nextKeybinding}` : 'e.g. Ctrl+Shift+1'}
-                            className={keybindingError ? 'error' : ''}
-                        />
-                        {keybindingError && (
-                            <small style={{ color: '#ef4444' }}>{keybindingError}</small>
-                        )}
-                        {!keybindingError && keybindingInfo.nextKeybinding && !initialData && (
-                            <small>Will auto-assign: {keybindingInfo.nextKeybinding}</small>
-                        )}
-                        {!keybindingError && keybindingInfo.availability.allTaken && !initialData && (
-                            <small style={{ color: '#f59e0b' }}>
-                                ⚠️ All 20 default slots taken. Please assign a custom keybinding.
-                            </small>
-                        )}
-                        {!keybindingError && !initialData && !keybindingInfo.availability.allTaken && (
-                            <small style={{ color: '#666' }}>
-                                Available: {keybindingInfo.availability.available}/{keybindingInfo.availability.total} default keybindings
-                            </small>
-                        )}
+                    <div className="form-row" style={{ gap: '12px' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Key Binding</label>
+                            <input
+                                type="text"
+                                name="keyBinding"
+                                value={formData.keyBinding}
+                                onChange={handleChange}
+                                placeholder={keybindingInfo.nextKeybinding ? `Auto: ${keybindingInfo.nextKeybinding}` : 'e.g. Ctrl+Shift+1'}
+                                className={keybindingError ? 'error' : ''}
+                            />
+                            {keybindingError && (
+                                <small style={{ color: '#ef4444' }}>{keybindingError}</small>
+                            )}
+                            {!keybindingError && keybindingInfo.nextKeybinding && !initialData && (
+                                <small>Will auto-assign: {keybindingInfo.nextKeybinding}</small>
+                            )}
+                            {!keybindingError && keybindingInfo.availability.allTaken && !initialData && (
+                                <small style={{ color: '#f59e0b' }}>
+                                    ⚠️ All 20 default slots taken. Please assign a custom keybinding.
+                                </small>
+                            )}
+                            {!keybindingError && !initialData && !keybindingInfo.availability.allTaken && (
+                                <small style={{ color: '#666' }}>
+                                    Available: {keybindingInfo.availability.available}/{keybindingInfo.availability.total} default keybindings
+                                </small>
+                            )}
+                        </div>
+                        <div className="form-group" style={{ width: '120px' }}>
+                            <label>Delay (ms)</label>
+                            <input
+                                type="number"
+                                name="delay"
+                                value={formData.delay || 0}
+                                onChange={handleChange}
+                                placeholder="0"
+                                min="0"
+                                step="50"
+                            />
+                        </div>
                     </div>
 
                     <div className="form-row">

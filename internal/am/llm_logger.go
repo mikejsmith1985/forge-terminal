@@ -1319,6 +1319,16 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 	// Older conversations can be loaded on-demand via GetConversation
 	cutoffTime := time.Now().Add(-24 * time.Hour)
 
+	// Partial struct for efficient header scanning
+	type ConversationHeader struct {
+		ConversationID string    `json:"conversationId"`
+		TabID          string    `json:"tabId"`
+		Complete       bool      `json:"complete"`
+		EndTime        time.Time `json:"endTime"`
+		StartTime      time.Time `json:"startTime"`
+		TUICaptureMode bool      `json:"tuiCaptureMode"`
+	}
+
 	for file := range allFiles {
 		// Check file modification time first to skip old files
 		info, err := os.Stat(file)
@@ -1326,25 +1336,40 @@ func (l *LLMLogger) loadConversationsFromDisk() {
 			continue
 		}
 
-		data, err := os.ReadFile(file)
+		// MEMORY FIX: Use streaming decoder to check header before loading full content
+		// This prevents loading 100MB+ files just to check the TabID
+		f, err := os.Open(file)
 		if err != nil {
-			log.Printf("[LLM Logger] Failed to read %s: %v", file, err)
+			log.Printf("[LLM Logger] Failed to open %s: %v", file, err)
 			continue
 		}
 
-		var conv LLMConversation
-		if err := json.Unmarshal(data, &conv); err != nil {
-			log.Printf("[LLM Logger] Failed to unmarshal %s: %v", file, err)
+		var header ConversationHeader
+		if err := json.NewDecoder(f).Decode(&header); err != nil {
+			f.Close()
+			// Don't log error for empty/corrupt files to avoid noise
 			continue
 		}
+		f.Close()
 
 		// Skip conversations that don't belong to this tab
-		if conv.TabID != l.tabID {
+		if header.TabID != l.tabID {
 			continue
 		}
 
 		// Only load incomplete conversations or very recent complete ones
-		if !conv.Complete || conv.EndTime.After(cutoffTime) {
+		if !header.Complete || header.EndTime.After(cutoffTime) {
+			// Now load the full file since we need it
+			data, err := os.ReadFile(file)
+			if err != nil {
+				continue
+			}
+
+			var conv LLMConversation
+			if err := json.Unmarshal(data, &conv); err != nil {
+				continue
+			}
+
 			l.conversations[conv.ConversationID] = &conv
 			loadedCount++
 

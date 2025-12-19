@@ -20,6 +20,7 @@ type Command struct {
 	LLMProvider string `json:"llmProvider,omitempty"` // "copilot", "claude", "aider"
 	LLMType     string `json:"llmType,omitempty"`     // "chat", "suggest", "explain", "code"
 	Icon        string `json:"icon,omitempty"`
+	Delay       int    `json:"delay,omitempty"`
 }
 
 // Default commands created on first run
