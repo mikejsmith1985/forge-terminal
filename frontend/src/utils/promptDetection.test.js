@@ -12,7 +12,8 @@ import { describe, it, expect } from 'vitest';
 // ============================================================================
 
 function stripAnsi(text) {
-  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
 
 const MENU_SELECTION_PATTERNS = [
@@ -99,7 +100,7 @@ function detectCliPrompt(text) {
   }
   
   const cleanText = stripAnsi(text);
-  const bufferToCheck = cleanText.slice(-2000);
+  const bufferToCheck = cleanText.slice(-800);
   
   const menuResult = detectMenuPrompt(bufferToCheck);
   if (menuResult.detected && menuResult.confidence !== 'low') {
@@ -354,6 +355,23 @@ Confirm with number keys or Enter, Cancel with Esc
       expect(result.waiting).toBe(true);
       expect(result.responseType).toBe('enter');
       expect(result.confidence).toBe('high');
+    });
+
+    it('should detect prompt when context is pushed out of 800 char buffer', () => {
+      // 800 chars is small. If we have a lot of noise between context and prompt...
+      // Context: "Confirm with number keys..."
+      // Prompt: "❯ 1. Yes"
+      
+      // Case 1: Context is far away (should be low confidence but detected)
+      const context = "Confirm with number keys or Enter\n";
+      const noise = "x".repeat(900); // Push context out of buffer
+      const prompt = "\n❯ 1. Yes\n";
+      
+      const buffer = context + noise + prompt;
+      const result = detectCliPrompt(buffer);
+      
+      expect(result.waiting).toBe(true);
+      expect(result.confidence).toBe('low'); // Context lost, so low confidence
     });
     
   });

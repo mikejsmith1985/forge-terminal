@@ -1103,11 +1103,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // 1. If a check is already scheduled, cancel it (new data arrived)
         // 2. Schedule a new check
         // This ensures we only check when the stream pauses, but we NEVER miss the final prompt
+        
+        // FIX: Add maxWait to prevent starvation during continuous output (e.g. spinners)
+        const isStarved = (Date.now() - lastPromptCheckRef.current) > 1000;
+
         if (waitingCheckIdleRef.current) {
-          cancelIdleWork(waitingCheckIdleRef.current);
+          if (!isStarved) {
+            cancelIdleWork(waitingCheckIdleRef.current);
+            waitingCheckIdleRef.current = null;
+          }
         }
         
-        waitingCheckIdleRef.current = scheduleIdleWork(() => {
+        if (!waitingCheckIdleRef.current) {
+          waitingCheckIdleRef.current = scheduleIdleWork(() => {
           waitingCheckIdleRef.current = null;
           
           // We removed the time-based throttle here because the debounce (cancelIdleWork)
