@@ -8,7 +8,7 @@ import { useAssistantStream } from '../../hooks/useAssistantStream';
 import { Send, X, Settings, RefreshCw, Check, AlertTriangle, Brain, TestTube } from 'lucide-react';
 import './AssistantPanel.css';
 
-const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFullScreen = false }) => {
+const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFullScreen = false, onFeedbackClick }) => {
   const [input, setInput] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -82,14 +82,20 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
 
   const handleModelSelect = async (modelName) => {
     try {
+      // Optimistic update
+      setStatus(prev => ({ ...prev, current_model: modelName }));
+      
       await fetch('/api/assistant/model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: modelName })
       });
-      fetchStatus(); // Refresh status
+      // No need to fetchStatus() immediately if we trust the optimistic update, 
+      // but good to verify eventually.
+      setTimeout(fetchStatus, 500); 
     } catch (err) {
       console.error('Failed to set model:', err);
+      fetchStatus(); // Revert on error
     }
   };
 
@@ -151,6 +157,40 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
             </button>
           </div>
 
+          {/* Feedback Button - Only in Sidebar Mode */}
+          {!isFullScreen && onFeedbackClick && (
+            <div style={{ padding: '12px', borderBottom: '1px solid var(--overlay)' }}>
+              <button
+                onClick={onFeedbackClick}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: 'rgba(249, 115, 22, 0.1)',
+                  border: '1px solid rgba(249, 115, 22, 0.3)',
+                  borderRadius: '6px',
+                  color: '#fb923c',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(249, 115, 22, 0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(249, 115, 22, 0.1)';
+                }}
+              >
+                <MessageSquare size={16} />
+                Send Feedback
+              </button>
+            </div>
+          )}
+
           {loadingStatus ? (
             <div style={{ padding: '10px', textAlign: 'center', color: 'var(--subtext)' }}>Loading status...</div>
           ) : status ? (
@@ -175,26 +215,38 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
               </div>
 
               <div style={{ borderTop: '1px solid var(--overlay)', paddingTop: '12px', display: 'flex', gap: '8px' }}>
-                <button 
-                  className="btn btn-secondary btn-sm" 
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                  onClick={() => {
-                    setShowTestModal(true);
-                    setShowSettings(false);
-                  }}
-                >
-                  <TestTube size={14} /> Test
-                </button>
-                <button 
-                  className="btn btn-secondary btn-sm" 
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                  onClick={() => {
-                    setShowTrainModal(true);
-                    setShowSettings(false);
-                  }}
-                >
-                  <Brain size={14} /> Train
-                </button>
+                <div style={{ flex: 1 }}>
+                  <button 
+                    className="btn btn-secondary btn-sm" 
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    onClick={() => {
+                      setShowTestModal(true);
+                      setShowSettings(false);
+                    }}
+                    title="Run automated tests against the current model to verify capabilities"
+                  >
+                    <TestTube size={14} /> Test
+                  </button>
+                  <small style={{ display: 'block', fontSize: '10px', color: 'var(--subtext)', marginTop: '4px', textAlign: 'center' }}>
+                    Verify model capabilities
+                  </small>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <button 
+                    className="btn btn-secondary btn-sm" 
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    onClick={() => {
+                      setShowTrainModal(true);
+                      setShowSettings(false);
+                    }}
+                    title="Train the model on Forge documentation and codebase"
+                  >
+                    <Brain size={14} /> Train
+                  </button>
+                  <small style={{ display: 'block', fontSize: '10px', color: 'var(--subtext)', marginTop: '4px', textAlign: 'center' }}>
+                    Learn from codebase
+                  </small>
+                </div>
               </div>
             </>
           ) : (

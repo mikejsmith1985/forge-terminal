@@ -7,17 +7,32 @@ const SystemCommandCard = ({ card, onExecuteCommand, onToast, onConfigureCard })
   const [showCommand, setShowCommand] = useState(false);
 
   const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(card.command);
-      setCopySuccess(true);
+    if (!card.command) {
       if (onToast) {
         onToast({
-          type: 'success',
-          message: 'Command copied to clipboard!',
+          type: 'error',
+          message: 'No command to copy',
           duration: 2000,
         });
       }
-      setTimeout(() => setCopySuccess(false), 2000);
+      return;
+    }
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(card.command);
+        setCopySuccess(true);
+        if (onToast) {
+          onToast({
+            type: 'success',
+            message: 'Command copied to clipboard!',
+            duration: 2000,
+          });
+        }
+        setTimeout(() => setCopySuccess(false), 2000);
+      } else {
+        throw new Error('Clipboard API not available');
+      }
     } catch (err) {
       console.error('Failed to copy:', err);
       if (onToast) {
@@ -31,6 +46,17 @@ const SystemCommandCard = ({ card, onExecuteCommand, onToast, onConfigureCard })
   }, [card.command, onToast]);
 
   const handleExecute = useCallback(() => {
+    if (!card.command) {
+      if (onToast) {
+        onToast({
+          type: 'error',
+          message: 'No command to execute',
+          duration: 2000,
+        });
+      }
+      return;
+    }
+
     if (onExecuteCommand) {
       onExecuteCommand({
         id: card.id,
@@ -39,7 +65,7 @@ const SystemCommandCard = ({ card, onExecuteCommand, onToast, onConfigureCard })
         triggerAM: card.triggerAM || false,
       });
     }
-  }, [card, onExecuteCommand]);
+  }, [card, onExecuteCommand, onToast]);
 
   const handleConfigure = useCallback(() => {
     if (onConfigureCard) {

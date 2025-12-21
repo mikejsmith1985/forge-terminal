@@ -15,6 +15,9 @@ type Config struct {
 	WSLHomePath string `json:"wslHomePath"` // e.g., "/home/mikej" (auto-detected if empty)
 	CmdHomePath string `json:"cmdHomePath"` // CMD default working directory
 	PsHomePath  string `json:"psHomePath"`  // PowerShell default working directory
+
+	// Feature flags
+	AMEnabled bool `json:"amEnabled"` // Artificial Memory enabled state
 }
 
 // DefaultConfig returns default configuration
@@ -22,6 +25,7 @@ var DefaultConfig = Config{
 	ShellType:   "cmd",
 	WSLDistro:   "",
 	WSLHomePath: "",
+	AMEnabled:   true, // Enabled by default
 }
 
 // GetConfigPath returns the path to the config JSON file

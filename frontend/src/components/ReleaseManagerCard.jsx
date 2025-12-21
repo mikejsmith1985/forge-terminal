@@ -65,28 +65,34 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
       // PowerShell 5.1 compatible syntax (no &&)
       const buildPart = buildAssets ? `${buildCmd}; if ($?) { ` : '';
       const buildEnd = buildAssets ? ' }' : '';
-      return `${buildPart}$b = git branch --show-current; git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b; if ($?) { git push origin main; if ($?) { gh release create ${next} --title "${next} - Release" --target main --generate-notes; if ($?) { git checkout $b; echo "Release ${next} created successfully!" } } } } }${buildEnd}`;
+      return `${buildPart}$b = git branch --show-current; git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b; if ($?) { git push origin main; if ($?) { gh release create ${next} --title "${next} - Release" --target main --generate-notes bin/forge.exe; if ($?) { git checkout $b; echo "Release ${next} created successfully!" } } } } }${buildEnd}`;
     } else {
       // Bash, CMD, and PowerShell 7+ support &&
       const buildPart = buildAssets ? `${buildCmd} && ` : '';
-      return `${buildPart}b=$(git branch --show-current) && git checkout main && git pull origin main && git merge $b && git push origin main && gh release create ${next} --title "${next} - Release" --target main --generate-notes && git checkout $b && echo "Release ${next} created successfully!"`;
+      return `${buildPart}b=$(git branch --show-current) && git checkout main && git pull origin main && git merge $b && git push origin main && gh release create ${next} --title "${next} - Release" --target main --generate-notes bin/forge.exe && git checkout $b && echo "Release ${next} created successfully!"`;
     }
   }, [next, shellType, buildAssets]);
 
   const releaseCommand = generateReleaseCommand();
 
   const handleCopy = useCallback(async () => {
+    if (!releaseCommand) return;
+
     try {
-      await navigator.clipboard.writeText(releaseCommand);
-      setCopySuccess(true);
-      if (onToast) {
-        onToast({
-          type: 'success',
-          message: 'Command copied to clipboard!',
-          duration: 2000,
-        });
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(releaseCommand);
+        setCopySuccess(true);
+        if (onToast) {
+          onToast({
+            type: 'success',
+            message: 'Command copied to clipboard!',
+            duration: 2000,
+          });
+        }
+        setTimeout(() => setCopySuccess(false), 2000);
+      } else {
+        throw new Error('Clipboard API not available');
       }
-      setTimeout(() => setCopySuccess(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
       if (onToast) {

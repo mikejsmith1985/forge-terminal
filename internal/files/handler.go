@@ -2,6 +2,7 @@ package files
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // FileAccessMode represents the file access security level
@@ -296,6 +298,52 @@ type FileWriteRequest struct {
 type FileDeleteRequest struct {
 	Path     string `json:"path"`
 	RootPath string `json:"rootPath"`
+}
+
+// HandleUpload saves an uploaded file
+func HandleUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB max
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Error retrieving file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Save to temp directory
+	tempDir := os.TempDir()
+	filename := fmt.Sprintf("clipboard-%d%s", time.Now().UnixNano(), filepath.Ext(handler.Filename))
+	if filepath.Ext(handler.Filename) == "" {
+		filename += ".png" // Default to png
+	}
+	filePath := filepath.Join(tempDir, filename)
+
+	dst, err := os.Create(filePath)
+	if err != nil {
+		http.Error(w, "Error creating file", http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		http.Error(w, "Error saving file", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"path": filePath,
+	})
 }
 
 // HandleList returns directory tree structure

@@ -416,6 +416,14 @@ function App() {
         mode: tabMode
       });
       setColorTheme(activeTab.colorTheme);
+      
+      // CRITICAL FIX: Ensure global theme class matches tab mode
+      // This ensures components using .light/.dark selectors (like SystemCommandCard) work correctly
+      if (tabMode !== theme) {
+        setTheme(tabMode);
+        document.documentElement.className = tabMode;
+      }
+      
       applyTheme(activeTab.colorTheme, tabMode);
     }
   }, [activeTab?.id, activeTab?.colorTheme, activeTab?.mode]);
@@ -1279,7 +1287,7 @@ function App() {
             onClick={() => setSidebarView('assistant')}
           >
             <MessageSquare size={16} />
-            AI
+            Help
           </button>
         )}
         <button 
@@ -1317,7 +1325,7 @@ function App() {
           </>
         ) : (
           <>
-            <h3>🤖 AI Assistant</h3>
+            <h3>🤖 Help & Guidance</h3>
             <span className="sidebar-path-hint">Local Ollama</span>
           </>
         )}
@@ -1453,7 +1461,6 @@ function App() {
           <DebugPanel
             terminalRef={getActiveTerminalRef()}
             tabId={activeTabId}
-            onFeedbackClick={() => setIsFeedbackModalOpen(true)}
           />
         ) : (
           <AssistantPanel
@@ -1461,6 +1468,7 @@ function App() {
             onClose={() => setSidebarView('cards')}
             currentTabId={activeTabId}
             assistantFontSize={chatFontSize}
+            onFeedbackClick={() => setIsFeedbackModalOpen(true)}
           />
         )}
       </div>
@@ -1566,6 +1574,7 @@ function App() {
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                   onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                   onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
+                  onPaste={() => addToast('Text pasted from clipboard', 'success', 1500)}
                   onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                 />
               </div>

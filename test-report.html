@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forge Terminal - Fix Verification Report</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #1e293b;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        h1 {
+            color: #38bdf8;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #94a3b8;
+            margin-top: 30px;
+        }
+        .status-pass {
+            color: #4ade80;
+            font-weight: bold;
+            background: rgba(74, 222, 128, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .code-block {
+            background-color: #0f172a;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            overflow-x: auto;
+            border: 1px solid #334155;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #334155;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fix Verification Report</h1>
+        <p><strong>Date:</strong> 2025-12-21</p>
+        <p><strong>Branch:</strong> fix/stability-and-assets</p>
+
+        <h2>1. Asset Creation Fix</h2>
+        <div class="metric">
+            <span>Component</span>
+            <span>ReleaseManagerCard.jsx</span>
+        </div>
+        <div class="metric">
+            <span>Status</span>
+            <span class="status-pass">VERIFIED</span>
+        </div>
+        <p><strong>Change:</strong> Added "Build Assets" checkbox (default: true) which injects <code>make build</code> into the release command.</p>
+        <p><strong>Test Result:</strong></p>
+        <div class="code-block">
+✓ src/components/ReleaseManagerCard.test.jsx (1 test)
+  ✓ ReleaseManagerCard (1)
+    ✓ includes build command in release script
+        </div>
+
+        <h2>2. Terminal Crash Fix</h2>
+        <div class="metric">
+            <span>Component</span>
+            <span>ForgeTerminal.jsx</span>
+        </div>
+        <div class="metric">
+            <span>Status</span>
+            <span class="status-pass">IMPLEMENTED</span>
+        </div>
+        <p><strong>Change:</strong> Added debounce logic to <code>Ctrl+C</code> handler to prevent clipboard API spamming and renderer crashes.</p>
+        <div class="code-block">
+// Prevent spamming copy operations which can crash the renderer
+if (isCopyingRef.current) {
+  return false;
+}
+// ...
+setTimeout(() => {
+  isCopyingRef.current = false;
+}, 200);
+        </div>
+    </div>
+</body>
+</html>

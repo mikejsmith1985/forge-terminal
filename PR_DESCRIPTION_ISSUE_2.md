@@ -45,14 +45,23 @@ Closes #2 from mikejsmith1985/forge-terminal-2
   - Documented future backend requirements
 
 ### Phase 4: Backend Performance & Stability
-- **Problem**: "AI agent doesn't respond" caused by backend heap overflow (OOM) when loading conversation history across multiple workspaces
-- **Solution**: Optimized `loadConversationsFromDisk` to use streaming decoder and lazy loading
+- **Problem**: "AI agent doesn't respond" caused by backend heap overflow (OOM) and lock contention when loading conversation history
+- **Solution**: Optimized `loadConversationsFromDisk` and refactored `GetLLMLogger` locking strategy
 - **Changes**:
-  - Modified `internal/am/llm_logger.go` to use `json.Decoder` for header scanning
+  - Modified `internal/am/llm_logger.go` to use `json.Decoder` for header scanning (Memory Fix)
+  - Moved `loadConversationsFromDisk` outside the global `llmLoggersMu` lock (Freeze Fix)
   - Prevented loading full content of 100MB+ conversation files just to check metadata
-  - Fixed critical memory leak where all history from all tabs was loaded into memory
+  - Fixed critical concurrency issue where I/O blocked all HTTP requests
   - Reduced heap usage from ~1.1GB to <50MB during startup
-  - Ensures stability when working in multiple workspaces simultaneously
+
+### Phase 5: AM Configuration Persistence
+- **Problem**: "With AM disabled why is llmlogger even active?" - The "AM Disabled" setting was not persisted to disk, causing AM to re-enable itself on every server restart.
+- **Solution**: Added `AMEnabled` to `config.json` and updated startup logic.
+- **Changes**:
+  - Added `AMEnabled` field to `internal/commands/config.go`
+  - Updated `cmd/forge/main.go` to check config before starting AM system
+  - Updated `handleAMMasterControl` to save state to `config.json`
+  - Ensures `llmlogger` is truly inactive when AM is disabled
 
 ## 🧪 Testing
 

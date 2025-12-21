@@ -124,8 +124,20 @@ func main() {
 	// Run AM cleanup on startup and initialize AM system
 	go am.CleanupOldLogs()
 	amSystem := am.InitSystem(am.DefaultAMDir())
-	if err := amSystem.Start(); err != nil {
-		log.Printf("[AM] Failed to start AM system: %v", err)
+
+	// Load config to check if AM should be enabled
+	config, err := commands.LoadConfig()
+	if err != nil {
+		log.Printf("[Config] Failed to load config: %v, using defaults", err)
+		config = &commands.DefaultConfig
+	}
+
+	if config.AMEnabled {
+		if err := amSystem.Start(); err != nil {
+			log.Printf("[AM] Failed to start AM system: %v", err)
+		}
+	} else {
+		log.Printf("[AM] System disabled by configuration")
 	}
 
 	// Initialize assistant core with AM system
@@ -247,6 +259,7 @@ func main() {
 	http.HandleFunc("/api/files/stats", WrapWithMiddleware(files.HandleStats))
 	http.HandleFunc("/api/files/read", WrapWithMiddleware(files.HandleRead))
 	http.HandleFunc("/api/files/write", WrapWithMiddleware(files.HandleWrite))
+	http.HandleFunc("/api/files/upload", WrapWithMiddleware(files.HandleUpload))
 	http.HandleFunc("/api/files/delete", WrapWithMiddleware(files.HandleDelete))
 	http.HandleFunc("/api/files/stream", WrapWithMiddleware(files.HandleReadStream))
 	http.HandleFunc("/api/files/access-mode", WrapWithMiddleware(files.HandleFileAccessMode))
@@ -1166,18 +1179,26 @@ func handleAMMasterControl(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("[AM Master] Enabled - AM system STARTED")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"message": "AM enabled and system started",
-		})
 	} else {
 		system.Stop()
 		log.Printf("[AM Master] Disabled - AM system STOPPED")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"message": "AM disabled and system stopped",
-		})
 	}
+
+	// Persist state to config
+	config, err := commands.LoadConfig()
+	if err == nil {
+		config.AMEnabled = req.Enabled
+		if err := commands.SaveConfig(config); err != nil {
+			log.Printf("[AM Master] Failed to save config: %v", err)
+		} else {
+			log.Printf("[AM Master] Config saved: AMEnabled=%v", req.Enabled)
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("AM system %s", map[bool]string{true: "started", false: "stopped"}[req.Enabled]),
+	})
 }
 
 func handleAMLLMConversations(w http.ResponseWriter, r *http.Request) {

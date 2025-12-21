@@ -112,31 +112,40 @@ func WaitForPendingWrites() {
 
 // GetLLMLogger returns or creates an LLM logger for a tab.
 func GetLLMLogger(tabID string, amDir string) *LLMLogger {
-	llmLoggersMu.Lock()
-	defer llmLoggersMu.Unlock()
-
-	log.Printf("[LLM Logger] GetLLMLogger called for tab '%s'", tabID)
-	log.Printf("[LLM Logger] Global logger map size: %d", len(llmLoggers))
-
+	// 1. Fast path: Check if logger exists with read lock
+	llmLoggersMu.RLock()
 	if logger, exists := llmLoggers[tabID]; exists {
-		log.Printf("[LLM Logger] ✓ Found existing logger for tab %s (conversations=%d)", tabID, len(logger.conversations))
+		llmLoggersMu.RUnlock()
+		log.Printf("[LLM Logger] ✓ Found existing logger for tab %s", tabID)
 		return logger
 	}
+	llmLoggersMu.RUnlock()
 
-	log.Printf("[LLM Logger] Creating NEW logger for tab %s", tabID)
-	logger := &LLMLogger{
+	// 2. Slow path: Create new logger and load history (WITHOUT global lock)
+	// This prevents blocking other tabs while performing I/O
+	log.Printf("[LLM Logger] Creating NEW logger for tab %s (loading history...)", tabID)
+	newLogger := &LLMLogger{
 		tabID:         tabID,
 		conversations: make(map[string]*LLMConversation),
 		amDir:         amDir,
 	}
 
-	// Load existing conversations from disk
-	logger.loadConversationsFromDisk()
+	// Load existing conversations from disk (expensive I/O operation)
+	newLogger.loadConversationsFromDisk()
 
-	llmLoggers[tabID] = logger
-	log.Printf("[LLM Logger] ✓ Logger created and registered for tab %s", tabID)
-	log.Printf("[LLM Logger] Global logger map size now: %d", len(llmLoggers))
-	return logger
+	// 3. Register logger: Acquire write lock and double-check
+	llmLoggersMu.Lock()
+	defer llmLoggersMu.Unlock()
+
+	// Race condition check: Did someone else create it while we were loading?
+	if existing, exists := llmLoggers[tabID]; exists {
+		log.Printf("[LLM Logger] ⚠️ Race detected: Logger for tab %s created by another thread, using existing", tabID)
+		return existing
+	}
+
+	llmLoggers[tabID] = newLogger
+	log.Printf("[LLM Logger] ✓ Logger registered for tab %s (conversations=%d)", tabID, len(newLogger.conversations))
+	return newLogger
 }
 
 // RemoveLLMLogger removes a logger when tab closes.

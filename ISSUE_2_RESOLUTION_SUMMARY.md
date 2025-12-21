@@ -145,34 +145,63 @@ try {
 - Documented backend integration requirements
 
 ### Phase 4: Backend Performance & Stability
-**Approach**: Optimize conversation loading to prevent heap overflow (OOM).
+**Approach**: Optimize conversation loading to prevent heap overflow (OOM) and lock contention.
 
-**Problem**: When working in multiple workspaces, the backend loaded ALL conversation history (including large TUI snapshots) from disk to check metadata, causing heap usage to spike >1GB and freezing the application.
+**Problem**: 
+1. **Heap Overflow**: Loading full conversation history caused >1GB heap usage.
+2. **Lock Contention**: Loading history inside the global `llmLoggersMu` lock caused all HTTP requests to block (freeze) while I/O was performing, even if memory usage was low.
 
 **Code Changes**:
 ```go
 // internal/am/llm_logger.go
 
-// MEMORY FIX: Use streaming decoder to check header before loading full content
-f, err := os.Open(file)
-// ...
-var header ConversationHeader
-if err := json.NewDecoder(f).Decode(&header); err != nil {
-    f.Close()
-    continue
-}
-f.Close()
+// 1. Memory Fix: Use streaming decoder
+if err := json.NewDecoder(f).Decode(&header); err != nil { ... }
 
-// Skip conversations that don't belong to this tab
-if header.TabID != l.tabID {
-    continue
+// 2. Lock Contention Fix: Move I/O outside global lock
+func GetLLMLogger(tabID string, amDir string) *LLMLogger {
+    // Fast path check
+    llmLoggersMu.RLock()
+    if logger, exists := llmLoggers[tabID]; exists { ... }
+    llmLoggersMu.RUnlock()
+
+    // Slow path: Load history WITHOUT global lock
+    newLogger := &LLMLogger{...}
+    newLogger.loadConversationsFromDisk() // <--- Expensive I/O here
+
+    // Register with lock
+    llmLoggersMu.Lock()
+    // ...
 }
 ```
 
 **Impact**:
 - Reduced startup memory usage by ~95%
-- Prevented application freeze when switching tabs
-- Fixed "AI agent doesn't respond" caused by GC stalls
+- **Eliminated UI freezes** caused by lock contention during I/O
+- Fixed "AI agent doesn't respond" caused by GC stalls and mutex blocking
+
+### Phase 5: AM Configuration Persistence
+**Problem**: The "AM Disabled" setting was client-side only or transient. Restarting the server caused AM to re-enable, activating `llmlogger` unexpectedly.
+
+**Code Changes**:
+```go
+// internal/commands/config.go
+type Config struct {
+    // ...
+    AMEnabled bool `json:"amEnabled"` // Added persistence
+}
+
+// cmd/forge/main.go
+config, _ := commands.LoadConfig()
+if config.AMEnabled {
+    amSystem.Start() // Only start if enabled in config
+}
+```
+
+**Impact**:
+- AM state is now persistent across restarts
+- `llmlogger` is correctly suppressed when AM is disabled
+- Reduces resource usage for users who opt-out of AM
 
 ---
 

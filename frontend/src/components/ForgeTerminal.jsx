@@ -66,7 +66,7 @@ const cancelIdleWork = (id) => {
  */
 function stripAnsi(text) {
   // eslint-disable-next-line no-control-regex
-  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
 
 // ----------------------------------------------------------------------------
@@ -274,13 +274,16 @@ function extractDirectory(text) {
     const line = lastLines[i].trim();
     
     // PowerShell prompt: "PS C:\Users\foo>" or "PS C:\Users\foo> "
-    const psMatch = line.match(/^PS\s+([A-Za-z]:\\[^>]*?)>\s*$/i);
+    // Relaxed regex: Allow optional leading chars (in case of leftover ANSI artifacts)
+    // and handle both "PS >" and "PS ...>" formats
+    const psMatch = line.match(/PS\s+([A-Za-z]:\\[^>]*?)>\s*$/i);
     if (psMatch) {
       return psMatch[1];
     }
     
     // CMD prompt: "C:\Users\foo>" or "C:\Users\foo>command"
-    const cmdMatch = line.match(/^([A-Za-z]:\\[^>]*?)>/);
+    // Relaxed regex: Don't enforce start of line
+    const cmdMatch = line.match(/([A-Za-z]:\\[^>]*?)>/);
     if (cmdMatch) {
       return cmdMatch[1];
     }
@@ -346,6 +349,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onWaitingChange = null, // Callback when prompt waiting state changes
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
   onCopy = null, // Callback when text is copied (for toast notification)
+  onPaste = null, // Callback when text is pasted (for toast notification)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name (for AM logging)
@@ -377,6 +381,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const lastDirectoryRef = useRef(null);
   const onDirectoryChangeRef = useRef(onDirectoryChange);
   const onCopyRef = useRef(onCopy);
+  const onPasteRef = useRef(onPaste);
   // PERF FIX: Batch AM logs instead of per-message
   const amLogQueueRef = useRef([]);
   const amLogFlushIdleRef = useRef(null);
@@ -434,6 +439,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onCopyRef.current = onCopy;
   }, [onCopy]);
+
+  // Keep onPaste ref updated
+  useEffect(() => {
+    onPasteRef.current = onPaste;
+  }, [onPaste]);
   
   // Keep visionEnabled ref updated and send control message to backend
   useEffect(() => {
@@ -841,9 +851,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 // Send file path to terminal
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                   // Quote the path if it contains spaces
-                  const textToSend = filePath.includes(' ') ? `"${filePath}"` : filePath;
+                  const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
+                  const textToSend = `see file at ${pathStr}`;
                   wsRef.current.send(textToSend);
                   console.log('[Terminal] Sent image path to backend:', textToSend);
+                  if (onPasteRef.current) onPasteRef.current();
                 }
               } catch (err) {
                 console.error('[Terminal] Image upload failed:', err);
@@ -866,6 +878,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   diagnosticCore.recordWebSocketEvent('send', { length: text.length, content: text });
                   wsRef.current.send(text);
                   console.log('[Terminal] Sent pasted text to backend:', text.length, 'chars');
+                  if (onPasteRef.current) onPasteRef.current();
                 } else {
                   console.warn('[Terminal] WebSocket not ready for paste');
                   diagnosticCore.recordWebSocketEvent('error', { reason: 'not-ready-for-paste' });
@@ -883,6 +896,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             .then((text) => {
               if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                 wsRef.current.send(text);
+                if (onPasteRef.current) onPasteRef.current();
               }
             })
             .catch((e) => console.error('[Terminal] Clipboard fallback failed:', e));

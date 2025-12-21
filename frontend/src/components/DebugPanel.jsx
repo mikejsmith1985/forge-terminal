@@ -4,7 +4,7 @@ import { Bug, RefreshCw, MessageSquare, Activity } from 'lucide-react';
 /**
  * DebugPanel - System diagnostics and feedback in sidebar
  */
-const DebugPanel = ({ terminalRef, tabId, onFeedbackClick }) => {
+const DebugPanel = ({ terminalRef, tabId }) => {
   const [diagnostics, setDiagnostics] = useState(null);
   const [freezeMetrics, setFreezeMetrics] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -132,64 +132,6 @@ const DebugPanel = ({ terminalRef, tabId, onFeedbackClick }) => {
           flexDirection: 'column', 
           gap: '12px',
         }}>
-          {/* Feedback Section - Always at top */}
-          <div style={{
-            padding: '16px',
-            background: 'rgba(249, 115, 22, 0.1)',
-            borderRadius: '8px',
-            border: '1px solid rgba(249, 115, 22, 0.3)',
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              marginBottom: '8px',
-            }}>
-              <h4 style={{ margin: 0, color: '#fb923c', fontSize: '13px', fontWeight: '600' }}>
-                Report Feedback
-              </h4>
-              <MessageSquare size={16} color="#fb923c" />
-            </div>
-            <p style={{ 
-              fontSize: '12px', 
-              color: '#ccc', 
-              marginBottom: '12px',
-              lineHeight: '1.5',
-            }}>
-              Found a bug or have a feature request? Create a GitHub issue with automatic screenshot capture and diagnostics.
-            </p>
-            <button
-              onClick={onFeedbackClick}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: 'rgba(249, 115, 22, 0.2)',
-                border: '1px solid rgba(249, 115, 22, 0.4)',
-                borderRadius: '6px',
-                color: '#fb923c',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.2s',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(249, 115, 22, 0.3)';
-                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.6)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(249, 115, 22, 0.2)';
-                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.4)';
-              }}
-            >
-              <MessageSquare size={16} />
-              Send Feedback
-            </button>
-          </div>
-
           <div style={{
             padding: '12px',
             background: 'rgba(255, 255, 255, 0.03)',
