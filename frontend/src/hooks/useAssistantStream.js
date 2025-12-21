@@ -47,27 +47,28 @@ export function useAssistantStream(tabId) {
         // { type: 'ASSISTANT_RESPONSE', content: '...' }
         // { type: 'ASSISTANT_DONE' }
         
-        if (data.type === 'ASSISTANT_THINKING') {
+        if (data.type === 'assistant_thinking' || data.type === 'ASSISTANT_THINKING') {
           setIsThinking(true);
-          setThinkingContent(prev => prev + data.content);
-        } else if (data.type === 'ASSISTANT_RESPONSE') {
+          setThinkingContent(prev => prev + (data.metadata?.content || data.content || ''));
+        } else if (data.type === 'assistant_response' || data.type === 'ASSISTANT_RESPONSE') {
           setIsThinking(false);
           setThinkingContent('');
+          const content = data.metadata?.content || data.content || '';
           setMessages(prev => {
             const lastMsg = prev[prev.length - 1];
             if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.isComplete) {
               return [
                 ...prev.slice(0, -1),
-                { ...lastMsg, content: lastMsg.content + data.content }
+                { ...lastMsg, content: lastMsg.content + content }
               ];
             } else {
               return [
                 ...prev,
-                { role: 'assistant', content: data.content, isComplete: false }
+                { role: 'assistant', content: content, isComplete: false }
               ];
             }
           });
-        } else if (data.type === 'ASSISTANT_DONE') {
+        } else if (data.type === 'assistant_done' || data.type === 'ASSISTANT_DONE') {
           setMessages(prev => {
             const lastMsg = prev[prev.length - 1];
             if (lastMsg) {
@@ -78,13 +79,15 @@ export function useAssistantStream(tabId) {
             }
             return prev;
           });
-        } else if (data.type === 'ASSISTANT_TOOL_USE') {
+        } else if (data.type === 'assistant_tool_use' || data.type === 'ASSISTANT_TOOL_USE') {
+          const tool = data.metadata?.tool || data.tool;
+          const params = data.metadata?.params || data.params;
           setMessages(prev => [
             ...prev,
             { 
               role: 'tool_request', 
-              tool: data.tool, 
-              params: data.params,
+              tool: tool, 
+              params: params,
               isComplete: true 
             }
           ]);

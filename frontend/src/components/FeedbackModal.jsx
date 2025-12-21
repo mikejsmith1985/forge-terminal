@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
-import { Camera, Github, Copy, Check, Settings, ExternalLink, Image as ImageIcon, Minus, X, Trash2 } from 'lucide-react';
+import { Camera, Github, Copy, Check, Settings, ExternalLink, Image as ImageIcon, Minus, X, Trash2, Video, StopCircle } from 'lucide-react';
 import { getLogs } from '../utils/logger';
 
 // ----------------------------------------------------------------------
@@ -14,6 +14,10 @@ const IMGUR_CLIENT_ID = '';
 const FeedbackModal = ({ isOpen, onClose }) => {
     const [comment, setComment] = useState('');
     const [screenshots, setScreenshots] = useState([]);
+    const [videoBlob, setVideoBlob] = useState(null);
+    const [videoUrl, setVideoUrl] = useState(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingStream, setRecordingStream] = useState(null);
     const [isCapturing, setIsCapturing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [createdIssueUrl, setCreatedIssueUrl] = useState(null);
@@ -42,6 +46,55 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         localStorage.setItem('forge_github_token', githubToken.trim());
         setShowSetup(false);
         setStatus({ type: '', msg: '' });
+    };
+
+    const handleStartRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            const chunks = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                setVideoBlob(blob);
+                setVideoUrl(url);
+                setIsRecording(false);
+                setRecordingStream(null);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setRecordingStream(stream);
+
+            // Auto-stop after 30 seconds
+            setTimeout(() => {
+                if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+            }, 30000);
+
+        } catch (err) {
+            console.error('Recording failed:', err);
+            setStatus({ type: 'error', msg: 'Failed to start recording' });
+        }
+    };
+
+    const handleStopRecording = () => {
+        if (recordingStream) {
+            recordingStream.getTracks().forEach(track => track.stop());
+            // This will trigger mediaRecorder.onstop
+        }
+    };
+
+    const handleRemoveVideo = () => {
+        setVideoBlob(null);
+        setVideoUrl(null);
     };
 
     const handleCapture = async () => {
@@ -159,7 +212,39 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         return data.content.download_url;
     };
 
-    const createIssue = async (imageUrls) => {
+    const uploadVideoToGithub = async (blob) => {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `feedback-video-${timestamp}.webm`;
+        
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64data = reader.result.split(',')[1];
+                try {
+                    const res = await fetch(`https://api.github.com/repos/mikejsmith1985/forge-terminal-2/contents/feedback-screenshots/${filename}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${githubToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: 'upload feedback video',
+                            content: base64data,
+                        })
+                    });
+                    
+                    if (!res.ok) throw new Error('GITHUB_UPLOAD_FAILED');
+                    const data = await res.json();
+                    resolve(data.content.download_url);
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            reader.readAsDataURL(blob);
+        });
+    };
+
+    const createIssue = async (imageUrls, videoUrl) => {
         const title = `Feedback: ${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}`;
         let body = `**Description**\n${comment}\n\n`;
 
@@ -170,6 +255,10 @@ const FeedbackModal = ({ isOpen, onClose }) => {
             });
         } else {
             body += `**Screenshot**\n> 📋 **Paste Screenshot Here**\n> The screenshot is in your clipboard. Please press **Ctrl+v** (or Cmd+V) to attach it.\n\n`;
+        }
+
+        if (videoUrl) {
+            body += `**Screen Recording**\n[Watch Video](${videoUrl})\n\n`;
         }
 
         body += `**Environment**\n- User Agent: ${navigator.userAgent}\n- Time: ${new Date().toISOString()}\n\n`;
@@ -231,8 +320,19 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                 }
             }
 
+            let uploadedVideoUrl = null;
+            if (videoBlob) {
+                setStatus({ type: 'info', msg: 'Uploading video...' });
+                try {
+                    uploadedVideoUrl = await uploadVideoToGithub(videoBlob);
+                } catch (err) {
+                    console.warn('Video upload failed:', err);
+                    setStatus({ type: 'warning', msg: 'Video upload failed. Continuing...' });
+                }
+            }
+
             setStatus({ type: 'info', msg: 'Creating GitHub issue...' });
-            const issue = await createIssue(imageUrls);
+            const issue = await createIssue(imageUrls, uploadedVideoUrl);
 
             setCreatedIssueUrl(issue.html_url);
             setStatus({ type: 'success', msg: `Issue #${issue.number} created!` });
@@ -240,6 +340,8 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                 onClose();
                 setComment('');
                 setScreenshots([]);
+                setVideoBlob(null);
+                setVideoUrl(null);
                 setStatus({ type: '', msg: '' });
                 setCreatedIssueUrl(null);
             }, 2000);
@@ -339,15 +441,37 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                                             type="button"
                                             className="btn btn-secondary btn-sm"
                                             onClick={handleCapture}
-                                            disabled={isCapturing}
+                                            disabled={isCapturing || isRecording}
                                         >
                                             <Camera size={16} style={{ marginRight: '6px' }} />
                                             {isCapturing ? 'Capturing...' : screenshots.length > 0 ? 'Add Another' : 'Capture'}
                                         </button>
+                                        {!isRecording && !videoBlob && (
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={handleStartRecording}
+                                                disabled={isCapturing}
+                                            >
+                                                <Video size={16} style={{ marginRight: '6px' }} />
+                                                Record Screen (30s)
+                                            </button>
+                                        )}
+                                        {isRecording && (
+                                            <button
+                                                type="button"
+                                                className="btn btn-danger btn-sm"
+                                                onClick={handleStopRecording}
+                                                style={{ background: '#ef4444', color: 'white', border: 'none' }}
+                                            >
+                                                <StopCircle size={16} style={{ marginRight: '6px' }} />
+                                                Stop Recording
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
-                                {screenshots.length === 0 && (
+                                {screenshots.length === 0 && !videoBlob && !isRecording && (
                                     <div style={{ 
                                         padding: '30px', 
                                         border: '2px dashed #333', 
@@ -363,6 +487,34 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                                         <p style={{ margin: 0, fontSize: '0.85em', color: '#666' }}>
                                             or use the buttons above
                                         </p>
+                                    </div>
+                                )}
+
+                                {videoUrl && (
+                                    <div className="video-preview" style={{ marginBottom: '10px', border: '1px solid #333', borderRadius: '6px', padding: '10px', background: '#111', position: 'relative' }}>
+                                        <video src={videoUrl} controls style={{ maxWidth: '100%', borderRadius: '4px' }} />
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveVideo}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '5px',
+                                                right: '5px',
+                                                background: 'rgba(239, 68, 68, 0.9)',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '4px 6px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                color: '#fff',
+                                                fontSize: '0.75em'
+                                            }}
+                                            title="Remove video"
+                                        >
+                                            <Trash2 size={12} /> Remove
+                                        </button>
                                     </div>
                                 )}
 

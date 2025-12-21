@@ -388,6 +388,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // PERF FIX: Throttle expensive operations
   const lastPromptCheckRef = useRef(0);
   const promptCheckIntervalMs = 500; // Only check prompts every 500ms max
+  const isCopyingRef = useRef(false); // Prevent clipboard spam
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -759,11 +760,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       
       // Handle Ctrl+C (Copy vs Interrupt)
       if (arg.ctrlKey && arg.code === 'KeyC' && arg.type === 'keydown') {
+        // Prevent spamming copy operations which can crash the renderer
+        if (isCopyingRef.current) {
+          return false;
+        }
+
         const selection = term.getSelection();
         
         if (selection) {
           // If there is a selection, COPY it
+          isCopyingRef.current = true;
           console.log('[Terminal] Ctrl+C with selection - copying to clipboard');
+          
           navigator.clipboard.writeText(selection)
             .then(() => {
               console.log('[Terminal] Copied to clipboard:', selection.length, 'chars');
@@ -773,6 +781,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             })
             .catch((err) => {
               console.error('[Terminal] Clipboard write failed:', err);
+            })
+            .finally(() => {
+              // Add a small delay before allowing another copy to prevent rapid-fire events
+              setTimeout(() => {
+                isCopyingRef.current = false;
+              }, 200);
             });
           
           return false; // Prevent xterm from handling (blocking the SIGINT)
@@ -786,28 +800,93 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
       // Handle Ctrl+V (Paste)
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        console.log('[Terminal] Ctrl+V detected - reading from clipboard');
+        console.log('[Terminal] Ctrl+V detected - checking clipboard');
         diagnosticCore.recordPasteEvent('', 'ctrl-v-triggered');
         
-        navigator.clipboard.readText()
-          .then((text) => {
-            console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
-            diagnosticCore.recordPasteEvent(text, 'clipboard-read');
-            
-            // Send the pasted text to Go backend via WebSocket
-            // Do NOT term.write(text) here - it will duplicate if backend echoes back
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              diagnosticCore.recordWebSocketEvent('send', { length: text.length, content: text });
-              wsRef.current.send(text);
-              console.log('[Terminal] Sent pasted text to backend:', text.length, 'chars');
-            } else {
-              console.warn('[Terminal] WebSocket not ready for paste');
-              diagnosticCore.recordWebSocketEvent('error', { reason: 'not-ready-for-paste' });
+        // Try to read clipboard items first (for images)
+        navigator.clipboard.read().then(async (items) => {
+          let imageFound = false;
+          for (const item of items) {
+            // Look for image types
+            const imageType = item.types.find(type => type.startsWith('image/'));
+            if (imageType) {
+              imageFound = true;
+              console.log('[Terminal] Image detected in clipboard:', imageType);
+              
+              try {
+                const blob = await item.getType(imageType);
+                const formData = new FormData();
+                formData.append('file', blob, 'clipboard-image.png');
+                
+                // Show uploading indicator
+                if (xtermRef.current) {
+                  xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
+                }
+                
+                const response = await fetch('/api/files/upload', {
+                  method: 'POST',
+                  body: formData
+                });
+                
+                if (!response.ok) throw new Error('Upload failed');
+                
+                const data = await response.json();
+                const filePath = data.path;
+                
+                // Clear uploading indicator (move cursor back and clear line)
+                if (xtermRef.current) {
+                  xtermRef.current.write('\r\x1b[K');
+                }
+                
+                // Send file path to terminal
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  // Quote the path if it contains spaces
+                  const textToSend = filePath.includes(' ') ? `"${filePath}"` : filePath;
+                  wsRef.current.send(textToSend);
+                  console.log('[Terminal] Sent image path to backend:', textToSend);
+                }
+              } catch (err) {
+                console.error('[Terminal] Image upload failed:', err);
+                if (xtermRef.current) {
+                  xtermRef.current.write('\r\x1b[K\x1b[31m[Image upload failed]\x1b[0m\r\n');
+                }
+              }
+              break; // Only handle one image
             }
-          })
-          .catch((err) => {
-            console.error('[Terminal] Clipboard read failed:', err);
-          });
+          }
+          
+          // If no image found, fall back to text
+          if (!imageFound) {
+            navigator.clipboard.readText()
+              .then((text) => {
+                console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
+                diagnosticCore.recordPasteEvent(text, 'clipboard-read');
+                
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  diagnosticCore.recordWebSocketEvent('send', { length: text.length, content: text });
+                  wsRef.current.send(text);
+                  console.log('[Terminal] Sent pasted text to backend:', text.length, 'chars');
+                } else {
+                  console.warn('[Terminal] WebSocket not ready for paste');
+                  diagnosticCore.recordWebSocketEvent('error', { reason: 'not-ready-for-paste' });
+                }
+              })
+              .catch((err) => {
+                console.error('[Terminal] Clipboard text read failed:', err);
+              });
+          }
+        }).catch((err) => {
+          // Fallback for browsers that don't support read() or permission denied
+          // Try readText directly
+          console.warn('[Terminal] Clipboard read() failed, falling back to readText():', err);
+          navigator.clipboard.readText()
+            .then((text) => {
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(text);
+              }
+            })
+            .catch((e) => console.error('[Terminal] Clipboard fallback failed:', e));
+        });
 
         return false; // Prevent xterm from handling this event
       }
