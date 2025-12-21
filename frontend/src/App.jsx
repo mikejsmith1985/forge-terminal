@@ -352,11 +352,37 @@ function App() {
           try {
             const data = JSON.parse(e.data);
             console.log('[SSE] Update notification received:', data);
+            
+            // Update the state so the UI reflects the new version
+            setUpdateInfo(data);
+            
             if (data.available) {
-              // CRITICAL: Auto-refresh immediately to load new binary
-              console.log('[Update] New version detected:', data.latestVersion, '- refreshing page to load new binary');
-              localStorage.setItem('lastKnownVersion', data.latestVersion);
-              window.location.reload();
+              // Check if user dismissed this version recently (within 24 hours)
+              const dismissedAt = localStorage.getItem('updateDismissedAt');
+              const dismissedVersion = localStorage.getItem('updateDismissedVersion');
+              const dayInMs = 24 * 60 * 60 * 1000;
+              
+              const wasRecentlyDismissed = dismissedAt && 
+                dismissedVersion === data.latestVersion &&
+                (Date.now() - parseInt(dismissedAt, 10)) < dayInMs;
+              
+              if (!wasRecentlyDismissed) {
+                addToast(
+                  `Update available: ${data.latestVersion}`,
+                  'update',
+                  0, // Don't auto-dismiss
+                  {
+                    action: 'View Update',
+                    onAction: () => setIsUpdateModalOpen(true),
+                    secondaryAction: 'Later',
+                    onSecondaryAction: () => {
+                      // Dismiss for this version for 24 hours
+                      localStorage.setItem('updateDismissedAt', Date.now().toString());
+                      localStorage.setItem('updateDismissedVersion', data.latestVersion);
+                    }
+                  }
+                );
+              }
             }
           } catch (err) {
             console.error('[SSE] Error parsing update event:', err);

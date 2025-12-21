@@ -104,17 +104,17 @@ const MENU_CONTEXT_PATTERNS = [
 // Y/N style prompts: These expect typing 'y' or 'n' then Enter
 const YN_PROMPT_PATTERNS = [
   // Standard y/n patterns at end of line
-  /\(y\/n\)\s*$/i,
-  /\[Y\/n\]\s*$/i,
-  /\[y\/N\]\s*$/i,
-  /\(yes\/no\)\s*$/i,
-  /\[yes\/no\]\s*$/i,
+  /\(y\/n\)[:?]?\s*$/i,
+  /\[Y\/n\][:?]?\s*$/i,
+  /\[y\/N\][:?]?\s*$/i,
+  /\(yes\/no\)[:?]?\s*$/i,
+  /\[yes\/no\][:?]?\s*$/i,
   // Question followed by y/n
-  /\?\s*\(y\/n\)\s*$/i,
-  /\?\s*\[Y\/n\]\s*$/i,
-  /\?\s*\[y\/N\]\s*$/i,
+  /\?\s*\(y\/n\)[:?]?\s*$/i,
+  /\?\s*\[Y\/n\][:?]?\s*$/i,
+  /\?\s*\[y\/N\][:?]?\s*$/i,
   // npm/yarn style
-  /\?\s*›?\s*\(Y\/n\)\s*$/i,
+  /\?\s*›?\s*\(Y\/n\)[:?]?\s*$/i,
   /Are you sure.*\?\s*$/i,
 ];
 
@@ -1140,6 +1140,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
           // Auto-respond logic
           if (waiting && autoRespondRef.current && ws.readyState === WebSocket.OPEN) {
+            // Don't auto-respond to low confidence detections to avoid accidental execution
+            if (confidence === 'low') {
+              return;
+            }
+
             if (responseType === 'enter') {
               ws.send('\r');
             } else {

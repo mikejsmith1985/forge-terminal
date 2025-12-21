@@ -83,11 +83,7 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
         await navigator.clipboard.writeText(releaseCommand);
         setCopySuccess(true);
         if (onToast) {
-          onToast({
-            type: 'success',
-            message: 'Command copied to clipboard!',
-            duration: 2000,
-          });
+          onToast('Command copied to clipboard!', 'success', 2000);
         }
         setTimeout(() => setCopySuccess(false), 2000);
       } else {
@@ -96,11 +92,7 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
     } catch (err) {
       console.error('Failed to copy:', err);
       if (onToast) {
-        onToast({
-          type: 'error',
-          message: 'Failed to copy command',
-          duration: 2000,
-        });
+        onToast('Failed to copy command', 'error', 2000);
       }
     }
   }, [releaseCommand, onToast]);

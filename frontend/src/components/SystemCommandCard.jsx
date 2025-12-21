@@ -9,11 +9,7 @@ const SystemCommandCard = ({ card, onExecuteCommand, onToast, onConfigureCard })
   const handleCopy = useCallback(async () => {
     if (!card.command) {
       if (onToast) {
-        onToast({
-          type: 'error',
-          message: 'No command to copy',
-          duration: 2000,
-        });
+        onToast('No command to copy', 'error', 2000);
       }
       return;
     }
@@ -23,11 +19,7 @@ const SystemCommandCard = ({ card, onExecuteCommand, onToast, onConfigureCard })
         await navigator.clipboard.writeText(card.command);
         setCopySuccess(true);
         if (onToast) {
-          onToast({
-            type: 'success',
-            message: 'Command copied to clipboard!',
-            duration: 2000,
-          });
+          onToast('Command copied to clipboard!', 'success', 2000);
         }
         setTimeout(() => setCopySuccess(false), 2000);
       } else {
@@ -36,11 +28,7 @@ const SystemCommandCard = ({ card, onExecuteCommand, onToast, onConfigureCard })
     } catch (err) {
       console.error('Failed to copy:', err);
       if (onToast) {
-        onToast({
-          type: 'error',
-          message: 'Failed to copy command',
-          duration: 2000,
-        });
+        onToast('Failed to copy command', 'error', 2000);
       }
     }
   }, [card.command, onToast]);
@@ -48,11 +36,7 @@ const SystemCommandCard = ({ card, onExecuteCommand, onToast, onConfigureCard })
   const handleExecute = useCallback(() => {
     if (!card.command) {
       if (onToast) {
-        onToast({
-          type: 'error',
-          message: 'No command to execute',
-          duration: 2000,
-        });
+        onToast('No command to execute', 'error', 2000);
       }
       return;
     }
