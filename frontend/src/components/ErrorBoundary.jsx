@@ -45,8 +45,16 @@ class ErrorBoundary extends React.Component {
           error: error?.toString(),
           stack: errorInfo?.componentStack,
           timestamp: new Date().toISOString(),
+          component: 'ErrorBoundary',
+          url: window.location.href,
         }),
-      }).catch(err => console.error('Failed to log error:', err));
+      })
+        .then(res => {
+          if (!res.ok) {
+            console.warn(`Error logging returned status ${res.status}. Error may not have been persisted.`);
+          }
+        })
+        .catch(err => console.warn('Failed to log error to backend:', err));
     } catch (e) {
       console.error('Error logging failed:', e);
     }

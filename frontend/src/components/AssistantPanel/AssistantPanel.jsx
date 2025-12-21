@@ -5,7 +5,7 @@ import ToolRequest from './ToolRequest';
 import ModelTestModal from './ModelTestModal';
 import TrainModelModal from './TrainModelModal';
 import { useAssistantStream } from '../../hooks/useAssistantStream';
-import { Send, X, Settings, RefreshCw, Check, AlertTriangle, Brain, TestTube } from 'lucide-react';
+import { Send, X, Settings, RefreshCw, Check, AlertTriangle, Brain, TestTube, MessageSquare } from 'lucide-react';
 import './AssistantPanel.css';
 
 const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFullScreen = false, onFeedbackClick }) => {
@@ -15,6 +15,8 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
   const [showTrainModal, setShowTrainModal] = useState(false);
   const [status, setStatus] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
+  const [testProgress, setTestProgress] = useState(null);
+  const [trainProgress, setTrainProgress] = useState(null);
   const messagesEndRef = useRef(null);
   
   // Use the new hook for streaming events
@@ -260,7 +262,114 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
       )}
 
       <div className="messages-container">
-        {messages.length === 0 && !isThinking && (
+        {/* Test/Train Progress Display */}
+        {testProgress && (
+          <div style={{
+            padding: '12px',
+            margin: '8px 0',
+            borderRadius: '6px',
+            border: '1px solid',
+            fontSize: '12px',
+            ...(testProgress.status === 'running' && {
+              background: '#1a3a5c',
+              borderColor: '#0066ff',
+              color: '#00ccff'
+            }),
+            ...(testProgress.status === 'completed' && {
+              background: '#1a2e1a',
+              borderColor: '#22c55e',
+              color: '#86efac'
+            }),
+            ...(testProgress.status === 'error' && {
+              background: '#422006',
+              borderColor: '#f97316',
+              color: '#fed7aa'
+            })
+          }}>
+            {testProgress.status === 'running' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+                  <strong>Running tests for {testProgress.model}...</strong>
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Tests may take 2-5 minutes. Check server logs for detailed output.</div>
+              </>
+            )}
+            {testProgress.status === 'completed' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span>✓</span>
+                  <strong>{testProgress.message}</strong>
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Results saved to test-results/ directory</div>
+              </>
+            )}
+            {testProgress.status === 'error' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span>✕</span>
+                  <strong>Test failed</strong>
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>{testProgress.error}</div>
+              </>
+            )}
+          </div>
+        )}
+
+        {trainProgress && (
+          <div style={{
+            padding: '12px',
+            margin: '8px 0',
+            borderRadius: '6px',
+            border: '1px solid',
+            fontSize: '12px',
+            ...(trainProgress.status === 'running' && {
+              background: '#3a1a5c',
+              borderColor: '#a855f7',
+              color: '#e9d5ff'
+            }),
+            ...(trainProgress.status === 'completed' && {
+              background: '#1a2e1a',
+              borderColor: '#22c55e',
+              color: '#86efac'
+            }),
+            ...(trainProgress.status === 'error' && {
+              background: '#422006',
+              borderColor: '#f97316',
+              color: '#fed7aa'
+            })
+          }}>
+            {trainProgress.status === 'running' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>🧠</span>
+                  <strong>Training {trainProgress.model}...</strong>
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Processing documentation and codebase. This may take several minutes.</div>
+              </>
+            )}
+            {trainProgress.status === 'completed' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span>✓</span>
+                  <strong>{trainProgress.message}</strong>
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.8 }}>Model has been trained on Forge codebase</div>
+              </>
+            )}
+            {trainProgress.status === 'error' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span>✕</span>
+                  <strong>Training failed</strong>
+                </div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>{trainProgress.error}</div>
+              </>
+            )}
+          </div>
+        )}
+
+        {messages.length === 0 && !isThinking && !testProgress && !trainProgress && (
           <div className="empty-state">
             <p>How can I help you with your terminal tasks today?</p>
           </div>
@@ -313,14 +422,29 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
         isOpen={showTestModal} 
         onCancel={() => setShowTestModal(false)}
         modelName={status?.current_model || 'Current Model'}
+        isLoading={testProgress !== null}
         onConfirm={() => {
-          // Trigger test run via API
+          const modelName = status?.current_model;
+          setTestProgress({ status: 'running', model: modelName });
+          setShowTestModal(false);
+          
           fetch('/api/assistant/run-tests', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: status?.current_model })
-          });
-          setShowTestModal(false);
+            body: JSON.stringify({ model: modelName })
+          })
+            .then(res => {
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              return res.json();
+            })
+            .then(data => {
+              setTestProgress({ status: 'completed', model: modelName, message: 'Tests completed successfully' });
+              setTimeout(() => setTestProgress(null), 5000);
+            })
+            .catch(err => {
+              setTestProgress({ status: 'error', model: modelName, error: err.message });
+              setTimeout(() => setTestProgress(null), 5000);
+            });
         }}
       />
 
@@ -329,13 +453,27 @@ const AssistantPanel = ({ isOpen, onClose, currentTabId, assistantFontSize, isFu
         onCancel={() => setShowTrainModal(false)}
         modelName={status?.current_model || 'Current Model'}
         onConfirm={() => {
-          // Trigger training via API
+          const modelName = status?.current_model;
+          setTrainProgress({ status: 'running', model: modelName });
+          setShowTrainModal(false);
+          
           fetch('/api/assistant/train-model', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: status?.current_model })
-          });
-          setShowTrainModal(false);
+            body: JSON.stringify({ model: modelName })
+          })
+            .then(res => {
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              return res.json();
+            })
+            .then(data => {
+              setTrainProgress({ status: 'completed', model: modelName, message: 'Training completed successfully' });
+              setTimeout(() => setTrainProgress(null), 5000);
+            })
+            .catch(err => {
+              setTrainProgress({ status: 'error', model: modelName, error: err.message });
+              setTimeout(() => setTrainProgress(null), 5000);
+            });
         }}
       />
     </div>

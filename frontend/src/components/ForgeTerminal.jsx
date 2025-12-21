@@ -1140,11 +1140,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
           // Auto-respond logic
           if (waiting && autoRespondRef.current && ws.readyState === WebSocket.OPEN) {
-            // Don't auto-respond to low confidence detections to avoid accidental execution
-            if (confidence === 'low') {
-              return;
-            }
-
             if (responseType === 'enter') {
               ws.send('\r');
             } else {

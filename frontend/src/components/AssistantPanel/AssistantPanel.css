@@ -526,6 +526,12 @@
   }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .assistant-input-form {
   display: flex;
   gap: 8px;

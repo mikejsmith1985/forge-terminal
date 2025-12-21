@@ -273,6 +273,9 @@ func main() {
 	http.HandleFunc("/api/assistant/train-model", WrapWithMiddleware(handleAssistantTrainModel))
 	http.HandleFunc("/api/assistant/training-status/", WrapWithMiddleware(handleAssistantTrainingStatus))
 
+	// Error logging API - client-side error reporting
+	http.HandleFunc("/api/log-error", WrapWithMiddleware(handleLogError))
+
 	// Find an available port
 	addr, listener, err := findAvailablePort()
 	if err != nil {
@@ -1764,6 +1767,45 @@ func handleAssistantTrainingStatus(w http.ResponseWriter, r *http.Request) {
 		"status":             status["status"],
 		"examples_processed": status["examples_processed"],
 		"model":              model,
+	})
+}
+
+// handleLogError handles client-side error logging
+func handleLogError(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var errorLog struct {
+		Error     string `json:"error"`
+		Stack     string `json:"stack"`
+		Timestamp string `json:"timestamp"`
+		Component string `json:"component,omitempty"`
+		URL       string `json:"url,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&errorLog); err != nil {
+		log.Printf("[Frontend Error] Failed to decode error report: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	// Log the error with a clear prefix for frontend errors
+	log.Printf("[Frontend Error] %s (at %s) - %s\nStack: %s", 
+		errorLog.Error, errorLog.Component, errorLog.Timestamp, errorLog.Stack)
+
+	// Always return success to prevent cascading errors on the frontend
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Error logged successfully",
 	})
 }
 
