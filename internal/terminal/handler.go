@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -173,14 +174,15 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// PERFORMANCE FIX: Initialize AM/Vision/LLM systems asynchronously
 	// These don't need to block the terminal from becoming interactive
-	var llmLogger *am.LLMLogger
+	var llmLoggerAtomic atomic.Value // Stores *am.LLMLogger - lock-free concurrent access
 	var insightsTracker *vision.InsightsTracker
 	amSystem := h.assistantCore.GetAMSystem()
 
 	// Launch async initialization - doesn't block terminal readiness
 	go func() {
 		if amSystem != nil {
-			llmLogger = amSystem.GetLLMLogger(tabID)
+			llmLogger := amSystem.GetLLMLogger(tabID)
+			llmLoggerAtomic.Store(llmLogger)
 			if llmLogger != nil {
 				activeConv := llmLogger.GetActiveConversationID()
 				log.Printf("[Terminal] Using LLM logger for tabID: %s, activeConv: %s", tabID, activeConv)
@@ -206,7 +208,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// Set up low-confidence callback for AM v2.0
 			// When parsing confidence is low during auto-respond, notify user via Vision
-			if llmLogger != nil {
+			if logger := llmLoggerAtomic.Load(); logger != nil {
+				llmLogger := logger.(*am.LLMLogger)
 				llmLogger.SetLowConfidenceCallback(func(raw string) {
 					log.Printf("[AM] Low confidence parsing detected, sending Vision notification")
 					// Send a Vision overlay to notify the user
@@ -366,18 +369,21 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 				// Feed output to LLM logger - THROTTLED to reduce CPU load
 				// Accumulate output and flush every 200ms to prevent lock contention
-				if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
-					// BOUNDED BUFFER: Prevent OOM
-					if llmOutputBuffer.Len() > 65536 { // 64KB limit
-						llmOutputBuffer.Reset()
-					}
-					llmOutputBuffer.Write(buf[:n])
-					now := time.Now()
-					if now.Sub(lastLLMFlush) > 200*time.Millisecond {
-						lastLLMFlush = now
-						if llmOutputBuffer.Len() > 0 {
-							llmLogger.AddOutput(llmOutputBuffer.String())
+				if logger := llmLoggerAtomic.Load(); logger != nil {
+					llmLogger := logger.(*am.LLMLogger)
+					if llmLogger.GetActiveConversationID() != "" {
+						// BOUNDED BUFFER: Prevent OOM
+						if llmOutputBuffer.Len() > 65536 { // 64KB limit
 							llmOutputBuffer.Reset()
+						}
+						llmOutputBuffer.Write(buf[:n])
+						now := time.Now()
+						if now.Sub(lastLLMFlush) > 200*time.Millisecond {
+							lastLLMFlush = now
+							if llmOutputBuffer.Len() > 0 {
+								llmLogger.AddOutput(llmOutputBuffer.String())
+								llmOutputBuffer.Reset()
+							}
 						}
 					}
 				}
@@ -433,8 +439,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// Check for AM control messages (auto-respond state sync)
 				var amMsg AMControlMessage
 				if err := json.Unmarshal(data, &amMsg); err == nil && amMsg.Type == "AM_AUTO_RESPOND" {
-					if llmLogger != nil {
-						llmLogger.SetAutoRespond(amMsg.AutoRespond)
+					if logger := llmLoggerAtomic.Load(); logger != nil {
+						logger.(*am.LLMLogger).SetAutoRespond(amMsg.AutoRespond)
 						log.Printf("[AM] Auto-respond set to %v for session %s", amMsg.AutoRespond, sessionID)
 					}
 					continue
@@ -468,8 +474,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			amInputAccumulator.WriteString(dataStr)
 			if time.Since(lastAMCheck) > 100*time.Millisecond {
-				if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
-					llmLogger.AddUserInput(amInputAccumulator.String())
+				if logger := llmLoggerAtomic.Load(); logger != nil {
+					llmLogger := logger.(*am.LLMLogger)
+					if llmLogger.GetActiveConversationID() != "" {
+						llmLogger.AddUserInput(amInputAccumulator.String())
+					}
 				}
 				amInputAccumulator.Reset()
 				lastAMCheck = time.Now()
@@ -480,7 +489,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				commandLine := strings.TrimSpace(inputBuffer.String())
 				inputBuffer.Reset()
 
-				if commandLine != "" && llmLogger != nil {
+				if logger := llmLoggerAtomic.Load(); commandLine != "" && logger != nil {
+					llmLogger := logger.(*am.LLMLogger)
 					// Only detect new LLM command if no conversation is active
 					activeConv := llmLogger.GetActiveConversationID()
 					if activeConv == "" {
@@ -505,11 +515,14 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Periodic flush check for LLM output (reduced frequency)
-			if llmLogger != nil && time.Since(lastFlushCheck) > flushTimeout {
-				if llmLogger.ShouldFlushOutput(flushTimeout) {
-					go llmLogger.FlushOutput() // Async flush
+			if logger := llmLoggerAtomic.Load(); logger != nil {
+				llmLogger := logger.(*am.LLMLogger)
+				if time.Since(lastFlushCheck) > flushTimeout {
+					if llmLogger.ShouldFlushOutput(flushTimeout) {
+						go llmLogger.FlushOutput() // Async flush
+					}
+					lastFlushCheck = time.Now()
 				}
-				lastFlushCheck = time.Now()
 			}
 		}
 	}()
@@ -533,7 +546,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// CRITICAL: Clean up LLM logger when session ends
-	if llmLogger != nil {
+	if logger := llmLoggerAtomic.Load(); logger != nil {
+		llmLogger := logger.(*am.LLMLogger)
 		// End any active conversation
 		if activeConv := llmLogger.GetActiveConversationID(); activeConv != "" {
 			log.Printf("[Terminal] Ending active conversation %s on session close", activeConv)
