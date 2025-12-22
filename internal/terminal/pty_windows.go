@@ -6,6 +6,7 @@ package terminal
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -16,10 +17,15 @@ import (
 // startPTY starts a PTY session on Windows using ConPTY.
 func startPTY(cmd *exec.Cmd) (io.ReadWriteCloser, error) {
 	// ConPTY takes a command string, not exec.Cmd
-	// Use cmd.exe as a wrapper for better compatibility
-	cpty, err := conpty.Start("cmd.exe")
+	// Use COMSPEC or cmd.exe as a wrapper for better compatibility
+	shell := os.Getenv("COMSPEC")
+	if shell == "" {
+		shell = "cmd.exe"
+	}
+	
+	cpty, err := conpty.Start(shell)
 	if err != nil {
-		return nil, fmt.Errorf("conpty start failed: %w", err)
+		return nil, fmt.Errorf("conpty start failed (shell=%s): %w", shell, err)
 	}
 	return cpty, nil
 }

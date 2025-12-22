@@ -1023,6 +1023,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           if (str.length > 0 && str[0] === '{') {
             try {
               const msg = JSON.parse(str);
+              
+              // Handle server errors (e.g. failed to start PTY)
+              if (msg.error) {
+                console.error('[Terminal] Server error:', msg.error);
+                if (xtermRef.current) {
+                  xtermRef.current.write(`\r\n\x1b[31mError: ${msg.error}\x1b[0m\r\n`);
+                }
+                // CRITICAL: Stop reconnecting on fatal error
+                reconnectAttemptsRef.current = maxReconnectAttempts + 1;
+                ws.close();
+                return;
+              }
+
               if (msg.type === 'VISION_OVERLAY') {
                 setActiveVisionOverlay({
                   type: msg.overlayType,

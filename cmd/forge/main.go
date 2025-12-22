@@ -543,7 +543,8 @@ func handleWSLDetect(w http.ResponseWriter, r *http.Request) {
 // findAvailablePort tries preferred ports in order and returns the first available one
 func findAvailablePort() (string, net.Listener, error) {
 	for _, port := range preferredPorts {
-		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		// Use localhost to allow OS to choose IPv4/IPv6 as needed
+		addr := fmt.Sprintf("localhost:%d", port)
 		listener, err := net.Listen("tcp", addr)
 		if err == nil {
 			return addr, listener, nil
@@ -552,7 +553,7 @@ func findAvailablePort() (string, net.Listener, error) {
 	}
 
 	// Fallback: let OS assign a random available port
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return "", nil, fmt.Errorf("no available ports: %w", err)
 	}

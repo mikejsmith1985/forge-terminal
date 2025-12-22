@@ -210,23 +210,25 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// When parsing confidence is low during auto-respond, notify user via Vision
 			if logger := llmLoggerAtomic.Load(); logger != nil {
 				llmLogger := logger.(*am.LLMLogger)
-				llmLogger.SetLowConfidenceCallback(func(raw string) {
-					log.Printf("[AM] Low confidence parsing detected, sending Vision notification")
-					// Send a Vision overlay to notify the user
-					overlayMsg := VisionOverlayMessage{
-						Type:        "VISION_OVERLAY",
-						OverlayType: "AM_LOW_CONFIDENCE",
-						Payload: map[string]interface{}{
-							"message":     "AM detected low-confidence parsing. Raw data preserved for manual review.",
-							"severity":    "warning",
-							"autoRespond": true,
-							"rawLength":   len(raw),
-						},
-					}
-					if err := conn.WriteJSON(overlayMsg); err != nil {
-						log.Printf("[AM] Failed to send low-confidence notification: %v", err)
-					}
-				})
+				if llmLogger != nil {
+					llmLogger.SetLowConfidenceCallback(func(raw string) {
+						log.Printf("[AM] Low confidence parsing detected, sending Vision notification")
+						// Send a Vision overlay to notify the user
+						overlayMsg := VisionOverlayMessage{
+							Type:        "VISION_OVERLAY",
+							OverlayType: "AM_LOW_CONFIDENCE",
+							Payload: map[string]interface{}{
+								"message":     "AM detected low-confidence parsing. Raw data preserved for manual review.",
+								"severity":    "warning",
+								"autoRespond": true,
+								"rawLength":   len(raw),
+							},
+						}
+						if err := conn.WriteJSON(overlayMsg); err != nil {
+							log.Printf("[AM] Failed to send low-confidence notification: %v", err)
+						}
+					})
+				}
 			}
 			log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
 		}
@@ -371,7 +373,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// Accumulate output and flush every 200ms to prevent lock contention
 				if logger := llmLoggerAtomic.Load(); logger != nil {
 					llmLogger := logger.(*am.LLMLogger)
-					if llmLogger.GetActiveConversationID() != "" {
+					if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
 						// BOUNDED BUFFER: Prevent OOM
 						if llmOutputBuffer.Len() > 65536 { // 64KB limit
 							llmOutputBuffer.Reset()
@@ -440,8 +442,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				var amMsg AMControlMessage
 				if err := json.Unmarshal(data, &amMsg); err == nil && amMsg.Type == "AM_AUTO_RESPOND" {
 					if logger := llmLoggerAtomic.Load(); logger != nil {
-						logger.(*am.LLMLogger).SetAutoRespond(amMsg.AutoRespond)
-						log.Printf("[AM] Auto-respond set to %v for session %s", amMsg.AutoRespond, sessionID)
+						if llmLogger := logger.(*am.LLMLogger); llmLogger != nil {
+							llmLogger.SetAutoRespond(amMsg.AutoRespond)
+							log.Printf("[AM] Auto-respond set to %v for session %s", amMsg.AutoRespond, sessionID)
+						}
 					}
 					continue
 				}
@@ -476,7 +480,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			if time.Since(lastAMCheck) > 100*time.Millisecond {
 				if logger := llmLoggerAtomic.Load(); logger != nil {
 					llmLogger := logger.(*am.LLMLogger)
-					if llmLogger.GetActiveConversationID() != "" {
+					if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
 						llmLogger.AddUserInput(amInputAccumulator.String())
 					}
 				}
@@ -491,23 +495,25 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 				if logger := llmLoggerAtomic.Load(); commandLine != "" && logger != nil {
 					llmLogger := logger.(*am.LLMLogger)
-					// Only detect new LLM command if no conversation is active
-					activeConv := llmLogger.GetActiveConversationID()
-					if activeConv == "" {
-						detected := detector.DetectCommand(commandLine)
+					if llmLogger != nil {
+						// Only detect new LLM command if no conversation is active
+						activeConv := llmLogger.GetActiveConversationID()
+						if activeConv == "" {
+							detected := detector.DetectCommand(commandLine)
 
-						if detected.Detected {
-							// Check if this is a TUI-based tool (Copilot, Claude)
-							isTUITool := detected.Provider == "github-copilot" || detected.Provider == "claude"
+							if detected.Detected {
+								// Check if this is a TUI-based tool (Copilot, Claude)
+								isTUITool := detected.Provider == "github-copilot" || detected.Provider == "claude"
 
-							if isTUITool {
-								llmLogger.StartConversationFromProcess(
-									string(detected.Provider),
-									string(detected.Type),
-									0,
-								)
-							} else {
-								llmLogger.StartConversation(detected)
+								if isTUITool {
+									llmLogger.StartConversationFromProcess(
+										string(detected.Provider),
+										string(detected.Type),
+										0,
+									)
+								} else {
+									llmLogger.StartConversation(detected)
+								}
 							}
 						}
 					}
@@ -517,7 +523,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// Periodic flush check for LLM output (reduced frequency)
 			if logger := llmLoggerAtomic.Load(); logger != nil {
 				llmLogger := logger.(*am.LLMLogger)
-				if time.Since(lastFlushCheck) > flushTimeout {
+				if llmLogger != nil && time.Since(lastFlushCheck) > flushTimeout {
 					if llmLogger.ShouldFlushOutput(flushTimeout) {
 						go llmLogger.FlushOutput() // Async flush
 					}
@@ -548,14 +554,16 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// CRITICAL: Clean up LLM logger when session ends
 	if logger := llmLoggerAtomic.Load(); logger != nil {
 		llmLogger := logger.(*am.LLMLogger)
-		// End any active conversation
-		if activeConv := llmLogger.GetActiveConversationID(); activeConv != "" {
-			log.Printf("[Terminal] Ending active conversation %s on session close", activeConv)
-			llmLogger.EndConversation()
+		if llmLogger != nil {
+			// End any active conversation
+			if activeConv := llmLogger.GetActiveConversationID(); activeConv != "" {
+				log.Printf("[Terminal] Ending active conversation %s on session close", activeConv)
+				llmLogger.EndConversation()
+			}
+			// Remove the logger from global map to prevent memory leaks
+			am.RemoveLLMLogger(tabID)
+			log.Printf("[Terminal] LLM logger cleaned up for tab %s", tabID)
 		}
-		// Remove the logger from global map to prevent memory leaks
-		am.RemoveLLMLogger(tabID)
-		log.Printf("[Terminal] LLM logger cleaned up for tab %s", tabID)
 	}
 
 	// Send close message with reason
