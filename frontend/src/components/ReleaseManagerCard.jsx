@@ -10,7 +10,6 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [buildAssets, setBuildAssets] = useState(false);
 
   const { incrementMajor, incrementMinor, incrementFix, getReleaseType } = useVersionIncrement();
 
@@ -58,31 +57,16 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
   const generateReleaseCommand = useCallback(() => {
     if (!next) return '';
     
-    let buildCmd = '';
-    if (buildAssets) {
-      if (shellType === 'powershell') {
-        buildCmd = '.\\build.ps1';
-      } else if (shellType === 'cmd') {
-        buildCmd = 'powershell -ExecutionPolicy Bypass -File .\\build.ps1';
-      } else {
-        buildCmd = 'make build';
-      }
-    }
-
     // Generate command based on shell type
+    // The workflow is triggered by pushing a tag, not by gh release create
     if (shellType === 'powershell') {
       // PowerShell 5.1 compatible syntax (no &&)
-      const buildPart = buildAssets ? `${buildCmd}; if ($?) { ` : '';
-      const buildEnd = buildAssets ? ' }' : '';
-      const assetPart = buildAssets ? ' bin\\forge.exe' : '';
-      return `${buildPart}$b = git branch --show-current; git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b; if ($?) { git push origin main; if ($?) { gh release create ${next} --title "${next} - Release" --target main --generate-notes${assetPart}; if ($?) { git checkout $b; echo "Release ${next} created successfully!" } } } } }${buildEnd}`;
+      return `$b = git branch --show-current; git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b; if ($?) { git push origin main; if ($?) { git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "Tag ${next} pushed successfully! GitHub Actions will build and release." -ForegroundColor Green } } } } } }`;
     } else {
       // Bash, CMD, and PowerShell 7+ support &&
-      const buildPart = buildAssets ? `${buildCmd} && ` : '';
-      const assetPart = buildAssets ? ' bin/forge.exe' : '';
-      return `${buildPart}b=$(git branch --show-current) && git checkout main && git pull origin main && git merge $b && git push origin main && gh release create ${next} --title "${next} - Release" --target main --generate-notes${assetPart} && git checkout $b && echo "Release ${next} created successfully!"`;
+      return `b=$(git branch --show-current) && git checkout main && git pull origin main && git merge $b && git push origin main && git tag ${next} && git push origin ${next} && git checkout $b && echo "Tag ${next} pushed successfully! GitHub Actions will build and release."`;
     }
-  }, [next, shellType, buildAssets]);
+  }, [next, shellType]);
 
   const releaseCommand = generateReleaseCommand();
 
@@ -164,18 +148,6 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
 
         <div className={`rm-release-type ${releaseDisplay.color}`}>
           {releaseDisplay.label}
-        </div>
-
-        <div className="rm-options" style={{ marginBottom: '15px', display: 'flex', alignItems: 'center' }}>
-          <label className="rm-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9em', color: '#ccc' }}>
-            <input
-              type="checkbox"
-              checked={buildAssets}
-              onChange={(e) => setBuildAssets(e.target.checked)}
-              style={{ cursor: 'pointer' }}
-            />
-            Build Assets
-          </label>
         </div>
 
         <div className="rm-buttons-group">

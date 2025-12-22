@@ -1143,6 +1143,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
         });
+        }
       };
 
       ws.onerror = (error) => {
@@ -1408,8 +1409,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         wsRef.current.onclose = null;
         wsRef.current.close();
       }
+      if (xtermRef.current) {
+        xtermRef.current.dispose();
+      }
       xtermRef.current = null;
-      term.dispose();
     };
   }, []); // Only run once on mount, theme updates handled by other effect
 
