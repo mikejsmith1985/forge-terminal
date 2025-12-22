@@ -18,6 +18,10 @@
 - **Issue**: The backend was panicking on startup when the AM system was disabled (default state), causing connection refused errors in the frontend. The panic occurred due to a nil pointer dereference when accessing the LLM logger.
 - **Fix**: Updated `internal/terminal/handler.go` to safely check for nil pointers before accessing LLM logger methods. This prevents the crash and ensures stable connections even when AM is disabled.
 
+### 5. Reconnection Loop Fix
+- **Issue**: In the initial v2.1.6 release, the frontend would stop reconnecting after any server error, causing continuous terminal resets.
+- **Fix**: Removed aggressive reconnection termination. The frontend now displays errors but allows normal reconnection handling to manage the connection lifecycle.
+
 ## 📦 Build Information
 - **Version**: v2.1.6
 - **Platform**: Windows (amd64)
