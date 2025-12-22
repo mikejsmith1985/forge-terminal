@@ -754,6 +754,78 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       term.focus();
     });
 
+    // ROBUST PASTE HANDLER: Listen for the native paste event on the textarea
+    // This works even when navigator.clipboard.read() is blocked or fails
+    // We use the container and capture phase to ensure we get the event before xterm swallows it
+    const handlePaste = async (e) => {
+      // We only care about images here. Text is handled by xterm natively if we don't preventDefault.
+      
+      // Check for images in the paste event
+      if (e.clipboardData && e.clipboardData.items) {
+        let imageFound = false;
+        for (const item of e.clipboardData.items) {
+          if (item.type.startsWith('image/')) {
+            imageFound = true;
+            e.preventDefault(); // Stop xterm from handling it
+            e.stopPropagation(); // Stop bubbling
+            
+            console.log('[Terminal] Image detected in paste event:', item.type);
+            
+            try {
+              const blob = item.getAsFile();
+              if (!blob) continue;
+              
+              const formData = new FormData();
+              const filename = `clipboard-${Date.now()}.png`;
+              formData.append('file', blob, filename);
+              
+              // Show uploading indicator
+              if (xtermRef.current) {
+                xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
+              }
+              
+              const response = await fetch('/api/files/upload', {
+                method: 'POST',
+                body: formData
+              });
+              
+              if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+              
+              const data = await response.json();
+              const filePath = data.path;
+              
+              // Clear uploading indicator
+              if (xtermRef.current) {
+                xtermRef.current.write('\r\x1b[K');
+              }
+              
+              // Send file path to terminal
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
+                const textToSend = `see file at ${pathStr}`;
+                wsRef.current.send(textToSend);
+                console.log('[Terminal] Sent image path to backend:', textToSend);
+                if (onPasteRef.current) onPasteRef.current();
+              }
+            } catch (err) {
+              console.error('[Terminal] Image upload failed:', err);
+              if (xtermRef.current) {
+                xtermRef.current.write(`\r\x1b[K\x1b[31m[Image upload failed: ${err.message}]\x1b[0m\r\n`);
+              }
+            }
+            break; // Only handle one image
+          }
+        }
+        
+        if (imageFound) return;
+      }
+    };
+
+    // Attach to container with capture=true to intercept before xterm
+    if (terminalRef.current) {
+      terminalRef.current.addEventListener('paste', handlePaste, true);
+    }
+
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
     // This runs BEFORE xterm processes the key and allows conditional intercept
     term.attachCustomKeyEventHandler((arg) => {
@@ -808,101 +880,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // Handle Ctrl+V (Paste)
+      // Handle Ctrl+V (Paste) - REMOVED
+      // We now use the native 'paste' event listener on the textarea (see above)
+      // This is more robust and handles images correctly without needing Clipboard API permissions
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        console.log('[Terminal] Ctrl+V detected - checking clipboard');
-        diagnosticCore.recordPasteEvent('', 'ctrl-v-triggered');
-        
-        // Try to read clipboard items first (for images)
-        navigator.clipboard.read().then(async (items) => {
-          let imageFound = false;
-          for (const item of items) {
-            // Look for image types
-            const imageType = item.types.find(type => type.startsWith('image/'));
-            if (imageType) {
-              imageFound = true;
-              console.log('[Terminal] Image detected in clipboard:', imageType);
-              
-              try {
-                const blob = await item.getType(imageType);
-                const formData = new FormData();
-                formData.append('file', blob, 'clipboard-image.png');
-                
-                // Show uploading indicator
-                if (xtermRef.current) {
-                  xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
-                }
-                
-                const response = await fetch('/api/files/upload', {
-                  method: 'POST',
-                  body: formData
-                });
-                
-                if (!response.ok) throw new Error('Upload failed');
-                
-                const data = await response.json();
-                const filePath = data.path;
-                
-                // Clear uploading indicator (move cursor back and clear line)
-                if (xtermRef.current) {
-                  xtermRef.current.write('\r\x1b[K');
-                }
-                
-                // Send file path to terminal
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  // Quote the path if it contains spaces
-                  const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
-                  const textToSend = `see file at ${pathStr}`;
-                  wsRef.current.send(textToSend);
-                  console.log('[Terminal] Sent image path to backend:', textToSend);
-                  if (onPasteRef.current) onPasteRef.current();
-                }
-              } catch (err) {
-                console.error('[Terminal] Image upload failed:', err);
-                if (xtermRef.current) {
-                  xtermRef.current.write('\r\x1b[K\x1b[31m[Image upload failed]\x1b[0m\r\n');
-                }
-              }
-              break; // Only handle one image
-            }
-          }
-          
-          // If no image found, fall back to text
-          if (!imageFound) {
-            navigator.clipboard.readText()
-              .then((text) => {
-                console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
-                diagnosticCore.recordPasteEvent(text, 'clipboard-read');
-                
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  diagnosticCore.recordWebSocketEvent('send', { length: text.length, content: text });
-                  wsRef.current.send(text);
-                  console.log('[Terminal] Sent pasted text to backend:', text.length, 'chars');
-                  if (onPasteRef.current) onPasteRef.current();
-                } else {
-                  console.warn('[Terminal] WebSocket not ready for paste');
-                  diagnosticCore.recordWebSocketEvent('error', { reason: 'not-ready-for-paste' });
-                }
-              })
-              .catch((err) => {
-                console.error('[Terminal] Clipboard text read failed:', err);
-              });
-          }
-        }).catch((err) => {
-          // Fallback for browsers that don't support read() or permission denied
-          // Try readText directly
-          console.warn('[Terminal] Clipboard read() failed, falling back to readText():', err);
-          navigator.clipboard.readText()
-            .then((text) => {
-              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.send(text);
-                if (onPasteRef.current) onPasteRef.current();
-              }
-            })
-            .catch((e) => console.error('[Terminal] Clipboard fallback failed:', e));
-        });
-
-        return false; // Prevent xterm from handling this event
+        return true; // Let xterm handle the key event (which triggers the paste event)
       }
 
       return true; // Let all other keys pass through standard xterm processing

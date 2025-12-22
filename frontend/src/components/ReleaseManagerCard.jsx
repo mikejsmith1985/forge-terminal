@@ -120,15 +120,15 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
   }, [releaseCommand, next, onExecuteCommand]);
 
   const getReleaseTypeDisplay = () => {
-    switch (releaseType) {
-      case 'major':
-        return { label: 'BREAKING CHANGES', color: 'red' };
-      case 'minor':
-        return { label: 'NEW FEATURES', color: 'blue' };
-      case 'fix':
-      default:
-        return { label: 'BUG FIXES', color: 'green' };
+    if (!releaseType) return { label: 'BUG FIXES', color: 'green' };
+    
+    if (releaseType.startsWith('MAJOR')) {
+      return { label: 'BREAKING CHANGES', color: 'red' };
     }
+    if (releaseType.startsWith('MINOR')) {
+      return { label: 'NEW FEATURES', color: 'blue' };
+    }
+    return { label: 'BUG FIXES', color: 'green' };
   };
 
   const releaseDisplay = getReleaseTypeDisplay();
