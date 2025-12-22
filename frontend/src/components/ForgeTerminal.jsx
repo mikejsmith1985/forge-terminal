@@ -1092,8 +1092,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         if (waitingCheckIdleRef.current) {
           if (!isStarved) {
             cancelIdleWork(waitingCheckIdleRef.current);
-            waitingCheckIdleRef.current = null;
           }
+          // Always clear the ref to allow new work to be scheduled
+          waitingCheckIdleRef.current = null;
         }
         
         if (!waitingCheckIdleRef.current) {
