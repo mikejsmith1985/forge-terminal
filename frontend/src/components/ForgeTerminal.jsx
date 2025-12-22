@@ -1030,9 +1030,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 if (xtermRef.current) {
                   xtermRef.current.write(`\r\n\x1b[31mError: ${msg.error}\x1b[0m\r\n`);
                 }
-                // CRITICAL: Stop reconnecting on fatal error
-                reconnectAttemptsRef.current = maxReconnectAttempts + 1;
-                ws.close();
+                // Don't close connection - let normal close handling manage reconnection
                 return;
               }
 
