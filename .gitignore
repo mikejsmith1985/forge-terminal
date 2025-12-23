@@ -19,7 +19,7 @@ frontend/node_modules/
 # Build artifacts
 frontend/dist/
 web/assets/
-cmd/forge/web/assets/
+# cmd/forge/web/assets/  # Include in releases
 cmd/forge/web/index.html
 
 # IDE
