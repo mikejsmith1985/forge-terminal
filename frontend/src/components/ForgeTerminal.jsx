@@ -40,18 +40,24 @@ function throttle(fn, ms) {
 }
 
 // Use requestIdleCallback with fallback for non-blocking work
-// AUTO_RESPOND_DEBOUNCE_MS: 1500ms matches v1.23.8 proven timing
-// CRITICAL: 100ms was too short (v2.1.8 bug) - prompt checks were starved
-const AUTO_RESPOND_DEBOUNCE_MS = 1500;
-
+// This allows prompt detection to fire quickly when the browser is idle,
+// rather than forcing a fixed delay. The timeout parameter (2000ms) is a 
+// maximum wait time, not a minimum - the callback fires as soon as the
+// browser has idle time available (typically 10-100ms after last activity).
 const scheduleIdleWork = (callback) => {
-  // Use 1500ms debounce matching v1.23.8 proven timing
-  // This ensures the prompt check runs after output stream settles
-  return setTimeout(callback, AUTO_RESPOND_DEBOUNCE_MS);
+  if (typeof requestIdleCallback !== 'undefined') {
+    return requestIdleCallback(callback, { timeout: 2000 });
+  }
+  // Fallback for browsers without requestIdleCallback
+  return setTimeout(callback, 100);
 };
 
 const cancelIdleWork = (id) => {
-  clearTimeout(id);
+  if (typeof cancelIdleCallback !== 'undefined') {
+    cancelIdleCallback(id);
+  } else {
+    clearTimeout(id);
+  }
 };
 
 // ============================================================================
