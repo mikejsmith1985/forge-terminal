@@ -43,6 +43,10 @@ const YN_PROMPT_PATTERNS = [
   /\?\s*\[y\/N\][:?]?\s*$/i,
   /\?\s*›?\s*\(Y\/n\)[:?]?\s*$/i,
   /Are you sure.*\?\s*$/i,
+  // PowerShell -Confirm prompts
+  /\[Y\]\s*Yes\s+\[A\]\s*Yes to All\s+\[N\]\s*No/i,
+  /\(default is "Y"\)\s*:?\s*$/i,
+  /\[Y\].*\[N\].*:\s*$/i,
 ];
 
 const QUESTION_PATTERNS = [
@@ -251,6 +255,30 @@ Save changes before exiting? (yes/no)
       expect(result.waiting).toBe(true);
       expect(result.responseType).toBe('y-enter');
       expect(result.confidence).toBe('high');
+    });
+
+    it('should detect PowerShell -Confirm prompt', () => {
+      const buffer = `
+Confirm
+Are you sure you want to perform this action?
+Performing the operation "Remove File" on target "C:\\test.txt".
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "Y"):
+`;
+      const result = detectCliPrompt(buffer);
+      
+      expect(result.waiting).toBe(true);
+      expect(result.responseType).toBe('y-enter');
+      expect(result.confidence).toBe('high');
+    });
+
+    it('should detect PowerShell default is Y prompt ending', () => {
+      const buffer = `
+Some operation prompt (default is "Y"):
+`;
+      const result = detectCliPrompt(buffer);
+      
+      expect(result.waiting).toBe(true);
+      expect(result.responseType).toBe('y-enter');
     });
     
   });

@@ -40,19 +40,18 @@ function throttle(fn, ms) {
 }
 
 // Use requestIdleCallback with fallback for non-blocking work
+// AUTO_RESPOND_DEBOUNCE_MS: 1500ms matches v1.23.8 proven timing
+// CRITICAL: 100ms was too short (v2.1.8 bug) - prompt checks were starved
+const AUTO_RESPOND_DEBOUNCE_MS = 1500;
+
 const scheduleIdleWork = (callback) => {
-  if (typeof requestIdleCallback !== 'undefined') {
-    return requestIdleCallback(callback, { timeout: 2000 });
-  }
-  return setTimeout(callback, 100);
+  // Use 1500ms debounce matching v1.23.8 proven timing
+  // This ensures the prompt check runs after output stream settles
+  return setTimeout(callback, AUTO_RESPOND_DEBOUNCE_MS);
 };
 
 const cancelIdleWork = (id) => {
-  if (typeof cancelIdleCallback !== 'undefined') {
-    cancelIdleCallback(id);
-  } else {
-    clearTimeout(id);
-  }
+  clearTimeout(id);
 };
 
 // ============================================================================
@@ -116,6 +115,11 @@ const YN_PROMPT_PATTERNS = [
   // npm/yarn style
   /\?\s*›?\s*\(Y\/n\)[:?]?\s*$/i,
   /Are you sure.*\?\s*$/i,
+  // PowerShell -Confirm prompts: [Y] Yes  [A] Yes to All  [N] No... (default is "Y"):
+  /\[Y\]\s*Yes\s+\[A\]\s*Yes to All\s+\[N\]\s*No/i,
+  /\(default is "Y"\)\s*:?\s*$/i,
+  // Generic confirmation ending with colon after Yes/No options
+  /\[Y\].*\[N\].*:\s*$/i,
 ];
 
 // Question patterns that indicate waiting for input (used with context)
@@ -189,8 +193,9 @@ function detectMenuPrompt(cleanText, debugLog = false) {
  */
 function detectYnPrompt(cleanText, debugLog = false) {
   // Get last few lines for y/n detection (these appear at end)
+  // Use more lines for PowerShell prompts which can span multiple lines
   const lines = cleanText.split(/[\r\n]/).filter(l => l.trim());
-  const lastLines = lines.slice(-3).join('\n');
+  const lastLines = lines.slice(-5).join('\n'); // Increased from 3 to 5 lines
   
   const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(lastLines));
   
@@ -390,9 +395,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 5;
-  // PERF FIX: Throttle expensive operations
-  const lastPromptCheckRef = useRef(0);
-  const promptCheckIntervalMs = 500; // Only check prompts every 500ms max
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   
   // State for scroll button visibility
@@ -1058,7 +1060,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
         // PERF FIX: Append to buffer efficiently (reuse buffer object)
         const buf = outputBufferRef.current;
-        buf.data = (buf.data + textData).slice(-800); // Reduced from 1000
+        buf.data = (buf.data + textData).slice(-800);
 
         // PERF FIX: Batch AM logging - just queue, flush in idle time
         if (amEnabledRef.current && textData) {
@@ -1091,31 +1093,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }
         }
 
-        // PERF FIX: Schedule expensive work during idle time
-        // We use a trailing debounce pattern here:
-        // 1. If a check is already scheduled, cancel it (new data arrived)
-        // 2. Schedule a new check
-        // This ensures we only check when the stream pauses, but we NEVER miss the final prompt
-        
-        // FIX: Add maxWait to prevent starvation during continuous output (e.g. spinners)
-        const isStarved = (Date.now() - lastPromptCheckRef.current) > 1000;
-
+        // Simple debounce pattern matching v1.23.8 proven behavior
+        // 1. Cancel any pending check (new data arrived)
+        // 2. Schedule a new check after 1500ms of idle time
+        // This ensures we only check when the stream settles
         if (waitingCheckIdleRef.current) {
-          if (!isStarved) {
-            cancelIdleWork(waitingCheckIdleRef.current);
-          }
-          // Always clear the ref to allow new work to be scheduled
-          waitingCheckIdleRef.current = null;
+          cancelIdleWork(waitingCheckIdleRef.current);
         }
         
-        if (!waitingCheckIdleRef.current) {
-          waitingCheckIdleRef.current = scheduleIdleWork(() => {
+        waitingCheckIdleRef.current = scheduleIdleWork(() => {
           waitingCheckIdleRef.current = null;
-          
-          // We removed the time-based throttle here because the debounce (cancelIdleWork)
-          // already prevents excessive checks during rapid output.
-          // If we are here, the stream has paused (idle), so we MUST check for a prompt.
-          lastPromptCheckRef.current = Date.now();
 
           // Update lastOutputRef for compatibility
           lastOutputRef.current = buf.data;
@@ -1140,13 +1127,21 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Auto-respond logic
-          if (waiting && autoRespondRef.current && ws.readyState === WebSocket.OPEN) {
+          // Auto-respond logic - CRITICAL: Match v1.23.8 exactly
+          const shouldAutoRespond = waiting && 
+            autoRespondRef.current && 
+            ws.readyState === WebSocket.OPEN;
+            
+          if (shouldAutoRespond) {
+            logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
+            
             if (responseType === 'enter') {
               ws.send('\r');
             } else {
               ws.send('y\r');
             }
+            
+            // Clear buffer and state after auto-respond
             buf.data = '';
             lastOutputRef.current = '';
             setIsWaiting(false);
@@ -1155,7 +1150,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
         });
-        }
       };
 
       ws.onerror = (error) => {

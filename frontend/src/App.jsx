@@ -530,19 +530,21 @@ function App() {
   }
 
   const checkForUpdates = async () => {
-    // Skip update check in local development
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      console.log('[Update] Skipping update check in local development');
-      return;
-    }
-
+    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
     try {
-      // Get current version
+      // Always fetch current version (needed for tooltip and modal display)
       const versionRes = await fetch('/api/version');
       const versionData = await versionRes.json();
       setCurrentVersion(versionData.version || '');
       
-      // Check for updates
+      // Skip GitHub update check in local development
+      if (isLocalDev) {
+        console.log('[Update] Skipping GitHub update check in local development');
+        return;
+      }
+      
+      // Check for updates from GitHub
       const res = await fetch('/api/update/check');
       const data = await res.json();
       
@@ -1656,6 +1658,7 @@ function App() {
         onClose={() => setIsUpdateModalOpen(false)}
         updateInfo={updateInfo}
         currentVersion={currentVersion}
+        isDevMode={window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'}
       />
 
       <WelcomeModal

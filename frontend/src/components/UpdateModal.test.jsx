@@ -269,4 +269,104 @@ describe('UpdateModal', () => {
       expect(updateButton).not.toBeInTheDocument();
     });
   });
+
+  describe('Version Display (Issue #3 Fix)', () => {
+    it('should display current version with "v" prefix', () => {
+      render(<UpdateModal {...defaultProps} currentVersion="2.1.8" />);
+      
+      // Should show "v2.1.8" not just "v" or "2.1.8"
+      expect(screen.getByText(/v2\.1\.8/)).toBeInTheDocument();
+    });
+
+    it('should show "Loading..." when currentVersion is empty', () => {
+      render(<UpdateModal {...defaultProps} currentVersion="" />);
+      
+      // Should show "Loading..." instead of just "v"
+      expect(screen.getByText(/Loading\.\.\./)).toBeInTheDocument();
+    });
+
+    it('should show "Loading..." when currentVersion is undefined', () => {
+      render(<UpdateModal {...defaultProps} currentVersion={undefined} />);
+      
+      // Should show "Loading..." instead of just "v"
+      expect(screen.getByText(/Loading\.\.\./)).toBeInTheDocument();
+    });
+
+    it('should have white color on version text for readability', () => {
+      const { container } = render(<UpdateModal {...defaultProps} currentVersion="2.1.8" />);
+      
+      // Find the version display element
+      const versionElement = container.querySelector('[style*="monospace"]');
+      
+      // The version text should be readable (white or light color)
+      // We check that it has color: '#fff' or similar
+      expect(versionElement).toBeInTheDocument();
+      if (versionElement) {
+        const style = versionElement.getAttribute('style') || '';
+        // Should have white color for readability
+        expect(style).toMatch(/color:\s*(?:#fff|#ffffff|white|rgb\(255,\s*255,\s*255\))/i);
+      }
+    });
+
+    it('should display full version number, not truncated', () => {
+      render(<UpdateModal {...defaultProps} currentVersion="2.1.8-beta.1" />);
+      
+      // Should show the full version string
+      expect(screen.getByText(/v2\.1\.8-beta\.1/)).toBeInTheDocument();
+    });
+  });
+
+  describe('Development Mode Awareness (Issue #4 Fix)', () => {
+    it('should show dev mode message when isDevMode is true and no update available', () => {
+      const devModeProps = {
+        ...defaultProps,
+        updateInfo: { available: false },
+        isDevMode: true,
+      };
+
+      render(<UpdateModal {...devModeProps} />);
+      
+      // Should show development mode indication
+      expect(screen.getByText(/development mode/i)).toBeInTheDocument();
+    });
+
+    it('should show instruction to use Check Now button in dev mode', () => {
+      const devModeProps = {
+        ...defaultProps,
+        updateInfo: { available: false },
+        isDevMode: true,
+      };
+
+      render(<UpdateModal {...devModeProps} />);
+      
+      // Should mention the Check Now button in the dev mode message
+      expect(screen.getByText(/Use the "Check Now" button/i)).toBeInTheDocument();
+    });
+
+    it('should NOT show dev mode message when update is available', () => {
+      const devModeWithUpdateProps = {
+        ...defaultProps,
+        updateInfo: mockUpdateInfo, // available: true
+        isDevMode: true,
+      };
+
+      render(<UpdateModal {...devModeWithUpdateProps} />);
+      
+      // Should NOT show dev mode message when an update is actually available
+      expect(screen.queryByText(/Running in development mode/i)).not.toBeInTheDocument();
+    });
+
+    it('should NOT show dev mode message when isDevMode is false', () => {
+      const prodModeProps = {
+        ...defaultProps,
+        updateInfo: { available: false },
+        isDevMode: false,
+      };
+
+      render(<UpdateModal {...prodModeProps} />);
+      
+      // Should NOT show dev mode message in production
+      expect(screen.queryByText(/Running in development mode/i)).not.toBeInTheDocument();
+    });
+  });
 });

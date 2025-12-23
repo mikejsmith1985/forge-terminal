@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw, ExternalLink, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, History, Upload } from 'lucide-react';
 
-const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdate }) => {
+const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdate, isDevMode = false }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateStatus, setUpdateStatus] = useState(null); // 'downloading' | 'applying' | 'success' | 'error' | 'restarting' | 'ready'
   const [errorMessage, setErrorMessage] = useState('');
@@ -362,7 +362,9 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
           }}>
             <div>
               <span style={{ color: '#888' }}>Current Version</span>
-              <div style={{ fontFamily: 'monospace', fontWeight: 600, marginTop: '4px' }}>v{currentVersion}</div>
+              <div style={{ fontFamily: 'monospace', fontWeight: 600, marginTop: '4px', color: '#fff' }}>
+                {currentVersion ? `v${currentVersion}` : 'Loading...'}
+              </div>
               {lastCheckedTime && (
                 <div style={{ fontSize: '0.75em', color: '#666', marginTop: '4px' }}>
                   Last checked: {lastCheckedTime.toLocaleTimeString()}
@@ -566,14 +568,34 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
               )}
             </>
           ) : (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '30px',
-              color: '#888'
-            }}>
-              <CheckCircle size={48} style={{ color: '#22c55e', marginBottom: '15px' }} />
-              <p style={{ margin: 0 }}>You're running the latest version!</p>
-            </div>
+            <>
+              {/* Development Mode Message */}
+              {isDevMode && (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '20px',
+                  color: '#888',
+                  background: '#1a1a1a',
+                  borderRadius: '8px',
+                  marginBottom: '15px'
+                }}>
+                  <p style={{ margin: 0, marginBottom: '8px' }}>
+                    Running in development mode
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.85em', color: '#666' }}>
+                    Update checks are disabled. Use the "Check Now" button to check GitHub manually.
+                  </p>
+                </div>
+              )}
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '30px',
+                color: '#888'
+              }}>
+                <CheckCircle size={48} style={{ color: '#22c55e', marginBottom: '15px' }} />
+                <p style={{ margin: 0 }}>You're running the latest version!</p>
+              </div>
+            </>
           )}
 
           {/* Version History Section */}
