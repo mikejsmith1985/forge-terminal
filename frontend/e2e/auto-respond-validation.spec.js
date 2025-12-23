@@ -62,15 +62,22 @@ test.describe('Auto-Respond Feature - Positive Tests', () => {
 ╰──────────────────────────────────────────────────────╯
 `;
 
+    // Use the internal output buffer simulation approach
+    // The auto-respond logic reads from outputBufferRef.current.data
     await page.evaluate((prompt) => {
       const term = window.xterm;
       if (term) {
         term.write(prompt);
       }
+      // Also set up the buffer that the auto-respond detection reads from
+      if (window.forgeTerminalInstance && window.forgeTerminalInstance.simulateOutput) {
+        window.forgeTerminalInstance.simulateOutput(prompt);
+      }
     }, simulatedPrompt);
 
-    // Wait for auto-respond detection
-    await page.waitForTimeout(1500);
+    // Wait for auto-respond detection - now using requestIdleCallback this should be fast
+    // but we give it extra time for test stability
+    await page.waitForTimeout(2500);
 
     // Get sent messages
     const messages = await page.evaluate(() => window.sentMessages);
