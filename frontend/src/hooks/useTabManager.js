@@ -198,6 +198,8 @@ export function useTabManager(initialShellConfig) {
           mode: tabState.mode || 'dark',
           autoRespond: tabState.autoRespond || false,
           amEnabled: tabState.amEnabled || false,
+          visionEnabled: tabState.visionEnabled || false,
+          assistantEnabled: tabState.assistantEnabled || false,
           currentDirectory: tabState.currentDirectory || null,
           type: tabState.type || 'terminal',
           createdAt: Date.now(),

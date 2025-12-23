@@ -1115,6 +1115,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
           // Now do the expensive regex work
           const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
+          
+          // DEBUG: Log auto-respond check (uncomment for debugging)
+          if (autoRespondRef.current) {
+            console.log('[AutoRespond] Check:', { 
+              waiting, 
+              responseType, 
+              confidence,
+              autoRespondEnabled: autoRespondRef.current,
+              wsReady: ws.readyState === WebSocket.OPEN,
+              bufferLen: buf.data.length
+            });
+          }
 
           if (waiting !== isWaiting) {
             setIsWaiting(waiting);
@@ -1139,6 +1151,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             ws.readyState === WebSocket.OPEN;
             
           if (shouldAutoRespond) {
+            console.log('[AutoRespond] SENDING response:', { responseType, confidence });
             logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
             
             if (responseType === 'enter') {
