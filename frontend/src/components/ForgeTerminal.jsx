@@ -19,20 +19,15 @@ function debounce(fn, ms) {
   };
 }
 
-// v2.0.1 EXACT: Use requestIdleCallback for non-blocking detection
-const scheduleIdleWork = (callback) => {
-  if (typeof requestIdleCallback !== 'undefined') {
-    return requestIdleCallback(callback, { timeout: 2000 });
-  }
-  return setTimeout(callback, 100);
+// v2.2.6 FIX: Use setTimeout for RELIABLE auto-respond detection
+// requestIdleCallback was causing 40-60% miss rate because browser never went "idle"
+// during continuous terminal output streaming. setTimeout(100) is predictable and fast.
+const scheduleDetection = (callback) => {
+  return setTimeout(callback, 100); // 100ms debounce - same as original v1.5.4
 };
 
-const cancelIdleWork = (id) => {
-  if (typeof cancelIdleCallback !== 'undefined') {
-    cancelIdleCallback(id);
-  } else {
-    clearTimeout(id);
-  }
+const cancelDetection = (id) => {
+  clearTimeout(id);
 };
 
 // ============================================================================
@@ -367,7 +362,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // v2.0.1 EXACT: Use outputBufferRef with 2000 char sliding window (increased for Copilot CLI menus)
   const outputBufferRef = useRef({ data: '' });
   const lastOutputRef = useRef(''); // Keep for compatibility
-  const waitingCheckIdleRef = useRef(null); // Use requestIdleCallback for non-blocking detection
+  const waitingCheckTimeoutRef = useRef(null); // v2.2.6: Use setTimeout for reliable detection
   const autoRespondRef = useRef(autoRespond);
   const amEnabledRef = useRef(amEnabled);
   const tabNameRef = useRef(tabName);
@@ -1100,12 +1095,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }, 5000);
         }
 
-        // v2.0.2 EXACT: Use requestIdleCallback for non-blocking prompt detection
-        if (waitingCheckIdleRef.current) {
-          cancelIdleWork(waitingCheckIdleRef.current);
+        // v2.2.6 FIX: Use setTimeout for reliable prompt detection (not requestIdleCallback)
+        if (waitingCheckTimeoutRef.current) {
+          cancelDetection(waitingCheckTimeoutRef.current);
         }
-        waitingCheckIdleRef.current = scheduleIdleWork(() => {
-          waitingCheckIdleRef.current = null;
+        waitingCheckTimeoutRef.current = scheduleDetection(() => {
+          waitingCheckTimeoutRef.current = null;
           
           // CRITICAL FIX: Use buf.data not lastOutputRef
           const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
@@ -1377,10 +1372,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();
 
-      // v2.0.1: Cancel idle callbacks
-      if (waitingCheckIdleRef.current) {
-        cancelIdleWork(waitingCheckIdleRef.current);
-        waitingCheckIdleRef.current = null;
+      // v2.2.6: Cancel detection timeout
+      if (waitingCheckTimeoutRef.current) {
+        cancelDetection(waitingCheckTimeoutRef.current);
+        waitingCheckTimeoutRef.current = null;
       }
       if (amLogTimeoutRef.current) {
         clearTimeout(amLogTimeoutRef.current);
