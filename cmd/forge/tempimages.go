@@ -1,0 +1,98 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+// Session temp directory - created once per app session, cleaned on startup
+var sessionTempDir string
+
+func initSessionTempDir() error {
+	// Create temp dir in OS temp folder
+	baseTemp := os.TempDir()
+	sessionTempDir = filepath.Join(baseTemp, "forge-terminal-session")
+	
+	// Remove old session dir if it exists
+	os.RemoveAll(sessionTempDir)
+	
+	// Create fresh session dir
+	if err := os.MkdirAll(sessionTempDir, 0755); err != nil {
+		return fmt.Errorf("failed to create session temp dir: %w", err)
+	}
+	
+	log.Printf("[TempDir] Session temp directory initialized: %s", sessionTempDir)
+	
+	return nil
+}
+
+func handleTempImageUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB max
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "No image provided", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Validate it's an image
+	if !isImageFile(header.Filename) {
+		http.Error(w, "File must be an image", http.StatusBadRequest)
+		return
+	}
+
+	// Generate timestamp-based filename
+	timestamp := time.Now().Format("20060102-150405")
+	ext := filepath.Ext(header.Filename)
+	filename := fmt.Sprintf("screenshot-%s%s", timestamp, ext)
+	
+	// Save to session temp dir
+	destPath := filepath.Join(sessionTempDir, filename)
+	
+	dst, err := os.Create(destPath)
+	if err != nil {
+		log.Printf("[TempDir] Failed to create temp file: %v", err)
+		http.Error(w, "Failed to save image", http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		log.Printf("[TempDir] Failed to write temp file: %v", err)
+		http.Error(w, "Failed to save image", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[TempDir] Temp image saved: %s (%d bytes)", destPath, header.Size)
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"filePath":"%s","filename":"%s"}`, destPath, filename)
+}
+
+func isImageFile(filename string) bool {
+	ext := filepath.Ext(filename)
+	imageExts := []string{".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"}
+	
+	for _, validExt := range imageExts {
+		if ext == validExt {
+			return true
+		}
+	}
+	
+	return false
+}

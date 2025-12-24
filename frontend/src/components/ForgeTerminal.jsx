@@ -19,36 +19,11 @@ function debounce(fn, ms) {
   };
 }
 
-// Throttle helper - runs at most once per interval (non-blocking)
-function throttle(fn, ms) {
-  let lastRun = 0;
-  let scheduled = false;
-  return (...args) => {
-    const now = Date.now();
-    if (now - lastRun >= ms) {
-      lastRun = now;
-      fn(...args);
-    } else if (!scheduled) {
-      scheduled = true;
-      setTimeout(() => {
-        scheduled = false;
-        lastRun = Date.now();
-        fn(...args);
-      }, ms - (now - lastRun));
-    }
-  };
-}
-
-// Use requestIdleCallback with fallback for non-blocking work
-// This allows prompt detection to fire quickly when the browser is idle,
-// rather than forcing a fixed delay. The timeout parameter (2000ms) is a 
-// maximum wait time, not a minimum - the callback fires as soon as the
-// browser has idle time available (typically 10-100ms after last activity).
+// v2.0.1 EXACT: Use requestIdleCallback for non-blocking detection
 const scheduleIdleWork = (callback) => {
   if (typeof requestIdleCallback !== 'undefined') {
     return requestIdleCallback(callback, { timeout: 2000 });
   }
-  // Fallback for browsers without requestIdleCallback
   return setTimeout(callback, 100);
 };
 
@@ -81,26 +56,33 @@ function stripAnsi(text) {
 // Menu-style prompts where an option is already selected (just press Enter)
 // These search the ENTIRE buffer, not just the last line
 const MENU_SELECTION_PATTERNS = [
-  // Copilot CLI: "❯ 1. Yes" or "> 1. Yes" (numbered menu with selection indicator)
-  /[›❯>]\s*1\.\s*Yes\b/i,
-  // Generic inquirer-style: "❯ Yes" anywhere in buffer
+  // Copilot CLI v1.0.3+: "> 1. Yes" or "> General purpose (default)"
+  />\s*1\.\s*Yes\b/i,
+  />\s*General\s+purpose\s*\(default\)/i,
+  // Legacy Copilot CLI: "❯ 1. Yes" or "› 1. Yes"
+  /[›❯]\s*1\.\s*Yes\b/i,
+  // Generic inquirer-style: "❯ Yes" or "> Yes" anywhere in buffer
   /[›❯>]\s*Yes\b/i,
-  // Copilot CLI: "❯ Run this command"
+  // Copilot CLI: "❯ Run this command" or "> Run this command"
   /[›❯>]\s*Run\s+this\s+command/i,
   // Selected option with checkmark or bullet
   /[●◉✓✔]\s*Yes\b/i,
+  // New format: "> (selected option)"
+  />\s*.+\(default\)/i,
 ];
 
 // Context patterns that indicate a CLI is showing a confirmation menu
 // Must be combined with MENU_SELECTION_PATTERNS
 const MENU_CONTEXT_PATTERNS = [
-  // Copilot CLI instruction line
+  // Copilot CLI v1.0.3+ question format
+  /What kind of help do you need\?/i,
+  /Do you want to run this command\??/i,
+  // Legacy Copilot CLI instruction line
   /Confirm with number keys or.*Enter/i,
   // Generic "use arrow keys" instruction
   /use.*arrow.*keys.*select/i,
   /↑↓.*keys.*Enter/i,
   // "Do you want to run" question
-  /Do you want to run this command\??/i,
   /Do you want to run\??/i,
   // Cancel with Esc instruction (common in TUI prompts)
   /Cancel with Esc/i,
@@ -382,10 +364,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const shellConfigRef = useRef(shellConfig);
   const currentDirectoryRef = useRef(currentDirectory);
   const connectFnRef = useRef(null);
-  // PERF FIX: Use a fixed-size circular buffer instead of string concat
-  const outputBufferRef = useRef({ data: '', writePos: 0 });
-  const lastOutputRef = useRef(''); // Keep for compatibility but update less often
-  const waitingCheckIdleRef = useRef(null); // Changed from timeout to idle callback
+  // v2.0.1 EXACT: Use outputBufferRef with 800 char sliding window
+  const outputBufferRef = useRef({ data: '' });
+  const lastOutputRef = useRef(''); // Keep for compatibility
+  const waitingCheckIdleRef = useRef(null);
   const autoRespondRef = useRef(autoRespond);
   const amEnabledRef = useRef(amEnabled);
   const tabNameRef = useRef(tabName);
@@ -393,9 +375,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const onDirectoryChangeRef = useRef(onDirectoryChange);
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
-  // PERF FIX: Batch AM logs instead of per-message
-  const amLogQueueRef = useRef([]);
-  const amLogFlushIdleRef = useRef(null);
+  // AM logging refs
+  const amLogBufferRef = useRef('');
+  const amLogTimeoutRef = useRef(null);
   const amInputBufferRef = useRef('');
   const amInputTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
@@ -415,8 +397,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
   // Keep autoRespond ref updated
   useEffect(() => {
+    if (autoRespond) {
+      console.log('%c[Auto-Respond] ENABLED', 'background: #ffa500; color: #000; font-weight: bold; padding: 2px 5px;', { tabId });
+    } else {
+      console.log('[Auto-Respond] Disabled', { tabId });
+    }
     autoRespondRef.current = autoRespond;
-  }, [autoRespond]);
+  }, [autoRespond, tabId]);
 
   // Keep amEnabled ref updated
   useEffect(() => {
@@ -762,22 +749,37 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       term.focus();
     });
 
-    // ROBUST PASTE HANDLER: Listen for the native paste event on the textarea
-    // This works even when navigator.clipboard.read() is blocked or fails
-    // We use the container and capture phase to ensure we get the event before xterm swallows it
+    // SIMPLE PASTE HANDLER: Only for images, text handled by xterm natively
     const handlePaste = async (e) => {
-      // We only care about images here. Text is handled by xterm natively if we don't preventDefault.
+      // Check for images in clipboard
+      if (!e.clipboardData || !e.clipboardData.items) return;
       
-      // Check for images in the paste event
-      if (e.clipboardData && e.clipboardData.items) {
-        let imageFound = false;
+      let hasImage = false;
+      let hasText = false;
+      
+      // Check what's in the clipboard
+      for (const item of e.clipboardData.items) {
+        if (item.type.startsWith('image/')) {
+          hasImage = true;
+        }
+        if (item.type.startsWith('text/')) {
+          hasText = true;
+        }
+      }
+      
+      // If there's text, let xterm handle it normally - DON'T preventDefault
+      if (hasText) {
+        return; // Let xterm's native paste handle it
+      }
+      
+      // Only handle if ONLY image (no text)
+      if (hasImage) {
+        e.preventDefault();
+        e.stopPropagation();
+        
         for (const item of e.clipboardData.items) {
           if (item.type.startsWith('image/')) {
-            imageFound = true;
-            e.preventDefault(); // Stop xterm from handling it
-            e.stopPropagation(); // Stop bubbling
-            
-            console.log('[Terminal] Image detected in paste event:', item.type);
+            console.log('[Terminal] Image-only paste detected:', item.type);
             
             try {
               const blob = item.getAsFile();
@@ -821,11 +823,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 xtermRef.current.write(`\r\x1b[K\x1b[31m[Image upload failed: ${err.message}]\x1b[0m\r\n`);
               }
             }
-            break; // Only handle one image
+            break;
           }
         }
-        
-        if (imageFound) return;
       }
     };
 
@@ -1064,69 +1064,57 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           textData = String(event.data);
         }
 
-        // PERF FIX: Append to buffer efficiently (reuse buffer object)
+        // v2.0.1 EXACT: 800 char buffer with object ref
         const buf = outputBufferRef.current;
         buf.data = (buf.data + textData).slice(-800);
 
-        // PERF FIX: Batch AM logging - just queue, flush in idle time
+        // v1.23.8 EXACT: AM logging with 5 second debounce
         if (amEnabledRef.current && textData) {
-          amLogQueueRef.current.push(textData);
+          amLogBufferRef.current += textData;
 
-          // Schedule flush during idle time (not on every message)
-          if (!amLogFlushIdleRef.current) {
-            amLogFlushIdleRef.current = scheduleIdleWork(() => {
-              amLogFlushIdleRef.current = null;
-              const queue = amLogQueueRef.current;
-              if (queue.length > 0) {
-                const combined = queue.join('');
-                amLogQueueRef.current = [];
-                const cleanContent = stripAnsi(combined);
-                if (cleanContent.trim()) {
-                  fetch('/api/am/log', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      tabId: tabId,
-                      tabName: tabNameRef.current || 'Terminal',
-                      workspace: window.location.pathname,
-                      entryType: 'AGENT_OUTPUT',
-                      content: cleanContent.slice(-1500),
-                    }),
-                  }).catch(() => {});
-                }
+          if (amLogTimeoutRef.current) {
+            clearTimeout(amLogTimeoutRef.current);
+          }
+          amLogTimeoutRef.current = setTimeout(() => {
+            if (amLogBufferRef.current) {
+              const cleanContent = stripAnsi(amLogBufferRef.current);
+              if (cleanContent.trim()) {
+                fetch('/api/am/log', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    tabId: tabId,
+                    tabName: tabNameRef.current || 'Terminal',
+                    workspace: window.location.pathname,
+                    entryType: 'AGENT_OUTPUT',
+                    content: cleanContent.slice(-1500),
+                  }),
+                }).catch(() => {});
               }
-            });
-          }
+              amLogBufferRef.current = '';
+            }
+          }, 5000);
         }
 
-        // Simple debounce pattern matching v1.23.8 proven behavior
-        // 1. Cancel any pending check (new data arrived)
-        // 2. Schedule a new check after 1500ms of idle time
-        // This ensures we only check when the stream settles
-        if (waitingCheckIdleRef.current) {
-          cancelIdleWork(waitingCheckIdleRef.current);
+        // v1.20.0 EXACT: 500ms timeout (fast enough for TUI)
+        if (waitingCheckTimeoutRef.current) {
+          clearTimeout(waitingCheckTimeoutRef.current);
         }
-        
-        waitingCheckIdleRef.current = scheduleIdleWork(() => {
-          waitingCheckIdleRef.current = null;
+        waitingCheckTimeoutRef.current = setTimeout(() => {
+          const { waiting, responseType, confidence } = detectCliPrompt(lastOutputRef.current, false);
 
-          // Update lastOutputRef for compatibility
-          lastOutputRef.current = buf.data;
-
-          // Now do the expensive regex work
-          const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
-          
-          // DEBUG: Log auto-respond check (uncomment for debugging)
-          if (autoRespondRef.current) {
-            console.log('[AutoRespond] Check:', { 
-              waiting, 
-              responseType, 
-              confidence,
-              autoRespondEnabled: autoRespondRef.current,
-              wsReady: ws.readyState === WebSocket.OPEN,
-              bufferLen: buf.data.length
-            });
-          }
+          // CRITICAL DEBUG: Always log what we're checking
+          const bufferPreview = lastOutputRef.current.slice(-300);
+          const cleanPreview = stripAnsi(bufferPreview);
+          console.log('[Auto-Respond] Detection check:', {
+            waiting,
+            responseType,
+            confidence,
+            autoRespondEnabled: autoRespondRef.current,
+            wsOpen: ws.readyState === WebSocket.OPEN,
+            bufferLength: lastOutputRef.current.length,
+            cleanPreview: cleanPreview.slice(-150)
+          });
 
           if (waiting !== isWaiting) {
             setIsWaiting(waiting);
@@ -1135,7 +1123,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Directory detection (also uses regex)
+          // Directory detection
           const detectedDir = extractDirectory(buf.data);
           if (detectedDir && detectedDir !== lastDirectoryRef.current) {
             lastDirectoryRef.current = detectedDir;
@@ -1145,30 +1133,34 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Auto-respond logic - CRITICAL: Match v1.23.8 exactly
-          const shouldAutoRespond = waiting && 
-            autoRespondRef.current && 
+          // v1.23.8 EXACT: Auto-respond logic
+          const shouldAutoRespond = waiting &&
+            autoRespondRef.current &&
             ws.readyState === WebSocket.OPEN;
-            
+
           if (shouldAutoRespond) {
-            console.log('[AutoRespond] SENDING response:', { responseType, confidence });
+            // Log to browser console for user visibility
+            console.log('%c[Auto-Respond] ACTIVATED', 'background: #00ff00; color: #000; font-weight: bold; padding: 2px 5px;', {
+              responseType,
+              confidence,
+              tabId,
+              bufferPreview: lastOutputRef.current.slice(-150)
+            });
             logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
-            
+
             if (responseType === 'enter') {
               ws.send('\r');
             } else {
               ws.send('y\r');
             }
-            
-            // Clear buffer and state after auto-respond
-            buf.data = '';
+
             lastOutputRef.current = '';
             setIsWaiting(false);
             if (onWaitingChange) {
               onWaitingChange(false);
             }
           }
-        });
+        }, 500); // v1.20.0 value
       };
 
       ws.onerror = (error) => {
@@ -1377,30 +1369,28 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();
 
-      // PERF FIX: Cancel idle callbacks instead of timeouts
+      // v2.0.1: Cancel idle callbacks
       if (waitingCheckIdleRef.current) {
         cancelIdleWork(waitingCheckIdleRef.current);
         waitingCheckIdleRef.current = null;
       }
-      if (amLogFlushIdleRef.current) {
-        cancelIdleWork(amLogFlushIdleRef.current);
-        amLogFlushIdleRef.current = null;
+      if (amLogTimeoutRef.current) {
+        clearTimeout(amLogTimeoutRef.current);
+        amLogTimeoutRef.current = null;
       }
       if (amInputTimeoutRef.current) {
         clearTimeout(amInputTimeoutRef.current);
       }
 
       // Flush any pending AM logs before closing
-      const amQueue = amLogQueueRef.current;
-      if (amQueue.length > 0 || amInputBufferRef.current) {
+      if (amLogBufferRef.current || amInputBufferRef.current) {
         const flushData = [];
-        if (amQueue.length > 0) {
-          const combined = amQueue.join('');
-          const cleanContent = stripAnsi(combined);
+        if (amLogBufferRef.current) {
+          const cleanContent = stripAnsi(amLogBufferRef.current);
           if (cleanContent.trim()) {
             flushData.push({ entryType: 'AGENT_OUTPUT', content: cleanContent.slice(-2000) });
           }
-          amLogQueueRef.current = [];
+          amLogBufferRef.current = '';
         }
         if (amInputBufferRef.current) {
           const cleanInput = amInputBufferRef.current
@@ -1426,7 +1416,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
 
       // Clear buffer
-      outputBufferRef.current = { data: '', writePos: 0 };
+      outputBufferRef.current = { data: '' };
 
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Remove onclose handler before closing to avoid race condition

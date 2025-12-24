@@ -276,6 +276,14 @@ func main() {
 	// Error logging API - client-side error reporting
 	http.HandleFunc("/api/log-error", WrapWithMiddleware(handleLogError))
 
+	// Temp image upload API
+	http.HandleFunc("/api/temp-image", WrapWithMiddleware(handleTempImageUpload))
+
+	// Initialize session temp directory
+	if err := initSessionTempDir(); err != nil {
+		log.Printf("[ERROR] Failed to initialize session temp dir: %v", err)
+	}
+
 	// Find an available port
 	addr, listener, err := findAvailablePort()
 	if err != nil {
