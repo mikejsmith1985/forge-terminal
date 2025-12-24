@@ -84,6 +84,12 @@ type AMControlMessage struct {
 	AutoRespond bool   `json:"autoRespond"`
 }
 
+// AutoRespondControlMessage represents standalone auto-respond control.
+type AutoRespondControlMessage struct {
+	Type    string `json:"type"` // "AUTO_RESPOND_TOGGLE"
+	Enabled bool   `json:"enabled"`
+}
+
 // NewHandler creates a new terminal WebSocket handler.
 func NewHandler(service assistant.Service, core *assistant.Core) *Handler {
 	return &Handler{
@@ -171,6 +177,34 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Get Vision parser from assistant core
 	visionParser := h.assistantCore.GetVisionParser()
+
+	// STANDALONE AUTO-RESPOND DETECTOR (independent of AM)
+	autoRespondDetector := NewAutoRespondDetector("github-copilot")
+	var autoRespondEnabled atomic.Bool
+	autoRespondDetector.SetCallbacks(
+		func() {
+			// Callback when waiting for user input
+			if autoRespondEnabled.Load() {
+				log.Printf("[AutoRespond] Detected: Waiting for user input")
+				_ = conn.WriteJSON(map[string]interface{}{
+					"type":      "AUTO_RESPOND_STATE",
+					"state":     "waiting_for_user",
+					"timestamp": time.Now(),
+				})
+			}
+		},
+		func() {
+			// Callback when assistant is responding
+			if autoRespondEnabled.Load() {
+				log.Printf("[AutoRespond] Detected: Assistant responding")
+				_ = conn.WriteJSON(map[string]interface{}{
+					"type":      "AUTO_RESPOND_STATE",
+					"state":     "assistant_responding",
+					"timestamp": time.Now(),
+				})
+			}
+		},
+	)
 
 	// PERFORMANCE FIX: Initialize AM/Vision/LLM systems asynchronously
 	// These don't need to block the terminal from becoming interactive
@@ -292,6 +326,24 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	})
 	defer unsubscribe()
 
+	// AUTO-RESPOND: Periodic check for state changes
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if autoRespondDetector.Check() {
+					// State changed to waiting for user
+					log.Printf("[AutoRespond] State check: Waiting for user input detected")
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+
 	// PTY -> WebSocket (read from terminal, send to browser)
 	go func() {
 		defer closeOnce.Do(func() { close(done) })
@@ -355,6 +407,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					log.Printf("[Terminal] WebSocket write error: %v", err)
 					return
 				}
+
+				// AUTO-RESPOND: Process output for state detection
+				autoRespondDetector.ProcessOutput(buf[:n])
 
 				// Vision: Feed data SYNCHRONOUSLY - no goroutine spawn
 				// Spawning goroutines per chunk caused unbounded growth and freezes
@@ -449,6 +504,22 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 					continue
 				}
+
+				// Check for standalone auto-respond control (independent of AM)
+				var autoRespondMsg AutoRespondControlMessage
+				if err := json.Unmarshal(data, &autoRespondMsg); err == nil && autoRespondMsg.Type == "AUTO_RESPOND_TOGGLE" {
+					autoRespondDetector.SetEnabled(autoRespondMsg.Enabled)
+					autoRespondEnabled.Store(autoRespondMsg.Enabled)
+					log.Printf("[AutoRespond] Standalone auto-respond set to %v for session %s", autoRespondMsg.Enabled, sessionID)
+					
+					// Send confirmation back to client
+					_ = conn.WriteJSON(map[string]interface{}{
+						"type":    "AUTO_RESPOND_CONFIRMED",
+						"enabled": autoRespondMsg.Enabled,
+						"stats":   autoRespondDetector.GetStats(),
+					})
+					continue
+				}
 			}
 
 			// ═══ CRITICAL PERFORMANCE: Write to PTY FIRST, process later ═══
@@ -461,6 +532,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
+
+			// AUTO-RESPOND: Process input for state detection
+			autoRespondDetector.ProcessInput(data)
 
 			// Accumulate input for LLM detection (after PTY write)
 			dataStr := string(data)
