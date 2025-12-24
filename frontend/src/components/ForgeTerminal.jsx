@@ -204,8 +204,8 @@ function detectCliPrompt(text, debugLog = false) {
   // Strip ANSI escape codes
   const cleanText = stripAnsi(text);
   
-  // Use smaller buffer for performance (reduced from 2000)
-  const bufferToCheck = cleanText.slice(-800);
+  // Use full buffer for Copilot CLI detection (menus can be large)
+  const bufferToCheck = cleanText.slice(-2000);
   
   // Priority 1: Check for menu-style prompts (Copilot, Claude, etc.)
   const menuResult = detectMenuPrompt(bufferToCheck, debugLog);
@@ -364,11 +364,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const shellConfigRef = useRef(shellConfig);
   const currentDirectoryRef = useRef(currentDirectory);
   const connectFnRef = useRef(null);
-  // v2.0.1 EXACT: Use outputBufferRef with 800 char sliding window
+  // v2.0.1 EXACT: Use outputBufferRef with 2000 char sliding window (increased for Copilot CLI menus)
   const outputBufferRef = useRef({ data: '' });
   const lastOutputRef = useRef(''); // Keep for compatibility
-  const waitingCheckIdleRef = useRef(null);
-  const waitingCheckTimeoutRef = useRef(null); // CRITICAL: Add missing ref for setTimeout
+  const waitingCheckIdleRef = useRef(null); // Use requestIdleCallback for non-blocking detection
   const autoRespondRef = useRef(autoRespond);
   const amEnabledRef = useRef(amEnabled);
   const tabNameRef = useRef(tabName);
@@ -1069,9 +1068,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           textData = String(event.data);
         }
 
-        // v2.0.1 EXACT: 800 char buffer with object ref
+        // v2.0.1 EXACT: 2000 char buffer with object ref (increased for Copilot CLI menus)
         const buf = outputBufferRef.current;
-        buf.data = (buf.data + textData).slice(-800);
+        buf.data = (buf.data + textData).slice(-2000);
 
         // v1.23.8 EXACT: AM logging with 5 second debounce
         if (amEnabledRef.current && textData) {
@@ -1101,12 +1100,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }, 5000);
         }
 
-        // v1.20.0 EXACT: 500ms timeout (fast enough for TUI)
-        if (waitingCheckTimeoutRef.current) {
-          clearTimeout(waitingCheckTimeoutRef.current);
+        // v2.0.2 EXACT: Use requestIdleCallback for non-blocking prompt detection
+        if (waitingCheckIdleRef.current) {
+          cancelIdleWork(waitingCheckIdleRef.current);
         }
-        waitingCheckTimeoutRef.current = setTimeout(() => {
-          // CRITICAL FIX: Use buf.data not lastOutputRef (v2.0.1 regression)
+        waitingCheckIdleRef.current = scheduleIdleWork(() => {
+          waitingCheckIdleRef.current = null;
+          
+          // CRITICAL FIX: Use buf.data not lastOutputRef
           const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
 
           // CRITICAL DEBUG: Always log what we're checking
@@ -1167,7 +1168,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               onWaitingChange(false);
             }
           }
-        }, 500); // v1.20.0 value
+        });
       };
 
       ws.onerror = (error) => {

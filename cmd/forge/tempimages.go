@@ -32,26 +32,51 @@ func initSessionTempDir() error {
 }
 
 func handleTempImageUpload(w http.ResponseWriter, r *http.Request) {
+	// Add recovery to prevent crashes
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("[TempDir] PANIC in handleTempImageUpload: %v", rec)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	// Validate session temp dir exists
+	if sessionTempDir == "" {
+		log.Printf("[TempDir] Session temp directory not initialized")
+		http.Error(w, "Temp directory not initialized", http.StatusInternalServerError)
+		return
+	}
+
 	// Parse multipart form
 	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB max
+		log.Printf("[TempDir] Failed to parse multipart form: %v", err)
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
 
 	file, header, err := r.FormFile("image")
 	if err != nil {
+		log.Printf("[TempDir] Failed to get form file: %v", err)
 		http.Error(w, "No image provided", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
+	// Validate header
+	if header == nil {
+		log.Printf("[TempDir] Form file header is nil")
+		http.Error(w, "Invalid file upload", http.StatusBadRequest)
+		return
+	}
+
 	// Validate it's an image
 	if !isImageFile(header.Filename) {
+		log.Printf("[TempDir] Invalid image file type: %s", header.Filename)
 		http.Error(w, "File must be an image", http.StatusBadRequest)
 		return
 	}
