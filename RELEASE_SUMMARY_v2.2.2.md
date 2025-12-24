@@ -1,8 +1,21 @@
 # Release Summary: v2.2.2
 
 **Release Date:** 2025-12-24  
-**Type:** Bug Fix  
+**Type:** Major Feature Update + Critical Bug Fix  
 **Priority:** Critical
+
+## What's New in v2.2.2
+
+### 🎨 New Feature: Image Drop Zone for Copilot
+- **NEW:** Image paste/drop zone added to command cards panel
+- Drag & drop images OR use Ctrl+V to paste from clipboard
+- Automatically saves to temp folder and copies path to clipboard
+- Makes it easy to share screenshots with Copilot for visual debugging
+
+### 🗑️ System Cards Removed
+- Removed built-in system command cards (Release Manager, etc.)
+- Cleaner, simpler interface focused on user-created cards
+- System cards were confusing and rarely used
 
 ## Critical Fix: Auto-Respond System Restored
 
@@ -57,6 +70,10 @@ Users can add this flag to command cards as alternative to auto-respond feature.
 
 ### Files Changed
 - `frontend/src/components/ForgeTerminal.jsx` - Restored v2.0.1 buffer logic
+- `frontend/src/components/ImageDropZone.jsx` - NEW: Image upload component
+- `frontend/src/components/CommandCards.jsx` - Added ImageDropZone, removed system cards
+- `cmd/forge/tempimages.go` - NEW: Backend handler for temp image uploads
+- `cmd/forge/main.go` - Added `/api/temp-image` endpoint
 
 ### Migration Notes
 No breaking changes. Auto-respond toggle behavior unchanged for users.
