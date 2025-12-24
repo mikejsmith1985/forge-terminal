@@ -18,107 +18,131 @@ const ImageDropZone = ({ onToast }) => {
   }, []);
 
   const handlePaste = useCallback(async (e) => {
-    e.preventDefault();
-    const items = e.clipboardData?.items;
-    
-    if (!items) return;
+    try {
+      e.preventDefault();
+      
+      const items = e.clipboardData?.items;
+      if (!items) return;
 
-    for (let item of items) {
-      if (item.type.startsWith('image/')) {
-        setIsProcessing(true);
-        const blob = item.getAsFile();
-        const formData = new FormData();
-        formData.append('image', blob);
-
-        try {
-          const response = await fetch('/api/temp-image', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to save image');
+      for (let item of items) {
+        if (item.type.startsWith('image/')) {
+          setIsProcessing(true);
+          const blob = item.getAsFile();
+          
+          if (!blob) {
+            setIsProcessing(false);
+            continue;
           }
+          
+          const formData = new FormData();
+          formData.append('image', blob);
 
-          const { filePath } = await response.json();
+          try {
+            const response = await fetch('/api/temp-image', {
+              method: 'POST',
+              body: formData,
+            });
 
-          // Copy file path to clipboard
-          await navigator.clipboard.writeText(filePath);
+            if (!response.ok) {
+              throw new Error('Failed to save image');
+            }
 
-          // Show toast
-          onToast?.({
-            type: 'success',
-            message: `File path copied to clipboard (replaced image)`,
-            detail: filePath,
-            duration: 5000,
-          });
-        } catch (error) {
-          console.error('Failed to process image:', error);
-          onToast?.({
-            type: 'error',
-            message: 'Failed to save image',
-            detail: error.message,
-          });
-        } finally {
-          setIsProcessing(false);
+            const { filePath } = await response.json();
+
+            // Copy file path to clipboard
+            await navigator.clipboard.writeText(filePath);
+
+            // Show toast
+            onToast?.({
+              type: 'success',
+              message: `File path copied to clipboard (replaced image)`,
+              detail: filePath,
+              duration: 5000,
+            });
+          } catch (error) {
+            console.error('Failed to process image:', error);
+            onToast?.({
+              type: 'error',
+              message: 'Failed to save image',
+              detail: error?.message || 'Unknown error',
+            });
+          } finally {
+            setIsProcessing(false);
+          }
+          break;
         }
-        break;
       }
+    } catch (err) {
+      // Catch-all to prevent app crash
+      console.error('Paste handler error:', err);
+      setIsProcessing(false);
     }
   }, [onToast]);
 
   const handleDrop = useCallback(async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    setIsProcessing(true);
-
-    const files = Array.from(e.dataTransfer.files);
-    const imageFile = files.find(f => f.type.startsWith('image/'));
-
-    if (!imageFile) {
-      onToast?.({
-        type: 'warning',
-        message: 'No image found',
-        detail: 'Please drop an image file',
-      });
-      setIsProcessing(false);
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('image', imageFile);
-
     try {
-      const response = await fetch('/api/temp-image', {
-        method: 'POST',
-        body: formData,
-      });
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      setIsProcessing(true);
 
-      if (!response.ok) {
-        throw new Error('Failed to save image');
+      // Safely check for files
+      if (!e.dataTransfer || !e.dataTransfer.files) {
+        setIsProcessing(false);
+        return;
       }
 
-      const { filePath } = await response.json();
+      const files = Array.from(e.dataTransfer.files);
+      const imageFile = files.find(f => f.type.startsWith('image/'));
 
-      // Copy file path to clipboard
-      await navigator.clipboard.writeText(filePath);
+      if (!imageFile) {
+        onToast?.({
+          type: 'warning',
+          message: 'No image found',
+          detail: 'Please drop an image file',
+        });
+        setIsProcessing(false);
+        return;
+      }
 
-      // Show toast
-      onToast?.({
-        type: 'success',
-        message: `File path copied to clipboard (replaced previous content)`,
-        detail: filePath,
-        duration: 5000,
-      });
-    } catch (error) {
-      console.error('Failed to process image:', error);
-      onToast?.({
-        type: 'error',
-        message: 'Failed to save image',
-        detail: error.message,
-      });
-    } finally {
+      const formData = new FormData();
+      formData.append('image', imageFile);
+
+      try {
+        const response = await fetch('/api/temp-image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save image');
+        }
+
+        const { filePath } = await response.json();
+
+        // Copy file path to clipboard
+        await navigator.clipboard.writeText(filePath);
+
+        // Show toast
+        onToast?.({
+          type: 'success',
+          message: `File path copied to clipboard (replaced previous content)`,
+          detail: filePath,
+          duration: 5000,
+        });
+      } catch (error) {
+        console.error('Failed to process image:', error);
+        onToast?.({
+          type: 'error',
+          message: 'Failed to save image',
+          detail: error?.message || 'Unknown error',
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    } catch (err) {
+      // Catch-all to prevent app crash
+      console.error('Drop handler error:', err);
       setIsProcessing(false);
     }
   }, [onToast]);

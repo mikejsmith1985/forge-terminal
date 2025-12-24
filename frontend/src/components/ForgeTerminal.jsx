@@ -368,6 +368,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const outputBufferRef = useRef({ data: '' });
   const lastOutputRef = useRef(''); // Keep for compatibility
   const waitingCheckIdleRef = useRef(null);
+  const waitingCheckTimeoutRef = useRef(null); // CRITICAL: Add missing ref for setTimeout
   const autoRespondRef = useRef(autoRespond);
   const amEnabledRef = useRef(amEnabled);
   const tabNameRef = useRef(tabName);
@@ -838,8 +839,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // This runs BEFORE xterm processes the key and allows conditional intercept
     term.attachCustomKeyEventHandler((arg) => {
       // PERF FIX: Only record diagnostics when explicitly enabled (avoid function call overhead)
-      if (diagnosticCore.isEnabled()) {
-        diagnosticCore.recordKeyboardEvent(arg);
+      try {
+        if (diagnosticCore.isEnabled()) {
+          diagnosticCore.recordKeyboardEvent(arg);
+        }
+      } catch (err) {
+        // Silently catch diagnostic errors to prevent error count inflation
       }
 
       // CRITICAL FIX: Explicitly allow spacebar no matter what
@@ -1101,10 +1106,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           clearTimeout(waitingCheckTimeoutRef.current);
         }
         waitingCheckTimeoutRef.current = setTimeout(() => {
-          const { waiting, responseType, confidence } = detectCliPrompt(lastOutputRef.current, false);
+          // CRITICAL FIX: Use buf.data not lastOutputRef (v2.0.1 regression)
+          const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
 
           // CRITICAL DEBUG: Always log what we're checking
-          const bufferPreview = lastOutputRef.current.slice(-300);
+          const bufferPreview = buf.data.slice(-300);
           const cleanPreview = stripAnsi(bufferPreview);
           console.log('[Auto-Respond] Detection check:', {
             waiting,
@@ -1112,7 +1118,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             confidence,
             autoRespondEnabled: autoRespondRef.current,
             wsOpen: ws.readyState === WebSocket.OPEN,
-            bufferLength: lastOutputRef.current.length,
+            bufferLength: buf.data.length,
             cleanPreview: cleanPreview.slice(-150)
           });
 
@@ -1144,7 +1150,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               responseType,
               confidence,
               tabId,
-              bufferPreview: lastOutputRef.current.slice(-150)
+              bufferPreview: buf.data.slice(-150)
             });
             logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
 
@@ -1154,7 +1160,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               ws.send('y\r');
             }
 
-            lastOutputRef.current = '';
+            // Clear buffer after responding
+            buf.data = '';
             setIsWaiting(false);
             if (onWaitingChange) {
               onWaitingChange(false);
