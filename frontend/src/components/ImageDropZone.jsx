@@ -21,19 +21,33 @@ const ImageDropZone = ({ onToast }) => {
 
   const handlePaste = useCallback(async (e) => {
     try {
-      e.preventDefault();
-      e.stopPropagation();
-      
       const items = e.clipboardData?.items;
       if (!items || items.length === 0) {
         console.log('[ImageDropZone] No clipboard items');
         return;
       }
 
+      // Check if there's an image first
       let foundImage = false;
       for (let item of items) {
         if (item.type.startsWith('image/')) {
           foundImage = true;
+          break;
+        }
+      }
+
+      // Only prevent default if we found an image
+      if (!foundImage) {
+        console.log('[ImageDropZone] No image found in clipboard, allowing default paste');
+        return;
+      }
+
+      // Now prevent default and process the image
+      e.preventDefault();
+      e.stopPropagation();
+
+      for (let item of items) {
+        if (item.type.startsWith('image/')) {
           setIsProcessing(true);
           setJustPasted(true);
           setTimeout(() => setJustPasted(false), 2000);
@@ -69,38 +83,27 @@ const ImageDropZone = ({ onToast }) => {
             await navigator.clipboard.writeText(result.filePath);
 
             // Show toast
-            onToast?.({
-              type: 'success',
-              message: `File path copied to clipboard (replaced image)`,
-              detail: result.filePath,
-              duration: 5000,
-            });
+            if (onToast) {
+              onToast(`File path copied to clipboard (replaced image)`, 'success', 5000);
+            }
           } catch (error) {
             console.error('[ImageDropZone] Failed to process image:', error);
-            onToast?.({
-              type: 'error',
-              message: 'Failed to save image',
-              detail: error?.message || 'Unknown error',
-            });
+            if (onToast) {
+              onToast('Failed to save image', 'error', 3000);
+            }
           } finally {
             setIsProcessing(false);
           }
           break;
         }
       }
-      
-      if (!foundImage) {
-        console.log('[ImageDropZone] No image found in clipboard');
-      }
     } catch (err) {
       // Catch-all to prevent app crash
       console.error('[ImageDropZone] Paste handler error:', err);
       setIsProcessing(false);
-      onToast?.({
-        type: 'error',
-        message: 'Paste operation failed',
-        detail: err?.message || 'Unknown error',
-      });
+      if (onToast) {
+        onToast('Paste operation failed', 'error', 3000);
+      }
     }
   }, [onToast]);
 
@@ -122,11 +125,9 @@ const ImageDropZone = ({ onToast }) => {
       const imageFile = files.find(f => f.type.startsWith('image/'));
 
       if (!imageFile) {
-        onToast?.({
-          type: 'warning',
-          message: 'No image found',
-          detail: 'Please drop an image file',
-        });
+        if (onToast) {
+          onToast('No image found - please drop an image file', 'warning', 3000);
+        }
         setIsProcessing(false);
         return;
       }
@@ -154,19 +155,14 @@ const ImageDropZone = ({ onToast }) => {
         await navigator.clipboard.writeText(result.filePath);
 
         // Show toast
-        onToast?.({
-          type: 'success',
-          message: `File path copied to clipboard (replaced previous content)`,
-          detail: result.filePath,
-          duration: 5000,
-        });
+        if (onToast) {
+          onToast(`File path copied to clipboard (replaced previous content)`, 'success', 5000);
+        }
       } catch (error) {
         console.error('[ImageDropZone] Failed to process image:', error);
-        onToast?.({
-          type: 'error',
-          message: 'Failed to save image',
-          detail: error?.message || 'Unknown error',
-        });
+        if (onToast) {
+          onToast('Failed to save image', 'error', 3000);
+        }
       } finally {
         setIsProcessing(false);
       }
@@ -174,11 +170,9 @@ const ImageDropZone = ({ onToast }) => {
       // Catch-all to prevent app crash
       console.error('[ImageDropZone] Drop handler error:', err);
       setIsProcessing(false);
-      onToast?.({
-        type: 'error',
-        message: 'Drop operation failed',
-        detail: err?.message || 'Unknown error',
-      });
+      if (onToast) {
+        onToast('Drop operation failed', 'error', 3000);
+      }
     }
   }, [onToast]);
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -105,8 +106,17 @@ func handleTempImageUpload(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[TempDir] Temp image saved: %s (%d bytes)", destPath, header.Size)
 
+	// Use json.Marshal to properly escape Windows paths
+	response := map[string]string{
+		"filePath": destPath,
+		"filename": filename,
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"filePath":"%s","filename":"%s"}`, destPath, filename)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("[TempDir] Failed to encode JSON response: %v", err)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 func isImageFile(filename string) bool {
