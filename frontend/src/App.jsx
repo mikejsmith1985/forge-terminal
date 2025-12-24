@@ -20,7 +20,6 @@ import AMMonitor from './components/AMMonitor'
 import AssistantPanel from './components/AssistantPanel/AssistantPanel'
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
-import AutoRespondDebugPanel from './components/AutoRespondDebugPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -1681,9 +1680,6 @@ function App() {
         onClose={() => setIsDiagnosticOverlayOpen(false)}
         position={sidebarPosition === 'right' ? 'left' : 'right'}
       />
-      
-      {/* Auto-Respond Debug Panel - ALWAYS visible for debugging */}
-      <AutoRespondDebugPanel />
     </div>
   )
 }

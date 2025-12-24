@@ -8,6 +8,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
   const [diagnostics, setDiagnostics] = useState(null);
   const [freezeMetrics, setFreezeMetrics] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRespondLogs, setAutoRespondLogs] = useState([]);
 
   const fetchFreezeMetrics = async () => {
     try {
@@ -58,6 +59,28 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     captureDiagnostics();
     fetchFreezeMetrics();
 
+    // Intercept console.log for [Auto-Respond] messages
+    const originalLog = console.log;
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      
+      // Check if this is an auto-respond log
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('[Auto-Respond]')) {
+        const timestamp = new Date().toLocaleTimeString();
+        const data = args[1] || {};
+        
+        setAutoRespondLogs(prev => {
+          const newLogs = [...prev, {
+            timestamp,
+            message: args[0],
+            data: JSON.parse(JSON.stringify(data))
+          }];
+          // Keep last 20 logs
+          return newLogs.slice(-20);
+        });
+      }
+    };
+
     // Auto-refresh if enabled
     if (autoRefresh) {
       const interval = setInterval(() => {
@@ -66,6 +89,10 @@ const DebugPanel = ({ terminalRef, tabId }) => {
       }, 2000);
       return () => clearInterval(interval);
     }
+
+    return () => {
+      console.log = originalLog;
+    };
   }, [autoRefresh, tabId]);
 
   return (
@@ -251,6 +278,107 @@ const DebugPanel = ({ terminalRef, tabId }) => {
             <h4 style={{ margin: '0 0 8px 0', color: '#fff', fontSize: '12px' }}>Last Updated</h4>
             <div style={{ fontSize: '11px', color: '#888' }}>
               {new Date(diagnostics.timestamp).toLocaleString()}
+            </div>
+          </div>
+
+          {/* Auto-Respond Monitor */}
+          <div style={{
+            padding: '12px',
+            background: 'rgba(255, 107, 0, 0.05)',
+            borderRadius: '8px',
+            border: '2px solid rgba(255, 107, 0, 0.3)',
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              marginBottom: '8px',
+            }}>
+              <h4 style={{ margin: 0, color: '#ff6b00', fontSize: '12px', fontWeight: 'bold' }}>
+                Auto-Respond Monitor
+              </h4>
+              <div style={{ 
+                fontSize: '10px', 
+                color: '#888',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span>Logs: {autoRespondLogs.length}/20</span>
+                <button
+                  onClick={() => setAutoRespondLogs([])}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #666',
+                    color: '#888',
+                    cursor: 'pointer',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    fontSize: '9px'
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            
+            <div style={{
+              maxHeight: '300px',
+              overflowY: 'auto',
+              fontSize: '11px',
+              fontFamily: 'monospace'
+            }}>
+              {autoRespondLogs.length === 0 ? (
+                <div style={{ color: '#888', textAlign: 'center', padding: '16px', fontStyle: 'italic' }}>
+                  Waiting for auto-respond activity...
+                </div>
+              ) : (
+                autoRespondLogs.map((log, idx) => (
+                  <div key={idx} style={{
+                    marginBottom: '8px',
+                    padding: '6px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    borderRadius: '3px',
+                    borderLeft: log.message.includes('ACTIVATED') ? '2px solid #00ff00' : 
+                                log.message.includes('ENABLED') ? '2px solid #0080ff' :
+                                log.message.includes('waiting') ? '2px solid #ffa500' :
+                                '2px solid #666'
+                  }}>
+                    <div style={{ color: '#666', marginBottom: '2px', fontSize: '9px' }}>
+                      {log.timestamp}
+                    </div>
+                    <div style={{ 
+                      color: log.message.includes('ACTIVATED') ? '#00ff00' : 
+                             log.message.includes('ENABLED') ? '#0080ff' :
+                             log.message.includes('waiting') ? '#ffa500' : '#ccc',
+                      fontWeight: log.message.includes('ACTIVATED') || log.message.includes('waiting') ? 'bold' : 'normal',
+                      marginBottom: '4px',
+                      fontSize: '10px'
+                    }}>
+                      {log.message}
+                    </div>
+                    {log.data && Object.keys(log.data).length > 0 && (
+                      <div style={{ fontSize: '9px', color: '#888' }}>
+                        {log.data.waiting !== undefined && (
+                          <div style={{ color: log.data.waiting ? '#00ff00' : '#ff4444' }}>
+                            ⚡ Waiting: {log.data.waiting ? 'YES' : 'NO'}
+                          </div>
+                        )}
+                        {log.data.responseType && (
+                          <div style={{ color: '#ffa500' }}>
+                            📤 Response: {log.data.responseType}
+                          </div>
+                        )}
+                        {log.data.confidence && (
+                          <div style={{ color: '#0080ff' }}>
+                            🎯 Confidence: {log.data.confidence}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
