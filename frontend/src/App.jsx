@@ -260,10 +260,10 @@ function App() {
     
     // Store the current version for post-update detection and trigger page refresh if needed
     const checkAndRefreshAfterUpdate = async () => {
-      // BYPASS: Don't auto-refresh in development mode (port 5173 = Vite dev server)
-      const isDevMode = window.location.port === '5173' || window.location.hostname === 'localhost';
-      if (isDevMode) {
-        console.log('[Update] Dev mode detected - skipping auto-refresh logic');
+      // BYPASS: Only skip in true dev mode (Vite dev server on 5173)
+      const isViteDevMode = window.location.port === '5173';
+      if (isViteDevMode) {
+        console.log('[Update] Vite dev mode detected - skipping auto-refresh logic');
         setVersionReady(true);
         return;
       }
@@ -308,13 +308,6 @@ function App() {
     
     checkAndRefreshAfterUpdate();
     
-    // BYPASS: Don't set up SSE in development mode
-    const isDevMode = window.location.port === '5173' || window.location.hostname === 'localhost';
-    if (isDevMode) {
-      console.log('[SSE] Dev mode detected - skipping SSE update notifications');
-      return; // Skip SSE setup in dev
-    }
-    
     // Set up SSE for real-time update notifications with exponential backoff and fallback polling
     let eventSource = null;
     let reconnectAttempt = 0;
@@ -322,6 +315,13 @@ function App() {
     const BASE_RECONNECT_DELAY = 5000; // 5 seconds
     let fallbackPollTimer = null;
     let reconnectTimer = null; // Track reconnection timer
+    
+    // Only enable update notifications in production (not Vite dev mode)
+    const isViteDevMode = window.location.port === '5173';
+    if (isViteDevMode) {
+      console.log('[SSE] Vite dev mode detected - skipping SSE update notifications');
+      return;
+    }
     
     const startFallbackPolling = () => {
       // Fallback polling every 5 minutes if SSE fails
