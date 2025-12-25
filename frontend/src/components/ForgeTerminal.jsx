@@ -744,9 +744,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       term.focus();
     });
 
-    // SIMPLE PASTE HANDLER: Only for images, text handled by xterm natively
+    // PASTE HANDLER: Handle both text and images
     const handlePaste = async (e) => {
-      // Check for images in clipboard
+      // Check for clipboard data
       if (!e.clipboardData || !e.clipboardData.items) return;
       
       let hasImage = false;
@@ -762,34 +762,42 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
       }
       
-      // If there's text, let xterm handle it normally - DON'T preventDefault
+      // Handle text paste - send to WebSocket
       if (hasText) {
-        return; // Let xterm's native paste handle it
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const text = e.clipboardData.getData('text/plain');
+        if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(text);
+          console.log('[Terminal] Text pasted:', text.length, 'chars');
+          if (onPasteRef.current) onPasteRef.current();
+        }
+        return;
       }
       
-      // Only handle if ONLY image (no text)
+      // Handle image paste only if NO text
       if (hasImage) {
         e.preventDefault();
         e.stopPropagation();
         
         for (const item of e.clipboardData.items) {
           if (item.type.startsWith('image/')) {
-            console.log('[Terminal] Image-only paste detected:', item.type);
+            console.log('[Terminal] Image paste detected:', item.type);
             
             try {
               const blob = item.getAsFile();
               if (!blob) continue;
               
               const formData = new FormData();
-              const filename = `clipboard-${Date.now()}.png`;
-              formData.append('file', blob, filename);
+              formData.append('image', blob);
               
               // Show uploading indicator
               if (xtermRef.current) {
                 xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
               }
               
-              const response = await fetch('/api/files/upload', {
+              const response = await fetch('/api/temp-image', {
                 method: 'POST',
                 body: formData
               });
@@ -797,19 +805,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
               
               const data = await response.json();
-              const filePath = data.path;
+              const filePath = data.filePath;
+              const filename = data.filename;
               
               // Clear uploading indicator
               if (xtermRef.current) {
                 xtermRef.current.write('\r\x1b[K');
               }
               
-              // Send file path to terminal
+              // Send markdown-style image reference to terminal
               if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
-                const textToSend = `see file at ${pathStr}`;
+                const textToSend = `[📷 ${filename}] ${filePath}`;
                 wsRef.current.send(textToSend);
-                console.log('[Terminal] Sent image path to backend:', textToSend);
+                console.log('[Terminal] Sent image to backend:', textToSend);
                 if (onPasteRef.current) onPasteRef.current();
               }
             } catch (err) {
@@ -887,11 +895,21 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // Handle Ctrl+V (Paste) - REMOVED
-      // We now use the native 'paste' event listener on the textarea (see above)
-      // This is more robust and handles images correctly without needing Clipboard API permissions
+      // Handle Ctrl+V (Paste) - Use Clipboard API for reliable paste
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        return true; // Let xterm handle the key event (which triggers the paste event)
+        // Use Clipboard API to read clipboard and send to terminal
+        navigator.clipboard.readText()
+          .then((text) => {
+            if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(text);
+              console.log('[Terminal] Ctrl+V: Pasted', text.length, 'chars');
+              if (onPasteRef.current) onPasteRef.current();
+            }
+          })
+          .catch((err) => {
+            console.error('[Terminal] Clipboard read failed:', err);
+          });
+        return false; // Prevent default xterm handling
       }
 
       return true; // Let all other keys pass through standard xterm processing
@@ -1368,6 +1386,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     return () => {
       // No cleanup needed for attachCustomKeyEventHandler - xterm handles it
+
+      // Clean up paste event listener
+      if (terminalRef.current) {
+        terminalRef.current.removeEventListener('paste', handlePaste, true);
+      }
 
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();

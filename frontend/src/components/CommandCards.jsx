@@ -1,7 +1,6 @@
 import React from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableCommandCard } from './SortableCommandCard';
-import ImageDropZone from './ImageDropZone';
 import { RefreshCw } from 'lucide-react';
 
 const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType }) => {
@@ -38,9 +37,6 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
 
   return (
     <div className="command-cards-container">
-      {/* Image Drop Zone at top */}
-      <ImageDropZone onToast={onToast} />
-
       {/* User Cards Section */}
       {userCards.length > 0 ? (
         <SortableContext
