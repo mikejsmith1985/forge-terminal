@@ -1,3 +1,9 @@
+# ⚠️ DEPRECATED - Feature Removed in v2.2.8
+
+This feature was removed. See root directory assistant documentation for details.
+
+---
+
 # Forge Agent Mode
 
 Forge Terminal v2.1.0 introduces **Agent Mode**, a new way to interact with your AI assistant. Instead of a traditional terminal, Agent Mode provides a full-screen chat interface where you can collaborate with the AI to perform tasks.
@@ -35,3 +41,4 @@ Agent Mode uses the **Copilot Provider** by default for complex queries. Ensure 
 *   Use Agent Mode for complex refactoring or debugging sessions where you need a "pair programmer" experience.
 *   Keep a standard terminal tab open for quick manual commands.
 *   Use `Ctrl+Tab` to switch between your Agent and Terminal tabs.
+

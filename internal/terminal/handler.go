@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
-	"github.com/mikejsmith1985/forge-terminal/internal/assistant"
+	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
 
@@ -27,10 +27,11 @@ const (
 
 // Handler manages WebSocket terminal connections.
 type Handler struct {
-	upgrader      websocket.Upgrader
-	sessions      sync.Map // map[string]*TerminalSession
-	assistantCore *assistant.Core
-	assistant     assistant.Service
+	upgrader     websocket.Upgrader
+	sessions     sync.Map // map[string]*TerminalSession
+	amSystem     *am.System
+	visionParser *vision.Parser
+	llmDetector  *llm.Detector
 }
 
 // connWriter wraps a websocket.Conn with a mutex for thread-safe writes.
@@ -90,8 +91,9 @@ type AutoRespondControlMessage struct {
 	Enabled bool   `json:"enabled"`
 }
 
-// NewHandler creates a new terminal WebSocket handler.
-func NewHandler(service assistant.Service, core *assistant.Core) *Handler {
+// NewHandlerDirect creates a new terminal WebSocket handler with direct dependencies.
+// This is the new constructor that doesn't depend on assistant.Core wrapper.
+func NewHandlerDirect(amSys *am.System, visionP *vision.Parser, llmDet *llm.Detector) *Handler {
 	return &Handler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -119,9 +121,25 @@ func NewHandler(service assistant.Service, core *assistant.Core) *Handler {
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		assistantCore: core,
-		assistant:     service,
+		amSystem:     amSys,
+		visionParser: visionP,
+		llmDetector:  llmDet,
 	}
+}
+
+// GetVisionParser returns the vision parser for terminal vision overlay features.
+func (h *Handler) GetVisionParser() *vision.Parser {
+	return h.visionParser
+}
+
+// GetAMSystem returns the AM (Artificial Memory) system for LLM logging.
+func (h *Handler) GetAMSystem() *am.System {
+	return h.amSystem
+}
+
+// GetLLMDetector returns the LLM detector for detecting AI CLI tools.
+func (h *Handler) GetLLMDetector() *llm.Detector {
+	return h.llmDetector
 }
 
 // HandleWebSocket upgrades the HTTP connection to WebSocket and manages PTY I/O.
@@ -175,8 +193,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Set initial terminal size (default 80x24)
 	_ = session.Resize(80, 24)
 
-	// Get Vision parser from assistant core
-	visionParser := h.assistantCore.GetVisionParser()
+	// Get Vision parser using getter method (supports both direct and assistantCore)
+	visionParser := h.GetVisionParser()
 
 	// STANDALONE AUTO-RESPOND DETECTOR (independent of AM)
 	autoRespondDetector := NewAutoRespondDetector("github-copilot")
@@ -210,7 +228,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// These don't need to block the terminal from becoming interactive
 	var llmLoggerAtomic atomic.Value // Stores *am.LLMLogger - lock-free concurrent access
 	var insightsTracker *vision.InsightsTracker
-	amSystem := h.assistantCore.GetAMSystem()
+	amSystem := h.GetAMSystem()
 
 	// Launch async initialization - doesn't block terminal readiness
 	go func() {
@@ -268,7 +286,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	detector := h.assistantCore.GetLLMDetector()
+	detector := h.GetLLMDetector()
 	var inputBuffer strings.Builder
 	var amInputAccumulator strings.Builder // Batch AM input checks
 	lastAMCheck := time.Now()

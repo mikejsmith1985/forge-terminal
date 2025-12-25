@@ -1,3 +1,9 @@
+# ⚠️ DEPRECATED - Feature Removed in v2.2.8
+
+This feature was removed. See root directory assistant documentation for details.
+
+---
+
 Artificial Memory (AM) — Architecture, Implementation, Dependencies, Logging & Debugging Monitors
 ================================================================================
 
@@ -142,3 +148,4 @@ Contact points & next steps
   3) Run an end-to-end test with Copilot/Claude (requires those CLIs installed in this environment).
 
 End of document
+

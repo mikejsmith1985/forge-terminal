@@ -1,3 +1,36 @@
+# ⚠️ DEPRECATED - Feature Removed in v2.2.8
+
+**This documentation is kept for historical reference only.**
+
+The Forge Assistant feature was removed in version 2.2.8 due to:
+- Low usage (Dev Mode only feature)
+- Maintenance overhead
+- Complexity not justified by user adoption
+
+## What Was Removed
+
+- AI chat interface
+- Ollama integration
+- RAG (Retrieval Augmented Generation) engine
+- Vector embeddings and semantic search
+- Model training functionality
+- Agent mode
+
+## What Remains Active
+
+The following production features continue to work:
+- ✅ AM (Artificial Memory) logging system for LLM conversation tracking
+- ✅ Vision parser for terminal overlays (error detection, JSON formatting)
+- ✅ LLM detector for identifying AI CLI tools (Copilot, Claude, Aider)
+- ✅ All terminal functionality
+- ✅ Command cards
+- ✅ Auto-respond feature
+
+---
+
+**Original Documentation Below:**
+
+
 # Quick Reference: Forge Assistant Training
 
 ## Current Status
@@ -81,3 +114,4 @@ We improved Forge Assistant accuracy from 66.7% to 75% by updating the knowledge
 
 ---
 See full details in `ASSISTANT_KNOWLEDGE_IMPLEMENTATION.md`
+

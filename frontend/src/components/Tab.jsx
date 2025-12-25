@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon, MessageCircle, Eye } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon, Eye } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -29,7 +29,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleVision, onToggleAssistant, onToggleMode, isWaiting = false, mode = 'dark', devMode = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleVision, onToggleMode, isWaiting = false, mode = 'dark', devMode = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -254,18 +254,6 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             >
               <Terminal size={14} />
               Forge Vision {tab.visionEnabled ? '✓' : ''}
-            </button>
-          )}
-          {devMode && onToggleAssistant && (
-            <button 
-              onClick={() => { 
-                setShowContextMenu(false); 
-                if (onToggleAssistant) onToggleAssistant(); 
-              }}
-              className={tab.assistantEnabled ? 'active' : ''}
-            >
-              <MessageCircle size={14} />
-              Assistant {tab.assistantEnabled ? '✓' : ''}
             </button>
           )}
           <button 

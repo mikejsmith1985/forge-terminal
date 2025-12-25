@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, MessageSquare, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
@@ -17,7 +17,6 @@ import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import MonacoEditor from './components/MonacoEditor'
 import AMMonitor from './components/AMMonitor'
-import AssistantPanel from './components/AssistantPanel/AssistantPanel'
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import { ToastContainer, useToast } from './components/Toast'
@@ -85,7 +84,7 @@ function App() {
   const [waitingTabs, setWaitingTabs] = useState({})
   
   // File explorer and editor state
-  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', 'assistant', or 'debug'
+  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', or 'debug'
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   
@@ -107,7 +106,6 @@ function App() {
     toggleTabAutoRespond,
     toggleTabAM,
     toggleTabVision,
-    toggleTabAssistant,
     toggleTabMode,
     updateTabDirectory,
     reorderTabs,
@@ -1267,6 +1265,7 @@ function App() {
     }
     saveCommands(newCommands)
     setIsModalOpen(false)
+    setEditingCommand(null)
   }
 
   const handleDragEnd = (event) => {
@@ -1309,15 +1308,6 @@ function App() {
           <Folder size={16} />
           Files
         </button>
-        {devMode && (
-          <button 
-            className={`sidebar-view-tab ${sidebarView === 'assistant' ? 'active' : ''}`}
-            onClick={() => setSidebarView('assistant')}
-          >
-            <MessageSquare size={16} />
-            Help
-          </button>
-        )}
         <button 
           className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
           onClick={() => setSidebarView('debug')}
@@ -1351,12 +1341,7 @@ function App() {
               {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
             </button>
           </>
-        ) : (
-          <>
-            <h3>🤖 Help & Guidance</h3>
-            <span className="sidebar-path-hint">Local Ollama</span>
-          </>
-        )}
+        ) : null}
       </div>
 
       {/* Row 3: Theme controls */}
@@ -1490,15 +1475,7 @@ function App() {
             terminalRef={getActiveTerminalRef()}
             tabId={activeTabId}
           />
-        ) : (
-          <AssistantPanel
-            isOpen={true}
-            onClose={() => setSidebarView('cards')}
-            currentTabId={activeTabId}
-            assistantFontSize={chatFontSize}
-            onFeedbackClick={() => setIsFeedbackModalOpen(true)}
-          />
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -1542,10 +1519,6 @@ function App() {
           onToggleVision={(tabId) => {
             console.log('[App] toggleTabVision called for tab:', tabId);
             toggleTabVision(tabId);
-          }}
-          onToggleAssistant={(tabId) => {
-            console.log('[App] toggleTabAssistant called for tab:', tabId);
-            toggleTabAssistant(tabId);
           }}
           onToggleMode={toggleTabMode}
           disableNewTab={tabs.length >= MAX_TABS}
@@ -1595,8 +1568,6 @@ function App() {
                   autoRespond={tab.autoRespond || false}
                   amEnabled={tab.amEnabled || false}
                   visionEnabled={tab.visionEnabled || false}
-                  assistantEnabled={tab.assistantEnabled || false}
-                  isAgentMode={tab.type === 'agent'} // Pass agent mode prop
                   tabName={tab.title}
                   currentDirectory={tab.currentDirectory || null}
                   onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
@@ -1626,7 +1597,10 @@ function App() {
 
       <CommandModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false)
+          setEditingCommand(null)
+        }}
         onSave={handleSaveCommand}
         initialData={editingCommand}
         commands={commands}

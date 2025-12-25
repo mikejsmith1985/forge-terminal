@@ -8,7 +8,6 @@ import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import VisionOverlay from './vision/VisionOverlay';
 import { diagnosticCore } from '../utils/diagnosticCore';
-import AssistantPanel from './AssistantPanel/AssistantPanel'; // Import AssistantPanel
 
 // Debounce helper for resize events
 function debounce(fn, ms) {
@@ -346,8 +345,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   amEnabled = false, // AM (Artificial Memory) logging enabled
   currentDirectory = null, // Current working directory to restore on connect
   visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
-  assistantEnabled = false, // Forge Assistant panel enabled (Dev Mode)
-  isAgentMode = false, // New prop: Agent Mode (full screen chat)
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -750,84 +747,70 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       if (!e.clipboardData || !e.clipboardData.items) return;
       
       let hasImage = false;
-      let hasText = false;
       
       // Check what's in the clipboard
       for (const item of e.clipboardData.items) {
         if (item.type.startsWith('image/')) {
           hasImage = true;
         }
-        if (item.type.startsWith('text/')) {
-          hasText = true;
-        }
       }
       
-      // Handle text paste - send to WebSocket
-      if (hasText) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const text = e.clipboardData.getData('text/plain');
-        if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(text);
-          console.log('[Terminal] Text pasted:', text.length, 'chars');
-          if (onPasteRef.current) onPasteRef.current();
-        }
+      // Only handle image paste here - text paste is handled by Ctrl+V key handler
+      // This prevents double-pasting when user presses Ctrl+V
+      if (!hasImage) {
         return;
       }
       
-      // Handle image paste only if NO text
-      if (hasImage) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        for (const item of e.clipboardData.items) {
-          if (item.type.startsWith('image/')) {
-            console.log('[Terminal] Image paste detected:', item.type);
+      // Handle image paste only
+      e.preventDefault();
+      e.stopPropagation();
+      
+      for (const item of e.clipboardData.items) {
+        if (item.type.startsWith('image/')) {
+          console.log('[Terminal] Image paste detected:', item.type);
+          
+          try {
+            const blob = item.getAsFile();
+            if (!blob) continue;
             
-            try {
-              const blob = item.getAsFile();
-              if (!blob) continue;
-              
-              const formData = new FormData();
-              formData.append('image', blob);
-              
-              // Show uploading indicator
-              if (xtermRef.current) {
-                xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
-              }
-              
-              const response = await fetch('/api/temp-image', {
-                method: 'POST',
-                body: formData
-              });
-              
-              if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
-              
-              const data = await response.json();
-              const filePath = data.filePath;
-              const filename = data.filename;
-              
-              // Clear uploading indicator
-              if (xtermRef.current) {
-                xtermRef.current.write('\r\x1b[K');
-              }
-              
-              // Send markdown-style image reference to terminal
-              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                const textToSend = `[📷 ${filename}] ${filePath}`;
-                wsRef.current.send(textToSend);
-                console.log('[Terminal] Sent image to backend:', textToSend);
-                if (onPasteRef.current) onPasteRef.current();
-              }
-            } catch (err) {
-              console.error('[Terminal] Image upload failed:', err);
-              if (xtermRef.current) {
-                xtermRef.current.write(`\r\x1b[K\x1b[31m[Image upload failed: ${err.message}]\x1b[0m\r\n`);
-              }
+            const formData = new FormData();
+            formData.append('image', blob);
+            
+            // Show uploading indicator
+            if (xtermRef.current) {
+              xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
             }
-            break;
+            
+            const response = await fetch('/api/temp-image', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+            
+            const data = await response.json();
+            const filePath = data.filePath;
+            const filename = data.filename;
+            
+            // Clear uploading indicator
+            if (xtermRef.current) {
+              xtermRef.current.write('\r\x1b[K');
+            }
+            
+            // Send markdown-style image reference to terminal
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              const textToSend = `[📷 ${filename}] ${filePath}`;
+              wsRef.current.send(textToSend);
+              console.log('[Terminal] Sent image to backend:', textToSend);
+              if (onPasteRef.current) onPasteRef.current();
+            }
+          } catch (err) {
+            console.error('[Terminal] Image upload failed:', err);
+            if (xtermRef.current) {
+              xtermRef.current.write(`\r\x1b[K\x1b[31m[Image upload failed: ${err.message}]\x1b[0m\r\n`);
+            }
           }
+          break;
         }
       }
     };
@@ -1463,21 +1446,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       setShowScrollButton(false);
     }
   };
-
-  // If in Agent Mode, render the AssistantPanel full screen
-  if (isAgentMode) {
-    return (
-      <div className={`forge-terminal-container ${className || ''}`} style={{ ...style, height: '100%', width: '100%', position: 'relative' }}>
-        <AssistantPanel 
-          isOpen={true} 
-          onClose={() => {}} // Cannot close in agent mode
-          currentTabId={tabId}
-          assistantFontSize={fontSize}
-          isFullScreen={true} // Pass full screen prop
-        />
-      </div>
-    );
-  }
 
   return (
     <div ref={containerRef} className={`terminal-outer-container ${className || ''}`} style={style}>

@@ -1,3 +1,9 @@
+# ⚠️ DEPRECATED - Feature Removed in v2.2.8
+
+This feature was removed. See root directory assistant documentation for details.
+
+---
+
 # Forge Assistant v1 Implementation Plan
 
 **Date:** 2025-12-08  
@@ -283,3 +289,4 @@ Commands classified as:
 **Status:** Plan complete, ready for Phase 2 implementation.
 
 **Next:** Create Ollama client and extend Service interface.
+

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -22,13 +21,13 @@ import (
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
-	"github.com/mikejsmith1985/forge-terminal/internal/assistant"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
+	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
 
@@ -37,9 +36,6 @@ var embeddedFS embed.FS
 
 // Preferred ports to try, in order
 var preferredPorts = []int{3005, 8333, 8080, 9000, 3000, 3333}
-
-// Global assistant service (initialized in main)
-var assistantService assistant.Service
 
 // headerFixingResponseWriter wraps http.ResponseWriter to fix MIME types for embedded assets
 type headerFixingResponseWriter struct {
@@ -140,46 +136,16 @@ func main() {
 		log.Printf("[AM] System disabled by configuration")
 	}
 
-	// Initialize assistant core with AM system
-	assistantCore := assistant.NewCore(amSystem)
-	log.Printf("[Assistant] Core initialized")
+	// Initialize components needed by terminal handler
+	// Vision system for terminal overlays
+	visionRegistry := vision.NewRegistry()
+	visionParser := vision.NewParser(8192, visionRegistry)
 
-	// Index documentation for RAG
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-		defer cancel()
+	// LLM detector for AI CLI tool detection
+	llmDetector := llm.NewDetector()
 
-		ragEngine := assistantCore.GetRAGEngine()
-		if ragEngine == nil {
-			log.Printf("[RAG] RAG engine not available")
-			return
-		}
-
-		// Ensure embedding model is available
-		if !ragEngine.EnsureEmbeddingsAvailable(ctx) {
-			log.Printf("[RAG] Warning: Embedding model unavailable, using hash-based fallback (accuracy will be degraded)")
-		}
-
-		// Index documentation
-		docsPath := filepath.Join(os.Getenv("HOME"), "projects", "forge-terminal", "docs")
-		if _, err := os.Stat(docsPath); err == nil {
-			log.Printf("[RAG] Starting document indexing from %s", docsPath)
-			if err := ragEngine.IndexDocuments(ctx, docsPath); err != nil {
-				log.Printf("[RAG] Warning: Failed to index documents: %v", err)
-			} else {
-				stats := ragEngine.GetStats()
-				log.Printf("[RAG] Indexing complete: %v", stats)
-			}
-		} else {
-			log.Printf("[RAG] Docs path not found: %s", docsPath)
-		}
-	}()
-
-	// Wrap core in LocalService (v1 implementation)
-	assistantService = assistant.NewLocalService(assistantCore)
-	log.Printf("[Assistant] LocalService initialized")
-
-	termHandler := terminal.NewHandler(assistantService, assistantCore)
+	// Create terminal handler with direct dependencies (no assistant.Core wrapper)
+	termHandler := terminal.NewHandlerDirect(amSystem, visionParser, llmDetector)
 	http.HandleFunc("/ws", termHandler.HandleWebSocket)
 
 	// Commands API
@@ -263,15 +229,6 @@ func main() {
 	http.HandleFunc("/api/files/delete", WrapWithMiddleware(files.HandleDelete))
 	http.HandleFunc("/api/files/stream", WrapWithMiddleware(files.HandleReadStream))
 	http.HandleFunc("/api/files/access-mode", WrapWithMiddleware(files.HandleFileAccessMode))
-
-	// Assistant API - AI chat and command suggestions (Dev Mode only)
-	http.HandleFunc("/api/assistant/status", WrapWithMiddleware(handleAssistantStatus))
-	http.HandleFunc("/api/assistant/chat", WrapWithMiddleware(handleAssistantChat))
-	http.HandleFunc("/api/assistant/execute", WrapWithMiddleware(handleAssistantExecute))
-	http.HandleFunc("/api/assistant/model", WrapWithMiddleware(handleAssistantSetModel))
-	http.HandleFunc("/api/assistant/run-tests", WrapWithMiddleware(handleAssistantRunTests))
-	http.HandleFunc("/api/assistant/train-model", WrapWithMiddleware(handleAssistantTrainModel))
-	http.HandleFunc("/api/assistant/training-status/", WrapWithMiddleware(handleAssistantTrainingStatus))
 
 	// Error logging API - client-side error reporting
 	http.HandleFunc("/api/log-error", WrapWithMiddleware(handleLogError))
@@ -1529,255 +1486,6 @@ func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleAssistantStatus checks if Ollama is available.
-func handleAssistantStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	ctx := r.Context()
-
-	status, err := assistantService.GetStatus(ctx)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(status)
-}
-
-// handleAssistantChat processes chat messages.
-func handleAssistantChat(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	ctx := r.Context()
-
-	var req assistant.ChatRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	response, err := assistantService.Chat(ctx, &req)
-	if err != nil {
-		log.Printf("[Assistant] Chat error: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(response)
-}
-
-// handleAssistantExecute executes a command.
-func handleAssistantExecute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	ctx := r.Context()
-
-	var req assistant.ExecuteCommandRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	response, err := assistantService.ExecuteCommand(ctx, &req)
-	if err != nil {
-		log.Printf("[Assistant] Execute error: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(response)
-}
-
-// handleAssistantSetModel changes the current Ollama model.
-func handleAssistantSetModel(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	ctx := r.Context()
-
-	var req assistant.SetModelRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.Model == "" {
-		http.Error(w, "Model name is required", http.StatusBadRequest)
-		return
-	}
-
-	if err := assistantService.SetModel(ctx, req.Model); err != nil {
-		log.Printf("[Assistant] SetModel error: %v", err)
-		json.NewEncoder(w).Encode(assistant.SetModelResponse{
-			Success: false,
-			Error:   err.Error(),
-		})
-		return
-	}
-
-	log.Printf("[Assistant] Model changed to: %s", req.Model)
-	json.NewEncoder(w).Encode(assistant.SetModelResponse{
-		Success: true,
-		Model:   req.Model,
-	})
-}
-
-// handleAssistantRunTests runs the model test suite asynchronously
-func handleAssistantRunTests(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var req struct {
-		Model string `json:"model"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.Model == "" {
-		http.Error(w, "Model name is required", http.StatusBadRequest)
-		return
-	}
-
-	// Run tests asynchronously
-	go runModelTests(req.Model)
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Tests started in background",
-		"model":   req.Model,
-	})
-}
-
-// runModelTests executes the model test suite using the test-model-comparison.sh script
-func runModelTests(model string) {
-	cmd := exec.Command("bash", "scripts/test-model-comparison.sh", "--baseline-only", model)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("[Model Tests] Error running tests for %s: %v\n%s", model, err, string(output))
-		return
-	}
-
-	log.Printf("[Model Tests] Tests completed for %s\n%s", model, string(output))
-}
-
-// Training state tracking (in-memory)
-var trainingStatus = make(map[string]map[string]interface{})
-
-// handleAssistantTrainModel initiates model training
-func handleAssistantTrainModel(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var req struct {
-		Model string `json:"model"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.Model == "" {
-		http.Error(w, "Model name is required", http.StatusBadRequest)
-		return
-	}
-
-	// Initialize training status
-	trainingStatus[req.Model] = map[string]interface{}{
-		"status":             "in_progress",
-		"started_at":         time.Now(),
-		"examples_processed": 0,
-		"completed":          false,
-	}
-
-	// Run training asynchronously
-	go trainModel(req.Model)
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Training started in background",
-		"model":   req.Model,
-	})
-}
-
-// trainModel executes model training using the train-model.sh script
-func trainModel(model string) {
-	cmd := exec.Command("bash", "scripts/train-model.sh", model)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("[Model Training] Error training %s: %v\n%s", model, err, string(output))
-		trainingStatus[model]["completed"] = true
-		trainingStatus[model]["status"] = "failed"
-		return
-	}
-
-	log.Printf("[Model Training] Training completed for %s\n%s", model, string(output))
-
-	// Update training status
-	trainingStatus[model]["completed"] = true
-	trainingStatus[model]["status"] = "completed"
-	trainingStatus[model]["examples_processed"] = 50 // We have 50 training examples
-}
-
-// handleAssistantTrainingStatus returns training progress
-func handleAssistantTrainingStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract model name from URL path
-	model := strings.TrimPrefix(r.URL.Path, "/api/assistant/training-status/")
-	if model == "" {
-		http.Error(w, "Model name required", http.StatusBadRequest)
-		return
-	}
-
-	status, exists := trainingStatus[model]
-	if !exists {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"completed": false,
-			"status":    "not_started",
-			"model":     model,
-		})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"completed":          status["completed"],
-		"status":             status["status"],
-		"examples_processed": status["examples_processed"],
-		"model":              model,
-	})
-}
 
 // handleLogError handles client-side error logging
 func handleLogError(w http.ResponseWriter, r *http.Request) {

@@ -55,14 +55,13 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     autoRespond: false, // Auto-respond to CLI confirmation prompts
     amEnabled: true, // AM (Artificial Memory) logging - DEFAULT ON for legal compliance
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
-    assistantEnabled: false, // Forge Assistant panel - DEFAULT OFF (Dev Mode feature)
     currentDirectory: currentDirectory || null, // Current working directory
     type: type, // 'terminal' or 'agent'
     createdAt: Date.now(),
   };
   
   logger.tabs('Creating tab object', { 
-    tabId: newTab.id, 
+    tabId: newTab.id,
     tabNumber, 
     colorTheme: assignedTheme,
     mode: assignedMode,
@@ -92,7 +91,6 @@ function tabsToSession(tabs, activeTabId) {
       autoRespond: tab.autoRespond || false,
       amEnabled: tab.amEnabled || false,
       visionEnabled: tab.visionEnabled || false,
-      assistantEnabled: tab.assistantEnabled || false,
       currentDirectory: tab.currentDirectory || null,
       type: tab.type || 'terminal',
     })),
@@ -199,7 +197,6 @@ export function useTabManager(initialShellConfig) {
           autoRespond: tabState.autoRespond || false,
           amEnabled: tabState.amEnabled || false,
           visionEnabled: tabState.visionEnabled || false,
-          assistantEnabled: tabState.assistantEnabled || false,
           currentDirectory: tabState.currentDirectory || null,
           type: tabState.type || 'terminal',
           createdAt: Date.now(),
@@ -558,40 +555,12 @@ export function useTabManager(initialShellConfig) {
 
   /**
    * Toggle assistant for a specific tab
-   */
-  const toggleTabAssistant = useCallback((tabId) => {
-    logger.tabs('Toggling tab Assistant', { tabId });
-    
-    setState(prev => {
-      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
-      if (tabIndex === -1) {
-        logger.tabs('Tab not found for Assistant toggle', { tabId });
-        return prev;
-      }
-
-      const oldValue = prev.tabs[tabIndex].assistantEnabled || false;
-      const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], assistantEnabled: !oldValue };
-      
-      logger.tabs('Tab Assistant toggled', { 
-        tabId, 
-        oldValue, 
-        newValue: !oldValue 
-      });
-      
-      return {
-        ...prev,
-        tabs: newTabs,
-      };
-    });
-  }, []);
-
   /**
    * Toggle light/dark mode for a tab
    * @param {string} tabId - ID of tab to update
    */
   const toggleTabMode = useCallback((tabId) => {
-    logger.tabs('Toggling tab mode', { tabId });
+    logger.tabs('Toggling tab mode', { tabId});
     
     setState(prev => {
       const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
@@ -653,7 +622,6 @@ export function useTabManager(initialShellConfig) {
     toggleTabAutoRespond,
     toggleTabAM,
     toggleTabVision,
-    toggleTabAssistant,
     toggleTabMode,
     updateTabDirectory,
     reorderTabs,

@@ -81,12 +81,11 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
 
     // Calculate the smart keybinding that will be auto-assigned and availability
     const keybindingInfo = useMemo(() => {
-        const availability = getKeybindingAvailability(
-            initialData ? commands.filter(c => c.id !== initialData.id) : commands
-        );
+        const activeCommands = initialData ? commands.filter(c => c.id !== initialData.id) : commands;
+        const availability = getKeybindingAvailability(activeCommands);
         const nextKeybinding = initialData 
             ? null 
-            : getNextAvailableKeybinding(commands);
+            : getNextAvailableKeybinding(activeCommands, null);
         
         return {
             availability,
