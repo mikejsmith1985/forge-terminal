@@ -198,6 +198,12 @@ function detectCliPrompt(text, debugLog = false) {
   // Strip ANSI escape codes
   const cleanText = stripAnsi(text);
   
+  // IGNORE: Image paste markdown format [📷 filename]
+  // Don't treat image pastes as CLI prompts
+  if (/\[📷\s+[^\]]+\]\s*$/.test(cleanText.trimEnd())) {
+    return { waiting: false, responseType: null, confidence: 'none' };
+  }
+  
   // Use full buffer for Copilot CLI detection (menus can be large)
   const bufferToCheck = cleanText.slice(-2000);
   
@@ -799,7 +805,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             
             // Send markdown-style image reference to terminal
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              const textToSend = `[📷 ${filename}] ${filePath}`;
+              const textToSend = `[📷 ${filename}]`;
               wsRef.current.send(textToSend);
               console.log('[Terminal] Sent image to backend:', textToSend);
               if (onPasteRef.current) onPasteRef.current();
