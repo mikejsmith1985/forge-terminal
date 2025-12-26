@@ -1226,12 +1226,17 @@ function App() {
   }
 
   const handleSaveCommand = (commandData) => {
+    console.log('[handleSaveCommand] commandData:', commandData);
+    console.log('[handleSaveCommand] editingCommand:', editingCommand);
+    
     // Validate keybinding if manually specified
     const validation = validateKeybinding(
       commandData.keyBinding, 
       commands, 
       editingCommand?.id
     );
+    
+    console.log('[handleSaveCommand] validation result:', validation);
     
     if (!validation.valid) {
       addToast(validation.error, 'error', 5000);

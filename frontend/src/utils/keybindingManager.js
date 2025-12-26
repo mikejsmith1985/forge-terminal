@@ -106,12 +106,21 @@ export const isDuplicateKeybinding = (keybinding, commands, excludeId = null) =>
   const normalized = normalizeKeybinding(keybinding);
   if (!normalized) return false;
   
+  console.log('[isDuplicateKeybinding] checking:', { keybinding, normalized, excludeId, commandsCount: commands.length });
+  
   const activeCommands = excludeId 
     ? commands.filter(cmd => cmd.id !== excludeId)
     : commands;
   
+  console.log('[isDuplicateKeybinding] activeCommandsCount after filter:', activeCommands.length);
+  console.log('[isDuplicateKeybinding] excluded command:', commands.find(cmd => cmd.id === excludeId));
+  
   const assigned = getAssignedKeybindings(activeCommands);
-  return assigned.has(normalized);
+  const isDuplicate = assigned.has(normalized);
+  
+  console.log('[isDuplicateKeybinding] result:', { isDuplicate, assigned: Array.from(assigned) });
+  
+  return isDuplicate;
 };
 
 /**

@@ -140,6 +140,15 @@ const FeedbackModal = ({ isOpen, onClose }) => {
 
     const handlePasteFromClipboard = async () => {
         try {
+            // Check permission first to provide better UX
+            const permissionStatus = await navigator.permissions.query({ name: 'clipboard-read' });
+            
+            if (permissionStatus.state === 'denied') {
+                setStatus({ type: 'error', msg: 'Clipboard access denied. Please allow in browser settings.' });
+                setTimeout(() => setStatus({ type: '', msg: '' }), 3000);
+                return;
+            }
+
             const clipboardItems = await navigator.clipboard.read();
             for (const item of clipboardItems) {
                 for (const type of item.types) {
