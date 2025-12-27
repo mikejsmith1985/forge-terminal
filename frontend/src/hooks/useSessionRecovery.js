@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  * 1. Auto-detect recoverable sessions for a project
  * 2. Track directory changes to trigger recovery prompts
  * 3. Provide methods to fetch and restore sessions
+ * 4. Support for v2 project-based session recovery
  * 
  * Usage:
  * const { 
@@ -14,7 +15,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  *   hasRecoverableSessions,
  *   checkForRecoverableSessions,
  *   triggerRecoveryOverlay,
- *   restoreSession
+ *   restoreSession,
+ *   projectSummaries
  * } = useSessionRecovery({ projectPath, tabId, onShowOverlay });
  */
 export function useSessionRecovery({ 
@@ -22,19 +24,25 @@ export function useSessionRecovery({
   tabId, 
   onShowOverlay, 
   onShowToast,
-  enabled = true 
+  enabled = true,
+  useV2API = true  // Use new session-based API
 }) {
   const [recoverableSessions, setRecoverableSessions] = useState([]);
+  const [projectSummaries, setProjectSummaries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastCheckedPath, setLastCheckedPath] = useState(null);
   const checkedPathsRef = useRef(new Set());
 
-  // Fetch all recoverable sessions from API
+  // Fetch all recoverable sessions from API (v1 or v2)
   const fetchRecoverableSessions = useCallback(async () => {
     if (!enabled) return [];
     
     try {
-      const response = await fetch('/api/am/restore/sessions');
+      const endpoint = useV2API 
+        ? '/api/am/v2/sessions'
+        : '/api/am/restore/sessions';
+      
+      const response = await fetch(endpoint);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -44,7 +52,24 @@ export function useSessionRecovery({
       console.error('[useSessionRecovery] Failed to fetch sessions:', err);
       return [];
     }
-  }, [enabled]);
+  }, [enabled, useV2API]);
+
+  // Fetch project summaries (v2 only)
+  const fetchProjectSummaries = useCallback(async () => {
+    if (!enabled || !useV2API) return [];
+    
+    try {
+      const response = await fetch('/api/am/v2/projects');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      return data.projects || [];
+    } catch (err) {
+      console.error('[useSessionRecovery] Failed to fetch projects:', err);
+      return [];
+    }
+  }, [enabled, useV2API]);
 
   // Check for recoverable sessions matching the current project
   const checkForRecoverableSessions = useCallback(async (path) => {
@@ -54,16 +79,34 @@ export function useSessionRecovery({
     try {
       const allSessions = await fetchRecoverableSessions();
       
-      // Filter sessions that match the current project path
-      const projectName = path.split('/').filter(Boolean).pop();
-      const matchingSessions = allSessions.filter(session => {
-        const sessionProject = session.metadata?.workingDirectory?.split('/').pop();
-        return sessionProject === projectName || 
-               session.metadata?.workingDirectory?.includes(path);
-      });
+      // For v2 API, filter by project name
+      const projectName = path.split(/[\\/]/).filter(Boolean).pop();
+      
+      let matchingSessions;
+      if (useV2API) {
+        // v2 sessions have a project field
+        matchingSessions = allSessions.filter(session => {
+          return session.project === projectName ||
+                 session.project?.toLowerCase() === projectName?.toLowerCase();
+        });
+      } else {
+        // v1 sessions use metadata.workingDirectory
+        matchingSessions = allSessions.filter(session => {
+          const sessionProject = session.metadata?.workingDirectory?.split(/[\\/]/).pop();
+          return sessionProject === projectName || 
+                 session.metadata?.workingDirectory?.includes(path);
+        });
+      }
 
       setRecoverableSessions(matchingSessions);
       setLastCheckedPath(path);
+      
+      // Also fetch project summaries if using v2
+      if (useV2API) {
+        const projects = await fetchProjectSummaries();
+        setProjectSummaries(projects);
+      }
+      
       return matchingSessions;
     } catch (err) {
       console.error('[useSessionRecovery] Check failed:', err);
@@ -71,7 +114,7 @@ export function useSessionRecovery({
     } finally {
       setLoading(false);
     }
-  }, [enabled, fetchRecoverableSessions]);
+  }, [enabled, useV2API, fetchRecoverableSessions, fetchProjectSummaries]);
 
   // Trigger the recovery overlay with current sessions
   const triggerRecoveryOverlay = useCallback((reason = 'manual') => {
@@ -197,12 +240,14 @@ export function useSessionRecovery({
   return {
     recoverableSessions,
     hasRecoverableSessions: recoverableSessions.length > 0,
+    projectSummaries,
     loading,
     lastCheckedPath,
     checkForRecoverableSessions,
     triggerRecoveryOverlay,
     restoreSession,
-    fetchAllSessions: fetchRecoverableSessions
+    fetchAllSessions: fetchRecoverableSessions,
+    fetchProjectSummaries
   };
 }
 

@@ -203,6 +203,12 @@ func main() {
 	http.HandleFunc("/api/am/restore/context/", WrapWithMiddleware(handleAMRestoreContext))
 	http.HandleFunc("/api/am/log", WrapWithMiddleware(handleAMLog))
 
+	// New Session-based Recovery API (v2)
+	http.HandleFunc("/api/am/v2/sessions", WrapWithMiddleware(handleAMV2Sessions))
+	http.HandleFunc("/api/am/v2/sessions/active", WrapWithMiddleware(handleAMV2ActiveSessions))
+	http.HandleFunc("/api/am/v2/sessions/", WrapWithMiddleware(handleAMV2SessionDetail))
+	http.HandleFunc("/api/am/v2/projects", WrapWithMiddleware(handleAMV2Projects))
+
 	// Vision Configuration & Insights API
 	http.HandleFunc("/api/vision/config", WrapWithMiddleware(handleVisionConfig))
 	http.HandleFunc("/api/vision/insights/", WrapWithMiddleware(handleVisionInsights))
@@ -1540,6 +1546,158 @@ func handleAMRestoreContext(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"context": ctx,
+	})
+}
+
+// =============================================================================
+// AM v2 Session Recovery API Handlers
+// =============================================================================
+
+// handleAMV2Sessions returns all recoverable sessions
+func handleAMV2Sessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	amDir := am.DefaultAMDir()
+	recovery := am.NewRecoveryAPI(amDir)
+
+	sessions, err := recovery.GetRecoverableSessions()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  false,
+			"error":    err.Error(),
+			"sessions": []interface{}{},
+		})
+		return
+	}
+
+	log.Printf("[AM v2] Found %d recoverable sessions", len(sessions))
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"sessions": sessions,
+		"count":    len(sessions),
+	})
+}
+
+// handleAMV2ActiveSessions returns currently active capture sessions
+func handleAMV2ActiveSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	activeSessions := am.GetAllActiveSessions()
+
+	sessions := make([]map[string]interface{}, 0, len(activeSessions))
+	for _, capture := range activeSessions {
+		session := capture.Session()
+		sessions = append(sessions, map[string]interface{}{
+			"id":        session.ID,
+			"tabId":     session.TabID,
+			"project":   session.Project.Name,
+			"provider":  session.Provider,
+			"startTime": session.StartTime,
+			"status":    session.Status,
+			"turnCount": len(session.Turns),
+		})
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"sessions": sessions,
+		"count":    len(sessions),
+	})
+}
+
+// handleAMV2SessionDetail handles individual session operations
+func handleAMV2SessionDetail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract session ID from path: /api/am/v2/sessions/{sessionId}
+	sessionID := strings.TrimPrefix(r.URL.Path, "/api/am/v2/sessions/")
+	if sessionID == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "session ID required",
+		})
+		return
+	}
+
+	amDir := am.DefaultAMDir()
+	recovery := am.NewRecoveryAPI(amDir)
+
+	switch r.Method {
+	case http.MethodGet:
+		// Get session summary
+		summary, err := recovery.GetSessionSummary(sessionID)
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"session": summary,
+		})
+
+	case http.MethodPost:
+		// Mark session as restored
+		err := recovery.MarkSessionRestored(sessionID)
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		log.Printf("[AM v2] Marked session %s as restored", sessionID)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":   true,
+			"sessionId": sessionID,
+			"message":   "Session marked as restored",
+		})
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleAMV2Projects returns recovery info grouped by project
+func handleAMV2Projects(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	amDir := am.DefaultAMDir()
+	recovery := am.NewRecoveryAPI(amDir)
+
+	projects, err := recovery.GetProjectSummaries()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  false,
+			"error":    err.Error(),
+			"projects": []interface{}{},
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"projects": projects,
+		"count":    len(projects),
 	})
 }
 
