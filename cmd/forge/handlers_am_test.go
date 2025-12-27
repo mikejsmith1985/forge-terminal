@@ -18,11 +18,9 @@ func TestHandleAMCheckEnhanced(t *testing.T) {
 			TabID:           "tab-1",
 			TabName:         "Planning",
 			Workspace:       "/project",
-			LastUpdated:     time.Now(),
+			Timestamp:       time.Now(),
 			LastCommand:     "npm install",
-			Provider:        "copilot",
-			ActiveCount:     2,
-			DurationMinutes: 10,
+			DurationSeconds: 600,
 			SessionID:       "sess-abc123",
 		},
 	}
@@ -65,11 +63,9 @@ func TestHandleAMCheckEnhancedWithContext(t *testing.T) {
 			TabID:           "tab-1",
 			TabName:         "Execution",
 			Workspace:       "/home/user/project",
-			LastUpdated:     time.Now(),
+			Timestamp:       time.Now(),
 			LastCommand:     "npm test",
-			Provider:        "claude",
-			ActiveCount:     3,
-			DurationMinutes: 15,
+			DurationSeconds: 900,
 			SessionID:       "sess-xyz789",
 		},
 	}
@@ -100,14 +96,8 @@ func TestHandleAMCheckEnhancedWithContext(t *testing.T) {
 	if session["lastCommand"] != "npm test" {
 		t.Errorf("LastCommand should be 'npm test', got %v", session["lastCommand"])
 	}
-	if session["provider"] != "claude" {
-		t.Errorf("Provider should be 'claude', got %v", session["provider"])
-	}
-	if session["activeCount"] != 3.0 {
-		t.Errorf("ActiveCount should be 3, got %v", session["activeCount"])
-	}
-	if session["durationMinutes"] != 15.0 {
-		t.Errorf("DurationMinutes should be 15, got %v", session["durationMinutes"])
+	if session["durationSeconds"] != 900.0 {
+		t.Errorf("DurationSeconds should be 900, got %v", session["durationSeconds"])
 	}
 }
 
@@ -135,25 +125,25 @@ func TestHandleAMCheckEnhancedEmpty(t *testing.T) {
 func TestHandleAMCheckGrouped(t *testing.T) {
 	mockSessions := []am.SessionInfo{
 		{
-			TabID:       "tab-1",
-			TabName:     "Planning",
-			Workspace:   "/project/a",
-			LastUpdated: time.Now().Add(-5 * time.Minute),
-			SessionID:   "sess-1",
+			TabID:     "tab-1",
+			TabName:   "Planning",
+			Workspace: "/project/a",
+			Timestamp: time.Now().Add(-5 * time.Minute),
+			SessionID: "sess-1",
 		},
 		{
-			TabID:       "tab-2",
-			TabName:     "Execution",
-			Workspace:   "/project/a",
-			LastUpdated: time.Now(),
-			SessionID:   "sess-2",
+			TabID:     "tab-2",
+			TabName:   "Execution",
+			Workspace: "/project/a",
+			Timestamp: time.Now(),
+			SessionID: "sess-2",
 		},
 		{
-			TabID:       "tab-3",
-			TabName:     "Testing",
-			Workspace:   "/project/b",
-			LastUpdated: time.Now(),
-			SessionID:   "sess-3",
+			TabID:     "tab-3",
+			TabName:   "Testing",
+			Workspace: "/project/b",
+			Timestamp: time.Now(),
+			SessionID: "sess-3",
 		},
 	}
 
@@ -186,18 +176,18 @@ func TestHandleAMCheckGrouped(t *testing.T) {
 func TestHandleAMCheckGroupedStructure(t *testing.T) {
 	mockSessions := []am.SessionInfo{
 		{
-			TabID:       "tab-1",
-			TabName:     "Planning",
-			Workspace:   "/project",
-			LastUpdated: time.Now().Add(-10 * time.Minute),
-			SessionID:   "sess-1",
+			TabID:     "tab-1",
+			TabName:   "Planning",
+			Workspace: "/project",
+			Timestamp: time.Now().Add(-10 * time.Minute),
+			SessionID: "sess-1",
 		},
 		{
-			TabID:       "tab-2",
-			TabName:     "Execution",
-			Workspace:   "/project",
-			LastUpdated: time.Now(),
-			SessionID:   "sess-2",
+			TabID:     "tab-2",
+			TabName:   "Execution",
+			Workspace: "/project",
+			Timestamp: time.Now(),
+			SessionID: "sess-2",
 		},
 	}
 
@@ -261,11 +251,11 @@ func TestHandleAMCheckGroupedEmpty(t *testing.T) {
 // TestHandleAMCheckGroupedMultipleWorkspaces verifies correct grouping
 func TestHandleAMCheckGroupedMultipleWorkspaces(t *testing.T) {
 	mockSessions := []am.SessionInfo{
-		{TabID: "tab-1", Workspace: "/proj-a", TabName: "T1", LastUpdated: time.Now(), SessionID: "s1"},
-		{TabID: "tab-2", Workspace: "/proj-a", TabName: "T2", LastUpdated: time.Now(), SessionID: "s2"},
-		{TabID: "tab-3", Workspace: "/proj-a", TabName: "T3", LastUpdated: time.Now(), SessionID: "s3"},
-		{TabID: "tab-4", Workspace: "/proj-b", TabName: "T4", LastUpdated: time.Now(), SessionID: "s4"},
-		{TabID: "tab-5", Workspace: "/proj-c", TabName: "T5", LastUpdated: time.Now(), SessionID: "s5"},
+		{TabID: "tab-1", Workspace: "/proj-a", TabName: "T1", Timestamp: time.Now(), SessionID: "s1"},
+		{TabID: "tab-2", Workspace: "/proj-a", TabName: "T2", Timestamp: time.Now(), SessionID: "s2"},
+		{TabID: "tab-3", Workspace: "/proj-a", TabName: "T3", Timestamp: time.Now(), SessionID: "s3"},
+		{TabID: "tab-4", Workspace: "/proj-b", TabName: "T4", Timestamp: time.Now(), SessionID: "s4"},
+		{TabID: "tab-5", Workspace: "/proj-c", TabName: "T5", Timestamp: time.Now(), SessionID: "s5"},
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -342,11 +332,11 @@ func TestHandleAMCheckGroupedContentType(t *testing.T) {
 func TestHandleAMCheckEnhancedValidJSON(t *testing.T) {
 	mockSessions := []am.SessionInfo{
 		{
-			TabID:       "tab-1",
-			TabName:     "Test",
-			Workspace:   "/test",
-			LastUpdated: time.Now(),
-			SessionID:   "sess-1",
+			TabID:     "tab-1",
+			TabName:   "Test",
+			Workspace: "/test",
+			Timestamp: time.Now(),
+			SessionID: "sess-1",
 		},
 	}
 
@@ -369,10 +359,10 @@ func TestHandleAMCheckEnhancedValidJSON(t *testing.T) {
 func TestHandleAMCheckGroupedValidJSON(t *testing.T) {
 	mockSessions := []am.SessionInfo{
 		{
-			TabID:       "tab-1",
-			Workspace:   "/test",
-			LastUpdated: time.Now(),
-			SessionID:   "sess-1",
+			TabID:     "tab-1",
+			Workspace: "/test",
+			Timestamp: time.Now(),
+			SessionID: "sess-1",
 		},
 	}
 
@@ -398,11 +388,9 @@ func TestEnhancedRecoveryInfo(t *testing.T) {
 			TabID:           "tab-1",
 			TabName:         "Main",
 			Workspace:       "/project",
-			LastUpdated:     time.Now(),
+			Timestamp:       time.Now(),
 			LastCommand:     "npm run test",
-			Provider:        "copilot",
-			ActiveCount:     2,
-			DurationMinutes: 5,
+			DurationSeconds: 300,
 			SessionID:       "sess-abc",
 		},
 	}
@@ -438,11 +426,11 @@ func TestEnhancedRecoveryInfo(t *testing.T) {
 func TestGroupedRecoveryInfo(t *testing.T) {
 	mockSessions := []am.SessionInfo{
 		{
-			TabID:       "tab-1",
-			TabName:     "T1",
-			Workspace:   "/proj",
-			LastUpdated: time.Now(),
-			SessionID:   "s1",
+			TabID:     "tab-1",
+			TabName:   "T1",
+			Workspace: "/proj",
+			Timestamp: time.Now(),
+			SessionID: "s1",
 		},
 	}
 
@@ -468,7 +456,7 @@ func TestGroupedRecoveryInfo(t *testing.T) {
 	if group.Workspace != "/proj" {
 		t.Errorf("Workspace mismatch")
 	}
-	if group.Count != 1 {
-		t.Errorf("Count should be 1")
+	if len(group.Sessions) != 1 {
+		t.Errorf("Sessions count should be 1")
 	}
 }

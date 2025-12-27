@@ -11,6 +11,8 @@ import SettingsModal from './components/SettingsModal'
 import UpdateModal from './components/UpdateModal'
 import WelcomeModal from './components/WelcomeModal'
 import WorkflowCards from './components/WorkflowCards'
+import { WorkflowCanvas } from './components/workflow/WorkflowCanvas'
+import { WorkflowExecutor } from './components/workflow/WorkflowExecutor'
 import FileAccessPrompt from './components/FileAccessPrompt'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
@@ -93,6 +95,12 @@ function App() {
   // File access permission state
   const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false)
   const [fileAccessModeReady, setFileAccessModeReady] = useState(false)
+  
+  // Workflow UI state
+  const [isWorkflowCanvasOpen, setIsWorkflowCanvasOpen] = useState(false)
+  const [editingWorkflow, setEditingWorkflow] = useState(null)
+  const [isWorkflowExecutorOpen, setIsWorkflowExecutorOpen] = useState(false)
+  const [executingWorkflow, setExecutingWorkflow] = useState(null)
   
   // Tab management
   const {
@@ -1038,16 +1046,16 @@ function App() {
   
   // Workflow handlers
   const handleWorkflowRun = useCallback((workflow) => {
-    addToast(`Running workflow: ${workflow.name}`, 'info', 2000);
     logger.workflows('Workflow run requested', { workflowId: workflow.id, name: workflow.name });
-    // TODO: Implement workflow execution UI
-  }, [addToast]);
+    setExecutingWorkflow(workflow);
+    setIsWorkflowExecutorOpen(true);
+  }, []);
   
   const handleWorkflowEdit = useCallback((workflow) => {
-    addToast('Workflow editor coming soon', 'info', 2000);
     logger.workflows('Workflow edit requested', { workflowId: workflow.id });
-    // TODO: Open workflow editor modal
-  }, [addToast]);
+    setEditingWorkflow(workflow);
+    setIsWorkflowCanvasOpen(true);
+  }, []);
   
   const handleWorkflowDelete = useCallback(async (workflowId) => {
     const workflow = workflows.find(wf => wf.id === workflowId);
@@ -1065,10 +1073,53 @@ function App() {
   }, [workflows, deleteWorkflow, addToast]);
   
   const handleNewWorkflow = useCallback(() => {
-    addToast('Workflow builder coming soon', 'info', 2000);
     logger.workflows('New workflow requested');
-    // TODO: Open workflow creation modal
-  }, [addToast]);
+    setEditingWorkflow(null);
+    setIsWorkflowCanvasOpen(true);
+  }, []);
+  
+  const handleWorkflowCanvasSave = useCallback(async (workflowData) => {
+    let result;
+    if (editingWorkflow) {
+      // Update existing workflow
+      result = await updateWorkflow(editingWorkflow.id, workflowData);
+      if (result.success) {
+        addToast('Workflow updated', 'success', 2000);
+      }
+    } else {
+      // Create new workflow
+      result = await createWorkflow(workflowData);
+      if (result.success) {
+        addToast('Workflow created', 'success', 2000);
+      }
+    }
+    
+    if (result.success) {
+      setIsWorkflowCanvasOpen(false);
+      setEditingWorkflow(null);
+    } else {
+      addToast(`Failed to save workflow: ${result.error}`, 'error', 3000);
+    }
+  }, [editingWorkflow, updateWorkflow, createWorkflow, addToast]);
+  
+  const handleWorkflowCanvasClose = useCallback(() => {
+    setIsWorkflowCanvasOpen(false);
+    setEditingWorkflow(null);
+  }, []);
+  
+  const handleWorkflowExecutorClose = useCallback(() => {
+    setIsWorkflowExecutorOpen(false);
+    setExecutingWorkflow(null);
+  }, []);
+  
+  const handleWorkflowExecuteCommand = useCallback((commandCard) => {
+    // Execute command in terminal
+    const terminalRef = getActiveTerminal();
+    if (terminalRef && commandCard) {
+      terminalRef.sendCommand(commandCard.command, commandCard.delay);
+      terminalRef.focus();
+    }
+  }, [getActiveTerminal]);
 
   // Sync Vision enabled state with Dev Mode
   useEffect(() => {
@@ -1730,6 +1781,26 @@ function App() {
         onClose={() => setIsDiagnosticOverlayOpen(false)}
         position={sidebarPosition === 'right' ? 'left' : 'right'}
       />
+
+      {/* Workflow Canvas - Full-screen workflow editor */}
+      {isWorkflowCanvasOpen && (
+        <WorkflowCanvas
+          workflow={editingWorkflow}
+          onSave={handleWorkflowCanvasSave}
+          onClose={handleWorkflowCanvasClose}
+          commandCards={commands}
+        />
+      )}
+
+      {/* Workflow Executor - Step-by-step execution panel */}
+      {isWorkflowExecutorOpen && executingWorkflow && (
+        <WorkflowExecutor
+          workflow={executingWorkflow}
+          onClose={handleWorkflowExecutorClose}
+          onExecuteCommand={handleWorkflowExecuteCommand}
+          commandCards={commands}
+        />
+      )}
     </div>
   )
 }
