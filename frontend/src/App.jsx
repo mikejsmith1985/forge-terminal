@@ -1114,12 +1114,12 @@ function App() {
   
   const handleWorkflowExecuteCommand = useCallback((commandCard) => {
     // Execute command in terminal
-    const terminalRef = getActiveTerminal();
+    const terminalRef = getActiveTerminalRef();
     if (terminalRef && commandCard) {
       terminalRef.sendCommand(commandCard.command, commandCard.delay);
       terminalRef.focus();
     }
-  }, [getActiveTerminal]);
+  }, [getActiveTerminalRef]);
 
   // Sync Vision enabled state with Dev Mode
   useEffect(() => {
