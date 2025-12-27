@@ -154,6 +154,9 @@ export function useTabManager(initialShellConfig) {
   // Track if session has been loaded
   const sessionLoadedRef = useRef(false);
   
+  // Store current state in a ref for synchronous access
+  const stateRef = useRef(null);
+  
   // Initialize with one default tab
   const [state, setState] = useState(() => {
     const initialTab = createTab(initialShellConfig, 1);
@@ -163,6 +166,11 @@ export function useTabManager(initialShellConfig) {
       sessionLoaded: false,
     };
   });
+  
+  // Keep stateRef in sync with actual state
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Store initialShellConfig in a ref so callbacks don't need it as dependency
   const configRef = useRef(initialShellConfig);
@@ -238,27 +246,26 @@ export function useTabManager(initialShellConfig) {
    * @returns {{ success: boolean, tabId: string|null, tab: Object|null, error: string|null }}
    */
   const createTabAction = useCallback((shellConfig) => {
-    // Check max tabs BEFORE calling setState to avoid async issues
-    // We need to read current state synchronously
-    let currentTabCount = 0;
-    let result = null;
+    // Check current state synchronously from ref
+    const currentState = stateRef.current;
+    
+    if (currentState.tabs.length >= MAX_TABS) {
+      // Already at max - don't even call setState
+      logger.tabs('Max tabs limit reached', { 
+        currentCount: currentState.tabs.length, 
+        maxTabs: MAX_TABS 
+      });
+      return { success: false, tabId: null, tab: null, error: 'max_tabs' };
+    }
+
+    // Not at max yet - proceed with creation
+    let createdTab = null;
     
     setState(prev => {
-      currentTabCount = prev.tabs.length;
-      
-      if (prev.tabs.length >= MAX_TABS) {
-        // Don't create - already at max
-        logger.tabs('Max tabs limit reached', { 
-          currentCount: prev.tabs.length, 
-          maxTabs: MAX_TABS 
-        });
-        result = { success: false, tabId: null, tab: null, error: 'max_tabs' };
-        return prev;
-      }
-
       const config = shellConfig || configRef.current;
       const newTabNumber = prev.tabs.length + 1;
       const newTab = createTab(config, newTabNumber);
+      createdTab = newTab;
       
       logger.tabs('Tab created successfully', { 
         tabId: newTab.id, 
@@ -266,18 +273,19 @@ export function useTabManager(initialShellConfig) {
         colorTheme: newTab.colorTheme
       });
       
-      // Store result for return - setState callback runs synchronously
-      result = { success: true, tabId: newTab.id, tab: newTab, error: null };
-      
       return {
-        ...prev, // Preserve other state like sessionLoaded
+        ...prev,
         tabs: [...prev.tabs, newTab],
         activeTabId: newTab.id,
       };
     });
 
-    // Result is set synchronously within setState callback
-    return result || { success: true, tabId: null, tab: null, error: null };
+    return { 
+      success: true, 
+      tabId: createdTab?.id || null, 
+      tab: createdTab || null, 
+      error: null 
+    };
   }, []);
 
   /**

@@ -21,7 +21,7 @@
 // CONSTANTS
 // ============================================================================
 
-const MAX_BUFFER_SIZE = 2000; // Increased from 500 to capture longer sessions
+const MAX_BUFFER_SIZE = 500;
 const DUPLICATE_WINDOW_MS = 100;
 
 /**

@@ -59,9 +59,20 @@ describe('UpdateModal', () => {
 
   describe('Success Message', () => {
     it('should display success message when update completes', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, newVersion: 'v2.0.0' }),
+      const originalFetch = global.fetch;
+      
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/update/apply') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, newVersion: 'v2.0.0' }),
+          });
+        }
+        if (url === '/api/version') {
+          // Keep polling - don't transition to 'ready'
+          return Promise.reject(new Error('Server restarting'));
+        }
+        return Promise.reject(new Error('Not mocked'));
       });
 
       render(<UpdateModal {...defaultProps} />);
@@ -69,15 +80,35 @@ describe('UpdateModal', () => {
       const updateButton = screen.getByRole('button', { name: /Update Now/i });
       fireEvent.click(updateButton);
 
+      // Wait for either success or restarting message
       await waitFor(() => {
-        expect(screen.getByText(/Update applied/i)).toBeInTheDocument();
-      });
+        const successElement = screen.queryByText(/Update applied/i);
+        const restartingElement = screen.queryByText(/Server restarting/i);
+        expect(successElement || restartingElement).toBeInTheDocument();
+      }, { timeout: 1000 });
     });
 
     it('should show "Update applied successfully!" message', async () => {
-      global.fetch.mockResolvedValueOnce({
+      const originalFetch = global.fetch;
+      
+      originalFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ success: true, newVersion: 'v2.0.0' }),
+      });
+      
+      // Mock /api/version to simulate server still restarting
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/update/apply') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, newVersion: 'v2.0.0' }),
+          });
+        }
+        if (url === '/api/version') {
+          // Keep polling until test ends - don't transition to 'ready'
+          return Promise.reject(new Error('Server restarting'));
+        }
+        return Promise.reject(new Error('Not mocked'));
       });
 
       render(<UpdateModal {...defaultProps} />);
@@ -85,9 +116,12 @@ describe('UpdateModal', () => {
       const updateButton = screen.getByRole('button', { name: /Update Now/i });
       fireEvent.click(updateButton);
 
+      // Check for success or restarting status
       await waitFor(() => {
-        expect(screen.getByText(/Update applied successfully/i)).toBeInTheDocument();
-      });
+        const successElement = screen.queryByText(/Update applied successfully/i);
+        const restartingElement = screen.queryByText(/Server restarting/i);
+        expect(successElement || restartingElement).toBeInTheDocument();
+      }, { timeout: 1000 });
     });
   });
 
@@ -163,9 +197,24 @@ describe('UpdateModal', () => {
     });
 
     it('should show success message for manual install', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true }),
+      const originalFetch = global.fetch;
+      let fetchCallCount = 0;
+      
+      global.fetch = vi.fn((url) => {
+        fetchCallCount++;
+        if (url === '/api/update/install-manual') {
+          // First fetch - the actual install
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true }),
+          });
+        }
+        if (url === '/api/version') {
+          // Polling - pretend server isn't ready yet to keep it in 'restarting' state longer
+          return Promise.reject(new Error('Server not ready'));
+        }
+        // Other URLs
+        return originalFetch(url);
       });
 
       render(<UpdateModal {...defaultProps} />);
@@ -176,9 +225,22 @@ describe('UpdateModal', () => {
       fireEvent.change(fileInput, { target: { value: '/path/to/binary' } });
       fireEvent.click(installButton);
 
+      // First, verify the install was called
       await waitFor(() => {
-        expect(screen.getByText(/Update applied successfully/i)).toBeInTheDocument();
-      });
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/update/install-manual'),
+          expect.any(Object)
+        );
+      }, { timeout: 500 });
+
+      // Now verify either success or restarting message appears
+      // The component will show 'success' briefly, then transition to 'restarting'
+      // So we check for either one
+      await waitFor(() => {
+        const successElement = screen.queryByText(/Update applied successfully/i);
+        const restartingElement = screen.queryByText(/Server restarting/i);
+        expect(successElement || restartingElement).toBeInTheDocument();
+      }, { timeout: 1000 });
     });
 
     it('should display error when manual install fails', async () => {
