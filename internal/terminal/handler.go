@@ -174,6 +174,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Terminal] Warning: No tabID provided, using session ID: %s", tabID)
 	}
 
+	// Get amEnabled status from query params
+	amEnabledStr := query.Get("amEnabled")
+	amEnabled := amEnabledStr == "true"
+	log.Printf("[Terminal] Tab %s AM enabled: %v", tabID, amEnabled)
+
 	// Create terminal session with config
 	sessionID := tabID // Use tabID as session ID for consistency
 	session, err := NewTerminalSessionWithConfig(sessionID, shellConfig)
@@ -232,7 +237,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Launch async initialization - doesn't block terminal readiness
 	go func() {
-		if amSystem != nil {
+		if amSystem != nil && amEnabled {
+			log.Printf("[Terminal] AM is ENABLED for tab %s - initializing LLM Logger", tabID)
 			llmLogger := amSystem.GetLLMLogger(tabID)
 			llmLoggerAtomic.Store(llmLogger)
 			if llmLogger != nil {
@@ -283,6 +289,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
+		} else if amSystem != nil && !amEnabled {
+			log.Printf("[Terminal] AM is DISABLED for tab %s - skipping LLM Logger initialization", tabID)
+		} else {
+			log.Printf("[Terminal] AM system is nil for tab %s", tabID)
 		}
 	}()
 

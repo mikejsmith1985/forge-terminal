@@ -20,6 +20,7 @@ import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import MonacoEditor from './components/MonacoEditor'
 import AMMonitor from './components/AMMonitor'
+import AMDebugPanel from './components/AMDebugPanel'
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import { ToastContainer, useToast } from './components/Toast'
@@ -1813,6 +1814,9 @@ function App() {
           commandCards={commands}
         />
       )}
+
+      {/* AM Debug Panel - Shows real-time AM logging activity */}
+      {devMode && <AMDebugPanel />}
     </div>
   )
 }
