@@ -145,7 +145,7 @@ function App() {
   // AM Default state (global override for new tabs)
   const [amDefaultEnabled, setAMDefaultEnabled] = useState(() => {
     const saved = localStorage.getItem('amDefaultEnabled');
-    return saved !== null ? saved === 'true' : false; // Default to OFF as requested
+    return saved !== null ? saved === 'true' : true; // Default to ON for legal compliance
   });
   
   // Vision Config state (global configuration)

@@ -618,6 +618,7 @@ body {
 
 .modal-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px;
@@ -2440,6 +2441,7 @@ body {
 
 .modal-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 24px;
 }
