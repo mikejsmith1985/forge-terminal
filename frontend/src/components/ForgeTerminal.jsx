@@ -803,11 +803,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               xtermRef.current.write('\r\x1b[K');
             }
             
-            // Send markdown-style image reference to terminal
+            // Send absolute file path to terminal so Copilot CLI can access it
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              const textToSend = `[📷 ${filename}]`;
+              const textToSend = `[📷 ${filePath}]`;
               wsRef.current.send(textToSend);
-              console.log('[Terminal] Sent image to backend:', textToSend);
+              console.log('[Terminal] Sent image path to backend:', textToSend);
               if (onPasteRef.current) onPasteRef.current();
             }
           } catch (err) {

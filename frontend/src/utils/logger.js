@@ -17,7 +17,10 @@ function formatLog(level, args) {
         }
         return String(arg);
     }).join(' ');
-    return `[${timestamp}] [${level}] ${message}`;
+    return {
+        timestamp: new Date().getTime(),
+        formatted: `[${timestamp}] [${level}] ${message}`
+    };
 }
 
 function addLog(level, args) {
@@ -44,7 +47,22 @@ console.error = (...args) => {
 };
 
 export const getLogs = () => {
-    return logs.join('\n');
+    return logs.map(log => log.formatted).join('\n');
+};
+
+/**
+ * Get logs from the last N minutes
+ * @param {number} minutes - Number of minutes to look back
+ * @returns {string} Formatted logs from the last N minutes
+ */
+export const getRecentLogs = (minutes = 3) => {
+    const now = new Date().getTime();
+    const cutoff = now - (minutes * 60 * 1000);
+    
+    return logs
+        .filter(log => log.timestamp >= cutoff)
+        .map(log => log.formatted)
+        .join('\n');
 };
 
 /**

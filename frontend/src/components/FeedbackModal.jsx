@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { Camera, Github, Copy, Check, Settings, ExternalLink, Image as ImageIcon, Minus, X, Trash2, Video, StopCircle } from 'lucide-react';
-import { getLogs } from '../utils/logger';
+import { getLogs, getRecentLogs } from '../utils/logger';
 
 // ----------------------------------------------------------------------
 // CONFIGURATION
@@ -272,9 +272,10 @@ const FeedbackModal = ({ isOpen, onClose }) => {
 
         body += `**Environment**\n- User Agent: ${navigator.userAgent}\n- Time: ${new Date().toISOString()}\n\n`;
 
-        const logs = getLogs();
-        if (logs) {
-            body += `<details>\n<summary>Application Logs</summary>\n\n\`\`\`\n${logs}\n\`\`\`\n</details>`;
+        // Get logs from last 3 minutes
+        const recentLogs = getRecentLogs(3);
+        if (recentLogs) {
+            body += `<details>\n<summary>Application Logs (Last 3 Minutes)</summary>\n\n\`\`\`\n${recentLogs}\n\`\`\`\n</details>`;
         }
 
         const res = await fetch(`https://api.github.com/repos/mikejsmith1985/forge-terminal-2/issues`, {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
@@ -1418,13 +1418,15 @@ function App() {
           <Folder size={16} />
           Files
         </button>
-        <button 
-          className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
-          onClick={() => setSidebarView('debug')}
-        >
-          <Bug size={16} />
-          Debug
-        </button>
+        {devMode && (
+          <button 
+            className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
+            onClick={() => setSidebarView('debug')}
+          >
+            <Bug size={16} />
+            Debug
+          </button>
+        )}
       </div>
 
       {/* Row 2: Header - context-aware based on view */}
@@ -1451,12 +1453,14 @@ function App() {
         ) : sidebarView === 'debug' ? (
           <>
             <h3>🐛 Debug</h3>
-            <button 
-              className="btn btn-primary"
-              onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
-            >
-              {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
-            </button>
+            {devMode && (
+              <button 
+                className="btn btn-primary"
+                onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
+              >
+                {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
+              </button>
+            )}
           </>
         ) : null}
       </div>
@@ -1473,8 +1477,16 @@ function App() {
           {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
         </button>
         <div className="spacer"></div>
-        {/* Update indicator - shows when update is available */}
+        {/* Feedback button */}
         <button 
+          className="btn btn-ghost btn-icon"
+          onClick={() => setIsFeedbackModalOpen(true)} 
+          title="Send Feedback"
+        >
+          <MessageCircle size={18} />
+        </button>
+        {/* Update indicator - shows when update is available */}
+        <button
           className={`btn btn-ghost btn-icon ${updateInfo?.available ? 'update-available' : ''}`}
           onClick={() => setIsUpdateModalOpen(true)} 
           title={updateInfo?.available ? `Update available: ${updateInfo.latestVersion}` : `Version ${currentVersion}`}
