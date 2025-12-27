@@ -24,7 +24,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch_depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -86,7 +86,7 @@ jobs:
           # Linux AMD64
           GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-linux-amd64 ./cmd/forge
           # Windows AMD64 (GUI mode - no console window)
-          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS -H windowsgui" -o bin/forge-windows-amd64.exe ./cmd/forge
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS -H=windowsgui" -o bin/forge-windows-amd64.exe ./cmd/forge
 
       - name: Build macOS Binaries
         if: matrix.os == 'macos-latest'
