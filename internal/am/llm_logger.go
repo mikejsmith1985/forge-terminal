@@ -526,30 +526,10 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 	// NEW: Parse snapshots incrementally to extract assistant responses
 	l.parseLatestSnapshotToTurns(conv, snapshot)
 
-	// Save to disk ASYNC - don't block on disk I/O while holding mutex
-	// Make a DEEP copy to avoid race conditions with slice modifications
-	convCopy := LLMConversation{
-		ConversationID:  conv.ConversationID,
-		TabID:           conv.TabID,
-		Provider:        conv.Provider,
-		CommandType:     conv.CommandType,
-		StartTime:       conv.StartTime,
-		EndTime:         conv.EndTime,
-		Complete:        conv.Complete,
-		AutoRespond:     conv.AutoRespond,
-		TUICaptureMode:  conv.TUICaptureMode,
-		ProcessPID:      conv.ProcessPID,
-		Metadata:        conv.Metadata,
-		Recovery:        conv.Recovery,
-		Turns:           append([]ConversationTurn(nil), conv.Turns...),
-		ScreenSnapshots: append([]ScreenSnapshot(nil), conv.ScreenSnapshots...),
-	}
-
-	pendingAsyncWrites.Add(1)
-	go func() {
-		defer pendingAsyncWrites.Done()
-		l.saveConversationAsync(&convCopy)
-	}()
+	// DISABLED: Async saves cause goroutine leaks and freezing
+	// Snapshots are NOT saved to disk immediately to prevent I/O blocking
+	// They are saved when conversation ends or periodically by external flush
+	// This prevents the 30-second keyboard lag caused by disk I/O on every keystroke
 }
 
 // stripANSI removes ANSI escape sequences from text.
@@ -855,24 +835,11 @@ func (l *LLMLogger) flushUserInputLocked() {
 	conv.Recovery.CanRestore = true
 	conv.Recovery.SuggestedRestorePrompt = "Continue from: " + truncateForRestore(cleaned, 100)
 
-	// Make a shallow copy for async save to avoid holding the lock during I/O
-	convCopy := *conv
-	convCopyPtr := &convCopy
-	activeConvID := l.activeConvID
-	cleanedMsg := cleaned
+	// DISABLED: Async saves cause goroutine leaks and freezing
+	// User input is NOT saved immediately to prevent I/O blocking
+	// It will be saved when output is flushed or conversation ends
 	
-	// Release lock before I/O to prevent blocking keyboard input
-	l.mu.Unlock()
-	defer l.mu.Lock()
-	
-	// Perform I/O asynchronously without holding the lock
-	pendingAsyncWrites.Add(1)
-	go func() {
-		defer pendingAsyncWrites.Done()
-		l.saveConversation(convCopyPtr)
-	}()
-	
-	log.Printf("[LLM Logger] Captured user input for %s: '%s' (turns=%d)", activeConvID, truncateForLog(cleanedMsg, 50), len(conv.Turns))
+	log.Printf("[LLM Logger] Captured user input for %s: '%s' (turns=%d)", l.activeConvID, truncateForLog(cleaned, 50), len(conv.Turns))
 }
 
 // truncateForLog truncates a string for logging purposes.
@@ -941,21 +908,13 @@ func (l *LLMLogger) FlushOutput() {
 	})
 
 	l.outputBuffer = ""
+	activeConvID := l.activeConvID
+	turnCount := len(conv.Turns)
 	
-	// Make a shallow copy for async save to avoid holding the lock during I/O
-	convCopy := *conv
-	convCopyPtr := &convCopy
-	
-	l.mu.Unlock()
-	
-	// Perform I/O asynchronously without holding the lock
-	pendingAsyncWrites.Add(1)
-	go func() {
-		defer pendingAsyncWrites.Done()
-		l.saveConversation(convCopyPtr)
-	}()
+	// Save synchronously - output flush is called infrequently enough that blocking is acceptable
+	l.saveConversation(conv)
 
-	log.Printf("[LLM Logger] Flushed output for %s (turns=%d, confidence=%.2f)", l.activeConvID, len(conv.Turns), confidence)
+	log.Printf("[LLM Logger] Flushed output for %s (turns=%d, confidence=%.2f)", activeConvID, turnCount, confidence)
 }
 
 // EndConversation marks the active conversation as complete.

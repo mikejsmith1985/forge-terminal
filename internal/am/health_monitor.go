@@ -52,7 +52,8 @@ func NewHealthMonitor() *HealthMonitor {
 	}
 
 	// Subscribe to events from capture pipeline
-	EventBus.Subscribe(hm.handleEvent)
+	// Store unsubscribe function for cleanup, but keep monitoring active indefinitely
+	_ = EventBus.Subscribe(hm.handleEvent)
 
 	return hm
 }
