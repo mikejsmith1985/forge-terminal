@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
@@ -10,6 +10,7 @@ import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import UpdateModal from './components/UpdateModal'
 import WelcomeModal from './components/WelcomeModal'
+import WorkflowCards from './components/WorkflowCards'
 import FileAccessPrompt from './components/FileAccessPrompt'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
@@ -23,6 +24,7 @@ import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
 import { useDevMode } from './hooks/useDevMode'
+import { useWorkflowManager } from './hooks/useWorkflowManager'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
@@ -84,7 +86,7 @@ function App() {
   const [waitingTabs, setWaitingTabs] = useState({})
   
   // File explorer and editor state
-  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', or 'debug'
+  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', 'workflows', or 'debug'
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   
@@ -113,6 +115,17 @@ function App() {
   
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
+  
+  // Workflow management
+  const {
+    workflows,
+    loading: workflowsLoading,
+    error: workflowsError,
+    loadWorkflows,
+    createWorkflow,
+    updateWorkflow,
+    deleteWorkflow,
+  } = useWorkflowManager();
   
   // AM Master Control state (global kill switch for ALL tabs)
   const [amMasterEnabled, setAMMasterEnabled] = useState(() => {
@@ -1022,6 +1035,40 @@ function App() {
     localStorage.setItem('visionConfig', JSON.stringify(newConfig));
     logger.settings('Vision config changed', newConfig);
   }, []);
+  
+  // Workflow handlers
+  const handleWorkflowRun = useCallback((workflow) => {
+    addToast(`Running workflow: ${workflow.name}`, 'info', 2000);
+    logger.workflows('Workflow run requested', { workflowId: workflow.id, name: workflow.name });
+    // TODO: Implement workflow execution UI
+  }, [addToast]);
+  
+  const handleWorkflowEdit = useCallback((workflow) => {
+    addToast('Workflow editor coming soon', 'info', 2000);
+    logger.workflows('Workflow edit requested', { workflowId: workflow.id });
+    // TODO: Open workflow editor modal
+  }, [addToast]);
+  
+  const handleWorkflowDelete = useCallback(async (workflowId) => {
+    const workflow = workflows.find(wf => wf.id === workflowId);
+    if (!workflow) return;
+    
+    const confirmed = window.confirm(`Delete workflow "${workflow.name}"?`);
+    if (!confirmed) return;
+    
+    const result = await deleteWorkflow(workflowId);
+    if (result.success) {
+      addToast('Workflow deleted', 'success', 2000);
+    } else {
+      addToast(`Failed to delete workflow: ${result.error}`, 'error', 3000);
+    }
+  }, [workflows, deleteWorkflow, addToast]);
+  
+  const handleNewWorkflow = useCallback(() => {
+    addToast('Workflow builder coming soon', 'info', 2000);
+    logger.workflows('New workflow requested');
+    // TODO: Open workflow creation modal
+  }, [addToast]);
 
   // Sync Vision enabled state with Dev Mode
   useEffect(() => {
@@ -1297,6 +1344,13 @@ function App() {
           Cards
         </button>
         <button 
+          className={`sidebar-view-tab ${sidebarView === 'workflows' ? 'active' : ''}`}
+          onClick={() => setSidebarView('workflows')}
+        >
+          <Workflow size={16} />
+          Flows
+        </button>
+        <button 
           className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
           onClick={() => {
             // Check if file access permission is set
@@ -1329,6 +1383,13 @@ function App() {
             <h3>⚡ Commands</h3>
             <button className="btn btn-primary" onClick={handleAdd}>
               <Plus size={16} /> Add
+            </button>
+          </>
+        ) : sidebarView === 'workflows' ? (
+          <>
+            <h3>🔄 Workflows</h3>
+            <button className="btn btn-primary" onClick={handleNewWorkflow}>
+              <Plus size={16} /> New
             </button>
           </>
         ) : sidebarView === 'files' ? (
@@ -1446,7 +1507,7 @@ function App() {
         />
       )}
 
-      {/* Content area - Cards, Files, Assistant, or Debug */}
+      {/* Content area - Cards, Workflows, Files, Assistant, or Debug */}
       <div className="sidebar-content">
         {sidebarView === 'cards' ? (
           <DndContext
@@ -1467,6 +1528,16 @@ function App() {
               shellType={shellConfig.shellType}
             />
           </DndContext>
+        ) : sidebarView === 'workflows' ? (
+          <WorkflowCards
+            workflows={workflows}
+            loading={workflowsLoading}
+            error={workflowsError}
+            onRun={handleWorkflowRun}
+            onEdit={handleWorkflowEdit}
+            onDelete={handleWorkflowDelete}
+            onNewWorkflow={handleNewWorkflow}
+          />
         ) : sidebarView === 'files' ? (
           <FileExplorer
             currentPath={activeTab?.currentDirectory}
