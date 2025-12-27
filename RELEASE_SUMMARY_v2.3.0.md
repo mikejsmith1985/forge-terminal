@@ -64,6 +64,12 @@ All tests passing as required by copilot-instructions.md:
 
 ## 🐛 Known Issues
 
+### Fixed in Final Release
+- **Issue**: Initial release builds failed due to Go 1.21 vs 1.22 incompatibility
+- **Root Cause**: Code uses `r.PathValue()` (Go 1.22+) but workflow used Go 1.21
+- **Fix**: Upgraded both `go.mod` and release workflow to Go 1.22
+- **Status**: ✅ Resolved - All binaries built successfully
+
 ### Non-Critical: Production Build Minification
 - **Issue**: Minified production build shows reference error
 - **Impact**: Development build works perfectly, all tests pass
