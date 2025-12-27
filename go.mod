@@ -1,6 +1,6 @@
 module github.com/mikejsmith1985/forge-terminal
 
-go 1.21
+go 1.22
 
 require (
 	github.com/UserExistsError/conpty v0.1.4
