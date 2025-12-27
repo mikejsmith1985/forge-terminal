@@ -1,7 +1,7 @@
 {
   "name": "forge-terminal-frontend",
   "private": true,
-  "version": "2.2.7",
+  "version": "2.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,6 +20,7 @@
     "@xterm/addon-search": "*",
     "@xterm/addon-web-links": "*",
     "@xterm/xterm": "*",
+    "@xyflow/react": "^12.10.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.555.0",
     "react": "^18.2.0",

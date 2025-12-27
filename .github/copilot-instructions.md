@@ -221,3 +221,17 @@ The user can run `scripts/cleanup-session-docs.sh` to clean up old files.
 
 **Last Updated:** 2025-12-08  
 **Note:** These instructions are automatically loaded by GitHub Copilot in every session.
+
+---
+
+## 🚨 MANDATORY: Verification Block (SDET)
+
+You are an expert SDET. Never submit a code change without a Verification Block. A verification block must contain:
+
+1. The specific command to run the test.
+2. The expected raw output (string or exit code).
+3. An actual execution of that command where you show me the output before proposing the final PR.
+
+This Verification Block is REQUIRED for every code change affecting behavior. It must appear in the PR description (and in the commit message when practical). Failure to include a complete Verification Block will block the PR and requires returning the change for completion.
+
+---

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, MessageSquarePlus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Tab from './Tab';
 
 /**
@@ -89,16 +89,6 @@ function TabBar({
         title="New tab (Ctrl+T)"
       >
         <Plus size={16} />
-      </button>
-      <button
-        className="new-tab-btn new-agent-btn"
-        onClick={() => onNewTab({ type: 'agent' })}
-        disabled={disableNewTab}
-        aria-label="New Agent"
-        title="New Agent (Ctrl+Shift+T)"
-        style={{ marginLeft: '4px', backgroundColor: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa' }}
-      >
-        <MessageSquarePlus size={16} />
       </button>
     </div>
   );

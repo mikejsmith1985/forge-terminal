@@ -1804,3 +1804,1124 @@ body {
   margin: 10px;
   margin-top: 0;
 }
+/* ========================================
+   WORKFLOW SYSTEM STYLES
+   ======================================== */
+
+/* Workflow Canvas Full-Screen Overlay */
+.workflow-canvas-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Canvas Header */
+.workflow-canvas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--card-border);
+  gap: 16px;
+}
+
+.workflow-canvas-header-left {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+}
+
+.workflow-name-input {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  min-width: 250px;
+}
+
+.workflow-description-input {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--subtext);
+  font-size: 14px;
+  flex: 1;
+}
+
+.workflow-name-input:focus,
+.workflow-description-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.workflow-canvas-header-right {
+  display: flex;
+  gap: 8px;
+}
+
+/* Canvas Toolbar */
+.workflow-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--card-border);
+  gap: 24px;
+}
+
+.workflow-toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workflow-toolbar-label {
+  color: var(--subtext);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.btn-toolbar {
+  padding: 6px 12px;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-toolbar:hover {
+  border-color: var(--accent);
+  background: var(--card-bg);
+}
+
+/* React Flow Container */
+.workflow-canvas-flow {
+  flex: 1;
+  position: relative;
+}
+
+.react-flow {
+  background: var(--bg);
+}
+
+/* Workflow Node Styles */
+.workflow-node {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 140px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s;
+}
+
+.workflow-node:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+.workflow-node-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.workflow-node-icon {
+  font-size: 24px;
+}
+
+.workflow-node-label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.workflow-node-description {
+  color: var(--subtext);
+  font-size: 11px;
+  text-align: center;
+  max-width: 120px;
+}
+
+/* Node Type Specific Styles */
+.workflow-node-start {
+  border-color: var(--green);
+  background: linear-gradient(145deg, var(--card-bg), rgba(34, 197, 94, 0.05));
+}
+
+.workflow-node-end {
+  border-color: var(--red);
+  background: linear-gradient(145deg, var(--card-bg), rgba(239, 68, 68, 0.05));
+}
+
+.workflow-node-decision {
+  border-color: var(--yellow);
+  background: linear-gradient(145deg, var(--card-bg), rgba(250, 204, 21, 0.05));
+}
+
+.workflow-node-command {
+  border-color: var(--accent);
+  background: linear-gradient(145deg, var(--card-bg), rgba(249, 115, 22, 0.05));
+}
+
+/* Node Status Styles */
+.workflow-node-status-completed {
+  border-color: var(--green);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+}
+
+.workflow-node-status-failed {
+  border-color: var(--red);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+.workflow-node-status-running {
+  border-color: var(--accent);
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 8px rgba(249, 115, 22, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.8); }
+}
+
+/* Node Handles */
+.workflow-handle {
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+}
+
+.workflow-handle:hover {
+  width: 12px;
+  height: 12px;
+}
+
+/* Edge Labels */
+.workflow-edge-label {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.workflow-edge-label-success {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.workflow-edge-label-failure {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Workflow Cards in Sidebar */
+.workflow-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  height: 100%;
+}
+
+.workflow-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.workflow-cards-loading,
+.workflow-cards-error,
+.workflow-cards-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--subtext);
+}
+
+.error-message {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.error-details {
+  font-size: 12px;
+  color: var(--subtext);
+}
+
+/* Workflow Card */
+.workflow-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.workflow-card:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.workflow-card.favorite {
+  border-color: var(--accent);
+  background: linear-gradient(145deg, var(--card-bg), rgba(249, 115, 22, 0.05));
+}
+
+.workflow-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.workflow-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.workflow-icon {
+  color: var(--accent);
+}
+
+.workflow-card-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workflow-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.workflow-card-description {
+  color: var(--subtext);
+  font-size: 12px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.workflow-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  color: var(--subtext);
+}
+
+.workflow-meta-separator {
+  color: var(--card-border);
+}
+
+.workflow-card-footer {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-run-workflow {
+  flex: 1;
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-run-workflow:hover {
+  background: var(--accent-secondary);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-new-workflow {
+  width: 100%;
+  padding: 10px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-new-workflow:hover {
+  background: var(--accent-secondary);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-new-workflow-large {
+  padding: 16px;
+  font-size: 15px;
+}
+
+/* Spinner for Loading States */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--card-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+/* ========================================
+   NODE CONFIGURATION MODAL STYLES
+   ======================================== */
+
+.success-criteria-editor {
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+}
+
+.criteria-enable {
+  margin-bottom: 12px;
+}
+
+.criteria-enable label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.criteria-enable input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.criteria-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+}
+
+.criteria-threshold-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.criteria-info {
+  padding: 8px 12px;
+  background: var(--overlay);
+  border-radius: 4px;
+  border-left: 3px solid var(--accent);
+}
+
+.node-type-info {
+  padding: 12px;
+  background: var(--overlay);
+  border-radius: 6px;
+}
+
+.node-type-description {
+  margin-top: 8px;
+  color: var(--subtext);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ========================================
+   PROJECT ASSOCIATION MODAL STYLES
+   ======================================== */
+
+.modal-container-small {
+  max-width: 500px;
+}
+
+.modal-description {
+  margin-bottom: 16px;
+  color: var(--subtext);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-button input {
+  flex: 1;
+}
+
+.btn-icon {
+  padding: 8px 12px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--accent-secondary);
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon-small {
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--red);
+  border: none;
+}
+
+.btn-icon-small:hover {
+  background: var(--overlay);
+}
+
+.project-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+}
+
+.project-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.project-item:last-child {
+  border-bottom: none;
+}
+
+.project-name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.empty-state {
+  padding: 24px;
+  text-align: center;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  background: var(--overlay);
+}
+
+.empty-state-text {
+  color: var(--subtext);
+  font-size: 13px;
+  margin: 0;
+}
+
+.form-help {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--subtext);
+  line-height: 1.4;
+}
+
+.form-help strong {
+  color: var(--text);
+}
+
+/* Modal styling updates for consistency */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  padding: 20px;
+}
+
+.modal-container {
+  background: var(--surface);
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-md);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--subtext);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: var(--overlay);
+  color: var(--text);
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--card-border);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-group select {
+  cursor: pointer;
+}
+
+.required {
+  color: var(--red);
+}
+/* ========================================
+   WORKFLOW EXECUTOR STYLES
+   ======================================== */
+
+.workflow-executor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.workflow-executor-container {
+  background: var(--surface);
+  border-radius: 12px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-md);
+}
+
+/* Executor Header */
+.workflow-executor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.workflow-executor-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.executor-icon {
+  color: var(--accent);
+  animation: pulse-rotate 2s ease-in-out infinite;
+}
+
+@keyframes pulse-rotate {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.workflow-executor-title h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.executor-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+}
+
+.btn-close-executor {
+  background: none;
+  border: none;
+  color: var(--subtext);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-close-executor:hover {
+  background: var(--overlay);
+  color: var(--text);
+}
+
+/* Executor Body */
+.workflow-executor-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.executor-current-step h3,
+.executor-history h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Executor Step */
+.executor-step {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.executor-step-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.executor-step-completed {
+  border-color: var(--green);
+}
+
+.executor-step-failed {
+  border-color: var(--red);
+}
+
+.executor-step-header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.executor-step-icon-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-icon {
+  flex-shrink: 0;
+}
+
+.status-icon-completed {
+  color: var(--green);
+}
+
+.status-icon-failed {
+  color: var(--red);
+}
+
+.status-icon-running {
+  color: var(--accent);
+  animation: spin 2s linear infinite;
+}
+
+.status-icon-pending {
+  color: var(--subtext);
+}
+
+.executor-step-emoji {
+  font-size: 16px;
+}
+
+.executor-step-info {
+  flex: 1;
+}
+
+.executor-step-label {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.executor-step-description {
+  margin: 0;
+  font-size: 13px;
+  color: var(--subtext);
+  line-height: 1.4;
+}
+
+/* Command Card Display */
+.executor-step-command {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+}
+
+.executor-command-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--subtext);
+  margin-bottom: 6px;
+}
+
+.executor-command-code {
+  display: block;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--overlay);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+/* Success Criteria Display */
+.executor-step-criteria {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--overlay);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.executor-criteria-label {
+  font-weight: 600;
+  color: var(--subtext);
+  margin-bottom: 4px;
+}
+
+.executor-criteria-value {
+  color: var(--text);
+}
+
+/* Execution Details */
+.executor-step-details {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.executor-detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.executor-detail-label {
+  font-weight: 600;
+  color: var(--subtext);
+  min-width: 80px;
+}
+
+.executor-detail-value {
+  color: var(--text);
+}
+
+.executor-detail-output {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.executor-output-text {
+  margin: 4px 0 0 0;
+  padding: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--text);
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.executor-criteria-result {
+  font-weight: 600;
+}
+
+.executor-criteria-result.met {
+  color: var(--green);
+}
+
+.executor-criteria-result.not-met {
+  color: var(--red);
+}
+
+/* History List */
+.executor-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Executor Footer */
+.workflow-executor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--card-border);
+  flex-wrap: wrap;
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-accent:hover:not(:disabled) {
+  background: var(--accent-secondary);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-success {
+  background: var(--green);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-success:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+}
+
+.btn-failure {
+  background: var(--red);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-failure:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+/* Loop Back Menu */
+.loop-back-container {
+  position: relative;
+}
+
+.loop-back-menu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 8px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-md);
+  min-width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.loop-back-option {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.loop-back-option:last-child {
+  border-bottom: none;
+}
+
+.loop-back-option:hover {
+  background: var(--overlay);
+  color: var(--accent);
+}
+
+/* Completion Message */
+.executor-completion {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.completion-message {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Disabled Button States */
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

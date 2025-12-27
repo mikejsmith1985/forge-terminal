@@ -70,4 +70,7 @@ export const logger = {
     settings: (action, data = {}) => {
         console.log(`[Settings] ${action}`, data);
     },
+    workflows: (action, data = {}) => {
+        console.log(`[Workflows] ${action}`, data);
+    },
 };

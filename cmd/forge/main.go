@@ -29,6 +29,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
+	"github.com/mikejsmith1985/forge-terminal/internal/workflows"
 )
 
 //go:embed all:web
@@ -151,6 +152,13 @@ func main() {
 	// Commands API
 	http.HandleFunc("/api/commands", WrapWithMiddleware(handleCommands))
 	http.HandleFunc("/api/commands/restore-defaults", WrapWithMiddleware(handleRestoreDefaultCommands))
+
+	// Workflows API
+	http.HandleFunc("GET /api/workflows", WrapWithMiddleware(handleGetWorkflows))
+	http.HandleFunc("POST /api/workflows", WrapWithMiddleware(handleSaveWorkflows))
+	http.HandleFunc("PUT /api/workflows/{id}", WrapWithMiddleware(handleUpdateWorkflow))
+	http.HandleFunc("DELETE /api/workflows/{id}", WrapWithMiddleware(handleDeleteWorkflow))
+	http.HandleFunc("GET /api/workflows/project/{name}", WrapWithMiddleware(handleGetWorkflowsByProject))
 
 	// Config API
 	http.HandleFunc("/api/config", WrapWithMiddleware(handleConfig))
@@ -383,6 +391,154 @@ func handleRestoreDefaultCommands(w http.ResponseWriter, r *http.Request) {
 		"restored": restoredCount,
 		"commands": newCommands,
 	})
+}
+
+// Workflow handlers
+
+func handleGetWorkflows(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	log.Printf("[API] Loading workflows...")
+	wfs, err := workflows.LoadWorkflows()
+	if err != nil {
+		log.Printf("[API] Failed to load workflows: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	log.Printf("[API] Successfully loaded %d workflows", len(wfs))
+	json.NewEncoder(w).Encode(wfs)
+}
+
+func handleSaveWorkflows(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	var wfs []workflows.Workflow
+	if err := json.NewDecoder(r.Body).Decode(&wfs); err != nil {
+		log.Printf("[API] Failed to decode workflows: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	log.Printf("[API] Saving %d workflows...", len(wfs))
+	if err := workflows.SaveWorkflows(wfs); err != nil {
+		log.Printf("[API] Failed to save workflows: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	log.Printf("[API] Successfully saved workflows")
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	// Extract ID from path
+	idStr := r.PathValue("id")
+	id := 0
+	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil {
+		log.Printf("[API] Invalid workflow ID: %s", idStr)
+		http.Error(w, "Invalid workflow ID", http.StatusBadRequest)
+		return
+	}
+	
+	var updated workflows.Workflow
+	if err := json.NewDecoder(r.Body).Decode(&updated); err != nil {
+		log.Printf("[API] Failed to decode workflow: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	// Load existing workflows
+	wfs, err := workflows.LoadWorkflows()
+	if err != nil {
+		log.Printf("[API] Failed to load workflows: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	// Find and update workflow
+	found := false
+	for i := range wfs {
+		if wfs[i].ID == id {
+			wfs[i] = updated
+			found = true
+			break
+		}
+	}
+	
+	if !found {
+		log.Printf("[API] Workflow not found: %d", id)
+		http.Error(w, "Workflow not found", http.StatusNotFound)
+		return
+	}
+	
+	// Save updated workflows
+	if err := workflows.SaveWorkflows(wfs); err != nil {
+		log.Printf("[API] Failed to save workflows: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	log.Printf("[API] Successfully updated workflow %d", id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	// Extract ID from path
+	idStr := r.PathValue("id")
+	id := 0
+	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil {
+		log.Printf("[API] Invalid workflow ID: %s", idStr)
+		http.Error(w, "Invalid workflow ID", http.StatusBadRequest)
+		return
+	}
+	
+	// Load existing workflows
+	wfs, err := workflows.LoadWorkflows()
+	if err != nil {
+		log.Printf("[API] Failed to load workflows: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	// Filter out workflow to delete
+	filtered := make([]workflows.Workflow, 0)
+	for _, wf := range wfs {
+		if wf.ID != id {
+			filtered = append(filtered, wf)
+		}
+	}
+	
+	// Save updated workflows
+	if err := workflows.SaveWorkflows(filtered); err != nil {
+		log.Printf("[API] Failed to save workflows: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	log.Printf("[API] Successfully deleted workflow %d", id)
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleGetWorkflowsByProject(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	projectName := r.PathValue("name")
+	log.Printf("[API] Loading workflows for project: %s", projectName)
+	
+	wfs, err := workflows.GetWorkflowsByProject(projectName)
+	if err != nil {
+		log.Printf("[API] Failed to get workflows by project: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	log.Printf("[API] Successfully loaded %d workflows for project %s", len(wfs), projectName)
+	json.NewEncoder(w).Encode(wfs)
 }
 
 func openBrowser(url string) {
