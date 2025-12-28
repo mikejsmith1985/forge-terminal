@@ -1,5 +1,5 @@
 /**
- * TourOverlay.jsx - Visual Tour Overlay for Forge Terminal v3.3.0
+ * TourOverlay.jsx - Visual Tour Overlay for Forge Terminal v3.3.6
  *
  * Renders a spotlight effect highlighting the target element with a tooltip.
  * Features:
@@ -7,6 +7,7 @@
  * - iOS-style blurred backdrop
  * - Animated tooltip with high-contrast text
  * - Responsive positioning based on target element
+ * - Smart viewport boundary detection to prevent cutoff
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -16,6 +17,9 @@ import './TourOverlay.css';
 
 const PADDING = 8; // Padding around spotlight
 const TOOLTIP_OFFSET = 16; // Distance from spotlight to tooltip
+const VIEWPORT_MARGIN = 20; // Minimum distance from viewport edge
+const TOOLTIP_WIDTH = 380; // Max tooltip width from CSS
+const TOOLTIP_HEIGHT = 200; // Estimated tooltip height
 
 const TourOverlay = ({ step, currentStep, totalSteps, onNext, onSkip }) => {
   const [targetRect, setTargetRect] = useState(null);
@@ -56,7 +60,7 @@ const TourOverlay = ({ step, currentStep, totalSteps, onNext, onSkip }) => {
     };
   }, [step]);
 
-  // Calculate tooltip position based on target and placement
+  // Calculate tooltip position based on target and placement with viewport bounds checking
   const tooltipStyle = useMemo(() => {
     if (!targetRect || !step?.spotlight) {
       // Center the tooltip
@@ -80,25 +84,70 @@ const TourOverlay = ({ step, currentStep, totalSteps, onNext, onSkip }) => {
       right: targetRect.right + PADDING,
     };
 
-    switch (placement) {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Helper to check if placement would cause cutoff
+    const wouldCutOff = (pos) => {
+      switch (pos) {
+        case 'top':
+          return spotlightRect.top - TOOLTIP_OFFSET - TOOLTIP_HEIGHT < VIEWPORT_MARGIN;
+        case 'bottom':
+          return spotlightRect.bottom + TOOLTIP_OFFSET + TOOLTIP_HEIGHT > viewportHeight - VIEWPORT_MARGIN;
+        case 'left':
+          return spotlightRect.left - TOOLTIP_OFFSET - TOOLTIP_WIDTH < VIEWPORT_MARGIN;
+        case 'right':
+          return spotlightRect.right + TOOLTIP_OFFSET + TOOLTIP_WIDTH > viewportWidth - VIEWPORT_MARGIN;
+        default:
+          return false;
+      }
+    };
+
+    // Determine best placement (fallback if original would cause cutoff)
+    let actualPlacement = placement;
+    if (wouldCutOff(placement)) {
+      // Try opposite placement first
+      const opposites = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+      const opposite = opposites[placement];
+      if (opposite && !wouldCutOff(opposite)) {
+        actualPlacement = opposite;
+      } else {
+        // Fall back to center
+        actualPlacement = 'center';
+      }
+    }
+
+    switch (actualPlacement) {
       case 'top':
-        style.bottom = window.innerHeight - spotlightRect.top + TOOLTIP_OFFSET;
-        style.left = spotlightRect.left + spotlightRect.width / 2;
+        style.bottom = viewportHeight - spotlightRect.top + TOOLTIP_OFFSET;
+        style.left = Math.max(VIEWPORT_MARGIN, Math.min(
+          spotlightRect.left + spotlightRect.width / 2,
+          viewportWidth - TOOLTIP_WIDTH / 2 - VIEWPORT_MARGIN
+        ));
         style.transform = 'translateX(-50%)';
         break;
       case 'bottom':
-        style.top = spotlightRect.bottom + TOOLTIP_OFFSET;
-        style.left = spotlightRect.left + spotlightRect.width / 2;
+        style.top = Math.min(spotlightRect.bottom + TOOLTIP_OFFSET, viewportHeight - TOOLTIP_HEIGHT - VIEWPORT_MARGIN);
+        style.left = Math.max(VIEWPORT_MARGIN, Math.min(
+          spotlightRect.left + spotlightRect.width / 2,
+          viewportWidth - TOOLTIP_WIDTH / 2 - VIEWPORT_MARGIN
+        ));
         style.transform = 'translateX(-50%)';
         break;
       case 'left':
-        style.right = window.innerWidth - spotlightRect.left + TOOLTIP_OFFSET;
-        style.top = spotlightRect.top + spotlightRect.height / 2;
+        style.right = viewportWidth - spotlightRect.left + TOOLTIP_OFFSET;
+        style.top = Math.max(VIEWPORT_MARGIN, Math.min(
+          spotlightRect.top + spotlightRect.height / 2,
+          viewportHeight - TOOLTIP_HEIGHT / 2 - VIEWPORT_MARGIN
+        ));
         style.transform = 'translateY(-50%)';
         break;
       case 'right':
-        style.left = spotlightRect.right + TOOLTIP_OFFSET;
-        style.top = spotlightRect.top + spotlightRect.height / 2;
+        style.left = Math.min(spotlightRect.right + TOOLTIP_OFFSET, viewportWidth - TOOLTIP_WIDTH - VIEWPORT_MARGIN);
+        style.top = Math.max(VIEWPORT_MARGIN, Math.min(
+          spotlightRect.top + spotlightRect.height / 2,
+          viewportHeight - TOOLTIP_HEIGHT / 2 - VIEWPORT_MARGIN
+        ));
         style.transform = 'translateY(-50%)';
         break;
       case 'center':

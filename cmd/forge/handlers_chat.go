@@ -16,8 +16,9 @@ import (
 )
 
 type ChatRequest struct {
-	Message string `json:"message"`
-	TabID   string `json:"tabId"`
+	Message      string   `json:"message"`
+	TabID        string   `json:"tabId"`
+	ContextFiles []string `json:"contextFiles"` // File paths for @ mentions (v3.3.6)
 }
 
 func handleChat(w http.ResponseWriter, r *http.Request) {
@@ -42,14 +43,26 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 		tabID = "main"
 	}
 
-	log.Printf("[Chat API] Processing message: %s (tabId: %s)", req.Message, tabID)
+	log.Printf("[Chat API] Processing message: %s (tabId: %s, contextFiles: %d)", req.Message, tabID, len(req.ContextFiles))
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
+	// Build file context from @ mentions (v3.3.6 Deep Context)
+	fileContext := buildFileContext(req.ContextFiles)
 
 	context, err := buildChatContext(tabID)
 	if err != nil {
 		log.Printf("[Chat API] Warning: failed to build context: %v", err)
 		context = ""
+	}
+
+	// Combine file context with terminal context
+	if fileContext != "" {
+		if context != "" {
+			context = fileContext + "\n\n---\n\n" + context
+		} else {
+			context = fileContext
+		}
 	}
 
 	fullPrompt := buildChatPrompt(req.Message, context)
@@ -74,6 +87,51 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	if err := streamChatResponse(w, fullPrompt, provider); err != nil {
 		log.Printf("[Chat API] Stream error: %v", err)
 	}
+}
+
+// buildFileContext reads files from @ mentions and formats them for the prompt (v3.3.6)
+func buildFileContext(filePaths []string) string {
+	if len(filePaths) == 0 {
+		return ""
+	}
+
+	var contextParts []string
+	for _, filePath := range filePaths {
+		// Clean the path (remove @ prefix if present)
+		cleanPath := strings.TrimPrefix(filePath, "@")
+		cleanPath = strings.TrimSpace(cleanPath)
+
+		if cleanPath == "" {
+			continue
+		}
+
+		log.Printf("[Chat API] Reading context file: %s", cleanPath)
+
+		// Read the file
+		content, err := os.ReadFile(cleanPath)
+		if err != nil {
+			// File not found or error - include error message
+			log.Printf("[Chat API] Failed to read file %s: %v", cleanPath, err)
+			contextParts = append(contextParts, fmt.Sprintf("--- CONTEXT FILE: %s ---\n[File not found: %v]", cleanPath, err))
+			continue
+		}
+
+		// Limit file size to prevent huge prompts (max 100KB per file)
+		maxSize := 100 * 1024
+		fileContent := string(content)
+		if len(fileContent) > maxSize {
+			fileContent = fileContent[:maxSize] + "\n... [truncated - file too large]"
+		}
+
+		contextParts = append(contextParts, fmt.Sprintf("--- CONTEXT FILE: %s ---\n%s", cleanPath, fileContent))
+		log.Printf("[Chat API] Added context file: %s (%d bytes)", cleanPath, len(fileContent))
+	}
+
+	if len(contextParts) == 0 {
+		return ""
+	}
+
+	return strings.Join(contextParts, "\n\n")
 }
 
 func buildChatContext(tabID string) (string, error) {

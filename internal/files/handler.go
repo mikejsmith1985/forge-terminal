@@ -729,6 +729,128 @@ func HandleReadStream(w http.ResponseWriter, r *http.Request) {
 }
 
 
+// HandleFlatList returns a flat JSON array of relative file paths (v3.3.6 @ mentions)
+// Respects common ignore patterns like .git, node_modules, dist
+func HandleFlatList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	dirPath := r.URL.Query().Get("path")
+	if dirPath == "" {
+		// Use current working directory
+		var err error
+		dirPath, err = os.Getwd()
+		if err != nil {
+			http.Error(w, "Failed to get working directory", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Resolve path
+	absPath, err := filepath.Abs(dirPath)
+	if err != nil {
+		http.Error(w, "Invalid path: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		http.Error(w, "Path not found: "+absPath, http.StatusNotFound)
+		return
+	}
+
+	if !info.IsDir() {
+		http.Error(w, "Path is not a directory", http.StatusBadRequest)
+		return
+	}
+
+	// Common ignore patterns
+	ignoreDirs := map[string]bool{
+		".git":         true,
+		"node_modules": true,
+		"dist":         true,
+		"build":        true,
+		".next":        true,
+		"__pycache__":  true,
+		".venv":        true,
+		"venv":         true,
+		"vendor":       true,
+		".idea":        true,
+		".vscode":      true,
+		"coverage":     true,
+		".nyc_output":  true,
+	}
+
+	var files []string
+	maxFiles := 5000 // Limit to prevent huge responses
+
+	err = filepath.Walk(absPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors
+		}
+
+		// Get relative path
+		relPath, err := filepath.Rel(absPath, path)
+		if err != nil {
+			return nil
+		}
+
+		// Skip root
+		if relPath == "." {
+			return nil
+		}
+
+		// Skip ignored directories
+		if info.IsDir() {
+			if ignoreDirs[info.Name()] {
+				return filepath.SkipDir
+			}
+			return nil // Don't add directories to the list, only files
+		}
+
+		// Skip hidden files (starting with .)
+		if strings.HasPrefix(info.Name(), ".") {
+			return nil
+		}
+
+		// Skip binary/large files by extension
+		ext := strings.ToLower(filepath.Ext(info.Name()))
+		skipExtensions := map[string]bool{
+			".exe": true, ".dll": true, ".so": true, ".dylib": true,
+			".zip": true, ".tar": true, ".gz": true, ".rar": true,
+			".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".ico": true, ".webp": true,
+			".mp3": true, ".mp4": true, ".wav": true, ".avi": true, ".mov": true,
+			".pdf": true, ".doc": true, ".docx": true, ".xls": true, ".xlsx": true,
+			".wasm": true, ".pyc": true, ".pyo": true,
+		}
+		if skipExtensions[ext] {
+			return nil
+		}
+
+		// Add file (use forward slashes for cross-platform consistency)
+		files = append(files, strings.ReplaceAll(relPath, "\\", "/"))
+
+		// Limit files
+		if len(files) >= maxFiles {
+			return filepath.SkipAll
+		}
+
+		return nil
+	})
+
+	if err != nil && err != filepath.SkipAll {
+		log.Printf("[Files] Walk error: %v", err)
+	}
+
+	// Sort files alphabetically
+	sort.Strings(files)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(files)
+}
+
 // HandleStats returns quick directory statistics for change detection
 // Returns count of files and directories without building full tree
 func HandleStats(w http.ResponseWriter, r *http.Request) {

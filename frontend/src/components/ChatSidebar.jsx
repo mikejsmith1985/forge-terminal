@@ -1,13 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Loader2 } from 'lucide-react';
+import { X, Send, Loader2, Settings, FileCode } from 'lucide-react';
 import './ChatSidebar.css';
 
-const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
+const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) => {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // @ mention state (v3.3.6 Deep Context)
+  const [mentionActive, setMentionActive] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionPosition, setMentionPosition] = useState(0);
+  const [fileList, setFileList] = useState([]);
+  const [filteredFiles, setFilteredFiles] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const popoverRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -17,12 +28,138 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
     scrollToBottom();
   }, [messages]);
 
+  // Fetch file list when component mounts or becomes active
+  useEffect(() => {
+    if (isOpen && fileList.length === 0) {
+      fetchFileList();
+    }
+  }, [isOpen]);
+
+  const fetchFileList = async () => {
+    setFilesLoading(true);
+    try {
+      const response = await fetch('/api/files/flat');
+      if (response.ok) {
+        const files = await response.json();
+        setFileList(files || []);
+      }
+    } catch (err) {
+      console.error('[ChatSidebar] Failed to fetch file list:', err);
+    } finally {
+      setFilesLoading(false);
+    }
+  };
+
+  // Filter files based on mention query
+  useEffect(() => {
+    if (mentionActive && mentionQuery) {
+      const query = mentionQuery.toLowerCase();
+      const filtered = fileList
+        .filter(file => file.toLowerCase().includes(query))
+        .slice(0, 10); // Limit to 10 results
+      setFilteredFiles(filtered);
+      setSelectedIndex(0);
+    } else if (mentionActive) {
+      setFilteredFiles(fileList.slice(0, 10));
+      setSelectedIndex(0);
+    } else {
+      setFilteredFiles([]);
+    }
+  }, [mentionActive, mentionQuery, fileList]);
+
+  // Handle input change with @ detection
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setInputValue(value);
+
+    // Detect @ mention
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      // Only activate if there's no space after @
+      if (!textAfterAt.includes(' ')) {
+        setMentionActive(true);
+        setMentionQuery(textAfterAt);
+        setMentionPosition(lastAtIndex);
+        return;
+      }
+    }
+
+    setMentionActive(false);
+    setMentionQuery('');
+  };
+
+  // Insert selected file mention
+  const insertMention = (file) => {
+    const beforeMention = inputValue.substring(0, mentionPosition);
+    const afterMention = inputValue.substring(mentionPosition + mentionQuery.length + 1);
+    const newValue = `${beforeMention}@${file} ${afterMention}`;
+    setInputValue(newValue);
+    setMentionActive(false);
+    setMentionQuery('');
+    inputRef.current?.focus();
+  };
+
+  // Handle keyboard navigation in popover
+  const handleKeyDown = (e) => {
+    if (mentionActive && filteredFiles.length > 0) {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedIndex(prev => Math.min(prev + 1, filteredFiles.length - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedIndex(prev => Math.max(prev - 1, 0));
+          break;
+        case 'Tab':
+        case 'Enter':
+          if (mentionActive) {
+            e.preventDefault();
+            insertMention(filteredFiles[selectedIndex]);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setMentionActive(false);
+          break;
+      }
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  // Parse @ mentions from message and extract file paths
+  const parseContextFiles = (message) => {
+    const regex = /@([\w./-]+)/g;
+    const matches = [];
+    let match;
+    while ((match = regex.exec(message)) !== null) {
+      matches.push(match[1]);
+    }
+    return matches;
+  };
+
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim() || isLoading) return;
 
     const userMessage = inputValue.trim();
+
+    // Parse @ mentions for context files
+    const contextFiles = parseContextFiles(userMessage);
+
     setInputValue('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage, id: Date.now() }]);
+    setMentionActive(false);
+    setMessages(prev => [...prev, {
+      role: 'user',
+      content: userMessage,
+      id: Date.now(),
+      contextFiles: contextFiles.length > 0 ? contextFiles : undefined
+    }]);
     setIsLoading(true);
     setError(null);
 
@@ -32,7 +169,8 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          tabId: tabId || 'default'
+          tabId: tabId || 'default',
+          contextFiles: contextFiles
         })
       });
 
@@ -89,28 +227,31 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
     }
   }, [inputValue, isLoading, tabId]);
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
   if (!isOpen) return null;
 
   return (
     <div className="chat-sidebar">
       <div className="chat-header">
         <h3>Chat Assistant</h3>
-        <button className="chat-close-btn" onClick={onClose} title="Close Chat">
-          <X size={18} />
-        </button>
+        <div className="chat-header-actions">
+          <button
+            className="router-config-btn"
+            onClick={onOpenRouterConfig}
+            title="Configure AI Router"
+          >
+            <Settings size={16} />
+          </button>
+          <button className="chat-close-btn" onClick={onClose} title="Close Chat">
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="chat-messages" style={{ fontSize: `${fontSize}px` }}>
         {messages.length === 0 && (
           <div className="chat-empty">
-            <p>🤖 Start a conversation. I can help with code, debugging, and more.</p>
+            <p>Start a conversation. I can help with code, debugging, and more.</p>
+            <p className="chat-hint">Tip: Use <span className="mention-hint">@filename</span> to include file contents in your message!</p>
           </div>
         )}
 
@@ -120,7 +261,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
               {msg.role === 'user' && <div className="chat-avatar">You</div>}
               {msg.role === 'assistant' && (
                 <div className="chat-avatar-container">
-                  <div className="chat-avatar">🤖</div>
+                  <div className="chat-avatar">AI</div>
                   {msg.model && (
                     <div className="chat-model-badge" title={`Routed to ${msg.model}`}>
                       {msg.model}
@@ -128,8 +269,14 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
                   )}
                 </div>
               )}
-              {msg.role === 'error' && <div className="chat-avatar">❌</div>}
+              {msg.role === 'error' && <div className="chat-avatar">!</div>}
               <div className="chat-content">
+                {msg.contextFiles && msg.contextFiles.length > 0 && (
+                  <div className="chat-context-files">
+                    <FileCode size={12} />
+                    <span>{msg.contextFiles.length} file{msg.contextFiles.length > 1 ? 's' : ''} attached</span>
+                  </div>
+                )}
                 {msg.role === 'assistant' ? (
                   <MarkdownContent content={msg.content} />
                 ) : (
@@ -143,7 +290,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
         {isLoading && (
           <div className="chat-message chat-message-loading">
             <div className="chat-bubble">
-              <div className="chat-avatar">🤖</div>
+              <div className="chat-avatar">AI</div>
               <div className="chat-content">
                 <Loader2 className="spinner" size={16} />
               </div>
@@ -155,12 +302,40 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
       </div>
 
       <div className="chat-input-area">
+        {/* @ Mention Autocomplete Popover */}
+        {mentionActive && filteredFiles.length > 0 && (
+          <div className="mention-popover" ref={popoverRef}>
+            <div className="mention-header">
+              <FileCode size={14} />
+              <span>Files</span>
+              {filesLoading && <Loader2 size={12} className="spinner" />}
+            </div>
+            <div className="mention-list">
+              {filteredFiles.map((file, idx) => (
+                <div
+                  key={file}
+                  className={`mention-item ${idx === selectedIndex ? 'selected' : ''}`}
+                  onClick={() => insertMention(file)}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                >
+                  <FileCode size={14} />
+                  <span className="mention-file-path">{file}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mention-hint-bar">
+              <kbd>Tab</kbd> or <kbd>Enter</kbd> to select, <kbd>Esc</kbd> to dismiss
+            </div>
+          </div>
+        )}
+
         <textarea
+          ref={inputRef}
           className="chat-input"
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type your message... (Shift+Enter for newline)"
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Type your message... Use @file.ext for context"
           disabled={isLoading}
           rows={3}
         />

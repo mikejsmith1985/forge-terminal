@@ -249,6 +249,7 @@ func main() {
 
 	// File management API
 	http.HandleFunc("/api/files/list", WrapWithMiddleware(files.HandleList))
+	http.HandleFunc("/api/files/flat", WrapWithMiddleware(files.HandleFlatList)) // v3.3.6 @ mentions
 	http.HandleFunc("/api/files/stats", WrapWithMiddleware(files.HandleStats))
 	http.HandleFunc("/api/files/read", WrapWithMiddleware(files.HandleRead))
 	http.HandleFunc("/api/files/write", WrapWithMiddleware(files.HandleWrite))
