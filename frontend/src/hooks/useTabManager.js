@@ -51,6 +51,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
+    viewMode: 'chat', // v3.3.0: New tabs start in chat mode ('chat' or 'terminal')
     autoRespond: false, // Auto-respond to CLI confirmation prompts
     amEnabled: true, // AM (Artificial Memory) logging - DEFAULT ON for legal compliance
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
@@ -63,6 +64,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     tabNumber, 
     colorTheme: assignedTheme,
     mode: assignedMode,
+    viewMode: newTab.viewMode,
     currentDirectory,
     themeIndex: themeIndex - 1
   });
@@ -85,6 +87,7 @@ function tabsToSession(tabs, activeTabId) {
       },
       colorTheme: tab.colorTheme,
       mode: tab.mode || 'dark',
+      viewMode: tab.viewMode || 'chat', // v3.3.0: Persist view mode
       autoRespond: tab.autoRespond || false,
       amEnabled: tab.amEnabled || false,
       visionEnabled: tab.visionEnabled || false,
@@ -198,6 +201,7 @@ export function useTabManager(initialShellConfig) {
           shellConfig: tabState.shellConfig || configRef.current,
           colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
           mode: tabState.mode || 'dark',
+          viewMode: tabState.viewMode || 'chat', // v3.3.0: Restore view mode
           autoRespond: tabState.autoRespond || false,
           amEnabled: tabState.amEnabled || false,
           visionEnabled: tabState.visionEnabled || false,
@@ -610,6 +614,38 @@ export function useTabManager(initialShellConfig) {
     });
   }, []);
 
+  /**
+   * Toggle view mode for a tab (chat <-> terminal)
+   * @param {string} tabId - ID of tab to update
+   */
+  const toggleTabViewMode = useCallback((tabId) => {
+    logger.tabs('Toggling tab view mode', { tabId });
+    
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        logger.tabs('Tab not found for view mode toggle', { tabId });
+        return prev;
+      }
+
+      const oldViewMode = prev.tabs[tabIndex].viewMode || 'chat';
+      const newViewMode = oldViewMode === 'chat' ? 'terminal' : 'chat';
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], viewMode: newViewMode };
+      
+      logger.tabs('Tab view mode toggled', { 
+        tabId, 
+        oldViewMode, 
+        newViewMode 
+      });
+      
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
   return {
     tabs: state.tabs,
     activeTabId: state.activeTabId,
@@ -624,6 +660,7 @@ export function useTabManager(initialShellConfig) {
     toggleTabAM,
     toggleTabVision,
     toggleTabMode,
+    toggleTabViewMode, // v3.3.0: Toggle between chat and terminal view
     updateTabDirectory,
     reorderTabs,
   };

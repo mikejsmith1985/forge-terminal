@@ -223,6 +223,10 @@ func main() {
 	// Chat API (v3.3.0 - Chat Sidebar)
 	http.HandleFunc("/api/llm/chat", WrapWithMiddleware(handleChat))
 
+	// Router Configuration API (v3.3.0 - Smart Router)
+	http.HandleFunc("/api/llm/router-config", WrapWithMiddleware(handleRouterConfig))
+	http.HandleFunc("/api/llm/test-command", WrapWithMiddleware(handleTestCommand))
+
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
 	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))

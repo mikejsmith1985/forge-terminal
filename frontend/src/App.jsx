@@ -25,6 +25,8 @@ import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 import ChatSidebar from './components/ChatSidebar'
+import ChatView from './components/ChatView'
+import RouterConfigOverlay from './components/RouterConfigOverlay'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -48,6 +50,7 @@ function App() {
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false)
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
   const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false)
+  const [isRouterConfigOpen, setIsRouterConfigOpen] = useState(false)
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
   const [colorTheme, setColorTheme] = useState(() => {
@@ -127,6 +130,7 @@ function App() {
     toggleTabAM,
     toggleTabVision,
     toggleTabMode,
+    toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
   } = useTabManager(shellConfig);
@@ -1768,30 +1772,52 @@ function App() {
                 key={tab.id}
                 className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
               >
-                <ForgeTerminal
-                  ref={(el) => {
-                    if (el) {
-                      terminalRefs.current[tab.id] = el;
-                    }
-                  }}
-                  tabId={tab.id}
-                  isVisible={tab.id === activeTabId}
-                  theme={tab.mode || 'dark'}
-                  colorTheme={tab.colorTheme || colorTheme}
-                  fontSize={fontSize}
-                  shellConfig={tab.shellConfig}
-                  autoRespond={tab.autoRespond || false}
-                  amEnabled={tab.amEnabled || false}
-                  visionEnabled={tab.visionEnabled || false}
-                  tabName={tab.title}
-                  currentDirectory={tab.currentDirectory || null}
-                  onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
-                  onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
-                  onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
-                  onPaste={() => addToast('Text pasted from clipboard', 'success', 1500)}
-                  onFeedbackClick={() => setIsFeedbackModalOpen(true)}
-                  onTerminalCommand={queryModelTier}
-                />
+                {/* v3.3.0: Conditionally render ChatView or ForgeTerminal based on viewMode */}
+                {tab.viewMode === 'chat' ? (
+                  <ChatView
+                    tabId={tab.id}
+                    fontSize={chatFontSize}
+                    onToggleTerminal={() => toggleTabViewMode(tab.id)}
+                    onOpenRouterConfig={() => setIsRouterConfigOpen(true)}
+                    onRunInTerminal={(command) => {
+                      // Ghost Driver: Switch to terminal and inject command
+                      toggleTabViewMode(tab.id);
+                      setTimeout(() => {
+                        const termRef = terminalRefs.current[tab.id];
+                        if (termRef) {
+                          termRef.sendCommand(command);
+                          termRef.focus();
+                        }
+                      }, 100);
+                    }}
+                  />
+                ) : (
+                  <ForgeTerminal
+                    ref={(el) => {
+                      if (el) {
+                        terminalRefs.current[tab.id] = el;
+                      }
+                    }}
+                    tabId={tab.id}
+                    isVisible={tab.id === activeTabId}
+                    theme={tab.mode || 'dark'}
+                    colorTheme={tab.colorTheme || colorTheme}
+                    fontSize={fontSize}
+                    shellConfig={tab.shellConfig}
+                    autoRespond={tab.autoRespond || false}
+                    amEnabled={tab.amEnabled || false}
+                    visionEnabled={tab.visionEnabled || false}
+                    tabName={tab.title}
+                    currentDirectory={tab.currentDirectory || null}
+                    onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
+                    onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
+                    onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
+                    onPaste={() => addToast('Text pasted from clipboard', 'success', 1500)}
+                    onFeedbackClick={() => setIsFeedbackModalOpen(true)}
+                    onTerminalCommand={queryModelTier}
+                    onSwitchToChat={() => toggleTabViewMode(tab.id)}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -1913,9 +1939,26 @@ function App() {
               addToast(`Viewing terminal state at ${new Date(data.timestamp).toLocaleTimeString()}`, 'info', 2000);
             }
           }}
+          onChatAboutHistory={(content, timestamp) => {
+            // Switch to chat mode if in terminal mode
+            if (activeTab?.viewMode === 'terminal') {
+              toggleTabViewMode(activeTabId);
+            }
+            // Close history slider
+            setIsHistorySliderOpen(false);
+            // Show toast with hint
+            addToast(`Analyzing terminal state from ${timestamp.toLocaleTimeString()}. Ask your question in chat.`, 'info', 4000);
+            // TODO: Could pre-populate chat context with historical content
+          }}
           position="bottom"
         />
       )}
+      
+      {/* Router Config Overlay - Smart Router Configuration (v3.3.0) */}
+      <RouterConfigOverlay
+        isOpen={isRouterConfigOpen}
+        onClose={() => setIsRouterConfigOpen(false)}
+      />
     </div>
   )
 }

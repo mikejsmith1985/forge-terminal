@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Clock, Rewind, FastForward, X, Play, Pause } from 'lucide-react';
+import { Clock, Rewind, FastForward, X, Play, Pause, MessageSquare } from 'lucide-react';
 import './HistorySlider.css';
 
 // Debounce hook for slider changes
@@ -31,6 +31,7 @@ export const HistorySlider = ({
   isOpen, 
   onClose, 
   onPreview,
+  onChatAboutHistory,
   position = 'bottom' 
 }) => {
   const [timeRange, setTimeRange] = useState(null);
@@ -282,15 +283,27 @@ export const HistorySlider = ({
         <div className="ghost-terminal-overlay">
           <div className="ghost-terminal-header">
             <span>Terminal State at {formatTime(currentTime)}</span>
-            <button 
-              className="ghost-close-btn"
-              onClick={() => {
-                setPreviewContent(null);
-                jumpToEnd();
-              }}
-            >
-              Return to Present
-            </button>
+            <div className="ghost-terminal-actions">
+              {onChatAboutHistory && (
+                <button 
+                  className="ghost-chat-btn"
+                  onClick={() => onChatAboutHistory(previewContent, currentTime)}
+                  title="Chat about this historical state"
+                >
+                  <MessageSquare size={14} />
+                  Chat about this
+                </button>
+              )}
+              <button 
+                className="ghost-close-btn"
+                onClick={() => {
+                  setPreviewContent(null);
+                  jumpToEnd();
+                }}
+              >
+                Return to Present
+              </button>
+            </div>
           </div>
           <pre className="ghost-terminal-content">
             {previewContent}

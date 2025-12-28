@@ -251,6 +251,32 @@
   color: var(--accent, #f97316);
 }
 
+.ghost-terminal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ghost-chat-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  color: #a78bfa;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ghost-chat-btn:hover {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%);
+  border-color: #a78bfa;
+}
+
 .ghost-close-btn {
   background: var(--accent, #f97316);
   color: #000;
