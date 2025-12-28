@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -202,11 +201,7 @@ func execCommand(ctx context.Context, name string, args ...string) (string, erro
 	}
 
 	// Hide console window on Windows
-	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow: true,
-		}
-	}
+	configureCmdForPlatform(cmd)
 
 	output, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(output)), err
@@ -219,9 +214,7 @@ func checkBinaryExists(name string) bool {
 	if runtime.GOOS == "windows" {
 		// Use 'where' on Windows to find the binary
 		cmd = exec.Command("cmd", "/c", "where", name)
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow: true,
-		}
+		configureCmdForPlatform(cmd)
 	} else {
 		cmd = exec.Command("which", name)
 	}

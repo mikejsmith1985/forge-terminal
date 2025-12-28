@@ -6,9 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -341,9 +339,5 @@ func setClaudeAPIKey(apiKey string) error {
 
 // hideWindow sets the SysProcAttr to hide the console window on Windows.
 func hideWindow(cmd *exec.Cmd) {
-	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow: true,
-		}
-	}
+	configureCmdForPlatform(cmd)
 }
