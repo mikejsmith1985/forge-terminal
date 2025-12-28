@@ -52,22 +52,63 @@ func TestEchoBuffer_PartialEcho(t *testing.T) {
 func TestEchoBuffer_Backspace(t *testing.T) {
 	eb := NewEchoBuffer()
 	eb.AddPending([]byte("hel"))
-	eb.AddPending([]byte{0x7F}) // Backspace
+	eb.AddPending([]byte{0x7F}) // Backspace - removes 'l', adds backspace
 	eb.AddPending([]byte("lo"))
 
-	// Pending should be "helo" (l removed by backspace, lo added)
-	// But backspace itself is also pending
-	// So we have: "he" + backspace + "lo"
+	// After "hel" + backspace + "lo":
+	// 1. "hel" added -> pending = "hel"
+	// 2. backspace -> removes 'l', adds 0x7F -> pending = "he" + 0x7F
+	// 3. "lo" added -> pending = "he" + 0x7F + "lo"
 
-	// Actually: backspace removes last rune ("l"), then adds backspace byte
-	// Then "lo" is added
-	// Result pending: "he" + 0x7F + "lo"
+	// Expected pending: "he\x7Flo" (5 bytes)
+	if eb.Len() != 5 {
+		t.Errorf("Expected 5 pending bytes, got %d", eb.Len())
+	}
+}
 
-	// Simulate PTY echoing the backspace sequence and "helo"
-	// PTY typically echoes: original chars, backspace as cursor movement
-	// For simplicity, test that backspace handling doesn't crash
-	if eb.Len() < 1 {
-		t.Error("Echo buffer should have pending bytes")
+func TestEchoBuffer_BackspaceEchoPattern(t *testing.T) {
+	eb := NewEchoBuffer()
+	
+	// User types "ab" then backspace
+	eb.AddPending([]byte("ab"))
+	eb.AddPending([]byte{0x7F}) // Backspace
+	
+	// After "ab" + backspace:
+	// 1. "ab" added -> pending = "ab"
+	// 2. backspace -> removes 'b', adds 0x7F -> pending = "a\x7F"
+	
+	// PTY echoes: "a" (we already consumed 'b'), then backspace pattern (0x08 0x20 0x08)
+	// Actually PTY echoes the original "ab" then the backspace effect
+	// But our pending only has "a\x7F" now
+	
+	// PTY output: "a" + backspace pattern + AI response
+	ptyEcho := []byte{'a', 0x08, 0x20, 0x08, 'X', 'Y', 'Z'}
+	
+	filtered := eb.FilterEcho(ptyEcho)
+	
+	// Should filter out "a" and the backspace pattern
+	// Should pass through "XYZ" (AI output)
+	if string(filtered) != "XYZ" {
+		t.Errorf("Expected 'XYZ' after filtering, got '%s' (hex: %x)", string(filtered), filtered)
+	}
+}
+
+func TestEchoBuffer_MultipleBackspaces(t *testing.T) {
+	eb := NewEchoBuffer()
+	
+	// User types "abc" then 2 backspaces then "de"
+	eb.AddPending([]byte("abc"))
+	eb.AddPending([]byte{0x7F, 0x7F}) // Two backspaces
+	eb.AddPending([]byte("de"))
+	
+	// After processing:
+	// "abc" -> pending = "abc"
+	// first backspace -> removes 'c', adds 0x7F -> pending = "ab\x7F"
+	// second backspace -> removes 'b', adds 0x7F -> pending = "a\x7F\x7F"
+	// "de" -> pending = "a\x7F\x7Fde"
+	
+	if eb.Len() != 5 {
+		t.Errorf("Expected 5 pending bytes, got %d", eb.Len())
 	}
 }
 

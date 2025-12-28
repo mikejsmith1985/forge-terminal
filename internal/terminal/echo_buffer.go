@@ -66,6 +66,7 @@ func (eb *EchoBuffer) AddPending(data []byte) {
 
 // FilterEcho filters incoming PTY output, removing bytes that match pending echo.
 // Returns the bytes that should be passed to the AutoResponder (non-echoed data).
+// Handles typical PTY backspace echo patterns (0x08 0x20 0x08 = back, space, back).
 func (eb *EchoBuffer) FilterEcho(data []byte) []byte {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
@@ -82,8 +83,24 @@ func (eb *EchoBuffer) FilterEcho(data []byte) []byte {
 	// Filter: Remove bytes that match pending echo
 	result := make([]byte, 0, len(data))
 	pendingIdx := 0
+	i := 0
 
-	for _, b := range data {
+	for i < len(data) {
+		b := data[i]
+
+		// Check for backspace echo pattern: 0x08 0x20 0x08 (back, space, back)
+		// This is what terminals typically echo for a backspace
+		if b == 0x08 && i+2 < len(data) && data[i+1] == 0x20 && data[i+2] == 0x08 {
+			// Check if we have a backspace in pending
+			if pendingIdx < len(eb.pending) && (eb.pending[pendingIdx] == 0x08 || eb.pending[pendingIdx] == 0x7F) {
+				// Consume the backspace from pending and skip all 3 bytes of the echo
+				pendingIdx++
+				i += 3
+				continue
+			}
+		}
+
+		// Standard byte matching
 		if pendingIdx < len(eb.pending) && b == eb.pending[pendingIdx] {
 			// This byte is expected echo - consume it
 			pendingIdx++
@@ -91,6 +108,7 @@ func (eb *EchoBuffer) FilterEcho(data []byte) []byte {
 			// This byte is NOT echo - pass to AutoResponder
 			result = append(result, b)
 		}
+		i++
 	}
 
 	// Remove consumed bytes from pending
@@ -106,6 +124,13 @@ func (eb *EchoBuffer) Clear() {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
 	eb.pending = eb.pending[:0]
+}
+
+// RegisterEcho is an alias for AddPending - registers bytes that we expect
+// to be echoed back by the PTY. This is the "handshake" part of echo suppression.
+// Call this AFTER writing to PTY to register what was sent.
+func (eb *EchoBuffer) RegisterEcho(data []byte) {
+	eb.AddPending(data)
 }
 
 // Len returns the current number of pending bytes.
