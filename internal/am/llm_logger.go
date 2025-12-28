@@ -533,33 +533,9 @@ func (l *LLMLogger) saveScreenSnapshotLocked() {
 }
 
 // stripANSI removes ANSI escape sequences from text.
+// Uses optimized state-machine approach instead of regex for performance.
 func (l *LLMLogger) stripANSI(text string) string {
-	// Pattern matches ANSI CSI sequences, OSC sequences, etc.
-	re := strings.NewReplacer(
-		"\x1b[2J", "",
-		"\x1b[H", "",
-		"\x1b[3J", "",
-	)
-	cleaned := re.Replace(text)
-	// Remove remaining ANSI sequences
-	for _, seq := range []string{"\x1b[", "\x1b]", "\x1b"} {
-		if strings.Contains(cleaned, seq) {
-			// Simplified removal - just keep printable chars
-			var result strings.Builder
-			inEscape := false
-			for _, r := range cleaned {
-				if r == '\x1b' {
-					inEscape = true
-				} else if inEscape && (r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z') {
-					inEscape = false
-				} else if !inEscape && (r >= 32 || r == '\n' || r == '\t' || r == '\r') {
-					result.WriteRune(r)
-				}
-			}
-			return result.String()
-		}
-	}
-	return cleaned
+	return StripANSIFastString(text)
 }
 
 // calculateDiff computes a simple diff between two screens.

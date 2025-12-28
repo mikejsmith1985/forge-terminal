@@ -296,14 +296,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	detector := h.GetLLMDetector()
+	// NOTE: detector is kept but LLM detection now happens in async pipeline
+	_ = h.GetLLMDetector() // Keep for backward compatibility
 	var inputBuffer strings.Builder
-	var amInputAccumulator strings.Builder // Batch AM input checks
-	lastAMCheck := time.Now()
-	var llmOutputBuffer strings.Builder // Buffer for LLM logger to reduce lock contention
-	const flushTimeout = 2 * time.Second
-	lastFlushCheck := time.Now()
-	lastLLMFlush := time.Now()
+	// Removed: amInputAccumulator, lastAMCheck, llmOutputBuffer, flushTimeout, lastFlushCheck, lastLLMFlush
+	// These are now handled by the async pipeline in internal/am/async_pipeline.go
 
 	// Channel to coordinate shutdown with reason
 	type closeReason struct {
@@ -452,25 +449,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				// Feed output to LLM logger - THROTTLED to reduce CPU load
-				// Accumulate output and flush every 200ms to prevent lock contention
-				if logger := llmLoggerAtomic.Load(); logger != nil {
-					llmLogger := logger.(*am.LLMLogger)
-					if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
-						// BOUNDED BUFFER: Prevent OOM
-						if llmOutputBuffer.Len() > 65536 { // 64KB limit
-							llmOutputBuffer.Reset()
-						}
-						llmOutputBuffer.Write(buf[:n])
-						now := time.Now()
-						if now.Sub(lastLLMFlush) > 200*time.Millisecond {
-							lastLLMFlush = now
-							if llmOutputBuffer.Len() > 0 {
-								llmLogger.AddOutput(llmOutputBuffer.String())
-								llmOutputBuffer.Reset()
-							}
-						}
-					}
+				// ═══ ASYNC PIPELINE: Non-blocking enqueue to AM system ═══
+				// This prevents LLM logger from blocking the PTY read loop
+				if amSystem != nil && amEnabled {
+					// Non-blocking send - drops data if pipeline full (UI > logging)
+					amSystem.EnqueueOutput(tabID, buf[:n])
 				}
 			}
 		}
@@ -573,21 +556,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			inputBuffer.WriteString(dataStr)
 
-			// AM: Capture user input when inside active LLM session
-			// Batch checks to avoid main thread contention (100ms intervals)
-			if amInputAccumulator.Len() > 8192 { // 8KB limit
-				amInputAccumulator.Reset()
-			}
-			amInputAccumulator.WriteString(dataStr)
-			if time.Since(lastAMCheck) > 100*time.Millisecond {
-				if logger := llmLoggerAtomic.Load(); logger != nil {
-					llmLogger := logger.(*am.LLMLogger)
-					if llmLogger != nil && llmLogger.GetActiveConversationID() != "" {
-						llmLogger.AddUserInput(amInputAccumulator.String())
-					}
-				}
-				amInputAccumulator.Reset()
-				lastAMCheck = time.Now()
+			// ═══ ASYNC PIPELINE: Non-blocking enqueue to AM system ═══
+			// This prevents AM operations from blocking keyboard input
+			if amSystem != nil && amEnabled {
+				// Non-blocking send - drops data if pipeline full (UI > logging)
+				amSystem.EnqueueInput(tabID, data)
 			}
 
 			// Check for newline/enter (command submission)
@@ -595,41 +568,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				commandLine := strings.TrimSpace(inputBuffer.String())
 				inputBuffer.Reset()
 
-				if logger := llmLoggerAtomic.Load(); commandLine != "" && logger != nil {
-					llmLogger := logger.(*am.LLMLogger)
-					if llmLogger != nil {
-						// Only detect new LLM command if no conversation is active
-						activeConv := llmLogger.GetActiveConversationID()
-						if activeConv == "" {
-							detected := detector.DetectCommand(commandLine)
-
-							if detected.Detected {
-								// Check if this is a TUI-based tool (Copilot, Claude)
-								isTUITool := detected.Provider == "github-copilot" || detected.Provider == "claude"
-
-								if isTUITool {
-									llmLogger.StartConversationFromProcess(
-										string(detected.Provider),
-										string(detected.Type),
-										0,
-									)
-								} else {
-									llmLogger.StartConversation(detected)
-								}
-							}
-						}
-					}
-				}
-			}
-
-			// Periodic flush check for LLM output (reduced frequency)
-			if logger := llmLoggerAtomic.Load(); logger != nil {
-				llmLogger := logger.(*am.LLMLogger)
-				if llmLogger != nil && time.Since(lastFlushCheck) > flushTimeout {
-					if llmLogger.ShouldFlushOutput(flushTimeout) {
-						go llmLogger.FlushOutput() // Async flush
-					}
-					lastFlushCheck = time.Now()
+				// ═══ ASYNC PIPELINE: Enqueue command for LLM detection ═══
+				if commandLine != "" && amSystem != nil && amEnabled {
+					amSystem.EnqueueCommand(tabID, commandLine)
 				}
 			}
 		}
