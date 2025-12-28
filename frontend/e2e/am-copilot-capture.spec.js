@@ -230,16 +230,16 @@ test.describe('AM TUI Capture - Real Copilot', () => {
     await pressEnter(page);
     await page.waitForTimeout(2000);
     
-    // Test format 2: "gh copilot" (if gh is installed)
-    await typeInTerminal(page, 'gh copilot');
+    // Test format 2: "copilot" standalone CLI
+    await typeInTerminal(page, 'copilot');
     await pressEnter(page);
     await page.waitForTimeout(2000);
     
     health = await (await request.get('/api/am/health')).json();
     const countAfterSecond = health.metrics.conversationsActive + health.metrics.conversationsComplete;
     
-    // Should detect this too (if gh copilot works)
-    // Note: This may fail if gh copilot isn't set up
+    // Should detect this too (if copilot CLI works)
+    // Note: This may fail if copilot CLI isn't set up
     expect(countAfterSecond).toBeGreaterThanOrEqual(countAfterFirst);
   });
 

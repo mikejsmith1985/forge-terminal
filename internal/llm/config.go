@@ -77,19 +77,23 @@ type ConfigLoader struct {
 }
 
 // DefaultConfig returns sensible defaults when forge.toml is missing.
+// Task 3: Default fallback commands as specified:
+// - Tier 1 (Haiku): gh copilot suggest "{prompt}"
+// - Tier 2 (Sonnet): gh copilot suggest "{prompt}"
+// - Tier 3 (Opus): claude "{prompt}" --model opus
 func DefaultConfig() *RoutingConfig {
 	return &RoutingConfig{
 		Tier1: TierConfig{
 			Name:    "Copilot",
-			Command: "gh copilot suggest \"{prompt}\"",
+			Command: `gh copilot suggest "{prompt}"`,
 		},
 		Tier2: TierConfig{
 			Name:    "Copilot",
-			Command: "gh copilot suggest \"{prompt}\"",
+			Command: `gh copilot suggest "{prompt}"`,
 		},
 		Tier3: TierConfig{
-			Name:    "Aider",
-			Command: "aider --yes-always --model claude-3-5-sonnet-20241022 --message \"{prompt}\"",
+			Name:    "Claude",
+			Command: `claude "{prompt}" --model opus`,
 		},
 		IncludeCwd:       true,
 		IncludeGitBranch: true,

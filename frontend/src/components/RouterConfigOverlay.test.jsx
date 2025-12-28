@@ -1,9 +1,9 @@
 /**
- * Task 2 TDD Tests: Smart Router Configuration UI
+ * Task 2 TDD Tests: Chat Configuration UI
  * 
  * Tests for:
  * - RouterConfigOverlay component renders
- * - Can edit tier1, tier2, tier3 mappings
+ * - Can select tool and model
  * - Syncs configuration to backend
  * - Test Command feature for CLI tool verification
  */
@@ -20,37 +20,26 @@ vi.mock('lucide-react', () => ({
   AlertCircle: () => <span data-testid="alert-icon">Alert</span>,
   Play: () => <span data-testid="play-icon">Play</span>,
   Loader2: () => <span data-testid="loader-icon">Loading</span>,
+  Save: () => <span data-testid="save-icon">Save</span>,
 }));
 
 // Test 1: Config structure validation
 describe('Router Config Structure', () => {
-  it('should have tier1, tier2, tier3 configurations', () => {
+  it('should have tool and model configurations', () => {
     const config = {
-      routing: {
-        tier1_name: 'Copilot',
-        tier1_cmd: 'gh copilot suggest "{prompt}"',
-        tier2_name: 'Copilot',
-        tier2_cmd: 'gh copilot suggest "{prompt}"',
-        tier3_name: 'Aider',
-        tier3_cmd: 'aider --yes-always --model claude-3-5-sonnet-20241022 --message "{prompt}"',
-      },
-      context: {
-        include_cwd: true,
-        include_git_branch: true,
-        include_vision: true,
-      },
+      tool: 'copilot',
+      model: 'default',
     };
 
-    expect(config.routing.tier1_name).toBe('Copilot');
-    expect(config.routing.tier2_name).toBe('Copilot');
-    expect(config.routing.tier3_name).toBe('Aider');
+    expect(config.tool).toBe('copilot');
+    expect(config.model).toBe('default');
   });
 
-  it('should support placeholder in commands', () => {
-    const cmd = 'gh copilot suggest "{prompt}"';
-    const prompt = 'How do I fix this bug?';
-    const result = cmd.replace('{prompt}', prompt);
-    expect(result).toBe('gh copilot suggest "How do I fix this bug?"');
+  it('should support multiple tools', () => {
+    const tools = ['copilot', 'aider', 'claude'];
+    expect(tools).toContain('copilot');
+    expect(tools).toContain('aider');
+    expect(tools).toContain('claude');
   });
 });
 
@@ -60,19 +49,8 @@ describe('Router Config API', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        routing: {
-          tier1_name: 'Copilot',
-          tier1_cmd: 'gh copilot suggest "{prompt}"',
-          tier2_name: 'Copilot',
-          tier2_cmd: 'gh copilot suggest "{prompt}"',
-          tier3_name: 'Aider',
-          tier3_cmd: 'aider --message "{prompt}"',
-        },
-        context: {
-          include_cwd: true,
-          include_git_branch: true,
-          include_vision: true,
-        },
+        tool: 'copilot',
+        model: 'default',
       }),
     });
 
@@ -80,9 +58,8 @@ describe('Router Config API', () => {
     const response = await fetch('/api/llm/router-config');
     const data = await response.json();
 
-    expect(data.routing.tier1_name).toBeDefined();
-    expect(data.routing.tier2_cmd).toBeDefined();
-    expect(data.context.include_cwd).toBe(true);
+    expect(data.tool).toBeDefined();
+    expect(data.model).toBeDefined();
   });
 
   it('should have POST /api/llm/router-config for saving', async () => {
@@ -94,10 +71,8 @@ describe('Router Config API', () => {
     global.fetch = mockFetch;
     
     const newConfig = {
-      routing: {
-        tier1_name: 'Claude',
-        tier1_cmd: 'claude -p "{prompt}"',
-      },
+      tool: 'aider',
+      model: 'claude-3-5-sonnet-20241022',
     };
 
     const response = await fetch('/api/llm/router-config', {
@@ -122,7 +97,7 @@ describe('Test Command Feature', () => {
         success: true,
         installed: true,
         version: 'v1.2.3',
-        output: 'gh copilot is installed',
+        output: 'copilot is installed',
       }),
     });
 
@@ -131,7 +106,7 @@ describe('Test Command Feature', () => {
     const response = await fetch('/api/llm/test-command', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: 'gh copilot --version' }),
+      body: JSON.stringify({ command: 'copilot --version' }),
     });
 
     const data = await response.json();
@@ -162,17 +137,17 @@ describe('Test Command Feature', () => {
   });
 });
 
-// Test 4: Tier label mapping
-describe('Tier Label Display', () => {
-  it('should map tier names to friendly labels', () => {
-    const tierLabels = {
-      tier1: 'Quick Tasks (Free/Fast)',
-      tier2: 'Standard Tasks (Balanced)',
-      tier3: 'Complex Tasks (High Reasoning)',
+// Test 4: Tool options
+describe('Tool Options', () => {
+  it('should have readable tool names', () => {
+    const tools = {
+      copilot: 'GitHub Copilot CLI',
+      aider: 'Aider',
+      claude: 'Claude CLI',
     };
 
-    expect(tierLabels.tier1).toContain('Quick');
-    expect(tierLabels.tier2).toContain('Balanced');
-    expect(tierLabels.tier3).toContain('Complex');
+    expect(tools.copilot).toContain('Copilot');
+    expect(tools.aider).toBe('Aider');
+    expect(tools.claude).toContain('Claude');
   });
 });

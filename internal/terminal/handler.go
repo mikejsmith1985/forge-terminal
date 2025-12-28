@@ -568,19 +568,30 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 						prompt := ExtractPrompt(line)
 						log.Printf("[SmartRouting] Executive trigger detected: %s", prompt)
 
-						// Handle the routing asynchronously
+						// Handle the routing asynchronously with extended notification
+						// Task 4: Badge shows what is ACTUALLY running
 						go func(p string) {
-							err := executiveTrigger.Handle(p, session, func(tier, toolName, prompt string) {
-								// Notify frontend of active routing
+							err := executiveTrigger.HandleWithExtendedNotify(p, session, func(n *RoutingNotification) {
+								// Notify frontend of active routing with full context
 								_ = conn.WriteJSON(map[string]interface{}{
-									"type":     "ROUTING_ACTIVE",
-									"tier":     tier,
-									"toolName": toolName,
-									"prompt":   prompt,
+									"type":            "ROUTING_ACTIVE",
+									"tier":            n.Tier,
+									"toolName":        n.ToolName,
+									"prompt":          n.Prompt,
+									"tierMismatch":    n.TierMismatch,
+									"actuallyRunning": n.ActuallyRunning,
+									"previousTier":    n.PreviousTier,
+									"action":          n.Action,
 								})
 							})
 							if err != nil {
 								log.Printf("[SmartRouting] Routing error: %v", err)
+								// Send error notification to frontend
+								_ = conn.WriteJSON(map[string]interface{}{
+									"type":    "ROUTING_ERROR",
+									"error":   err.Error(),
+									"prompt":  p,
+								})
 							}
 						}(prompt)
 

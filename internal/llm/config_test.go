@@ -12,8 +12,9 @@ func TestDefaultConfig(t *testing.T) {
 	if config.Tier1.Name != "Copilot" {
 		t.Errorf("Expected Tier1 name 'Copilot', got '%s'", config.Tier1.Name)
 	}
-	if config.Tier3.Name != "Aider" {
-		t.Errorf("Expected Tier3 name 'Aider', got '%s'", config.Tier3.Name)
+	// Task 3: Default Tier3 changed to Claude with opus model
+	if config.Tier3.Name != "Claude" {
+		t.Errorf("Expected Tier3 name 'Claude', got '%s'", config.Tier3.Name)
 	}
 	if !config.IncludeVision {
 		t.Error("Expected IncludeVision to be true by default")
@@ -87,9 +88,10 @@ func TestConfigLoader_GetTierConfig(t *testing.T) {
 		t.Errorf("Expected Tier1 (Haiku) name 'Copilot', got '%s'", tier1.Name)
 	}
 
+	// Task 3: Default Tier3 changed to Claude with opus model
 	tier3 := cl.GetTierConfig(TierOpus)
-	if tier3.Name != "Aider" {
-		t.Errorf("Expected Tier3 (Opus) name 'Aider', got '%s'", tier3.Name)
+	if tier3.Name != "Claude" {
+		t.Errorf("Expected Tier3 (Opus) name 'Claude', got '%s'", tier3.Name)
 	}
 }
 

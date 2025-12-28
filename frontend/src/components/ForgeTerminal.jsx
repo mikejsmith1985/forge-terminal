@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, us
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
-import { ArrowDownToLine } from 'lucide-react';
+import { ArrowDownToLine, MessageSquare } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
@@ -344,6 +344,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
   onTerminalCommand = null, // Callback when command is executed (for model tier detection)
+  onRoutingUpdate = null, // Callback when smart routing executes (for badge sync)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name (for AM logging)
@@ -352,6 +353,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   amEnabled = false, // AM (Artificial Memory) logging enabled
   currentDirectory = null, // Current working directory to restore on connect
   visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
+  onSwitchToChat = null, // Callback to switch to chat view
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -375,6 +377,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
   const onTerminalCommandRef = useRef(onTerminalCommand);
+  const onRoutingUpdateRef = useRef(onRoutingUpdate);
   const commandBufferRef = useRef(''); // Track current command line for model tier detection
   // AM logging refs
   const amLogBufferRef = useRef('');
@@ -445,7 +448,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onTerminalCommandRef.current = onTerminalCommand;
   }, [onTerminalCommand]);
-  
+
+  // Keep onRoutingUpdate ref updated
+  useEffect(() => {
+    onRoutingUpdateRef.current = onRoutingUpdate;
+  }, [onRoutingUpdate]);
+
   // Keep visionEnabled ref updated and send control message to backend
   useEffect(() => {
     visionEnabledRef.current = visionEnabled;
@@ -1065,6 +1073,35 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 });
                 return; // Don't write to terminal
               }
+
+              // Task 4: Handle smart routing notifications - badge sync
+              if (msg.type === 'ROUTING_ACTIVE') {
+                logger.terminal('Smart routing executed', {
+                  tier: msg.tier,
+                  toolName: msg.toolName,
+                  actuallyRunning: msg.actuallyRunning,
+                  tierMismatch: msg.tierMismatch,
+                  action: msg.action
+                });
+                if (onRoutingUpdateRef.current) {
+                  onRoutingUpdateRef.current({
+                    tier: msg.tier,
+                    toolName: msg.toolName,
+                    prompt: msg.prompt,
+                    actuallyRunning: msg.actuallyRunning,
+                    tierMismatch: msg.tierMismatch,
+                    previousTier: msg.previousTier,
+                    action: msg.action
+                  });
+                }
+                return; // Don't write to terminal
+              }
+
+              if (msg.type === 'ROUTING_ERROR') {
+                console.warn('[SmartRouter] Routing error:', msg.error);
+                logger.terminal('Smart routing error', { error: msg.error, prompt: msg.prompt });
+                return; // Don't write to terminal
+              }
             } catch (e) {
               // Malformed JSON starting with { - just write it
               term.write(str);
@@ -1556,6 +1593,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           aria-label="Scroll to bottom"
         >
           <ArrowDownToLine size={16} />
+        </button>
+      )}
+      
+      {/* Switch to Chat button */}
+      {onSwitchToChat && isVisible && (
+        <button
+          className="switch-to-chat-btn"
+          onClick={onSwitchToChat}
+          title="Switch to Chat"
+          aria-label="Switch to Chat"
+        >
+          <MessageSquare size={16} />
+          <span>Chat</span>
         </button>
       )}
     </div>

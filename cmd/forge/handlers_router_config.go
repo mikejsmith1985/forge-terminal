@@ -222,14 +222,18 @@ func extractVersion(output string) string {
 }
 
 // getDefaultRouterConfig returns default configuration
+// Task 3: Default fallback commands as specified:
+// - Tier 1 (Haiku): gh copilot suggest "{prompt}"
+// - Tier 2 (Sonnet): gh copilot suggest "{prompt}"
+// - Tier 3 (Opus): claude "{prompt}" --model opus
 func getDefaultRouterConfig() *RouterConfigResponse {
 	resp := &RouterConfigResponse{}
 	resp.Routing.Tier1Name = "Copilot"
 	resp.Routing.Tier1Cmd = `gh copilot suggest "{prompt}"`
 	resp.Routing.Tier2Name = "Copilot"
 	resp.Routing.Tier2Cmd = `gh copilot suggest "{prompt}"`
-	resp.Routing.Tier3Name = "Aider"
-	resp.Routing.Tier3Cmd = `aider --yes-always --model claude-3-5-sonnet-20241022 --message "{prompt}"`
+	resp.Routing.Tier3Name = "Claude"
+	resp.Routing.Tier3Cmd = `claude "{prompt}" --model opus`
 	resp.Context.IncludeCwd = true
 	resp.Context.IncludeGitBranch = true
 	resp.Context.IncludeVision = true

@@ -20,7 +20,6 @@ import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import MonacoEditor from './components/MonacoEditor'
 import AMMonitor from './components/AMMonitor'
-import AMDebugPanel from './components/AMDebugPanel'
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
@@ -114,6 +113,8 @@ function App() {
   
   // Model Router state
   const [currentModelTier, setCurrentModelTier] = useState(null)
+  // Task 4: Track what's ACTUALLY running (for badge sync)
+  const [routingInfo, setRoutingInfo] = useState(null)
   
   // Tab management
   const {
@@ -155,14 +156,14 @@ function App() {
       setCurrentModelTier(null);
       return;
     }
-    
+
     try {
       const response = await fetch('/api/llm/model-tier', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input }),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setCurrentModelTier(data.tier);
@@ -171,6 +172,14 @@ function App() {
     } catch (err) {
       console.warn('[ModelRouter] Classification failed:', err);
     }
+  }, []);
+
+  // Task 4: Handle routing updates - badge shows what's ACTUALLY running
+  const handleRoutingUpdate = useCallback((info) => {
+    logger.router('Smart routing update', info);
+    setRoutingInfo(info);
+    // Also update the tier for consistency
+    setCurrentModelTier(info.actuallyRunning || info.toolName || info.tier);
   }, []);
   
   // AM Master Control state (global kill switch for ALL tabs)
@@ -1521,15 +1530,6 @@ function App() {
         <button className="btn btn-ghost btn-icon" onClick={toggleSidebarPosition} title={`Move sidebar to ${sidebarPosition === 'right' ? 'left' : 'right'}`}>
           {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
         </button>
-        <div className="spacer"></div>
-        {/* Chat button */}
-        <button 
-          className={`btn btn-ghost btn-icon ${isChatSidebarOpen ? 'active' : ''}`}
-          onClick={() => setIsChatSidebarOpen(prev => !prev)} 
-          title="Chat Assistant"
-        >
-          <MessageSquare size={18} />
-        </button>
         {/* Time-Travel button */}
         <button 
           className={`btn btn-ghost btn-icon ${isHistorySliderOpen ? 'active' : ''}`}
@@ -1631,22 +1631,39 @@ function App() {
         />
       )}
       
-      {/* Model Router Indicator */}
+      {/* Model Router Indicator - Task 4: Shows what's ACTUALLY running */}
       {currentModelTier && (
         <div className="model-tier-indicator" style={{
           padding: '8px 12px',
           margin: '8px 0',
-          background: 'rgba(139, 92, 246, 0.15)',
-          border: '1px solid rgba(139, 92, 246, 0.3)',
+          background: routingInfo?.tierMismatch
+            ? 'rgba(251, 191, 36, 0.15)' // Yellow for mismatch
+            : 'rgba(139, 92, 246, 0.15)', // Purple for normal
+          border: `1px solid ${routingInfo?.tierMismatch
+            ? 'rgba(251, 191, 36, 0.3)'
+            : 'rgba(139, 92, 246, 0.3)'}`,
           borderRadius: '6px',
           fontSize: '12px',
-          color: '#a78bfa',
+          color: routingInfo?.tierMismatch ? '#fbbf24' : '#a78bfa',
           display: 'flex',
           alignItems: 'center',
           gap: '8px'
         }}>
-          <span style={{ fontWeight: 600 }}>Routed to {currentModelTier}</span>
-          <span style={{ opacity: 0.7 }}>{currentModelTier === 'Opus' ? '🧠 Architecture' : currentModelTier === 'Sonnet' ? '🔧 Refactor' : '⚡ Quick Task'}</span>
+          <span style={{ fontWeight: 600 }}>
+            Running: {currentModelTier}
+          </span>
+          <span style={{ opacity: 0.7 }}>
+            {currentModelTier === 'Claude' || currentModelTier === 'Opus'
+              ? '🧠 Architecture'
+              : currentModelTier === 'Sonnet'
+                ? '🔧 Refactor'
+                : '⚡ Quick Task'}
+          </span>
+          {routingInfo?.tierMismatch && (
+            <span style={{ fontSize: '10px', opacity: 0.6 }}>
+              (switched from {routingInfo.previousTier})
+            </span>
+          )}
         </div>
       )}
 
@@ -1815,6 +1832,7 @@ function App() {
                     onPaste={() => addToast('Text pasted from clipboard', 'success', 1500)}
                     onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                     onTerminalCommand={queryModelTier}
+                    onRoutingUpdate={handleRoutingUpdate}
                     onSwitchToChat={() => toggleTabViewMode(tab.id)}
                   />
                 )}
@@ -1916,9 +1934,6 @@ function App() {
           commandCards={commands}
         />
       )}
-
-      {/* AM Debug Panel - Shows real-time AM logging activity */}
-      {devMode && <AMDebugPanel />}
       
       {/* Chat Sidebar - AI assistant for terminal context */}
       <ChatSidebar
