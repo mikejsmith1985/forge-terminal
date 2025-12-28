@@ -88,8 +88,8 @@ func TestBuildChatPrompt(t *testing.T) {
 	prompt := buildChatPrompt(userMessage, context)
 
 	// Should contain both context and user message
-	if !strings.Contains(prompt, "TERMINAL CONTEXT") {
-		t.Error("Prompt should contain terminal context section")
+	if !strings.Contains(prompt, "=== CONTEXT ===") {
+		t.Error("Prompt should contain context section")
 	}
 	if !strings.Contains(prompt, userMessage) {
 		t.Error("Prompt should contain user message")
@@ -112,7 +112,7 @@ func TestBuildChatPromptNoContext(t *testing.T) {
 	}
 
 	// Should NOT contain context section when context is empty
-	if strings.Contains(prompt, "TERMINAL CONTEXT") {
+	if strings.Contains(prompt, "=== CONTEXT ===") {
 		t.Error("Prompt should not contain context section when empty")
 	}
 }

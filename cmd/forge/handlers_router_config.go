@@ -9,42 +9,21 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/BurntSushi/toml"
 )
 
-// RouterConfigRequest represents the request body for updating router config
-type RouterConfigRequest struct {
-	Routing struct {
-		Tier1Name string `json:"tier1_name"`
-		Tier1Cmd  string `json:"tier1_cmd"`
-		Tier2Name string `json:"tier2_name"`
-		Tier2Cmd  string `json:"tier2_cmd"`
-		Tier3Name string `json:"tier3_name"`
-		Tier3Cmd  string `json:"tier3_cmd"`
-	} `json:"routing"`
-	Context struct {
-		IncludeCwd       bool `json:"include_cwd"`
-		IncludeGitBranch bool `json:"include_git_branch"`
-		IncludeVision    bool `json:"include_vision"`
-	} `json:"context"`
+// TierConfig represents configuration for a single tier
+type TierConfig struct {
+	Name  string `json:"name" toml:"name"`
+	Model string `json:"model" toml:"model"`
 }
 
-// RouterConfigResponse represents the response for router config API
-type RouterConfigResponse struct {
-	Routing struct {
-		Tier1Name string `json:"tier1_name"`
-		Tier1Cmd  string `json:"tier1_cmd"`
-		Tier2Name string `json:"tier2_name"`
-		Tier2Cmd  string `json:"tier2_cmd"`
-		Tier3Name string `json:"tier3_name"`
-		Tier3Cmd  string `json:"tier3_cmd"`
-	} `json:"routing"`
-	Context struct {
-		IncludeCwd       bool `json:"include_cwd"`
-		IncludeGitBranch bool `json:"include_git_branch"`
-		IncludeVision    bool `json:"include_vision"`
-	} `json:"context"`
+// RouterConfig represents the new simplified router configuration (v3.3.6)
+type RouterConfig struct {
+	Tiers      map[string]TierConfig `json:"tiers" toml:"tiers"`
+	ActiveTier string                `json:"active_tier" toml:"active_tier"`
 }
 
 // TestCommandRequest represents a request to test a CLI command
@@ -61,6 +40,143 @@ type TestCommandResponse struct {
 	Error     string `json:"error,omitempty"`
 }
 
+var (
+	routerConfigCache *RouterConfig
+	configMutex       sync.RWMutex
+)
+
+// getDefaultRouterConfig returns the default tier configuration
+func getDefaultRouterConfig() *RouterConfig {
+	return &RouterConfig{
+		Tiers: map[string]TierConfig{
+			"tier1": {Name: "Standard", Model: "gpt-4o-mini"},
+			"tier2": {Name: "Advanced", Model: "gpt-4o"},
+			"tier3": {Name: "Expert", Model: "claude-3-5-sonnet"},
+		},
+		ActiveTier: "tier1",
+	}
+}
+
+// getConfigPath returns the path to forge.toml
+func getConfigPath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "forge.toml"
+	}
+	return filepath.Join(homeDir, ".forge", "forge.toml")
+}
+
+// ensureConfigExists creates forge.toml with defaults if it doesn't exist
+func ensureConfigExists() error {
+	configPath := getConfigPath()
+
+	// Check if config already exists
+	if _, err := os.Stat(configPath); err == nil {
+		return nil // Config exists
+	}
+
+	log.Printf("[Router Config] forge.toml not found, creating with defaults at: %s", configPath)
+
+	// Ensure directory exists
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return err
+	}
+
+	// Create default config
+	defaultConfig := getDefaultRouterConfig()
+	return saveRouterConfigToFile(defaultConfig, configPath)
+}
+
+// saveRouterConfigToFile saves config to the specified path
+func saveRouterConfigToFile(config *RouterConfig, configPath string) error {
+	tomlContent := `# Forge Terminal - Smart Model Routing Configuration (v3.3.6)
+# Define which model to use for each complexity tier
+
+[tiers.tier1]
+# Standard: Fast, lightweight tasks (quick edits, tests, linting)
+name = "` + config.Tiers["tier1"].Name + `"
+model = "` + config.Tiers["tier1"].Model + `"
+
+[tiers.tier2]
+# Advanced: Balanced tasks (refactoring, debugging, code review)
+name = "` + config.Tiers["tier2"].Name + `"
+model = "` + config.Tiers["tier2"].Model + `"
+
+[tiers.tier3]
+# Expert: Complex tasks (architecture, design, system-level changes)
+name = "` + config.Tiers["tier3"].Name + `"
+model = "` + config.Tiers["tier3"].Model + `"
+
+# Current active tier
+active_tier = "` + config.ActiveTier + `"
+`
+
+	log.Printf("[Router Config] Saving to: %s", configPath)
+	return os.WriteFile(configPath, []byte(tomlContent), 0644)
+}
+
+// loadRouterConfig loads configuration from forge.toml or creates default
+func loadRouterConfig() (*RouterConfig, error) {
+	// Ensure config exists (auto-init)
+	if err := ensureConfigExists(); err != nil {
+		log.Printf("[Router Config] Failed to auto-init: %v", err)
+	}
+
+	configPath := getConfigPath()
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		log.Printf("[Router Config] Failed to read %s: %v, using defaults", configPath, err)
+		return getDefaultRouterConfig(), nil
+	}
+
+	var config RouterConfig
+	if err := toml.Unmarshal(data, &config); err != nil {
+		log.Printf("[Router Config] Failed to parse TOML: %v, using defaults", err)
+		return getDefaultRouterConfig(), nil
+	}
+
+	// Ensure tiers map is initialized
+	if config.Tiers == nil {
+		config.Tiers = getDefaultRouterConfig().Tiers
+	}
+
+	// Ensure active_tier has a value
+	if config.ActiveTier == "" {
+		config.ActiveTier = "tier1"
+	}
+
+	return &config, nil
+}
+
+// GetRouterConfig returns the current router configuration (cached)
+func GetRouterConfig() *RouterConfig {
+	configMutex.RLock()
+	if routerConfigCache != nil {
+		defer configMutex.RUnlock()
+		return routerConfigCache
+	}
+	configMutex.RUnlock()
+
+	// Load and cache
+	configMutex.Lock()
+	defer configMutex.Unlock()
+
+	config, _ := loadRouterConfig()
+	routerConfigCache = config
+	return config
+}
+
+// GetActiveModel returns the model for the currently active tier
+func GetActiveModel() string {
+	config := GetRouterConfig()
+	if tier, ok := config.Tiers[config.ActiveTier]; ok {
+		return tier.Model
+	}
+	return "gpt-4o-mini" // Default fallback
+}
+
 // handleRouterConfig handles GET and POST for /api/llm/router-config
 func handleRouterConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -70,23 +186,41 @@ func handleRouterConfig(w http.ResponseWriter, r *http.Request) {
 		config, err := loadRouterConfig()
 		if err != nil {
 			log.Printf("[Router Config] Failed to load: %v", err)
-			// Return defaults on error
 			config = getDefaultRouterConfig()
 		}
+
+		// Clear cache to ensure fresh data
+		configMutex.Lock()
+		routerConfigCache = config
+		configMutex.Unlock()
+
 		json.NewEncoder(w).Encode(config)
 
 	case http.MethodPost:
-		var req RouterConfigRequest
+		var req RouterConfig
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
 
-		if err := saveRouterConfig(&req); err != nil {
+		// Validate
+		if req.Tiers == nil || len(req.Tiers) == 0 {
+			http.Error(w, "Tiers configuration required", http.StatusBadRequest)
+			return
+		}
+
+		// Save to file
+		configPath := getConfigPath()
+		if err := saveRouterConfigToFile(&req, configPath); err != nil {
 			log.Printf("[Router Config] Failed to save: %v", err)
 			http.Error(w, "Failed to save configuration", http.StatusInternalServerError)
 			return
 		}
+
+		// Update cache
+		configMutex.Lock()
+		routerConfigCache = &req
+		configMutex.Unlock()
 
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
@@ -194,20 +328,16 @@ func handleTestCommand(w http.ResponseWriter, r *http.Request) {
 
 // extractVersion tries to find a version string in command output
 func extractVersion(output string) string {
-	// Common patterns: v1.2.3, 1.2.3, version 1.2.3
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		// Look for version-like patterns
 		if strings.Contains(strings.ToLower(line), "version") ||
 			strings.HasPrefix(line, "v") ||
 			(len(line) > 0 && line[0] >= '0' && line[0] <= '9') {
 
-			// Extract just the version number if possible
 			words := strings.Fields(line)
 			for _, word := range words {
 				if len(word) > 0 && (word[0] == 'v' || (word[0] >= '0' && word[0] <= '9')) {
-					// Clean up the version string
 					word = strings.TrimPrefix(word, "v")
 					word = strings.TrimSuffix(word, ",")
 					word = strings.TrimSuffix(word, ".")
@@ -219,138 +349,4 @@ func extractVersion(output string) string {
 		}
 	}
 	return ""
-}
-
-// getDefaultRouterConfig returns default configuration
-// Task 3: Default fallback commands as specified:
-// - Tier 1 (Haiku): gh copilot suggest "{prompt}"
-// - Tier 2 (Sonnet): gh copilot suggest "{prompt}"
-// - Tier 3 (Opus): claude "{prompt}" --model opus
-func getDefaultRouterConfig() *RouterConfigResponse {
-	resp := &RouterConfigResponse{}
-	resp.Routing.Tier1Name = "Copilot"
-	resp.Routing.Tier1Cmd = `gh copilot suggest "{prompt}"`
-	resp.Routing.Tier2Name = "Copilot"
-	resp.Routing.Tier2Cmd = `gh copilot suggest "{prompt}"`
-	resp.Routing.Tier3Name = "Claude"
-	resp.Routing.Tier3Cmd = `claude "{prompt}" --model opus`
-	resp.Context.IncludeCwd = true
-	resp.Context.IncludeGitBranch = true
-	resp.Context.IncludeVision = true
-	return resp
-}
-
-// loadRouterConfig loads configuration from forge.toml
-func loadRouterConfig() (*RouterConfigResponse, error) {
-	// Try current directory first
-	configPath := "forge.toml"
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// Try home directory
-		homeDir, _ := os.UserHomeDir()
-		configPath = filepath.Join(homeDir, ".forge", "forge.toml")
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			return getDefaultRouterConfig(), nil
-		}
-	}
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	var tomlConfig struct {
-		Routing struct {
-			Tier1Name string `toml:"tier1_name"`
-			Tier1Cmd  string `toml:"tier1_cmd"`
-			Tier2Name string `toml:"tier2_name"`
-			Tier2Cmd  string `toml:"tier2_cmd"`
-			Tier3Name string `toml:"tier3_name"`
-			Tier3Cmd  string `toml:"tier3_cmd"`
-		} `toml:"routing"`
-		Context struct {
-			IncludeCwd       bool `toml:"include_cwd"`
-			IncludeGitBranch bool `toml:"include_git_branch"`
-			IncludeVision    bool `toml:"include_vision"`
-		} `toml:"context"`
-	}
-
-	if err := toml.Unmarshal(data, &tomlConfig); err != nil {
-		return nil, err
-	}
-
-	resp := &RouterConfigResponse{}
-	resp.Routing.Tier1Name = tomlConfig.Routing.Tier1Name
-	resp.Routing.Tier1Cmd = tomlConfig.Routing.Tier1Cmd
-	resp.Routing.Tier2Name = tomlConfig.Routing.Tier2Name
-	resp.Routing.Tier2Cmd = tomlConfig.Routing.Tier2Cmd
-	resp.Routing.Tier3Name = tomlConfig.Routing.Tier3Name
-	resp.Routing.Tier3Cmd = tomlConfig.Routing.Tier3Cmd
-	resp.Context.IncludeCwd = tomlConfig.Context.IncludeCwd
-	resp.Context.IncludeGitBranch = tomlConfig.Context.IncludeGitBranch
-	resp.Context.IncludeVision = tomlConfig.Context.IncludeVision
-
-	return resp, nil
-}
-
-// saveRouterConfig saves configuration to forge.toml
-func saveRouterConfig(req *RouterConfigRequest) error {
-	// Determine config path - prefer home directory for persistence
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	forgeDir := filepath.Join(homeDir, ".forge")
-	if err := os.MkdirAll(forgeDir, 0755); err != nil {
-		return err
-	}
-
-	configPath := filepath.Join(forgeDir, "forge.toml")
-
-	// Build TOML content
-	tomlContent := `# Forge Terminal - Smart Model Routing Configuration
-# Define which CLI tool to use for each complexity tier
-
-[routing]
-# Tier 1: Free/Unlimited - Use for quick tasks (linting, tests, simple edits)
-tier1_name = "` + req.Routing.Tier1Name + `"
-tier1_cmd = "` + escapeTomlString(req.Routing.Tier1Cmd) + `"
-
-# Tier 2: Standard - Use for refactoring, debugging, code review
-tier2_name = "` + req.Routing.Tier2Name + `"
-tier2_cmd = "` + escapeTomlString(req.Routing.Tier2Cmd) + `"
-
-# Tier 3: High Reasoning - Use for architecture, design, complex analysis
-tier3_name = "` + req.Routing.Tier3Name + `"
-tier3_cmd = "` + escapeTomlString(req.Routing.Tier3Cmd) + `"
-
-[context]
-# Automatically include terminal context in prompts
-include_cwd = ` + boolToString(req.Context.IncludeCwd) + `
-include_git_branch = ` + boolToString(req.Context.IncludeGitBranch) + `
-include_vision = ` + boolToString(req.Context.IncludeVision) + `
-
-# Available placeholders for commands:
-# {prompt}     - The user's input after "?"
-# {cwd}        - Current working directory
-# {branch}     - Git branch name
-# {vision}     - Recent Forge Vision summary (if available)
-# {file}       - Currently focused file (if detected)
-`
-
-	log.Printf("[Router Config] Saving to: %s", configPath)
-	return os.WriteFile(configPath, []byte(tomlContent), 0644)
-}
-
-func escapeTomlString(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "\"", "\\\"")
-	return s
-}
-
-func boolToString(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }

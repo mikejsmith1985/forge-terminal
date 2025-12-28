@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
@@ -20,6 +21,9 @@ type ChatRequest struct {
 	TabID        string   `json:"tabId"`
 	ContextFiles []string `json:"contextFiles"` // File paths for @ mentions (v3.3.6)
 }
+
+// Regex to match [@filepath] tokens in user message
+var contextFileTokenRegex = regexp.MustCompile(`\[@([^\]]+)\]`)
 
 func handleChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -43,12 +47,19 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 		tabID = "main"
 	}
 
-	log.Printf("[Chat API] Processing message: %s (tabId: %s, contextFiles: %d)", req.Message, tabID, len(req.ContextFiles))
+	// Parse [@file] tokens from message and add to contextFiles
+	tokenFiles := parseContextTokens(req.Message)
+	allContextFiles := append(req.ContextFiles, tokenFiles...)
+
+	// Remove [@file] tokens from user message so LLM sees clean question
+	cleanMessage := stripContextTokens(req.Message)
+
+	log.Printf("[Chat API] Processing message: %s (tabId: %s, contextFiles: %d)", cleanMessage, tabID, len(allContextFiles))
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 	// Build file context from @ mentions (v3.3.6 Deep Context)
-	fileContext := buildFileContext(req.ContextFiles)
+	fileContext := buildFileContext(allContextFiles)
 
 	context, err := buildChatContext(tabID)
 	if err != nil {
@@ -65,14 +76,14 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fullPrompt := buildChatPrompt(req.Message, context)
+	fullPrompt := buildChatPrompt(cleanMessage, context)
 
 	log.Printf("[Chat API] Full prompt length: %d chars", len(fullPrompt))
 
-	tier := llm.ClassifyTask(req.Message)
+	tier := llm.ClassifyTask(cleanMessage)
 	log.Printf("[Chat API] Classified to tier: %s", tier)
 
-	// Map tier to model name for routing header
+	// Get model from router config based on tier
 	modelName := getModelForTier(tier)
 
 	// Set the routing header so frontend can display which model was used
@@ -89,6 +100,23 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// parseContextTokens extracts file paths from [@filepath] tokens in message
+func parseContextTokens(message string) []string {
+	matches := contextFileTokenRegex.FindAllStringSubmatch(message, -1)
+	var files []string
+	for _, match := range matches {
+		if len(match) > 1 {
+			files = append(files, match[1])
+		}
+	}
+	return files
+}
+
+// stripContextTokens removes [@filepath] tokens from the message
+func stripContextTokens(message string) string {
+	return contextFileTokenRegex.ReplaceAllString(message, "")
+}
+
 // buildFileContext reads files from @ mentions and formats them for the prompt (v3.3.6)
 func buildFileContext(filePaths []string) string {
 	if len(filePaths) == 0 {
@@ -96,14 +124,17 @@ func buildFileContext(filePaths []string) string {
 	}
 
 	var contextParts []string
+	seen := make(map[string]bool) // Deduplicate files
+
 	for _, filePath := range filePaths {
 		// Clean the path (remove @ prefix if present)
 		cleanPath := strings.TrimPrefix(filePath, "@")
 		cleanPath = strings.TrimSpace(cleanPath)
 
-		if cleanPath == "" {
+		if cleanPath == "" || seen[cleanPath] {
 			continue
 		}
+		seen[cleanPath] = true
 
 		log.Printf("[Chat API] Reading context file: %s", cleanPath)
 
@@ -112,7 +143,7 @@ func buildFileContext(filePaths []string) string {
 		if err != nil {
 			// File not found or error - include error message
 			log.Printf("[Chat API] Failed to read file %s: %v", cleanPath, err)
-			contextParts = append(contextParts, fmt.Sprintf("--- CONTEXT FILE: %s ---\n[File not found: %v]", cleanPath, err))
+			contextParts = append(contextParts, fmt.Sprintf("CONTEXT FILE: %s\n<error>File not found: %v</error>", cleanPath, err))
 			continue
 		}
 
@@ -123,7 +154,7 @@ func buildFileContext(filePaths []string) string {
 			fileContent = fileContent[:maxSize] + "\n... [truncated - file too large]"
 		}
 
-		contextParts = append(contextParts, fmt.Sprintf("--- CONTEXT FILE: %s ---\n%s", cleanPath, fileContent))
+		contextParts = append(contextParts, fmt.Sprintf("CONTEXT FILE: %s\n<code>\n%s\n</code>", cleanPath, fileContent))
 		log.Printf("[Chat API] Added context file: %s (%d bytes)", cleanPath, len(fileContent))
 	}
 
@@ -202,7 +233,7 @@ func buildChatPrompt(userMessage string, context string) string {
 	prompt.WriteString("You are Forge Terminal's AI assistant. You help developers with terminal commands, debugging, and code questions.\n\n")
 
 	if context != "" {
-		prompt.WriteString("=== TERMINAL CONTEXT ===\n")
+		prompt.WriteString("=== CONTEXT ===\n")
 		prompt.WriteString(context)
 		prompt.WriteString("\n\n=== USER MESSAGE ===\n")
 	}
@@ -241,7 +272,7 @@ func streamChatResponse(w http.ResponseWriter, prompt string, provider string) e
 
 	claudeURL := "https://api.anthropic.com/v1/messages"
 	payload := map[string]interface{}{
-		"model": "claude-3-5-sonnet-20241022",
+		"model":      "claude-3-5-sonnet-20241022",
 		"max_tokens": 2048,
 		"messages": []map[string]string{
 			{
@@ -315,16 +346,27 @@ func streamChatResponse(w http.ResponseWriter, prompt string, provider string) e
 	return nil
 }
 
-// getModelForTier maps LLM tier to model name for routing display
+// getModelForTier maps LLM tier to model name from router config
 func getModelForTier(tier llm.ModelTier) string {
+	config := GetRouterConfig()
+
 	switch tier {
 	case llm.TierHaiku:
-		return "gpt-4o-mini" // Standard tier for quick tasks
+		if t, ok := config.Tiers["tier1"]; ok {
+			return t.Model
+		}
+		return "gpt-4o-mini"
 	case llm.TierSonnet:
-		return "gpt-4o" // Advanced tier for balanced tasks
+		if t, ok := config.Tiers["tier2"]; ok {
+			return t.Model
+		}
+		return "gpt-4o"
 	case llm.TierOpus:
-		return "claude-3-5-sonnet" // Expert tier for complex tasks
+		if t, ok := config.Tiers["tier3"]; ok {
+			return t.Model
+		}
+		return "claude-3-5-sonnet"
 	default:
-		return "gpt-4o-mini" // Default to standard
+		return GetActiveModel()
 	}
 }

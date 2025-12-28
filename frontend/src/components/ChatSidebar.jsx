@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Loader2, Settings, FileCode } from 'lucide-react';
+import { X, Send, Loader2, Settings, FileCode, Zap } from 'lucide-react';
 import './ChatSidebar.css';
 
 const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) => {
@@ -20,6 +20,10 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
   const [filesLoading, setFilesLoading] = useState(false);
   const popoverRef = useRef(null);
 
+  // Router config state for dynamic badge
+  const [activeModel, setActiveModel] = useState(null);
+  const [lastRoutedModel, setLastRoutedModel] = useState(null);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -28,12 +32,32 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
     scrollToBottom();
   }, [messages]);
 
-  // Fetch file list when component mounts or becomes active
+  // Fetch router config for default model display
   useEffect(() => {
-    if (isOpen && fileList.length === 0) {
-      fetchFileList();
+    if (isOpen) {
+      fetchRouterConfig();
+      if (fileList.length === 0) {
+        fetchFileList();
+      }
     }
   }, [isOpen]);
+
+  const fetchRouterConfig = async () => {
+    try {
+      const response = await fetch('/api/llm/router-config');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.tiers && data.active_tier) {
+          const activeTier = data.tiers[data.active_tier];
+          if (activeTier) {
+            setActiveModel(activeTier.model);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[ChatSidebar] Failed to fetch router config:', err);
+    }
+  };
 
   const fetchFileList = async () => {
     setFilesLoading(true);
@@ -56,7 +80,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
       const query = mentionQuery.toLowerCase();
       const filtered = fileList
         .filter(file => file.toLowerCase().includes(query))
-        .slice(0, 10); // Limit to 10 results
+        .slice(0, 10);
       setFilteredFiles(filtered);
       setSelectedIndex(0);
     } else if (mentionActive) {
@@ -73,14 +97,14 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
     const cursorPos = e.target.selectionStart;
     setInputValue(value);
 
-    // Detect @ mention
+    // Detect @ mention (look for @ not inside [...])
     const textBeforeCursor = value.substring(0, cursorPos);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
 
     if (lastAtIndex !== -1) {
       const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-      // Only activate if there's no space after @
-      if (!textAfterAt.includes(' ')) {
+      // Only activate if there's no space after @ and not inside brackets
+      if (!textAfterAt.includes(' ') && !textAfterAt.includes('[') && !textAfterAt.includes(']')) {
         setMentionActive(true);
         setMentionQuery(textAfterAt);
         setMentionPosition(lastAtIndex);
@@ -92,11 +116,12 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
     setMentionQuery('');
   };
 
-  // Insert selected file mention
+  // Insert selected file mention with [@file] token format
   const insertMention = (file) => {
     const beforeMention = inputValue.substring(0, mentionPosition);
     const afterMention = inputValue.substring(mentionPosition + mentionQuery.length + 1);
-    const newValue = `${beforeMention}@${file} ${afterMention}`;
+    // Use [@filepath] token format
+    const newValue = `${beforeMention}[@${file}] ${afterMention}`;
     setInputValue(newValue);
     setMentionActive(false);
     setMentionQuery('');
@@ -133,9 +158,9 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
     }
   };
 
-  // Parse @ mentions from message and extract file paths
+  // Parse [@filepath] tokens from message and extract file paths
   const parseContextFiles = (message) => {
-    const regex = /@([\w./-]+)/g;
+    const regex = /\[@([^\]]+)\]/g;
     const matches = [];
     let match;
     while ((match = regex.exec(message)) !== null) {
@@ -149,7 +174,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
 
     const userMessage = inputValue.trim();
 
-    // Parse @ mentions for context files
+    // Parse [@file] tokens for context files
     const contextFiles = parseContextFiles(userMessage);
 
     setInputValue('');
@@ -180,7 +205,8 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
       }
 
       // Get the routed model from response header
-      const routedModel = response.headers.get('X-Forge-Routed-To') || 'Unknown';
+      const routedModel = response.headers.get('X-Forge-Routed-To') || activeModel || 'Unknown';
+      setLastRoutedModel(routedModel);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -225,7 +251,10 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, tabId]);
+  }, [inputValue, isLoading, tabId, activeModel]);
+
+  // Get display model - prioritize last routed, then active config
+  const displayModel = lastRoutedModel || activeModel || 'gpt-4o-mini';
 
   if (!isOpen) return null;
 
@@ -234,6 +263,11 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
       <div className="chat-header">
         <h3>Chat Assistant</h3>
         <div className="chat-header-actions">
+          {/* Dynamic model badge */}
+          <div className="active-model-badge" title={`Active: ${displayModel}`}>
+            <Zap size={12} />
+            <span>{displayModel}</span>
+          </div>
           <button
             className="router-config-btn"
             onClick={onOpenRouterConfig}
@@ -251,7 +285,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
         {messages.length === 0 && (
           <div className="chat-empty">
             <p>Start a conversation. I can help with code, debugging, and more.</p>
-            <p className="chat-hint">Tip: Use <span className="mention-hint">@filename</span> to include file contents in your message!</p>
+            <p className="chat-hint">Tip: Use <span className="mention-hint">[@filename]</span> to include file contents in your message!</p>
           </div>
         )}
 
@@ -335,7 +369,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="Type your message... Use @file.ext for context"
+          placeholder="Type your message... Use [@file.ext] for context"
           disabled={isLoading}
           rows={3}
         />
