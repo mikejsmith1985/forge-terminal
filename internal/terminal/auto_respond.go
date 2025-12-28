@@ -1,11 +1,20 @@
 // Package terminal provides auto-respond detection for Copilot CLI.
+// This is the Precision Auto-Responder v2.0 with:
+// - Echo Buffer: Filters user input echoes to avoid self-triggering
+// - Sequence Engine: Supports Tab/Enter/Sleep action chains
+// - Settle Time: Waits for pattern stability before firing
+// - User Abort: Any user input immediately kills automation
 package terminal
 
 import (
+	"bytes"
+	"log"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mikejsmith1985/forge-terminal/internal/am"
 )
 
 // AutoRespondState represents the current state of the conversation.
@@ -18,8 +27,46 @@ const (
 	StateAssistantResponding
 )
 
-// AutoRespondDetector detects when Copilot CLI is waiting for user input.
-// This is INDEPENDENT of AM (Artificial Memory) system.
+// PrecisionAutoResponder is the v2.0 auto-responder with echo filtering
+// and sequence engine support. It replaces the simple AutoRespondDetector.
+type PrecisionAutoResponder struct {
+	mu               sync.RWMutex
+	enabled          bool
+	state            AutoRespondState
+	lastOutputTime   time.Time
+	lastInputTime    time.Time
+	provider         string
+	sessionStartTime time.Time
+	turnCount        int
+
+	// v2.0 Components
+	echoBuffer     *EchoBuffer     // Filters user echo from PTY output
+	sequenceEngine *SequenceEngine // Executes action sequences
+
+	// Callbacks
+	onWaitingForUser  func()
+	onAssistantActive func()
+	ptyWriter         func([]byte) error // Write to PTY
+}
+
+// NewPrecisionAutoResponder creates a new precision auto-responder.
+// ptyWriter is the callback to write bytes to the PTY.
+func NewPrecisionAutoResponder(provider string, ptyWriter func([]byte) error) *PrecisionAutoResponder {
+	p := &PrecisionAutoResponder{
+		enabled:          false,
+		state:            StateIdle,
+		provider:         provider,
+		sessionStartTime: time.Now(),
+		echoBuffer:       NewEchoBuffer(),
+		ptyWriter:        ptyWriter,
+	}
+	// Initialize sequence engine with PTY writer
+	p.sequenceEngine = NewSequenceEngine(ptyWriter)
+	return p
+}
+
+// AutoRespondDetector is kept for backward compatibility.
+// It wraps PrecisionAutoResponder for existing code.
 type AutoRespondDetector struct {
 	mu                 sync.RWMutex
 	enabled            bool
@@ -33,9 +80,13 @@ type AutoRespondDetector struct {
 	turnCount          int
 	onWaitingForUser   func() // Callback when waiting for user input
 	onAssistantActive  func() // Callback when assistant is responding
+
+	// v2.0: Optional precision responder (nil if not initialized)
+	precision *PrecisionAutoResponder
 }
 
 // NewAutoRespondDetector creates a new standalone auto-respond detector.
+// For backward compatibility - use NewPrecisionAutoResponder for v2.0 features.
 func NewAutoRespondDetector(provider string) *AutoRespondDetector {
 	d := &AutoRespondDetector{
 		enabled:          false,
@@ -44,6 +95,13 @@ func NewAutoRespondDetector(provider string) *AutoRespondDetector {
 		sessionStartTime: time.Now(),
 	}
 	d.updatePromptPattern()
+	return d
+}
+
+// NewAutoRespondDetectorWithPTY creates a detector with v2.0 precision responder.
+func NewAutoRespondDetectorWithPTY(provider string, ptyWriter func([]byte) error) *AutoRespondDetector {
+	d := NewAutoRespondDetector(provider)
+	d.precision = NewPrecisionAutoResponder(provider, ptyWriter)
 	return d
 }
 
@@ -57,6 +115,11 @@ func (d *AutoRespondDetector) SetEnabled(enabled bool) {
 		d.outputBuffer.Reset()
 		d.sessionStartTime = time.Now()
 		d.turnCount = 0
+	}
+
+	// v2.0: Also enable/disable precision responder
+	if d.precision != nil {
+		d.precision.SetEnabled(enabled)
 	}
 }
 
@@ -73,9 +136,15 @@ func (d *AutoRespondDetector) SetCallbacks(onWaitingForUser, onAssistantActive f
 	defer d.mu.Unlock()
 	d.onWaitingForUser = onWaitingForUser
 	d.onAssistantActive = onAssistantActive
+
+	// v2.0: Also set on precision responder
+	if d.precision != nil {
+		d.precision.SetCallbacks(onWaitingForUser, onAssistantActive)
+	}
 }
 
 // ProcessOutput processes output from the terminal and detects state changes.
+// v2.0: Routes through EchoBuffer to filter user echoes.
 func (d *AutoRespondDetector) ProcessOutput(data []byte) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -84,6 +153,13 @@ func (d *AutoRespondDetector) ProcessOutput(data []byte) {
 		return
 	}
 
+	// v2.0: Use precision responder if available
+	if d.precision != nil {
+		d.precision.ProcessOutput(data)
+		return
+	}
+
+	// Legacy path: direct processing
 	// Add to buffer (keep last 2KB only to prevent memory issues)
 	if d.outputBuffer.Len() > 2048 {
 		current := d.outputBuffer.String()
@@ -103,6 +179,7 @@ func (d *AutoRespondDetector) ProcessOutput(data []byte) {
 }
 
 // ProcessInput processes input from user.
+// v2.0: Signals abort to sequence engine and adds to echo buffer.
 func (d *AutoRespondDetector) ProcessInput(data []byte) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -111,6 +188,13 @@ func (d *AutoRespondDetector) ProcessInput(data []byte) {
 		return
 	}
 
+	// v2.0: Use precision responder if available
+	if d.precision != nil {
+		d.precision.ProcessInput(data)
+		return
+	}
+
+	// Legacy path
 	d.lastInputTime = time.Now()
 
 	// User typed - clear output buffer for fresh detection
@@ -138,6 +222,13 @@ func (d *AutoRespondDetector) Check() bool {
 		return false
 	}
 
+	// v2.0: Check settle state in sequence engine
+	if d.precision != nil {
+		d.precision.Check()
+		return false // v2.0 handles responses internally
+	}
+
+	// Legacy path
 	// Only check if assistant was responding
 	if d.state != StateAssistantResponding {
 		return false
@@ -169,9 +260,11 @@ func (d *AutoRespondDetector) Check() bool {
 
 // detectPrompt checks if the output contains a prompt indicating waiting for input.
 func (d *AutoRespondDetector) detectPrompt(output string) bool {
-	// Remove ANSI codes for cleaner detection
-	cleaned := stripANSI(output)
-	
+	// Use parser_core StripANSI for consistent ANSI removal
+	var cleanBuf bytes.Buffer
+	am.StripANSIToBuffer([]byte(output), &cleanBuf)
+	cleaned := cleanBuf.String()
+
 	// Get last few lines (where prompt would appear)
 	lines := strings.Split(cleaned, "\n")
 	if len(lines) == 0 {
@@ -280,8 +373,142 @@ func (d *AutoRespondDetector) updatePromptPattern() {
 	d.promptPattern = regexp.MustCompile(`[\n\r][\s]*[>$#❯]\s*$`)
 }
 
-// stripANSI removes ANSI escape sequences.
-func stripANSI(text string) string {
-	ansiPattern := regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[PX^_][^\x1b]*\x1b\\|\x1b.`)
-	return ansiPattern.ReplaceAllString(text, "")
+// ============================================================================
+// PrecisionAutoResponder v2.0 Methods
+// ============================================================================
+
+// SetEnabled enables or disables the precision auto-responder.
+func (p *PrecisionAutoResponder) SetEnabled(enabled bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.enabled = enabled
+	p.sequenceEngine.SetEnabled(enabled)
+	if enabled {
+		p.state = StateIdle
+		p.echoBuffer.Clear()
+		p.sessionStartTime = time.Now()
+		p.turnCount = 0
+		log.Printf("[PrecisionAutoResponder] Enabled with provider: %s", p.provider)
+	} else {
+		log.Printf("[PrecisionAutoResponder] Disabled")
+	}
+}
+
+// IsEnabled returns whether the precision auto-responder is enabled.
+func (p *PrecisionAutoResponder) IsEnabled() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.enabled
+}
+
+// SetCallbacks sets callbacks for state changes.
+func (p *PrecisionAutoResponder) SetCallbacks(onWaitingForUser, onAssistantActive func()) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.onWaitingForUser = onWaitingForUser
+	p.onAssistantActive = onAssistantActive
+}
+
+// ProcessOutput processes PTY output through the echo buffer and sequence engine.
+// This is the main entry point for PTY -> AutoResponder data flow.
+func (p *PrecisionAutoResponder) ProcessOutput(data []byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.enabled {
+		return
+	}
+
+	p.lastOutputTime = time.Now()
+
+	// CRITICAL: Filter out echoed user input before pattern matching
+	filteredData := p.echoBuffer.FilterEcho(data)
+
+	// If we were idle and got non-echo output, assistant is responding
+	if len(filteredData) > 0 {
+		if p.state == StateIdle || p.state == StateWaitingForAssistant {
+			p.state = StateAssistantResponding
+			if p.onAssistantActive != nil {
+				go p.onAssistantActive()
+			}
+		}
+
+		// Feed filtered output to sequence engine for pattern matching
+		p.sequenceEngine.ProcessOutput(filteredData)
+	}
+}
+
+// ProcessInput processes user input - aborts sequences and adds to echo buffer.
+// This is the main entry point for User -> PTY data flow.
+// MUST be called AFTER successful PTY write.
+func (p *PrecisionAutoResponder) ProcessInput(data []byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.enabled {
+		return
+	}
+
+	p.lastInputTime = time.Now()
+
+	// CRITICAL: Abort any pending or executing sequences FIRST
+	p.sequenceEngine.AbortOnUserInput()
+
+	// Add to echo buffer so we can filter these bytes from PTY output
+	p.echoBuffer.AddPending(data)
+
+	// Update state
+	if p.state == StateIdle || p.state == StateAssistantResponding {
+		p.state = StateUserTyping
+	}
+
+	// If user pressed Enter, we're waiting for assistant
+	for _, b := range data {
+		if b == '\r' || b == '\n' {
+			p.state = StateWaitingForAssistant
+			p.turnCount++
+			break
+		}
+	}
+}
+
+// Check should be called periodically to check for settled patterns.
+func (p *PrecisionAutoResponder) Check() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.enabled {
+		return
+	}
+
+	// Check if any pattern has settled and should fire
+	p.sequenceEngine.CheckSettle()
+}
+
+// GetStats returns statistics about the precision responder.
+func (p *PrecisionAutoResponder) GetStats() map[string]interface{} {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	seqStats := p.sequenceEngine.GetStats()
+
+	return map[string]interface{}{
+		"enabled":        p.enabled,
+		"state":          p.state,
+		"turnCount":      p.turnCount,
+		"uptime":         time.Since(p.sessionStartTime).Seconds(),
+		"provider":       p.provider,
+		"echoBufferLen":  p.echoBuffer.Len(),
+		"sequenceEngine": seqStats,
+	}
+}
+
+// Reset clears all state.
+func (p *PrecisionAutoResponder) Reset() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.state = StateIdle
+	p.echoBuffer.Clear()
+	p.turnCount = 0
+	p.sessionStartTime = time.Now()
 }

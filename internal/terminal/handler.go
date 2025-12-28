@@ -201,8 +201,13 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Get Vision parser using getter method (supports both direct and assistantCore)
 	visionParser := h.GetVisionParser()
 
-	// STANDALONE AUTO-RESPOND DETECTOR (independent of AM)
-	autoRespondDetector := NewAutoRespondDetector("github-copilot")
+	// PRECISION AUTO-RESPONDER v2.0 (independent of AM)
+	// Uses EchoBuffer to filter user echo and SequenceEngine for action chains
+	ptyWriter := func(data []byte) error {
+		_, err := session.Write(data)
+		return err
+	}
+	autoRespondDetector := NewAutoRespondDetectorWithPTY("github-copilot", ptyWriter)
 	var autoRespondEnabled atomic.Bool
 	autoRespondDetector.SetCallbacks(
 		func() {
