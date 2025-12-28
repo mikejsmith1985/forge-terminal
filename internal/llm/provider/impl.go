@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // =============================================================================
@@ -31,91 +30,117 @@ func (p *CopilotProvider) DisplayName() string {
 }
 
 func (p *CopilotProvider) GetBinaryName() string {
-	// Check for standalone copilot CLI first, then gh
-	if checkBinaryExists("copilot") {
-		return "copilot"
-	}
-	return "gh"
+	return "copilot"
 }
 
 func (p *CopilotProvider) IsInstalled() bool {
-	// Check for standalone copilot CLI
-	if checkBinaryExists("copilot") {
-		return true
-	}
-
-	// Check for gh CLI with copilot extension
-	if checkBinaryExists("gh") {
-		// Verify copilot extension is installed
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		output, err := execCommand(ctx, "gh", "extension", "list")
-		if err == nil && strings.Contains(output, "copilot") {
-			return true
-		}
-
-		// Also try the copilot subcommand directly
-		_, err = execCommand(ctx, "gh", "copilot", "--help")
-		return err == nil
-	}
-
-	return false
+	return checkBinaryExists("copilot")
 }
 
 func (p *CopilotProvider) IsAuthenticated(ctx context.Context) (bool, error) {
-	// First check if gh is authenticated
-	output, err := execCommand(ctx, "gh", "auth", "status")
+	// The standalone copilot CLI handles auth internally via GitHub
+	// If we can run copilot --version, we're good
+	_, err := execCommand(ctx, "copilot", "--version")
 	if err != nil {
-		// Check if it's an auth error vs command error
-		if strings.Contains(output, "not logged in") ||
-			strings.Contains(output, "no oauth token") {
-			return false, nil
-		}
-		return false, err
+		return false, nil
 	}
-
-	// gh auth status returns 0 if authenticated
-	return strings.Contains(output, "Logged in") ||
-		strings.Contains(output, "logged in"), nil
+	return true, nil
 }
 
 func (p *CopilotProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
-	// Try to get models from copilot CLI
-	output, err := execCommand(ctx, "gh", "copilot", "model", "list")
+	// Try to parse models from copilot --help output
+	output, err := execCommand(ctx, "copilot", "--help")
 	if err == nil && len(output) > 0 {
-		// Parse model list output
-		models := parseModelList(output)
+		models := parseCopilotHelpModels(output)
 		if len(models) > 0 {
 			return models, nil
 		}
 	}
 
-	// Fallback to known Copilot-supported models
+	// Fallback to known Copilot CLI models (as of late 2025)
 	return []ModelInfo{
-		{ID: "gpt-4o", Name: "GPT-4o", Description: "Latest GPT-4 optimized model"},
-		{ID: "gpt-4o-mini", Name: "GPT-4o Mini", Description: "Fast and efficient"},
-		{ID: "claude-3.5-sonnet", Name: "Claude 3.5 Sonnet", Description: "Anthropic's Sonnet model"},
-		{ID: "o1-preview", Name: "o1-preview", Description: "OpenAI reasoning model"},
-		{ID: "o1-mini", Name: "o1-mini", Description: "Fast reasoning model"},
+		{ID: "claude-sonnet-4.5", Name: "Claude Sonnet 4.5", Description: "Latest Claude Sonnet"},
+		{ID: "claude-haiku-4.5", Name: "Claude Haiku 4.5", Description: "Fast Claude model"},
+		{ID: "claude-opus-4.5", Name: "Claude Opus 4.5", Description: "Most capable Claude"},
+		{ID: "claude-sonnet-4", Name: "Claude Sonnet 4", Description: "Claude Sonnet 4"},
+		{ID: "gpt-5.1-codex-max", Name: "GPT-5.1 Codex Max", Description: "Most capable coding model"},
+		{ID: "gpt-5.1-codex", Name: "GPT-5.1 Codex", Description: "Advanced coding model"},
+		{ID: "gpt-5.2", Name: "GPT-5.2", Description: "Latest GPT model"},
+		{ID: "gpt-5.1", Name: "GPT-5.1", Description: "GPT 5.1"},
+		{ID: "gpt-5", Name: "GPT-5", Description: "GPT 5"},
+		{ID: "gpt-5.1-codex-mini", Name: "GPT-5.1 Codex Mini", Description: "Fast coding model"},
+		{ID: "gpt-5-mini", Name: "GPT-5 Mini", Description: "Fast GPT model"},
+		{ID: "gpt-4.1", Name: "GPT-4.1", Description: "GPT 4.1"},
+		{ID: "gemini-3-pro-preview", Name: "Gemini 3 Pro Preview", Description: "Google's Gemini model"},
 	}, nil
 }
 
+// parseCopilotHelpModels extracts model choices from copilot --help output
+func parseCopilotHelpModels(output string) []ModelInfo {
+	var models []ModelInfo
+
+	// The --model choices can span multiple lines, so we need to find the full choices string
+	// Look for "choices:" and then collect everything until we find the closing ")"
+
+	choicesIdx := strings.Index(output, "choices:")
+	if choicesIdx == -1 {
+		return models
+	}
+
+	// Start after "choices:"
+	remaining := output[choicesIdx+8:]
+
+	// Find the closing paren for the choices
+	endIdx := strings.Index(remaining, ")")
+	if endIdx != -1 {
+		remaining = remaining[:endIdx]
+	}
+
+	// Clean up the string: remove newlines and extra whitespace
+	remaining = strings.ReplaceAll(remaining, "\n", " ")
+	remaining = strings.ReplaceAll(remaining, "\r", "")
+
+	// Parse quoted model names
+	parts := strings.Split(remaining, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		part = strings.Trim(part, "\"'")
+		part = strings.TrimSpace(part) // Trim again after removing quotes
+		if part != "" && !strings.HasPrefix(part, "-") {
+			models = append(models, ModelInfo{
+				ID:   part,
+				Name: formatModelName(part),
+			})
+		}
+	}
+
+	return models
+}
+
+// formatModelName converts model ID to display name
+func formatModelName(id string) string {
+	// Simple formatting: replace dashes with spaces and title case
+	name := strings.ReplaceAll(id, "-", " ")
+	words := strings.Fields(name)
+	for i, word := range words {
+		if len(word) > 0 {
+			words[i] = strings.ToUpper(word[:1]) + word[1:]
+		}
+	}
+	return strings.Join(words, " ")
+}
+
 func (p *CopilotProvider) GetAuthInstructions() string {
-	return `To authenticate with GitHub Copilot:
+	return `To authenticate with GitHub Copilot CLI:
 
-1. Install the GitHub CLI if not installed:
-   - Windows: winget install GitHub.cli
-   - macOS: brew install gh
-   - Linux: See https://cli.github.com
+1. Install the GitHub Copilot CLI:
+   npm install -g @anthropic-ai/copilot-cli
+   
+   Or download from: https://githubnext.com/projects/copilot-cli
 
-2. Install the Copilot extension:
-   gh extension install github/gh-copilot
+2. The CLI will prompt for authentication on first use
 
-3. Authenticate with GitHub:
-   gh auth login
-
-4. Ensure you have an active Copilot subscription`
+3. Ensure you have an active GitHub Copilot subscription`
 }
 
 // =============================================================================
@@ -147,28 +172,41 @@ func (p *ClaudeProvider) IsInstalled() bool {
 }
 
 func (p *ClaudeProvider) IsAuthenticated(ctx context.Context) (bool, error) {
-	// Try claude auth status
-	output, err := execCommand(ctx, "claude", "auth", "status")
-	if err != nil {
-		// Check for specific auth error messages
-		if strings.Contains(output, "not authenticated") ||
-			strings.Contains(output, "not logged in") ||
-			strings.Contains(output, "no api key") ||
-			strings.Contains(output, "API key") {
-			return false, nil
-		}
-
-		// Also check if there's a config file with API key
-		if p.hasAPIKeyConfigured() {
-			return true, nil
-		}
-
-		return false, err
+	// Check for web login credentials first (most common case)
+	if p.hasWebLoginConfigured() {
+		return true, nil
 	}
 
-	return strings.Contains(output, "authenticated") ||
-		strings.Contains(output, "logged in") ||
-		strings.Contains(output, "Logged in"), nil
+	// Check for API key configuration
+	if p.hasAPIKeyConfigured() {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// hasWebLoginConfigured checks for Claude Code web login credentials
+func (p *ClaudeProvider) hasWebLoginConfigured() bool {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+
+	// Check ~/.claude/.credentials.json for claudeAiOauth
+	credentialsPath := filepath.Join(homeDir, ".claude", ".credentials.json")
+	if data, err := os.ReadFile(credentialsPath); err == nil {
+		var creds map[string]interface{}
+		if json.Unmarshal(data, &creds) == nil {
+			// Check for claudeAiOauth with valid accessToken
+			if oauth, ok := creds["claudeAiOauth"].(map[string]interface{}); ok {
+				if token, ok := oauth["accessToken"].(string); ok && token != "" {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func (p *ClaudeProvider) hasAPIKeyConfigured() bool {

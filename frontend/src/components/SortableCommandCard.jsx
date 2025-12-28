@@ -48,16 +48,12 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
                     <div {...attributes} {...listeners} className="action-icon" style={{ cursor: 'grab' }} title="Drag to reorder">
                         <GripVertical size={18} />
                     </div>
-                    {!command.isSystemCard && (
-                        <>
-                            <div className="action-icon" onClick={(e) => { e.stopPropagation(); onEdit(command); }} title="Edit Command">
-                                <Edit2 size={18} />
-                            </div>
-                            <div className="action-icon delete" onClick={(e) => { e.stopPropagation(); onDelete(command.id); }} title="Delete Command">
-                                <Trash2 size={18} />
-                            </div>
-                        </>
-                    )}
+                    <div className="action-icon" onClick={(e) => { e.stopPropagation(); onEdit(command); }} title="Edit Command">
+                        <Edit2 size={18} />
+                    </div>
+                    <div className="action-icon delete" onClick={(e) => { e.stopPropagation(); onDelete(command.id); }} title="Delete Command">
+                        <Trash2 size={18} />
+                    </div>
                 </div>
             </div>
 

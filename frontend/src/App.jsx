@@ -34,7 +34,6 @@ import { useWorkflowManager } from './hooks/useWorkflowManager'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { getMergedCommandCards, getUserDefinedCards } from './utils/defaultCommandCards'
 import { useGuidedTour } from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
 
@@ -1246,10 +1245,8 @@ function App() {
       })
       .then(data => {
         // Ensure data is an array
-        const userCards = Array.isArray(data) ? data : [];
-        // Merge with default system cards
-        const mergedCards = getMergedCommandCards(userCards);
-        setCommands(mergedCards);
+        const cards = Array.isArray(data) ? data : [];
+        setCommands(cards);
         setCommandsLoading(false);
       })
       .catch(err => {
@@ -1286,14 +1283,10 @@ function App() {
 
   const saveCommands = async (newCommands) => {
     try {
-      // Filter out system cards before saving to backend
-      // System cards have string IDs and are generated on the client side
-      const userCardsOnly = getUserDefinedCards(newCommands);
-      
       await fetch('/api/commands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userCardsOnly)
+        body: JSON.stringify(newCommands)
       })
       setCommands(newCommands)
     } catch (err) {

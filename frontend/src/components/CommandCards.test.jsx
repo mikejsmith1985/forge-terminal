@@ -111,29 +111,6 @@ describe('CommandCards - Drag and Drop', () => {
     expect(mockHandlers.onDelete).toHaveBeenCalledWith(mockCommands[0].id);
   });
 
-  it('filters out system cards', () => {
-    const commandsWithSystem = [
-      ...mockCommands,
-      { id: 'system-1', name: 'System Card', command: 'test', isSystemCard: true },
-    ];
-
-    render(
-      <DndContext>
-        <CommandCards
-          commands={commandsWithSystem}
-          loading={false}
-          error={null}
-          {...mockHandlers}
-        />
-      </DndContext>
-    );
-
-    // System card should not be rendered
-    expect(screen.queryByText('System Card')).not.toBeInTheDocument();
-    // User cards should be rendered
-    expect(screen.getByText('Test 1')).toBeInTheDocument();
-  });
-
   it('shows empty state when no commands', () => {
     render(
       <DndContext>

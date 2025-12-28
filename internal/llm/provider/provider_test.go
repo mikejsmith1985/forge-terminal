@@ -182,6 +182,80 @@ gpt-4o`
 }
 
 // =============================================================================
+// Copilot Help Parsing Tests
+// =============================================================================
+
+func TestParseCopilotHelpModels(t *testing.T) {
+	// Sample copilot --help output with model choices
+	output := `Usage: copilot [options] [command]
+
+GitHub Copilot CLI - An AI-powered coding assistant
+
+Options:
+  --model <model>                     Set the AI model to use (choices: "claude-sonnet-4.5", "claude-haiku-4.5",
+                                      "claude-opus-4.5", "claude-sonnet-4", "gpt-5.1-codex-max", "gpt-5.1-codex",
+                                      "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5.1-codex-mini", "gpt-5-mini", "gpt-4.1",
+                                      "gemini-3-pro-preview")
+  -h, --help                          display help for command`
+
+	models := parseCopilotHelpModels(output)
+
+	// Should find 13 models
+	if len(models) < 10 {
+		t.Errorf("Expected at least 10 models from copilot help, got %d", len(models))
+	}
+
+	// Check for specific models
+	modelIDs := make(map[string]bool)
+	for _, m := range models {
+		modelIDs[m.ID] = true
+	}
+
+	expectedModels := []string{"claude-sonnet-4.5", "gpt-5.1-codex-max", "gemini-3-pro-preview"}
+	for _, expected := range expectedModels {
+		if !modelIDs[expected] {
+			t.Errorf("Expected to find model '%s' in parsed models", expected)
+		}
+	}
+}
+
+func TestParseCopilotHelpModelsEmpty(t *testing.T) {
+	models := parseCopilotHelpModels("")
+	if len(models) != 0 {
+		t.Errorf("Expected 0 models from empty string, got %d", len(models))
+	}
+}
+
+func TestFormatModelName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"gpt-5.1-codex-max", "Gpt 5.1 Codex Max"},
+		{"claude-sonnet-4.5", "Claude Sonnet 4.5"},
+		{"gemini-3-pro-preview", "Gemini 3 Pro Preview"},
+	}
+
+	for _, tt := range tests {
+		result := formatModelName(tt.input)
+		if result != tt.expected {
+			t.Errorf("formatModelName(%s) = %s, want %s", tt.input, result, tt.expected)
+		}
+	}
+}
+
+// =============================================================================
+// Claude Web Auth Tests
+// =============================================================================
+
+func TestClaudeProviderHasWebLoginConfigured(t *testing.T) {
+	p := NewClaudeProvider()
+	// This test checks the method exists and doesn't panic
+	// Actual result depends on whether ~/.claude/.credentials.json exists
+	_ = p.hasWebLoginConfigured()
+}
+
+// =============================================================================
 // Integration Tests (require CLI tools to be installed)
 // =============================================================================
 
