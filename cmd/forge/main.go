@@ -248,7 +248,7 @@ func main() {
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
 
 	// File management API
-	http.HandleFunc("/api/files/list", WrapWithMiddleware(files.HandleList))
+	http.HandleFunc("/api/files/list", WrapWithMiddleware(handleListFiles)) // v3.3.7 Active Engineer
 	http.HandleFunc("/api/files/flat", WrapWithMiddleware(files.HandleFlatList)) // v3.3.6 @ mentions
 	http.HandleFunc("/api/files/stats", WrapWithMiddleware(files.HandleStats))
 	http.HandleFunc("/api/files/read", WrapWithMiddleware(files.HandleRead))
