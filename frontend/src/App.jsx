@@ -35,6 +35,8 @@ import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
 import { getMergedCommandCards, getUserDefinedCards } from './utils/defaultCommandCards'
+import { useGuidedTour } from './hooks/useGuidedTour'
+import TourOverlay from './components/TourOverlay'
 
 const MAX_TABS = 20;
 
@@ -149,6 +151,16 @@ function App() {
     updateWorkflow,
     deleteWorkflow,
   } = useWorkflowManager();
+
+  // Guided Tour for first-run experience
+  const {
+    isActive: isTourActive,
+    stepData: tourStepData,
+    currentStep: tourCurrentStep,
+    totalSteps: tourTotalSteps,
+    nextStep: tourNextStep,
+    skipTour,
+  } = useGuidedTour();
   
   // Query model tier when terminal input changes
   const queryModelTier = useCallback(async (input) => {
@@ -1974,6 +1986,17 @@ function App() {
         isOpen={isRouterConfigOpen}
         onClose={() => setIsRouterConfigOpen(false)}
       />
+
+      {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
+      {isTourActive && (
+        <TourOverlay
+          step={tourStepData}
+          currentStep={tourCurrentStep}
+          totalSteps={tourTotalSteps}
+          onNext={tourNextStep}
+          onSkip={skipTour}
+        />
+      )}
     </div>
   )
 }
