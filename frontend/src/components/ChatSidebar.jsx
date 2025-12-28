@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Loader2, Settings, FileCode, Zap } from 'lucide-react';
+import { X, Send, Loader2, Settings, FileCode, Zap, Brain } from 'lucide-react';
 import './ChatSidebar.css';
 
 const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) => {
@@ -7,10 +7,11 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [filesInMessage, setFilesInMessage] = useState(0);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // @ mention state (v3.3.6 Deep Context)
+  // @ mention state (v3.3.6 Deep Context - Active Engineer mode)
   const [mentionActive, setMentionActive] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionPosition, setMentionPosition] = useState(0);
@@ -23,6 +24,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
   // Router config state for dynamic badge
   const [activeModel, setActiveModel] = useState(null);
   const [lastRoutedModel, setLastRoutedModel] = useState(null);
+  const [routedTier, setRoutedTier] = useState(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
