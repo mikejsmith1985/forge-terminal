@@ -32,6 +32,17 @@
 
   --gradient-primary: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
   --gradient-card: linear-gradient(145deg, #171717 0%, #0a0a0a 100%);
+  
+  /* Semantic aliases for Chat/Router components */
+  --bg-primary: var(--bg);
+  --bg-secondary: var(--surface);
+  --bg-tertiary: var(--overlay);
+  --bg-hover: #333333;
+  --text-primary: var(--text);
+  --text-secondary: var(--subtext);
+  --text-tertiary: #666666;
+  --border-color: var(--overlay);
+  --accent-color: var(--accent);
 }
 
 .light {
@@ -66,6 +77,17 @@
 
   --gradient-primary: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
   --gradient-card: linear-gradient(145deg, #ffffff 0%, #fafaf9 100%);
+  
+  /* Semantic aliases for Chat/Router components (light mode) */
+  --bg-primary: var(--bg);
+  --bg-secondary: var(--surface);
+  --bg-tertiary: #f3f4f6;
+  --bg-hover: #e5e7eb;
+  --text-primary: var(--text);
+  --text-secondary: var(--subtext);
+  --text-tertiary: #9ca3af;
+  --border-color: #e5e7eb;
+  --accent-color: var(--accent);
 }
 
 * {
@@ -1174,6 +1196,23 @@ body {
 .terminal-wrapper.hidden {
   visibility: hidden;
   pointer-events: none;
+}
+
+/* View layer system for chat/terminal switching without remounting */
+.view-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.view-layer.active {
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 1;
 }
 
 /* Terminal outer container for scroll button positioning */

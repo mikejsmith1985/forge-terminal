@@ -433,42 +433,52 @@ h4.chat-view-heading {
   to { transform: rotate(360deg); }
 }
 
-/* Light mode */
-@media (prefers-color-scheme: light) {
-  .chat-view {
-    background: #f9fafb;
-  }
+/* Light mode - using .light class on document root */
+.light .chat-view {
+  background: #f9fafb;
+}
 
-  .chat-view-header,
-  .chat-view-input-area {
-    background: white;
-    border-color: #e5e7eb;
-  }
+.light .chat-view-header,
+.light .chat-view-input-area {
+  background: white;
+  border-color: #e5e7eb;
+}
 
-  .chat-view-content {
-    background: #f3f4f6;
-    border-color: #e5e7eb;
-    color: #1f2937;
-  }
+.light .chat-view-content {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #1f2937;
+}
 
-  .chat-view-message-user .chat-view-content {
-    background: rgba(102, 126, 234, 0.1);
-    border-color: rgba(102, 126, 234, 0.2);
-    color: #1f2937;
-  }
+.light .chat-view-message-user .chat-view-content {
+  background: rgba(102, 126, 234, 0.1);
+  border-color: rgba(102, 126, 234, 0.2);
+  color: #1f2937;
+}
 
-  .chat-view-input {
-    background: white;
-    border-color: #d1d5db;
-    color: #1f2937;
-  }
+.light .chat-view-input {
+  background: white;
+  border-color: #d1d5db;
+  color: #1f2937;
+}
 
-  .chat-view-code-block {
-    background: #1f2937;
-  }
+.light .chat-view-code-block {
+  background: #1f2937;
+}
 
-  .chat-view-inline-code {
-    background: rgba(0, 0, 0, 0.08);
-    color: #ea580c;
-  }
+.light .chat-view-inline-code {
+  background: rgba(0, 0, 0, 0.08);
+  color: #ea580c;
+}
+
+.light .chat-view-empty h3 {
+  color: #1f2937;
+}
+
+.light .chat-view-empty p {
+  color: #6b7280;
+}
+
+.light .chat-view-title h2 {
+  color: #1f2937;
 }

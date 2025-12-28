@@ -1801,8 +1801,9 @@ function App() {
                 key={tab.id}
                 className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
               >
-                {/* v3.3.0: Conditionally render ChatView or ForgeTerminal based on viewMode */}
-                {tab.viewMode === 'chat' ? (
+                {/* v3.3.0: Render BOTH ChatView and ForgeTerminal, show/hide based on viewMode
+                    This preserves terminal state when switching between views */}
+                <div className={`view-layer chat-layer ${tab.viewMode === 'chat' ? 'active' : ''}`}>
                   <ChatView
                     tabId={tab.id}
                     fontSize={chatFontSize}
@@ -1820,7 +1821,8 @@ function App() {
                       }, 100);
                     }}
                   />
-                ) : (
+                </div>
+                <div className={`view-layer terminal-layer ${tab.viewMode === 'terminal' ? 'active' : ''}`}>
                   <ForgeTerminal
                     ref={(el) => {
                       if (el) {
@@ -1828,7 +1830,7 @@ function App() {
                       }
                     }}
                     tabId={tab.id}
-                    isVisible={tab.id === activeTabId}
+                    isVisible={tab.id === activeTabId && tab.viewMode === 'terminal'}
                     theme={tab.mode || 'dark'}
                     colorTheme={tab.colorTheme || colorTheme}
                     fontSize={fontSize}
@@ -1847,7 +1849,7 @@ function App() {
                     onRoutingUpdate={handleRoutingUpdate}
                     onSwitchToChat={() => toggleTabViewMode(tab.id)}
                   />
-                )}
+                </div>
               </div>
             ))}
           </div>

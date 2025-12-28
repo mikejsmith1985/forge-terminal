@@ -620,36 +620,78 @@
   to { transform: rotate(360deg); }
 }
 
-/* Light mode */
-@media (prefers-color-scheme: light) {
-  .router-config-backdrop {
-    background: rgba(0, 0, 0, 0.4);
-  }
+/* Light mode - using .light class on document root */
+.light .router-config-backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
 
-  .router-config-modal {
-    background: white;
-    border-color: #e5e7eb;
-  }
+.light .router-config-modal {
+  background: white;
+  border-color: #e5e7eb;
+}
 
-  .router-config-header,
-  .router-config-footer {
-    background: #f9fafb;
-    border-color: #e5e7eb;
-  }
+.light .router-config-header,
+.light .router-config-footer {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
 
-  .router-config-tier {
-    background: #f9fafb;
-    border-color: #e5e7eb;
-  }
+.light .router-config-tier {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
 
-  .tier-field input {
-    background: white;
-    border-color: #d1d5db;
-    color: #1f2937;
-  }
+.light .tier-field input {
+  background: white;
+  border-color: #d1d5db;
+  color: #1f2937;
+}
 
-  .tier-test-btn {
-    background: white;
-    border-color: #d1d5db;
-  }
+.light .tier-test-btn {
+  background: white;
+  border-color: #d1d5db;
+}
+
+.light .router-config-title h2 {
+  color: #1f2937;
+}
+
+.light .config-description {
+  color: #4b5563;
+}
+
+.light .tier-card {
+  background: white;
+  border-color: #e5e7eb;
+}
+
+.light .tier-card .tier-name {
+  color: #1f2937;
+}
+
+.light .tier-card .tier-description {
+  color: #6b7280;
+}
+
+.light .tier-model-select {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #1f2937;
+}
+
+.light .tier-activate-btn {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #6b7280;
+}
+
+.light .config-info {
+  background: rgba(139, 92, 246, 0.08);
+  color: #6b7280;
+}
+
+.light .btn-cancel {
+  background: white;
+  border-color: #d1d5db;
+  color: #6b7280;
 }
