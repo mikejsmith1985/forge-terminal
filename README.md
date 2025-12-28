@@ -14,9 +14,10 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 ### Core Terminal
 - **🚀 Single Binary**: No Docker, Node.js, or config files required. Just download and run.
 - **💻 Full PTY Terminal**: Real PTY support (xterm.js) for interactive apps like `vim`, `htop`, `claude`, and more.
-- **📑 Multi-Tab Support**: Open up to 20 terminal tabs with drag-and-drop reordering.
+- **📑 Multi-Tab Support**: Open up to 20 terminal tabs with drag-and-drop reordering. Each tab has its own isolated terminal session and chat context.
 - **💾 Session Persistence**: Tabs, themes, and positions are restored automatically across restarts.
 - **🔍 Terminal Search**: Find text in terminal output with match highlighting.
+- **🔐 Tab Isolation (NEW v3.3.7)**: Each terminal tab has a completely isolated session with independent WebSocket connections and PTY processes. Chat messages persist per-tab when switching between chat and terminal views.
 
 ### Command Cards
 - **⚡ Quick Commands**: Save frequently used commands with descriptions and icons.
@@ -25,6 +26,17 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **📋 Paste vs Execute**: Choose to paste commands for editing or execute immediately.
 - **🔄 Drag & Drop**: Reorder command cards to your preference.
 - **⭐ Favorites**: Mark important commands as favorites.
+
+### AI Chat & Context Brain (NEW v3.3.0+)
+- **💬 Chat-Native Interface**: Full-featured chat interface with easy switching to terminal. New tabs start in chat mode by default.
+- **🧠 Context Brain**: Intelligent context system that automatically includes:
+  - Terminal output history (last 50 lines)
+  - Vision-detected patterns (errors, warnings, file paths)
+  - Multi-file context via `@filepath` syntax for deep project understanding
+- **🎯 Smart Routing**: Executive trigger (prefix with `?`) for intelligent model tier selection based on task complexity
+- **🌙 Dark Mode (v3.3.7)**: Chat sidebar and router configuration now support dark mode for comfortable extended use
+- **⚙️ Router Configuration**: Configure which AI models handle different task tiers (basic/intermediate/advanced)
+- **📊 Task Classification**: Automatic detection of task complexity for optimal model selection
 
 ### Theming & Customization
 - **🎨 10 Color Themes**: Molten Metal, Deep Ocean, Emerald Forest, Midnight Purple, Rose Gold, Arctic Frost, plus 4 high-contrast accessibility themes.
@@ -49,6 +61,7 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 ### Quality of Life
 - **🐛 Debug Panel**: Integrated debug panel in the ribbon with real-time system diagnostics, auto-refresh capability, and one-click feedback reporting. Includes Terminal Info, Focus State, WebSocket status, and viewport details. **Send Feedback** button opens GitHub issue creation with automatic screenshot capture. **NEW in v1.23.0**: Comprehensive **Diagnostic Overlay** for troubleshooting. Captures all keyboard, paste, websocket, and AM events in real-time. 4 intelligent problem detectors identify root causes: double-paste issues, spacebar blocking, stale AM output, and hydration delays. Session export to `~/.forge/diagnostics/` for offline analysis.
 - **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./.forge/am/` directory with workspace-aware naming. **NEW in v1.21.0**: Full TUI screen capture for AI CLI tools (Copilot, Claude) with automatic session reconstruction and 70% parsing accuracy + 100% raw snapshot fallback.
+- **🎓 Interactive Guided Tour (NEW v3.3.5)**: First-run experience with interactive guide introducing Chat Evolution UI features. Highlights key components and explains the workflow for new users.
 - **🔄 Auto-Updates**: Automatic update checking with one-click installation.
 - **📜 Version History**: View and rollback to previous versions.
 - **🤖 Auto-Respond**: Auto-respond to CLI confirmation prompts (per-tab toggle).
@@ -411,17 +424,55 @@ Forge Terminal stores configuration in `~/.forge/`:
 | File | Purpose |
 |------|---------|
 | `commands.json` | Saved command cards |
-| `config.json` | Shell and app settings |
-| `sessions.json` | Tab state for session restore |
+| `config.json` | Shell and app settings (including dark mode preferences for chat and router) |
+| `sessions.json` | Tab state for session restore (includes active view mode per tab) |
+| `router_config.json` | LLM router configuration with model mappings for different task tiers |
 | `welcome_shown` | Tracks if welcome screen was shown for current version |
 
 AM logs are stored in the working directory:
 - `./am/` - Active session logs (Markdown format)
 - `./am_archive/` - Archived logs from completed sessions
 
+### Dark Mode Settings (v3.3.7+)
+Individual dark mode preferences are now saved for:
+- **Chat Sidebar**: Toggle dark mode in Chat settings
+- **Router Configuration**: Toggle dark mode in Router Configuration panel
+- **Terminal Tabs**: Per-tab light/dark mode (existing feature)
+
+These settings persist across sessions in `config.json`.
+
 ## Changelog
 
-### v1.20.0 (Current)
+### v3.3.7 (Current)
+- **Dark Mode for Chat & Config**: Chat sidebar and router configuration now support dark mode
+- **Terminal View Preservation**: Terminal view mode is now preserved when switching tabs
+- **Terminal Tab Isolation**: Fixed terminal session isolation to prevent cross-tab interference
+- **Chat Message Persistence**: Chat messages now persist per-tab when switching between chat and terminal views
+- **Improved Tab Cleanup**: Proper resource cleanup when closing tabs
+- **CSS z-index Fixes**: Improved z-index layering for terminal wrappers to prevent visual overlap
+
+### v3.3.6 (Active Engineer - Configuration Persistence & Deep Context)
+- **Active Engineer Integration**: New file listing API endpoint for workspace navigation
+- **Configuration Persistence**: Router configuration now persists across sessions
+- **Deep Context with @mentions**: Reference files with @filepath syntax for enhanced AI context
+- **Enhanced Chat Context**: Improved context building with terminal history and vision insights
+
+### v3.3.5 (Guided Tour - First Run Experience)
+- **Interactive Guided Tour**: First-run experience walking users through Chat Evolution UI
+- **Chat Evolution UI**: Full-tab chat interface replacing sidebar chat
+- **Smart Routing**: AI-powered model tier classification based on task complexity
+
+### v3.3.4 (Remediation)
+- **AM Tests**: Comprehensive test coverage for Artificial Memory system
+- **Router Config Enhancements**: Improved router configuration UI and functionality
+
+### v3.3.0 (Chat Evolution - Production-Ready)
+- **Context Brain**: Full-featured context system with terminal history and vision insights
+- **Smart Routing**: Executive trigger (?) for intelligent model routing
+- **Chat-Native Tabs**: Tabs start in chat mode with easy switching to terminal
+- **Active Model Orchestrator**: Dynamic model selection based on task analysis
+
+### v1.20.0
 - **Vision-AM Integration**: All Vision findings (errors, warnings, patterns) persisted to AM logs
 - **Configurable Vision-AutoRespond**: Choose between strict (interrupt) or lenient (collect) modes
 - **Insights API**: New endpoint for accessing Vision insights from sessions

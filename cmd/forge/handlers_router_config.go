@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -10,8 +11,10 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/mikejsmith1985/forge-terminal/internal/llm/provider"
 )
 
 // TierConfig represents configuration for a single tier
@@ -349,4 +352,213 @@ func extractVersion(output string) string {
 		}
 	}
 	return ""
+}
+
+// =============================================================================
+// Provider Verification API (v3.4.0)
+// =============================================================================
+
+// VerifyProviderRequest represents a request to verify a provider
+type VerifyProviderRequest struct {
+	Provider string `json:"provider"`
+	APIKey   string `json:"apiKey,omitempty"`
+}
+
+// VerifyProviderResponse represents the response from provider verification
+type VerifyProviderResponse struct {
+	Success       bool                  `json:"success"`
+	Provider      string                `json:"provider"`
+	DisplayName   string                `json:"displayName"`
+	Installed     bool                  `json:"installed"`
+	Authenticated bool                  `json:"authenticated"`
+	Models        []provider.ModelInfo  `json:"models,omitempty"`
+	Error         string                `json:"error,omitempty"`
+	Instructions  string                `json:"instructions,omitempty"`
+	BinaryPath    string                `json:"binaryPath,omitempty"`
+}
+
+// handleVerifyProvider verifies a single provider's installation and auth status
+// POST /api/llm/verify-provider
+func handleVerifyProvider(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req VerifyProviderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		json.NewEncoder(w).Encode(VerifyProviderResponse{
+			Success: false,
+			Error:   "Invalid request body",
+		})
+		return
+	}
+
+	if req.Provider == "" {
+		json.NewEncoder(w).Encode(VerifyProviderResponse{
+			Success: false,
+			Error:   "Provider name required",
+		})
+		return
+	}
+
+	log.Printf("[Provider] Verifying provider: %s", req.Provider)
+
+	// If API key provided, try to configure it first
+	if req.APIKey != "" {
+		if err := provider.SetAPIKey(req.Provider, req.APIKey); err != nil {
+			log.Printf("[Provider] Failed to set API key: %v", err)
+			// Continue anyway, the auth check will fail if key is invalid
+		}
+	}
+
+	// Get provider status with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	registry := provider.GetRegistry()
+	status, err := registry.GetStatus(ctx, req.Provider)
+	if err != nil {
+		log.Printf("[Provider] Error getting status: %v", err)
+		json.NewEncoder(w).Encode(VerifyProviderResponse{
+			Success:  false,
+			Provider: req.Provider,
+			Error:    err.Error(),
+		})
+		return
+	}
+
+	response := VerifyProviderResponse{
+		Success:       true,
+		Provider:      status.Name,
+		DisplayName:   status.DisplayName,
+		Installed:     status.Installed,
+		Authenticated: status.Authenticated,
+		Models:        status.Models,
+		Instructions:  status.Instructions,
+		BinaryPath:    status.BinaryPath,
+	}
+
+	if status.AuthError != "" {
+		response.Error = status.AuthError
+	}
+
+	// Set appropriate HTTP status
+	if !status.Installed {
+		w.WriteHeader(http.StatusNotFound)
+		response.Error = "CLI tool not installed"
+	} else if !status.Authenticated {
+		w.WriteHeader(http.StatusUnauthorized)
+		if response.Error == "" {
+			response.Error = "Not authenticated. Please login or provide API key."
+		}
+	}
+
+	log.Printf("[Provider] %s: installed=%v, authenticated=%v, models=%d",
+		req.Provider, status.Installed, status.Authenticated, len(status.Models))
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleListProviders returns all available providers and their statuses
+// GET /api/llm/providers
+func handleListProviders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	log.Printf("[Provider] Listing all providers")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	registry := provider.GetRegistry()
+	statuses := registry.VerifyAll(ctx)
+
+	// Convert to response format
+	providers := make([]VerifyProviderResponse, 0, len(statuses))
+	for _, status := range statuses {
+		resp := VerifyProviderResponse{
+			Success:       true,
+			Provider:      status.Name,
+			DisplayName:   status.DisplayName,
+			Installed:     status.Installed,
+			Authenticated: status.Authenticated,
+			Models:        status.Models,
+			Instructions:  status.Instructions,
+			BinaryPath:    status.BinaryPath,
+		}
+		if status.AuthError != "" {
+			resp.Error = status.AuthError
+		}
+		providers = append(providers, resp)
+	}
+
+	log.Printf("[Provider] Found %d providers", len(providers))
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"providers": providers,
+	})
+}
+
+// handleProviderModels returns models for a specific provider
+// GET /api/llm/providers/{name}/models
+func handleProviderModels(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract provider name from path
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 5 {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Provider name required",
+		})
+		return
+	}
+	providerName := pathParts[4]
+
+	log.Printf("[Provider] Getting models for: %s", providerName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	registry := provider.GetRegistry()
+	p, ok := registry.Get(providerName)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Unknown provider: " + providerName,
+		})
+		return
+	}
+
+	models, err := p.ListModels(ctx)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+			"models":  []interface{}{},
+		})
+		return
+	}
+
+	log.Printf("[Provider] %s has %d models", providerName, len(models))
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"provider": providerName,
+		"models":   models,
+	})
 }

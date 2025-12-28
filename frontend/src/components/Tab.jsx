@@ -21,9 +21,12 @@ function getShellIcon(shellType) {
  * Get the accent color for a tab based on its colorTheme
  */
 function getTabAccentColor(colorTheme, mode = 'dark') {
-  const themeData = themes[colorTheme];
+  // Fallback to molten if theme not found
+  const themeData = themes[colorTheme] || themes['molten'];
   if (!themeData) return null;
-  return themeData[mode]?.ui?.accent || null;
+  
+  // Fallback to dark mode if specific mode not found
+  return themeData[mode]?.ui?.accent || themeData['dark']?.ui?.accent || null;
 }
 
 /**

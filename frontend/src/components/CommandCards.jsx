@@ -32,8 +32,8 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
     );
   }
 
-  // Filter out system cards - we don't show them anymore
-  const userCards = commands.filter(cmd => !cmd.isSystemCard);
+  // Show all cards including system cards
+  const userCards = commands;
 
   return (
     <div className="command-cards-container">

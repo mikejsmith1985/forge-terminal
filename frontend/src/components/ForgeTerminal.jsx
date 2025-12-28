@@ -57,6 +57,8 @@ const MENU_SELECTION_PATTERNS = [
   /[›❯]\s*1\.\s*Yes\b/i,
   // Generic inquirer-style: "❯ Yes" or "> Yes" anywhere in buffer
   /[›❯>]\s*Yes\b/i,
+  // Generic "Continue" option
+  /[›❯>]\s*Continue\b/i,
   // Copilot CLI: "❯ Run this command" or "> Run this command"
   /[›❯>]\s*Run\s+this\s+command/i,
   // Selected option with checkmark or bullet
@@ -1123,6 +1125,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
         // v1.23.8 EXACT: AM logging with 5 second debounce
         if (amEnabledRef.current && textData) {
+          // Limit buffer growth to prevent memory issues during high-volume output
+          if (amLogBufferRef.current.length > 100000) {
+             // Keep last 20k chars if buffer gets too big
+             amLogBufferRef.current = amLogBufferRef.current.slice(-20000);
+          }
           amLogBufferRef.current += textData;
 
           if (amLogTimeoutRef.current) {
@@ -1130,7 +1137,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }
           amLogTimeoutRef.current = setTimeout(() => {
             if (amLogBufferRef.current) {
-              const cleanContent = stripAnsi(amLogBufferRef.current);
+              // PERF FIX: Slice BEFORE stripAnsi to avoid freezing on large buffers
+              // We only need the last 1500 chars for the API, so processing 10k is plenty safe
+              const rawContent = amLogBufferRef.current.length > 10000 
+                ? amLogBufferRef.current.slice(-10000) 
+                : amLogBufferRef.current;
+                
+              const cleanContent = stripAnsi(rawContent);
               if (cleanContent.trim()) {
                 fetch('/api/am/log', {
                   method: 'POST',
@@ -1362,6 +1375,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           // AM logging: Optimized input capture - only when AM enabled
           if (amEnabledRef.current) {
             amInputBufferRef.current += data;
+            
+            // Limit input buffer size
+            if (amInputBufferRef.current.length > 5000) {
+              amInputBufferRef.current = amInputBufferRef.current.slice(-5000);
+            }
             
             if (amInputTimeoutRef.current) {
               clearTimeout(amInputTimeoutRef.current);

@@ -24,7 +24,7 @@ import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 import ChatSidebar from './components/ChatSidebar'
-import ChatView from './components/ChatView'
+import ChatView, { cleanupChatMessages } from './components/ChatView'
 import RouterConfigOverlay from './components/RouterConfigOverlay'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
@@ -970,6 +970,8 @@ function App() {
         delete newState[tabId];
         return newState;
       });
+      // Clean up chat messages for this tab
+      cleanupChatMessages(tabId);
     }
   }, [tabs.length, closeTab]);
 

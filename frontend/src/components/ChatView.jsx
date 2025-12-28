@@ -3,11 +3,17 @@
  * 
  * This is the primary view for new tabs. Users can toggle to terminal mode
  * via the header toggle button.
+ * 
+ * Messages are persisted per tabId to maintain state when switching tabs.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Loader2, Terminal, Brain, Settings, Play } from 'lucide-react';
 import './ChatView.css';
+
+// In-memory store for chat messages per tab
+// This persists messages when switching between chat/terminal modes
+const chatMessagesStore = new Map();
 
 const ChatView = ({ 
   tabId, 
@@ -16,11 +22,31 @@ const ChatView = ({
   onOpenRouterConfig,
   onRunInTerminal,
 }) => {
-  const [messages, setMessages] = useState([]);
+  // Initialize messages from store if available for this tab
+  const [messages, setMessages] = useState(() => {
+    return chatMessagesStore.get(tabId) || [];
+  });
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  const currentTabIdRef = useRef(tabId);
+
+  // Persist messages to store when they change
+  useEffect(() => {
+    if (tabId) {
+      chatMessagesStore.set(tabId, messages);
+    }
+  }, [messages, tabId]);
+
+  // When tabId changes, load messages for that tab
+  useEffect(() => {
+    if (tabId !== currentTabIdRef.current) {
+      currentTabIdRef.current = tabId;
+      const storedMessages = chatMessagesStore.get(tabId) || [];
+      setMessages(storedMessages);
+    }
+  }, [tabId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -304,6 +330,13 @@ const MarkdownContent = ({ content, onRunInTerminal }) => {
   };
 
   return <div className="chat-view-markdown">{parseMarkdown(content)}</div>;
+};
+
+// Utility function to clean up chat messages for a tab (call when tab is closed)
+export const cleanupChatMessages = (tabId) => {
+  if (tabId && chatMessagesStore.has(tabId)) {
+    chatMessagesStore.delete(tabId);
+  }
 };
 
 export default ChatView;

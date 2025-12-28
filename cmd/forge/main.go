@@ -227,6 +227,11 @@ func main() {
 	http.HandleFunc("/api/llm/router-config", WrapWithMiddleware(handleRouterConfig))
 	http.HandleFunc("/api/llm/test-command", WrapWithMiddleware(handleTestCommand))
 
+	// Provider Discovery API (v3.4.0 - Dynamic Provider Discovery)
+	http.HandleFunc("/api/llm/verify-provider", WrapWithMiddleware(handleVerifyProvider))
+	http.HandleFunc("/api/llm/providers", WrapWithMiddleware(handleListProviders))
+	http.HandleFunc("/api/llm/providers/", WrapWithMiddleware(handleProviderModels))
+
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
 	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))
