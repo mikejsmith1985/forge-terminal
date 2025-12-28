@@ -1,5 +1,5 @@
 # Forge Terminal - Smart Model Routing Configuration
-# Restore Semantic Intelligence to Router
+# v3.3.3 - Semantic Intelligence Router
 
 [router]
 default_tier = "tier1"
@@ -7,23 +7,32 @@ default_tier = "tier1"
 [tiers.tier1]
 name = "Standard"
 model = "gpt-4o-mini"
-description = "General queries and simple shell explanations."
+tools = ["base-shell"]
+description = "Fast, cost-effective model for simple shell commands and explanations."
 
 [tiers.tier2]
 name = "Advanced"
 model = "gpt-4o"
-description = "Multi-file analysis and architectural planning."
+tools = ["fabric", "git-assistant"]
+description = "High-reasoning model for complex architectural analysis and git workflows."
 
 [tiers.tier3]
 name = "Expert"
 model = "claude-3-5-sonnet"
-description = "Deep terminal debugging with full context vision support."
+tools = ["compiler-expert", "vision-debugger"]
+description = "State-of-the-art model for deep debugging, visual analysis, and creative code generation."
+
+[features]
+auto_respond = true
+vision_enabled = true
+context_injection = true
 
 [context]
 # Automatically include terminal context in prompts
 include_cwd = true
 include_git_branch = true
 include_vision = true  # Include recent screenshot summaries
+buffer_lines = 50      # Number of terminal lines to include
 
 # Available placeholders for commands:
 # {prompt}     - The user's input after "?"

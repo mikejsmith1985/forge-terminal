@@ -234,6 +234,7 @@ type SessionGroup struct {
 	Workspace string        `json:"workspace"`
 	Sessions  []SessionInfo `json:"sessions"`
 	Latest    SessionInfo   `json:"latest"`
+	Count     int           `json:"count"`
 }
 
 // parseSessionLogContent parses the markdown content of a session log file.
@@ -296,21 +297,25 @@ func generateSessionID(tabID, workspace string) string {
 // GroupSessionsByWorkspace groups sessions by their workspace.
 func GroupSessionsByWorkspace(sessions []SessionInfo) []SessionGroup {
 	groups := make(map[string][]SessionInfo)
-	var latest SessionInfo
 
 	for _, session := range sessions {
 		groups[session.Workspace] = append(groups[session.Workspace], session)
-		if session.Timestamp.After(latest.Timestamp) {
-			latest = session
-		}
 	}
 
 	var result []SessionGroup
 	for workspace, sessionsInGroup := range groups {
+		// Find latest session in this group
+		var groupLatest SessionInfo
+		for _, s := range sessionsInGroup {
+			if s.Timestamp.After(groupLatest.Timestamp) {
+				groupLatest = s
+			}
+		}
 		result = append(result, SessionGroup{
 			Workspace: workspace,
 			Sessions:  sessionsInGroup,
-			Latest:    latest,
+			Latest:    groupLatest,
+			Count:     len(sessionsInGroup),
 		})
 	}
 

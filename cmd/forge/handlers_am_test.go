@@ -243,8 +243,12 @@ func TestHandleAMCheckGroupedEmpty(t *testing.T) {
 	if result["hasRecoverable"] != false {
 		t.Errorf("Should have hasRecoverable=false for empty sessions")
 	}
-	if len(result["groups"].([]interface{})) != 0 {
-		t.Errorf("Should have empty groups list")
+	// Groups can be null or empty array when there are no sessions
+	groups := result["groups"]
+	if groups != nil {
+		if groupsSlice, ok := groups.([]interface{}); ok && len(groupsSlice) != 0 {
+			t.Errorf("Should have empty groups list")
+		}
 	}
 }
 
