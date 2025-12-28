@@ -32,13 +32,15 @@ type ScreenSnapshot struct {
 
 // ConversationTurn represents a single exchange in an LLM conversation.
 type ConversationTurn struct {
-	Role            string    `json:"role"`
-	Content         string    `json:"content"`
-	Timestamp       time.Time `json:"timestamp"`
-	Provider        string    `json:"provider"`
-	Raw             string    `json:"raw,omitempty"`             // Raw PTY data for debugging
-	CaptureMethod   string    `json:"captureMethod,omitempty"`   // "pty_input", "pty_output", "tui_snapshot"
-	ParseConfidence float64   `json:"parseConfidence,omitempty"` // 0.0-1.0 for output parsing
+	Role            string         `json:"role"`
+	Content         string         `json:"content"`
+	Timestamp       time.Time      `json:"timestamp"`
+	Provider        string         `json:"provider"`
+	Raw             string         `json:"raw,omitempty"`             // Raw PTY data for debugging
+	CaptureMethod   string         `json:"captureMethod,omitempty"`   // "pty_input", "pty_output", "tui_snapshot"
+	ParseConfidence float64        `json:"parseConfidence,omitempty"` // 0.0-1.0 for output parsing
+	ImageSummary    *ImageSummary  `json:"imageSummary,omitempty"`    // Image context from Agent Optical Nerve
+	ImageContext    string         `json:"imageContext,omitempty"`    // "Whispered" image description
 }
 
 // ConversationRecovery holds recovery metadata for a conversation.
@@ -76,25 +78,26 @@ type LLMConversation struct {
 
 // LLMLogger manages LLM conversation logging for a tab.
 type LLMLogger struct {
-	mu                sync.RWMutex // RWMutex for better read performance (GetActiveConversationID called per keystroke)
-	tabID             string
-	conversations     map[string]*LLMConversation
-	activeConvID      string
-	outputBuffer      string
-	inputBuffer       string
-	lastOutputTime    time.Time
-	lastInputTime     time.Time
-	lastSnapshotTime  time.Time // NEW: Track when last snapshot was saved
-	lastDiskLoadTime  time.Time // Track when we last loaded from disk
-	amDir             string
-	autoRespond       bool
-	capture           *ConversationCapture
-	onLowConfidence   func(raw string) // Callback for Vision notification
-	tuiCaptureMode    bool
-	currentScreen     strings.Builder
-	lastScreen        string
-	snapshotCount     int
-	onProcessCallback func(pid int, provider string) // Callback when Layer 3 detects process
+	mu                  sync.RWMutex // RWMutex for better read performance (GetActiveConversationID called per keystroke)
+	tabID               string
+	conversations       map[string]*LLMConversation
+	activeConvID        string
+	outputBuffer        string
+	inputBuffer         string
+	lastOutputTime      time.Time
+	lastInputTime       time.Time
+	lastSnapshotTime    time.Time // NEW: Track when last snapshot was saved
+	lastDiskLoadTime    time.Time // Track when we last loaded from disk
+	amDir               string
+	autoRespond         bool
+	capture             *ConversationCapture
+	onLowConfidence     func(raw string) // Callback for Vision notification
+	tuiCaptureMode      bool
+	currentScreen       strings.Builder
+	lastScreen          string
+	snapshotCount       int
+	onProcessCallback   func(pid int, provider string) // Callback when Layer 3 detects process
+	pendingImageContext string                          // Image context to inject in next user turn ("whisper")
 }
 
 var (
@@ -744,6 +747,12 @@ func (l *LLMLogger) extractGenericResponseFromSnapshot(content string) string {
 // This is the key method that was missing - it captures what the user types
 // AFTER the LLM session has started (e.g., prompts inside copilot TUI).
 func (l *LLMLogger) AddUserInput(rawInput string) {
+	l.AddUserInputWithContext(rawInput, "")
+}
+
+// AddUserInputWithContext adds user input with optional image context ("whisper").
+// The imageContext is stored in the turn for AI context awareness.
+func (l *LLMLogger) AddUserInputWithContext(rawInput string, imageContext string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -753,6 +762,11 @@ func (l *LLMLogger) AddUserInput(rawInput string) {
 
 	l.inputBuffer += rawInput
 	l.lastInputTime = time.Now()
+	
+	// Store image context for the next flushed turn
+	if imageContext != "" {
+		l.pendingImageContext = imageContext
+	}
 
 	// Only trigger snapshot on Enter press (user submitted prompt), not every keystroke
 	// This prevents blocking disk I/O on every keystroke which caused 30-second keyboard lag
@@ -794,14 +808,24 @@ func (l *LLMLogger) flushUserInputLocked() {
 		return
 	}
 
-	conv.Turns = append(conv.Turns, ConversationTurn{
+	// Create turn with optional image context (Agent Optical Nerve "whisper")
+	turn := ConversationTurn{
 		Role:          "user",
 		Content:       cleaned,
 		Timestamp:     time.Now(),
 		Provider:      conv.Provider,
 		Raw:           raw,
 		CaptureMethod: "pty_input",
-	})
+	}
+	
+	// Add image context if pending
+	if l.pendingImageContext != "" {
+		turn.ImageContext = l.pendingImageContext
+		log.Printf("[LLM Logger] 🖼️ Injected image context: %s", truncateForLog(l.pendingImageContext, 50))
+		l.pendingImageContext = "" // Clear after use
+	}
+	
+	conv.Turns = append(conv.Turns, turn)
 
 	// Update recovery info
 	if conv.Recovery == nil {

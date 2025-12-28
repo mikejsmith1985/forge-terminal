@@ -320,6 +320,7 @@ func (p *AsyncPipeline) ProcessLoop(amSystem *System) {
 
 // handleBinaryData routes binary/image data to appropriate handler.
 // This prevents attempting to parse binary as text which would corrupt output.
+// Industrial Phase 2: Routes to ImageAnalyzer for background AI analysis.
 func (p *AsyncPipeline) handleBinaryData(amSystem *System, tabID string, data []byte, detection ImageDetectionResult) {
 	// Log detection for debugging (minimal logging in hot path)
 	if p.config.EnableDebugLogs {
@@ -327,8 +328,15 @@ func (p *AsyncPipeline) handleBinaryData(amSystem *System, tabID string, data []
 			detection.Format, detection.IsBase64, len(data))
 	}
 
-	// For now, we simply skip binary data from text processing
-	// Future enhancement: route to image storage system
+	// Route to ImageAnalyzer for background processing (Agent Optical Nerve)
+	if detection.IsImage {
+		analyzer := GetImageAnalyzer()
+		if analyzer != nil {
+			analyzer.QueueImage(tabID, data, detection)
+		}
+	}
+
+	// Increment binary message counter
 	p.binaryMessages.Add(1)
 }
 
@@ -370,6 +378,7 @@ func (p *AsyncPipeline) processCommand(amSystem *System, tabID string, command s
 }
 
 // flushTabBuffer flushes a single tab's buffer to the LLM logger.
+// Also captures snapshots for Time-Travel Scrubber (Industrial Phase 2).
 func (p *AsyncPipeline) flushTabBuffer(amSystem *System, tabID string, buf *tabBuffer) {
 	if amSystem == nil {
 		return
@@ -380,16 +389,56 @@ func (p *AsyncPipeline) flushTabBuffer(amSystem *System, tabID string, buf *tabB
 		return
 	}
 	
-	// Only flush if there's an active conversation
+	// Capture snapshot for Time-Travel (non-blocking, <1ms)
+	if buf.output.Len() > 0 {
+		outputContent := buf.output.String()
+		cleanedContent := StripANSIString(outputContent)
+		
+		// Get StateStore and capture snapshot
+		store := GetStateStore(tabID)
+		if store != nil {
+			ctx := SnapshotContext{
+				WorkingDirectory: "", // TODO: Extract from terminal state
+				LastCommand:      "", // TODO: Extract from recent commands
+				LastExitCode:     0,
+			}
+			store.CaptureSnapshot(cleanedContent, ctx)
+		}
+		
+		// Feed to Forensics detector for exit code monitoring
+		detector := GetForensicsDetector(tabID)
+		if detector != nil {
+			detector.FeedOutput(cleanedContent)
+		}
+	}
+	
+	// Only flush to logger if there's an active conversation
 	if logger.GetActiveConversationID() == "" {
 		buf.input.Reset()
 		buf.output.Reset()
 		return
 	}
 	
-	// Flush input
+	// Check for image context to inject ("whisper")
+	analyzer := GetImageAnalyzer()
+	var imageContext string
+	if analyzer != nil {
+		if summary := analyzer.GetRecentSummary(tabID); summary != nil {
+			imageContext = summary.Description
+			// Clear after use to avoid repeated injection
+			analyzer.ClearRecentSummary(tabID)
+		}
+	}
+	
+	// Flush input with optional image context
 	if buf.input.Len() > 0 {
-		logger.AddUserInput(buf.input.String())
+		inputContent := buf.input.String()
+		if imageContext != "" {
+			// Prepend image context as a "whisper"
+			logger.AddUserInputWithContext(inputContent, imageContext)
+		} else {
+			logger.AddUserInput(inputContent)
+		}
 		buf.input.Reset()
 	}
 	

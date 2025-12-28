@@ -203,6 +203,9 @@ func main() {
 	http.HandleFunc("/api/am/restore/context/", WrapWithMiddleware(handleAMRestoreContext))
 	http.HandleFunc("/api/am/log", WrapWithMiddleware(handleAMLog))
 
+	// Time-Travel Rewind API (Industrial Phase 2)
+	http.HandleFunc("/api/am/session/", WrapWithMiddleware(handleAMSessionRewind))
+
 	// New Session-based Recovery API (v2)
 	http.HandleFunc("/api/am/v2/sessions", WrapWithMiddleware(handleAMV2Sessions))
 	http.HandleFunc("/api/am/v2/sessions/active", WrapWithMiddleware(handleAMV2ActiveSessions))

@@ -1,0 +1,306 @@
+/**
+ * HistorySlider.css - Time-Travel Scrubber Styles
+ * Industrial Phase 2: Terminal state reconstruction UI
+ */
+
+.history-slider-container {
+  position: fixed;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, rgba(26, 26, 26, 0.95) 0%, rgba(10, 10, 10, 0.98) 100%);
+  border-top: 1px solid rgba(249, 115, 22, 0.3);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  padding: 12px 16px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.history-slider-container.bottom {
+  bottom: 0;
+}
+
+.history-slider-container.top {
+  top: 0;
+  border-top: none;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+/* Header */
+.history-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.history-slider-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent, #f97316);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.history-slider-title svg {
+  opacity: 0.8;
+}
+
+.snapshot-count {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--subtext, #888);
+  background: rgba(249, 115, 22, 0.15);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.history-slider-close {
+  background: transparent;
+  border: none;
+  color: var(--subtext, #888);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.history-slider-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text, #fff);
+}
+
+/* Error State */
+.history-slider-error {
+  text-align: center;
+  padding: 16px;
+  color: var(--subtext, #888);
+}
+
+.history-slider-error small {
+  display: block;
+  margin-top: 8px;
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+/* Content */
+.history-slider-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Controls */
+.history-slider-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-control-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text, #e5e5e5);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-control-btn:hover {
+  background: rgba(249, 115, 22, 0.2);
+  border-color: rgba(249, 115, 22, 0.4);
+  color: var(--accent, #f97316);
+}
+
+.history-control-btn.play-btn {
+  background: var(--accent, #f97316);
+  color: #000;
+  border-color: transparent;
+}
+
+.history-control-btn.play-btn:hover {
+  background: #fb923c;
+}
+
+/* Slider Track */
+.history-slider-track {
+  flex: 1;
+  position: relative;
+  height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.history-slider-input {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.history-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--accent, #f97316);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
+  transition: transform 0.2s;
+}
+
+.history-slider-input::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.history-slider-input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--accent, #f97316);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
+}
+
+.history-slider-progress {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  background: linear-gradient(90deg, var(--accent, #f97316) 0%, rgba(249, 115, 22, 0.6) 100%);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Info */
+.history-slider-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--subtext, #888);
+}
+
+.time-display {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text, #e5e5e5);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.loading-indicator {
+  color: var(--accent, #f97316);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.preview-indicator {
+  color: var(--accent, #f97316);
+  font-weight: 500;
+}
+
+/* Ghost Terminal Overlay */
+.ghost-terminal-overlay {
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  max-width: 900px;
+  max-height: 60vh;
+  background: rgba(10, 10, 10, 0.95);
+  border: 2px solid rgba(249, 115, 22, 0.5);
+  border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ghost-terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: rgba(249, 115, 22, 0.15);
+  border-bottom: 1px solid rgba(249, 115, 22, 0.3);
+  font-size: 13px;
+  color: var(--accent, #f97316);
+}
+
+.ghost-close-btn {
+  background: var(--accent, #f97316);
+  color: #000;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ghost-close-btn:hover {
+  background: #fb923c;
+}
+
+.ghost-terminal-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(229, 229, 229, 0.9);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+/* Scrollbar styling for ghost terminal */
+.ghost-terminal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ghost-terminal-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.ghost-terminal-content::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.4);
+  border-radius: 4px;
+}
+
+.ghost-terminal-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(249, 115, 22, 0.6);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .history-slider-container {
+    padding: 10px 12px;
+  }
+
+  .ghost-terminal-overlay {
+    width: 95%;
+    max-height: 50vh;
+  }
+}
