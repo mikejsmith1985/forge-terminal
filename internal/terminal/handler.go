@@ -307,6 +307,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Removed: amInputAccumulator, lastAMCheck, llmOutputBuffer, flushTimeout, lastFlushCheck, lastLLMFlush
 	// These are now handled by the async pipeline in internal/am/async_pipeline.go
 
+	// EXECUTIVE TRIGGER: Smart Model Routing via "?" prefix
+	executiveTrigger := NewExecutiveTriggerHandler(visionParser)
+	lineBuffer := NewLineBuffer()
+	var smartRoutingEnabled atomic.Bool
+	smartRoutingEnabled.Store(true) // Enabled by default
+
 	// Channel to coordinate shutdown with reason
 	type closeReason struct {
 		code   int
@@ -535,6 +541,52 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 						"stats":   autoRespondDetector.GetStats(),
 					})
 					continue
+				}
+
+				// Check for smart routing toggle control
+				var routingMsg struct {
+					Type    string `json:"type"`
+					Enabled bool   `json:"enabled"`
+				}
+				if err := json.Unmarshal(data, &routingMsg); err == nil && routingMsg.Type == "SMART_ROUTING_TOGGLE" {
+					smartRoutingEnabled.Store(routingMsg.Enabled)
+					log.Printf("[SmartRouting] Smart routing set to %v for session %s", routingMsg.Enabled, sessionID)
+					_ = conn.WriteJSON(map[string]interface{}{
+						"type":    "SMART_ROUTING_CONFIRMED",
+						"enabled": routingMsg.Enabled,
+					})
+					continue
+				}
+			}
+
+			// ═══ EXECUTIVE TRIGGER: Check for "?" smart routing ═══
+			// Detect complete lines ending with Enter and check for "?" prefix
+			if smartRoutingEnabled.Load() {
+				lines := lineBuffer.Add(data)
+				for _, line := range lines {
+					if IsExecutiveTrigger(line) {
+						prompt := ExtractPrompt(line)
+						log.Printf("[SmartRouting] Executive trigger detected: %s", prompt)
+
+						// Handle the routing asynchronously
+						go func(p string) {
+							err := executiveTrigger.Handle(p, session, func(tier, toolName, prompt string) {
+								// Notify frontend of active routing
+								_ = conn.WriteJSON(map[string]interface{}{
+									"type":     "ROUTING_ACTIVE",
+									"tier":     tier,
+									"toolName": toolName,
+									"prompt":   prompt,
+								})
+							})
+							if err != nil {
+								log.Printf("[SmartRouting] Routing error: %v", err)
+							}
+						}(prompt)
+
+						// Don't write the "?" line to PTY - we'll inject the routed command instead
+						continue
+					}
 				}
 			}
 

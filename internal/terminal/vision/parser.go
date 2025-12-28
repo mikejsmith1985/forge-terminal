@@ -16,16 +16,22 @@ type Parser struct {
 	debounceTime    time.Duration
 	enabled         bool
 	insightsTracker *InsightsTracker // Optional insights tracking
+
+	// Image summary for multimodal context bridge
+	lastImageSummary     string
+	lastImageSummaryTime time.Time
+	imageSummaryTTL      time.Duration // How long to keep the summary valid (0 = forever)
 }
 
 // NewParser creates a stream parser with specified buffer size.
 func NewParser(maxSize int, registry *Registry) *Parser {
 	return &Parser{
-		buffer:       make([]byte, 0, maxSize),
-		maxSize:      maxSize,
-		registry:     registry,
-		debounceTime: 200 * time.Millisecond, // Wait for output to stabilize
-		enabled:      false,                   // Disabled by default (Dev Mode)
+		buffer:          make([]byte, 0, maxSize),
+		maxSize:         maxSize,
+		registry:        registry,
+		debounceTime:    200 * time.Millisecond, // Wait for output to stabilize
+		enabled:         false,                   // Disabled by default (Dev Mode)
+		imageSummaryTTL: 5 * time.Minute,        // Image context valid for 5 minutes
 	}
 }
 
@@ -155,4 +161,48 @@ func (p *Parser) Clear() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.buffer = make([]byte, 0, p.maxSize)
+}
+
+// SetLastImageSummary stores a summary from image analysis.
+// This is used by the multimodal context bridge to give "blind"
+// CLI tools (like Copilot) visual context.
+func (p *Parser) SetLastImageSummary(summary string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.lastImageSummary = summary
+	p.lastImageSummaryTime = time.Now()
+}
+
+// GetLastImageSummary returns the most recent image summary if still valid.
+// Returns empty string if no summary exists or if it has expired.
+func (p *Parser) GetLastImageSummary() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// Check if summary exists
+	if p.lastImageSummary == "" {
+		return ""
+	}
+
+	// Check if summary is still valid (within TTL)
+	if p.imageSummaryTTL > 0 && time.Since(p.lastImageSummaryTime) > p.imageSummaryTTL {
+		return "" // Expired
+	}
+
+	return p.lastImageSummary
+}
+
+// ClearImageSummary clears the stored image summary.
+func (p *Parser) ClearImageSummary() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.lastImageSummary = ""
+}
+
+// SetImageSummaryTTL sets how long image summaries remain valid.
+// Use 0 for no expiration.
+func (p *Parser) SetImageSummaryTTL(ttl time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.imageSummaryTTL = ttl
 }

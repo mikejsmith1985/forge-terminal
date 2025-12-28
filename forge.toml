@@ -1,0 +1,28 @@
+# Forge Terminal - Smart Model Routing Configuration
+# Define which CLI tool to use for each complexity tier
+
+[routing]
+# Tier 1: Free/Unlimited - Use for quick tasks (linting, tests, simple edits)
+tier1_name = "Copilot"
+tier1_cmd = "gh copilot suggest \"{prompt}\""
+
+# Tier 2: Standard - Use for refactoring, debugging, code review
+tier2_name = "Copilot"
+tier2_cmd = "gh copilot suggest \"{prompt}\""
+
+# Tier 3: High Reasoning - Use for architecture, design, complex analysis
+tier3_name = "Aider"
+tier3_cmd = "aider --yes-always --model claude-3-5-sonnet-20241022 --message \"{prompt}\""
+
+[context]
+# Automatically include terminal context in prompts
+include_cwd = true
+include_git_branch = true
+include_vision = true  # Include recent screenshot summaries
+
+# Available placeholders for commands:
+# {prompt}     - The user's input after "?"
+# {cwd}        - Current working directory
+# {branch}     - Git branch name
+# {vision}     - Recent Forge Vision summary (if available)
+# {file}       - Currently focused file (if detected)
