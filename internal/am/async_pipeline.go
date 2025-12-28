@@ -49,15 +49,16 @@ const (
 // AsyncPipeline provides a non-blocking capture pipeline.
 // It decouples the PTY read loop from LLM detection and logging.
 type AsyncPipeline struct {
-	config   PipelineConfig
-	inputCh  chan PipelineMessage
-	running  atomic.Bool
-	wg       sync.WaitGroup
-	stopCh   chan struct{}
-	
+	config  PipelineConfig
+	inputCh chan PipelineMessage
+	running atomic.Bool
+	wg      sync.WaitGroup
+	stopCh  chan struct{}
+
 	// Stats for monitoring
-	droppedMessages atomic.Int64
+	droppedMessages   atomic.Int64
 	processedMessages atomic.Int64
+	binaryMessages    atomic.Int64 // Count of binary/image data skipped
 }
 
 // NewAsyncPipeline creates a new async pipeline.
@@ -178,60 +179,125 @@ func (p *AsyncPipeline) GetStats() (processed, dropped int64) {
 	return p.processedMessages.Load(), p.droppedMessages.Load()
 }
 
+// GetExtendedStats returns extended pipeline statistics including binary count.
+func (p *AsyncPipeline) GetExtendedStats() PipelineStats {
+	processed := p.processedMessages.Load()
+	dropped := p.droppedMessages.Load()
+	binary := p.binaryMessages.Load()
+	total := processed + dropped
+	var dropRate float64
+	if total > 0 {
+		dropRate = float64(dropped) / float64(total)
+	}
+	return PipelineStats{
+		Processed:    processed,
+		Dropped:      dropped,
+		Binary:       binary,
+		ChannelDepth: len(p.inputCh),
+		DropRate:     dropRate,
+	}
+}
+
+// PipelineStats holds extended pipeline statistics.
+type PipelineStats struct {
+	Processed    int64
+	Dropped      int64
+	Binary       int64
+	ChannelDepth int
+	DropRate     float64
+}
+
 // tabBuffer holds per-tab buffers for batching input/output.
+// Uses pooled buffers to reduce GC pressure.
 type tabBuffer struct {
-	input      bytes.Buffer
-	output     bytes.Buffer
+	input      *bytes.Buffer
+	output     *bytes.Buffer
 	lastFlush  time.Time
 	lastInput  time.Time
 	lastOutput time.Time
 }
 
-// worker is the background goroutine that processes all AM data.
+// newTabBuffer creates a new tabBuffer with pooled buffers.
+func newTabBuffer() *tabBuffer {
+	return &tabBuffer{
+		input:      GetBuffer(),
+		output:     GetBuffer(),
+		lastFlush:  time.Now(),
+		lastInput:  time.Now(),
+		lastOutput: time.Now(),
+	}
+}
+
+// release returns buffers to the pool.
+func (tb *tabBuffer) release() {
+	if tb.input != nil {
+		PutBuffer(tb.input)
+		tb.input = nil
+	}
+	if tb.output != nil {
+		PutBuffer(tb.output)
+		tb.output = nil
+	}
+}
+
+// ProcessLoop is the main processing goroutine that handles all AM data.
+// This is the renamed worker function following the ProcessLoop pattern.
 // ALL LLM Parsing, ANSI Stripping, and JSON Serialization happens here.
-func (p *AsyncPipeline) worker(amSystem *System) {
+// Image/binary data is detected and routed to side-channel to prevent text parsing.
+func (p *AsyncPipeline) ProcessLoop(amSystem *System) {
 	defer p.wg.Done()
-	
-	// Per-tab buffers for batching
+
+	// Per-tab buffers for batching (using pooled buffers)
 	buffers := make(map[string]*tabBuffer)
-	
+	defer func() {
+		// Release all pooled buffers on shutdown
+		for _, buf := range buffers {
+			buf.release()
+		}
+	}()
+
 	flushTicker := time.NewTicker(p.config.FlushInterval)
 	defer flushTicker.Stop()
-	
+
 	for {
 		select {
 		case <-p.stopCh:
 			// Final flush before shutdown
 			p.flushAllBuffers(amSystem, buffers)
 			return
-			
+
 		case msg := <-p.inputCh:
 			p.processedMessages.Add(1)
-			
+
+			// Image/Binary detection - route to side channel immediately
+			if msg.Type == MsgTypeOutput && len(msg.Data) >= 8 {
+				detection := DetectImageData(msg.Data)
+				if detection.IsImage || detection.IsBinary {
+					p.handleBinaryData(amSystem, msg.TabID, msg.Data, detection)
+					continue // Don't process as text
+				}
+			}
+
 			// Get or create buffer for this tab
 			buf, ok := buffers[msg.TabID]
 			if !ok {
-				buf = &tabBuffer{
-					lastFlush:  time.Now(),
-					lastInput:  time.Now(),
-					lastOutput: time.Now(),
-				}
+				buf = newTabBuffer()
 				buffers[msg.TabID] = buf
 			}
-			
+
 			switch msg.Type {
 			case MsgTypeInput:
 				buf.input.Write(msg.Data)
 				buf.lastInput = msg.Timestamp
-				
+
 			case MsgTypeOutput:
 				buf.output.Write(msg.Data)
 				buf.lastOutput = msg.Timestamp
-				
+
 			case MsgTypeCommand:
 				// Process command for LLM detection
 				p.processCommand(amSystem, msg.TabID, string(msg.Data))
-				
+
 			case MsgTypeEndConversation:
 				// Flush and end conversation
 				p.flushTabBuffer(amSystem, msg.TabID, buf)
@@ -239,17 +305,37 @@ func (p *AsyncPipeline) worker(amSystem *System) {
 					logger.EndConversation()
 				}
 			}
-			
+
 			// Check if buffer exceeds max size
 			if buf.output.Len() > p.config.MaxBufferSize {
 				p.flushTabBuffer(amSystem, msg.TabID, buf)
 			}
-			
+
 		case <-flushTicker.C:
 			// Periodic flush of all buffers
 			p.flushAllBuffers(amSystem, buffers)
 		}
 	}
+}
+
+// handleBinaryData routes binary/image data to appropriate handler.
+// This prevents attempting to parse binary as text which would corrupt output.
+func (p *AsyncPipeline) handleBinaryData(amSystem *System, tabID string, data []byte, detection ImageDetectionResult) {
+	// Log detection for debugging (minimal logging in hot path)
+	if p.config.EnableDebugLogs {
+		log.Printf("[AsyncPipeline] Binary data detected: format=%s isBase64=%v size=%d",
+			detection.Format, detection.IsBase64, len(data))
+	}
+
+	// For now, we simply skip binary data from text processing
+	// Future enhancement: route to image storage system
+	p.binaryMessages.Add(1)
+}
+
+// worker is an alias for ProcessLoop for backwards compatibility.
+// Deprecated: Use ProcessLoop directly.
+func (p *AsyncPipeline) worker(amSystem *System) {
+	p.ProcessLoop(amSystem)
 }
 
 // processCommand handles LLM command detection in the background.
@@ -334,103 +420,20 @@ func copyBytes(data []byte) []byte {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// OPTIMIZED ANSI STRIPPING - State machine approach, zero allocations in hot path
+// OPTIMIZED ANSI STRIPPING - Delegates to parser_core state machine
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// StripANSIFast removes ANSI escape sequences using a state machine.
+// StripANSIFast removes ANSI escape sequences using the state machine from parser_core.
 // This is optimized for high-frequency stream processing without regex.
+// Deprecated: Use StripANSIBytes from parser_core.go directly for new code.
 func StripANSIFast(input []byte) []byte {
-	if len(input) == 0 {
-		return input
-	}
-	
-	// Fast path: check if there are any escape sequences
-	hasEscape := false
-	for _, b := range input {
-		if b == 0x1b {
-			hasEscape = true
-			break
-		}
-	}
-	if !hasEscape {
-		return input
-	}
-	
-	// State machine for ANSI parsing
-	const (
-		stateNormal = iota
-		stateEscape       // Saw ESC (0x1b)
-		stateCSI          // Saw ESC [ (CSI sequence)
-		stateOSC          // Saw ESC ] (OSC sequence)
-		stateOSCString    // Inside OSC string
-	)
-	
-	result := make([]byte, 0, len(input))
-	state := stateNormal
-	
-	for i := 0; i < len(input); i++ {
-		b := input[i]
-		
-		switch state {
-		case stateNormal:
-			if b == 0x1b {
-				state = stateEscape
-			} else if b >= 32 || b == '\n' || b == '\t' || b == '\r' {
-				result = append(result, b)
-			}
-			
-		case stateEscape:
-			switch b {
-			case '[':
-				state = stateCSI
-			case ']':
-				state = stateOSC
-			case '(':
-				// Skip next byte (charset designation)
-				if i+1 < len(input) {
-					i++
-				}
-				state = stateNormal
-			default:
-				// Single-character escape sequence
-				if b >= 0x40 && b <= 0x5f {
-					state = stateNormal
-				} else {
-					state = stateNormal
-				}
-			}
-			
-		case stateCSI:
-			// CSI sequence ends with letter (0x40-0x7e)
-			if b >= 0x40 && b <= 0x7e {
-				state = stateNormal
-			}
-			// Stay in CSI state for parameter bytes (0x30-0x3f) and intermediate (0x20-0x2f)
-			
-		case stateOSC:
-			if b == 0x07 { // BEL terminates OSC
-				state = stateNormal
-			} else if b == 0x1b {
-				// Check for ST (ESC \)
-				if i+1 < len(input) && input[i+1] == '\\' {
-					i++
-					state = stateNormal
-				}
-			}
-			// Stay in OSC state otherwise
-		}
-	}
-	
-	return result
+	return StripANSIBytes(input)
 }
 
 // StripANSIFastString is a string wrapper for StripANSIFast.
+// Deprecated: Use StripANSIString from parser_core.go directly for new code.
 func StripANSIFastString(input string) string {
-	if len(input) == 0 {
-		return input
-	}
-	result := StripANSIFast([]byte(input))
-	return string(result)
+	return StripANSIString(input)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

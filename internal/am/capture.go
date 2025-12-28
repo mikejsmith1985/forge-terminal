@@ -2,7 +2,6 @@
 package am
 
 import (
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -275,23 +274,20 @@ func (c *ConversationCapture) Reset() {
 
 // --- Input Cleaning Functions ---
 
-// ANSI escape sequence pattern - comprehensive pattern for terminal escape codes
-// Matches: CSI sequences, OSC sequences (including rgb colors), DCS, PM, APC, and single-char escapes
-var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[PX^_][^\x1b]*\x1b\\|\x1b.`)
-
 // CleanUserInput processes raw PTY input into clean user prompt text.
+// Uses state machine parser from parser_core.go instead of regex.
 func CleanUserInput(raw string) string {
 	// Step 1: Apply backspace logic
-	result := applyBackspaces(raw)
+	result := string(ApplyBackspaces([]byte(raw)))
 
-	// Step 2: Remove ANSI escape sequences
-	result = ansiPattern.ReplaceAllString(result, "")
+	// Step 2: Remove ANSI escape sequences (state machine)
+	result = StripANSIString(result)
 
-	// Step 3: Remove control characters except newline/tab
+	// Step 3: Remove control characters (bytes < 32 except newline/tab)
 	result = removeControlChars(result)
 
-	// Step 4: Normalize whitespace
-	result = normalizeWhitespace(result)
+	// Step 4: Normalize whitespace (byte-level, no regex)
+	result = NormalizeWhitespace(result)
 
 	// Step 5: Remove CLI prompt characters if at start
 	result = strings.TrimLeft(result, "> ❯ ")
@@ -299,26 +295,12 @@ func CleanUserInput(raw string) string {
 	return strings.TrimSpace(result)
 }
 
-// applyBackspaces processes backspace characters in input.
-// Handles both DEL (0x7f) and BS (0x08) by deleting previous character.
+// applyBackspaces is deprecated - use ApplyBackspaces from parser_core.go
 func applyBackspaces(s string) string {
-	var result []rune
-	runes := []rune(s)
-	
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
-		if r == '\x7f' || r == '\x08' { // DEL or BS
-			if len(result) > 0 {
-				result = result[:len(result)-1]
-			}
-		} else {
-			result = append(result, r)
-		}
-	}
-	return string(result)
+	return string(ApplyBackspaces([]byte(s)))
 }
 
-// removeControlChars removes control characters except newline and tab.
+// removeControlChars is now handled by StripANSIToBuffer in parser_core.go
 func removeControlChars(s string) string {
 	var result strings.Builder
 	for _, r := range s {
@@ -329,34 +311,24 @@ func removeControlChars(s string) string {
 	return result.String()
 }
 
-// normalizeWhitespace collapses multiple spaces and trims.
+// normalizeWhitespace uses byte-level normalization from parser_core.go
 func normalizeWhitespace(s string) string {
-	// Replace multiple spaces with single space
-	space := regexp.MustCompile(`[ \t]+`)
-	s = space.ReplaceAllString(s, " ")
-
-	// Replace multiple newlines with single
-	newlines := regexp.MustCompile(`[\r\n]+`)
-	s = newlines.ReplaceAllString(s, "\n")
-
-	return strings.TrimSpace(s)
+	return NormalizeWhitespace(s)
 }
 
 // --- Output Parsing Functions ---
 
 // ParseAssistantOutput cleans assistant output and returns confidence score.
+// Uses state machine parser from parser_core.go instead of regex.
 func ParseAssistantOutput(raw string, provider string) (string, float64) {
-	// Step 1: Remove ANSI sequences
-	cleaned := ansiPattern.ReplaceAllString(raw, "")
+	// Step 1: Remove ANSI sequences (state machine)
+	cleaned := StripANSIString(raw)
 
-	// Step 2: Remove common TUI artifacts
+	// Step 2: Remove common TUI artifacts (byte-level scanning)
 	cleaned = removeTUIArtifacts(cleaned, provider)
 
-	// Step 3: Remove control characters
-	cleaned = removeControlChars(cleaned)
-
-	// Step 4: Normalize whitespace
-	cleaned = normalizeWhitespace(cleaned)
+	// Step 3: Normalize whitespace
+	cleaned = NormalizeWhitespace(cleaned)
 
 	// Calculate confidence based on how much was stripped
 	confidence := calculateParseConfidence(raw, cleaned)
@@ -365,40 +337,69 @@ func ParseAssistantOutput(raw string, provider string) (string, float64) {
 }
 
 // removeTUIArtifacts removes provider-specific TUI elements.
+// Uses byte-level scanning instead of regex for performance.
 func removeTUIArtifacts(s string, provider string) string {
-	// Common patterns to remove
-	patterns := []string{
-		`\[[\?0-9;]*[hlm]`,           // DEC private modes
-		`\[\d+;\d+H`,                  // Cursor positioning
-		`\[\d+[ABCD]`,                 // Cursor movement
-		`\[[\d;]*m`,                   // SGR (colors)
-		`\[\?2004[hl]`,                // Bracketed paste
-		`\[\?25[hl]`,                  // Cursor visibility
-		`\[\?1049[hl]`,                // Alternate screen
-	}
+	// The main ANSI sequences are already stripped by StripANSIString.
+	// This function handles remaining text-based artifacts.
 
 	result := s
-	for _, pattern := range patterns {
-		re := regexp.MustCompile(pattern)
-		result = re.ReplaceAllString(result, "")
-	}
 
-	// Provider-specific cleanup
+	// Provider-specific cleanup using string operations
 	switch provider {
 	case "github-copilot":
-		// Remove Copilot TUI frames
-		result = regexp.MustCompile(`Welcome to GitHub Copilot.*?mistakes\.`).ReplaceAllString(result, "")
-		result = regexp.MustCompile(`●.*?\n`).ReplaceAllString(result, "") // Status lines
+		// Remove Copilot welcome message
+		result = removeSubstringBetween(result, "Welcome to GitHub Copilot", "mistakes.")
+		// Remove status lines (lines starting with ●)
+		result = removeLinesWithPrefix(result, "●")
 	case "claude":
-		// Remove Claude TUI frames
-		result = regexp.MustCompile(`Claude Code v[\d.]+`).ReplaceAllString(result, "")
-		result = regexp.MustCompile(`Tips for getting started.*?\n`).ReplaceAllString(result, "")
+		// Remove Claude version header
+		result = removeLineContaining(result, "Claude Code v")
+		// Remove tips line
+		result = removeLineContaining(result, "Tips for getting started")
 	}
 
 	return result
 }
 
+// removeSubstringBetween removes text between start and end markers (inclusive).
+func removeSubstringBetween(s, start, end string) string {
+	startIdx := strings.Index(s, start)
+	if startIdx == -1 {
+		return s
+	}
+	endIdx := strings.Index(s[startIdx:], end)
+	if endIdx == -1 {
+		return s
+	}
+	return s[:startIdx] + s[startIdx+endIdx+len(end):]
+}
+
+// removeLinesWithPrefix removes all lines starting with the given prefix.
+func removeLinesWithPrefix(s, prefix string) string {
+	lines := strings.Split(s, "\n")
+	var result []string
+	for _, line := range lines {
+		if !strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			result = append(result, line)
+		}
+	}
+	return strings.Join(result, "\n")
+}
+
+// removeLineContaining removes lines containing the substring.
+func removeLineContaining(s, substr string) string {
+	lines := strings.Split(s, "\n")
+	var result []string
+	for _, line := range lines {
+		if !strings.Contains(line, substr) {
+			result = append(result, line)
+		}
+	}
+	return strings.Join(result, "\n")
+}
+
 // calculateParseConfidence estimates parsing quality.
+// Uses byte-level artifact detection instead of regex.
 func calculateParseConfidence(raw, cleaned string) float64 {
 	if len(raw) == 0 {
 		return 0.0
@@ -407,21 +408,17 @@ func calculateParseConfidence(raw, cleaned string) float64 {
 	// Ratio of content retained
 	retentionRatio := float64(len(cleaned)) / float64(len(raw))
 
-	// Check for remaining artifacts
-	artifactPatterns := []string{
-		`\[`,      // Unclosed escape
-		`\x1b`,    // Raw escape char
-		`\?\d+`,   // DEC mode remnants
+	// Check for remaining artifacts using ContainsANSIArtifacts from parser_core
+	artifactPenalty := 0.0
+	if ContainsANSIArtifacts(cleaned) {
+		artifactPenalty = 0.2
 	}
 
-	artifactCount := 0
-	for _, pattern := range artifactPatterns {
-		re := regexp.MustCompile(pattern)
-		artifactCount += len(re.FindAllString(cleaned, -1))
+	// Additional check for orphaned brackets (common artifact)
+	bracketCount := strings.Count(cleaned, "[")
+	if bracketCount > 5 {
+		artifactPenalty += float64(bracketCount) * 0.01
 	}
-
-	// Penalize for artifacts
-	artifactPenalty := float64(artifactCount) * 0.05
 
 	// Base confidence from retention (too low = stripped too much, too high = didn't clean)
 	var baseConfidence float64

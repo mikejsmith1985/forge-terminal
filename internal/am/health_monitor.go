@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -304,10 +303,8 @@ func (hm *HealthMonitor) RecordPTYHeartbeat() {
 	// No-op - legacy compatibility
 }
 
-// ANSI artifact patterns that indicate corrupted content
-var ansiArtifacts = regexp.MustCompile(`\[\??[0-9;]*[a-zA-Z]|\x1b`)
-
 // ValidateConversationContent checks if a conversation file has valid, clean content.
+// Uses ContainsANSIArtifacts from parser_core.go instead of regex.
 func ValidateConversationContent(filePath string) (bool, string) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -328,12 +325,12 @@ func ValidateConversationContent(filePath string) (bool, string) {
 		return false, "no conversation turns found"
 	}
 
-	// Check each turn for ANSI artifacts
+	// Check each turn for ANSI artifacts using parser_core
 	for i, turn := range conv.Turns {
 		if len(turn.Content) == 0 {
 			continue
 		}
-		if ansiArtifacts.MatchString(turn.Content) {
+		if ContainsANSIArtifacts(turn.Content) {
 			return false, "turn " + string(rune('0'+i)) + " contains ANSI artifacts"
 		}
 	}

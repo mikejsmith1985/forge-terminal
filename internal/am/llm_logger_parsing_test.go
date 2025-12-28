@@ -150,7 +150,8 @@ func TestANSIPatternMatching(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ansiPattern.ReplaceAllString(tt.input, "")
+			// Use StripANSIString from parser_core.go instead of removed ansiPattern
+			result := StripANSIString(tt.input)
 			if tt.removed && result != "" {
 				t.Errorf("ANSI not removed: input=%q result=%q", tt.input, result)
 			}

@@ -1174,6 +1174,7 @@ func GetActiveConversations() map[string]*LLMConversation {
 
 // saveConversationAsync saves conversation to disk without blocking.
 // Used for snapshot saves to prevent keyboard lag.
+// Uses atomic write (write to .tmp then rename) to prevent corruption on crash.
 func (l *LLMLogger) saveConversationAsync(conv *LLMConversation) {
 	if l.amDir == "" {
 		return
@@ -1193,7 +1194,8 @@ func (l *LLMLogger) saveConversationAsync(conv *LLMConversation) {
 		return
 	}
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	// Atomic write: write to .tmp file first, then rename
+	if err := atomicWriteFile(filePath, data, 0644); err != nil {
 		log.Printf("[LLM Logger] ❌ Failed to write conversation to %s: %v", filePath, err)
 		return
 	}
@@ -1222,13 +1224,34 @@ func (l *LLMLogger) saveConversation(conv *LLMConversation) {
 		return
 	}
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	// Atomic write: write to .tmp file first, then rename
+	if err := atomicWriteFile(filePath, data, 0644); err != nil {
 		log.Printf("[LLM Logger] ❌ Failed to write conversation to %s: %v", filePath, err)
 		return
 	}
 
 	log.Printf("[LLM Logger] ✅ Saved conversation %s to %s (%d bytes, %d turns, %d snapshots)",
 		conv.ConversationID, filename, len(data), len(conv.Turns), len(conv.ScreenSnapshots))
+}
+
+// atomicWriteFile writes data to a file atomically using a temp file and rename.
+// This ensures that if the app crashes during write, the previous file remains intact.
+func atomicWriteFile(filePath string, data []byte, perm os.FileMode) error {
+	// Write to temp file in same directory (same filesystem for atomic rename)
+	tmpPath := filePath + ".tmp"
+
+	if err := os.WriteFile(tmpPath, data, perm); err != nil {
+		return fmt.Errorf("write temp file: %w", err)
+	}
+
+	// Atomic rename - this is atomic on POSIX and Windows (same volume)
+	if err := os.Rename(tmpPath, filePath); err != nil {
+		// Clean up temp file on failure
+		os.Remove(tmpPath)
+		return fmt.Errorf("rename temp to final: %w", err)
+	}
+
+	return nil
 }
 
 // loadConversationsFromDisk loads existing conversations from disk for this tab.

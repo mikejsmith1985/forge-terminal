@@ -4,7 +4,6 @@ package am
 import (
 	"fmt"
 	"log"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -337,15 +336,21 @@ func ExtractConversationSummary(conv *LLMConversation) string {
 }
 
 // CleanTUIContent removes common TUI chrome and formatting artifacts.
+// Uses byte-level functions from parser_core.go instead of regex.
 func CleanTUIContent(content string) string {
-	// Remove box drawing characters
-	boxChars := regexp.MustCompile(`[─│┌┐└┘├┤┬┴┼╭╮╰╯╔╗╚╝╠╣╦╩╬]`)
-	cleaned := boxChars.ReplaceAllString(content, "")
-	
-	// Remove repeated separator lines
-	sepLines := regexp.MustCompile(`\n[-─=]{3,}\n`)
-	cleaned = sepLines.ReplaceAllString(cleaned, "\n")
-	
+	// Remove box drawing characters (using parser_core)
+	cleaned := StripBoxDrawing(content)
+
+	// Remove repeated separator lines (using IsSeparatorLine from parser_core)
+	lines := strings.Split(cleaned, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if !IsSeparatorLine(line) {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+	cleaned = strings.Join(filteredLines, "\n")
+
 	// Remove UI hints
 	uiHints := []string{
 		"Ctrl+c Exit",
@@ -357,9 +362,9 @@ func CleanTUIContent(content string) string {
 	for _, hint := range uiHints {
 		cleaned = strings.ReplaceAll(cleaned, hint, "")
 	}
-	
-	// Normalize whitespace
-	lines := strings.Split(cleaned, "\n")
+
+	// Normalize whitespace - remove empty lines and trim
+	lines = strings.Split(cleaned, "\n")
 	var result []string
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -367,6 +372,6 @@ func CleanTUIContent(content string) string {
 			result = append(result, trimmed)
 		}
 	}
-	
+
 	return strings.Join(result, "\n")
 }
