@@ -217,6 +217,9 @@ func main() {
 	http.HandleFunc("/api/vision/insights/", WrapWithMiddleware(handleVisionInsights))
 	http.HandleFunc("/api/vision/insights/summary/", WrapWithMiddleware(handleVisionInsightsSummary))
 
+	// Model Router API (Industrial Phase 2)
+	http.HandleFunc("/api/llm/model-tier", WrapWithMiddleware(handleModelTier))
+
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
 	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))

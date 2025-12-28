@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle, Clock } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
@@ -23,6 +23,7 @@ import AMMonitor from './components/AMMonitor'
 import AMDebugPanel from './components/AMDebugPanel'
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
+import HistorySlider from './components/HistorySlider'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -103,6 +104,12 @@ function App() {
   const [isWorkflowExecutorOpen, setIsWorkflowExecutorOpen] = useState(false)
   const [executingWorkflow, setExecutingWorkflow] = useState(null)
   
+  // Time-Travel UI state
+  const [isHistorySliderOpen, setIsHistorySliderOpen] = useState(false)
+  
+  // Model Router state
+  const [currentModelTier, setCurrentModelTier] = useState(null)
+  
   // Tab management
   const {
     tabs,
@@ -135,6 +142,30 @@ function App() {
     updateWorkflow,
     deleteWorkflow,
   } = useWorkflowManager();
+  
+  // Query model tier when terminal input changes
+  const queryModelTier = useCallback(async (input) => {
+    if (!input || input.trim().length < 10) {
+      setCurrentModelTier(null);
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/llm/model-tier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentModelTier(data.tier);
+        logger.router('Model tier classified', { input, tier: data.tier });
+      }
+    } catch (err) {
+      console.warn('[ModelRouter] Classification failed:', err);
+    }
+  }, []);
   
   // AM Master Control state (global kill switch for ALL tabs)
   const [amMasterEnabled, setAMMasterEnabled] = useState(() => {
@@ -764,6 +795,13 @@ function App() {
       if (e.ctrlKey && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
         setIsSearchOpen(true);
+        return;
+      }
+      
+      // Ctrl+Shift+H: Toggle History Slider
+      if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        setIsHistorySliderOpen(prev => !prev);
         return;
       }
       
@@ -1478,6 +1516,14 @@ function App() {
           {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
         </button>
         <div className="spacer"></div>
+        {/* Time-Travel button */}
+        <button 
+          className={`btn btn-ghost btn-icon ${isHistorySliderOpen ? 'active' : ''}`}
+          onClick={() => setIsHistorySliderOpen(prev => !prev)} 
+          title="Time Travel (Ctrl+Shift+H)"
+        >
+          <Clock size={18} />
+        </button>
         {/* Feedback button */}
         <button 
           className="btn btn-ghost btn-icon"
@@ -1569,6 +1615,25 @@ function App() {
           amEnabled={activeTab.amEnabled || false}
           devMode={devMode}
         />
+      )}
+      
+      {/* Model Router Indicator */}
+      {currentModelTier && (
+        <div className="model-tier-indicator" style={{
+          padding: '8px 12px',
+          margin: '8px 0',
+          background: 'rgba(139, 92, 246, 0.15)',
+          border: '1px solid rgba(139, 92, 246, 0.3)',
+          borderRadius: '6px',
+          fontSize: '12px',
+          color: '#a78bfa',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span style={{ fontWeight: 600 }}>Routed to {currentModelTier}</span>
+          <span style={{ opacity: 0.7 }}>{currentModelTier === 'Opus' ? '🧠 Architecture' : currentModelTier === 'Sonnet' ? '🔧 Refactor' : '⚡ Quick Task'}</span>
+        </div>
       )}
 
       {/* Content area - Cards, Workflows, Files, Assistant, or Debug */}
@@ -1715,6 +1780,7 @@ function App() {
                   onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
                   onPaste={() => addToast('Text pasted from clipboard', 'success', 1500)}
                   onFeedbackClick={() => setIsFeedbackModalOpen(true)}
+                  onTerminalCommand={queryModelTier}
                 />
               </div>
             ))}
@@ -1817,6 +1883,21 @@ function App() {
 
       {/* AM Debug Panel - Shows real-time AM logging activity */}
       {devMode && <AMDebugPanel />}
+      
+      {/* History Slider - Time-Travel Scrubber */}
+      {activeTabId && (
+        <HistorySlider
+          tabId={activeTabId}
+          isOpen={isHistorySliderOpen}
+          onClose={() => setIsHistorySliderOpen(false)}
+          onPreview={(data) => {
+            if (data) {
+              addToast(`Viewing terminal state at ${new Date(data.timestamp).toLocaleTimeString()}`, 'info', 2000);
+            }
+          }}
+          position="bottom"
+        />
+      )}
     </div>
   )
 }

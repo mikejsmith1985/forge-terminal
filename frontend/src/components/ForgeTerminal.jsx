@@ -343,6 +343,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
+  onTerminalCommand = null, // Callback when command is executed (for model tier detection)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name (for AM logging)
@@ -373,6 +374,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const onDirectoryChangeRef = useRef(onDirectoryChange);
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
+  const onTerminalCommandRef = useRef(onTerminalCommand);
+  const commandBufferRef = useRef(''); // Track current command line for model tier detection
   // AM logging refs
   const amLogBufferRef = useRef('');
   const amLogTimeoutRef = useRef(null);
@@ -437,6 +440,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onPasteRef.current = onPaste;
   }, [onPaste]);
+  
+  // Keep onTerminalCommand ref updated
+  useEffect(() => {
+    onTerminalCommandRef.current = onTerminalCommand;
+  }, [onTerminalCommand]);
   
   // Keep visionEnabled ref updated and send control message to backend
   useEffect(() => {
@@ -1291,6 +1299,28 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
+          
+          // Track command buffer for model tier detection
+          if (onTerminalCommandRef.current) {
+            // Check if Enter key was pressed
+            if (data === '\r' || data === '\n' || data === '\r\n') {
+              const command = commandBufferRef.current.trim();
+              if (command.length >= 10) {
+                // Only analyze substantial commands
+                onTerminalCommandRef.current(command);
+              }
+              commandBufferRef.current = ''; // Reset after Enter
+            } else if (data === '\x7f' || data === '\b') {
+              // Backspace - remove last character
+              commandBufferRef.current = commandBufferRef.current.slice(0, -1);
+            } else if (data === '\x03') {
+              // Ctrl+C - clear buffer
+              commandBufferRef.current = '';
+            } else if (data.charCodeAt(0) >= 32) {
+              // Printable character - add to buffer
+              commandBufferRef.current += data;
+            }
+          }
           
           // AM logging: Optimized input capture - only when AM enabled
           if (amEnabledRef.current) {
