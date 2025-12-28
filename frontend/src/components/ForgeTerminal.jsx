@@ -127,6 +127,67 @@ const TUI_FRAME_INDICATORS = [
   /Ctrl\+c\s+Exit/i,
 ];
 
+// =============================================================================
+// INTERACTIVE TUI DETECTION (Claude Code multi-question wizards, etc.)
+// =============================================================================
+// These patterns detect when a TUI requires user interaction beyond Y/N
+// AutoRespond should NOT activate, and Chat UI should switch to Terminal view
+
+const INTERACTIVE_TUI_PATTERNS = [
+  // Claude Code: "Tab to navigate" or "↹ to switch"
+  /Tab\s+to\s+navigate/i,
+  /↹\s+to\s+switch/i,
+  /Tab\s+to\s+switch/i,
+  // Claude Code: Multiple question indicators
+  /\[\s*\d+\s*\/\s*\d+\s*\]/,  // [1/3], [2/5] style progress
+  // Generic wizard step indicators
+  /Step\s+\d+\s+of\s+\d+/i,
+  // Claude Code permission prompts with multiple options
+  /Select.*files?.*to/i,
+  /Choose.*option/i,
+  // Multi-select indicators
+  /Space\s+to\s+select/i,
+  /Press\s+space\s+to\s+toggle/i,
+  // Claude Code specific patterns
+  /Allow\s+tool/i,
+  /Deny\s+tool/i,
+  // Input field indicators (not just Y/N)
+  /Enter\s+.*:/,
+  /Type\s+.*:/,
+  /Input:/i,
+];
+
+/**
+ * Detect if a TUI is showing an interactive prompt that needs user navigation
+ * (Tab, arrow keys, space to select, etc.) - NOT a simple Y/N or confirmation
+ * @param {string} cleanText - ANSI-stripped text buffer
+ * @returns {{ detected: boolean, type: string }}
+ */
+function detectInteractiveTUI(cleanText) {
+  // Check for TUI frame first (box characters)
+  const hasTuiFrame = TUI_FRAME_INDICATORS.some(p => p.test(cleanText));
+  
+  // Check for interactive navigation patterns
+  const hasInteractivePattern = INTERACTIVE_TUI_PATTERNS.some(p => p.test(cleanText));
+  
+  if (hasInteractivePattern) {
+    return { detected: true, type: 'interactive-wizard' };
+  }
+  
+  // If we have a TUI frame but no Y/N and no "Yes selected", it might be interactive
+  if (hasTuiFrame) {
+    const hasYesSelected = MENU_SELECTION_PATTERNS.some(p => p.test(cleanText));
+    const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(cleanText));
+    
+    // TUI frame without clear confirmation pattern = likely interactive
+    if (!hasYesSelected && !hasYnPrompt) {
+      return { detected: true, type: 'tui-active' };
+    }
+  }
+  
+  return { detected: false, type: null };
+}
+
 // ----------------------------------------------------------------------------
 // DETECTION FUNCTIONS
 // ----------------------------------------------------------------------------
@@ -179,9 +240,13 @@ function detectYnPrompt(cleanText, debugLog = false) {
   // Get last few lines for y/n detection (these appear at end)
   // Use more lines for PowerShell prompts which can span multiple lines
   const lines = cleanText.split(/[\r\n]/).filter(l => l.trim());
-  const lastLines = lines.slice(-5).join('\n'); // Increased from 3 to 5 lines
+  const lastLines = lines.slice(-5); // Array of last 5 lines
   
-  const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(lastLines));
+  // Check if ANY of the last lines matches the pattern
+  // This handles cases where the prompt is followed by a cursor or empty line
+  const hasYnPrompt = lastLines.some(line => 
+    YN_PROMPT_PATTERNS.some(p => p.test(line))
+  );
   
   return { detected: hasYnPrompt };
 }
@@ -347,6 +412,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onPaste = null, // Callback when text is pasted (for toast notification)
   onTerminalCommand = null, // Callback when command is executed (for model tier detection)
   onRoutingUpdate = null, // Callback when smart routing executes (for badge sync)
+  onInteractiveTUI = null, // Callback when interactive TUI detected (triggers switch to terminal view)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name (for AM logging)
@@ -390,6 +456,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 5;
   const isCopyingRef = useRef(false); // Prevent clipboard spam
+  const onInteractiveTUIRef = useRef(onInteractiveTUI);
+  const lastTUIStateRef = useRef(false); // Track if we already fired TUI callback
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -400,6 +468,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Vision state
   const [activeVisionOverlay, setActiveVisionOverlay] = useState(null);
   const visionEnabledRef = useRef(visionEnabled);
+
+  // Keep onInteractiveTUI ref updated
+  useEffect(() => {
+    onInteractiveTUIRef.current = onInteractiveTUI;
+  }, [onInteractiveTUI]);
 
   // Keep autoRespond ref updated
   useEffect(() => {
@@ -1169,8 +1242,29 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         waitingCheckTimeoutRef.current = scheduleDetection(() => {
           waitingCheckTimeoutRef.current = null;
           
+          // Strip ANSI for pattern matching
+          const cleanBuffer = stripAnsi(buf.data);
+          
           // CRITICAL FIX: Use buf.data not lastOutputRef
           const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
+
+          // v3.4.0: Detect interactive TUI (Claude Code multi-question wizards, etc.)
+          // This should trigger auto-switch to terminal view
+          const tuiResult = detectInteractiveTUI(cleanBuffer);
+          if (tuiResult.detected && !lastTUIStateRef.current) {
+            lastTUIStateRef.current = true;
+            console.log('%c[TUI Detected] Interactive prompt requires user input', 
+              'background: #8b5cf6; color: #fff; font-weight: bold; padding: 2px 5px;', 
+              { type: tuiResult.type, tabId }
+            );
+            if (onInteractiveTUIRef.current) {
+              onInteractiveTUIRef.current(tuiResult.type);
+            }
+          } else if (!tuiResult.detected && lastTUIStateRef.current) {
+            // TUI ended - reset state
+            lastTUIStateRef.current = false;
+            console.log('[TUI Ended] Interactive prompt completed', { tabId });
+          }
 
           // CRITICAL DEBUG: Always log what we're checking
           const bufferPreview = buf.data.slice(-300);
@@ -1203,9 +1297,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }
 
           // v1.23.8 EXACT: Auto-respond logic
+          // IMPORTANT: Do NOT auto-respond if interactive TUI is active
           const shouldAutoRespond = waiting &&
             autoRespondRef.current &&
-            ws.readyState === WebSocket.OPEN;
+            ws.readyState === WebSocket.OPEN &&
+            !tuiResult.detected; // Skip auto-respond for interactive TUIs
 
           if (shouldAutoRespond) {
             // Log to browser console for user visibility

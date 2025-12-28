@@ -23,6 +23,26 @@ export const DEFAULT_COMMAND_CARDS = [
     // This card doesn't have a command property - it's handled specially
   },
   {
+    id: 'system-run-copilot',
+    name: 'Run Copilot',
+    description: 'Start the GitHub Copilot CLI assistant',
+    category: 'system',
+    isSystemCard: true,
+    command: 'copilot',
+    icon: 'lucide-bot',
+    colorTheme: 'purple',
+    favorite: true,
+    pasteOnly: false,
+    configurable: true,
+    triggerAM: true,
+    projectConfigKey: 'runCopilot',
+    defaultCommands: [
+      'copilot',
+      'gh copilot suggest',
+      'gh copilot explain',
+    ],
+  },
+  {
     id: 'system-git-status',
     name: 'Git Status',
     description: 'Quick check of git repository status',

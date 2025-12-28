@@ -152,6 +152,12 @@ function App() {
     deleteWorkflow,
   } = useWorkflowManager();
 
+  // Tour action handlers for interactive steps
+  const tourActionHandlers = useMemo(() => ({
+    openRouterConfig: () => setIsRouterConfigOpen(true),
+    closeRouterConfig: () => setIsRouterConfigOpen(false),
+  }), []);
+
   // Guided Tour for first-run experience
   const {
     isActive: isTourActive,
@@ -160,7 +166,7 @@ function App() {
     totalSteps: tourTotalSteps,
     nextStep: tourNextStep,
     skipTour,
-  } = useGuidedTour();
+  } = useGuidedTour(tourActionHandlers);
   
   // Query model tier when terminal input changes
   const queryModelTier = useCallback(async (input) => {
@@ -526,9 +532,11 @@ function App() {
       if (tabMode !== theme) {
         setTheme(tabMode);
         document.documentElement.className = tabMode;
+        // Force re-apply theme variables immediately after class change
+        applyTheme(activeTab.colorTheme, tabMode);
+      } else {
+        applyTheme(activeTab.colorTheme, tabMode);
       }
-      
-      applyTheme(activeTab.colorTheme, tabMode);
     }
   }, [activeTab?.id, activeTab?.colorTheme, activeTab?.mode]);
 
@@ -989,6 +997,20 @@ function App() {
     }));
   }, []);
 
+  // Handle interactive TUI detection - auto-switch to terminal view
+  // This is triggered when Claude Code or similar shows a multi-question wizard
+  const handleInteractiveTUI = useCallback((tabId, tuiType) => {
+    logger.terminal('Interactive TUI detected, switching to terminal view', { tabId, tuiType });
+    
+    // Get the tab's current view mode
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab && tab.viewMode !== 'terminal') {
+      // Switch to terminal view so user can interact directly
+      toggleTabViewMode(tabId);
+      addToast('Interactive prompt detected - switched to terminal', 'info', 3000);
+    }
+  }, [tabs, toggleTabViewMode, addToast]);
+
   // Handle directory change from terminal - auto-rename tab and save directory
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
     if (folderName) {
@@ -1282,7 +1304,11 @@ function App() {
   const handleExecute = (cmd) => {
     const termRef = getActiveTerminalRef();
     if (termRef) {
-      termRef.sendCommand(cmd.command, cmd.delay)
+      // If command is empty but triggerAM is true, we still want to trigger AM
+      // but we shouldn't send an empty command to the terminal as it might just print a newline
+      if (cmd.command && cmd.command.trim().length > 0) {
+        termRef.sendCommand(cmd.command, cmd.delay)
+      }
       termRef.focus()
 
       // If this command card is configured to trigger AM, send an AM log entry
@@ -1844,6 +1870,7 @@ function App() {
                     currentDirectory={tab.currentDirectory || null}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
+                    onInteractiveTUI={(tuiType) => handleInteractiveTUI(tab.id, tuiType)}
                     onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
                     onPaste={() => addToast('Text pasted from clipboard', 'success', 1500)}
                     onFeedbackClick={() => setIsFeedbackModalOpen(true)}

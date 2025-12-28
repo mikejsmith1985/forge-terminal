@@ -1,11 +1,12 @@
 /**
- * useGuidedTour.js - Tour Engine Hook for Forge Terminal v3.3.0
+ * useGuidedTour.js - Tour Engine Hook for Forge Terminal v3.4.0
  *
  * Manages the guided tour state and provides methods for navigation.
  * Features:
  * - Persistence via localStorage (tour runs only once per version)
  * - Dynamic element positioning via getBoundingClientRect
  * - Fallback selectors for robustness
+ * - Action triggers (onAdvance) for opening modals, etc.
  * - getRect helper for spotlight positioning
  */
 
@@ -37,13 +38,19 @@ export const getRect = (selector) => {
   return null;
 };
 
-export const useGuidedTour = () => {
+export const useGuidedTour = (actionHandlers = {}) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [targetRect, setTargetRect] = useState(null);
   const [isReady, setIsReady] = useState(false);
   const resizeObserverRef = useRef(null);
   const targetElementRef = useRef(null);
+  const actionHandlersRef = useRef(actionHandlers);
+
+  // Keep action handlers ref updated
+  useEffect(() => {
+    actionHandlersRef.current = actionHandlers;
+  }, [actionHandlers]);
 
   // Check if tour should start on mount
   useEffect(() => {
@@ -162,15 +169,37 @@ export const useGuidedTour = () => {
     };
   }, [isActive, currentStep, updateTargetRect]);
 
+  // Execute an action handler if defined
+  const executeAction = useCallback((actionName) => {
+    if (actionName && actionHandlersRef.current[actionName]) {
+      console.log('[Tour] Executing action:', actionName);
+      actionHandlersRef.current[actionName]();
+    }
+  }, []);
+
   // Navigate to next step
   const nextStep = useCallback(() => {
-    if (currentStep < TOUR_STEPS.length - 1) {
-      setCurrentStep((prev) => prev + 1);
+    const currentStepData = TOUR_STEPS[currentStep];
+    
+    // Execute onAdvance action if defined
+    if (currentStepData?.onAdvance) {
+      executeAction(currentStepData.onAdvance);
+      // Small delay to let the action complete (e.g., modal opening)
+      setTimeout(() => {
+        if (currentStep < TOUR_STEPS.length - 1) {
+          setCurrentStep((prev) => prev + 1);
+        } else {
+          completeTour();
+        }
+      }, 300);
     } else {
-      // Tour complete
-      completeTour();
+      if (currentStep < TOUR_STEPS.length - 1) {
+        setCurrentStep((prev) => prev + 1);
+      } else {
+        completeTour();
+      }
     }
-  }, [currentStep]);
+  }, [currentStep, executeAction]);
 
   // Navigate to previous step
   const prevStep = useCallback(() => {
@@ -179,10 +208,18 @@ export const useGuidedTour = () => {
     }
   }, [currentStep]);
 
-  // Skip/dismiss the tour
+  // Skip/dismiss the tour - also closes any modal that was opened
   const skipTour = useCallback(() => {
+    // Check if current step has a modal open and close it
+    const currentStepData = TOUR_STEPS[currentStep];
+    if (currentStepData?.requiresModalOpen) {
+      // Close the modal based on type
+      if (currentStepData.requiresModalOpen === 'routerConfig') {
+        executeAction('closeRouterConfig');
+      }
+    }
     completeTour();
-  }, []);
+  }, [currentStep, executeAction]);
 
   // Complete the tour and save to localStorage
   const completeTour = useCallback(() => {

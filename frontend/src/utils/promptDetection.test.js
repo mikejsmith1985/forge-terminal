@@ -93,8 +93,13 @@ function detectMenuPrompt(cleanText) {
 
 function detectYnPrompt(cleanText) {
   const lines = cleanText.split(/[\r\n]/).filter(l => l.trim());
-  const lastLines = lines.slice(-3).join('\n');
-  const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(lastLines));
+  const lastLines = lines.slice(-5); // Array of last 5 lines
+  
+  // Check if ANY of the last lines matches the pattern
+  // This handles cases where the prompt is followed by a cursor or empty line
+  const hasYnPrompt = lastLines.some(line => 
+    YN_PROMPT_PATTERNS.some(p => p.test(line))
+  );
   return { detected: hasYnPrompt };
 }
 
@@ -280,6 +285,18 @@ Some operation prompt (default is "Y"):
       expect(result.waiting).toBe(true);
       expect(result.responseType).toBe('y-enter');
     });
+
+    it('should detect Y/N prompt followed by cursor line', () => {
+      // Regression test for auto-respond fix
+      const buffer = `
+Proceed with installation? (y/n)
+> `;
+      const result = detectCliPrompt(buffer);
+      
+      expect(result.waiting).toBe(true);
+      expect(result.responseType).toBe('y-enter');
+      expect(result.confidence).toBe('high');
+    });
     
   });
   
@@ -447,6 +464,189 @@ More text
       
       expect(result.waiting).toBe(true);
       expect(result.confidence).toBe('low');
+    });
+    
+  });
+  
+});
+
+// =============================================================================
+// Interactive TUI Detection Tests (v3.4.0)
+// =============================================================================
+
+// Copy of detection logic from ForgeTerminal.jsx for testing
+const INTERACTIVE_TUI_PATTERNS = [
+  /Tab\s+to\s+navigate/i,
+  /↹\s+to\s+switch/i,
+  /Tab\s+to\s+switch/i,
+  /\[\s*\d+\s*\/\s*\d+\s*\]/,
+  /Step\s+\d+\s+of\s+\d+/i,
+  /Select.*files?.*to/i,
+  /Choose.*option/i,
+  /Space\s+to\s+select/i,
+  /Press\s+space\s+to\s+toggle/i,
+  /Allow\s+tool/i,
+  /Deny\s+tool/i,
+  /Enter\s+.*:/,
+  /Type\s+.*:/,
+  /Input:/i,
+];
+
+const TUI_FRAME_INDICATORS_TEST = [
+  /[╭╮╯╰│─┌┐└┘├┤┬┴┼]/,
+  /Remaining requests:\s*[\d.]+%/i,
+  /Ctrl\+c\s+Exit/i,
+];
+
+function detectInteractiveTUI(cleanText) {
+  const hasTuiFrame = TUI_FRAME_INDICATORS_TEST.some(p => p.test(cleanText));
+  const hasInteractivePattern = INTERACTIVE_TUI_PATTERNS.some(p => p.test(cleanText));
+  
+  if (hasInteractivePattern) {
+    return { detected: true, type: 'interactive-wizard' };
+  }
+  
+  if (hasTuiFrame) {
+    const hasYesSelected = MENU_SELECTION_PATTERNS.some(p => p.test(cleanText));
+    const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(cleanText));
+    
+    if (!hasYesSelected && !hasYnPrompt) {
+      return { detected: true, type: 'tui-active' };
+    }
+  }
+  
+  return { detected: false, type: null };
+}
+
+describe('Interactive TUI Detection', () => {
+  
+  describe('Claude Code Multi-Question Wizards', () => {
+    
+    it('should detect Tab to navigate prompt', () => {
+      const buffer = `
+╭──────────────────────────────────────────────────────────────╮
+│ Select files to edit                                          │
+╰──────────────────────────────────────────────────────────────╯
+
+[x] src/index.js
+[ ] src/utils.js
+[ ] package.json
+
+Tab to navigate • Space to select • Enter to confirm
+`;
+      const result = detectInteractiveTUI(buffer);
+      expect(result.detected).toBe(true);
+      expect(result.type).toBe('interactive-wizard');
+    });
+    
+    it('should detect Step X of Y wizard progress', () => {
+      const buffer = `
+Step 2 of 4: Configure build settings
+
+Enter output directory: _
+`;
+      const result = detectInteractiveTUI(buffer);
+      expect(result.detected).toBe(true);
+      expect(result.type).toBe('interactive-wizard');
+    });
+    
+    it('should detect Space to select multi-choice', () => {
+      const buffer = `
+? Which packages to install?
+  Press space to toggle selection
+
+❯ [ ] eslint
+  [ ] prettier
+  [ ] typescript
+`;
+      const result = detectInteractiveTUI(buffer);
+      expect(result.detected).toBe(true);
+      expect(result.type).toBe('interactive-wizard');
+    });
+    
+    it('should detect Allow/Deny tool prompts', () => {
+      const buffer = `
+Claude wants to use the following tool:
+
+read_file: package.json
+
+Allow tool • Deny tool • Allow for session
+`;
+      const result = detectInteractiveTUI(buffer);
+      expect(result.detected).toBe(true);
+      expect(result.type).toBe('interactive-wizard');
+    });
+    
+    it('should detect input field prompts', () => {
+      const buffer = `
+Enter your project name:
+`;
+      const result = detectInteractiveTUI(buffer);
+      expect(result.detected).toBe(true);
+      expect(result.type).toBe('interactive-wizard');
+    });
+    
+  });
+  
+  describe('TUI Frame Detection', () => {
+    
+    it('should detect TUI with box characters but no confirmation pattern', () => {
+      const buffer = `
+╭──────────────────────────────────────────────────────────────╮
+│ Loading project files...                                      │
+│                                                               │
+│ [████████████████████████████░░░░░░░░░░░░] 70%               │
+╰──────────────────────────────────────────────────────────────╯
+`;
+      const result = detectInteractiveTUI(buffer);
+      expect(result.detected).toBe(true);
+      expect(result.type).toBe('tui-active');
+    });
+    
+    it('should NOT detect TUI when Y/N prompt is present', () => {
+      // Y/N prompt on its own line at the end - this would be handled by auto-respond
+      const buffer = `
+╭──────────────────────────────────────────────────────────────╮
+│ Some TUI content here                                         │
+╰──────────────────────────────────────────────────────────────╯
+
+Are you sure? (y/n)
+`;
+      const result = detectInteractiveTUI(buffer);
+      // Should be false because Y/N pattern IS present
+      expect(result.detected).toBe(false);
+    });
+    
+    it('should NOT detect TUI when Yes is selected', () => {
+      const buffer = `
+╭──────────────────────────────────────────────────────────────╮
+│ Do you want to run this command?                              │
+╰──────────────────────────────────────────────────────────────╯
+
+❯ Yes
+  No
+`;
+      const result = detectInteractiveTUI(buffer);
+      // Should be false because Yes IS selected
+      expect(result.detected).toBe(false);
+    });
+    
+  });
+  
+  describe('Non-Interactive Terminal Output', () => {
+    
+    it('should NOT detect regular command output', () => {
+      const buffer = `
+$ npm install
+added 150 packages in 5s
+
+$ npm run build
+Building project...
+Done!
+$ _
+`;
+      const result = detectInteractiveTUI(buffer);
+      expect(result.detected).toBe(false);
     });
     
   });
