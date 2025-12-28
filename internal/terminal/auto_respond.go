@@ -62,6 +62,14 @@ func NewPrecisionAutoResponder(provider string, ptyWriter func([]byte) error) *P
 	}
 	// Initialize sequence engine with PTY writer
 	p.sequenceEngine = NewSequenceEngine(ptyWriter)
+
+	// Set callback to check if auto-respond is still enabled
+	p.sequenceEngine.shouldContinue = func() bool {
+		p.mu.RLock()
+		defer p.mu.RUnlock()
+		return p.enabled
+	}
+
 	return p
 }
 

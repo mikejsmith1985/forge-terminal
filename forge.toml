@@ -1,18 +1,23 @@
 # Forge Terminal - Smart Model Routing Configuration
-# Define which CLI tool to use for each complexity tier
+# Restore Semantic Intelligence to Router
 
-[routing]
-# Tier 1: Free/Unlimited - Use for quick tasks (linting, tests, simple edits)
-tier1_name = "Copilot"
-tier1_cmd = "gh copilot suggest \"{prompt}\""
+[router]
+default_tier = "tier1"
 
-# Tier 2: Standard - Use for refactoring, debugging, code review
-tier2_name = "Copilot"
-tier2_cmd = "gh copilot suggest \"{prompt}\""
+[tiers.tier1]
+name = "Standard"
+model = "gpt-4o-mini"
+description = "General queries and simple shell explanations."
 
-# Tier 3: High Reasoning - Use for architecture, design, complex analysis
-tier3_name = "Aider"
-tier3_cmd = "aider --yes-always --model claude-3-5-sonnet-20241022 --message \"{prompt}\""
+[tiers.tier2]
+name = "Advanced"
+model = "gpt-4o"
+description = "Multi-file analysis and architectural planning."
+
+[tiers.tier3]
+name = "Expert"
+model = "claude-3-5-sonnet"
+description = "Deep terminal debugging with full context vision support."
 
 [context]
 # Automatically include terminal context in prompts

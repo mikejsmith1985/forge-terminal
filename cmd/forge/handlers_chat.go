@@ -59,6 +59,13 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	tier := llm.ClassifyTask(req.Message)
 	log.Printf("[Chat API] Classified to tier: %s", tier)
 
+	// Map tier to model name for routing header
+	modelName := getModelForTier(tier)
+
+	// Set the routing header so frontend can display which model was used
+	w.Header().Set("X-Forge-Routed-To", modelName)
+	log.Printf("[Chat API] Routed to model: %s", modelName)
+
 	provider := "auto"
 	if os.Getenv("LLM_PROVIDER") != "" {
 		provider = os.Getenv("LLM_PROVIDER")
@@ -248,4 +255,18 @@ func streamChatResponse(w http.ResponseWriter, prompt string, provider string) e
 
 	flusher.Flush()
 	return nil
+}
+
+// getModelForTier maps LLM tier to model name for routing display
+func getModelForTier(tier llm.ModelTier) string {
+	switch tier {
+	case llm.TierHaiku:
+		return "gpt-4o-mini" // Standard tier for quick tasks
+	case llm.TierSonnet:
+		return "gpt-4o" // Advanced tier for balanced tasks
+	case llm.TierOpus:
+		return "claude-3-5-sonnet" // Expert tier for complex tasks
+	default:
+		return "gpt-4o-mini" // Default to standard
+	}
 }

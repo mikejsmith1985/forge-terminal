@@ -48,6 +48,7 @@ type SequenceEngine struct {
 	executing      bool               // Currently executing a sequence
 	aborted        bool               // User input killed execution
 	maxBufferSize  int                // Maximum settle buffer size
+	shouldContinue func() bool        // Callback to check if execution should continue
 }
 
 // DefaultSequences contains pre-configured patterns for common CLI tools.
@@ -280,10 +281,18 @@ func (se *SequenceEngine) executeActions(seq *Sequence) {
 		// Check for abort before each action
 		se.mu.Lock()
 		aborted := se.aborted
+		shouldContinue := se.shouldContinue
 		se.mu.Unlock()
 
 		if aborted {
-			log.Printf("[AutoRespond] Sequence '%s' aborted at action %d",
+			log.Printf("[AutoRespond] Sequence '%s' aborted at action %d by user input",
+				seq.Name, i)
+			return
+		}
+
+		// PRODUCTION FIX: Check toggle state in real-time
+		if shouldContinue != nil && !shouldContinue() {
+			log.Printf("[AutoRespond] Sequence '%s' aborted at action %d by user toggle",
 				seq.Name, i)
 			return
 		}

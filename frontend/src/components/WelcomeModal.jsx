@@ -17,8 +17,9 @@ function WelcomeModal({ isOpen, onClose, version }) {
     if (!isOpen) return;
     
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' || e.key === 'Enter') {
-        e.preventDefault();
+      // Close modal on Escape, Enter, or any printable key so the "Press any key to continue" hint is accurate.
+      if (e.key === 'Escape' || e.key === 'Enter' || (!e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1)) {
+        if (e.key === 'Escape' || e.key === 'Enter') e.preventDefault();
         onClose();
       }
     };

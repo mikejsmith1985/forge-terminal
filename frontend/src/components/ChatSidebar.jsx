@@ -41,6 +41,9 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
         throw new Error(errData.error || 'Failed to get response');
       }
 
+      // Get the routed model from response header
+      const routedModel = response.headers.get('X-Forge-Routed-To') || 'Unknown';
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullResponse = '';
@@ -55,7 +58,12 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
         fullResponse += chunk;
 
         if (!messageAdded) {
-          setMessages(prev => [...prev, { role: 'assistant', content: fullResponse, id: assistantMessageId }]);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: fullResponse,
+            id: assistantMessageId,
+            model: routedModel
+          }]);
           messageAdded = true;
         } else {
           setMessages(prev => {
@@ -110,7 +118,16 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize }) => {
           <div key={msg.id} className={`chat-message chat-message-${msg.role}`}>
             <div className="chat-bubble">
               {msg.role === 'user' && <div className="chat-avatar">You</div>}
-              {msg.role === 'assistant' && <div className="chat-avatar">🤖</div>}
+              {msg.role === 'assistant' && (
+                <div className="chat-avatar-container">
+                  <div className="chat-avatar">🤖</div>
+                  {msg.model && (
+                    <div className="chat-model-badge" title={`Routed to ${msg.model}`}>
+                      {msg.model}
+                    </div>
+                  )}
+                </div>
+              )}
               {msg.role === 'error' && <div className="chat-avatar">❌</div>}
               <div className="chat-content">
                 {msg.role === 'assistant' ? (

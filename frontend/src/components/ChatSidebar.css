@@ -128,6 +128,14 @@
   flex-direction: row-reverse;
 }
 
+.chat-avatar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 28px;
+}
+
 .chat-avatar {
   min-width: 28px;
   height: 28px;
@@ -139,6 +147,21 @@
   font-weight: 600;
   color: white;
   flex-shrink: 0;
+}
+
+.chat-model-badge {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 120px;
+  text-align: center;
 }
 
 .chat-message-user .chat-avatar {
