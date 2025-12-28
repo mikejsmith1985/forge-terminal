@@ -87,6 +87,29 @@ if (-not $SkipBackend) {
     $sizeMB = [math]::Round($binary.Length / 1MB, 1)
     Write-Host "✓ Backend built successfully ($sizeMB MB)" -ForegroundColor Green
     Write-Host ""
+    
+    GenerateAppIcon
+}
+
+function GenerateAppIcon {
+    if (-not (Test-Path "assets/logo.png")) {
+        return
+    }
+    
+    Write-Host "🎨 Processing application icon..." -ForegroundColor Yellow
+    
+    if (Get-Command "magick" -ErrorAction SilentlyContinue) {
+        $icoPath = "assets/app.ico"
+        try {
+            magick convert assets/logo.png -define icon:auto-resize=256,128,96,64,48,32,16 $icoPath
+            Write-Host "✓ Icon generated: $icoPath" -ForegroundColor Green
+        } catch {
+            Write-Host "⚠ Icon generation failed: $_" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "⚠ ImageMagick not found, skipping icon generation" -ForegroundColor Yellow
+        Write-Host "  Install ImageMagick or set app.ico manually" -ForegroundColor Gray
+    }
 }
 
 Write-Host "✅ Build complete!" -ForegroundColor Green

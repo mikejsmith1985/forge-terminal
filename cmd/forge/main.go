@@ -220,6 +220,9 @@ func main() {
 	// Model Router API (Industrial Phase 2)
 	http.HandleFunc("/api/llm/model-tier", WrapWithMiddleware(handleModelTier))
 
+	// Chat API (v3.3.0 - Chat Sidebar)
+	http.HandleFunc("/api/llm/chat", WrapWithMiddleware(handleChat))
+
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
 	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))
@@ -1795,6 +1798,7 @@ func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
+			"code":    "SHORTCUT_CREATE_FAILED",
 		})
 		return
 	}
@@ -1802,7 +1806,8 @@ func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Desktop] Shortcut created successfully")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"message": "Desktop shortcut created",
+		"message": "Desktop shortcut created successfully",
+		"code":    "SHORTCUT_CREATE_SUCCESS",
 	})
 }
 

@@ -304,18 +304,21 @@ func getExeSuffix() string {
 }
 
 func compareVersions(v1, v2 string) int {
-	// Simple semver comparison
-	// Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
+	parts1 := parseVersion(v1)
+	parts2 := parseVersion(v2)
 
-	for i := 0; i < 3; i++ {
+	maxParts := len(parts1)
+	if len(parts2) > maxParts {
+		maxParts = len(parts2)
+	}
+
+	for i := 0; i < maxParts; i++ {
 		var n1, n2 int
 		if i < len(parts1) {
-			fmt.Sscanf(parts1[i], "%d", &n1)
+			n1 = parts1[i]
 		}
 		if i < len(parts2) {
-			fmt.Sscanf(parts2[i], "%d", &n2)
+			n2 = parts2[i]
 		}
 		if n1 > n2 {
 			return 1
@@ -325,6 +328,19 @@ func compareVersions(v1, v2 string) int {
 		}
 	}
 	return 0
+}
+
+func parseVersion(v string) []int {
+	parts := strings.Split(v, ".")
+	result := make([]int, 0, len(parts))
+
+	for _, part := range parts {
+		var num int
+		_, _ = fmt.Sscanf(part, "%d", &num)
+		result = append(result, num)
+	}
+
+	return result
 }
 
 func copyFile(src, dst string) error {

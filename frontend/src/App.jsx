@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle, Clock } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle, MessageSquare, Clock } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import CommandCards from './components/CommandCards'
@@ -24,6 +24,7 @@ import AMDebugPanel from './components/AMDebugPanel'
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
+import ChatSidebar from './components/ChatSidebar'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -46,6 +47,7 @@ function App() {
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false)
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
+  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false)
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
   const [colorTheme, setColorTheme] = useState(() => {
@@ -1516,6 +1518,14 @@ function App() {
           {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
         </button>
         <div className="spacer"></div>
+        {/* Chat button */}
+        <button 
+          className={`btn btn-ghost btn-icon ${isChatSidebarOpen ? 'active' : ''}`}
+          onClick={() => setIsChatSidebarOpen(prev => !prev)} 
+          title="Chat Assistant"
+        >
+          <MessageSquare size={18} />
+        </button>
         {/* Time-Travel button */}
         <button 
           className={`btn btn-ghost btn-icon ${isHistorySliderOpen ? 'active' : ''}`}
@@ -1883,6 +1893,14 @@ function App() {
 
       {/* AM Debug Panel - Shows real-time AM logging activity */}
       {devMode && <AMDebugPanel />}
+      
+      {/* Chat Sidebar - AI assistant for terminal context */}
+      <ChatSidebar
+        isOpen={isChatSidebarOpen}
+        onClose={() => setIsChatSidebarOpen(false)}
+        tabId={activeTabId}
+        fontSize={chatFontSize}
+      />
       
       {/* History Slider - Time-Travel Scrubber */}
       {activeTabId && (
