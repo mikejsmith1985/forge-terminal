@@ -99,6 +99,10 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
     const cursorPos = e.target.selectionStart;
     setInputValue(value);
 
+    // Count files referenced in the input
+    const fileMatches = value.match(/\[@([^\]]+)\]/g) || [];
+    setFilesInMessage(fileMatches.length);
+
     // Detect @ mention (look for @ not inside [...])
     const textBeforeCursor = value.substring(0, cursorPos);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
@@ -209,6 +213,17 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
       // Get the routed model from response header
       const routedModel = response.headers.get('X-Forge-Routed-To') || activeModel || 'Unknown';
       setLastRoutedModel(routedModel);
+
+      // Extract tier information from model name
+      let tier = 'gpt-4o';
+      if (routedModel.includes('mini')) {
+        tier = 'Haiku';
+      } else if (routedModel.includes('opus') || routedModel.includes('sonnet')) {
+        tier = 'Opus';
+      } else if (routedModel.includes('4o')) {
+        tier = 'Sonnet';
+      }
+      setRoutedTier(tier);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -365,13 +380,21 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
           </div>
         )}
 
+        {/* Active Engineer context badge */}
+        {filesInMessage > 0 && (
+          <div className="chat-context-badge">
+            <Brain size={13} />
+            <span>🧠 Reading {filesInMessage} file{filesInMessage !== 1 ? 's' : ''}</span>
+          </div>
+        )}
+
         <textarea
           ref={inputRef}
           className="chat-input"
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="Type your message... Use [@file.ext] for context"
+          placeholder="Type your message... Use [@file.ext] to attach files"
           disabled={isLoading}
           rows={3}
         />
