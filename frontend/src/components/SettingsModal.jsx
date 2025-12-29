@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield, DollarSign, Zap, Brain, Cpu, Play } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
+import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 
 const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, visionConfig, onVisionConfigChange, initialTab = 'shell', onRestartTour }) => {
   const [config, setConfig] = useState(shellConfig);
@@ -773,7 +774,9 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
         </div>
 
         <div className="modal-body">
-          {activeTab === 'cli' ? (
+          {activeTab === 'claude' ? (
+            <ClaudeCLICommandsTable />
+          ) : activeTab === 'cli' ? (
             <CLISettingsPanel onToast={onToast} />
           ) : activeTab === 'budget' ? renderBudgetTab() : (
             <>
