@@ -59,11 +59,11 @@
                         <div class="metric-label">Issues Identified</div>
                     </div>
                     <div class="metric">
-                        <div class="metric-value">6</div>
+                        <div class="metric-value">8</div>
                         <div class="metric-label">Issues Fixed</div>
                     </div>
                     <div class="metric">
-                        <div class="metric-value">2</div>
+                        <div class="metric-value">0</div>
                         <div class="metric-label">Working as Designed</div>
                     </div>
                     <div class="metric">
@@ -88,27 +88,27 @@
                         </div>
                     </div>
 
-                    <div class="issue-card design">
+                    <div class="issue-card">
                         <h3>
                             <span class="issue-number">#52.2</span>
                             Copilot Command Card Switches to Terminal
-                            <span class="issue-status status-design">BY DESIGN</span>
+                            <span class="issue-status status-fixed">FIXED</span>
                         </h3>
-                        <p class="issue-desc">Running copilot command card switches window to terminal instead of chat UI.</p>
+                        <p class="issue-desc">Running copilot command card switches window to terminal instead of working through chat UI.</p>
                         <div class="solution">
-                            <strong>Explanation:</strong> Command cards are designed to execute commands in the terminal. The chat UI is a separate feature for interactive conversations. This is intentional separation of concerns.
+                            <strong>Solution:</strong> Fixed handleExecute in App.jsx to check activeTab.viewMode. When in chat mode, commands now route through PTY bridge (sendChatCommand) so Chat UX receives output. Terminal focus is no longer stolen when in chat mode.
                         </div>
                     </div>
 
-                    <div class="issue-card design">
+                    <div class="issue-card">
                         <h3>
                             <span class="issue-number">#52.3</span>
                             CD Command Bypasses Chat UX
-                            <span class="issue-status status-design">BY DESIGN</span>
+                            <span class="issue-status status-fixed">FIXED</span>
                         </h3>
                         <p class="issue-desc">CD command goes to terminal, chat UX receives no feedback.</p>
                         <div class="solution">
-                            <strong>Explanation:</strong> Command cards execute in the terminal by design. Directory changes are terminal operations. Chat view is for AI conversations, not shell navigation.
+                            <strong>Solution:</strong> Fixed PTY bridge race condition. Added getTerminalRef getter for lazy ref access. ChatView now properly uses getActiveTerminalRef() to reliably connect to terminal, ensuring chat UX receives all PTY output including directory changes.
                         </div>
                     </div>
 
