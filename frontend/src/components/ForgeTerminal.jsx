@@ -612,24 +612,55 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // v3.5.2 Fix: Prevent hidden terminals from stealing focus
   // When a terminal is hidden, set tabIndex=-1 on its helper textarea
   // This removes it from keyboard tab order and prevents spacebar focus stealing
+  // Uses MutationObserver to handle dynamically created textareas
   useEffect(() => {
     if (!terminalRef.current) return;
     
-    // Find the xterm helper textarea (xterm creates this for keyboard input)
-    const textarea = terminalRef.current.querySelector('.xterm-helper-textarea');
-    if (!textarea) return;
-    
-    if (isVisible) {
-      // Active terminal: make textarea focusable
-      textarea.tabIndex = 0;
-    } else {
-      // Hidden terminal: remove from tab order
-      textarea.tabIndex = -1;
-      // Also blur if currently focused (shouldn't happen, but safety)
-      if (document.activeElement === textarea) {
-        textarea.blur();
+    const updateTextareaTabIndex = () => {
+      // Find the xterm helper textarea (xterm creates this for keyboard input)
+      const textarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
+      if (!textarea) return;
+      
+      if (isVisible) {
+        // Active terminal: make textarea focusable
+        textarea.tabIndex = 0;
+      } else {
+        // Hidden terminal: remove from tab order
+        textarea.tabIndex = -1;
+        // Also blur if currently focused (shouldn't happen, but safety)
+        if (document.activeElement === textarea) {
+          textarea.blur();
+        }
       }
-    }
+    };
+    
+    // Initial update
+    updateTextareaTabIndex();
+    
+    // Watch for dynamically added textareas (xterm creates these after init)
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          // Check if any added nodes contain the helper textarea
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.classList?.contains('xterm-helper-textarea') ||
+                  node.querySelector?.('.xterm-helper-textarea')) {
+                updateTextareaTabIndex();
+                return;
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    observer.observe(terminalRef.current, {
+      childList: true,
+      subtree: true
+    });
+    
+    return () => observer.disconnect();
   }, [isVisible]);
 
   // Expose methods to parent via ref

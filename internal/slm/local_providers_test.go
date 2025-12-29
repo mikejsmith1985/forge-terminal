@@ -160,7 +160,7 @@ func TestEngineSelectsLocalProviders(t *testing.T) {
 	}
 	
 	// Valid local providers
-	validProviders := []string{"ollama", "llama-cpp", "embedded", "heuristic"}
+	validProviders := []string{"ollama", "llama-cpp", "embedded", "heuristic", "rule-based"}
 	isValid := false
 	for _, valid := range validProviders {
 		if status.ActiveProvider == valid {

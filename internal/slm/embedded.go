@@ -1,8 +1,18 @@
-// Package slm provides the embedded SLM provider.
-// This uses an embedded model (via llama.cpp) for offline inference.
+// Package slm provides the rule-based complexity analyzer.
+// This is a lightweight, fast, pure-Go implementation that requires no
+// external dependencies. For AI-powered analysis, use Ollama.
 //
-// NOTE: This is a stub implementation. Full llama.cpp integration
-// will be added in a future phase. Currently falls back to heuristics.
+// Architecture Decision (v3.5.2):
+// True embedded LLM inference in Go without CGO is experimental.
+// We provide a tiered approach:
+// 1. Ollama (if installed) - Full AI analysis, free, local
+// 2. RuleBasedProvider (this) - Fast heuristic analysis, always available
+//
+// The rule-based analyzer uses proven heuristics for complexity estimation:
+// - Token count analysis
+// - Keyword detection (debug, refactor, etc.)
+// - Code pattern recognition
+// - Context-aware scoring
 package slm
 
 import (
@@ -14,81 +24,52 @@ import (
 )
 
 const (
-	// Model file location
-	modelSubdir = "models/base"
-	modelFile   = "qwen2.5-0.5b-q4.gguf"
-
-	// Default model size for status reporting
-	defaultModelSizeMB = 300
+	// Model configuration for future embedded LLM support
+	modelSubdir       = "models"
+	modelFile         = "qwen2.5-0.5b-q4.gguf"
+	defaultModelSizeMB = 400
 )
 
-// EmbeddedProvider uses an embedded llama.cpp model for analysis.
-type EmbeddedProvider struct {
-	modelPath   string
-	modelLoaded bool
+// RuleBasedProvider uses proven heuristics for fast complexity analysis.
+// This is the fallback when no AI providers are available.
+// Confidence is lower than AI-based analysis but performance is instant.
+type RuleBasedProvider struct {
 	initialized bool
 }
 
-// NewEmbeddedProvider creates a new embedded provider.
-func NewEmbeddedProvider() *EmbeddedProvider {
-	return &EmbeddedProvider{}
+// NewRuleBasedProvider creates a new rule-based analyzer.
+func NewRuleBasedProvider() *RuleBasedProvider {
+	return &RuleBasedProvider{}
+}
+
+// NewEmbeddedProvider is an alias for backward compatibility.
+// Returns a RuleBasedProvider since true embedded LLM is not yet production-ready.
+func NewEmbeddedProvider() *RuleBasedProvider {
+	return NewRuleBasedProvider()
 }
 
 // Name returns the provider identifier.
-func (e *EmbeddedProvider) Name() string {
-	return "embedded"
+func (r *RuleBasedProvider) Name() string {
+	return "rule-based"
 }
 
-// IsAvailable checks if the embedded model exists.
-func (e *EmbeddedProvider) IsAvailable() bool {
-	modelPath := e.getModelPath()
-	_, err := os.Stat(modelPath)
-	return err == nil
+// IsAvailable always returns true - rule-based analysis is always available.
+func (r *RuleBasedProvider) IsAvailable() bool {
+	return true
 }
 
-// getModelPath returns the path to the embedded model.
-func (e *EmbeddedProvider) getModelPath() string {
-	if e.modelPath != "" {
-		return e.modelPath
-	}
-
-	// Default location: ~/.forge/models/base/qwen2.5-0.5b-q4.gguf
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	return filepath.Join(home, ".forge", modelSubdir, modelFile)
-}
-
-// Initialize loads the model.
-func (e *EmbeddedProvider) Initialize(ctx context.Context) error {
-	modelPath := e.getModelPath()
-
-	if _, err := os.Stat(modelPath); err != nil {
-		log.Printf("[SLM/Embedded] Model not found at %s", modelPath)
-		log.Printf("[SLM/Embedded] To enable embedded SLM, download the model to this location")
-		return err
-	}
-
-	// TODO: Load model via llama.cpp
-	// For now, we mark as available but use heuristics internally
-	e.modelPath = modelPath
-	e.initialized = true
-	e.modelLoaded = true
-
-	log.Printf("[SLM/Embedded] Model found at %s (llama.cpp integration pending)", modelPath)
+// Initialize prepares the provider (no-op for rule-based).
+func (r *RuleBasedProvider) Initialize(ctx context.Context) error {
+	r.initialized = true
+	log.Printf("[SLM/RuleBased] Initialized - fast heuristic analysis ready")
 	return nil
 }
 
-// Analyze uses the embedded model to analyze the prompt.
-func (e *EmbeddedProvider) Analyze(ctx context.Context, input PromptContext) (*AnalysisResult, error) {
+// Analyze uses heuristics to analyze the prompt complexity.
+func (r *RuleBasedProvider) Analyze(ctx context.Context, input PromptContext) (*AnalysisResult, error) {
 	start := time.Now()
 
-	// TODO: Implement actual llama.cpp inference
-	// For now, use enhanced heuristics as a placeholder
-
-	// The embedded model would provide better analysis than pure heuristics
-	// For now, we simulate this by using heuristics with higher confidence
+	// Use the engine's heuristic methods
 	engine := GetEngine()
 	complexity := engine.estimateComplexity(input)
 	taskType := engine.classifyTask(input.Prompt)
@@ -98,43 +79,38 @@ func (e *EmbeddedProvider) Analyze(ctx context.Context, input PromptContext) (*A
 		Complexity: complexity,
 		TaskType:   taskType,
 		Iterations: iterations,
-		Confidence: 0.6, // Slightly higher than pure heuristics
-		Reasoning:  "Embedded model analysis (llama.cpp integration pending)",
+		Confidence: 0.5, // Moderate confidence for heuristic analysis
+		Reasoning:  "Rule-based analysis using keyword and pattern detection",
 		LatencyMs:  time.Since(start).Milliseconds(),
-		Provider:   "embedded",
+		Provider:   "rule-based",
 	}, nil
 }
 
-// Shutdown releases model resources.
-func (e *EmbeddedProvider) Shutdown() error {
-	// TODO: Unload llama.cpp model
-	e.modelLoaded = false
-	e.initialized = false
+// Shutdown releases resources (no-op for rule-based).
+func (r *RuleBasedProvider) Shutdown() error {
+	r.initialized = false
 	return nil
 }
 
 // Status returns provider state.
-func (e *EmbeddedProvider) Status() EngineStatus {
+func (r *RuleBasedProvider) Status() EngineStatus {
 	return EngineStatus{
-		ActiveProvider: "embedded",
-		ModelID:        modelFile,
-		ModelLoaded:    e.modelLoaded,
-		ModelSizeMB:    defaultModelSizeMB,
+		ActiveProvider: "rule-based",
+		ModelLoaded:    r.initialized,
 	}
 }
 
 // DownloadModel downloads the default model to the expected location.
 // This is called from the UI when user wants to enable embedded SLM.
 func DownloadModel(ctx context.Context, progressCallback func(percent int)) error {
-	// TODO: Implement model download
-	// This would download from a CDN or GitHub release
-	log.Printf("[SLM/Embedded] Model download not yet implemented")
+	// For now, log that users should install Ollama instead
+	log.Printf("[SLM] For AI-powered analysis, install Ollama: https://ollama.ai")
+	log.Printf("[SLM] Then run: ollama pull qwen2.5:0.5b")
 	return nil
 }
 
 // GetModelDownloadURL returns the URL for downloading the default model.
 func GetModelDownloadURL() string {
-	// TODO: Host model on GitHub releases or CDN
 	return "https://github.com/mikejsmith1985/forge-terminal/releases/download/v3.5.0/qwen2.5-0.5b-q4.gguf"
 }
 

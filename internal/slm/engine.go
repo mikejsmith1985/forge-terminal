@@ -77,19 +77,18 @@ func (e *Engine) Initialize(ctx context.Context) error {
 		}
 	}
 
-	// Priority 3 - Embedded provider (requires CGO, model file)
-	embeddedProvider := NewEmbeddedProvider()
-	if err := embeddedProvider.Initialize(ctx); err == nil {
-		e.provider = embeddedProvider
-		log.Printf("[SLM] ✓ Using embedded SLM as primary provider")
+	// Priority 3 - Rule-based provider (always available, no external dependencies)
+	// This replaces the broken "embedded" provider that was never fully implemented
+	ruleBasedProvider := NewRuleBasedProvider()
+	if err := ruleBasedProvider.Initialize(ctx); err == nil {
+		e.provider = ruleBasedProvider
+		log.Printf("[SLM] ✓ Using rule-based analysis (fast heuristics)")
+		log.Printf("[SLM] For AI analysis, install Ollama: https://ollama.ai")
 		return nil
-	} else {
-		log.Printf("[SLM] Embedded SLM not available: %v", err)
 	}
 
-	// Final fallback: heuristic (rule-based, no AI)
-	log.Printf("[SLM] ⚠ No local AI available, using heuristic fallback")
-	log.Printf("[SLM] To enable AI: install Ollama (ollama.ai) or download model to ~/.forge/models/")
+	// Final fallback: heuristic (should not reach here, but just in case)
+	log.Printf("[SLM] ⚠ Using heuristic fallback")
 	e.provider = NewHeuristicProvider()
 	e.heuristicEnabled = true
 
