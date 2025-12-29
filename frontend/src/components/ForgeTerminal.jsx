@@ -482,6 +482,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       console.log('[Auto-Respond] Disabled', { tabId });
     }
     autoRespondRef.current = autoRespond;
+    
+    // v3.4.1 FIX: Send AUTO_RESPOND_TOGGLE to backend WebSocket
+    // The backend PrecisionAutoResponder needs to know the toggle state
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'AUTO_RESPOND_TOGGLE',
+        enabled: autoRespond
+      }));
+      console.log('[Auto-Respond] Sent toggle to backend:', autoRespond);
+    }
   }, [autoRespond, tabId]);
 
   // Keep amEnabled ref updated
@@ -734,6 +744,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     },
     hideVisionOverlay: () => {
       setActiveVisionOverlay(null);
+    },
+    // v3.4.1: Auto-respond control for backend sync
+    setAutoRespond: (enabled) => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'AUTO_RESPOND_TOGGLE',
+          enabled: enabled
+        }));
+        console.log('[Auto-Respond] Manual toggle sent to backend:', enabled);
+        return true;
+      }
+      console.warn('[Auto-Respond] Cannot send toggle - WebSocket not connected');
+      return false;
     },
   }));
   
@@ -1065,6 +1088,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         const { cols, rows } = term;
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
         logger.terminal('Initial size sent', { tabId, cols, rows });
+
+        // v3.4.1 FIX: Send current auto-respond state to backend on connect
+        // This ensures backend is in sync after reconnection or session restore
+        if (autoRespondRef.current) {
+          ws.send(JSON.stringify({
+            type: 'AUTO_RESPOND_TOGGLE',
+            enabled: true
+          }));
+          console.log('[Auto-Respond] Synced enabled state on connect');
+        }
 
         // Restore directory if available
         if (currentDirectoryRef.current) {

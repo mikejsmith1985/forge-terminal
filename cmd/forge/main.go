@@ -25,6 +25,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
+	"github.com/mikejsmith1985/forge-terminal/internal/llm/ledger"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
@@ -88,6 +89,13 @@ func main() {
 		log.Printf("[Forge] Warning: failed to ensure directories: %v", err)
 	}
 	log.Printf("[Forge] Storage structure: %s", storage.GetCurrentStructure())
+
+	// v3.4.1: Initialize CFO ledger on startup (creates file if missing)
+	if _, err := ledger.GetLedger(); err != nil {
+		log.Printf("[CFO] Warning: failed to initialize ledger: %v", err)
+	} else {
+		log.Printf("[CFO] Ledger initialized at %s", ledger.DefaultFilePath())
+	}
 
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
