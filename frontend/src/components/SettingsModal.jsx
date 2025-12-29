@@ -15,6 +15,11 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
   const [budgetStatus, setBudgetStatus] = useState(null);
   const [budgetConfig, setBudgetConfig] = useState({ budget_limit: 1500, budget_unit: 'credits', renewal_day: 1 });
   const [loadingBudget, setLoadingBudget] = useState(false);
+  
+  // v3.5.0: SLM Smart Routing state
+  const [slmStatus, setSlmStatus] = useState(null);
+  const [learningStats, setLearningStats] = useState(null);
+  const [ollamaStatus, setOllamaStatus] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -22,8 +27,13 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
       checkMissingCards();
       loadFileAccessMode();
       loadBudgetStatus();
+      if (devMode) {
+        loadSLMStatus();
+        loadLearningStats();
+        loadOllamaStatus();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, devMode]);
 
   useEffect(() => {
     setConfig(shellConfig);
@@ -48,6 +58,62 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
       console.error('Failed to load budget status:', err);
     } finally {
       setLoadingBudget(false);
+    }
+  };
+
+  // v3.5.0: Load SLM engine status
+  const loadSLMStatus = async () => {
+    try {
+      const res = await fetch('/api/slm/status');
+      if (res.ok) {
+        const data = await res.json();
+        setSlmStatus(data.status);
+      }
+    } catch (err) {
+      console.error('Failed to load SLM status:', err);
+    }
+  };
+
+  // v3.5.0: Load learning statistics
+  const loadLearningStats = async () => {
+    try {
+      const res = await fetch('/api/slm/learning');
+      if (res.ok) {
+        const data = await res.json();
+        setLearningStats(data.stats);
+      }
+    } catch (err) {
+      console.error('Failed to load learning stats:', err);
+    }
+  };
+
+  // v3.5.0: Load Ollama status
+  const loadOllamaStatus = async () => {
+    try {
+      const res = await fetch('/api/ollama/status');
+      if (res.ok) {
+        const data = await res.json();
+        setOllamaStatus(data);
+      }
+    } catch (err) {
+      console.error('Failed to load Ollama status:', err);
+    }
+  };
+
+  // v3.5.0: Clear learning data
+  const clearLearningData = async () => {
+    if (!confirm('Are you sure you want to clear all learning data? This cannot be undone.')) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/slm/learning/clear', { method: 'DELETE' });
+      if (res.ok) {
+        setLearningStats({ total_samples: 0, accuracy_rate: 0 });
+        if (onToast) onToast('Learning data cleared', 'success', 3000);
+      }
+    } catch (err) {
+      console.error('Failed to clear learning data:', err);
+      if (onToast) onToast('Failed to clear learning data', 'error', 3000);
     }
   };
 
@@ -406,6 +472,133 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               </div>
             </div>
           </div>
+
+          {/* v3.5.0: Smart Routing Engine (Dev Mode only) */}
+          {devMode && (
+            <div style={{ 
+              background: '#1a1a1a', 
+              borderRadius: '12px', 
+              padding: '16px',
+              marginBottom: '16px',
+              border: '1px solid #8b5cf6'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <Brain size={16} style={{ color: '#8b5cf6' }} />
+                <span style={{ fontWeight: 500, color: '#8b5cf6' }}>🧪 Smart Routing Engine (Beta)</span>
+              </div>
+
+              {/* Engine Status */}
+              <div style={{ fontSize: '0.85rem', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ color: '#888' }}>Active Provider:</span>
+                  <span style={{ color: '#22c55e' }}>
+                    {slmStatus?.active_provider === 'heuristic' && '📊 Heuristic (Rule-based)'}
+                    {slmStatus?.active_provider === 'ollama' && '🦙 Ollama (Local AI)'}
+                    {slmStatus?.active_provider === 'embedded' && '🧠 Embedded SLM'}
+                    {!slmStatus && '⏳ Loading...'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ color: '#888' }}>Model:</span>
+                  <span>{slmStatus?.model_id || 'N/A'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ color: '#888' }}>Analyses:</span>
+                  <span>{slmStatus?.total_analyses || 0}</span>
+                </div>
+              </div>
+
+              {/* Ollama Status */}
+              <div style={{ 
+                background: ollamaStatus?.available ? '#052e16' : '#1c1917',
+                border: `1px solid ${ollamaStatus?.available ? '#22c55e' : '#44403c'}`,
+                borderRadius: '6px',
+                padding: '8px 10px',
+                fontSize: '0.8rem',
+                marginBottom: '12px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span>
+                  {ollamaStatus?.available 
+                    ? `🦙 Ollama: ${ollamaStatus.model || 'Available'}`
+                    : '🦙 Ollama: Not detected'
+                  }
+                </span>
+                {!ollamaStatus?.available && (
+                  <span style={{ color: '#888', fontSize: '0.75rem' }}>
+                    Install for better analysis
+                  </span>
+                )}
+              </div>
+
+              {/* Learning Stats */}
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ fontWeight: 500, marginBottom: '8px', fontSize: '0.85rem' }}>
+                  📚 Learning Progress
+                </div>
+                <div style={{ fontSize: '0.8rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#888' }}>Feedback Samples:</span>
+                    <span>{learningStats?.total_samples || 0}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#888' }}>Prediction Accuracy:</span>
+                    <span style={{ color: (learningStats?.accuracy_rate || 0) > 0.7 ? '#22c55e' : '#f59e0b' }}>
+                      {learningStats?.total_samples > 0 
+                        ? `${(learningStats.accuracy_rate * 100).toFixed(0)}%`
+                        : 'N/A'
+                      }
+                    </span>
+                  </div>
+                  {learningStats?.last_updated && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ color: '#888' }}>Last Updated:</span>
+                      <span style={{ fontSize: '0.75rem' }}>
+                        {new Date(learningStats.last_updated).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => { loadSLMStatus(); loadLearningStats(); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    background: '#333',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🔄 Refresh
+                </button>
+                <button
+                  onClick={clearLearningData}
+                  disabled={!learningStats?.total_samples}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    background: learningStats?.total_samples ? '#7f1d1d' : '#333',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: learningStats?.total_samples ? '#fca5a5' : '#666',
+                    fontSize: '0.8rem',
+                    cursor: learningStats?.total_samples ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  🗑️ Clear Data
+                </button>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div style={{ 
