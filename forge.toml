@@ -1,8 +1,17 @@
 # Forge Terminal - Smart Model Routing Configuration
-# v3.3.3 - Semantic Intelligence Router
+# v3.4.0 - CFO Router with Budget Management
 
 [router]
 default_tier = "tier1"
+provider = "copilot"    # Primary provider: "copilot", "anthropic", "ollama"
+auto_pilot = true       # Enable automatic model selection based on context
+
+[budget]
+# Monthly budget configuration (managed via ~/.forge/ledger.json)
+# These are defaults - actual values stored in ledger
+limit = 1500            # Monthly budget limit
+unit = "credits"        # "credits" for Copilot, "usd" for Anthropic
+renewal_day = 1         # Day of month to reset budget (1-28)
 
 [tiers.tier1]
 name = "Standard"

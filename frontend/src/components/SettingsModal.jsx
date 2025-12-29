@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield, DollarSign, Zap, Brain } from 'lucide-react';
 
 const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, visionConfig, onVisionConfigChange }) => {
   const [config, setConfig] = useState(shellConfig);
@@ -11,18 +11,65 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
   const [missingCards, setMissingCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
   const [fileAccessMode, setFileAccessMode] = useState('restricted');
+  const [activeTab, setActiveTab] = useState('shell'); // 'shell' or 'budget'
+  const [budgetStatus, setBudgetStatus] = useState(null);
+  const [budgetConfig, setBudgetConfig] = useState({ budget_limit: 1500, budget_unit: 'credits', renewal_day: 1 });
+  const [loadingBudget, setLoadingBudget] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       detectWSL();
       checkMissingCards();
       loadFileAccessMode();
+      loadBudgetStatus();
     }
   }, [isOpen]);
 
   useEffect(() => {
     setConfig(shellConfig);
   }, [shellConfig]);
+
+  const loadBudgetStatus = async () => {
+    setLoadingBudget(true);
+    try {
+      const res = await fetch('/api/llm/budget');
+      if (res.ok) {
+        const data = await res.json();
+        setBudgetStatus(data.status);
+        if (data.status) {
+          setBudgetConfig({
+            budget_limit: data.status.budget_limit,
+            budget_unit: data.status.budget_unit,
+            renewal_day: data.status.renewal_day
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load budget status:', err);
+    } finally {
+      setLoadingBudget(false);
+    }
+  };
+
+  const saveBudgetConfig = async () => {
+    try {
+      const res = await fetch('/api/llm/budget/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(budgetConfig)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBudgetStatus(data);
+        if (onToast) onToast('Budget configuration saved!', 'success', 3000);
+      } else {
+        if (onToast) onToast('Failed to save budget config', 'error', 3000);
+      }
+    } catch (err) {
+      console.error('Failed to save budget config:', err);
+      if (onToast) onToast('Failed to save budget config', 'error', 3000);
+    }
+  };
 
   const checkMissingCards = async () => {
     try {
@@ -154,25 +201,289 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
 
   if (!isOpen) return null;
 
+  // Helper to get health status color
+  const getHealthColor = (health) => {
+    switch (health) {
+      case 'healthy': return '#22c55e';
+      case 'warning': return '#f59e0b';
+      case 'critical': return '#ef4444';
+      case 'exhausted': return '#dc2626';
+      default: return '#888';
+    }
+  };
+
+  // Budget tab content
+  const renderBudgetTab = () => (
+    <div style={{ padding: '10px 0' }}>
+      <h4 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Brain size={18} style={{ color: '#8b5cf6' }} />
+        Intelligence & Budget
+      </h4>
+
+      {loadingBudget ? (
+        <div style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
+          Loading budget status...
+        </div>
+      ) : budgetStatus ? (
+        <>
+          {/* Budget Progress Bar */}
+          <div style={{ 
+            background: '#1a1a1a', 
+            borderRadius: '12px', 
+            padding: '16px',
+            marginBottom: '16px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontWeight: 500 }}>Monthly Budget</span>
+              <span style={{ color: getHealthColor(budgetStatus.health) }}>
+                {budgetStatus.health === 'healthy' && '✓ Healthy'}
+                {budgetStatus.health === 'warning' && '⚠ Warning'}
+                {budgetStatus.health === 'critical' && '🔴 Critical'}
+                {budgetStatus.health === 'exhausted' && '⛔ Exhausted'}
+              </span>
+            </div>
+            
+            <div style={{ 
+              background: '#333', 
+              borderRadius: '8px', 
+              height: '24px',
+              overflow: 'hidden',
+              marginBottom: '8px'
+            }}>
+              <div style={{ 
+                background: `linear-gradient(90deg, ${getHealthColor(budgetStatus.health)}, ${getHealthColor(budgetStatus.health)}88)`,
+                height: '100%',
+                width: `${Math.min(100, budgetStatus.percent_used)}%`,
+                transition: 'width 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: budgetStatus.percent_used > 50 ? '#fff' : 'transparent'
+              }}>
+                {budgetStatus.percent_used.toFixed(0)}%
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#888' }}>
+              <span>
+                {budgetStatus.current_usage.toFixed(2)} / {budgetStatus.budget_limit.toFixed(0)} {budgetStatus.budget_unit}
+              </span>
+              <span>
+                Day {budgetStatus.days_elapsed} of ~30 ({budgetStatus.time_progress.toFixed(0)}%)
+              </span>
+            </div>
+          </div>
+
+          {/* Budget Configuration */}
+          <div style={{ 
+            background: '#1a1a1a', 
+            borderRadius: '12px', 
+            padding: '16px',
+            marginBottom: '16px'
+          }}>
+            <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>
+              Budget Configuration
+            </label>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+              <div style={{ flex: 2 }}>
+                <label style={{ fontSize: '0.8rem', color: '#888', display: 'block', marginBottom: '4px' }}>
+                  Monthly Limit
+                </label>
+                <input
+                  type="number"
+                  value={budgetConfig.budget_limit}
+                  onChange={(e) => setBudgetConfig({ ...budgetConfig, budget_limit: parseFloat(e.target.value) || 0 })}
+                  style={{ 
+                    width: '100%', 
+                    padding: '8px', 
+                    borderRadius: '6px', 
+                    border: '1px solid #333', 
+                    background: '#0a0a0a', 
+                    color: '#fff' 
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.8rem', color: '#888', display: 'block', marginBottom: '4px' }}>
+                  Unit
+                </label>
+                <select
+                  value={budgetConfig.budget_unit}
+                  onChange={(e) => setBudgetConfig({ ...budgetConfig, budget_unit: e.target.value })}
+                  style={{ 
+                    width: '100%', 
+                    padding: '8px', 
+                    borderRadius: '6px', 
+                    border: '1px solid #333', 
+                    background: '#0a0a0a', 
+                    color: '#fff' 
+                  }}
+                >
+                  <option value="credits">Credits (Copilot)</option>
+                  <option value="usd">USD (Anthropic)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '0.8rem', color: '#888', display: 'block', marginBottom: '4px' }}>
+                Renewal Day (1-28)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="28"
+                value={budgetConfig.renewal_day}
+                onChange={(e) => setBudgetConfig({ ...budgetConfig, renewal_day: parseInt(e.target.value) || 1 })}
+                style={{ 
+                  width: '100px', 
+                  padding: '8px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #333', 
+                  background: '#0a0a0a', 
+                  color: '#fff' 
+                }}
+              />
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={saveBudgetConfig}
+              style={{ width: '100%' }}
+            >
+              <DollarSign size={16} style={{ marginRight: '6px' }} />
+              Save Budget Configuration
+            </button>
+          </div>
+
+          {/* Model Pricing Info */}
+          <div style={{ 
+            background: '#1a1a1a', 
+            borderRadius: '12px', 
+            padding: '16px'
+          }}>
+            <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>
+              Auto-Pilot Routing
+            </label>
+            
+            <div style={{ 
+              background: '#0a0a0a', 
+              borderRadius: '8px', 
+              padding: '12px',
+              fontSize: '0.85rem',
+              lineHeight: '1.6'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Zap size={14} style={{ color: '#22c55e' }} />
+                <strong>Speed Models</strong>
+                <span style={{ color: '#888' }}>- Quick tasks (0.25-0.33 credits)</span>
+              </div>
+              <div style={{ paddingLeft: '22px', color: '#666', marginBottom: '12px' }}>
+                GPT-4o-mini, Claude 3.5 Haiku
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Brain size={14} style={{ color: '#8b5cf6' }} />
+                <strong>Reasoning Models</strong>
+                <span style={{ color: '#888' }}>- Complex tasks (1.0+ credits)</span>
+              </div>
+              <div style={{ paddingLeft: '22px', color: '#666', marginBottom: '12px' }}>
+                GPT-4o, Claude Sonnet 4, Gemini 3
+              </div>
+
+              <div style={{ 
+                background: '#1e3a5f', 
+                border: '1px solid #3b82f6',
+                borderRadius: '6px',
+                padding: '10px',
+                fontSize: '0.8rem'
+              }}>
+                💡 Forge automatically selects the optimal model based on task complexity 
+                and your remaining budget. When budget is low, it downgrades to cheaper models.
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div style={{ 
+          background: '#422006', 
+          border: '1px solid #f97316',
+          borderRadius: '8px',
+          padding: '12px',
+          fontSize: '0.85em'
+        }}>
+          ⚠️ Failed to load budget status. The ledger may not be initialized.
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: '500px' }}>
+      <div className="modal" style={{ maxWidth: '550px' }}>
         <div className="modal-header">
-          <h3><Settings size={20} style={{ marginRight: '8px', verticalAlign: 'bottom' }} /> Shell Settings</h3>
+          <h3><Settings size={20} style={{ marginRight: '8px', verticalAlign: 'bottom' }} /> Settings</h3>
           <button className="btn-close" onClick={onClose}>×</button>
         </div>
 
+        {/* Tab Navigation */}
+        <div style={{ 
+          display: 'flex', 
+          borderBottom: '1px solid #333',
+          padding: '0 16px'
+        }}>
+          <button
+            onClick={() => setActiveTab('shell')}
+            style={{ 
+              padding: '12px 20px',
+              background: 'transparent',
+              border: 'none',
+              color: activeTab === 'shell' ? '#fff' : '#888',
+              borderBottom: activeTab === 'shell' ? '2px solid #8b5cf6' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Terminal size={16} />
+            Shell
+          </button>
+          <button
+            onClick={() => setActiveTab('budget')}
+            style={{ 
+              padding: '12px 20px',
+              background: 'transparent',
+              border: 'none',
+              color: activeTab === 'budget' ? '#fff' : '#888',
+              borderBottom: activeTab === 'budget' ? '2px solid #8b5cf6' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <DollarSign size={16} />
+            Intelligence
+          </button>
+        </div>
+
         <div className="modal-body">
-          <div style={{ 
-            fontSize: '0.75rem', 
-            color: '#666', 
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <span>⬇ Scroll for more options ⬇</span>
-          </div>
+          {activeTab === 'budget' ? renderBudgetTab() : (
+            <>
+              <div style={{ 
+                fontSize: '0.75rem', 
+                color: '#666', 
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>⬇ Scroll for more options ⬇</span>
+              </div>
 
           <div className="form-group" style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Default Shell</label>
@@ -784,6 +1095,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               Used by the File Explorer and Monaco Editor. Changes apply immediately.
             </p>
           </div>
+          </>
+          )}
         </div>
 
         <div className="modal-footer">

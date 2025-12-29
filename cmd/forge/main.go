@@ -232,6 +232,14 @@ func main() {
 	http.HandleFunc("/api/llm/providers", WrapWithMiddleware(handleListProviders))
 	http.HandleFunc("/api/llm/providers/", WrapWithMiddleware(handleProviderModels))
 
+	// Budget & CFO Router API (v3.4.0 - Smart Marketplace)
+	http.HandleFunc("/api/llm/budget", WrapWithMiddleware(handleBudgetStatus))
+	http.HandleFunc("/api/llm/budget/config", WrapWithMiddleware(handleBudgetConfig))
+	http.HandleFunc("/api/llm/budget/history", WrapWithMiddleware(handleBudgetHistory))
+	http.HandleFunc("/api/llm/budget/reset", WrapWithMiddleware(handleBudgetReset))
+	http.HandleFunc("/api/llm/pricing", WrapWithMiddleware(handleModelPricing))
+	http.HandleFunc("/api/llm/route/preview", WrapWithMiddleware(handleRoutePreview))
+
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
 	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))
