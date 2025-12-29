@@ -1316,12 +1316,30 @@ function App() {
   const handleExecute = (cmd) => {
     const termRef = getActiveTerminalRef();
     if (termRef) {
+      // Issue #52: Check if we're in chat viewMode - route through PTY bridge
+      const isInChatMode = activeTab?.viewMode === 'chat';
+      
       // If command is empty but triggerAM is true, we still want to trigger AM
       // but we shouldn't send an empty command to the terminal as it might just print a newline
       if (cmd.command && cmd.command.trim().length > 0) {
-        termRef.sendCommand(cmd.command, cmd.delay)
+        if (isInChatMode && termRef.sendChatCommand) {
+          // Issue #52: In chat mode, use PTY bridge so chat UX receives output
+          termRef.sendChatCommand({
+            type: 'CHAT_COMMAND',
+            command: cmd.command,
+            cli: cmd.llmProvider || 'copilot',
+            model: '',
+          });
+          // Don't switch focus away from chat in chat mode
+        } else {
+          // Terminal mode - send directly and focus
+          termRef.sendCommand(cmd.command, cmd.delay);
+          termRef.focus();
+        }
+      } else if (!isInChatMode) {
+        // Only focus terminal if not in chat mode
+        termRef.focus();
       }
-      termRef.focus()
 
       // If this command card is configured to trigger AM, send an AM log entry
       // so the backend can start/associate a conversation without relying on text detection.
@@ -1880,7 +1898,9 @@ function App() {
                         }
                       }, 100);
                     }}
-                    terminalRef={terminalRefs.current[tab.id]} // v3.5.3: PTY bridge connection
+                    // v3.5.3: PTY bridge connection - use getter to ensure ref is current
+                    terminalRef={terminalRefs.current[tab.id]}
+                    getTerminalRef={() => terminalRefs.current[tab.id]}
                   />
                 </div>
                 <div className={`view-layer terminal-layer ${tab.viewMode === 'terminal' ? 'active' : ''}`}>

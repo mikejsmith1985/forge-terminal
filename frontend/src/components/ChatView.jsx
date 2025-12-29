@@ -25,7 +25,13 @@ const ChatView = ({
   onOpenSettings,
   onRunInTerminal,
   terminalRef, // v3.5.3: Reference to ForgeTerminal for PTY WebSocket access
+  getTerminalRef, // Issue #52: Getter function for lazy ref access
 }) => {
+  // Issue #52: Helper to get terminal ref (handles race condition)
+  const getActiveTerminalRef = () => {
+    return terminalRef || (getTerminalRef && getTerminalRef());
+  };
+
   // Initialize messages from store if available for this tab
   const [messages, setMessages] = useState(() => {
     return chatMessagesStore.get(tabId) || [];
@@ -126,8 +132,10 @@ const ChatView = ({
   }, []);
 
   // v3.5.3: PTY Bridge - Subscribe to terminal output when using PTY mode
+  // Issue #52: Use getActiveTerminalRef for lazy ref access
   useEffect(() => {
-    if (!usePTYBridge || !terminalRef) return;
+    const ref = getActiveTerminalRef();
+    if (!usePTYBridge || !ref) return;
 
     // Register a handler for PTY output that we receive via the terminal
     const handlePTYOutput = (data) => {
@@ -193,28 +201,28 @@ const ChatView = ({
     };
 
     // Register handlers
-    if (terminalRef.registerChatOutputHandler) {
-      terminalRef.registerChatOutputHandler(handlePTYOutput);
+    if (ref.registerChatOutputHandler) {
+      ref.registerChatOutputHandler(handlePTYOutput);
     }
-    if (terminalRef.registerChatResponseCompleteHandler) {
-      terminalRef.registerChatResponseCompleteHandler(handleResponseComplete);
+    if (ref.registerChatResponseCompleteHandler) {
+      ref.registerChatResponseCompleteHandler(handleResponseComplete);
     }
-    if (terminalRef.registerChatPromptWaitingHandler) {
-      terminalRef.registerChatPromptWaitingHandler(handlePromptWaiting);
+    if (ref.registerChatPromptWaitingHandler) {
+      ref.registerChatPromptWaitingHandler(handlePromptWaiting);
     }
 
     return () => {
-      if (terminalRef.unregisterChatOutputHandler) {
-        terminalRef.unregisterChatOutputHandler();
+      if (ref.unregisterChatOutputHandler) {
+        ref.unregisterChatOutputHandler();
       }
-      if (terminalRef.unregisterChatResponseCompleteHandler) {
-        terminalRef.unregisterChatResponseCompleteHandler();
+      if (ref.unregisterChatResponseCompleteHandler) {
+        ref.unregisterChatResponseCompleteHandler();
       }
-      if (terminalRef.unregisterChatPromptWaitingHandler) {
-        terminalRef.unregisterChatPromptWaitingHandler();
+      if (ref.unregisterChatPromptWaitingHandler) {
+        ref.unregisterChatPromptWaitingHandler();
       }
     };
-  }, [usePTYBridge, terminalRef, isLoading, tabId]);
+  }, [usePTYBridge, terminalRef, getTerminalRef, isLoading, tabId]);
 
   // Persist messages to store when they change
   useEffect(() => {
@@ -241,8 +249,10 @@ const ChatView = ({
   }, [messages]);
 
   // v3.5.3: Send message via PTY bridge (injects into terminal's PTY session)
+  // Issue #52: Use getActiveTerminalRef for lazy ref access
   const sendViaPTYBridge = useCallback(async (userMessage, slmResult) => {
-    if (!terminalRef) {
+    const ref = getActiveTerminalRef();
+    if (!ref) {
       throw new Error('Terminal not connected');
     }
 
@@ -264,7 +274,7 @@ const ChatView = ({
     }]);
 
     // Send CHAT_COMMAND to terminal WebSocket
-    const success = terminalRef.sendChatCommand({
+    const success = ref.sendChatCommand({
       type: 'CHAT_COMMAND',
       command: userMessage,
       cli: cli,
@@ -432,7 +442,9 @@ const ChatView = ({
       }
 
       // v3.5.3: Use PTY bridge if available, otherwise fall back to HTTP
-      if (usePTYBridge && terminalRef && terminalRef.sendChatCommand) {
+      // Issue #52: Use getActiveTerminalRef for lazy ref access
+      const ref = getActiveTerminalRef();
+      if (usePTYBridge && ref && ref.sendChatCommand) {
         console.log('[ChatView] Using PTY bridge mode');
         await sendViaPTYBridge(userMessage, slmResult);
         // Note: isLoading will be cleared by the timeout in sendViaPTYBridge
