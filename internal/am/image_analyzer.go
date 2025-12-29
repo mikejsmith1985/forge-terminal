@@ -4,10 +4,15 @@
 package am
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -256,8 +261,8 @@ func (a *ImageAnalyzer) analysisLoop() {
 }
 
 // analyzeImage performs the actual image analysis.
-// TODO: Integrate with LLM client (Haiku tier) for AI analysis.
-// For now, uses heuristic-based analysis.
+// v3.5.2: Uses Ollama vision models (llava) if available for REAL AI analysis.
+// Falls back to enhanced heuristics if no vision model is available.
 func (a *ImageAnalyzer) analyzeImage(req ImageAnalysisRequest) *ImageSummary {
 	summary := &ImageSummary{
 		Hash:         req.ImageHash,
@@ -275,10 +280,18 @@ func (a *ImageAnalyzer) analyzeImage(req ImageAnalysisRequest) *ImageSummary {
 	// Extract dimensions if possible
 	summary.Dimensions = extractDimensions(req.ImageData, req.Format)
 	
-	// Generate description
-	// TODO: Replace with actual LLM call to Haiku
-	summary.Description = generateDescription(summary, req.Detection)
-	summary.Confidence = 0.7 // Medium confidence for heuristic analysis
+	// v3.5.2: Try Ollama vision analysis first (FREE local AI)
+	ollamaDesc, err := analyzeWithOllamaVision(req.ImageData, req.Format, contentType)
+	if err == nil && ollamaDesc != "" {
+		summary.Description = ollamaDesc
+		summary.Confidence = 0.9 // High confidence for real AI vision
+		log.Printf("[ImageAnalyzer] Ollama vision analysis complete: %s", truncateString(ollamaDesc, 100))
+		return summary
+	}
+	
+	// Fallback to enhanced heuristics
+	summary.Description = generateEnhancedDescription(summary, req.Detection, req.ImageData)
+	summary.Confidence = 0.5 // Lower confidence for heuristic analysis
 	
 	return summary
 }
@@ -402,4 +415,148 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// analyzeWithOllamaVision uses Ollama's vision models for real image analysis.
+// Returns empty string and error if Ollama is not available or fails.
+// This is FREE local AI - no API costs.
+func analyzeWithOllamaVision(imageData []byte, format string, contentType string) (string, error) {
+	// Check if Ollama is running
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get("http://localhost:11434/api/version")
+	if err != nil {
+		return "", fmt.Errorf("ollama not available: %w", err)
+	}
+	resp.Body.Close()
+	
+	// Check for vision models
+	visionModels := []string{"llava", "llava:13b", "llava:7b", "bakllava", "moondream"}
+	availableModel := ""
+	
+	tagsResp, err := client.Get("http://localhost:11434/api/tags")
+	if err != nil {
+		return "", fmt.Errorf("failed to list models: %w", err)
+	}
+	defer tagsResp.Body.Close()
+	
+	var tagsResult struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(tagsResp.Body).Decode(&tagsResult); err != nil {
+		return "", fmt.Errorf("failed to parse models: %w", err)
+	}
+	
+	// Find first available vision model
+	for _, vm := range visionModels {
+		for _, m := range tagsResult.Models {
+			if strings.HasPrefix(m.Name, vm) {
+				availableModel = m.Name
+				break
+			}
+		}
+		if availableModel != "" {
+			break
+		}
+	}
+	
+	if availableModel == "" {
+		return "", fmt.Errorf("no vision model available in Ollama")
+	}
+	
+	// Encode image to base64 for API
+	base64Image := base64.StdEncoding.EncodeToString(imageData)
+	
+	// Build vision prompt
+	prompt := "Describe this image concisely. If it's a screenshot, identify the application, any error messages, code, or important UI elements. If it's a diagram, describe its structure. Focus on details relevant to software development."
+	
+	// Call Ollama vision API
+	payload := map[string]interface{}{
+		"model":  availableModel,
+		"prompt": prompt,
+		"images": []string{base64Image},
+		"stream": false,
+		"options": map[string]interface{}{
+			"temperature": 0.3,
+			"num_predict": 300,
+		},
+	}
+	
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+	
+	// Use longer timeout for vision analysis
+	visionClient := &http.Client{Timeout: 60 * time.Second}
+	req, err := http.NewRequest("POST", "http://localhost:11434/api/generate", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	
+	genResp, err := visionClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("vision API call failed: %w", err)
+	}
+	defer genResp.Body.Close()
+	
+	if genResp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("vision API returned %d", genResp.StatusCode)
+	}
+	
+	var result struct {
+		Response string `json:"response"`
+	}
+	if err := json.NewDecoder(genResp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	return strings.TrimSpace(result.Response), nil
+}
+
+// generateEnhancedDescription creates a detailed heuristic description.
+// Used when Ollama vision is not available.
+func generateEnhancedDescription(summary *ImageSummary, detection ImageDetectionResult, data []byte) string {
+	var parts []string
+	
+	// Content type description
+	switch summary.ContentType {
+	case "screenshot":
+		parts = append(parts, "Screenshot")
+		// Try to detect specific characteristics
+		if summary.Dimensions != "" {
+			if strings.Contains(summary.Dimensions, "1920") || strings.Contains(summary.Dimensions, "2560") {
+				parts = append(parts, "of desktop application or browser")
+			}
+		}
+	case "diagram":
+		parts = append(parts, "Technical diagram or flowchart")
+	case "code":
+		parts = append(parts, "Image containing code or text")
+	case "photo":
+		parts = append(parts, "Photograph")
+	default:
+		parts = append(parts, "Image")
+	}
+	
+	// Add dimensions
+	if summary.Dimensions != "" {
+		parts = append(parts, fmt.Sprintf("at %s resolution", summary.Dimensions))
+	}
+	
+	// Add format and size
+	parts = append(parts, fmt.Sprintf("(%s, %s)", strings.ToUpper(summary.Format), formatSize(summary.Size)))
+	
+	// Add detection hints
+	if detection.IsBase64 {
+		parts = append(parts, "- pasted as base64")
+	}
+	
+	// Add guidance for AI
+	description := strings.Join(parts, " ")
+	description += ". NOTE: For detailed analysis, install Ollama with a vision model (llava)."
+	
+	return description
 }

@@ -45,43 +45,53 @@ func NewEngine() *Engine {
 }
 
 // Initialize sets up the engine with available providers.
+// Priority: Ollama (free local) > LlamaCpp (bundled) > Embedded > Heuristic
+// NO external API calls - all inference is local and free.
 func (e *Engine) Initialize(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Try to initialize Ollama first (if user prefers or it's available)
+	// v3.5.2: Priority 1 - Ollama (if user has it installed, it's free)
 	ollamaProvider := NewOllamaProvider()
 	if ollamaProvider.IsAvailable() {
 		log.Printf("[SLM] Ollama detected, checking for suitable models...")
 		if err := ollamaProvider.Initialize(ctx); err == nil {
-			if e.preferences.PreferOllama {
-				e.provider = ollamaProvider
-				log.Printf("[SLM] Using Ollama as primary provider")
-			} else {
-				e.fallbacks = append(e.fallbacks, ollamaProvider)
-				log.Printf("[SLM] Ollama available as fallback")
-			}
+			e.provider = ollamaProvider
+			log.Printf("[SLM] ✓ Using Ollama as primary provider (FREE local AI)")
+			return nil
+		} else {
+			log.Printf("[SLM] Ollama init failed: %v", err)
 		}
 	}
 
-	// Initialize embedded provider
+	// v3.5.2: Priority 2 - LlamaCpp subprocess (bundled binary + model)
+	llamaCppProvider := NewLlamaCppProvider()
+	if llamaCppProvider.IsAvailable() {
+		log.Printf("[SLM] llama-cli binary detected, initializing...")
+		if err := llamaCppProvider.Initialize(ctx); err == nil {
+			e.provider = llamaCppProvider
+			log.Printf("[SLM] ✓ Using llama-cli as primary provider (FREE local AI)")
+			return nil
+		} else {
+			log.Printf("[SLM] llama-cli init failed: %v", err)
+		}
+	}
+
+	// Priority 3 - Embedded provider (requires CGO, model file)
 	embeddedProvider := NewEmbeddedProvider()
 	if err := embeddedProvider.Initialize(ctx); err == nil {
-		if e.provider == nil {
-			e.provider = embeddedProvider
-			log.Printf("[SLM] Using embedded SLM as primary provider")
-		} else {
-			e.fallbacks = append(e.fallbacks, embeddedProvider)
-		}
+		e.provider = embeddedProvider
+		log.Printf("[SLM] ✓ Using embedded SLM as primary provider")
+		return nil
 	} else {
 		log.Printf("[SLM] Embedded SLM not available: %v", err)
 	}
 
-	// If no provider available, use heuristic fallback
-	if e.provider == nil {
-		log.Printf("[SLM] No SLM provider available, using heuristic fallback")
-		e.provider = NewHeuristicProvider()
-	}
+	// Final fallback: heuristic (rule-based, no AI)
+	log.Printf("[SLM] ⚠ No local AI available, using heuristic fallback")
+	log.Printf("[SLM] To enable AI: install Ollama (ollama.ai) or download model to ~/.forge/models/")
+	e.provider = NewHeuristicProvider()
+	e.heuristicEnabled = true
 
 	return nil
 }

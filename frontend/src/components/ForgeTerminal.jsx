@@ -609,6 +609,29 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
   }, [isVisible]);
 
+  // v3.5.2 Fix: Prevent hidden terminals from stealing focus
+  // When a terminal is hidden, set tabIndex=-1 on its helper textarea
+  // This removes it from keyboard tab order and prevents spacebar focus stealing
+  useEffect(() => {
+    if (!terminalRef.current) return;
+    
+    // Find the xterm helper textarea (xterm creates this for keyboard input)
+    const textarea = terminalRef.current.querySelector('.xterm-helper-textarea');
+    if (!textarea) return;
+    
+    if (isVisible) {
+      // Active terminal: make textarea focusable
+      textarea.tabIndex = 0;
+    } else {
+      // Hidden terminal: remove from tab order
+      textarea.tabIndex = -1;
+      // Also blur if currently focused (shouldn't happen, but safety)
+      if (document.activeElement === textarea) {
+        textarea.blur();
+      }
+    }
+  }, [isVisible]);
+
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     sendCommand: (command, delay) => {
