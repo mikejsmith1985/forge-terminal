@@ -19,9 +19,9 @@ vi.mock('./IconPicker', () => ({
 
 describe('CommandModal - Edit Command Keybinding Bug', () => {
   const existingCommands = [
-    { id: 1, name: 'Test 1', command: 'echo 1', keyBinding: 'Ctrl+Shift+1', description: 'First' },
-    { id: 2, name: 'Test 2', command: 'echo 2', keyBinding: 'Ctrl+Shift+2', description: 'Second' },
-    { id: 3, name: 'Test 3', command: 'echo 3', keyBinding: 'Ctrl+Shift+3', description: 'Third' },
+    { id: 1, description: 'Test 1', command: 'echo 1', keyBinding: 'Ctrl+Shift+1' },
+    { id: 2, description: 'Test 2', command: 'echo 2', keyBinding: 'Ctrl+Shift+2' },
+    { id: 3, description: 'Test 3', command: 'echo 3', keyBinding: 'Ctrl+Shift+3' },
   ];
 
   const mockOnSave = vi.fn();

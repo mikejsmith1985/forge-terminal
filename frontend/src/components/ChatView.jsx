@@ -25,7 +25,13 @@ const ChatView = ({
   onOpenSettings,
   onRunInTerminal,
   terminalRef, // v3.5.3: Reference to ForgeTerminal for PTY WebSocket access
+  getTerminalRef, // Issue #52: Getter function for lazy ref access
 }) => {
+  // Issue #52: Helper to get terminal ref (handles race condition)
+  const getActiveTerminalRef = () => {
+    return terminalRef || (getTerminalRef && getTerminalRef());
+  };
+
   // Initialize messages from store if available for this tab
   const [messages, setMessages] = useState(() => {
     return chatMessagesStore.get(tabId) || [];
@@ -39,6 +45,13 @@ const ChatView = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [usePTYBridge, setUsePTYBridge] = useState(true); // v3.5.3: Use PTY bridge by default
   const [pendingResponse, setPendingResponse] = useState(''); // Accumulating PTY output
+  
+  // Issue #52: User preference for Enter key behavior
+  const [enterToSend, setEnterToSend] = useState(() => {
+    const saved = localStorage.getItem('chat_enter_to_send');
+    return saved !== null ? saved === 'true' : true; // Default: Enter sends
+  });
+  
   const messagesEndRef = useRef(null);
   const messageRefs = useRef({}); // For scrolling to search results
   const currentTabIdRef = useRef(tabId);
@@ -119,8 +132,10 @@ const ChatView = ({
   }, []);
 
   // v3.5.3: PTY Bridge - Subscribe to terminal output when using PTY mode
+  // Issue #52: Use getActiveTerminalRef for lazy ref access
   useEffect(() => {
-    if (!usePTYBridge || !terminalRef) return;
+    const ref = getActiveTerminalRef();
+    if (!usePTYBridge || !ref) return;
 
     // Register a handler for PTY output that we receive via the terminal
     const handlePTYOutput = (data) => {
@@ -186,28 +201,28 @@ const ChatView = ({
     };
 
     // Register handlers
-    if (terminalRef.registerChatOutputHandler) {
-      terminalRef.registerChatOutputHandler(handlePTYOutput);
+    if (ref.registerChatOutputHandler) {
+      ref.registerChatOutputHandler(handlePTYOutput);
     }
-    if (terminalRef.registerChatResponseCompleteHandler) {
-      terminalRef.registerChatResponseCompleteHandler(handleResponseComplete);
+    if (ref.registerChatResponseCompleteHandler) {
+      ref.registerChatResponseCompleteHandler(handleResponseComplete);
     }
-    if (terminalRef.registerChatPromptWaitingHandler) {
-      terminalRef.registerChatPromptWaitingHandler(handlePromptWaiting);
+    if (ref.registerChatPromptWaitingHandler) {
+      ref.registerChatPromptWaitingHandler(handlePromptWaiting);
     }
 
     return () => {
-      if (terminalRef.unregisterChatOutputHandler) {
-        terminalRef.unregisterChatOutputHandler();
+      if (ref.unregisterChatOutputHandler) {
+        ref.unregisterChatOutputHandler();
       }
-      if (terminalRef.unregisterChatResponseCompleteHandler) {
-        terminalRef.unregisterChatResponseCompleteHandler();
+      if (ref.unregisterChatResponseCompleteHandler) {
+        ref.unregisterChatResponseCompleteHandler();
       }
-      if (terminalRef.unregisterChatPromptWaitingHandler) {
-        terminalRef.unregisterChatPromptWaitingHandler();
+      if (ref.unregisterChatPromptWaitingHandler) {
+        ref.unregisterChatPromptWaitingHandler();
       }
     };
-  }, [usePTYBridge, terminalRef, isLoading, tabId]);
+  }, [usePTYBridge, terminalRef, getTerminalRef, isLoading, tabId]);
 
   // Persist messages to store when they change
   useEffect(() => {
@@ -234,8 +249,10 @@ const ChatView = ({
   }, [messages]);
 
   // v3.5.3: Send message via PTY bridge (injects into terminal's PTY session)
+  // Issue #52: Use getActiveTerminalRef for lazy ref access
   const sendViaPTYBridge = useCallback(async (userMessage, slmResult) => {
-    if (!terminalRef) {
+    const ref = getActiveTerminalRef();
+    if (!ref) {
       throw new Error('Terminal not connected');
     }
 
@@ -257,7 +274,7 @@ const ChatView = ({
     }]);
 
     // Send CHAT_COMMAND to terminal WebSocket
-    const success = terminalRef.sendChatCommand({
+    const success = ref.sendChatCommand({
       type: 'CHAT_COMMAND',
       command: userMessage,
       cli: cli,
@@ -425,7 +442,9 @@ const ChatView = ({
       }
 
       // v3.5.3: Use PTY bridge if available, otherwise fall back to HTTP
-      if (usePTYBridge && terminalRef && terminalRef.sendChatCommand) {
+      // Issue #52: Use getActiveTerminalRef for lazy ref access
+      const ref = getActiveTerminalRef();
+      if (usePTYBridge && ref && ref.sendChatCommand) {
         console.log('[ChatView] Using PTY bridge mode');
         await sendViaPTYBridge(userMessage, slmResult);
         // Note: isLoading will be cleared by the timeout in sendViaPTYBridge
@@ -463,12 +482,33 @@ const ChatView = ({
     }
   }, []);
 
+  // Issue #52: Handle Enter key with configurable behavior
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+    if (e.key === 'Enter') {
+      if (enterToSend) {
+        // Enter sends, Shift+Enter for newline
+        if (!e.shiftKey) {
+          e.preventDefault();
+          handleSendMessage();
+        }
+      } else {
+        // Shift+Enter sends, Enter for newline
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleSendMessage();
+        }
+      }
     }
   };
+  
+  // Toggle Enter key behavior and persist to localStorage
+  const toggleEnterBehavior = useCallback(() => {
+    setEnterToSend(prev => {
+      const newValue = !prev;
+      localStorage.setItem('chat_enter_to_send', String(newValue));
+      return newValue;
+    });
+  }, []);
 
   // Image upload handlers
   const handleImageUpload = useCallback(async (file) => {
@@ -700,17 +740,35 @@ const ChatView = ({
             className="chat-view-input"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             onPaste={handlePaste}
-            placeholder="Ask a question... (Shift+Enter for newline, paste images)"
+            placeholder={enterToSend 
+              ? "Ask a question... (Enter to send, Shift+Enter for newline)" 
+              : "Ask a question... (Shift+Enter to send, Enter for newline)"}
             disabled={isLoading}
             rows={3}
           />
           <button
+            className="chat-view-enter-toggle"
+            onClick={toggleEnterBehavior}
+            title={enterToSend ? "Enter sends message (click to toggle)" : "Shift+Enter sends message (click to toggle)"}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '10px',
+              padding: '4px 8px',
+              cursor: 'pointer',
+              opacity: 0.7,
+            }}
+          >
+            {enterToSend ? '⏎ sends' : '⇧⏎ sends'}
+          </button>
+          <button
             className="chat-view-send-btn"
             onClick={handleSendMessage}
             disabled={isLoading || (!inputValue.trim() && pendingImages.length === 0)}
-            title="Send (Enter)"
+            title={enterToSend ? "Send (Enter)" : "Send (Shift+Enter)"}
           >
             {isLoading ? <Loader2 className="spinner" size={20} /> : <Send size={20} />}
           </button>

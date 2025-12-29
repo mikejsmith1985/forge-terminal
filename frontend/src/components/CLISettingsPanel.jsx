@@ -479,50 +479,145 @@ const CLISettingsPanel = ({ onToast }) => {
         </h4>
 
         {config.claude_installed && (
-          <div style={{ 
-            background: '#1a1a1a', 
-            borderRadius: '12px', 
-            padding: '16px'
-          }}>
-            <label style={{ 
-              display: 'block', 
-              marginBottom: '8px', 
-              fontWeight: 500,
-              fontSize: '0.9rem'
+          <>
+            <div style={{ 
+              background: '#1a1a1a', 
+              borderRadius: '12px', 
+              padding: '16px',
+              marginBottom: '12px'
             }}>
-              Default Model
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {config.claude_models?.map(model => (
-                <button
-                  key={model}
-                  onClick={() => saveClaudeConfig({ model })}
-                  disabled={saving}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    background: config.claude?.model === model ? '#f59e0b' : '#333',
-                    border: 'none',
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: 500,
+                fontSize: '0.9rem'
+              }}>
+                Default Model
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {config.claude_models?.map(model => (
+                  <button
+                    key={model}
+                    onClick={() => saveClaudeConfig({ model })}
+                    disabled={saving}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      background: config.claude?.model === model ? '#f59e0b' : '#333',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: config.claude?.model === model ? '#000' : '#fff',
+                      cursor: 'pointer',
+                      textTransform: 'capitalize',
+                      fontWeight: config.claude?.model === model ? 600 : 400
+                    }}
+                  >
+                    {model}
+                  </button>
+                ))}
+              </div>
+              <small style={{ 
+                display: 'block', 
+                marginTop: '8px', 
+                color: '#888', 
+                fontSize: '0.75rem' 
+              }}>
+                Aliases map to latest model versions (e.g., "sonnet" → claude-sonnet-4-5)
+              </small>
+            </div>
+
+            {/* Issue #52: Additional Claude CLI Features */}
+            <div style={{ 
+              background: '#1a1a1a', 
+              borderRadius: '12px', 
+              padding: '16px',
+              marginBottom: '12px'
+            }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '12px', 
+                fontWeight: 500,
+                fontSize: '0.9rem'
+              }}>
+                Claude Code Features
+              </label>
+              
+              {[
+                { key: 'auto_approve_read', label: 'Auto-approve read operations', desc: 'Automatically approve file reading without prompting' },
+                { key: 'auto_approve_edit', label: 'Auto-approve edit operations', desc: 'Automatically approve file edits (use with caution)' },
+                { key: 'auto_approve_bash', label: 'Auto-approve bash commands', desc: 'Automatically run shell commands (use with caution)' },
+                { key: 'mcp_enabled', label: 'MCP Protocol Support', desc: 'Enable Model Context Protocol for enhanced tool integration' },
+                { key: 'verbose', label: 'Verbose Output', desc: 'Show detailed logs for debugging' },
+              ].map(feature => (
+                <label 
+                  key={feature.key}
+                  style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    background: '#0a0a0a',
                     borderRadius: '6px',
-                    color: config.claude?.model === model ? '#000' : '#fff',
-                    cursor: 'pointer',
-                    textTransform: 'capitalize',
-                    fontWeight: config.claude?.model === model ? 600 : 400
+                    marginBottom: '8px',
+                    cursor: 'pointer'
                   }}
                 >
-                  {model}
-                </button>
+                  <input
+                    type="checkbox"
+                    checked={config.claude?.[feature.key] === true}
+                    onChange={(e) => saveClaudeConfig({ [feature.key]: e.target.checked })}
+                    disabled={saving}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{feature.label}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#888' }}>{feature.desc}</div>
+                  </div>
+                </label>
               ))}
             </div>
-            <small style={{ 
-              display: 'block', 
-              marginTop: '8px', 
-              color: '#888', 
-              fontSize: '0.75rem' 
+
+            {/* Max Tokens */}
+            <div style={{ 
+              background: '#1a1a1a', 
+              borderRadius: '12px', 
+              padding: '16px'
             }}>
-              Aliases map to latest model versions (e.g., "sonnet" → claude-sonnet-4-5)
-            </small>
-          </div>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: 500,
+                fontSize: '0.9rem'
+              }}>
+                Max Output Tokens
+              </label>
+              <input
+                type="number"
+                value={config.claude?.max_tokens || 16000}
+                onChange={(e) => saveClaudeConfig({ max_tokens: parseInt(e.target.value) || 16000 })}
+                min={1000}
+                max={128000}
+                step={1000}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #333', 
+                  background: '#0a0a0a', 
+                  color: '#fff',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <small style={{ 
+                display: 'block', 
+                marginTop: '6px', 
+                color: '#888', 
+                fontSize: '0.75rem' 
+              }}>
+                Maximum tokens for Claude responses (1K-128K). Higher = more detailed but more expensive.
+              </small>
+            </div>
+          </>
         )}
 
         {!config.claude_installed && (

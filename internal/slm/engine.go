@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"log"
-	"strings"
 	"sync"
 	"time"
 )
@@ -32,31 +31,33 @@ type Engine struct {
 	totalAnalyses int
 	totalLatency  int64
 	
-	// Heuristic fallback for when no SLM is available
-	heuristicEnabled bool
+	// Issue #52: NO HEURISTICS - if no SLM, don't route
+	noSLMAvailable bool
 }
 
 // NewEngine creates a new SLM routing engine.
 func NewEngine() *Engine {
 	return &Engine{
-		preferences:      &RoutingPreferences{AutoRoutingEnabled: true},
-		heuristicEnabled: true,
+		preferences:    &RoutingPreferences{AutoRoutingEnabled: true},
+		noSLMAvailable: false,
 	}
 }
 
 // Initialize sets up the engine with available providers.
-// Priority: Ollama (free local) > LlamaCpp (bundled) > Embedded > Heuristic
-// NO external API calls - all inference is local and free.
+// Priority: Ollama (if installed) > LlamaCpp with auto-download
+// NO external API calls for inference - all local and free.
+// Issue #52: Auto-downloads model if not present. NO HEURISTICS.
 func (e *Engine) Initialize(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// v3.5.2: Priority 1 - Ollama (if user has it installed, it's free)
+	// Priority 1 - Ollama (if user has it installed, use it - it's optimized)
 	ollamaProvider := NewOllamaProvider()
 	if ollamaProvider.IsAvailable() {
 		log.Printf("[SLM] Ollama detected, checking for suitable models...")
 		if err := ollamaProvider.Initialize(ctx); err == nil {
 			e.provider = ollamaProvider
+			e.noSLMAvailable = false
 			log.Printf("[SLM] ✓ Using Ollama as primary provider (FREE local AI)")
 			return nil
 		} else {
@@ -64,48 +65,87 @@ func (e *Engine) Initialize(ctx context.Context) error {
 		}
 	}
 
-	// v3.5.2: Priority 2 - LlamaCpp subprocess (bundled binary + model)
+	// Priority 2 - LlamaCpp with auto-download
+	// This ensures SLM works out of the box with NO external dependencies
+	log.Printf("[SLM] Checking for bundled model...")
+	
+	// Auto-download model if not present
+	modelJustDownloaded := false
+	if !ModelExists() {
+		log.Printf("[SLM] Model not found, downloading SmolLM2-135M (~100MB)...")
+		log.Printf("[SLM] This is a one-time download for intelligent routing.")
+		
+		err := EnsureModelAvailable(func(p DownloadProgress) {
+			if int(p.Percent)%10 == 0 {
+				log.Printf("[SLM] Download progress: %.0f%% (%.1f MB/s)", 
+					p.Percent, p.Speed/1_000_000)
+			}
+		})
+		if err != nil {
+			log.Printf("[SLM] Model download failed: %v", err)
+			log.Printf("[SLM] ⚠ Routing disabled - install Ollama or download model manually")
+			e.provider = nil
+			e.noSLMAvailable = true
+			return nil
+		}
+		log.Printf("[SLM] ✓ Model downloaded successfully!")
+		modelJustDownloaded = true
+	}
+
+	// Apply initial training after first model download
+	if modelJustDownloaded {
+		log.Printf("[SLM] Applying initial training data...")
+		if err := ApplyInitialTraining(); err != nil {
+			log.Printf("[SLM] Warning: Failed to apply initial training: %v", err)
+		}
+	}
+
+	// Try to initialize LlamaCpp provider
 	llamaCppProvider := NewLlamaCppProvider()
 	if llamaCppProvider.IsAvailable() {
 		log.Printf("[SLM] llama-cli binary detected, initializing...")
 		if err := llamaCppProvider.Initialize(ctx); err == nil {
 			e.provider = llamaCppProvider
-			log.Printf("[SLM] ✓ Using llama-cli as primary provider (FREE local AI)")
+			e.noSLMAvailable = false
+			log.Printf("[SLM] ✓ Using embedded SLM (SmolLM2-135M) - NO external dependencies!")
 			return nil
 		} else {
 			log.Printf("[SLM] llama-cli init failed: %v", err)
 		}
+	} else {
+		log.Printf("[SLM] llama-cli binary not found")
+		log.Printf("[SLM] Download from: https://github.com/ggerganov/llama.cpp/releases")
+		log.Printf("[SLM] Place in: %s", GetBinDir())
 	}
 
-	// Priority 3 - Rule-based provider (always available, no external dependencies)
-	// This replaces the broken "embedded" provider that was never fully implemented
-	ruleBasedProvider := NewRuleBasedProvider()
-	if err := ruleBasedProvider.Initialize(ctx); err == nil {
-		e.provider = ruleBasedProvider
-		log.Printf("[SLM] ✓ Using rule-based analysis (fast heuristics)")
-		log.Printf("[SLM] For AI analysis, install Ollama: https://ollama.ai")
-		return nil
-	}
-
-	// Final fallback: heuristic (should not reach here, but just in case)
-	log.Printf("[SLM] ⚠ Using heuristic fallback")
-	e.provider = NewHeuristicProvider()
-	e.heuristicEnabled = true
+	// No SLM available - routing disabled, use user's default model
+	log.Printf("[SLM] ⚠ No SLM available - routing DISABLED")
+	log.Printf("[SLM] Prompts will use your default model without smart routing")
+	e.provider = nil
+	e.noSLMAvailable = true
 
 	return nil
 }
 
 // Analyze performs prompt analysis using the best available provider.
+// Issue #52: If no SLM is available, returns nil (no routing, use default model).
 func (e *Engine) Analyze(ctx context.Context, input PromptContext) (*AnalysisResult, error) {
 	e.mu.RLock()
 	provider := e.provider
 	fallbacks := e.fallbacks
+	noSLM := e.noSLMAvailable
 	e.mu.RUnlock()
+
+	// Issue #52: If no SLM available, return nil - don't route, use user's default
+	if noSLM || provider == nil {
+		log.Printf("[SLM] No SLM available - skipping analysis, use default model")
+		return nil, nil
+	}
 
 	start := time.Now()
 
 	// Try primary provider
-	if provider != nil && provider.IsAvailable() {
+	if provider.IsAvailable() {
 		result, err := provider.Analyze(ctx, input)
 		if err == nil {
 			e.recordAnalysis(time.Since(start).Milliseconds())
@@ -126,8 +166,9 @@ func (e *Engine) Analyze(ctx context.Context, input PromptContext) (*AnalysisRes
 		}
 	}
 
-	// Ultimate fallback: heuristic analysis
-	return e.heuristicAnalysis(input), nil
+	// Issue #52: NO HEURISTICS - if all providers fail, return nil (use default)
+	log.Printf("[SLM] All providers failed - skipping analysis, use default model")
+	return nil, nil
 }
 
 // recordAnalysis updates internal stats.
@@ -136,197 +177,6 @@ func (e *Engine) recordAnalysis(latencyMs int64) {
 	defer e.mu.Unlock()
 	e.totalAnalyses++
 	e.totalLatency += latencyMs
-}
-
-// heuristicAnalysis provides a rule-based fallback when no SLM is available.
-func (e *Engine) heuristicAnalysis(input PromptContext) *AnalysisResult {
-	start := time.Now()
-
-	// Estimate complexity based on heuristics
-	complexity := e.estimateComplexity(input)
-	taskType := e.classifyTask(input.Prompt)
-
-	// Estimate iterations based on complexity
-	iterations := e.estimateIterations(complexity)
-
-	return &AnalysisResult{
-		Complexity: complexity,
-		TaskType:   taskType,
-		Iterations: iterations,
-		Confidence: 0.5, // Low confidence for heuristic
-		Reasoning:  "Heuristic analysis (no SLM available)",
-		LatencyMs:  time.Since(start).Milliseconds(),
-		Provider:   "heuristic",
-	}
-}
-
-// estimateComplexity uses heuristics to guess prompt complexity.
-func (e *Engine) estimateComplexity(input PromptContext) int {
-	score := 3 // Base complexity
-
-	// File count increases complexity
-	if input.FileCount > 5 {
-		score += 2
-	} else if input.FileCount > 2 {
-		score += 1
-	}
-
-	// Token count increases complexity
-	if input.EstimatedTokens > 2000 {
-		score += 2
-	} else if input.EstimatedTokens > 500 {
-		score += 1
-	}
-
-	// Error output suggests debugging
-	if input.HasErrorOutput || input.HasStackTrace {
-		score += 2
-	}
-
-	// Long prompts tend to be more complex
-	if len(input.Prompt) > 500 {
-		score += 1
-	}
-
-	// Keyword analysis
-	prompt := strings.ToLower(input.Prompt)
-	complexKeywords := []string{
-		"refactor", "architect", "design", "optimize", "debug",
-		"race condition", "deadlock", "memory leak", "security",
-		"performance", "scalability", "migration",
-	}
-	for _, kw := range complexKeywords {
-		if strings.Contains(prompt, kw) {
-			score += 1
-			break
-		}
-	}
-
-	simpleKeywords := []string{
-		"explain", "what is", "how to", "example", "simple",
-		"quick", "just", "only",
-	}
-	for _, kw := range simpleKeywords {
-		if strings.Contains(prompt, kw) {
-			score -= 1
-			break
-		}
-	}
-
-	// Clamp to 1-10
-	if score < 1 {
-		score = 1
-	}
-	if score > 10 {
-		score = 10
-	}
-
-	return score
-}
-
-// classifyTask attempts to categorize the task type.
-func (e *Engine) classifyTask(prompt string) TaskType {
-	lower := strings.ToLower(prompt)
-
-	// Check for debug patterns
-	debugPatterns := []string{
-		"debug", "fix", "error", "bug", "issue", "problem",
-		"not working", "fails", "crash", "exception",
-	}
-	for _, p := range debugPatterns {
-		if strings.Contains(lower, p) {
-			return TaskDebug
-		}
-	}
-
-	// Check for explain patterns
-	explainPatterns := []string{
-		"explain", "what is", "how does", "why", "understand",
-		"describe", "tell me about",
-	}
-	for _, p := range explainPatterns {
-		if strings.Contains(lower, p) {
-			return TaskExplain
-		}
-	}
-
-	// Check for refactor patterns
-	refactorPatterns := []string{
-		"refactor", "improve", "clean up", "reorganize",
-		"restructure", "optimize", "simplify",
-	}
-	for _, p := range refactorPatterns {
-		if strings.Contains(lower, p) {
-			return TaskRefactor
-		}
-	}
-
-	// Check for generate patterns
-	generatePatterns := []string{
-		"create", "generate", "write", "implement", "build",
-		"add", "make", "new",
-	}
-	for _, p := range generatePatterns {
-		if strings.Contains(lower, p) {
-			return TaskGenerate
-		}
-	}
-
-	// Simple if very short
-	if len(prompt) < 50 {
-		return TaskSimple
-	}
-
-	return TaskUnknown
-}
-
-// estimateIterations predicts iterations per model tier based on complexity.
-func (e *Engine) estimateIterations(complexity int) map[string]int {
-	iterations := make(map[string]int)
-
-	// Speed tier (Haiku, GPT-4o-mini)
-	switch {
-	case complexity <= 3:
-		iterations["haiku"] = 1
-		iterations["gpt-4o-mini"] = 1
-	case complexity <= 5:
-		iterations["haiku"] = 2
-		iterations["gpt-4o-mini"] = 2
-	case complexity <= 7:
-		iterations["haiku"] = 3
-		iterations["gpt-4o-mini"] = 3
-	default:
-		iterations["haiku"] = 4
-		iterations["gpt-4o-mini"] = 4
-	}
-
-	// Balanced tier (Sonnet, GPT-4o)
-	switch {
-	case complexity <= 4:
-		iterations["sonnet"] = 1
-		iterations["gpt-4o"] = 1
-		iterations["gemini-3"] = 1
-	case complexity <= 7:
-		iterations["sonnet"] = 2
-		iterations["gpt-4o"] = 2
-		iterations["gemini-3"] = 1
-	default:
-		iterations["sonnet"] = 2
-		iterations["gpt-4o"] = 2
-		iterations["gemini-3"] = 2
-	}
-
-	// Reasoning tier (Opus, O1)
-	switch {
-	case complexity <= 6:
-		iterations["opus"] = 1
-		iterations["o1"] = 1
-	default:
-		iterations["opus"] = 1
-		iterations["o1"] = 1
-	}
-
-	return iterations
 }
 
 // RecordFeedback stores the outcome of a routing decision for learning.
@@ -357,7 +207,8 @@ func (e *Engine) Status() EngineStatus {
 		status.ModelLoaded = providerStatus.ModelLoaded
 		status.ModelSizeMB = providerStatus.ModelSizeMB
 	} else {
-		status.ActiveProvider = "heuristic"
+		// Issue #52: No heuristics - report as disabled, not "heuristic"
+		status.ActiveProvider = "disabled"
 	}
 
 	// Check Ollama availability

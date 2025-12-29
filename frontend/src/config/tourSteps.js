@@ -57,11 +57,29 @@ export const TOUR_STEPS = [
     spotlight: true,
   },
   {
+    id: 'slm-download',
+    selector: '.sidebar',
+    fallbackSelector: '.terminal-container',
+    title: 'Smart Routing AI Download 📥',
+    content: 'On first launch, Forge downloads a small AI model (~100MB) for intelligent task analysis. This happens once and enables offline Smart Routing. The download happens automatically in the background.',
+    placement: 'right',
+    spotlight: true,
+  },
+  {
     id: 'slm-explained',
     selector: '.model-tier-indicator, .sidebar',
     fallbackSelector: '.sidebar',
-    title: 'How Smart Routing Works',
-    content: 'Forge uses a Small Language Model (SLM) to understand your prompt\'s intent and complexity. Green = simple/fast (Haiku), Yellow = medium (Sonnet), Red = complex (Opus). The ⚠️ icon means SLM isn\'t available - it falls back to pattern matching.',
+    title: 'What Smart Routing Does 🧠',
+    content: 'The AI analyzes your prompt to understand: task type (debug, refactor, generate), complexity (1-10), and optimal model. Green = simple/fast (Haiku), Yellow = medium (Sonnet), Red = complex (Opus). This saves money by using cheaper models for simple tasks.',
+    placement: 'right',
+    spotlight: true,
+  },
+  {
+    id: 'slm-disabled',
+    selector: '.sidebar',
+    fallbackSelector: '.terminal-container',
+    title: 'Without the AI Model ⚠️',
+    content: 'If you skip or cancel the download: Smart Routing is DISABLED. All prompts use your default model (no optimization). You can trigger the download later from Settings → Intelligence. Ollama users get Smart Routing automatically.',
     placement: 'right',
     spotlight: true,
   },
@@ -177,4 +195,4 @@ export const TOUR_STEPS = [
 ];
 
 export const TOUR_STORAGE_KEY = 'forge_tour_completed';
-export const TOUR_VERSION = '3.6.0'; // Bump to trigger tour for existing users
+export const TOUR_VERSION = '3.6.1'; // Bump to trigger tour for existing users - added SLM download explanation
