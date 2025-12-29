@@ -2,14 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
@@ -302,7 +305,7 @@ func streamChatResponse(w http.ResponseWriter, prompt string, provider string) e
 	}
 
 	if os.Getenv("SKIP_LLM") == "true" {
-		mockResponse := "This is a mock response. To enable real LLM responses, set LLM credentials in environment variables."
+		mockResponse := "This is a mock response. To enable real LLM responses, ensure copilot or claude CLI is installed."
 		_, err := io.WriteString(w, mockResponse)
 		if err != nil {
 			return err
@@ -311,10 +314,22 @@ func streamChatResponse(w http.ResponseWriter, prompt string, provider string) e
 		return nil
 	}
 
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		fallbackMsg := "AI assistant is not configured. Please set ANTHROPIC_API_KEY environment variable."
-		_, err := io.WriteString(w, fallbackMsg)
+	// v3.5.0: Try CLI tools first, then fall back to direct API
+	// This uses the same auth as terminal commands
+	
+	// Try Copilot CLI first (uses GitHub auth)
+	if cliResponse, err := streamViaCopilotCLI(prompt); err == nil {
+		_, err = io.WriteString(w, cliResponse)
+		if err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+	
+	// Try Claude CLI (uses Anthropic auth from claude login)
+	if cliResponse, err := streamViaClaudeCLI(prompt); err == nil {
+		_, err = io.WriteString(w, cliResponse)
 		if err != nil {
 			return err
 		}
@@ -322,6 +337,112 @@ func streamChatResponse(w http.ResponseWriter, prompt string, provider string) e
 		return nil
 	}
 
+	// Fall back to direct API if ANTHROPIC_API_KEY is set
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey != "" {
+		return streamViaDirectAPI(w, prompt, apiKey, flusher)
+	}
+
+	// No provider available
+	fallbackMsg := `No AI provider available. Please ensure one of the following:
+
+1. GitHub Copilot CLI is installed and authenticated:
+   - Install: npm install -g @githubnext/github-copilot-cli
+   - Auth: copilot (follow prompts)
+
+2. Claude CLI is installed and authenticated:
+   - Install: pip install claude-cli
+   - Auth: claude login
+
+3. Or set ANTHROPIC_API_KEY environment variable for direct API access.`
+
+	_, err := io.WriteString(w, fallbackMsg)
+	if err != nil {
+		return err
+	}
+	flusher.Flush()
+	return nil
+}
+
+// streamViaCopilotCLI executes prompt through the copilot CLI
+func streamViaCopilotCLI(prompt string) (string, error) {
+	// Check if copilot is available
+	if _, err := exec.LookPath("copilot"); err != nil {
+		return "", fmt.Errorf("copilot not found: %w", err)
+	}
+
+	// Use copilot -p for non-interactive prompt mode
+	// -s (silent) outputs only the response without stats
+	// --allow-all-tools allows execution without prompts
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "copilot", "-p", prompt, "-s", "--no-color")
+	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	
+	output, err := cmd.Output()
+	if err != nil {
+		log.Printf("[Chat CLI] copilot command failed: %v", err)
+		return "", err
+	}
+
+	// Clean the output
+	result := cleanCLIOutput(string(output))
+	if result == "" {
+		return "", fmt.Errorf("empty response from copilot")
+	}
+
+	log.Printf("[Chat CLI] Got response from copilot (%d chars)", len(result))
+	return result, nil
+}
+
+// streamViaClaudeCLI executes prompt through the claude CLI
+func streamViaClaudeCLI(prompt string) (string, error) {
+	// Check if claude is available
+	if _, err := exec.LookPath("claude"); err != nil {
+		return "", fmt.Errorf("claude not found: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	// claude -p (print) outputs response and exits
+	// --output-format text ensures plain text output
+	cmd := exec.CommandContext(ctx, "claude", "-p", prompt, "--output-format", "text")
+	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	
+	output, err := cmd.Output()
+	if err != nil {
+		log.Printf("[Chat CLI] claude command failed: %v", err)
+		return "", err
+	}
+
+	result := cleanCLIOutput(string(output))
+	if result == "" {
+		return "", fmt.Errorf("empty response from claude")
+	}
+
+	log.Printf("[Chat CLI] Got response from claude (%d chars)", len(result))
+	return result, nil
+}
+
+// cleanCLIOutput removes ANSI codes and cleans CLI output
+func cleanCLIOutput(output string) string {
+	// Remove ANSI escape codes
+	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	clean := ansiRegex.ReplaceAllString(output, "")
+	
+	// Remove carriage returns
+	clean = strings.ReplaceAll(clean, "\r", "")
+	
+	// Trim whitespace
+	clean = strings.TrimSpace(clean)
+	
+	return clean
+}
+
+// streamViaDirectAPI calls Claude API directly (fallback)
+func streamViaDirectAPI(w http.ResponseWriter, prompt string, apiKey string, flusher http.Flusher) error {
 	claudeURL := "https://api.anthropic.com/v1/messages"
 	payload := map[string]interface{}{
 		"model":      "claude-3-5-sonnet-20241022",
