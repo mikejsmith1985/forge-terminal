@@ -70,6 +70,7 @@ func (e *Engine) Initialize(ctx context.Context) error {
 	log.Printf("[SLM] Checking for bundled model...")
 	
 	// Auto-download model if not present
+	modelJustDownloaded := false
 	if !ModelExists() {
 		log.Printf("[SLM] Model not found, downloading SmolLM2-135M (~100MB)...")
 		log.Printf("[SLM] This is a one-time download for intelligent routing.")
@@ -88,6 +89,15 @@ func (e *Engine) Initialize(ctx context.Context) error {
 			return nil
 		}
 		log.Printf("[SLM] ✓ Model downloaded successfully!")
+		modelJustDownloaded = true
+	}
+
+	// Apply initial training after first model download
+	if modelJustDownloaded {
+		log.Printf("[SLM] Applying initial training data...")
+		if err := ApplyInitialTraining(); err != nil {
+			log.Printf("[SLM] Warning: Failed to apply initial training: %v", err)
+		}
 	}
 
 	// Try to initialize LlamaCpp provider
