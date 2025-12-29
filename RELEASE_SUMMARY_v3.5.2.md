@@ -4,40 +4,44 @@
 
 ## Overview
 
-v3.5.2 focuses on delivering a fully functional local SLM (Small Language Model) system with zero external API costs, fixing critical UX bugs, and enabling real AI vision capabilities through Ollama integration.
+v3.5.2 is a critical bug-fix release that addresses broken SLM code that prevented building, fixes the tab focus bug, and confirms image vision integration is working correctly.
 
 ## Bug Fixes
 
-### 1. SLM Implementation (Issue #1)
-**Problem:** The SLM system was stubbed out, using only heuristics instead of real AI analysis.
+### 1. SLM Implementation Fix (Critical)
+**Problem:** The `embedded.go` file had undefined types (`EmbeddedProvider`), missing imports (`os`, `filepath`), and missing constants, causing build failures.
 
 **Solution:** 
-- Implemented `LlamaCppProvider` for subprocess-based GGUF model inference
-- Updated engine priority: **Ollama → LlamaCpp → Embedded → Heuristic**
-- Removed Claude CLI provider (violated the no-external-API-cost requirement)
-- All analysis is now FREE and LOCAL
+- Rewrote `embedded.go` with clean `RuleBasedProvider` implementation
+- Added proper imports and constant definitions
+- Updated `engine.go` to use correct provider chain
+- Provider priority: **Ollama → LlamaCpp → RuleBased → Heuristic**
+- All analysis is FREE and LOCAL
 
 **How to Enable Real AI:**
 1. **Ollama (Recommended):** Install from [ollama.ai](https://ollama.ai), run `ollama pull qwen2.5:0.5b`
 2. **LlamaCpp:** Download `llama-cli` binary and `qwen2.5-0.5b-q4.gguf` model to `~/.forge/`
 
-### 2. Tab Focus Stealing (Issue #2)
-**Problem:** When a second tab was opened and user pressed spacebar, focus jumped to the first tab's terminal.
+### 2. Tab Focus Stealing Fix
+**Problem:** When multiple tabs were open and user pressed spacebar, focus jumped to the first tab.
 
-**Root Cause:** xterm creates a `<textarea>` for each terminal. Hidden terminals still had focusable textareas (tabIndex=0).
+**Root Cause:** xterm creates a `<textarea>` for each terminal. Hidden terminals still had focusable textareas.
 
 **Solution:**
+- Added `MutationObserver` to handle dynamically created xterm textareas
 - Set `tabIndex=-1` on hidden terminal textareas
-- Added `useEffect` hook in `ForgeTerminal.jsx` to manage focus state
 - Hidden terminals are now completely removed from keyboard tab order
+- Textareas are properly blurred when tab becomes hidden
 
-### 3. Image Vision Analysis (Issue #3)
-**Problem:** Pasted images couldn't be analyzed by AI - only basic heuristics were used.
+### 3. Image Vision Analysis (Verified)
+**Status:** Already correctly implemented - no changes needed.
 
-**Solution:**
-- Integrated Ollama vision API for real image analysis (supports `llava`, `bakllava`, `moondream` models)
-- Enhanced heuristic descriptions when no vision model is available
-- Clear user guidance: "Install Ollama with llava for detailed analysis"
+The architecture works as follows:
+1. User pastes image → saved to temp file
+2. `ImageAnalyzer` queues image for background analysis
+3. If Ollama+llava available → real AI vision (0.9 confidence)
+4. If not → heuristic description (0.5 confidence)
+5. Description is injected into next user input
 
 **How to Enable Vision:**
 ```bash
