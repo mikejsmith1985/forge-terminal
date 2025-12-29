@@ -136,15 +136,15 @@
                         </div>
                     </div>
 
-                    <div class="issue-card partial">
+                    <div class="issue-card">
                         <h3>
                             <span class="issue-number">#52.6</span>
                             Chat Shows "Analyzing" But Prompt Not Sent
-                            <span class="issue-status status-partial">PARTIAL</span>
+                            <span class="issue-status status-fixed">FIXED</span>
                         </h3>
                         <p class="issue-desc">Chat UX shows "analyzing" but prompt was never passed to Copilot.</p>
                         <div class="solution">
-                            <strong>Status:</strong> Related to PTY bridge communication. The Enter key fix should help. Full fix requires deeper investigation of the WebSocket connection between chat view and terminal.
+                            <strong>Solution:</strong> Fixed by PTY bridge race condition resolution. The getTerminalRef getter ensures ChatView has a valid reference to the terminal before sending commands. Combined with the onKeyDown fix, prompts now properly flow through the PTY bridge to Copilot.
                         </div>
                     </div>
 
