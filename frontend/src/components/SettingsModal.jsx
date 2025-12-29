@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield, DollarSign, Zap, Brain } from 'lucide-react';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, visionConfig, onVisionConfigChange }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, visionConfig, onVisionConfigChange, initialTab = 'shell' }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -11,7 +11,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
   const [missingCards, setMissingCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
   const [fileAccessMode, setFileAccessMode] = useState('restricted');
-  const [activeTab, setActiveTab] = useState('shell'); // 'shell' or 'budget'
+  const [activeTab, setActiveTab] = useState(initialTab); // 'shell' or 'budget'
   const [budgetStatus, setBudgetStatus] = useState(null);
   const [budgetConfig, setBudgetConfig] = useState({ budget_limit: 1500, budget_unit: 'credits', renewal_day: 1 });
   const [loadingBudget, setLoadingBudget] = useState(false);
@@ -20,6 +20,13 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
   const [slmStatus, setSlmStatus] = useState(null);
   const [learningStats, setLearningStats] = useState(null);
   const [ollamaStatus, setOllamaStatus] = useState(null);
+
+  // Update activeTab when initialTab prop changes
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   useEffect(() => {
     if (isOpen) {

@@ -25,7 +25,6 @@ import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 import ChatSidebar from './components/ChatSidebar'
 import ChatView, { cleanupChatMessages } from './components/ChatView'
-import RouterConfigOverlay from './components/RouterConfigOverlay'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -50,7 +49,7 @@ function App() {
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false)
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
   const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false)
-  const [isRouterConfigOpen, setIsRouterConfigOpen] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState('shell') // For opening Settings to specific tab
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
   const [colorTheme, setColorTheme] = useState(() => {
@@ -1829,7 +1828,10 @@ function App() {
                     tabId={tab.id}
                     fontSize={chatFontSize}
                     onToggleTerminal={() => toggleTabViewMode(tab.id)}
-                    onOpenRouterConfig={() => setIsRouterConfigOpen(true)}
+                    onOpenSettings={() => {
+                      setSettingsInitialTab('budget');
+                      setIsSettingsModalOpen(true);
+                    }}
                     onRunInTerminal={(command) => {
                       // Ghost Driver: Switch to terminal and inject command
                       toggleTabViewMode(tab.id);
@@ -1909,7 +1911,11 @@ function App() {
 
       <SettingsModal
         isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
+        onClose={() => {
+          setIsSettingsModalOpen(false);
+          setSettingsInitialTab('shell'); // Reset to default tab on close
+        }}
+        initialTab={settingsInitialTab}
         shellConfig={shellConfig}
         onSave={saveConfig}
         onToast={addToast}
@@ -1977,6 +1983,10 @@ function App() {
         onClose={() => setIsChatSidebarOpen(false)}
         tabId={activeTabId}
         fontSize={chatFontSize}
+        onOpenSettings={() => {
+          setSettingsInitialTab('budget');
+          setIsSettingsModalOpen(true);
+        }}
       />
       
       {/* History Slider - Time-Travel Scrubber */}
@@ -2004,12 +2014,6 @@ function App() {
           position="bottom"
         />
       )}
-      
-      {/* Router Config Overlay - Smart Router Configuration (v3.3.0) */}
-      <RouterConfigOverlay
-        isOpen={isRouterConfigOpen}
-        onClose={() => setIsRouterConfigOpen(false)}
-      />
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (

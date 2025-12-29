@@ -108,6 +108,17 @@ func main() {
 		log.Printf("[SLM] Engine initialized: provider=%s, model=%s", status.ActiveProvider, status.ModelID)
 	}
 
+	// v3.5.1: Initialize Chat Store (SQLite-backed persistent chat)
+	forgeDir := filepath.Join(os.Getenv("HOME"), ".forge")
+	if err := initChatStore(forgeDir); err != nil {
+		log.Printf("[Chat] Warning: failed to initialize chat store: %v", err)
+	} else {
+		log.Printf("[Chat] Store initialized at %s/chat/chat.db", forgeDir)
+	}
+
+	// v3.5.1: Initialize Chat Bridge (syncs AM events to Chat)
+	initChatBridge()
+
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
@@ -266,6 +277,16 @@ func main() {
 	http.HandleFunc("/api/slm/learning/clear", WrapWithMiddleware(handleSLMLearningClear))
 	http.HandleFunc("/api/slm/preferences", WrapWithMiddleware(handleSLMPreferences))
 	http.HandleFunc("/api/ollama/status", WrapWithMiddleware(handleOllamaStatus))
+
+	// Chat Store API - v3.5.1 (SQLite-backed persistent chat)
+	http.HandleFunc("/api/chat/messages", WrapWithMiddleware(handleChatMessages))
+	http.HandleFunc("/api/chat/search", WrapWithMiddleware(handleChatSearch))
+	http.HandleFunc("/api/chat/thread/", WrapWithMiddleware(handleChatThread))
+	http.HandleFunc("/api/chat/workers", WrapWithMiddleware(handleChatWorkers))
+	http.HandleFunc("/api/chat/context", WrapWithMiddleware(handleChatContext))
+	http.HandleFunc("/api/chat/images", WrapWithMiddleware(handleChatImageUpload))
+	http.HandleFunc("/api/chat/images/", WrapWithMiddleware(handleChatImageServe))
+	http.HandleFunc("/api/chat/ws", handleChatWebSocket) // WebSocket, no middleware wrapper
 
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))

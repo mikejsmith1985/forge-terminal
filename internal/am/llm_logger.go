@@ -1111,6 +1111,20 @@ func (l *LLMLogger) flushUserInputLocked() {
 	
 	conv.Turns = append(conv.Turns, turn)
 
+	// v3.5.1: Publish LLM_TURN event for Chat bridge
+	EventBus.Publish(&LayerEvent{
+		Type:      "LLM_TURN",
+		Layer:     1,
+		TabID:     l.tabID,
+		ConvID:    conv.ConversationID,
+		Provider:  conv.Provider,
+		Timestamp: turn.Timestamp,
+		Metadata: map[string]interface{}{
+			"role":    turn.Role,
+			"content": cleaned,
+		},
+	})
+
 	// v3.5.0: Track user iteration for SLM feedback
 	if conv.SLMTracking != nil {
 		// Run SLM analysis on first real user prompt (not system turn)
@@ -1242,6 +1256,20 @@ func (l *LLMLogger) EndConversation() {
 		// Add parsed turns to conversation
 		for _, turn := range parsedTurns {
 			conv.Turns = append(conv.Turns, turn)
+			
+			// v3.5.1: Publish LLM_TURN event for Chat bridge
+			EventBus.Publish(&LayerEvent{
+				Type:      "LLM_TURN",
+				Layer:     1,
+				TabID:     l.tabID,
+				ConvID:    conv.ConversationID,
+				Provider:  conv.Provider,
+				Timestamp: turn.Timestamp,
+				Metadata: map[string]interface{}{
+					"role":    turn.Role,
+					"content": turn.Content,
+				},
+			})
 		}
 
 		log.Printf("[LLM Logger] Parsed %d turns from TUI snapshots", len(parsedTurns))
@@ -1251,11 +1279,26 @@ func (l *LLMLogger) EndConversation() {
 	if !l.tuiCaptureMode && l.outputBuffer != "" {
 		cleanedOutput := llm.ParseLLMOutput(l.outputBuffer, llm.Provider(conv.Provider))
 		if cleanedOutput != "" {
-			conv.Turns = append(conv.Turns, ConversationTurn{
+			turn := ConversationTurn{
 				Role:      "assistant",
 				Content:   cleanedOutput,
 				Timestamp: time.Now(),
 				Provider:  conv.Provider,
+			}
+			conv.Turns = append(conv.Turns, turn)
+			
+			// v3.5.1: Publish LLM_TURN event for Chat bridge
+			EventBus.Publish(&LayerEvent{
+				Type:      "LLM_TURN",
+				Layer:     1,
+				TabID:     l.tabID,
+				ConvID:    conv.ConversationID,
+				Provider:  conv.Provider,
+				Timestamp: turn.Timestamp,
+				Metadata: map[string]interface{}{
+					"role":    turn.Role,
+					"content": turn.Content,
+				},
 			})
 		}
 		l.outputBuffer = ""

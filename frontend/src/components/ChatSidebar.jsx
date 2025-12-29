@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Send, Loader2, Settings, FileCode, Zap, Brain } from 'lucide-react';
 import './ChatSidebar.css';
 
-const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) => {
+const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -286,9 +286,9 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenRouterConfig }) =
             <span>{displayModel}</span>
           </div>
           <button
-            className="router-config-btn"
-            onClick={onOpenRouterConfig}
-            title="Configure AI Router"
+            className="settings-btn"
+            onClick={onOpenSettings}
+            title="Intelligence & Budget Settings"
           >
             <Settings size={16} />
           </button>

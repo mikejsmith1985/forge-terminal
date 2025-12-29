@@ -1,11 +1,13 @@
 /**
- * tourSteps.js - Guided Tour Configuration for Forge Terminal v3.5.0
+ * tourSteps.js - Guided Tour Configuration for Forge Terminal v3.5.1
  *
  * Defines the tour steps for the First Run Experience.
  * Each step targets a specific CSS selector and provides content to display.
  *
- * v3.5.0: Updated to reflect both terminal and chat workflows.
- * Chat interface now uses CLI tools (copilot -p, claude -p) - no API key needed.
+ * v3.5.1: Chat UI is now an Enhanced UX layer for CLI tools.
+ * - Analyzes prompts with Smart Routing before CLI execution
+ * - Displays rich output (files, screenshots)
+ * - Uses CLI authentication (copilot/claude) - no API key needed
  */
 
 export const TOUR_STEPS = [
@@ -15,7 +17,7 @@ export const TOUR_STEPS = [
     selector: '.terminal-container',
     fallbackSelector: '.terminal-outer-container',
     title: 'Welcome to Forge Terminal',
-    content: 'Forge enhances your CLI AI tools like GitHub Copilot and Claude. Use them in the terminal or through the chat sidebar - both use your existing CLI authentication.',
+    content: 'Forge enhances your CLI AI tools like GitHub Copilot and Claude. It tracks conversations, learns your patterns, and optimizes model selection - all using your existing CLI authentication.',
     placement: 'left',
     spotlight: true,
   },
@@ -25,43 +27,53 @@ export const TOUR_STEPS = [
     selector: '.terminal-container',
     fallbackSelector: '.terminal-outer-container',
     title: 'Terminal Mode',
-    content: 'Type "copilot" or "claude" in the terminal for interactive AI sessions. Forge automatically tracks your conversations and learns your patterns for smart model selection.',
+    content: 'Type "copilot" or "claude" in the terminal for interactive AI sessions. Forge automatically tracks your conversations in the background.',
     placement: 'left',
     spotlight: true,
   },
   {
     id: 'chat-sidebar',
-    // Step 3: Show the chat sidebar
+    // Step 3: Show the chat sidebar as Enhanced UX
     selector: '.chat-sidebar, .chat-toggle-btn',
     fallbackSelector: '.terminal-container',
-    title: 'Chat Sidebar',
-    content: 'Click the chat icon to open the sidebar. Ask questions directly - Forge uses your installed copilot or claude CLI behind the scenes. No separate API key needed!',
+    title: 'Chat Interface - Enhanced UX',
+    content: 'The Chat view is an enhanced UX layer for your CLI tools. It analyzes prompts with Smart Routing, then executes via copilot/claude CLI. Same authentication, richer experience.',
+    placement: 'left',
+    spotlight: true,
+  },
+  {
+    id: 'command-cards',
+    // Step 4: Command cards in sidebar
+    selector: '.command-cards-container, .commands-panel',
+    fallbackSelector: '.terminal-container',
+    title: 'Command Cards',
+    content: 'Command cards are quick actions that execute in the active tab. They work whether you\'re viewing Chat or Terminal - both share the same session.',
     placement: 'left',
     spotlight: true,
   },
   {
     id: 'smart-routing',
-    // Step 4: Explain the smart routing
+    // Step 5: Explain the smart routing
     selector: '.terminal-container',
     fallbackSelector: '.terminal-outer-container',
     title: 'Smart Model Selection',
-    content: 'Forge analyzes your prompts to predict complexity. Over time, it learns which models work best for different tasks - saving you credits while getting better results.',
+    content: 'Before each prompt reaches the CLI, Forge analyzes complexity (1-10 scale), detects task type, and predicts which model will work best. Over time, it learns from your usage patterns.',
     placement: 'left',
     spotlight: true,
   },
   {
     id: 'settings-budget',
-    // Step 5: Point to settings for budget
+    // Step 6: Point to settings for budget
     selector: '.settings-btn, [title="Settings"]',
     fallbackSelector: '.header button',
-    title: 'Budget & Intelligence Settings',
-    content: 'Open Settings to configure your monthly budget (credits or dollars). Enable Developer Mode to see the Smart Routing engine status and learning progress.',
+    title: 'Intelligence & Budget',
+    content: 'Open Settings → Intelligence to configure your monthly budget and see Smart Routing status. Enable Developer Mode to view learning progress and SLM engine details.',
     placement: 'bottom',
     spotlight: true,
   },
   {
     id: 'time-travel',
-    // Step 6: Target the history slider - time travel feature
+    // Step 7: Target the history slider - time travel feature
     selector: '.history-slider-container',
     fallbackSelector: '.theme-controls button[title*="Time Travel"]',
     title: 'Time Travel',
@@ -74,7 +86,7 @@ export const TOUR_STEPS = [
     selector: null,
     fallbackPosition: 'center',
     title: 'You\'re All Set!',
-    content: 'Use the terminal for interactive sessions or the chat sidebar for quick questions. Forge learns from your usage to optimize model selection. Check Settings → Intelligence (Dev Mode) to see your learning progress. Happy coding!',
+    content: 'Use Terminal for interactive sessions or Chat for enhanced UX. Both use your CLI tools - no extra configuration needed. Check Settings → Intelligence to manage your budget.',
     placement: 'center',
     spotlight: false,
     isFinal: true,
@@ -82,4 +94,4 @@ export const TOUR_STEPS = [
 ];
 
 export const TOUR_STORAGE_KEY = 'forge_tour_completed';
-export const TOUR_VERSION = '3.5.0';
+export const TOUR_VERSION = '3.5.1';
