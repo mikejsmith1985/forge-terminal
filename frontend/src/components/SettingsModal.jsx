@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield, DollarSign, Zap, Brain } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield, DollarSign, Zap, Brain, Cpu, Play } from 'lucide-react';
+import CLISettingsPanel from './CLISettingsPanel';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, visionConfig, onVisionConfigChange, initialTab = 'shell' }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, visionConfig, onVisionConfigChange, initialTab = 'shell', onRestartTour }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -669,10 +670,29 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <DollarSign size={16} />
             Intelligence
           </button>
+          <button
+            onClick={() => setActiveTab('cli')}
+            style={{ 
+              padding: '12px 20px',
+              background: 'transparent',
+              border: 'none',
+              color: activeTab === 'cli' ? '#fff' : '#888',
+              borderBottom: activeTab === 'cli' ? '2px solid #8b5cf6' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Cpu size={16} />
+            CLI
+          </button>
         </div>
 
         <div className="modal-body">
-          {activeTab === 'budget' ? renderBudgetTab() : (
+          {activeTab === 'cli' ? (
+            <CLISettingsPanel onToast={onToast} />
+          ) : activeTab === 'budget' ? renderBudgetTab() : (
             <>
               <div style={{ 
                 fontSize: '0.75rem', 
@@ -835,22 +855,34 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             borderTop: '1px solid #333'
           }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Installation</label>
-            <button
-              className="btn btn-secondary"
-              onClick={handleCreateDesktopShortcut}
-              disabled={creatingShortcut}
-              style={{ width: '100%' }}
-            >
-              <DesktopIcon size={16} style={{ marginRight: '6px' }} />
-              {creatingShortcut ? 'Creating...' : 'Create Desktop Shortcut'}
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={handleCreateDesktopShortcut}
+                disabled={creatingShortcut}
+                style={{ flex: 1 }}
+              >
+                <DesktopIcon size={16} style={{ marginRight: '6px' }} />
+                {creatingShortcut ? 'Creating...' : 'Desktop Shortcut'}
+              </button>
+              {onRestartTour && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={onRestartTour}
+                  style={{ flex: 1 }}
+                >
+                  <Play size={16} style={{ marginRight: '6px' }} />
+                  Replay Tour
+                </button>
+              )}
+            </div>
             <small style={{ 
               display: 'block', 
               marginTop: '8px', 
               color: '#888', 
               fontSize: '0.8em' 
             }}>
-              Add a shortcut to your desktop for quick access
+              Create a desktop shortcut or replay the feature tour
             </small>
           </div>
 

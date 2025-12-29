@@ -77,23 +77,21 @@ type ConfigLoader struct {
 }
 
 // DefaultConfig returns sensible defaults when forge.toml is missing.
-// Task 3: Default fallback commands as specified:
-// - Tier 1 (Haiku): gh copilot suggest "{prompt}"
-// - Tier 2 (Sonnet): gh copilot suggest "{prompt}"
-// - Tier 3 (Opus): claude "{prompt}" --model opus
+// Uses Copilot CLI without hardcoded models - let the CLI handle model selection.
+// Users can configure their preferred model in ~/.copilot/config.json or forge.toml
 func DefaultConfig() *RoutingConfig {
 	return &RoutingConfig{
 		Tier1: TierConfig{
 			Name:    "Copilot",
-			Command: `gh copilot suggest "{prompt}"`,
+			Command: `copilot -p "{prompt}" -s --no-color`,
 		},
 		Tier2: TierConfig{
 			Name:    "Copilot",
-			Command: `gh copilot suggest "{prompt}"`,
+			Command: `copilot -p "{prompt}" -s --no-color`,
 		},
 		Tier3: TierConfig{
-			Name:    "Claude",
-			Command: `claude "{prompt}" --model opus`,
+			Name:    "Copilot",
+			Command: `copilot -p "{prompt}" -s --no-color`,
 		},
 		IncludeCwd:       true,
 		IncludeGitBranch: true,

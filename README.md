@@ -33,7 +33,12 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
   - Terminal output history (last 50 lines)
   - Vision-detected patterns (errors, warnings, file paths)
   - Multi-file context via `@filepath` syntax for deep project understanding
-- **🎯 Smart Routing**: Executive trigger (prefix with `?`) for intelligent model tier selection based on task complexity
+- **🎯 Smart Routing with SLM (NEW v3.6.0)**: Executive trigger (prefix with `?`) for real smart model tier selection
+  - **Real Task Analysis**: Uses Small Language Model (SLM) to analyze prompt intent (debug, refactor, generate, explain, etc.)
+  - **Complexity Scoring**: Automatic 1-10 complexity assessment with color-coded confidence indicators
+  - **Optimal Model Selection**: Routes to Haiku, Sonnet, or Opus based on actual task requirements (not heuristics)
+  - **Fallback Safety**: Gracefully falls back to heuristic pattern matching if SLM unavailable
+  - **Live Feedback**: Badge shows real task type, complexity, and which model is running
 - **🌙 Dark Mode (v3.3.7)**: Chat sidebar and router configuration now support dark mode for comfortable extended use
 - **⚙️ Router Configuration**: Configure which AI models handle different task tiers (basic/intermediate/advanced)
 - **📊 Task Classification**: Automatic detection of task complexity for optimal model selection

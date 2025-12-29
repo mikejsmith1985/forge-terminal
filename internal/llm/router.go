@@ -40,25 +40,27 @@ type Router struct {
 }
 
 // NewRouter creates a new router with default configuration
+// Model names are tier descriptors, not hardcoded model IDs - actual model selection
+// is handled by the CLI or configured by the user in forge.toml/~/.copilot/config.json
 func NewRouter(configLoader *ConfigLoader) *Router {
 	return &Router{
 		classifier: NewTaskClassifier(),
 		config:     configLoader,
 		tools: map[ModelTier]Tool{
 			TierHaiku: {
-				Name:  "gpt-4o-mini",
+				Name:  "fast",
 				Tier:  TierHaiku,
-				Model: "gpt-4o-mini",
+				Model: "auto", // Let CLI choose
 			},
 			TierSonnet: {
-				Name:  "gpt-4o",
+				Name:  "balanced",
 				Tier:  TierSonnet,
-				Model: "gpt-4o",
+				Model: "auto", // Let CLI choose
 			},
 			TierOpus: {
-				Name:  "claude-3-5-sonnet",
+				Name:  "advanced",
 				Tier:  TierOpus,
-				Model: "claude-3-5-sonnet",
+				Model: "auto", // Let CLI choose
 			},
 		},
 	}

@@ -278,6 +278,12 @@ func main() {
 	http.HandleFunc("/api/slm/preferences", WrapWithMiddleware(handleSLMPreferences))
 	http.HandleFunc("/api/ollama/status", WrapWithMiddleware(handleOllamaStatus))
 
+	// CLI Configuration API - v3.5.3 (Copilot/Claude config management)
+	http.HandleFunc("/api/cli/config", WrapWithMiddleware(handleCLIConfig))
+	http.HandleFunc("/api/cli/copilot/config", WrapWithMiddleware(handleCLICopilotConfig))
+	http.HandleFunc("/api/cli/claude/config", WrapWithMiddleware(handleCLIClaudeConfig))
+	http.HandleFunc("/api/cli/copilot/trust", WrapWithMiddleware(handleCLITrustFolder))
+
 	// Chat Store API - v3.5.1 (SQLite-backed persistent chat)
 	http.HandleFunc("/api/chat/messages", WrapWithMiddleware(handleChatMessages))
 	http.HandleFunc("/api/chat/search", WrapWithMiddleware(handleChatSearch))

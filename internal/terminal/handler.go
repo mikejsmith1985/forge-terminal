@@ -91,6 +91,23 @@ type AutoRespondControlMessage struct {
 	Enabled bool   `json:"enabled"`
 }
 
+// ChatCommandMessage represents a Chat UI command to inject into PTY.
+// v3.5.3: Enables Chat view to use the same PTY session as Terminal view.
+type ChatCommandMessage struct {
+	Type    string `json:"type"`    // "CHAT_COMMAND"
+	Command string `json:"command"` // The command/message to inject
+	CLI     string `json:"cli,omitempty"`   // "copilot" or "claude" - if set, wraps as CLI command
+	Model   string `json:"model,omitempty"` // Model to use with CLI (from SLM routing)
+}
+
+// ChatOutputMessage represents PTY output formatted for Chat display.
+type ChatOutputMessage struct {
+	Type      string `json:"type"`      // "CHAT_OUTPUT"
+	Content   string `json:"content"`   // The output text
+	IsPrompt  bool   `json:"isPrompt"`  // True if this looks like an interactive prompt
+	Timestamp int64  `json:"timestamp"` // Unix timestamp
+}
+
 // NewHandlerDirect creates a new terminal WebSocket handler with direct dependencies.
 // This is the new constructor that doesn't depend on assistant.Core wrapper.
 func NewHandlerDirect(amSys *am.System, visionP *vision.Parser, llmDet *llm.Detector) *Handler {
@@ -201,13 +218,49 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Get Vision parser using getter method (supports both direct and assistantCore)
 	visionParser := h.GetVisionParser()
 
+	// v3.5.3: PromptDetector for Chat PTY bridge response detection
+	promptDetector := NewPromptDetector()
+	promptDetector.SetHeuristicMode(true) // Enable heuristic fallback for non-integrated shells
+	var chatResponsePending atomic.Bool
+	
+	// Set up prompt detection callbacks for Chat bridge
+	promptDetector.OnResponseComplete(func(response string) {
+		if chatResponsePending.Load() {
+			log.Printf("[ChatBridge] Response complete detected (%d chars)", len(response))
+			_ = conn.WriteJSON(map[string]interface{}{
+				"type":      "CHAT_RESPONSE_COMPLETE",
+				"response":  response,
+				"timestamp": time.Now().UnixMilli(),
+			})
+			chatResponsePending.Store(false)
+		}
+	})
+	
+	promptDetector.OnWaitingForInput(func() {
+		log.Printf("[PromptDetector] Waiting for input detected")
+		_ = conn.WriteJSON(map[string]interface{}{
+			"type":      "PROMPT_WAITING_FOR_INPUT",
+			"timestamp": time.Now().UnixMilli(),
+		})
+	})
+	
+	promptDetector.OnStateChange(func(old, new PromptState) {
+		_ = conn.WriteJSON(map[string]interface{}{
+			"type":      "PROMPT_STATE_CHANGE",
+			"oldState":  old.String(),
+			"newState":  new.String(),
+			"timestamp": time.Now().UnixMilli(),
+		})
+	})
+
 	// PRECISION AUTO-RESPONDER v2.0 (independent of AM)
 	// Uses EchoBuffer to filter user echo and SequenceEngine for action chains
 	ptyWriter := func(data []byte) error {
 		_, err := session.Write(data)
 		return err
 	}
-	autoRespondDetector := NewAutoRespondDetectorWithPTY("github-copilot", ptyWriter)
+	// v3.5.3: Use shared PromptDetector for unified detection across AutoRespond, AM, and Chat
+	autoRespondDetector := NewAutoRespondDetectorWithPromptDetector("github-copilot", ptyWriter, promptDetector)
 	var autoRespondEnabled atomic.Bool
 	autoRespondDetector.SetCallbacks(
 		func() {
@@ -293,6 +346,23 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					})
 				}
 			}
+			
+			// v3.5.3: Hook PromptDetector to end conversations when shell prompt returns
+			// This provides more accurate conversation boundaries than pattern matching
+			promptDetector.OnPromptDetected(func() {
+				llmLogger := llmLoggerAtomic.Load()
+				if llmLogger == nil {
+					return
+				}
+				if logger, ok := llmLogger.(*am.LLMLogger); ok && logger != nil {
+					activeConv := logger.GetActiveConversationID()
+					if activeConv != "" {
+						log.Printf("[PromptDetector→AM] Shell prompt detected, ending conversation %s", activeConv)
+						logger.EndConversation()
+					}
+				}
+			})
+			
 			log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
 		} else if amSystem != nil && !amEnabled {
 			log.Printf("[Terminal] AM is DISABLED for tab %s - skipping LLM Logger initialization", tabID)
@@ -333,6 +403,20 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				if amSystem != nil && amSystem.HealthMonitor != nil {
 					amSystem.HealthMonitor.RecordPTYHeartbeat()
 				}
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	// v3.5.3: Periodically check for quiescence (for heuristic prompt detection)
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				promptDetector.CheckQuiescence()
 			case <-done:
 				return
 			}
@@ -447,6 +531,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// AUTO-RESPOND: Process output for state detection
 				autoRespondDetector.ProcessOutput(buf[:n])
 
+				// v3.5.3: Feed output to prompt detector for Chat bridge
+				promptDetector.ProcessOutput(buf[:n])
+
 				// Vision: Feed data SYNCHRONOUSLY - no goroutine spawn
 				// Spawning goroutines per chunk caused unbounded growth and freezes
 				if visionParser.Enabled() {
@@ -557,6 +644,55 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
+
+				// v3.5.3: Check for Chat command messages (Chat→PTY bridge)
+				var chatMsg ChatCommandMessage
+				if err := json.Unmarshal(data, &chatMsg); err == nil && chatMsg.Type == "CHAT_COMMAND" {
+					log.Printf("[ChatBridge] Received chat command for session %s: cli=%s, model=%s", 
+						sessionID, chatMsg.CLI, chatMsg.Model)
+					
+					// Start response capture BEFORE sending command
+					chatResponsePending.Store(true)
+					promptDetector.StartResponseCapture()
+					
+					// Create bridge and inject command
+					bridge := NewChatPTYBridge(session)
+					
+					if chatMsg.CLI != "" {
+						// Wrap as CLI command with model selection
+						if err := bridge.SendCLICommand(chatMsg.CLI, chatMsg.Model, chatMsg.Command); err != nil {
+							log.Printf("[ChatBridge] CLI command error: %v", err)
+							chatResponsePending.Store(false)
+							_ = conn.WriteJSON(map[string]interface{}{
+								"type":  "CHAT_ERROR",
+								"error": err.Error(),
+							})
+						} else {
+							_ = conn.WriteJSON(map[string]interface{}{
+								"type":    "CHAT_COMMAND_SENT",
+								"cli":     chatMsg.CLI,
+								"model":   chatMsg.Model,
+								"command": truncate(chatMsg.Command, 50),
+							})
+						}
+					} else {
+						// Direct message to PTY (for responding to prompts)
+						if err := bridge.SendMessage(chatMsg.Command); err != nil {
+							log.Printf("[ChatBridge] Message error: %v", err)
+							chatResponsePending.Store(false)
+							_ = conn.WriteJSON(map[string]interface{}{
+								"type":  "CHAT_ERROR",
+								"error": err.Error(),
+							})
+						} else {
+							_ = conn.WriteJSON(map[string]interface{}{
+								"type":    "CHAT_COMMAND_SENT",
+								"command": truncate(chatMsg.Command, 50),
+							})
+						}
+					}
+					continue
+				}
 			}
 
 			// ═══ EXECUTIVE TRIGGER: Check for "?" smart routing ═══
@@ -572,7 +708,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 						// Task 4: Badge shows what is ACTUALLY running
 						go func(p string) {
 							err := executiveTrigger.HandleWithExtendedNotify(p, session, func(n *RoutingNotification) {
-								// Notify frontend of active routing with full context
+								// Notify frontend of active routing with full context including SLM data
 								_ = conn.WriteJSON(map[string]interface{}{
 									"type":            "ROUTING_ACTIVE",
 									"tier":            n.Tier,
@@ -582,6 +718,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 									"actuallyRunning": n.ActuallyRunning,
 									"previousTier":    n.PreviousTier,
 									"action":          n.Action,
+									// v3.5.3: SLM analysis data
+									"taskType":        n.TaskType,
+									"complexity":      n.Complexity,
+									"confidence":      n.Confidence,
+									"usedSLM":         n.UsedSLM,
 								})
 							})
 							if err != nil {

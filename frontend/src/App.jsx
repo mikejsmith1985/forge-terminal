@@ -38,6 +38,25 @@ import TourOverlay from './components/TourOverlay'
 
 const MAX_TABS = 20;
 
+// v3.5.3: Helper functions for SLM task type display
+const getTaskTypeIcon = (taskType) => {
+  switch (taskType?.toLowerCase()) {
+    case 'debug': return '🐛';
+    case 'explain': return '📖';
+    case 'refactor': return '🔧';
+    case 'generate': return '✨';
+    case 'simple': return '⚡';
+    case 'architecture': return '🧠';
+    default: return '🤖';
+  }
+};
+
+const formatTaskType = (taskType) => {
+  if (!taskType) return null;
+  // Capitalize first letter
+  return taskType.charAt(0).toUpperCase() + taskType.slice(1);
+};
+
 function App() {
   const [commands, setCommands] = useState([])
   const [commandsLoading, setCommandsLoading] = useState(true)
@@ -164,6 +183,7 @@ function App() {
     totalSteps: tourTotalSteps,
     nextStep: tourNextStep,
     skipTour,
+    restartTour,
   } = useGuidedTour(tourActionHandlers);
   
   // Query model tier when terminal input changes
@@ -1684,16 +1704,33 @@ function App() {
           <span style={{ fontWeight: 600 }}>
             Running: {currentModelTier}
           </span>
+          {/* v3.5.3: Use real task type from SLM analysis */}
           <span style={{ opacity: 0.7 }}>
-            {currentModelTier === 'Claude' || currentModelTier === 'Opus'
-              ? '🧠 Architecture'
-              : currentModelTier === 'Sonnet'
-                ? '🔧 Refactor'
-                : '⚡ Quick Task'}
+            {getTaskTypeIcon(routingInfo?.taskType)} {formatTaskType(routingInfo?.taskType) || 'Analyzing...'}
           </span>
+          {/* Show complexity if available from SLM */}
+          {routingInfo?.complexity > 0 && (
+            <span style={{ 
+              fontSize: '10px', 
+              opacity: 0.6,
+              background: routingInfo.complexity >= 7 ? 'rgba(239, 68, 68, 0.2)' : 
+                         routingInfo.complexity >= 4 ? 'rgba(251, 191, 36, 0.2)' : 
+                         'rgba(34, 197, 94, 0.2)',
+              padding: '2px 6px',
+              borderRadius: '4px'
+            }}>
+              {routingInfo.complexity}/10
+            </span>
+          )}
           {routingInfo?.tierMismatch && (
             <span style={{ fontSize: '10px', opacity: 0.6 }}>
               (switched from {routingInfo.previousTier})
+            </span>
+          )}
+          {/* SLM indicator */}
+          {routingInfo?.usedSLM === false && (
+            <span style={{ fontSize: '9px', opacity: 0.4 }} title="Using heuristic fallback (SLM not available)">
+              ⚠️
             </span>
           )}
         </div>
@@ -1843,6 +1880,7 @@ function App() {
                         }
                       }, 100);
                     }}
+                    terminalRef={terminalRefs.current[tab.id]} // v3.5.3: PTY bridge connection
                   />
                 </div>
                 <div className={`view-layer terminal-layer ${tab.viewMode === 'terminal' ? 'active' : ''}`}>
@@ -1927,6 +1965,10 @@ function App() {
         onAMDefaultChange={handleAMDefaultChange}
         visionConfig={visionConfig}
         onVisionConfigChange={handleVisionConfigChange}
+        onRestartTour={() => {
+          setIsSettingsModalOpen(false);
+          restartTour();
+        }}
       />
 
       <UpdateModal

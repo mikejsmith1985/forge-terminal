@@ -1,5 +1,15 @@
 // Package slm provides model capability definitions for smart routing.
-// v3.5.1: Real model capabilities for Copilot CLI (12 models) and Claude CLI (3 models)
+//
+// DEPRECATED: The hardcoded model lists (CopilotModels, ClaudeModels) in this file
+// are no longer used. Model selection is now delegated to the CLI tools themselves
+// (copilot, claude) which handle model availability dynamically.
+//
+// Users can configure their preferred models via:
+// - ~/.copilot/config.json for Copilot CLI
+// - Claude CLI settings for Claude
+// - forge.toml for Forge-specific overrides
+//
+// This file is retained for reference but should not be used for routing decisions.
 package slm
 
 // ModelCapability defines a model's characteristics for routing decisions

@@ -24,6 +24,7 @@ const ChatView = ({
   onToggleTerminal,
   onOpenSettings,
   onRunInTerminal,
+  terminalRef, // v3.5.3: Reference to ForgeTerminal for PTY WebSocket access
 }) => {
   // Initialize messages from store if available for this tab
   const [messages, setMessages] = useState(() => {
@@ -36,11 +37,15 @@ const ChatView = ({
   const [analysisStatus, setAnalysisStatus] = useState(null); // SLM analysis display
   const [pendingImages, setPendingImages] = useState([]); // Images to attach
   const [isDragOver, setIsDragOver] = useState(false);
+  const [usePTYBridge, setUsePTYBridge] = useState(true); // v3.5.3: Use PTY bridge by default
+  const [pendingResponse, setPendingResponse] = useState(''); // Accumulating PTY output
   const messagesEndRef = useRef(null);
   const messageRefs = useRef({}); // For scrolling to search results
   const currentTabIdRef = useRef(tabId);
   const wsRef = useRef(null);
   const fileInputRef = useRef(null);
+  const responseAccumulatorRef = useRef(''); // For accumulating PTY output
+  const assistantMessageIdRef = useRef(null); // Track current assistant message being built
 
   // Load messages from SQLite on mount
   useEffect(() => {
@@ -113,6 +118,97 @@ const ChatView = ({
     };
   }, []);
 
+  // v3.5.3: PTY Bridge - Subscribe to terminal output when using PTY mode
+  useEffect(() => {
+    if (!usePTYBridge || !terminalRef) return;
+
+    // Register a handler for PTY output that we receive via the terminal
+    const handlePTYOutput = (data) => {
+      if (!isLoading || !assistantMessageIdRef.current) return;
+      
+      // Accumulate output
+      responseAccumulatorRef.current += data;
+      
+      // Update the assistant message in real-time
+      setMessages(prev => {
+        const updated = [...prev];
+        const idx = updated.findIndex(m => m.id === assistantMessageIdRef.current);
+        if (idx !== -1) {
+          updated[idx] = { ...updated[idx], content: responseAccumulatorRef.current };
+        }
+        return updated;
+      });
+    };
+
+    // v3.5.3: Handler for response completion (detected by PromptDetector on backend)
+    const handleResponseComplete = (response) => {
+      console.log('[ChatView] Response complete from PromptDetector:', response?.length, 'chars');
+      
+      if (!assistantMessageIdRef.current) return;
+      
+      const finalResponse = response || responseAccumulatorRef.current;
+      const assistantMessageId = assistantMessageIdRef.current;
+      
+      // Update the final message content
+      setMessages(prev => {
+        const updated = [...prev];
+        const idx = updated.findIndex(m => m.id === assistantMessageId);
+        if (idx !== -1) {
+          updated[idx] = { ...updated[idx], content: finalResponse };
+        }
+        return updated;
+      });
+      
+      // Persist to SQLite
+      fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: assistantMessageId,
+          type: 'assistant',
+          content: finalResponse,
+          workerId: tabId || 'default',
+          workerName: 'AI',
+        })
+      }).catch(err => console.warn('[ChatView] Failed to persist assistant message:', err));
+      
+      // Clear state
+      setIsLoading(false);
+      setAnalysisStatus(null);
+      assistantMessageIdRef.current = null;
+      responseAccumulatorRef.current = '';
+    };
+
+    // Handler for prompt waiting (interactive prompts like [Y/n])
+    const handlePromptWaiting = () => {
+      console.log('[ChatView] Prompt waiting for input detected');
+      // Could show an indicator to the user that they need to respond
+    };
+
+    // Register handlers
+    if (terminalRef.registerChatOutputHandler) {
+      terminalRef.registerChatOutputHandler(handlePTYOutput);
+    }
+    if (terminalRef.registerChatResponseCompleteHandler) {
+      terminalRef.registerChatResponseCompleteHandler(handleResponseComplete);
+    }
+    if (terminalRef.registerChatPromptWaitingHandler) {
+      terminalRef.registerChatPromptWaitingHandler(handlePromptWaiting);
+    }
+
+    return () => {
+      if (terminalRef.unregisterChatOutputHandler) {
+        terminalRef.unregisterChatOutputHandler();
+      }
+      if (terminalRef.unregisterChatResponseCompleteHandler) {
+        terminalRef.unregisterChatResponseCompleteHandler();
+      }
+      if (terminalRef.unregisterChatPromptWaitingHandler) {
+        terminalRef.unregisterChatPromptWaitingHandler();
+      }
+    };
+  }, [usePTYBridge, terminalRef, isLoading, tabId]);
+
   // Persist messages to store when they change
   useEffect(() => {
     if (tabId) {
@@ -136,6 +232,149 @@ const ChatView = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // v3.5.3: Send message via PTY bridge (injects into terminal's PTY session)
+  const sendViaPTYBridge = useCallback(async (userMessage, slmResult) => {
+    if (!terminalRef) {
+      throw new Error('Terminal not connected');
+    }
+
+    const assistantMessageId = `msg-${Date.now() + 1}`;
+    assistantMessageIdRef.current = assistantMessageId;
+    responseAccumulatorRef.current = '';
+
+    // Determine CLI and model from SLM result
+    const cli = 'copilot'; // Default to copilot, could be configurable
+    const model = slmResult?.recommendedModel || slmResult?.model || '';
+
+    // Add placeholder assistant message
+    setMessages(prev => [...prev, { 
+      role: 'assistant', 
+      content: '⏳ Waiting for response...', 
+      id: assistantMessageId,
+      workerName: model || 'AI',
+      metadata: slmResult ? { complexity: slmResult.complexity } : null,
+    }]);
+
+    // Send CHAT_COMMAND to terminal WebSocket
+    const success = terminalRef.sendChatCommand({
+      type: 'CHAT_COMMAND',
+      command: userMessage,
+      cli: cli,
+      model: model,
+    });
+
+    if (!success) {
+      throw new Error('Failed to send command to terminal');
+    }
+
+    // v3.5.3: Response completion is now detected by PromptDetector on the backend
+    // The handleResponseComplete callback (registered in useEffect) will finalize the response
+    // We still have a fallback timeout for safety, but it's much longer now
+    setTimeout(() => {
+      if (isLoading && assistantMessageIdRef.current === assistantMessageId) {
+        console.warn('[ChatView] Response timeout - finalizing with accumulated content');
+        // Fallback: finalize with whatever we have
+        if (responseAccumulatorRef.current.trim()) {
+          fetch('/api/chat/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: assistantMessageId,
+              type: 'assistant',
+              content: responseAccumulatorRef.current,
+              workerId: tabId || 'default',
+              workerName: model || 'AI',
+              metadata: slmResult ? { 
+                complexity: slmResult.complexity,
+                model: model,
+                taskType: slmResult.taskType,
+              } : null,
+            })
+          }).catch(err => console.warn('[ChatView] Failed to persist assistant message:', err));
+        }
+        setIsLoading(false);
+        setAnalysisStatus(null);
+        assistantMessageIdRef.current = null;
+      }
+    }, 120000); // 2 minute fallback timeout (PromptDetector should handle most cases)
+
+    return assistantMessageId;
+  }, [terminalRef, tabId, isLoading]);
+
+  // v3.5.3: Send message via HTTP API (fallback mode)
+  const sendViaHTTP = useCallback(async (userMessage, slmResult) => {
+    const response = await fetch('/api/llm/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: userMessage,
+        tabId: tabId || 'default'
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || 'Failed to get response');
+    }
+
+    // Get routing info from headers
+    const routedModel = response.headers.get('X-Forge-Routed-To');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullResponse = '';
+    const assistantMessageId = `msg-${Date.now() + 1}`;
+    let messageAdded = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      fullResponse += chunk;
+
+      if (!messageAdded) {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: fullResponse, 
+          id: assistantMessageId,
+          workerName: routedModel || 'AI',
+          metadata: slmResult ? { complexity: slmResult.complexity } : null,
+        }]);
+        messageAdded = true;
+      } else {
+        setMessages(prev => {
+          const updated = [...prev];
+          const idx = updated.findIndex(m => m.id === assistantMessageId);
+          if (idx !== -1) {
+            updated[idx] = { ...updated[idx], content: fullResponse };
+          }
+          return updated;
+        });
+      }
+    }
+
+    // Persist assistant message to SQLite
+    await fetch('/api/chat/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: assistantMessageId,
+        type: 'assistant',
+        content: fullResponse,
+        workerId: tabId || 'default',
+        workerName: routedModel || 'AI',
+        metadata: slmResult ? { 
+          complexity: slmResult.complexity,
+          model: routedModel,
+          taskType: slmResult.taskType,
+        } : null,
+      })
+    }).catch(err => console.warn('[ChatView] Failed to persist assistant message:', err));
+
+    return fullResponse;
+  }, [tabId]);
 
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -185,76 +424,17 @@ const ChatView = ({
         setAnalysisStatus(null);
       }
 
-      // Now send to LLM
-      const response = await fetch('/api/llm/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          tabId: tabId || 'default'
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(errText || 'Failed to get response');
+      // v3.5.3: Use PTY bridge if available, otherwise fall back to HTTP
+      if (usePTYBridge && terminalRef && terminalRef.sendChatCommand) {
+        console.log('[ChatView] Using PTY bridge mode');
+        await sendViaPTYBridge(userMessage, slmResult);
+        // Note: isLoading will be cleared by the timeout in sendViaPTYBridge
+        return;
       }
 
-      // Get routing info from headers
-      const routedModel = response.headers.get('X-Forge-Routed-To');
-      const budgetWarning = response.headers.get('X-Forge-Budget-Warning');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = '';
-      const assistantMessageId = `msg-${Date.now() + 1}`;
-      let messageAdded = false;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        fullResponse += chunk;
-
-        if (!messageAdded) {
-          setMessages(prev => [...prev, { 
-            role: 'assistant', 
-            content: fullResponse, 
-            id: assistantMessageId,
-            workerName: routedModel || 'AI',
-            metadata: slmResult ? { complexity: slmResult.complexity } : null,
-          }]);
-          messageAdded = true;
-        } else {
-          setMessages(prev => {
-            const updated = [...prev];
-            const idx = updated.findIndex(m => m.id === assistantMessageId);
-            if (idx !== -1) {
-              updated[idx] = { ...updated[idx], content: fullResponse };
-            }
-            return updated;
-          });
-        }
-      }
-
-      // Persist assistant message to SQLite
-      await fetch('/api/chat/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: assistantMessageId,
-          type: 'assistant',
-          content: fullResponse,
-          workerId: tabId || 'default',
-          workerName: routedModel || 'AI',
-          metadata: slmResult ? { 
-            complexity: slmResult.complexity,
-            model: routedModel,
-            taskType: slmResult.taskType,
-          } : null,
-        })
-      }).catch(err => console.warn('[ChatView] Failed to persist assistant message:', err));
+      // Fallback: Use HTTP API
+      console.log('[ChatView] Using HTTP fallback mode');
+      await sendViaHTTP(userMessage, slmResult);
 
       // Clear analysis status after response
       setAnalysisStatus(null);

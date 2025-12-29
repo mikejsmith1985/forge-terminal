@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +19,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm/cfo"
+	"github.com/mikejsmith1985/forge-terminal/internal/slm"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
 
@@ -66,27 +69,76 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	// Build file context from @ mentions (v3.3.6 Deep Context)
 	fileContext := buildFileContext(allContextFiles)
 
-	context, err := buildChatContext(tabID)
+	terminalContext, err := buildChatContext(tabID)
 	if err != nil {
 		log.Printf("[Chat API] Warning: failed to build context: %v", err)
-		context = ""
+		terminalContext = ""
 	}
 
 	// Combine file context with terminal context
 	if fileContext != "" {
-		if context != "" {
-			context = fileContext + "\n\n---\n\n" + context
+		if terminalContext != "" {
+			terminalContext = fileContext + "\n\n---\n\n" + terminalContext
 		} else {
-			context = fileContext
+			terminalContext = fileContext
 		}
 	}
 
-	fullPrompt := buildChatPrompt(cleanMessage, context)
+	fullPrompt := buildChatPrompt(cleanMessage, terminalContext)
 
 	log.Printf("[Chat API] Full prompt length: %d chars", len(fullPrompt))
 
-	tier := llm.ClassifyTask(cleanMessage)
-	log.Printf("[Chat API] Classified to tier: %s", tier)
+	// v3.5.3: Use SLM engine for intelligent model selection based on complexity
+	slmEngine := slm.GetEngine()
+	slmCtx := context.Background()
+	
+	// Build prompt context for SLM analysis
+	promptContext := slm.PromptContext{
+		Prompt:          cleanMessage,
+		FileCount:       len(allContextFiles),
+		EstimatedTokens: len(fullPrompt) / 4, // ~4 chars per token
+		HasErrorOutput:  strings.Contains(strings.ToLower(cleanMessage), "error"),
+		HasStackTrace:   strings.Contains(cleanMessage, "at ") && strings.Contains(cleanMessage, "("),
+	}
+	
+	// Analyze prompt complexity
+	slmAnalysis, slmErr := slmEngine.Analyze(slmCtx, promptContext)
+	
+	var tier llm.ModelTier
+	var complexity int
+	var taskType string
+	
+	if slmErr == nil && slmAnalysis != nil {
+		complexity = slmAnalysis.Complexity
+		taskType = string(slmAnalysis.TaskType)
+		
+		// Map SLM complexity (1-10) to model tier
+		// 1-3: Haiku (fast, cheap)
+		// 4-6: Sonnet (balanced)
+		// 7-10: Opus (powerful, expensive)
+		switch {
+		case complexity <= 3:
+			tier = llm.TierHaiku
+		case complexity <= 6:
+			tier = llm.TierSonnet
+		default:
+			tier = llm.TierOpus
+		}
+		
+		log.Printf("[Chat API] SLM Analysis: complexity=%d, taskType=%s, tier=%s, confidence=%.2f, provider=%s",
+			complexity, taskType, tier, slmAnalysis.Confidence, slmAnalysis.Provider)
+		
+		// Add SLM headers for frontend visibility
+		w.Header().Set("X-Forge-Complexity", fmt.Sprintf("%d", complexity))
+		w.Header().Set("X-Forge-Task-Type", taskType)
+		w.Header().Set("X-Forge-SLM-Provider", slmAnalysis.Provider)
+	} else {
+		// Fallback to old regex-based classifier
+		tier = llm.ClassifyTask(cleanMessage)
+		complexity = 5 // Default mid-range
+		taskType = "unknown"
+		log.Printf("[Chat API] SLM failed (%v), fallback to regex classifier: tier=%s", slmErr, tier)
+	}
 
 	// Get model from router config based on tier
 	modelName := getModelForTier(tier)
@@ -136,7 +188,7 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 		provider = os.Getenv("LLM_PROVIDER")
 	}
 
-	if err := streamChatResponse(w, fullPrompt, provider); err != nil {
+	if err := streamChatResponse(w, fullPrompt, provider, tabID, modelName); err != nil {
 		log.Printf("[Chat API] Stream error: %v", err)
 	}
 
@@ -298,7 +350,9 @@ func buildChatPrompt(userMessage string, context string) string {
 	return prompt.String()
 }
 
-func streamChatResponse(w http.ResponseWriter, prompt string, provider string) error {
+// streamChatResponse sends the prompt to an LLM and streams the response.
+// modelName is the SLM-selected model to use (e.g., "claude-sonnet-4", "gpt-5-mini")
+func streamChatResponse(w http.ResponseWriter, prompt string, provider string, tabID string, modelName string) error {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return fmt.Errorf("streaming not supported")
@@ -316,19 +370,53 @@ func streamChatResponse(w http.ResponseWriter, prompt string, provider string) e
 
 	// v3.5.0: Try CLI tools first, then fall back to direct API
 	// This uses the same auth as terminal commands
+	// v3.5.3: Pass model selection from SLM analysis to CLI
 	
-	// Try Copilot CLI first (uses GitHub auth)
-	if cliResponse, err := streamViaCopilotCLI(prompt); err == nil {
-		_, err = io.WriteString(w, cliResponse)
-		if err != nil {
-			return err
+	// Determine which CLI to use based on model name
+	isCopilotModel := strings.HasPrefix(modelName, "gpt") || 
+		strings.HasPrefix(modelName, "claude-") || 
+		strings.HasPrefix(modelName, "gemini") ||
+		modelName == "" // Default to copilot
+	
+	isClaudeModel := strings.HasPrefix(modelName, "claude-") || 
+		modelName == "opus" || modelName == "sonnet" || modelName == "haiku"
+	
+	// Try Copilot CLI first if it's a copilot-supported model
+	if isCopilotModel {
+		if cliResponse, err := streamViaCopilotCLI(prompt, tabID, modelName); err == nil {
+			_, err = io.WriteString(w, cliResponse)
+			if err != nil {
+				return err
+			}
+			flusher.Flush()
+			return nil
 		}
-		flusher.Flush()
-		return nil
 	}
 	
-	// Try Claude CLI (uses Anthropic auth from claude login)
-	if cliResponse, err := streamViaClaudeCLI(prompt); err == nil {
+	// Try Claude CLI for Claude models or as fallback
+	if isClaudeModel {
+		// Map full model names to Claude CLI aliases
+		claudeModel := modelName
+		if strings.Contains(modelName, "opus") {
+			claudeModel = "opus"
+		} else if strings.Contains(modelName, "sonnet") {
+			claudeModel = "sonnet"
+		} else if strings.Contains(modelName, "haiku") {
+			claudeModel = "haiku"
+		}
+		
+		if cliResponse, err := streamViaClaudeCLI(prompt, claudeModel); err == nil {
+			_, err = io.WriteString(w, cliResponse)
+			if err != nil {
+				return err
+			}
+			flusher.Flush()
+			return nil
+		}
+	}
+	
+	// Fallback: try copilot without model specification
+	if cliResponse, err := streamViaCopilotCLI(prompt, tabID, ""); err == nil {
 		_, err = io.WriteString(w, cliResponse)
 		if err != nil {
 			return err
@@ -364,21 +452,57 @@ func streamChatResponse(w http.ResponseWriter, prompt string, provider string) e
 	return nil
 }
 
+// tabIDToSessionUUID converts a Forge tabID to a valid UUID for copilot CLI
+// This ensures each Forge tab gets its own isolated Copilot session
+func tabIDToSessionUUID(tabID string) string {
+	// Hash the tabID to get consistent bytes
+	hash := sha256.Sum256([]byte("forge-terminal:" + tabID))
+	// Format as UUID v4-like string (8-4-4-4-12)
+	hexStr := hex.EncodeToString(hash[:16])
+	return fmt.Sprintf("%s-%s-%s-%s-%s",
+		hexStr[0:8], hexStr[8:12], hexStr[12:16], hexStr[16:20], hexStr[20:32])
+}
+
 // streamViaCopilotCLI executes prompt through the copilot CLI
-func streamViaCopilotCLI(prompt string) (string, error) {
+// Uses tabID to create isolated sessions and prevent context pollution
+// modelName specifies which model to use (e.g., "claude-sonnet-4", "gpt-5-mini")
+// Uses --allow-all-tools to enable non-interactive execution from Chat view
+func streamViaCopilotCLI(prompt string, tabID string, modelName string) (string, error) {
 	// Check if copilot is available
 	if _, err := exec.LookPath("copilot"); err != nil {
 		return "", fmt.Errorf("copilot not found: %w", err)
 	}
 
+	// Generate a unique session ID from the tabID to isolate conversations
+	sessionID := tabIDToSessionUUID(tabID)
+
 	// Use copilot -p for non-interactive prompt mode
 	// -s (silent) outputs only the response without stats
-	// --allow-all-tools allows execution without prompts
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	// --session-id isolates this tab's conversation history
+	// --no-custom-instructions prevents loading AGENTS.md from other projects
+	// --model specifies the SLM-selected model
+	// --allow-all-tools enables automatic tool execution without prompts (critical for Chat view)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second) // Extended timeout for tool execution
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "copilot", "-p", prompt, "-s", "--no-color")
+	// Build args - include --model only if specified
+	// --allow-all-tools is required for non-interactive mode when tools may be called
+	args := []string{
+		"-p", prompt,
+		"-s",
+		"--no-color",
+		"--session-id", sessionID,
+		"--no-custom-instructions",
+		"--allow-all-tools", // Auto-approve tool calls - no human interaction needed
+	}
+	if modelName != "" {
+		args = append([]string{"--model", modelName}, args...)
+	}
+	
+	cmd := exec.CommandContext(ctx, "copilot", args...)
 	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	
+	log.Printf("[Chat CLI] Using copilot with model=%s, session-id=%s, allow-all-tools=true for tab=%s", modelName, sessionID, tabID)
 	
 	output, err := cmd.Output()
 	if err != nil {
@@ -397,19 +521,34 @@ func streamViaCopilotCLI(prompt string) (string, error) {
 }
 
 // streamViaClaudeCLI executes prompt through the claude CLI
-func streamViaClaudeCLI(prompt string) (string, error) {
+// modelName is the model alias (e.g., "opus", "sonnet", "haiku")
+// Uses --permission-mode acceptEdits to enable non-interactive execution from Chat view
+func streamViaClaudeCLI(prompt string, modelName string) (string, error) {
 	// Check if claude is available
 	if _, err := exec.LookPath("claude"); err != nil {
 		return "", fmt.Errorf("claude not found: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second) // Extended for tool execution
 	defer cancel()
 
 	// claude -p (print) outputs response and exits
 	// --output-format text ensures plain text output
-	cmd := exec.CommandContext(ctx, "claude", "-p", prompt, "--output-format", "text")
+	// --model specifies the model alias (sonnet, opus, haiku)
+	// --permission-mode acceptEdits auto-approves file edits without prompting
+	args := []string{
+		"-p", prompt,
+		"--output-format", "text",
+		"--permission-mode", "acceptEdits", // Auto-approve edits - no human interaction needed
+	}
+	if modelName != "" {
+		args = append(args, "--model", modelName)
+	}
+	
+	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	
+	log.Printf("[Chat CLI] Using claude with model=%s, permission-mode=acceptEdits", modelName)
 	
 	output, err := cmd.Output()
 	if err != nil {
@@ -520,25 +659,26 @@ func streamViaDirectAPI(w http.ResponseWriter, prompt string, apiKey string, flu
 }
 
 // getModelForTier maps LLM tier to model name from router config
+// v3.5.3: Returns models compatible with Copilot CLI --model flag
 func getModelForTier(tier llm.ModelTier) string {
 	config := GetRouterConfig()
 
 	switch tier {
 	case llm.TierHaiku:
-		if t, ok := config.Tiers["tier1"]; ok {
+		if t, ok := config.Tiers["tier1"]; ok && t.Model != "" && t.Model != "auto" {
 			return t.Model
 		}
-		return "gpt-4o-mini"
+		return "gpt-5-mini" // Fast, cheap - Copilot CLI compatible
 	case llm.TierSonnet:
-		if t, ok := config.Tiers["tier2"]; ok {
+		if t, ok := config.Tiers["tier2"]; ok && t.Model != "" && t.Model != "auto" {
 			return t.Model
 		}
-		return "gpt-4o"
+		return "claude-sonnet-4" // Balanced - Copilot CLI compatible
 	case llm.TierOpus:
-		if t, ok := config.Tiers["tier3"]; ok {
+		if t, ok := config.Tiers["tier3"]; ok && t.Model != "" && t.Model != "auto" {
 			return t.Model
 		}
-		return "claude-3-5-sonnet"
+		return "claude-opus-4.5" // Powerful - Copilot CLI compatible
 	default:
 		return GetActiveModel()
 	}

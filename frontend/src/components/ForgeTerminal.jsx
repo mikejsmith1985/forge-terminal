@@ -458,6 +458,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const onInteractiveTUIRef = useRef(onInteractiveTUI);
   const lastTUIStateRef = useRef(false); // Track if we already fired TUI callback
+  const chatOutputHandlerRef = useRef(null); // v3.5.3: Handler for Chat PTY bridge output
+  const chatResponseCompleteHandlerRef = useRef(null); // v3.5.3: Handler for response completion
+  const chatPromptWaitingHandlerRef = useRef(null); // v3.5.3: Handler for prompt waiting state
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -811,6 +814,37 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
       console.warn('[Auto-Respond] Cannot send toggle - WebSocket not connected');
       return false;
+    },
+    // v3.5.3: Chat PTY Bridge - send chat commands through terminal WebSocket
+    sendChatCommand: (chatCommand) => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(chatCommand));
+        console.log('[ChatBridge] Sent chat command:', chatCommand.cli, chatCommand.model);
+        return true;
+      }
+      console.warn('[ChatBridge] Cannot send chat command - WebSocket not connected');
+      return false;
+    },
+    // v3.5.3: Register handler for chat output from PTY
+    registerChatOutputHandler: (handler) => {
+      chatOutputHandlerRef.current = handler;
+    },
+    unregisterChatOutputHandler: () => {
+      chatOutputHandlerRef.current = null;
+    },
+    // v3.5.3: Register handler for response completion (from PromptDetector)
+    registerChatResponseCompleteHandler: (handler) => {
+      chatResponseCompleteHandlerRef.current = handler;
+    },
+    unregisterChatResponseCompleteHandler: () => {
+      chatResponseCompleteHandlerRef.current = null;
+    },
+    // v3.5.3: Register handler for prompt waiting state
+    registerChatPromptWaitingHandler: (handler) => {
+      chatPromptWaitingHandlerRef.current = handler;
+    },
+    unregisterChatPromptWaitingHandler: () => {
+      chatPromptWaitingHandlerRef.current = null;
     },
   }));
   
@@ -1264,6 +1298,44 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 logger.terminal('Smart routing error', { error: msg.error, prompt: msg.prompt });
                 return; // Don't write to terminal
               }
+
+              // v3.5.3: Handle Chat bridge responses
+              if (msg.type === 'CHAT_COMMAND_SENT') {
+                console.log('[ChatBridge] Command sent confirmation:', msg);
+                return; // Don't write to terminal
+              }
+              
+              if (msg.type === 'CHAT_ERROR') {
+                console.error('[ChatBridge] Error:', msg.error);
+                // Notify chat output handler of error
+                if (chatOutputHandlerRef.current) {
+                  chatOutputHandlerRef.current(`\n[Error: ${msg.error}]\n`);
+                }
+                return; // Don't write to terminal
+              }
+
+              // v3.5.3: Handle response completion from PromptDetector
+              if (msg.type === 'CHAT_RESPONSE_COMPLETE') {
+                console.log('[ChatBridge] Response complete detected:', msg.response?.length, 'chars');
+                if (chatResponseCompleteHandlerRef.current) {
+                  chatResponseCompleteHandlerRef.current(msg.response);
+                }
+                return; // Don't write to terminal
+              }
+
+              // v3.5.3: Handle prompt state changes
+              if (msg.type === 'PROMPT_WAITING_FOR_INPUT') {
+                console.log('[PromptDetector] Waiting for input');
+                if (chatPromptWaitingHandlerRef.current) {
+                  chatPromptWaitingHandlerRef.current();
+                }
+                return; // Don't write to terminal
+              }
+              
+              if (msg.type === 'PROMPT_STATE_CHANGE') {
+                console.log('[PromptDetector] State change:', msg.oldState, '->', msg.newState);
+                return; // Don't write to terminal
+              }
             } catch (e) {
               // Malformed JSON starting with { - just write it
               term.write(str);
@@ -1282,6 +1354,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // v2.0.1 EXACT: 2000 char buffer with object ref (increased for Copilot CLI menus)
         const buf = outputBufferRef.current;
         buf.data = (buf.data + textData).slice(-2000);
+
+        // v3.5.3: Forward PTY output to Chat handler if registered
+        if (textData && chatOutputHandlerRef.current) {
+          chatOutputHandlerRef.current(textData);
+        }
 
         // v1.23.8 EXACT: AM logging with 5 second debounce
         if (amEnabledRef.current && textData) {

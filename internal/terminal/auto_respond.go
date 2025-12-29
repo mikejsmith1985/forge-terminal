@@ -113,6 +113,43 @@ func NewAutoRespondDetectorWithPTY(provider string, ptyWriter func([]byte) error
 	return d
 }
 
+// NewAutoRespondDetectorWithPromptDetector creates a detector that uses a shared PromptDetector.
+// v3.5.3: This enables unified prompt detection across AutoRespond, AM, and Chat.
+func NewAutoRespondDetectorWithPromptDetector(provider string, ptyWriter func([]byte) error, detector *PromptDetector) *AutoRespondDetector {
+	d := NewAutoRespondDetector(provider)
+	d.precision = NewPrecisionAutoResponder(provider, ptyWriter)
+	
+	// Subscribe to PromptDetector events
+	if detector != nil {
+		detector.OnWaitingForInput(func() {
+			d.mu.RLock()
+			enabled := d.enabled
+			callback := d.onWaitingForUser
+			d.mu.RUnlock()
+			
+			if enabled && callback != nil {
+				log.Printf("[AutoRespond] PromptDetector: waiting for input detected")
+				callback()
+			}
+		})
+		
+		detector.OnStateChange(func(old, new PromptState) {
+			d.mu.RLock()
+			enabled := d.enabled
+			assistantCallback := d.onAssistantActive
+			d.mu.RUnlock()
+			
+			// If transitioning to executing state, assistant is responding
+			if enabled && new == PromptStateExecuting && assistantCallback != nil {
+				log.Printf("[AutoRespond] PromptDetector: assistant responding")
+				assistantCallback()
+			}
+		})
+	}
+	
+	return d
+}
+
 // SetEnabled enables or disables auto-respond detection.
 func (d *AutoRespondDetector) SetEnabled(enabled bool) {
 	d.mu.Lock()

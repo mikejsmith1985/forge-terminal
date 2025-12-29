@@ -1,92 +1,175 @@
 /**
- * tourSteps.js - Guided Tour Configuration for Forge Terminal v3.5.1
+ * tourSteps.js - Guided Tour Configuration for Forge Terminal v3.6.0
  *
- * Defines the tour steps for the First Run Experience.
- * Each step targets a specific CSS selector and provides content to display.
+ * Comprehensive tour showcasing all Forge Terminal features.
+ * Replaces the static splash page with an interactive guided experience.
  *
- * v3.5.1: Chat UI is now an Enhanced UX layer for CLI tools.
- * - Analyzes prompts with Smart Routing before CLI execution
- * - Displays rich output (files, screenshots)
- * - Uses CLI authentication (copilot/claude) - no API key needed
+ * Features covered:
+ * - Terminal & CLI integration
+ * - Chat UI (Enhanced UX layer)
+ * - Command Cards
+ * - Tab management
+ * - Themes & accessibility
+ * - Time Travel
+ * - File Explorer
+ * - AM (Artificial Memory)
+ * - Smart Model Selection with SLM (NEW v3.6.0)
+ * - CLI Configuration (Copilot/Claude)
+ * - Budget & Intelligence
+ * - Workflows
  */
 
 export const TOUR_STEPS = [
   {
     id: 'welcome',
-    // Step 1: Welcome and explain Forge's purpose
     selector: '.terminal-container',
     fallbackSelector: '.terminal-outer-container',
-    title: 'Welcome to Forge Terminal',
-    content: 'Forge enhances your CLI AI tools like GitHub Copilot and Claude. It tracks conversations, learns your patterns, and optimizes model selection - all using your existing CLI authentication.',
+    title: 'Welcome to Forge Terminal! 🔥',
+    content: 'A powerful terminal that enhances GitHub Copilot CLI and Claude CLI with intelligent features. Let\'s take a quick tour of what you can do.',
     placement: 'left',
     spotlight: true,
   },
   {
-    id: 'terminal-usage',
-    // Step 2: Explain terminal usage
+    id: 'terminal',
     selector: '.terminal-container',
     fallbackSelector: '.terminal-outer-container',
-    title: 'Terminal Mode',
-    content: 'Type "copilot" or "claude" in the terminal for interactive AI sessions. Forge automatically tracks your conversations in the background.',
-    placement: 'left',
-    spotlight: true,
-  },
-  {
-    id: 'chat-sidebar',
-    // Step 3: Show the chat sidebar as Enhanced UX
-    selector: '.chat-sidebar, .chat-toggle-btn',
-    fallbackSelector: '.terminal-container',
-    title: 'Chat Interface - Enhanced UX',
-    content: 'The Chat view is an enhanced UX layer for your CLI tools. It analyzes prompts with Smart Routing, then executes via copilot/claude CLI. Same authentication, richer experience.',
-    placement: 'left',
-    spotlight: true,
-  },
-  {
-    id: 'command-cards',
-    // Step 4: Command cards in sidebar
-    selector: '.command-cards-container, .commands-panel',
-    fallbackSelector: '.terminal-container',
-    title: 'Command Cards',
-    content: 'Command cards are quick actions that execute in the active tab. They work whether you\'re viewing Chat or Terminal - both share the same session.',
+    title: 'Full PTY Terminal',
+    content: 'Run any command including interactive apps like vim, htop, and of course "copilot" or "claude" for AI assistance. Supports CMD, PowerShell, and WSL on Windows.',
     placement: 'left',
     spotlight: true,
   },
   {
     id: 'smart-routing',
-    // Step 5: Explain the smart routing
     selector: '.terminal-container',
     fallbackSelector: '.terminal-outer-container',
-    title: 'Smart Model Selection',
-    content: 'Before each prompt reaches the CLI, Forge analyzes complexity (1-10 scale), detects task type, and predicts which model will work best. Over time, it learns from your usage patterns.',
+    title: 'Smart Model Selection 🎯 (NEW v3.6.0)',
+    content: 'Type "?" before any prompt to use Smart Routing. Forge analyzes your task intent (debug, refactor, generate, etc.) and complexity to automatically select the best model: Haiku for simple tasks, Sonnet for medium, Opus for complex architecture.',
     placement: 'left',
     spotlight: true,
   },
   {
-    id: 'settings-budget',
-    // Step 6: Point to settings for budget
-    selector: '.settings-btn, [title="Settings"]',
-    fallbackSelector: '.header button',
-    title: 'Intelligence & Budget',
-    content: 'Open Settings → Intelligence to configure your monthly budget and see Smart Routing status. Enable Developer Mode to view learning progress and SLM engine details.',
+    id: 'smart-routing-example',
+    selector: '.model-tier-indicator, .terminal-container',
+    fallbackSelector: '.terminal-outer-container',
+    title: 'See Real Task Analysis',
+    content: 'After typing "? your prompt", watch the badge update. It shows the actual task type (🐛 debug, 🔧 refactor, etc.), complexity score (1-10), and which model is running. This is powered by real AI analysis, not just pattern matching!',
+    placement: 'left',
+    spotlight: true,
+  },
+  {
+    id: 'slm-explained',
+    selector: '.model-tier-indicator, .sidebar',
+    fallbackSelector: '.sidebar',
+    title: 'How Smart Routing Works',
+    content: 'Forge uses a Small Language Model (SLM) to understand your prompt\'s intent and complexity. Green = simple/fast (Haiku), Yellow = medium (Sonnet), Red = complex (Opus). The ⚠️ icon means SLM isn\'t available - it falls back to pattern matching.',
+    placement: 'right',
+    spotlight: true,
+  },
+  {
+    id: 'tabs',
+    selector: '.tab-bar',
+    fallbackSelector: '.terminal-pane',
+    title: 'Multi-Tab Support',
+    content: 'Open up to 20 tabs with Ctrl+T. Each tab remembers its shell, theme, and working directory. Right-click tabs for more options like AM logging and Auto-Respond.',
+    placement: 'bottom',
+    spotlight: true,
+  },
+  {
+    id: 'chat-sidebar',
+    selector: '.chat-sidebar, .chat-toggle-btn, .view-layer.chat-layer',
+    fallbackSelector: '.terminal-container',
+    title: 'Chat Interface',
+    content: 'Toggle between Terminal and Chat views. The Chat view provides an enhanced UX for AI interactions while using the same CLI authentication - no API keys needed.',
+    placement: 'left',
+    spotlight: true,
+  },
+  {
+    id: 'command-cards',
+    selector: '.command-cards-container, .commands-panel, .sidebar-content',
+    fallbackSelector: '.sidebar',
+    title: 'Command Cards ⚡',
+    content: 'Save frequently-used commands as cards. Execute with a click or keyboard shortcuts (Ctrl+Shift+1-9). Drag to reorder, right-click to edit.',
+    placement: 'left',
+    spotlight: true,
+  },
+  {
+    id: 'themes',
+    selector: '.theme-controls',
+    fallbackSelector: '.sidebar-header',
+    title: '10 Color Themes 🎨',
+    content: 'Click the palette icon to cycle through themes including Molten Metal, Ocean, Forest, and 4 high-contrast accessibility themes. Each tab can have its own theme!',
     placement: 'bottom',
     spotlight: true,
   },
   {
     id: 'time-travel',
-    // Step 7: Target the history slider - time travel feature
-    selector: '.history-slider-container',
-    fallbackSelector: '.theme-controls button[title*="Time Travel"]',
-    title: 'Time Travel',
-    content: 'Drag this slider to rewind your terminal state to any point in time. Perfect for reviewing long-running AI responses or recovering from mistakes.',
+    selector: '.history-slider-container, button[title*="Time Travel"]',
+    fallbackSelector: '.theme-controls',
+    title: 'Time Travel ⏰',
+    content: 'Rewind your terminal to any point in time with Ctrl+Shift+H. Perfect for reviewing long AI responses or recovering from mistakes.',
     placement: 'top',
     spotlight: true,
+  },
+  {
+    id: 'files',
+    selector: '.sidebar-view-tab:nth-child(3), button:has(svg):contains("Files")',
+    fallbackSelector: '.sidebar-view-tabs',
+    title: 'File Explorer 📁',
+    content: 'Browse and edit files directly in Forge. Click "Files" in the sidebar tabs to open the explorer. Includes a built-in Monaco editor with syntax highlighting.',
+    placement: 'right',
+    spotlight: true,
+  },
+  {
+    id: 'workflows',
+    selector: '.sidebar-view-tab:nth-child(2)',
+    fallbackSelector: '.sidebar-view-tabs',
+    title: 'Workflows 🔄',
+    content: 'Chain command cards into automated workflows. Create multi-step sequences that run with a single click.',
+    placement: 'right',
+    spotlight: true,
+  },
+  {
+    id: 'settings-cli',
+    selector: 'button[title="Shell Settings"], .settings-btn',
+    fallbackSelector: '.terminal-controls',
+    title: 'CLI Configuration 🔧',
+    content: 'Open Settings → CLI to configure GitHub Copilot and Claude CLI options. Set your preferred model, trusted folders, and more - all from the UI!',
+    placement: 'bottom',
+    spotlight: true,
+  },
+  {
+    id: 'settings-budget',
+    selector: 'button[title="Shell Settings"], .settings-btn',
+    fallbackSelector: '.terminal-controls',
+    title: 'Intelligence & Budget 💰',
+    content: 'Settings → Intelligence lets you configure your monthly budget and see Smart Routing status. Forge optimizes model selection to stretch your credits with SLM-powered task analysis.',
+    placement: 'bottom',
+    spotlight: true,
+  },
+  {
+    id: 'am-logging',
+    selector: '.tab-bar .tab',
+    fallbackSelector: '.terminal-pane',
+    title: 'Artificial Memory (AM) 🧠',
+    content: 'AM logs all terminal activity for crash recovery and legal compliance. Right-click any tab to toggle AM logging. Enable Dev Mode in Settings for advanced AM features.',
+    placement: 'bottom',
+    spotlight: true,
+  },
+  {
+    id: 'keyboard-shortcuts',
+    selector: '.terminal-container',
+    fallbackSelector: '.terminal-outer-container',
+    title: 'Keyboard Power User ⌨️',
+    content: 'Ctrl+T: New tab | Ctrl+W: Close tab | Ctrl+F: Search | Ctrl+Shift+H: Time Travel | Ctrl+Shift+1-9: Command cards | Type "?" to use Smart Routing',
+    placement: 'center',
+    spotlight: false,
   },
   {
     id: 'complete',
     selector: null,
     fallbackPosition: 'center',
-    title: 'You\'re All Set!',
-    content: 'Use Terminal for interactive sessions or Chat for enhanced UX. Both use your CLI tools - no extra configuration needed. Check Settings → Intelligence to manage your budget.',
+    title: 'You\'re Ready! 🚀',
+    content: 'Try Smart Routing with "? your task" to see AI-powered model selection in action. Explore the terminal, try the command cards, and check Settings for more options. You can replay this tour anytime from Settings → Shell tab.',
     placement: 'center',
     spotlight: false,
     isFinal: true,
@@ -94,4 +177,4 @@ export const TOUR_STEPS = [
 ];
 
 export const TOUR_STORAGE_KEY = 'forge_tour_completed';
-export const TOUR_VERSION = '3.5.1';
+export const TOUR_VERSION = '3.6.0'; // Bump to trigger tour for existing users
