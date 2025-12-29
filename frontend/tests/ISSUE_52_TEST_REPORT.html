@@ -59,7 +59,7 @@
                         <div class="metric-label">Issues Identified</div>
                     </div>
                     <div class="metric">
-                        <div class="metric-value">8</div>
+                        <div class="metric-value">9</div>
                         <div class="metric-label">Issues Fixed</div>
                     </div>
                     <div class="metric">
@@ -67,8 +67,8 @@
                         <div class="metric-label">Working as Designed</div>
                     </div>
                     <div class="metric">
-                        <div class="metric-value">1</div>
-                        <div class="metric-label">Requires Training</div>
+                        <div class="metric-value">0</div>
+                        <div class="metric-label">Remaining</div>
                     </div>
                 </div>
             </div>
@@ -172,15 +172,15 @@
                         </div>
                     </div>
 
-                    <div class="issue-card partial">
+                    <div class="issue-card">
                         <h3>
                             <span class="issue-number">#52.9</span>
                             Smart Router Using Wrong Model Selection
-                            <span class="issue-status status-partial">TRAINING NEEDED</span>
+                            <span class="issue-status status-fixed">FIXED</span>
                         </h3>
-                        <p class="issue-desc">Router determined reading GH issue and fixing tour required Opus (terrible logic).</p>
+                        <p class="issue-desc">Router determined reading GH issue and fixing tour required Opus (terrible logic). User explicitly requested NO HEURISTICS.</p>
                         <div class="solution">
-                            <strong>Status:</strong> This requires SLM training improvements. The current heuristics may over-classify tasks as complex. Needs separate issue for training data collection and model refinement.
+                            <strong>Solution:</strong> Removed ALL heuristic fallbacks from SLM engine. If no real SLM (Ollama/llama.cpp) is available, routing is DISABLED entirely - the system passes through to the user's default model without any "smart" guessing. No more pattern matching or keyword-based classification.
                         </div>
                     </div>
                 </div>

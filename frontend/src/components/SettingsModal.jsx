@@ -525,21 +525,30 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               <div style={{ 
                 marginTop: '12px',
                 padding: '10px',
-                background: slmStatus?.active_provider === 'ollama' ? '#052e16' : '#1c1917',
-                border: `1px solid ${slmStatus?.active_provider === 'ollama' ? '#22c55e' : '#44403c'}`,
+                background: slmStatus?.active_provider === 'ollama' ? '#052e16' : 
+                           slmStatus?.active_provider === 'disabled' ? '#422006' : '#1c1917',
+                border: `1px solid ${slmStatus?.active_provider === 'ollama' ? '#22c55e' : 
+                                    slmStatus?.active_provider === 'disabled' ? '#f97316' : '#44403c'}`,
                 borderRadius: '6px',
                 fontSize: '0.8rem'
               }}>
                 <div style={{ fontWeight: 500, marginBottom: '6px' }}>Smart Routing Status</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888' }}>
                   <span>Engine:</span>
-                  <span style={{ color: '#22c55e' }}>
-                    {slmStatus?.active_provider === 'heuristic' && '📊 Pattern Matching'}
+                  <span style={{ color: slmStatus?.active_provider === 'disabled' ? '#f97316' : '#22c55e' }}>
+                    {slmStatus?.active_provider === 'disabled' && '⚠️ Disabled (Install Ollama)'}
                     {slmStatus?.active_provider === 'ollama' && '🧠 AI Analysis (Ollama)'}
+                    {slmStatus?.active_provider === 'llama-cpp' && '🧠 AI Analysis (llama.cpp)'}
                     {slmStatus?.active_provider === 'embedded' && '🧠 Embedded SLM'}
                     {!slmStatus && '⏳ Checking...'}
                   </span>
                 </div>
+                {slmStatus?.active_provider === 'disabled' && (
+                  <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#f97316' }}>
+                    Without Ollama, routing uses your default model for all prompts.
+                    <br/>Install: <a href="https://ollama.ai" target="_blank" rel="noopener" style={{ color: '#3b82f6' }}>https://ollama.ai</a>
+                  </div>
+                )}
                 {learningStats?.total_samples > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginTop: '4px' }}>
                     <span>Learning Samples:</span>

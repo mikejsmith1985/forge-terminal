@@ -32,21 +32,22 @@ type Engine struct {
 	totalAnalyses int
 	totalLatency  int64
 	
-	// Heuristic fallback for when no SLM is available
-	heuristicEnabled bool
+	// Issue #52: NO HEURISTICS - if no SLM, don't route
+	noSLMAvailable bool
 }
 
 // NewEngine creates a new SLM routing engine.
 func NewEngine() *Engine {
 	return &Engine{
-		preferences:      &RoutingPreferences{AutoRoutingEnabled: true},
-		heuristicEnabled: true,
+		preferences:    &RoutingPreferences{AutoRoutingEnabled: true},
+		noSLMAvailable: false,
 	}
 }
 
 // Initialize sets up the engine with available providers.
-// Priority: Ollama (free local) > LlamaCpp (bundled) > Embedded > Heuristic
+// Priority: Ollama (free local) > LlamaCpp (bundled)
 // NO external API calls - all inference is local and free.
+// Issue #52: NO HEURISTICS - if no SLM available, routing is disabled.
 func (e *Engine) Initialize(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -57,6 +58,7 @@ func (e *Engine) Initialize(ctx context.Context) error {
 		log.Printf("[SLM] Ollama detected, checking for suitable models...")
 		if err := ollamaProvider.Initialize(ctx); err == nil {
 			e.provider = ollamaProvider
+			e.noSLMAvailable = false
 			log.Printf("[SLM] ✓ Using Ollama as primary provider (FREE local AI)")
 			return nil
 		} else {
@@ -70,6 +72,7 @@ func (e *Engine) Initialize(ctx context.Context) error {
 		log.Printf("[SLM] llama-cli binary detected, initializing...")
 		if err := llamaCppProvider.Initialize(ctx); err == nil {
 			e.provider = llamaCppProvider
+			e.noSLMAvailable = false
 			log.Printf("[SLM] ✓ Using llama-cli as primary provider (FREE local AI)")
 			return nil
 		} else {
@@ -77,35 +80,35 @@ func (e *Engine) Initialize(ctx context.Context) error {
 		}
 	}
 
-	// Priority 3 - Rule-based provider (always available, no external dependencies)
-	// This replaces the broken "embedded" provider that was never fully implemented
-	ruleBasedProvider := NewRuleBasedProvider()
-	if err := ruleBasedProvider.Initialize(ctx); err == nil {
-		e.provider = ruleBasedProvider
-		log.Printf("[SLM] ✓ Using rule-based analysis (fast heuristics)")
-		log.Printf("[SLM] For AI analysis, install Ollama: https://ollama.ai")
-		return nil
-	}
-
-	// Final fallback: heuristic (should not reach here, but just in case)
-	log.Printf("[SLM] ⚠ Using heuristic fallback")
-	e.provider = NewHeuristicProvider()
-	e.heuristicEnabled = true
+	// Issue #52: NO HEURISTICS - if no real SLM is available, disable routing entirely
+	// The system will pass through to the user's default model without any "smart" routing
+	log.Printf("[SLM] ⚠ No SLM available - routing DISABLED (no heuristics)")
+	log.Printf("[SLM] For AI analysis, install Ollama: https://ollama.ai")
+	e.provider = nil
+	e.noSLMAvailable = true
 
 	return nil
 }
 
 // Analyze performs prompt analysis using the best available provider.
+// Issue #52: If no SLM is available, returns nil (no routing, use default model).
 func (e *Engine) Analyze(ctx context.Context, input PromptContext) (*AnalysisResult, error) {
 	e.mu.RLock()
 	provider := e.provider
 	fallbacks := e.fallbacks
+	noSLM := e.noSLMAvailable
 	e.mu.RUnlock()
+
+	// Issue #52: If no SLM available, return nil - don't route, use user's default
+	if noSLM || provider == nil {
+		log.Printf("[SLM] No SLM available - skipping analysis, use default model")
+		return nil, nil
+	}
 
 	start := time.Now()
 
 	// Try primary provider
-	if provider != nil && provider.IsAvailable() {
+	if provider.IsAvailable() {
 		result, err := provider.Analyze(ctx, input)
 		if err == nil {
 			e.recordAnalysis(time.Since(start).Milliseconds())
@@ -126,8 +129,9 @@ func (e *Engine) Analyze(ctx context.Context, input PromptContext) (*AnalysisRes
 		}
 	}
 
-	// Ultimate fallback: heuristic analysis
-	return e.heuristicAnalysis(input), nil
+	// Issue #52: NO HEURISTICS - if all providers fail, return nil (use default)
+	log.Printf("[SLM] All providers failed - skipping analysis, use default model")
+	return nil, nil
 }
 
 // recordAnalysis updates internal stats.
@@ -357,7 +361,8 @@ func (e *Engine) Status() EngineStatus {
 		status.ModelLoaded = providerStatus.ModelLoaded
 		status.ModelSizeMB = providerStatus.ModelSizeMB
 	} else {
-		status.ActiveProvider = "heuristic"
+		// Issue #52: No heuristics - report as disabled, not "heuristic"
+		status.ActiveProvider = "disabled"
 	}
 
 	// Check Ollama availability
