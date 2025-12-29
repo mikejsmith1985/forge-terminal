@@ -27,7 +27,20 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
     useEffect(() => {
         if (isOpen) {
             if (initialData) {
-                setFormData({ icon: null, llmProvider: '', llmType: 'chat', ...initialData });
+                // Safely merge initialData with defaults to prevent undefined values
+                setFormData({
+                    description: initialData.description || '',
+                    command: initialData.command || '',
+                    keyBinding: initialData.keyBinding || '',
+                    pasteOnly: initialData.pasteOnly || false,
+                    favorite: initialData.favorite || false,
+                    triggerAM: initialData.triggerAM || false,
+                    llmProvider: initialData.llmProvider || '',
+                    llmType: initialData.llmType || 'chat',
+                    icon: initialData.icon || null,
+                    delay: initialData.delay || 0,
+                    id: initialData.id, // Preserve ID for editing
+                });
             } else {
                 setFormData({
                     description: '',

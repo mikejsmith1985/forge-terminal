@@ -39,6 +39,13 @@ const ChatView = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [usePTYBridge, setUsePTYBridge] = useState(true); // v3.5.3: Use PTY bridge by default
   const [pendingResponse, setPendingResponse] = useState(''); // Accumulating PTY output
+  
+  // Issue #52: User preference for Enter key behavior
+  const [enterToSend, setEnterToSend] = useState(() => {
+    const saved = localStorage.getItem('chat_enter_to_send');
+    return saved !== null ? saved === 'true' : true; // Default: Enter sends
+  });
+  
   const messagesEndRef = useRef(null);
   const messageRefs = useRef({}); // For scrolling to search results
   const currentTabIdRef = useRef(tabId);
@@ -463,12 +470,33 @@ const ChatView = ({
     }
   }, []);
 
+  // Issue #52: Handle Enter key with configurable behavior
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+    if (e.key === 'Enter') {
+      if (enterToSend) {
+        // Enter sends, Shift+Enter for newline
+        if (!e.shiftKey) {
+          e.preventDefault();
+          handleSendMessage();
+        }
+      } else {
+        // Shift+Enter sends, Enter for newline
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleSendMessage();
+        }
+      }
     }
   };
+  
+  // Toggle Enter key behavior and persist to localStorage
+  const toggleEnterBehavior = useCallback(() => {
+    setEnterToSend(prev => {
+      const newValue = !prev;
+      localStorage.setItem('chat_enter_to_send', String(newValue));
+      return newValue;
+    });
+  }, []);
 
   // Image upload handlers
   const handleImageUpload = useCallback(async (file) => {
@@ -700,17 +728,35 @@ const ChatView = ({
             className="chat-view-input"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             onPaste={handlePaste}
-            placeholder="Ask a question... (Shift+Enter for newline, paste images)"
+            placeholder={enterToSend 
+              ? "Ask a question... (Enter to send, Shift+Enter for newline)" 
+              : "Ask a question... (Shift+Enter to send, Enter for newline)"}
             disabled={isLoading}
             rows={3}
           />
           <button
+            className="chat-view-enter-toggle"
+            onClick={toggleEnterBehavior}
+            title={enterToSend ? "Enter sends message (click to toggle)" : "Shift+Enter sends message (click to toggle)"}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '10px',
+              padding: '4px 8px',
+              cursor: 'pointer',
+              opacity: 0.7,
+            }}
+          >
+            {enterToSend ? '⏎ sends' : '⇧⏎ sends'}
+          </button>
+          <button
             className="chat-view-send-btn"
             onClick={handleSendMessage}
             disabled={isLoading || (!inputValue.trim() && pendingImages.length === 0)}
-            title="Send (Enter)"
+            title={enterToSend ? "Send (Enter)" : "Send (Shift+Enter)"}
           >
             {isLoading ? <Loader2 className="spinner" size={20} /> : <Send size={20} />}
           </button>

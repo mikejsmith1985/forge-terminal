@@ -423,6 +423,32 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               />
             </div>
 
+            {/* Issue #52: Allow setting current spend for mid-cycle setup */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '0.8rem', color: '#888', display: 'block', marginBottom: '4px' }}>
+                Current Spend (for mid-cycle setup)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={budgetConfig.current_spend || budgetStatus?.current_usage || 0}
+                onChange={(e) => setBudgetConfig({ ...budgetConfig, current_spend: parseFloat(e.target.value) || 0 })}
+                placeholder="0.00"
+                style={{ 
+                  width: '150px', 
+                  padding: '8px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #333', 
+                  background: '#0a0a0a', 
+                  color: '#fff' 
+                }}
+              />
+              <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px' }}>
+                If you're setting this up mid-cycle, enter your current spend to track remaining budget correctly.
+              </p>
+            </div>
+
             <button
               className="btn btn-primary"
               onClick={saveBudgetConfig}
@@ -440,7 +466,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             padding: '16px'
           }}>
             <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>
-              Auto-Pilot Routing
+              Smart Model Routing (Not Hardcoded)
             </label>
             
             <div style={{ 
@@ -450,22 +476,38 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               fontSize: '0.85rem',
               lineHeight: '1.6'
             }}>
+              {/* Issue #52: Clearer explanation that this is about cost, not capability */}
+              <div style={{ 
+                background: '#14532d', 
+                border: '1px solid #22c55e',
+                borderRadius: '6px',
+                padding: '10px',
+                fontSize: '0.8rem',
+                marginBottom: '12px'
+              }}>
+                ⚡ <strong>Economy vs Power:</strong> Forge analyzes your task to choose the most cost-effective model.
+                A simple question doesn't need a $1 model when a $0.25 model works just as well.
+                <br/><br/>
+                📈 For complex tasks (architecture, large refactors), it automatically uses more powerful models.
+                <strong> You're not getting worse models - you're getting smarter spending.</strong>
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <Zap size={14} style={{ color: '#22c55e' }} />
-                <strong>Speed Models</strong>
-                <span style={{ color: '#888' }}>- Quick tasks (0.25-0.33 credits)</span>
+                <strong>Economy Tier</strong>
+                <span style={{ color: '#888' }}>- Simple tasks (0.25-0.33 credits)</span>
               </div>
               <div style={{ paddingLeft: '22px', color: '#666', marginBottom: '12px' }}>
-                GPT-4o-mini, Claude 3.5 Haiku
+                GPT-4o-mini, Claude Haiku — fast, cheap, great for quick answers
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <Brain size={14} style={{ color: '#8b5cf6' }} />
-                <strong>Reasoning Models</strong>
+                <strong>Power Tier</strong>
                 <span style={{ color: '#888' }}>- Complex tasks (1.0+ credits)</span>
               </div>
               <div style={{ paddingLeft: '22px', color: '#666', marginBottom: '12px' }}>
-                GPT-4o, Claude Sonnet 4, Gemini 3
+                GPT-4o, Claude Sonnet/Opus — used when task requires deeper reasoning
               </div>
 
               <div style={{ 
@@ -475,8 +517,40 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
                 padding: '10px',
                 fontSize: '0.8rem'
               }}>
-                💡 Forge automatically selects the optimal model based on task complexity 
-                and your remaining budget. When budget is low, it downgrades to cheaper models.
+                💡 <strong>Budget-Aware:</strong> Forge considers task complexity AND your remaining budget.
+                One Opus prompt that solves the problem is better than 10 Haiku prompts that don't.
+              </div>
+              
+              {/* Issue #52: SLM Status indicator visible to all users */}
+              <div style={{ 
+                marginTop: '12px',
+                padding: '10px',
+                background: slmStatus?.active_provider === 'ollama' ? '#052e16' : '#1c1917',
+                border: `1px solid ${slmStatus?.active_provider === 'ollama' ? '#22c55e' : '#44403c'}`,
+                borderRadius: '6px',
+                fontSize: '0.8rem'
+              }}>
+                <div style={{ fontWeight: 500, marginBottom: '6px' }}>Smart Routing Status</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888' }}>
+                  <span>Engine:</span>
+                  <span style={{ color: '#22c55e' }}>
+                    {slmStatus?.active_provider === 'heuristic' && '📊 Pattern Matching'}
+                    {slmStatus?.active_provider === 'ollama' && '🧠 AI Analysis (Ollama)'}
+                    {slmStatus?.active_provider === 'embedded' && '🧠 Embedded SLM'}
+                    {!slmStatus && '⏳ Checking...'}
+                  </span>
+                </div>
+                {learningStats?.total_samples > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginTop: '4px' }}>
+                    <span>Learning Samples:</span>
+                    <span>{learningStats.total_samples}</span>
+                  </div>
+                )}
+                <p style={{ fontSize: '0.7rem', color: '#666', marginTop: '8px', marginBottom: 0 }}>
+                  {devMode 
+                    ? 'Enable Dev Mode above for detailed SLM controls' 
+                    : 'Enable Dev Mode in Shell tab for detailed SLM controls'}
+                </p>
               </div>
             </div>
           </div>
