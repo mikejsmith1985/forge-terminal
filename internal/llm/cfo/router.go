@@ -409,6 +409,187 @@ func (r *Router) GetAllModels() []*pricing.ModelCost {
 	return r.registry.ListModels()
 }
 
+// SmartRouteDecision extends RouteDecision with SLM analysis.
+type SmartRouteDecision struct {
+	RouteDecision
+
+	// SLM analysis results
+	Complexity         int            `json:"complexity"`
+	TaskType           string         `json:"task_type"`
+	ExpectedIterations map[string]int `json:"expected_iterations,omitempty"`
+	Confidence         float64        `json:"confidence"`
+	AnalysisProvider   string         `json:"analysis_provider"`
+	AnalysisLatencyMs  int64          `json:"analysis_latency_ms"`
+
+	// Value calculations
+	ValueScores map[string]float64 `json:"value_scores,omitempty"` // Model -> value score
+}
+
+// ResolveModelSmart uses SLM analysis for optimal model selection.
+// This is the v3.5.0 smart routing method that considers:
+// - Prompt complexity
+// - Estimated iterations per model
+// - Budget constraints
+// - Value optimization (capability per credit)
+func (r *Router) ResolveModelSmart(prompt string, availableModels []string, slmAnalysis interface{}) SmartRouteDecision {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	decision := SmartRouteDecision{}
+	decision.RiskLevel = RiskLow
+
+	// Get current budget status
+	status := r.ledger.GetStatus()
+	decision.RemainingBudget = status.Remaining
+	decision.RiskLevel = r.assessRisk(status)
+
+	// Extract SLM analysis if provided
+	if analysis, ok := slmAnalysis.(map[string]interface{}); ok {
+		if complexity, ok := analysis["complexity"].(int); ok {
+			decision.Complexity = complexity
+		}
+		if taskType, ok := analysis["task_type"].(string); ok {
+			decision.TaskType = taskType
+		}
+		if iterations, ok := analysis["iterations"].(map[string]int); ok {
+			decision.ExpectedIterations = iterations
+		}
+		if confidence, ok := analysis["confidence"].(float64); ok {
+			decision.Confidence = confidence
+		}
+		if provider, ok := analysis["provider"].(string); ok {
+			decision.AnalysisProvider = provider
+		}
+		if latency, ok := analysis["latency_ms"].(int64); ok {
+			decision.AnalysisLatencyMs = latency
+		}
+	}
+
+	// Calculate value scores for each model
+	valueScores := make(map[string]float64)
+	safeDaily := status.Remaining / float64(max(1, status.DaysRemaining))
+
+	for _, modelID := range availableModels {
+		cost, ok := r.registry.GetModel(modelID)
+		if !ok {
+			continue
+		}
+
+		// Get expected iterations (default to 1)
+		iterations := 1
+		if decision.ExpectedIterations != nil {
+			if iter, ok := decision.ExpectedIterations[modelID]; ok && iter > 0 {
+				iterations = iter
+			}
+		}
+
+		// Calculate total expected cost
+		var totalCost float64
+		switch cost.CostUnit {
+		case pricing.UnitCredits:
+			totalCost = cost.CreditMultiplier * float64(iterations)
+		case pricing.UnitUSD:
+			estimatedTokens := r.estimateTokens(prompt)
+			singleCost := r.registry.EstimateCostUSD(modelID, estimatedTokens, estimatedTokens*2)
+			totalCost = singleCost * float64(iterations)
+		case pricing.UnitFree:
+			totalCost = 0.001 // Tiny non-zero for math
+		}
+
+		// Get capability score (simplified: based on cost tier)
+		capability := r.getModelCapability(modelID)
+
+		// Value = capability / total cost
+		costDenom := totalCost
+		if costDenom < 0.001 {
+			costDenom = 0.001
+		}
+		value := float64(capability) / costDenom
+
+		// Risk adjustment: penalize if cost exceeds safe daily spend
+		if totalCost > safeDaily && status.PercentUsed > 50 {
+			riskPenalty := safeDaily / totalCost
+			value *= riskPenalty
+		}
+
+		valueScores[modelID] = value
+	}
+
+	decision.ValueScores = valueScores
+
+	// Find the best value model
+	var bestModel string
+	var bestValue float64 = -1
+
+	for modelID, value := range valueScores {
+		if value > bestValue {
+			bestValue = value
+			bestModel = modelID
+		}
+	}
+
+	if bestModel != "" {
+		decision.SelectedModel = bestModel
+		if cost, ok := r.registry.GetModel(bestModel); ok {
+			switch cost.CostUnit {
+			case pricing.UnitCredits:
+				decision.EstimatedCost = cost.CreditMultiplier
+			case pricing.UnitUSD:
+				estimatedTokens := r.estimateTokens(prompt)
+				decision.EstimatedCost = r.registry.EstimateCostUSD(bestModel, estimatedTokens, estimatedTokens*2)
+			}
+		}
+		decision.Reason = "Selected by smart routing (best value)"
+	} else {
+		// Fallback to cheapest
+		decision.SelectedModel = r.findCheapestModel(availableModels)
+		decision.Reason = "Fallback to cheapest model"
+	}
+
+	return decision
+}
+
+// getModelCapability returns a capability score (1-10) for a model.
+func (r *Router) getModelCapability(modelID string) int {
+	modelID = strings.ToLower(modelID)
+
+	// Reasoning tier (10)
+	if strings.Contains(modelID, "opus") || strings.Contains(modelID, "o1") {
+		return 10
+	}
+
+	// High capability (9)
+	if strings.Contains(modelID, "gemini-3") || strings.Contains(modelID, "sonnet-4.5") {
+		return 9
+	}
+
+	// Standard (8)
+	if strings.Contains(modelID, "sonnet") || strings.Contains(modelID, "gpt-4o") ||
+		strings.Contains(modelID, "gpt-5") {
+		return 8
+	}
+
+	// Mid tier (6)
+	if strings.Contains(modelID, "haiku") || strings.Contains(modelID, "mini") {
+		return 6
+	}
+
+	// Free/local (5)
+	if strings.Contains(modelID, "llama") || strings.Contains(modelID, "mistral") {
+		return 5
+	}
+
+	return 7 // Default
+}
+
+// max returns the larger of two integers.
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 // Global router instance
 var (
 	globalRouter     *Router

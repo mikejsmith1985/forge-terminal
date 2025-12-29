@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm/ledger"
+	"github.com/mikejsmith1985/forge-terminal/internal/slm"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
@@ -95,6 +97,15 @@ func main() {
 		log.Printf("[CFO] Warning: failed to initialize ledger: %v", err)
 	} else {
 		log.Printf("[CFO] Ledger initialized at %s", ledger.DefaultFilePath())
+	}
+
+	// v3.5.0: Initialize SLM engine (Dev Mode feature, smart routing)
+	slmEngine := slm.GetEngine()
+	if err := slmEngine.Initialize(context.Background()); err != nil {
+		log.Printf("[SLM] Warning: failed to initialize SLM engine: %v", err)
+	} else {
+		status := slmEngine.Status()
+		log.Printf("[SLM] Engine initialized: provider=%s, model=%s", status.ActiveProvider, status.ModelID)
 	}
 
 	// Serve embedded frontend with no-cache headers
@@ -247,6 +258,14 @@ func main() {
 	http.HandleFunc("/api/llm/budget/reset", WrapWithMiddleware(handleBudgetReset))
 	http.HandleFunc("/api/llm/pricing", WrapWithMiddleware(handleModelPricing))
 	http.HandleFunc("/api/llm/route/preview", WrapWithMiddleware(handleRoutePreview))
+
+	// SLM (Smart Language Model) routing API - v3.5.0
+	http.HandleFunc("/api/slm/status", WrapWithMiddleware(handleSLMStatus))
+	http.HandleFunc("/api/slm/analyze", WrapWithMiddleware(handleSLMAnalyze))
+	http.HandleFunc("/api/slm/learning", WrapWithMiddleware(handleSLMLearningStats))
+	http.HandleFunc("/api/slm/learning/clear", WrapWithMiddleware(handleSLMLearningClear))
+	http.HandleFunc("/api/slm/preferences", WrapWithMiddleware(handleSLMPreferences))
+	http.HandleFunc("/api/ollama/status", WrapWithMiddleware(handleOllamaStatus))
 
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
