@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/slm"
@@ -233,6 +234,90 @@ func handleOllamaStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(status)
 }
 
+// handleSLMModelStatus handles GET /api/slm/model
+// Returns the status of the embedded SLM model.
+func handleSLMModelStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	modelExists := slm.ModelExists()
+	binaryExists := slm.BinaryExists()
+	modelPath := slm.GetExpectedModelPath()
+	binaryPath := slm.GetExpectedBinaryPath()
+
+	status := map[string]interface{}{
+		"model_exists":  modelExists,
+		"binary_exists": binaryExists,
+		"model_path":    modelPath,
+		"binary_path":   binaryPath,
+		"model_name":    slm.DefaultModelName,
+		"ready":         modelExists && binaryExists,
+	}
+
+	// Get file size if exists
+	if modelExists {
+		if info, err := os.Stat(modelPath); err == nil {
+			status["model_size_mb"] = info.Size() / 1_000_000
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}
+
+// handleSLMModelDownload handles POST /api/slm/model/download
+// Triggers download of the embedded SLM model.
+func handleSLMModelDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check if already exists
+	if slm.ModelExists() {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "exists",
+			"message": "Model already downloaded",
+			"path":    slm.GetExpectedModelPath(),
+		})
+		return
+	}
+
+	// Start download (this is synchronous for now - could be made async with SSE)
+	log.Printf("[SLM API] Starting model download...")
+	
+	var lastProgress slm.DownloadProgress
+	err := slm.DownloadModel(func(p slm.DownloadProgress) {
+		lastProgress = p
+		if int(p.Percent)%20 == 0 {
+			log.Printf("[SLM API] Download: %.0f%%", p.Percent)
+		}
+	})
+
+	if err != nil {
+		log.Printf("[SLM API] Download failed: %v", err)
+		http.Error(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Re-initialize the SLM engine with the new model
+	engine := slm.GetEngine()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	engine.Initialize(ctx)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      "downloaded",
+		"message":     "Model downloaded successfully",
+		"path":        slm.GetExpectedModelPath(),
+		"size_mb":     lastProgress.Downloaded / 1_000_000,
+	})
+}
+
 // registerSLMHandlers registers all SLM-related API endpoints.
 // These are only enabled when Dev Mode is active.
 func registerSLMHandlers() {
@@ -241,6 +326,8 @@ func registerSLMHandlers() {
 	http.HandleFunc("/api/slm/learning", handleSLMLearningStats)
 	http.HandleFunc("/api/slm/learning/clear", handleSLMLearningClear)
 	http.HandleFunc("/api/slm/preferences", handleSLMPreferences)
+	http.HandleFunc("/api/slm/model", handleSLMModelStatus)
+	http.HandleFunc("/api/slm/model/download", handleSLMModelDownload)
 	http.HandleFunc("/api/ollama/status", handleOllamaStatus)
 
 	log.Printf("[SLM] Registered API endpoints")

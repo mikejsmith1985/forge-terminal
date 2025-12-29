@@ -291,9 +291,6 @@ func (o *OllamaProvider) parseAnalysisResponse(response string) (*AnalysisResult
 
 // extractPartialResult tries to get something useful from an unparseable response.
 func (o *OllamaProvider) extractPartialResult(response string) *AnalysisResult {
-	// Fallback to heuristic with medium confidence
-	engine := GetEngine()
-	
 	// Try to extract complexity from response text
 	complexity := 5 // Default
 	if strings.Contains(strings.ToLower(response), "complex") || 
@@ -307,7 +304,7 @@ func (o *OllamaProvider) extractPartialResult(response string) *AnalysisResult {
 	return &AnalysisResult{
 		Complexity: complexity,
 		TaskType:   TaskUnknown,
-		Iterations: engine.estimateIterations(complexity),
+		Iterations: map[string]int{"default": 1}, // Simple default
 		Confidence: 0.5,
 		Reasoning:  "Partial extraction from Ollama response",
 	}
