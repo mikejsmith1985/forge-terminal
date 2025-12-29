@@ -253,6 +253,10 @@ func (l *LLMLogger) StartConversationFromProcess(provider string, cmdType string
 		ProcessPID:      pid,
 		ScreenSnapshots: []ScreenSnapshot{},
 		Metadata:        l.captureMetadata(),
+		// v3.5.0: Initialize empty SLM tracking - will be populated on first user input
+		SLMTracking: &SLMTrackingData{
+			UserIterations: 0,
+		},
 	}
 
 	// Add initial turn noting process start
@@ -429,6 +433,70 @@ func (l *LLMLogger) runSLMAnalysis(conv *LLMConversation, prompt string) {
 	}
 
 	log.Printf("[SLM] Analysis complete for %s: complexity=%d, task=%s, predicted=%s/%d",
+		conv.ConversationID, result.Complexity, result.TaskType,
+		conv.SLMTracking.PredictedModel, conv.SLMTracking.PredictedIterations)
+}
+
+// runSLMAnalysisForInput runs SLM analysis for user input during conversation.
+// This is called when the first user prompt is detected in a TUI-mode conversation.
+func (l *LLMLogger) runSLMAnalysisForInput(conv *LLMConversation, prompt string) {
+	if conv == nil || prompt == "" {
+		return
+	}
+
+	engine := slm.GetEngine()
+	if engine == nil {
+		log.Printf("[SLM] Engine not available")
+		return
+	}
+
+	// Build context
+	input := slm.PromptContext{
+		Prompt:          prompt,
+		EstimatedTokens: len(prompt) / 4,
+	}
+
+	// Run analysis
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := engine.Analyze(ctx, input)
+	if err != nil {
+		log.Printf("[SLM] Analysis failed: %v", err)
+		return
+	}
+
+	// Update tracking (need lock)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Verify conversation still active
+	if conv.ConversationID != l.activeConvID {
+		return
+	}
+
+	if conv.SLMTracking == nil {
+		conv.SLMTracking = &SLMTrackingData{}
+	}
+
+	// Update with analysis results
+	conv.SLMTracking.PromptHash = hashForTracking(prompt)
+	conv.SLMTracking.InitialPrompt = truncateForTracking(prompt, 200)
+	conv.SLMTracking.PredictedComplexity = result.Complexity
+	conv.SLMTracking.AnalysisProvider = result.Provider
+
+	// Find predicted iterations
+	if result.Iterations != nil {
+		for _, model := range []string{"sonnet", "haiku", "gemini-3", "gpt-4o"} {
+			if iters, ok := result.Iterations[model]; ok {
+				conv.SLMTracking.PredictedModel = model
+				conv.SLMTracking.PredictedIterations = iters
+				break
+			}
+		}
+	}
+
+	log.Printf("[SLM] ✅ Analysis for %s: complexity=%d, task=%s, model=%s, iterations=%d",
 		conv.ConversationID, result.Complexity, result.TaskType,
 		conv.SLMTracking.PredictedModel, conv.SLMTracking.PredictedIterations)
 }
@@ -1045,6 +1113,13 @@ func (l *LLMLogger) flushUserInputLocked() {
 
 	// v3.5.0: Track user iteration for SLM feedback
 	if conv.SLMTracking != nil {
+		// Run SLM analysis on first real user prompt (not system turn)
+		if conv.SLMTracking.PromptHash == "" && cleaned != "" {
+			// This is the first user prompt - run SLM analysis
+			log.Printf("[SLM] First user prompt detected, running analysis...")
+			go l.runSLMAnalysisForInput(conv, cleaned)
+		}
+		
 		recorder := GetFeedbackRecorder()
 		if recorder != nil {
 			recorder.RecordUserTurn(conv, cleaned)
