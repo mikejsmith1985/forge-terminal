@@ -175,12 +175,18 @@
                     <div class="issue-card">
                         <h3>
                             <span class="issue-number">#52.9</span>
-                            Smart Router Using Wrong Model Selection
+                            Smart Router Using Wrong Model Selection + No External Dependencies
                             <span class="issue-status status-fixed">FIXED</span>
                         </h3>
-                        <p class="issue-desc">Router determined reading GH issue and fixing tour required Opus (terrible logic). User explicitly requested NO HEURISTICS.</p>
+                        <p class="issue-desc">Router used heuristics that made terrible decisions. User explicitly requested NO HEURISTICS and NO external dependencies like Ollama.</p>
                         <div class="solution">
-                            <strong>Solution:</strong> Removed ALL heuristic fallbacks from SLM engine. If no real SLM (Ollama/llama.cpp) is available, routing is DISABLED entirely - the system passes through to the user's default model without any "smart" guessing. No more pattern matching or keyword-based classification.
+                            <strong>Solution:</strong> 
+                            <br/>1. REMOVED all heuristic code (estimateComplexity, classifyTask, keyword matching)
+                            <br/>2. IMPLEMENTED auto-download of SmolLM2-135M (~100MB) on first run
+                            <br/>3. Model stored in ~/.forge/models/ - works offline after first download
+                            <br/>4. If no model available: routing DISABLED (uses default model)
+                            <br/>5. Zero external dependencies - no Ollama required
+                            <br/><strong>Result:</strong> Real AI analysis or nothing. No guessing.
                         </div>
                     </div>
                 </div>
