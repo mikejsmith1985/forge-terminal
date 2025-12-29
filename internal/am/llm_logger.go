@@ -74,6 +74,32 @@ type LLMConversation struct {
 	TUICaptureMode  bool                  `json:"tuiCaptureMode,omitempty"`
 	ScreenSnapshots []ScreenSnapshot      `json:"screenSnapshots,omitempty"`
 	ProcessPID      int                   `json:"processPID,omitempty"`
+
+	// v3.5.0: SLM feedback tracking
+	SLMTracking *SLMTrackingData `json:"slmTracking,omitempty"`
+}
+
+// SLMTrackingData holds data for smart routing feedback.
+type SLMTrackingData struct {
+	// Initial analysis
+	PromptHash          string `json:"promptHash"`
+	InitialPrompt       string `json:"initialPrompt,omitempty"` // First 200 chars
+	PredictedComplexity int    `json:"predictedComplexity,omitempty"`
+	PredictedModel      string `json:"predictedModel,omitempty"`
+	PredictedIterations int    `json:"predictedIterations,omitempty"`
+	AnalysisProvider    string `json:"analysisProvider,omitempty"` // "heuristic", "ollama", "embedded"
+
+	// Actual usage
+	ActualModel      string `json:"actualModel,omitempty"`
+	UserIterations   int    `json:"userIterations"`   // Number of user turns
+	TotalTokensIn    int    `json:"totalTokensIn"`    // Estimated input tokens
+	TotalTokensOut   int    `json:"totalTokensOut"`   // Estimated output tokens
+	ModelSwitched    bool   `json:"modelSwitched"`    // Did user switch models mid-conversation?
+	SwitchedToModel  string `json:"switchedToModel,omitempty"`
+
+	// Outcome
+	Outcome         string    `json:"outcome,omitempty"` // "success", "partial", "failed", "abandoned"
+	OutcomeDetected time.Time `json:"outcomeDetected,omitempty"`
 }
 
 // LLMLogger manages LLM conversation logging for a tab.
@@ -336,6 +362,72 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 	log.Printf("[LLM Logger] Final state: activeConvID='%s', mapSize=%d", l.activeConvID, len(l.conversations))
 	log.Printf("[LLM Logger] ═══ END START CONVERSATION ═══")
 	return convID
+}
+
+// InitializeSLMTracking sets up SLM analysis for the active conversation.
+// Should be called after StartConversation when SLM analysis is available.
+func (l *LLMLogger) InitializeSLMTracking(analysis interface{}, initialPrompt string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.activeConvID == "" {
+		return
+	}
+
+	conv, exists := l.conversations[l.activeConvID]
+	if !exists {
+		return
+	}
+
+	// Import the analysis from SLM package
+	// We use interface{} to avoid circular imports, then type assert
+	if slmResult, ok := analysis.(interface {
+		GetComplexity() int
+		GetProvider() string
+		GetIterations() map[string]int
+	}); ok {
+		tracking := &SLMTrackingData{
+			PromptHash:          hashForTracking(initialPrompt),
+			InitialPrompt:       truncateForTracking(initialPrompt, 200),
+			PredictedComplexity: slmResult.GetComplexity(),
+			AnalysisProvider:    slmResult.GetProvider(),
+		}
+
+		// Find best predicted model
+		iters := slmResult.GetIterations()
+		for _, model := range []string{"haiku", "sonnet", "gemini-3", "gpt-4o"} {
+			if count, ok := iters[model]; ok {
+				tracking.PredictedModel = model
+				tracking.PredictedIterations = count
+				break
+			}
+		}
+
+		conv.SLMTracking = tracking
+		log.Printf("[LLM Logger] SLM tracking initialized: complexity=%d, model=%s, iters=%d",
+			tracking.PredictedComplexity, tracking.PredictedModel, tracking.PredictedIterations)
+	}
+}
+
+// hashForTracking creates a short hash for prompt identification.
+func hashForTracking(s string) string {
+	// Use first 32 chars of a simple hash representation
+	h := 0
+	for i, c := range s {
+		if i > 100 {
+			break
+		}
+		h = 31*h + int(c)
+	}
+	return fmt.Sprintf("%x", uint32(h))
+}
+
+// truncateForTracking truncates a string for storage.
+func truncateForTracking(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // AddOutput accumulates LLM output.
@@ -827,6 +919,14 @@ func (l *LLMLogger) flushUserInputLocked() {
 	
 	conv.Turns = append(conv.Turns, turn)
 
+	// v3.5.0: Track user iteration for SLM feedback
+	if conv.SLMTracking != nil {
+		recorder := GetFeedbackRecorder()
+		if recorder != nil {
+			recorder.RecordUserTurn(conv, cleaned)
+		}
+	}
+
 	// Update recovery info
 	if conv.Recovery == nil {
 		conv.Recovery = &ConversationRecovery{}
@@ -965,6 +1065,16 @@ func (l *LLMLogger) EndConversation() {
 	conv.Complete = true
 	conv.EndTime = time.Now()
 	l.saveConversation(conv)
+
+	// v3.5.0: Record SLM feedback for learning
+	if conv.SLMTracking != nil {
+		recorder := GetFeedbackRecorder()
+		if recorder != nil {
+			if err := recorder.FinalizeAndRecord(conv); err != nil {
+				log.Printf("[LLM Logger] Warning: failed to record SLM feedback: %v", err)
+			}
+		}
+	}
 
 	EventBus.Publish(&LayerEvent{
 		Type:      "LLM_END",
