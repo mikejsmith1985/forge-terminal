@@ -2,6 +2,7 @@
 package am
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
+	"github.com/mikejsmith1985/forge-terminal/internal/slm"
 )
 
 // Memory limits to prevent unbounded growth
@@ -327,6 +329,9 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 			Provider:  string(detected.Provider),
 		})
 		log.Printf("[LLM Logger] Initial turn added, total turns: %d", len(conv.Turns))
+
+		// v3.5.0: Run SLM analysis on initial prompt
+		go l.runSLMAnalysis(conv, detected.Prompt)
 	} else {
 		log.Printf("[LLM Logger] No initial prompt provided")
 	}
@@ -362,6 +367,70 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 	log.Printf("[LLM Logger] Final state: activeConvID='%s', mapSize=%d", l.activeConvID, len(l.conversations))
 	log.Printf("[LLM Logger] ═══ END START CONVERSATION ═══")
 	return convID
+}
+
+// runSLMAnalysis performs SLM analysis on a prompt and sets up tracking.
+// Called asynchronously to not block conversation start.
+func (l *LLMLogger) runSLMAnalysis(conv *LLMConversation, prompt string) {
+	if conv == nil || prompt == "" {
+		return
+	}
+
+	engine := slm.GetEngine()
+	if engine == nil {
+		log.Printf("[LLM Logger] SLM engine not available")
+		return
+	}
+
+	// Build context for analysis
+	input := slm.PromptContext{
+		Prompt:          prompt,
+		EstimatedTokens: len(prompt) / 4,
+	}
+
+	// Run analysis with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := engine.Analyze(ctx, input)
+	if err != nil {
+		log.Printf("[LLM Logger] SLM analysis failed: %v", err)
+		return
+	}
+
+	// Update conversation with tracking data
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Make sure conversation still exists
+	if conv.ConversationID != l.activeConvID {
+		log.Printf("[LLM Logger] Conversation changed during SLM analysis, skipping")
+		return
+	}
+
+	// Initialize tracking
+	conv.SLMTracking = &SLMTrackingData{
+		PromptHash:          hashForTracking(prompt),
+		InitialPrompt:       truncateForTracking(prompt, 200),
+		PredictedComplexity: result.Complexity,
+		AnalysisProvider:    result.Provider,
+		UserIterations:      1, // Initial prompt counts as first iteration
+	}
+
+	// Find best predicted model from iterations
+	if result.Iterations != nil {
+		for _, model := range []string{"sonnet", "haiku", "gemini-3", "gpt-4o"} {
+			if iters, ok := result.Iterations[model]; ok {
+				conv.SLMTracking.PredictedModel = model
+				conv.SLMTracking.PredictedIterations = iters
+				break
+			}
+		}
+	}
+
+	log.Printf("[SLM] Analysis complete for %s: complexity=%d, task=%s, predicted=%s/%d",
+		conv.ConversationID, result.Complexity, result.TaskType,
+		conv.SLMTracking.PredictedModel, conv.SLMTracking.PredictedIterations)
 }
 
 // InitializeSLMTracking sets up SLM analysis for the active conversation.
@@ -465,6 +534,61 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 	// Traditional line-based capture
 	l.outputBuffer += rawOutput
 	l.lastOutputTime = time.Now()
+
+	// v3.5.0: Detect model from output for SLM tracking
+	l.detectModelFromOutput(rawOutput)
+}
+
+// detectModelFromOutput looks for model indicators in the terminal output.
+// Copilot CLI shows model names in various formats.
+func (l *LLMLogger) detectModelFromOutput(output string) {
+	if l.activeConvID == "" {
+		return
+	}
+
+	conv, exists := l.conversations[l.activeConvID]
+	if !exists || conv.SLMTracking == nil {
+		return
+	}
+
+	// Already have the model
+	if conv.SLMTracking.ActualModel != "" {
+		return
+	}
+
+	// Clean output for pattern matching
+	cleaned := strings.ToLower(output)
+
+	// Model patterns from Copilot CLI output
+	modelPatterns := map[string][]string{
+		"claude-haiku-4.5":  {"haiku", "claude-3.5-haiku", "claude-haiku"},
+		"claude-sonnet-4":   {"sonnet 4", "claude-sonnet-4", "sonnet-4"},
+		"claude-sonnet-4.5": {"sonnet 4.5", "claude-sonnet-4.5", "sonnet-4.5"},
+		"claude-opus-4":     {"opus", "claude-opus"},
+		"gpt-4o":            {"gpt-4o", "gpt4o"},
+		"gpt-4o-mini":       {"gpt-4o-mini", "4o-mini"},
+		"gemini-3":          {"gemini", "gemini-3", "gemini 3"},
+		"o1":                {"o1-preview", "o1 preview"},
+	}
+
+	for modelID, patterns := range modelPatterns {
+		for _, pattern := range patterns {
+			if strings.Contains(cleaned, pattern) {
+				oldModel := conv.SLMTracking.ActualModel
+				conv.SLMTracking.ActualModel = modelID
+
+				// Check if this is a switch
+				if oldModel != "" && oldModel != modelID {
+					conv.SLMTracking.ModelSwitched = true
+					conv.SLMTracking.SwitchedToModel = modelID
+					log.Printf("[SLM] Model switch detected: %s -> %s", oldModel, modelID)
+				} else {
+					log.Printf("[SLM] Detected model from output: %s", modelID)
+				}
+				return
+			}
+		}
+	}
 }
 
 // detectScreenClear checks if output contains screen clear sequences.
