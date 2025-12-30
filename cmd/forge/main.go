@@ -276,6 +276,8 @@ func main() {
 	http.HandleFunc("/api/slm/learning", WrapWithMiddleware(handleSLMLearningStats))
 	http.HandleFunc("/api/slm/learning/clear", WrapWithMiddleware(handleSLMLearningClear))
 	http.HandleFunc("/api/slm/preferences", WrapWithMiddleware(handleSLMPreferences))
+	http.HandleFunc("/api/slm/model", WrapWithMiddleware(handleSLMModelStatus))           // Issue #52: SLM model status
+	http.HandleFunc("/api/slm/model/download", WrapWithMiddleware(handleSLMModelDownload)) // Issue #52: SLM model download
 	http.HandleFunc("/api/ollama/status", WrapWithMiddleware(handleOllamaStatus))
 
 	// CLI Configuration API - v3.5.3 (Copilot/Claude config management)

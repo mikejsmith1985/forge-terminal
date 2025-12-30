@@ -401,6 +401,12 @@ func (l *LLMLogger) runSLMAnalysis(conv *LLMConversation, prompt string) {
 		log.Printf("[LLM Logger] SLM analysis failed: %v", err)
 		return
 	}
+	
+	// Issue #52 fix: result can be nil when no SLM provider is available
+	if result == nil {
+		log.Printf("[LLM Logger] No analysis result (SLM not available)")
+		return
+	}
 
 	// Update conversation with tracking data
 	l.mu.Lock()
@@ -463,6 +469,12 @@ func (l *LLMLogger) runSLMAnalysisForInput(conv *LLMConversation, prompt string)
 	result, err := engine.Analyze(ctx, input)
 	if err != nil {
 		log.Printf("[SLM] Analysis failed: %v", err)
+		return
+	}
+	
+	// Issue #52 fix: result can be nil when no SLM provider is available
+	if result == nil {
+		log.Printf("[SLM] No analysis result (SLM not available)")
 		return
 	}
 

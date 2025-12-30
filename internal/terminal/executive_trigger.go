@@ -325,7 +325,7 @@ func (eth *ExecutiveTriggerHandler) Route(prompt string) *RoutingResult {
 			Prompt: cleanPrompt,
 		}
 
-		if result, err := eth.slmProvider.Analyze(ctx, slmInput); err == nil {
+		if result, err := eth.slmProvider.Analyze(ctx, slmInput); err == nil && result != nil {
 			taskType = string(result.TaskType)
 			complexity = result.Complexity
 			confidence = result.Confidence
