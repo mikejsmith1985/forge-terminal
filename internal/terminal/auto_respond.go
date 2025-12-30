@@ -121,14 +121,14 @@ func NewAutoRespondDetectorWithPromptDetector(provider string, ptyWriter func([]
 	
 	// Subscribe to PromptDetector events
 	if detector != nil {
-		detector.OnWaitingForInput(func() {
+		detector.OnWaitingForInput(func(promptText string) {
 			d.mu.RLock()
 			enabled := d.enabled
 			callback := d.onWaitingForUser
 			d.mu.RUnlock()
 			
 			if enabled && callback != nil {
-				log.Printf("[AutoRespond] PromptDetector: waiting for input detected")
+				log.Printf("[AutoRespond] PromptDetector: waiting for input detected: %s", promptText)
 				callback()
 			}
 		})

@@ -69,6 +69,32 @@ func (w *headerFixingResponseWriter) WriteHeader(statusCode int) {
 }
 
 func main() {
+	// v3.7.1: Handle subcommands before starting web server
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "lens":
+			// Run the Context Builder TUI
+			args := []string{"."}
+			if len(os.Args) > 2 {
+				args = os.Args[2:]
+			}
+			if err := runLensCommand(args); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		case "-h", "--help", "help":
+			fmt.Println("Forge Terminal - Agentic Coding Workspace")
+			fmt.Println("")
+			fmt.Println("Usage:")
+			fmt.Println("  forge              Start the web UI server")
+			fmt.Println("  forge lens [path]  Open the Context Builder file picker")
+			fmt.Println("  forge -port PORT   Start server on specific port")
+			fmt.Println("")
+			return
+		}
+	}
+
 	// Set up file-based logging for production diagnostics
 	logFile, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), ".forge", "forge.log"),
 		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)

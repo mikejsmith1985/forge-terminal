@@ -44,12 +44,16 @@ type connWriter struct {
 func (cw *connWriter) WriteMessage(messageType int, data []byte) error {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
+	// Set write deadline to prevent indefinite blocking
+	_ = cw.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return cw.conn.WriteMessage(messageType, data)
 }
 
 func (cw *connWriter) WriteJSON(v interface{}) error {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
+	// Set write deadline to prevent indefinite blocking
+	_ = cw.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return cw.conn.WriteJSON(v)
 }
 
@@ -236,11 +240,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	})
 	
-	promptDetector.OnWaitingForInput(func() {
-		log.Printf("[PromptDetector] Waiting for input detected")
+	promptDetector.OnWaitingForInput(func(promptText string) {
+		log.Printf("[PromptDetector] Waiting for input detected: %s", promptText)
 		_ = conn.WriteJSON(map[string]interface{}{
-			"type":      "PROMPT_WAITING_FOR_INPUT",
-			"timestamp": time.Now().UnixMilli(),
+			"type":       "PROMPT_WAITING_FOR_INPUT",
+			"promptText": promptText, // v3.7.1: Include prompt text for chat UI
+			"timestamp":  time.Now().UnixMilli(),
 		})
 	})
 	
@@ -586,10 +591,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					case "VISION_ENABLE":
 						visionParser.SetEnabled(true)
 						log.Printf("[Vision] Enabled for session %s", sessionID)
+						continue
 					case "VISION_DISABLE":
 						visionParser.SetEnabled(false)
 						visionParser.Clear()
 						log.Printf("[Vision] Disabled for session %s", sessionID)
+						continue
 					case "INJECT_COMMAND":
 						// Execute command in PTY (like git add <file>)
 						if visionMsg.Command != "" {
@@ -598,8 +605,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 								log.Printf("[Vision] Command injection error: %v", err)
 							}
 						}
+						continue
 					}
-					continue
+					// No match - fall through to other handlers
 				}
 
 				// Check for AM control messages (auto-respond state sync)
@@ -647,9 +655,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 				// v3.5.3: Check for Chat command messages (Chat→PTY bridge)
 				var chatMsg ChatCommandMessage
-				if err := json.Unmarshal(data, &chatMsg); err == nil && chatMsg.Type == "CHAT_COMMAND" {
-					log.Printf("[ChatBridge] Received chat command for session %s: cli=%s, model=%s", 
-						sessionID, chatMsg.CLI, chatMsg.Model)
+				if err := json.Unmarshal(data, &chatMsg); err != nil {
+					log.Printf("[ChatBridge] JSON parse error: %v", err)
+				} else if chatMsg.Type == "CHAT_COMMAND" {
+					log.Printf("[ChatBridge] Received chat command for session %s: cli=%s, model=%s, cmd=%s", 
+						sessionID, chatMsg.CLI, chatMsg.Model, truncate(chatMsg.Command, 50))
 					
 					// Start response capture BEFORE sending command
 					chatResponsePending.Store(true)

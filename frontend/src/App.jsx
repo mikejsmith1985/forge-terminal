@@ -19,6 +19,7 @@ import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
 import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
+import LensFilePicker from './components/LensFilePicker'
 import MonacoEditor from './components/MonacoEditor'
 import AMMonitor from './components/AMMonitor'
 import DebugPanel from './components/DebugPanel'
@@ -1003,10 +1004,19 @@ function App() {
   // Handle interactive TUI detection - auto-switch to terminal view
   // This is triggered when Claude Code or similar shows a multi-question wizard
   const handleInteractiveTUI = useCallback((tabId, tuiType) => {
-    logger.terminal('Interactive TUI detected, switching to terminal view', { tabId, tuiType });
+    logger.terminal('Interactive TUI detected', { tabId, tuiType });
     
-    // Get the tab's current view mode
+    // v3.7.1: Don't auto-switch to terminal if user is working in chat mode
+    // If they launched a CLI from chat, they want to stay in chat
+    // Only switch if they were already in terminal mode (shouldn't happen)
+    // or if this is a complex wizard that truly needs direct terminal interaction
     const tab = tabs.find(t => t.id === tabId);
+    if (tab && tab.viewMode === 'chat') {
+      // User is in chat mode - don't interrupt their workflow
+      logger.terminal('User in chat mode, not switching to terminal');
+      return;
+    }
+    
     if (tab && tab.viewMode !== 'terminal') {
       // Switch to terminal view so user can interact directly
       toggleTabViewMode(tabId);

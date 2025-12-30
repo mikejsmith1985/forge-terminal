@@ -56,10 +56,17 @@ type PromptDetector struct {
 	// Response accumulation
 	responseBuffer  strings.Builder
 	capturingResponse bool
+	
+	// v3.7.1: Debounced response completion
+	responseCompleteTimer *time.Timer
+	pendingResponse       string
+	
+	// v3.7.1: Last detected prompt text for interactive prompts
+	lastPromptText string
 
 	// Callbacks
 	onPromptDetected   func()
-	onWaitingForInput  func()
+	onWaitingForInput  func(promptText string) // v3.7.1: Now includes prompt text
 	onCommandComplete  func()
 	onResponseComplete func(response string)
 	onStateChange      func(old, new PromptState)
@@ -98,6 +105,13 @@ func (d *PromptDetector) ProcessOutput(data []byte) {
 	defer d.mu.Unlock()
 
 	d.lastActivity = time.Now()
+	
+	// v3.7.1: Cancel pending response timer on new activity
+	// This prevents premature response completion during streaming output
+	if d.responseCompleteTimer != nil && len(data) > 0 {
+		d.responseCompleteTimer.Stop()
+		d.responseCompleteTimer = nil
+	}
 
 	// Accumulate response if capturing OR in heuristic mode
 	if d.capturingResponse || d.heuristicMode {
@@ -156,7 +170,7 @@ func (d *PromptDetector) handleOSC133(code string) {
 		d.state = PromptStateWaitingForInput
 		log.Printf("[PromptDetector] OSC 133;B - Waiting for input")
 		if d.onWaitingForInput != nil {
-			go d.onWaitingForInput()
+			go d.onWaitingForInput(d.lastPromptText) // v3.7.1: Pass last known prompt text
 		}
 		
 	case "C":
@@ -268,9 +282,10 @@ func (d *PromptDetector) analyzeForPrompt() {
 		
 		oldState := d.state
 		d.state = PromptStateWaitingForInput
+		d.lastPromptText = lastLine // v3.7.1: Store for callback
 		
 		if d.onWaitingForInput != nil {
-			go d.onWaitingForInput()
+			go d.onWaitingForInput(lastLine) // v3.7.1: Pass prompt text
 		}
 		if d.onPromptDetected != nil {
 			go d.onPromptDetected()
@@ -287,15 +302,34 @@ func (d *PromptDetector) analyzeForPrompt() {
 		log.Printf("[PromptDetector] Heuristic: Shell prompt detected")
 		
 		oldState := d.state
-		// If we were executing or capturing a response, response is complete
+		// v3.7.1: Use debounced response completion to avoid triggering too early
+		// This handles cases where LLM CLIs output incrementally with prompts
 		if (d.state == PromptStateExecuting || d.capturingResponse) && d.onResponseComplete != nil {
 			response := d.responseBuffer.String()
-			d.capturingResponse = false
-			go d.onResponseComplete(response)
+			
+			// Cancel any existing timer
+			if d.responseCompleteTimer != nil {
+				d.responseCompleteTimer.Stop()
+			}
+			
+			// Store pending response and start debounce timer
+			d.pendingResponse = response
+			d.responseCompleteTimer = time.AfterFunc(500*time.Millisecond, func() {
+				d.mu.Lock()
+				defer d.mu.Unlock()
+				
+				// Only fire if we're still pending and no new activity
+				if d.pendingResponse != "" && d.onResponseComplete != nil {
+					log.Printf("[PromptDetector] Response complete (debounced): %d chars", len(d.pendingResponse))
+					d.capturingResponse = false
+					go d.onResponseComplete(d.pendingResponse)
+					d.pendingResponse = ""
+					d.responseBuffer.Reset()
+				}
+			})
 		}
 		
 		d.state = PromptStateWaitingForInput
-		d.responseBuffer.Reset()
 		
 		if d.onPromptDetected != nil {
 			go d.onPromptDetected()
@@ -375,7 +409,8 @@ func (d *PromptDetector) OnPromptDetected(fn func()) {
 	d.onPromptDetected = fn
 }
 
-func (d *PromptDetector) OnWaitingForInput(fn func()) {
+// v3.7.1: Updated to include prompt text
+func (d *PromptDetector) OnWaitingForInput(fn func(promptText string)) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.onWaitingForInput = fn

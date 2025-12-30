@@ -91,6 +91,15 @@ var DefaultSequences = []*Sequence{
 			{Type: ActionKey, Key: '\r'}, // Press Enter to confirm
 		},
 	},
+	// Copilot CLI: Error message "Copilot couldn't generate a response"
+	{
+		Name:       "copilot-error-no-response",
+		Pattern:    regexp.MustCompile(`(?i)Copilot couldn.*t generate a response`),
+		SettleTime: 400 * time.Millisecond,
+		Actions: []Action{
+			{Type: ActionKey, Key: '\r'}, // Press Enter to dismiss
+		},
+	},
 	// Claude Code: Tab navigation prompts
 	{
 		Name:       "claude-tab-navigate",

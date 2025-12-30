@@ -239,10 +239,21 @@ const ChatView = ({
       responseAccumulatorRef.current = '';
     };
 
-    // Handler for prompt waiting (interactive prompts like [Y/n])
-    const handlePromptWaiting = () => {
-      console.log('[ChatView] Prompt waiting for input detected');
-      // Could show an indicator to the user that they need to respond
+    // v3.7.1: Handler for prompt waiting (interactive prompts like [Y/n])
+    // Shows the prompt in chat so user knows to respond
+    const handlePromptWaiting = (promptText) => {
+      console.log('[ChatView] Prompt waiting for input:', promptText);
+      
+      if (promptText && promptText.trim()) {
+        // Add the prompt as a system message so user sees what they need to answer
+        const promptMsgId = `prompt-${Date.now()}`;
+        setMessages(prev => [...prev, {
+          id: promptMsgId,
+          role: 'prompt', // Special role for interactive prompts
+          content: promptText.trim(),
+          isInteractive: true,
+        }]);
+      }
     };
 
     // v3.6.4: Handler for external commands (command cards) to initialize chat state
@@ -358,9 +369,17 @@ const ChatView = ({
     assistantMessageIdRef.current = assistantMessageId;
     responseAccumulatorRef.current = '';
 
-    // Determine CLI and model from SLM result
-    const cli = 'copilot'; // Default to copilot, could be configurable
+    // v3.7.1 SIMPLIFIED: Always send directly to PTY (empty cli)
+    // This works correctly when user has an LLM CLI already running (the expected use case)
+    // If no CLI is running, the message goes to the shell - user should start CLI first
+    const cli = '';  // Direct to PTY
     const model = slmResult?.recommendedModel || slmResult?.model || '';
+
+    console.log('[ChatView] Sending via PTY bridge:', { 
+      cli: '(direct to PTY)', 
+      model,
+      messagePreview: userMessage.substring(0, 50)
+    });
 
     // Add placeholder assistant message
     setMessages(prev => [...prev, { 
@@ -372,6 +391,7 @@ const ChatView = ({
     }]);
 
     // Send CHAT_COMMAND to terminal WebSocket
+    // cli is empty, so backend will use SendMessage (direct to PTY)
     const success = ref.sendChatCommand({
       type: 'CHAT_COMMAND',
       command: userMessage,
@@ -756,7 +776,7 @@ const ChatView = ({
           <div 
             key={msg.id} 
             ref={el => messageRefs.current[msg.id] = el}
-            className={`chat-view-message chat-view-message-${msg.role}`}
+            className={`chat-view-message chat-view-message-${msg.role}${msg.isInteractive ? ' interactive-prompt' : ''}`}
           >
             <div className="chat-view-bubble">
               {msg.role === 'user' && <div className="chat-view-avatar user-avatar">You</div>}
@@ -766,9 +786,17 @@ const ChatView = ({
                 </div>
               )}
               {msg.role === 'error' && <div className="chat-view-avatar error-avatar">❌</div>}
+              {msg.role === 'prompt' && (
+                <div className="chat-view-avatar prompt-avatar" title="Input needed">
+                  ❓
+                </div>
+              )}
               <div className="chat-view-content">
                 {msg.workerName && msg.role === 'assistant' && (
                   <div className="chat-view-worker-badge">{msg.workerName}</div>
+                )}
+                {msg.isInteractive && (
+                  <div className="chat-view-prompt-indicator">⚡ Input needed - type your response below</div>
                 )}
                 {msg.role === 'assistant' ? (
                   <MarkdownContent content={msg.content} onRunInTerminal={onRunInTerminal} />

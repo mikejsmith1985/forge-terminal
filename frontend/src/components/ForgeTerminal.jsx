@@ -484,6 +484,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const chatResponseCompleteHandlerRef = useRef(null); // v3.5.3: Handler for response completion
   const chatPromptWaitingHandlerRef = useRef(null); // v3.5.3: Handler for prompt waiting state
   const chatCommandInitHandlerRef = useRef(null); // v3.6.4: Handler to init ChatView state for external commands
+  const isVisibleRef = useRef(isVisible); // v3.7.1: Track visibility for focus management
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -495,6 +496,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onInteractiveTUIRef.current = onInteractiveTUI;
   }, [onInteractiveTUI]);
+
+  // v3.7.1: Keep isVisible ref updated (for mount-time focus checks)
+  useEffect(() => {
+    isVisibleRef.current = isVisible;
+  }, [isVisible]);
 
   // Keep autoRespond ref updated
   useEffect(() => {
@@ -561,7 +567,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     onRoutingUpdateRef.current = onRoutingUpdate;
   }, [onRoutingUpdate]);
 
-  // Refit terminal when becoming visible
+  // Refit terminal when becoming visible, blur when hidden
   useEffect(() => {
     if (isVisible && fitAddonRef.current && xtermRef.current) {
       // Small delay to ensure the container is properly sized
@@ -569,11 +575,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         fitAddonRef.current.fit();
         // Critical fix: Re-focus after fit on visibility change
         queueMicrotask(() => {
-          if (xtermRef.current) {
+          if (xtermRef.current && isVisibleRef.current) {
             xtermRef.current.focus();
           }
         });
       }, 50);
+    } else if (!isVisible && xtermRef.current) {
+      // v3.7.1 FIX: Explicitly blur terminal when it becomes hidden
+      // This prevents keystrokes from going to hidden terminals
+      const textarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
+      if (textarea && document.activeElement === textarea) {
+        textarea.blur();
+      }
     }
   }, [isVisible]);
 
@@ -905,9 +918,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.loadAddon(fitAddon);
     fitAddonRef.current = fitAddon;
     
-    // Critical fix: Re-focus after fit addon loads (it steals focus during init)
+    // v3.7.1 FIX: Only focus if terminal is visible (prevents stealing focus from ChatView)
     queueMicrotask(() => {
-      term.focus();
+      if (isVisibleRef.current) {
+        term.focus();
+      }
     });
 
     // Add search addon
@@ -915,9 +930,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.loadAddon(searchAddon);
     searchAddonRef.current = searchAddon;
     
-    // Critical fix: Re-focus after search addon loads
+    // v3.7.1 FIX: Only focus if terminal is visible
     queueMicrotask(() => {
-      term.focus();
+      if (isVisibleRef.current) {
+        term.focus();
+      }
     });
 
     // Open terminal
@@ -925,10 +942,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     xtermRef.current = term;
     diagnosticCore.recordInitEvent('xterm_created', { tabId });
     
-    // Critical fix: Force focus immediately after terminal.open()
-    // This ensures the terminal textarea receives focus before React re-renders
+    // v3.7.1 FIX: Only focus if terminal is visible
     queueMicrotask(() => {
-      term.focus();
+      if (isVisibleRef.current) {
+        term.focus();
+      }
     });
 
     // PASTE HANDLER: Handle both text and images
@@ -1013,6 +1031,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
     // This runs BEFORE xterm processes the key and allows conditional intercept
     term.attachCustomKeyEventHandler((arg) => {
+      // v3.7.1 CRITICAL FIX: Block ALL key events when terminal is not visible
+      // This prevents keystrokes from leaking to hidden terminals
+      if (!isVisibleRef.current) {
+        return false; // Block the key event entirely
+      }
+
       // PERF FIX: Only record diagnostics when explicitly enabled (avoid function call overhead)
       try {
         if (diagnosticCore.isEnabled()) {
@@ -1090,9 +1114,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // Initial fit - PERFORMANCE FIX: Call directly instead of setTimeout(0)
     fitAddon.fit();
-    // Critical fix: Re-focus after fit() call (fit triggers hidden re-render)
+    // v3.7.1 FIX: Only focus if terminal is visible
     queueMicrotask(() => {
-      term.focus();
+      if (isVisibleRef.current) {
+        term.focus();
+      }
     });
 
     // Record that handlers are now attached
@@ -1299,9 +1325,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
               // v3.5.3: Handle prompt state changes
               if (msg.type === 'PROMPT_WAITING_FOR_INPUT') {
-                console.log('[PromptDetector] Waiting for input');
+                console.log('[PromptDetector] Waiting for input:', msg.promptText);
                 if (chatPromptWaitingHandlerRef.current) {
-                  chatPromptWaitingHandlerRef.current();
+                  chatPromptWaitingHandlerRef.current(msg.promptText); // v3.7.1: Pass prompt text
                 }
                 return; // Don't write to terminal
               }
@@ -1576,6 +1602,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
       // Handle terminal input
       term.onData((data) => {
+        // v3.7.1 FIX: Don't send data from hidden terminals
+        if (!isVisibleRef.current) {
+          return; // Discard input from hidden terminals
+        }
+
         // PERF FIX: Only record diagnostics when explicitly enabled
         if (diagnosticCore.isEnabled()) {
           diagnosticCore.recordTerminalData(data);
