@@ -1316,28 +1316,17 @@ function App() {
   const handleExecute = (cmd) => {
     const termRef = getActiveTerminalRef();
     if (termRef) {
-      // Issue #52: Check if we're in chat viewMode - route through PTY bridge
-      const isInChatMode = activeTab?.viewMode === 'chat';
+      // Command cards should ALWAYS execute directly in terminal, regardless of viewMode
+      // Chat routing is only for user input from ChatView UI, not command cards
       
       // If command is empty but triggerAM is true, we still want to trigger AM
       // but we shouldn't send an empty command to the terminal as it might just print a newline
       if (cmd.command && cmd.command.trim().length > 0) {
-        if (isInChatMode && termRef.sendChatCommand) {
-          // Issue #52: In chat mode, use PTY bridge so chat UX receives output
-          termRef.sendChatCommand({
-            type: 'CHAT_COMMAND',
-            command: cmd.command,
-            cli: cmd.llmProvider || 'copilot',
-            model: '',
-          });
-          // Don't switch focus away from chat in chat mode
-        } else {
-          // Terminal mode - send directly and focus
-          termRef.sendCommand(cmd.command, cmd.delay);
-          termRef.focus();
-        }
-      } else if (!isInChatMode) {
-        // Only focus terminal if not in chat mode
+        // Execute command directly in terminal
+        termRef.sendCommand(cmd.command, cmd.delay);
+        termRef.focus();
+      } else {
+        // Focus terminal even if command is empty
         termRef.focus();
       }
 
