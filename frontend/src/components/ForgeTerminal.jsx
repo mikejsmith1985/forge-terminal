@@ -461,6 +461,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const chatOutputHandlerRef = useRef(null); // v3.5.3: Handler for Chat PTY bridge output
   const chatResponseCompleteHandlerRef = useRef(null); // v3.5.3: Handler for response completion
   const chatPromptWaitingHandlerRef = useRef(null); // v3.5.3: Handler for prompt waiting state
+  const chatCommandInitHandlerRef = useRef(null); // v3.6.4: Handler to init ChatView state for external commands
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -818,6 +819,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // v3.5.3: Chat PTY Bridge - send chat commands through terminal WebSocket
     sendChatCommand: (chatCommand) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        // v3.6.4: Notify ChatView to init state before sending command
+        if (chatCommandInitHandlerRef.current && chatCommand.command) {
+          chatCommandInitHandlerRef.current(chatCommand);
+        }
         wsRef.current.send(JSON.stringify(chatCommand));
         console.log('[ChatBridge] Sent chat command:', chatCommand.cli, chatCommand.model);
         return true;
@@ -845,6 +850,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     },
     unregisterChatPromptWaitingHandler: () => {
       chatPromptWaitingHandlerRef.current = null;
+    },
+    // v3.6.4: Register handler for initializing chat state from external commands (command cards)
+    registerChatCommandInitHandler: (handler) => {
+      chatCommandInitHandlerRef.current = handler;
+    },
+    unregisterChatCommandInitHandler: () => {
+      chatCommandInitHandlerRef.current = null;
     },
   }));
   

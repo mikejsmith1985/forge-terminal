@@ -200,6 +200,51 @@ const ChatView = ({
       // Could show an indicator to the user that they need to respond
     };
 
+    // v3.6.4: Handler for external commands (command cards) to initialize chat state
+    const handleExternalCommand = (chatCommand) => {
+      console.log('[ChatView] External command received:', chatCommand.command?.substring(0, 50));
+      
+      // Generate IDs for messages
+      const userMessageId = `user-ext-${Date.now()}`;
+      const newAssistantMessageId = `assistant-ext-${Date.now()}`;
+      
+      // Add user message
+      const userMsg = {
+        id: userMessageId,
+        role: 'user',
+        content: chatCommand.command,
+      };
+      
+      // Add placeholder assistant message
+      const assistantMsg = {
+        id: newAssistantMessageId,
+        role: 'assistant',
+        content: '⏳ Waiting for response...',
+        workerName: chatCommand.model || chatCommand.cli || 'AI',
+      };
+      
+      setMessages(prev => [...prev, userMsg, assistantMsg]);
+      
+      // Set up state for response accumulation
+      assistantMessageIdRef.current = newAssistantMessageId;
+      responseAccumulatorRef.current = '';
+      setIsLoading(true);
+      setError(null);
+      
+      // Persist user message to SQLite
+      fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: userMessageId,
+          type: 'user',
+          content: chatCommand.command,
+          workerId: tabId || 'default',
+          workerName: 'User',
+        })
+      }).catch(err => console.warn('[ChatView] Failed to persist external user message:', err));
+    };
+
     // Register handlers
     if (ref.registerChatOutputHandler) {
       ref.registerChatOutputHandler(handlePTYOutput);
@@ -209,6 +254,10 @@ const ChatView = ({
     }
     if (ref.registerChatPromptWaitingHandler) {
       ref.registerChatPromptWaitingHandler(handlePromptWaiting);
+    }
+    // v3.6.4: Register handler for external commands (command cards)
+    if (ref.registerChatCommandInitHandler) {
+      ref.registerChatCommandInitHandler(handleExternalCommand);
     }
 
     return () => {
@@ -220,6 +269,10 @@ const ChatView = ({
       }
       if (ref.unregisterChatPromptWaitingHandler) {
         ref.unregisterChatPromptWaitingHandler();
+      }
+      // v3.6.4: Unregister external command handler
+      if (ref.unregisterChatCommandInitHandler) {
+        ref.unregisterChatCommandInitHandler();
       }
     };
   }, [usePTYBridge, terminalRef, getTerminalRef, isLoading, tabId]);

@@ -731,7 +731,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
                     : '🦙 Ollama: Not detected'
                   }
                 </span>
-                {!ollamaStatus?.available && (
+                {/* Only suggest installing Ollama if embedded SLM is also not working */}
+                {!ollamaStatus?.available && slmStatus?.active_provider !== 'llama-cpp' && (
                   <span style={{ color: '#888', fontSize: '0.75rem' }}>
                     Install for better analysis
                   </span>
