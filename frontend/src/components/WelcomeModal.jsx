@@ -54,23 +54,7 @@ function WelcomeModal({ isOpen, onClose, version, onStartTour }) {
 `}
           </pre>
           <div className="welcome-subtitle" style={{ fontSize: '1.5rem', fontWeight: 600, marginTop: '10px' }}>TERMINAL</div>
-          <div className="welcome-version" style={{ color: '#888', marginBottom: '20px' }}>v{version}</div>
-
-          <div style={{ 
-            background: 'rgba(139, 92, 246, 0.1)', 
-            border: '1px solid rgba(139, 92, 246, 0.3)',
-            borderRadius: '12px',
-            padding: '20px',
-            marginBottom: '30px'
-          }}>
-            <Sparkles size={32} style={{ color: '#a78bfa', marginBottom: '12px' }} />
-            <p style={{ fontSize: '1.1rem', lineHeight: 1.6, margin: 0, color: '#e5e5e5' }}>
-              <strong>One binary, double-click, works.</strong>
-            </p>
-            <p style={{ fontSize: '0.9rem', color: '#a3a3a3', marginTop: '10px', marginBottom: 0 }}>
-              Let's take a quick tour to discover all the features.
-            </p>
-          </div>
+          <div className="welcome-version" style={{ color: '#888', marginBottom: '30px' }}>v{version}</div>
 
           <div className="welcome-footer">
             <button 

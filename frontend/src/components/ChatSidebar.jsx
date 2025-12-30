@@ -329,9 +329,9 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
                   </div>
                 )}
                 {msg.role === 'assistant' ? (
-                  <MarkdownContent content={msg.content} />
+                  <MarkdownContent content={msg.content || ''} />
                 ) : (
-                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.content}</pre>
+                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.content || ''}</pre>
                 )}
               </div>
             </div>
@@ -413,6 +413,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
 
 const MarkdownContent = ({ content }) => {
   const parseMarkdown = (text) => {
+    if (!text) return []; // Guard against undefined/null content
     const lines = text.split('\n');
     const elements = [];
     let inCodeBlock = false;

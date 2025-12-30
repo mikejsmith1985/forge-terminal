@@ -1749,12 +1749,10 @@ function App() {
             onNewWorkflow={handleNewWorkflow}
           />
         ) : sidebarView === 'files' ? (
-          <FileExplorer
+          <LensFilePicker
             currentPath={activeTab?.currentDirectory}
-            rootPath={activeTab?.currentDirectory}
-            onFileOpen={handleFileOpen}
+            onFileSelect={handleFileOpen}
             terminalRef={getActiveTerminalRef()}
-            shellConfig={activeTab?.shellConfig || shellConfig}
           />
         ) : sidebarView === 'debug' ? (
           <DebugPanel

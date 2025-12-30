@@ -799,9 +799,9 @@ const ChatView = ({
                   <div className="chat-view-prompt-indicator">⚡ Input needed - type your response below</div>
                 )}
                 {msg.role === 'assistant' ? (
-                  <MarkdownContent content={msg.content} onRunInTerminal={onRunInTerminal} />
+                  <MarkdownContent content={msg.content || ''} onRunInTerminal={onRunInTerminal} />
                 ) : (
-                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>{msg.content}</pre>
+                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>{msg.content || ''}</pre>
                 )}
               </div>
             </div>
@@ -917,6 +917,7 @@ const ChatView = ({
  */
 const MarkdownContent = ({ content, onRunInTerminal }) => {
   const parseMarkdown = (text) => {
+    if (!text) return []; // Guard against undefined/null content
     const lines = text.split('\n');
     const elements = [];
     let inCodeBlock = false;

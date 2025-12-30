@@ -12,19 +12,27 @@ import { test, expect } from '@playwright/test';
 
 // Helper to dismiss modals
 async function dismissModals(page) {
+  // Dismiss the "Welcome to Forge Terminal" tour modal - use specific class
+  const tourSkipBtn = page.locator('.tour-btn-skip');
+  if (await tourSkipBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await tourSkipBtn.click({ force: true });
+    await page.waitForTimeout(500);
+  }
+  
+  // Also try the X close button
+  const tourCloseBtn = page.locator('.tour-tooltip-close');
+  if (await tourCloseBtn.isVisible({ timeout: 300 }).catch(() => false)) {
+    await tourCloseBtn.click({ force: true });
+    await page.waitForTimeout(300);
+  }
+  
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(200);
   
   // Dismiss File Access Permissions modal
   const confirmButton = page.locator('button:has-text("Confirm Selection")');
   if (await confirmButton.isVisible({ timeout: 500 }).catch(() => false)) {
     await confirmButton.click();
-    await page.waitForTimeout(200);
-  }
-  
-  const skipButton = page.locator('button:has-text("Skip")');
-  if (await skipButton.isVisible({ timeout: 500 }).catch(() => false)) {
-    await skipButton.click();
     await page.waitForTimeout(200);
   }
   
@@ -68,6 +76,11 @@ test.describe('LensFilePicker', () => {
       errors.push(err.message);
     });
 
+    // Wait for app to fully load and dismiss any modals
+    await page.waitForTimeout(1000);
+    await dismissModals(page);
+    await page.waitForTimeout(500);
+
     // Click on Files tab in the ribbon (right sidebar)
     const filesTab = page.locator('.sidebar-view-tab:has-text("Files"), button:has-text("Files")').first();
     
@@ -93,15 +106,30 @@ test.describe('LensFilePicker', () => {
     
     await page.screenshot({ path: 'test-results/lens-01-files-sidebar.png', fullPage: true });
     
-    // Look for lens picker elements
-    const lensHeader = page.locator('.lens-header, .lens-tabs, .lens-picker');
-    const isLensVisible = await lensHeader.isVisible({ timeout: 3000 }).catch(() => false);
+    // Check for error boundary - FAIL if visible
+    const errorBoundary = page.locator('text=Something Went Wrong');
+    const hasError = await errorBoundary.isVisible({ timeout: 500 }).catch(() => false);
+    console.log('Has error boundary:', hasError);
+    
+    // Look for lens picker elements - use the actual class names
+    const lensPicker = page.locator('.lens-picker');
+    const contextCart = page.locator('text=Context Cart');
+    const heatmapTab = page.locator('button:has-text("Heatmap")');
+    
+    const isLensVisible = await lensPicker.isVisible({ timeout: 3000 }).catch(() => false);
+    const isCartVisible = await contextCart.isVisible({ timeout: 1000 }).catch(() => false);
+    const isHeatmapVisible = await heatmapTab.isVisible({ timeout: 1000 }).catch(() => false);
     
     console.log('LensFilePicker visible:', isLensVisible);
+    console.log('Context Cart visible:', isCartVisible);
+    console.log('Heatmap tab visible:', isHeatmapVisible);
     console.log('Total errors:', errors.length);
     
-    // Even if not visible, the test should capture the sidebar state
-    await page.screenshot({ path: 'test-results/lens-02-picker-view.png', fullPage: true });
+    // MUST NOT have error boundary
+    expect(hasError).toBe(false);
+    
+    // LensFilePicker should be visible
+    expect(isLensVisible || isCartVisible || isHeatmapVisible).toBe(true);
   });
 
   test('lens tabs can be switched', async ({ page }) => {
