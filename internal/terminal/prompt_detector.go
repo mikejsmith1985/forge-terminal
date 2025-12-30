@@ -287,9 +287,10 @@ func (d *PromptDetector) analyzeForPrompt() {
 		log.Printf("[PromptDetector] Heuristic: Shell prompt detected")
 		
 		oldState := d.state
-		// If we were executing, response is complete
-		if d.state == PromptStateExecuting && d.onResponseComplete != nil {
+		// If we were executing or capturing a response, response is complete
+		if (d.state == PromptStateExecuting || d.capturingResponse) && d.onResponseComplete != nil {
 			response := d.responseBuffer.String()
+			d.capturingResponse = false
 			go d.onResponseComplete(response)
 		}
 		
@@ -334,11 +335,14 @@ func (d *PromptDetector) SetHeuristicMode(enabled bool) {
 }
 
 // StartResponseCapture begins accumulating output as a response.
+// Also sets state to Executing so heuristic detection knows to fire onResponseComplete.
 func (d *PromptDetector) StartResponseCapture() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.capturingResponse = true
+	d.state = PromptStateExecuting // Critical: Set state so shell prompt detection triggers onResponseComplete
 	d.responseBuffer.Reset()
+	log.Printf("[PromptDetector] StartResponseCapture: state set to Executing")
 }
 
 // StopResponseCapture stops accumulating and returns the response.

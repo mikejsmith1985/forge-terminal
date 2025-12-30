@@ -45,6 +45,7 @@ const ChatView = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [usePTYBridge, setUsePTYBridge] = useState(true); // v3.5.3: Use PTY bridge by default
   const [pendingResponse, setPendingResponse] = useState(''); // Accumulating PTY output
+  const [terminalReady, setTerminalReady] = useState(false); // Track when terminal ref is available
   
   // Issue #52: User preference for Enter key behavior
   const [enterToSend, setEnterToSend] = useState(() => {
@@ -59,6 +60,44 @@ const ChatView = ({
   const fileInputRef = useRef(null);
   const responseAccumulatorRef = useRef(''); // For accumulating PTY output
   const assistantMessageIdRef = useRef(null); // Track current assistant message being built
+  const isLoadingRef = useRef(false); // Track isLoading for PTY handlers (avoids stale closure)
+
+  // Poll for terminal ref availability (handles race condition with ForgeTerminal mount)
+  useEffect(() => {
+    if (terminalReady) return;
+    
+    const checkTerminalRef = () => {
+      const ref = getActiveTerminalRef();
+      if (ref && ref.sendChatCommand) {
+        console.log('[ChatView] Terminal ref now available');
+        setTerminalReady(true);
+      }
+    };
+    
+    // Check immediately
+    checkTerminalRef();
+    
+    // Poll every 100ms until terminal is ready
+    const interval = setInterval(checkTerminalRef, 100);
+    
+    // Stop polling after 5 seconds
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      if (!terminalReady) {
+        console.warn('[ChatView] Terminal ref not available after 5s, will use HTTP fallback');
+      }
+    }, 5000);
+    
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [terminalReady, getTerminalRef, terminalRef]);
+
+  // Keep isLoadingRef in sync with isLoading state
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
   // Load messages from SQLite on mount
   useEffect(() => {
@@ -133,13 +172,19 @@ const ChatView = ({
 
   // v3.5.3: PTY Bridge - Subscribe to terminal output when using PTY mode
   // Issue #52: Use getActiveTerminalRef for lazy ref access
+  // Fix: Wait for terminalReady state before registering handlers
   useEffect(() => {
+    if (!usePTYBridge || !terminalReady) return;
+    
     const ref = getActiveTerminalRef();
-    if (!usePTYBridge || !ref) return;
+    if (!ref) return;
+    
+    console.log('[ChatView] Registering PTY bridge handlers');
 
     // Register a handler for PTY output that we receive via the terminal
     const handlePTYOutput = (data) => {
-      if (!isLoading || !assistantMessageIdRef.current) return;
+      // Use isLoadingRef to get current value (avoids stale closure issue)
+      if (!isLoadingRef.current || !assistantMessageIdRef.current) return;
       
       // Accumulate output
       responseAccumulatorRef.current += data;
@@ -275,7 +320,7 @@ const ChatView = ({
         ref.unregisterChatCommandInitHandler();
       }
     };
-  }, [usePTYBridge, terminalRef, getTerminalRef, isLoading, tabId]);
+  }, [usePTYBridge, terminalReady, tabId]); // terminalReady triggers re-run when terminal becomes available
 
   // Persist messages to store when they change
   useEffect(() => {
@@ -342,7 +387,8 @@ const ChatView = ({
     // The handleResponseComplete callback (registered in useEffect) will finalize the response
     // We still have a fallback timeout for safety, but it's much longer now
     setTimeout(() => {
-      if (isLoading && assistantMessageIdRef.current === assistantMessageId) {
+      // Use isLoadingRef to get current value (avoids stale closure issue)
+      if (isLoadingRef.current && assistantMessageIdRef.current === assistantMessageId) {
         console.warn('[ChatView] Response timeout - finalizing with accumulated content');
         // Fallback: finalize with whatever we have
         if (responseAccumulatorRef.current.trim()) {
@@ -370,7 +416,7 @@ const ChatView = ({
     }, 120000); // 2 minute fallback timeout (PromptDetector should handle most cases)
 
     return assistantMessageId;
-  }, [terminalRef, tabId, isLoading]);
+  }, [terminalRef, tabId]); // Removed isLoading - using isLoadingRef instead
 
   // v3.5.3: Send message via HTTP API (fallback mode)
   const sendViaHTTP = useCallback(async (userMessage, slmResult) => {

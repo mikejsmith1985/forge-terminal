@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon, Eye } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -32,7 +32,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleVision, onToggleMode, isWaiting = false, mode = 'dark', devMode = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleMode, isWaiting = false, mode = 'dark', devMode = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -45,13 +45,11 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
     if (showContextMenu) {
       console.log('[Tab] Context menu opened:', { 
         devMode, 
-        hasOnToggleVision: !!onToggleVision,
         hasOnToggleAM: !!onToggleAM,
-        tabId: tab.id,
-        visionEnabled: tab.visionEnabled
+        tabId: tab.id
       });
     }
-  }, [showContextMenu, devMode, onToggleVision, onToggleAM, tab.id, tab.visionEnabled]);
+  }, [showContextMenu, devMode, onToggleAM, tab.id]);
 
   const handleClick = (e) => {
     // Don't trigger onClick if clicking close button or in edit mode
@@ -181,11 +179,6 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             <BookOpen size={10} />
           </span>
         )}
-        {devMode && tab.visionEnabled && (
-          <span className="vision-indicator" title="Vision enabled">
-            <Eye size={10} />
-          </span>
-        )}
         {tab.autoRespond && (
           <span className="auto-respond-indicator" title="Auto-respond enabled">
             <Zap size={10} />
@@ -245,18 +238,6 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             >
               <BookOpen size={14} />
               AM Logging {tab.amEnabled ? '✓' : ''}
-            </button>
-          )}
-          {devMode && onToggleVision && (
-            <button 
-              onClick={() => { 
-                setShowContextMenu(false); 
-                if (onToggleVision) onToggleVision(); 
-              }}
-              className={tab.visionEnabled ? 'active' : ''}
-            >
-              <Terminal size={14} />
-              Forge Vision {tab.visionEnabled ? '✓' : ''}
             </button>
           )}
           <button 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield, DollarSign, Zap, Brain, Cpu, Play, Download, Loader } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, DollarSign, Zap, Brain, Cpu, Play, Download, Loader } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, visionConfig, onVisionConfigChange, initialTab = 'shell', onRestartTour }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, initialTab = 'shell', onRestartTour }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -663,8 +663,108 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
 
                 {/* Ollama alternative */}
                 {slmStatus?.active_provider === 'disabled' && !slmInstallStatus?.ready && (
-                  <div style={{ marginTop: '8px', fontSize: '0.7rem', color: '#888' }}>
-                    Or use <a href="https://ollama.ai" target="_blank" rel="noopener" style={{ color: '#3b82f6' }}>Ollama</a> for faster analysis
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '8px' }}>
+                      Or install Ollama for faster local AI analysis:
+                    </div>
+                    <button
+                      onClick={() => {
+                        // Open Ollama download page - the installer is simple and quick
+                        window.open('https://ollama.ai/download', '_blank');
+                        onToast?.('Opening Ollama download page. After installing, run: ollama pull qwen2.5:0.5b', 'info', 7000);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        background: 'transparent',
+                        border: '1px solid #3b82f6',
+                        borderRadius: '6px',
+                        color: '#3b82f6',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        width: '100%',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Download size={14} />
+                      Install Ollama (Recommended)
+                    </button>
+                    <div style={{ 
+                      marginTop: '10px', 
+                      padding: '10px', 
+                      background: '#0a0a0a', 
+                      borderRadius: '6px',
+                      border: '1px solid #333'
+                    }}>
+                      <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '6px' }}>
+                        After installing Ollama, run this command to download a model:
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <code style={{ 
+                          flex: 1,
+                          padding: '8px',
+                          background: '#1a1a1a',
+                          borderRadius: '4px',
+                          fontSize: '0.8rem',
+                          color: '#22c55e',
+                          fontFamily: 'monospace'
+                        }}>
+                          ollama pull qwen2.5:0.5b
+                        </code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText('ollama pull qwen2.5:0.5b');
+                            onToast?.('Command copied to clipboard!', 'success', 2000);
+                          }}
+                          style={{
+                            padding: '8px',
+                            background: '#333',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: '#888',
+                            cursor: 'pointer',
+                            fontSize: '0.7rem'
+                          }}
+                          title="Copy command"
+                        >
+                          📋
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: '#666', marginTop: '8px' }}>
+                        <strong>Recommended:</strong> qwen2.5:0.5b (~400MB) - Fast, efficient, perfect for routing<br/>
+                        <strong>Alternative:</strong> qwen2.5:1.5b (~1GB) - More accurate but slower<br/>
+                        <strong>Low RAM?</strong> tinyllama (~600MB) - Works on older machines
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show Ollama install option even when embedded SLM is ready */}
+                {slmInstallStatus?.ready && slmStatus?.active_provider !== 'ollama' && (
+                  <div style={{ marginTop: '8px' }}>
+                    <button
+                      onClick={() => {
+                        window.open('https://ollama.ai/download', '_blank');
+                        onToast?.('Opening Ollama download page. After installing, run: ollama pull qwen2.5:0.5b', 'info', 7000);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 10px',
+                        background: 'transparent',
+                        border: '1px solid #444',
+                        borderRadius: '4px',
+                        color: '#888',
+                        fontSize: '0.7rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Download size={12} />
+                      Upgrade to Ollama (faster, more models)
+                    </button>
                   </div>
                 )}
 
@@ -1184,171 +1284,6 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               </>
             )}
           </div>
-
-          {/* Vision Configuration - Show when Dev Mode is enabled */}
-          {devMode && visionConfig && (
-            <div style={{ 
-              marginTop: '20px',
-              paddingTop: '20px',
-              borderTop: '1px solid #333'
-            }}>
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '10px', 
-                marginBottom: '15px',
-                fontWeight: 500 
-              }}>
-                <Eye size={18} style={{ color: '#10b981' }} />
-                <span>Forge Vision Configuration</span>
-              </label>
-              
-              <div style={{ 
-                background: '#1a2e1a', 
-                border: '1px solid #22c55e',
-                borderRadius: '8px',
-                padding: '12px',
-                marginBottom: '15px',
-                fontSize: '0.85em',
-                color: '#86efac'
-              }}>
-                ✓ Vision is enabled (Dev Mode active)
-              </div>
-
-              {/* Detector Toggles */}
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ 
-                  display: 'block', 
-                  marginBottom: '10px',
-                  fontSize: '0.9em',
-                  color: '#a3a3a3'
-                }}>
-                  Active Detectors:
-                </label>
-                
-                {[
-                  { key: 'json', label: 'JSON Blocks', icon: '{ }' },
-                  { key: 'compiler_error', label: 'Compiler Errors', icon: '⚠️' },
-                  { key: 'stack_trace', label: 'Stack Traces', icon: '📚' },
-                  { key: 'git', label: 'Git Status', icon: '⎇' },
-                  { key: 'filepath', label: 'File Paths', icon: '📁' },
-                ].map(detector => (
-                  <label 
-                    key={detector.key}
-                    style={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '8px 12px',
-                      background: visionConfig.detectors[detector.key] ? '#1a2e1a' : '#1a1a1a',
-                      border: visionConfig.detectors[detector.key] ? '1px solid #22c55e' : '1px solid #333',
-                      borderRadius: '6px',
-                      marginBottom: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visionConfig.detectors[detector.key]}
-                      onChange={(e) => {
-                        const newConfig = {
-                          ...visionConfig,
-                          detectors: {
-                            ...visionConfig.detectors,
-                            [detector.key]: e.target.checked
-                          }
-                        };
-                        onVisionConfigChange(newConfig);
-                      }}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: '1.1em', minWidth: '24px' }}>{detector.icon}</span>
-                    <span style={{ flex: 1 }}>{detector.label}</span>
-                    {visionConfig.detectors[detector.key] && (
-                      <span style={{ fontSize: '0.8em', color: '#22c55e' }}>✓</span>
-                    )}
-                  </label>
-                ))}
-              </div>
-
-              {/* JSON Minimum Size Slider */}
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ 
-                  display: 'block', 
-                  marginBottom: '8px',
-                  fontSize: '0.9em',
-                  color: '#a3a3a3'
-                }}>
-                  JSON Minimum Size: <strong style={{ color: '#fff' }}>{visionConfig.jsonMinSize} bytes</strong>
-                </label>
-                <input 
-                  type="range" 
-                  min="10" 
-                  max="100" 
-                  value={visionConfig.jsonMinSize}
-                  onChange={(e) => {
-                    const newConfig = {
-                      ...visionConfig,
-                      jsonMinSize: parseInt(e.target.value)
-                    };
-                    onVisionConfigChange(newConfig);
-                  }}
-                  style={{ 
-                    width: '100%',
-                    height: '6px',
-                    borderRadius: '3px',
-                    outline: 'none',
-                    background: `linear-gradient(to right, #22c55e 0%, #22c55e ${(visionConfig.jsonMinSize - 10) / 90 * 100}%, #333 ${(visionConfig.jsonMinSize - 10) / 90 * 100}%, #333 100%)`,
-                    cursor: 'pointer'
-                  }}
-                />
-                <small style={{ 
-                  display: 'block', 
-                  marginTop: '6px', 
-                  color: '#888', 
-                  fontSize: '0.75em' 
-                }}>
-                  Ignore trivial JSON like {'{}'} or [] (prevents noise)
-                </small>
-              </div>
-
-              {/* Auto-dismiss Toggle */}
-              <label style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 12px',
-                background: '#1a1a1a',
-                border: '1px solid #333',
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={visionConfig.autoDismiss}
-                  onChange={(e) => {
-                    const newConfig = {
-                      ...visionConfig,
-                      autoDismiss: e.target.checked
-                    };
-                    onVisionConfigChange(newConfig);
-                  }}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <span style={{ flex: 1 }}>Auto-dismiss info overlays</span>
-              </label>
-              <small style={{ 
-                display: 'block', 
-                marginTop: '6px', 
-                marginLeft: '28px',
-                color: '#888', 
-                fontSize: '0.75em' 
-              }}>
-                Info-level overlays (Git, JSON, Paths) dismiss on next command
-              </small>
-            </div>
-          )}
 
           {/* DevMode Toggle */}
           <div className="form-group" style={{ marginTop: '25px', paddingTop: '15px', borderTop: '1px solid #333' }}>

@@ -6,7 +6,6 @@ import { ArrowDownToLine, MessageSquare } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
-import VisionOverlay from './vision/VisionOverlay';
 import { diagnosticCore } from '../utils/diagnosticCore';
 
 // Debounce helper for resize events
@@ -49,22 +48,41 @@ function stripAnsi(text) {
 
 // Menu-style prompts where an option is already selected (just press Enter)
 // These search the ENTIRE buffer, not just the last line
+// IMPORTANT: Patterns with ">" must be anchored to line start to avoid matching user input
 const MENU_SELECTION_PATTERNS = [
   // Copilot CLI v1.0.3+: "> 1. Yes" or "> General purpose (default)"
-  />\s*1\.\s*Yes\b/i,
-  />\s*General\s+purpose\s*\(default\)/i,
-  // Legacy Copilot CLI: "❯ 1. Yes" or "› 1. Yes"
+  // Anchored to line start to avoid matching shell prompts like "PS C:\> yes"
+  /^\s*>\s*1\.\s*Yes\b/im,
+  /^\s*>\s*General\s+purpose\s*\(default\)/im,
+  // Legacy Copilot CLI: "❯ 1. Yes" or "› 1. Yes" (special chars don't appear in shell prompts)
   /[›❯]\s*1\.\s*Yes\b/i,
-  // Generic inquirer-style: "❯ Yes" or "> Yes" anywhere in buffer
-  /[›❯>]\s*Yes\b/i,
-  // Generic "Continue" option
-  /[›❯>]\s*Continue\b/i,
-  // Copilot CLI: "❯ Run this command" or "> Run this command"
-  /[›❯>]\s*Run\s+this\s+command/i,
+  // Generic inquirer-style: "❯ Yes" or "› Yes" - only special arrow chars, NOT ">"
+  // The ">" char appears in shell prompts and would match user typing "yes"
+  /[›❯]\s*Yes\b/i,
+  // Generic "Continue" option - only special arrow chars
+  /[›❯]\s*Continue\b/i,
+  // Copilot CLI: "❯ Run this command" - only special arrow chars
+  /[›❯]\s*Run\s+this\s+command/i,
   // Selected option with checkmark or bullet
   /[●◉✓✔]\s*Yes\b/i,
-  // New format: "> (selected option)"
-  />\s*.+\(default\)/i,
+  // New format: "> (selected option)" - anchored to line start
+  /^\s*>\s*.+\(default\)/im,
+  // Permission prompts: "❯ Allow" or "› Allow" for file/directory access
+  /[›❯]\s*Allow\b/i,
+  // Permission prompts: "❯ Always allow" for persistent permissions
+  /[›❯]\s*Always\s+allow\b/i,
+  // Permission prompts: "❯ Allow for this session"
+  /[›❯]\s*Allow\s+for\s+this\s+session\b/i,
+  // Accept/Approve patterns
+  /[›❯]\s*Accept\b/i,
+  /[›❯]\s*Approve\b/i,
+  // PATH-BASED PERMISSION PROMPTS: "❯ /path/to/dir" or "❯ \path\to\dir" or "❯ C:\path"
+  // These appear when Copilot asks to read/list a directory
+  /[›❯]\s*\/\w/i,           // Unix path: ❯ /home/user
+  /[›❯]\s*\\\w/i,           // Windows path: ❯ \Users\mike
+  /[›❯]\s*[A-Za-z]:\\/i,    // Windows drive path: ❯ C:\Projects
+  /[›❯]\s*\.\//i,           // Relative path: ❯ ./src
+  /[›❯]\s*\.\.\//i,         // Parent path: ❯ ../parent
 ];
 
 // Context patterns that indicate a CLI is showing a confirmation menu
@@ -82,6 +100,11 @@ const MENU_CONTEXT_PATTERNS = [
   /Do you want to run\??/i,
   // Cancel with Esc instruction (common in TUI prompts)
   /Cancel with Esc/i,
+  // Permission request context
+  /Allow\s+(read|write|execute|access)/i,
+  /wants?\s+to\s+(read|write|access|list)/i,
+  /Permission\s+requested/i,
+  /Grant\s+access/i,
 ];
 
 // Y/N style prompts: These expect typing 'y' or 'n' then Enter
@@ -420,7 +443,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   autoRespond = false, // Auto-respond "yes" to CLI confirmation prompts
   amEnabled = false, // AM (Artificial Memory) logging enabled
   currentDirectory = null, // Current working directory to restore on connect
-  visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
   onSwitchToChat = null, // Callback to switch to chat view
 }, ref) {
   const terminalRef = useRef(null);
@@ -468,10 +490,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
-  
-  // Vision state
-  const [activeVisionOverlay, setActiveVisionOverlay] = useState(null);
-  const visionEnabledRef = useRef(visionEnabled);
 
   // Keep onInteractiveTUI ref updated
   useEffect(() => {
@@ -542,25 +560,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onRoutingUpdateRef.current = onRoutingUpdate;
   }, [onRoutingUpdate]);
-
-  // Keep visionEnabled ref updated and send control message to backend
-  useEffect(() => {
-    visionEnabledRef.current = visionEnabled;
-    
-    // Send enable/disable message to backend
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const msg = {
-        type: visionEnabled ? 'VISION_ENABLE' : 'VISION_DISABLE'
-      };
-      wsRef.current.send(JSON.stringify(msg));
-      logger.terminal(`Vision ${visionEnabled ? 'enabled' : 'disabled'}`, { tabId });
-    }
-    
-    // Clear overlay when disabling
-    if (!visionEnabled) {
-      setActiveVisionOverlay(null);
-    }
-  }, [visionEnabled, tabId]);
 
   // Refit terminal when becoming visible
   useEffect(() => {
@@ -796,13 +795,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
     },
     isWaitingForPrompt: () => isWaiting,
-    // Vision overlay control methods
-    showVisionOverlay: (overlayConfig) => {
-      setActiveVisionOverlay(overlayConfig);
-    },
-    hideVisionOverlay: () => {
-      setActiveVisionOverlay(null);
-    },
     // v3.4.1: Auto-respond control for backend sync
     setAutoRespond: (enabled) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -859,28 +851,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       chatCommandInitHandlerRef.current = null;
     },
   }));
-  
-  // Vision action handler
-  const handleVisionAction = useCallback((action) => {
-    if (action.type === 'INJECT_COMMAND' && action.command) {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(action));
-        logger.terminal('Vision command injected', { tabId, command: action.command });
-        // Dismiss overlay after action
-        setActiveVisionOverlay(null);
-      }
-    } else if (action.type === 'SHOW_ERROR' && action.message) {
-      // Show error via terminal write
-      if (xtermRef.current) {
-        xtermRef.current.writeln(`\r\n\x1b[31mError: ${action.message}\x1b[0m\r\n`);
-      }
-    }
-  }, [tabId]);
-  
-  // Vision dismiss handler
-  const handleVisionDismiss = useCallback(() => {
-    setActiveVisionOverlay(null);
-  }, []);
 
   // Update terminal theme when theme or colorTheme prop changes
   useEffect(() => {
@@ -1272,14 +1242,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 }
                 // Don't close connection - let normal close handling manage reconnection
                 return;
-              }
-
-              if (msg.type === 'VISION_OVERLAY') {
-                setActiveVisionOverlay({
-                  type: msg.overlayType,
-                  payload: msg.payload
-                });
-                return; // Don't write to terminal
               }
 
               // Task 4: Handle smart routing notifications - badge sync
@@ -1865,15 +1827,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           cursor: 'text',
         }}
       />
-      
-      {/* Vision Overlay */}
-      {visionEnabled && (
-        <VisionOverlay 
-          activeOverlay={activeVisionOverlay}
-          onAction={handleVisionAction}
-          onDismiss={handleVisionDismiss}
-        />
-      )}
       
       {showScrollButton && isVisible && (
         <button

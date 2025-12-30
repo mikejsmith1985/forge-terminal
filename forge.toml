@@ -1,5 +1,5 @@
 # Forge Terminal - Smart Model Routing Configuration
-# v3.4.0 - CFO Router with Budget Management
+# v3.7.0 - Forge Assist, Enhanced CLI Settings
 
 [router]
 default_tier = "tier1"

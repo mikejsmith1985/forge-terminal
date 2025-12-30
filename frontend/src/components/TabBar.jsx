@@ -15,7 +15,6 @@ function TabBar({
   onReorder,
   onToggleAutoRespond = null, // Callback to toggle auto-respond for a tab
   onToggleAM = null, // Callback to toggle AM logging for a tab
-  onToggleVision = null, // Callback to toggle Forge Vision for a tab
   onToggleMode = null, // Callback to toggle light/dark mode for a tab
   disableNewTab = false,
   waitingTabs = {}, // Map of tabId -> isWaiting
@@ -48,12 +47,6 @@ function TabBar({
     }
   };
 
-  const handleToggleVision = (tabId) => {
-    if (onToggleVision) {
-      onToggleVision(tabId);
-    }
-  };
-
   const handleToggleMode = (tabId) => {
     if (onToggleMode) {
       onToggleMode(tabId);
@@ -75,7 +68,6 @@ function TabBar({
             onRename={(newTitle) => handleTabRename(tab.id, newTitle)}
             onToggleAutoRespond={() => handleToggleAutoRespond(tab.id)}
             onToggleAM={devMode ? () => handleToggleAM(tab.id) : null}
-            onToggleVision={devMode ? () => handleToggleVision(tab.id) : null}
             onToggleMode={() => handleToggleMode(tab.id)}
             devMode={devMode}
           />

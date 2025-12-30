@@ -4,6 +4,7 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle, MessageSquare, Clock } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
+import ForgeAssist from './components/ForgeAssist'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
@@ -121,6 +122,9 @@ function App() {
   const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false)
   const [fileAccessModeReady, setFileAccessModeReady] = useState(false)
   
+  // Forge Assist state
+  const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
+  
   // Workflow UI state
   const [isWorkflowCanvasOpen, setIsWorkflowCanvasOpen] = useState(false)
   const [editingWorkflow, setEditingWorkflow] = useState(null)
@@ -148,7 +152,6 @@ function App() {
     updateTabColorTheme,
     toggleTabAutoRespond,
     toggleTabAM,
-    toggleTabVision,
     toggleTabMode,
     toggleTabViewMode,
     updateTabDirectory,
@@ -228,31 +231,6 @@ function App() {
   const [amDefaultEnabled, setAMDefaultEnabled] = useState(() => {
     const saved = localStorage.getItem('amDefaultEnabled');
     return saved !== null ? saved === 'true' : true; // Default to ON for legal compliance
-  });
-  
-  // Vision Config state (global configuration)
-  const [visionConfig, setVisionConfig] = useState(() => {
-    const saved = localStorage.getItem('visionConfig');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse vision config:', e);
-      }
-    }
-    // Default config - enabled when Dev Mode is ON
-    return {
-      enabled: false, // Will be set to true when devMode is enabled
-      detectors: {
-        json: true,
-        compiler_error: true,
-        stack_trace: true,
-        git: true,
-        filepath: true,
-      },
-      jsonMinSize: 30,
-      autoDismiss: true,
-    };
   });
   
   // Store refs for each terminal by tab ID
@@ -851,6 +829,13 @@ function App() {
         return;
       }
       
+      // Ctrl+/: Toggle Forge Assist
+      if (e.ctrlKey && !e.shiftKey && e.key === '/') {
+        e.preventDefault();
+        setIsForgeAssistOpen(prev => !prev);
+        return;
+      }
+      
       // Ctrl+Shift+H: Toggle History Slider
       if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
         e.preventDefault();
@@ -1144,13 +1129,6 @@ function App() {
       logger.settings('AM Master enabled', {});
     }
   }, [addToast]);
-
-  // Handle Vision config change
-  const handleVisionConfigChange = useCallback((newConfig) => {
-    setVisionConfig(newConfig);
-    localStorage.setItem('visionConfig', JSON.stringify(newConfig));
-    logger.settings('Vision config changed', newConfig);
-  }, []);
   
   // Workflow handlers
   const handleWorkflowRun = useCallback((workflow) => {
@@ -1228,20 +1206,6 @@ function App() {
       terminalRef.focus();
     }
   }, [getActiveTerminalRef]);
-
-  // Sync Vision enabled state with Dev Mode
-  useEffect(() => {
-    if (devModeInitialized) {
-      // User requested Vision to be disabled by default even in dev mode
-      // setVisionConfig(prev => {
-      //   const newConfig = { ...prev, enabled: devMode };
-      //   localStorage.setItem('visionConfig', JSON.stringify(newConfig));
-      //   return newConfig;
-      // });
-      // logger.settings('Vision synced with Dev Mode', { devMode });
-    }
-  }, [devMode, devModeInitialized]);
-
 
   const loadCommands = () => {
     setCommandsLoading(true);
@@ -1828,10 +1792,6 @@ function App() {
           onReorder={reorderTabs}
           onToggleAutoRespond={toggleTabAutoRespond}
           onToggleAM={handleToggleAM}
-          onToggleVision={(tabId) => {
-            console.log('[App] toggleTabVision called for tab:', tabId);
-            toggleTabVision(tabId);
-          }}
           onToggleMode={toggleTabMode}
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}
@@ -1907,7 +1867,6 @@ function App() {
                     shellConfig={tab.shellConfig}
                     autoRespond={tab.autoRespond || false}
                     amEnabled={tab.amEnabled || false}
-                    visionEnabled={tab.visionEnabled || false}
                     tabName={tab.title}
                     currentDirectory={tab.currentDirectory || null}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
@@ -1972,8 +1931,6 @@ function App() {
         onAMMasterChange={handleAMMasterToggle}
         amDefaultEnabled={amDefaultEnabled}
         onAMDefaultChange={handleAMDefaultChange}
-        visionConfig={visionConfig}
-        onVisionConfigChange={handleVisionConfigChange}
         onRestartTour={() => {
           setIsSettingsModalOpen(false);
           restartTour();
@@ -2065,6 +2022,35 @@ function App() {
           position="bottom"
         />
       )}
+
+      {/* Forge Assist - Context-aware command palette (Ctrl+/) */}
+      <ForgeAssist
+        isOpen={isForgeAssistOpen}
+        onClose={() => setIsForgeAssistOpen(false)}
+        onSendToTerminal={(cmd) => {
+          const termRef = getActiveTerminalRef();
+          if (termRef?.sendCommand) {
+            termRef.sendCommand(cmd);
+          } else if (termRef?.write) {
+            termRef.write(cmd);
+          }
+        }}
+        onSendToChat={(cmd) => {
+          // If in chat view, would send to chat input
+          // For now, just send to terminal
+          const termRef = getActiveTerminalRef();
+          if (termRef?.sendCommand) {
+            termRef.sendCommand(cmd);
+          }
+        }}
+        terminalBuffer={(() => {
+          // Get terminal buffer on demand when ForgeAssist is open
+          const termRef = getActiveTerminalRef();
+          return termRef?.getBuffer?.() || '';
+        })()}
+        activeView={activeTab?.viewMode === 'chat' ? 'chat' : 'terminal'}
+        onToast={addToast}
+      />
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (
