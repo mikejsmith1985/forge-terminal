@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield, DollarSign, Zap, Brain, Cpu, Play } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Eye, Shield, DollarSign, Zap, Brain, Cpu, Play, Download, Loader } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 
@@ -17,6 +17,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
   const [budgetStatus, setBudgetStatus] = useState(null);
   const [budgetConfig, setBudgetConfig] = useState({ budget_limit: 1500, budget_unit: 'credits', renewal_day: 1 });
   const [loadingBudget, setLoadingBudget] = useState(false);
+  const [slmInstallStatus, setSlmInstallStatus] = useState(null);
+  const [isInstallingSlm, setIsInstallingSlm] = useState(false);
   
   // v3.5.0: SLM Smart Routing state
   const [slmStatus, setSlmStatus] = useState(null);
@@ -36,8 +38,9 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
       checkMissingCards();
       loadFileAccessMode();
       loadBudgetStatus();
+      loadSLMStatus();
+      loadSlmInstallStatus();
       if (devMode) {
-        loadSLMStatus();
         loadLearningStats();
         loadOllamaStatus();
       }
@@ -80,6 +83,47 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
       }
     } catch (err) {
       console.error('Failed to load SLM status:', err);
+    }
+  };
+
+  // Load SLM installation status (model + binary)
+  const loadSlmInstallStatus = async () => {
+    try {
+      const res = await fetch('/api/slm/install/status');
+      if (res.ok) {
+        const data = await res.json();
+        setSlmInstallStatus(data);
+      }
+    } catch (err) {
+      console.error('Failed to load SLM install status:', err);
+    }
+  };
+
+  // Install SLM (model + binary)
+  const installSlm = async () => {
+    setIsInstallingSlm(true);
+    try {
+      const res = await fetch('/api/slm/install', { method: 'POST' });
+      const data = await res.json();
+      
+      if (data.ready) {
+        onToast?.('🧠 SLM installed successfully! Smart Routing is now active.', 'success', 5000);
+        loadSLMStatus();
+        loadSlmInstallStatus();
+      } else {
+        const modelStatus = data.model?.status;
+        const binaryStatus = data.binary?.status;
+        if (modelStatus === 'error' || binaryStatus === 'error') {
+          const errorMsg = data.model?.message || data.binary?.message || 'Unknown error';
+          onToast?.(`⚠️ SLM installation issue: ${errorMsg}`, 'error', 7000);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to install SLM:', err);
+      onToast?.('❌ Failed to install SLM: ' + err.message, 'error', 5000);
+    } finally {
+      setIsInstallingSlm(false);
+      loadSlmInstallStatus();
     }
   };
 
@@ -522,45 +566,114 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
                 One Opus prompt that solves the problem is better than 10 Haiku prompts that don't.
               </div>
               
-              {/* Issue #52: SLM Status indicator visible to all users */}
+              {/* SLM Status indicator visible to all users */}
               <div style={{ 
                 marginTop: '12px',
-                padding: '10px',
-                background: slmStatus?.active_provider === 'ollama' ? '#052e16' : 
-                           slmStatus?.active_provider === 'disabled' ? '#422006' : '#1c1917',
-                border: `1px solid ${slmStatus?.active_provider === 'ollama' ? '#22c55e' : 
-                                    slmStatus?.active_provider === 'disabled' ? '#f97316' : '#44403c'}`,
-                borderRadius: '6px',
-                fontSize: '0.8rem'
+                padding: '12px',
+                background: slmStatus?.active_provider === 'ollama' || slmStatus?.active_provider === 'llama-cpp' ? '#052e16' : 
+                           slmStatus?.active_provider === 'disabled' ? '#1c1917' : '#1c1917',
+                border: `1px solid ${slmStatus?.active_provider === 'ollama' || slmStatus?.active_provider === 'llama-cpp' ? '#22c55e' : 
+                                    slmStatus?.active_provider === 'disabled' ? '#44403c' : '#44403c'}`,
+                borderRadius: '8px',
+                fontSize: '0.85rem'
               }}>
-                <div style={{ fontWeight: 500, marginBottom: '6px' }}>Smart Routing Status</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888' }}>
+                <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Brain size={16} />
+                  Smart Routing Status
+                </div>
+                
+                {/* Status Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginBottom: '8px' }}>
                   <span>Engine:</span>
-                  <span style={{ color: slmStatus?.active_provider === 'disabled' ? '#f97316' : '#22c55e' }}>
-                    {slmStatus?.active_provider === 'disabled' && '⚠️ Disabled (Install Ollama)'}
-                    {slmStatus?.active_provider === 'ollama' && '🧠 AI Analysis (Ollama)'}
-                    {slmStatus?.active_provider === 'llama-cpp' && '🧠 AI Analysis (llama.cpp)'}
+                  <span style={{ color: slmStatus?.active_provider === 'disabled' ? '#888' : '#22c55e' }}>
+                    {slmStatus?.active_provider === 'disabled' && '⏸️ Not Installed'}
+                    {slmStatus?.active_provider === 'ollama' && '🧠 Ollama (Active)'}
+                    {slmStatus?.active_provider === 'llama-cpp' && '🧠 Embedded SLM (Active)'}
                     {slmStatus?.active_provider === 'embedded' && '🧠 Embedded SLM'}
                     {!slmStatus && '⏳ Checking...'}
                   </span>
                 </div>
-                {slmStatus?.active_provider === 'disabled' && (
-                  <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#f97316' }}>
-                    Without Ollama, routing uses your default model for all prompts.
-                    <br/>Install: <a href="https://ollama.ai" target="_blank" rel="noopener" style={{ color: '#3b82f6' }}>https://ollama.ai</a>
+
+                {/* Installation Status */}
+                {slmInstallStatus && (
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '8px', fontSize: '0.8rem' }}>
+                    <span style={{ color: slmInstallStatus.model_exists ? '#22c55e' : '#888' }}>
+                      {slmInstallStatus.model_exists ? '✓' : '○'} Model
+                      {slmInstallStatus.model_size_mb ? ` (${slmInstallStatus.model_size_mb}MB)` : ''}
+                    </span>
+                    <span style={{ color: slmInstallStatus.binary_exists ? '#22c55e' : '#888' }}>
+                      {slmInstallStatus.binary_exists ? '✓' : '○'} Runtime
+                    </span>
                   </div>
                 )}
+
+                {/* Install Button - show when SLM not ready */}
+                {slmInstallStatus && !slmInstallStatus.ready && (
+                  <div style={{ marginTop: '10px' }}>
+                    <button
+                      onClick={installSlm}
+                      disabled={isInstallingSlm}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 16px',
+                        background: isInstallingSlm ? '#333' : 'linear-gradient(135deg, #667eea, #764ba2)',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: 'white',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        cursor: isInstallingSlm ? 'wait' : 'pointer',
+                        width: '100%',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {isInstallingSlm ? (
+                        <>
+                          <Loader size={16} className="spin" />
+                          Installing Smart Routing (~150MB)...
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} />
+                          Install Smart Routing (Free, ~150MB)
+                        </>
+                      )}
+                    </button>
+                    <p style={{ fontSize: '0.7rem', color: '#888', marginTop: '8px', textAlign: 'center' }}>
+                      Downloads SmolLM2-135M model + llama.cpp runtime. One-time setup.
+                    </p>
+                  </div>
+                )}
+
+                {/* Already ready - show active status */}
+                {slmInstallStatus?.ready && slmStatus?.active_provider !== 'ollama' && (
+                  <div style={{ 
+                    marginTop: '8px', 
+                    padding: '8px', 
+                    background: '#052e16', 
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    color: '#22c55e'
+                  }}>
+                    ✓ Smart Routing is active! Prompts are analyzed locally before being sent to your AI model.
+                  </div>
+                )}
+
+                {/* Ollama alternative */}
+                {slmStatus?.active_provider === 'disabled' && !slmInstallStatus?.ready && (
+                  <div style={{ marginTop: '8px', fontSize: '0.7rem', color: '#888' }}>
+                    Or use <a href="https://ollama.ai" target="_blank" rel="noopener" style={{ color: '#3b82f6' }}>Ollama</a> for faster analysis
+                  </div>
+                )}
+
                 {learningStats?.total_samples > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginTop: '8px', fontSize: '0.8rem' }}>
                     <span>Learning Samples:</span>
                     <span>{learningStats.total_samples}</span>
                   </div>
                 )}
-                <p style={{ fontSize: '0.7rem', color: '#666', marginTop: '8px', marginBottom: 0 }}>
-                  {devMode 
-                    ? 'Enable Dev Mode above for detailed SLM controls' 
-                    : 'Enable Dev Mode in Shell tab for detailed SLM controls'}
-                </p>
               </div>
             </div>
           </div>

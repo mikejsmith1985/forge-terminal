@@ -318,6 +318,165 @@ func handleSLMModelDownload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleSLMBinaryDownload handles POST /api/slm/binary/download
+// Triggers download of the llama-cli binary.
+func handleSLMBinaryDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check if already exists
+	if slm.BinaryExists() {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "exists",
+			"message": "Binary already installed",
+			"path":    slm.GetExpectedBinaryPath(),
+		})
+		return
+	}
+
+	// Start download
+	log.Printf("[SLM API] Starting binary download...")
+	
+	var lastProgress slm.DownloadProgress
+	err := slm.DownloadBinary(func(p slm.DownloadProgress) {
+		lastProgress = p
+		if int(p.Percent)%20 == 0 {
+			log.Printf("[SLM API] Binary download: %.0f%%", p.Percent)
+		}
+	})
+
+	if err != nil {
+		log.Printf("[SLM API] Binary download failed: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Re-initialize the SLM engine with the new binary
+	engine := slm.GetEngine()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	engine.Initialize(ctx)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      "downloaded",
+		"message":     "Binary installed successfully",
+		"path":        slm.GetExpectedBinaryPath(),
+		"size_mb":     lastProgress.Downloaded / 1_000_000,
+	})
+}
+
+// handleSLMInstall handles POST /api/slm/install
+// Downloads both model and binary to fully set up SLM.
+func handleSLMInstall(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	log.Printf("[SLM API] Starting full SLM installation...")
+	
+	results := map[string]interface{}{
+		"model":  map[string]interface{}{"status": "pending"},
+		"binary": map[string]interface{}{"status": "pending"},
+	}
+
+	// Download model
+	if slm.ModelExists() {
+		results["model"] = map[string]interface{}{
+			"status":  "exists",
+			"message": "Model already downloaded",
+			"path":    slm.GetExpectedModelPath(),
+		}
+	} else {
+		log.Printf("[SLM API] Downloading model...")
+		err := slm.DownloadModel(func(p slm.DownloadProgress) {
+			if int(p.Percent)%25 == 0 {
+				log.Printf("[SLM API] Model: %.0f%%", p.Percent)
+			}
+		})
+		if err != nil {
+			results["model"] = map[string]interface{}{
+				"status":  "error",
+				"message": err.Error(),
+			}
+		} else {
+			results["model"] = map[string]interface{}{
+				"status":  "downloaded",
+				"message": "Model downloaded successfully",
+				"path":    slm.GetExpectedModelPath(),
+			}
+		}
+	}
+
+	// Download binary
+	if slm.BinaryExists() {
+		results["binary"] = map[string]interface{}{
+			"status":  "exists",
+			"message": "Binary already installed",
+			"path":    slm.GetExpectedBinaryPath(),
+		}
+	} else {
+		log.Printf("[SLM API] Downloading binary...")
+		err := slm.DownloadBinary(func(p slm.DownloadProgress) {
+			if int(p.Percent)%25 == 0 {
+				log.Printf("[SLM API] Binary: %.0f%%", p.Percent)
+			}
+		})
+		if err != nil {
+			results["binary"] = map[string]interface{}{
+				"status":  "error",
+				"message": err.Error(),
+			}
+		} else {
+			results["binary"] = map[string]interface{}{
+				"status":  "downloaded",
+				"message": "Binary installed successfully",
+				"path":    slm.GetExpectedBinaryPath(),
+			}
+		}
+	}
+
+	// Re-initialize the SLM engine
+	engine := slm.GetEngine()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	engine.Initialize(ctx)
+
+	// Check final status
+	ready := slm.ModelExists() && slm.BinaryExists()
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "complete",
+		"ready":   ready,
+		"model":   results["model"],
+		"binary":  results["binary"],
+	})
+}
+
+// handleSLMInstallStatus handles GET /api/slm/install/status
+// Returns detailed installation status.
+func handleSLMInstallStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	status := slm.GetInstallationStatus()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}
+
 // registerSLMHandlers registers all SLM-related API endpoints.
 // These are only enabled when Dev Mode is active.
 func registerSLMHandlers() {
@@ -328,6 +487,9 @@ func registerSLMHandlers() {
 	http.HandleFunc("/api/slm/preferences", handleSLMPreferences)
 	http.HandleFunc("/api/slm/model", handleSLMModelStatus)
 	http.HandleFunc("/api/slm/model/download", handleSLMModelDownload)
+	http.HandleFunc("/api/slm/binary/download", handleSLMBinaryDownload)
+	http.HandleFunc("/api/slm/install", handleSLMInstall)
+	http.HandleFunc("/api/slm/install/status", handleSLMInstallStatus)
 	http.HandleFunc("/api/ollama/status", handleOllamaStatus)
 
 	log.Printf("[SLM] Registered API endpoints")
