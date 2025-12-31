@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, us
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
-import { ArrowDownToLine, MessageSquare } from 'lucide-react';
+import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
@@ -17,15 +17,45 @@ function debounce(fn, ms) {
   };
 }
 
-// v2.2.6 FIX: Use setTimeout for RELIABLE auto-respond detection
-// requestIdleCallback was causing 40-60% miss rate because browser never went "idle"
-// during continuous terminal output streaming. setTimeout(100) is predictable and fast.
-const scheduleDetection = (callback) => {
-  return setTimeout(callback, 100); // 100ms debounce - same as original v1.5.4
+// Throttle helper - runs at most once per interval (non-blocking)
+function throttle(fn, ms) {
+  let lastRun = 0;
+  let scheduled = false;
+  return (...args) => {
+    const now = Date.now();
+    if (now - lastRun >= ms) {
+      lastRun = now;
+      fn(...args);
+    } else if (!scheduled) {
+      scheduled = true;
+      setTimeout(() => {
+        scheduled = false;
+        lastRun = Date.now();
+        fn(...args);
+      }, ms - (now - lastRun));
+    }
+  };
+}
+
+// Use requestIdleCallback with fallback for non-blocking work
+// This allows prompt detection to fire quickly when the browser is idle,
+// rather than forcing a fixed delay. The timeout parameter (2000ms) is a 
+// maximum wait time, not a minimum - the callback fires as soon as the
+// browser has idle time available (typically 10-100ms after last activity).
+const scheduleIdleWork = (callback) => {
+  if (typeof requestIdleCallback !== 'undefined') {
+    return requestIdleCallback(callback, { timeout: 2000 });
+  }
+  // Fallback for browsers without requestIdleCallback
+  return setTimeout(callback, 100);
 };
 
-const cancelDetection = (id) => {
-  clearTimeout(id);
+const cancelIdleWork = (id) => {
+  if (typeof cancelIdleCallback !== 'undefined') {
+    cancelIdleCallback(id);
+  } else {
+    clearTimeout(id);
+  }
 };
 
 // ============================================================================
@@ -48,63 +78,30 @@ function stripAnsi(text) {
 
 // Menu-style prompts where an option is already selected (just press Enter)
 // These search the ENTIRE buffer, not just the last line
-// IMPORTANT: Patterns with ">" must be anchored to line start to avoid matching user input
 const MENU_SELECTION_PATTERNS = [
-  // Copilot CLI v1.0.3+: "> 1. Yes" or "> General purpose (default)"
-  // Anchored to line start to avoid matching shell prompts like "PS C:\> yes"
-  /^\s*>\s*1\.\s*Yes\b/im,
-  /^\s*>\s*General\s+purpose\s*\(default\)/im,
-  // Legacy Copilot CLI: "❯ 1. Yes" or "› 1. Yes" (special chars don't appear in shell prompts)
-  /[›❯]\s*1\.\s*Yes\b/i,
-  // Generic inquirer-style: "❯ Yes" or "› Yes" - only special arrow chars, NOT ">"
-  // The ">" char appears in shell prompts and would match user typing "yes"
-  /[›❯]\s*Yes\b/i,
-  // Generic "Continue" option - only special arrow chars
-  /[›❯]\s*Continue\b/i,
-  // Copilot CLI: "❯ Run this command" - only special arrow chars
-  /[›❯]\s*Run\s+this\s+command/i,
+  // Copilot CLI: "❯ 1. Yes" or "> 1. Yes" (numbered menu with selection indicator)
+  /[›❯>]\s*1\.\s*Yes\b/i,
+  // Generic inquirer-style: "❯ Yes" anywhere in buffer
+  /[›❯>]\s*Yes\b/i,
+  // Copilot CLI: "❯ Run this command"
+  /[›❯>]\s*Run\s+this\s+command/i,
   // Selected option with checkmark or bullet
   /[●◉✓✔]\s*Yes\b/i,
-  // New format: "> (selected option)" - anchored to line start
-  /^\s*>\s*.+\(default\)/im,
-  // Permission prompts: "❯ Allow" or "› Allow" for file/directory access
-  /[›❯]\s*Allow\b/i,
-  // Permission prompts: "❯ Always allow" for persistent permissions
-  /[›❯]\s*Always\s+allow\b/i,
-  // Permission prompts: "❯ Allow for this session"
-  /[›❯]\s*Allow\s+for\s+this\s+session\b/i,
-  // Accept/Approve patterns
-  /[›❯]\s*Accept\b/i,
-  /[›❯]\s*Approve\b/i,
-  // PATH-BASED PERMISSION PROMPTS: "❯ /path/to/dir" or "❯ \path\to\dir" or "❯ C:\path"
-  // These appear when Copilot asks to read/list a directory
-  /[›❯]\s*\/\w/i,           // Unix path: ❯ /home/user
-  /[›❯]\s*\\\w/i,           // Windows path: ❯ \Users\mike
-  /[›❯]\s*[A-Za-z]:\\/i,    // Windows drive path: ❯ C:\Projects
-  /[›❯]\s*\.\//i,           // Relative path: ❯ ./src
-  /[›❯]\s*\.\.\//i,         // Parent path: ❯ ../parent
 ];
 
 // Context patterns that indicate a CLI is showing a confirmation menu
 // Must be combined with MENU_SELECTION_PATTERNS
 const MENU_CONTEXT_PATTERNS = [
-  // Copilot CLI v1.0.3+ question format
-  /What kind of help do you need\?/i,
-  /Do you want to run this command\??/i,
-  // Legacy Copilot CLI instruction line
+  // Copilot CLI instruction line
   /Confirm with number keys or.*Enter/i,
   // Generic "use arrow keys" instruction
   /use.*arrow.*keys.*select/i,
   /↑↓.*keys.*Enter/i,
   // "Do you want to run" question
+  /Do you want to run this command\??/i,
   /Do you want to run\??/i,
   // Cancel with Esc instruction (common in TUI prompts)
   /Cancel with Esc/i,
-  // Permission request context
-  /Allow\s+(read|write|execute|access)/i,
-  /wants?\s+to\s+(read|write|access|list)/i,
-  /Permission\s+requested/i,
-  /Grant\s+access/i,
 ];
 
 // Y/N style prompts: These expect typing 'y' or 'n' then Enter
@@ -149,67 +146,6 @@ const TUI_FRAME_INDICATORS = [
   // Ctrl+c Exit indicator
   /Ctrl\+c\s+Exit/i,
 ];
-
-// =============================================================================
-// INTERACTIVE TUI DETECTION (Claude Code multi-question wizards, etc.)
-// =============================================================================
-// These patterns detect when a TUI requires user interaction beyond Y/N
-// AutoRespond should NOT activate, and Chat UI should switch to Terminal view
-
-const INTERACTIVE_TUI_PATTERNS = [
-  // Claude Code: "Tab to navigate" or "↹ to switch"
-  /Tab\s+to\s+navigate/i,
-  /↹\s+to\s+switch/i,
-  /Tab\s+to\s+switch/i,
-  // Claude Code: Multiple question indicators
-  /\[\s*\d+\s*\/\s*\d+\s*\]/,  // [1/3], [2/5] style progress
-  // Generic wizard step indicators
-  /Step\s+\d+\s+of\s+\d+/i,
-  // Claude Code permission prompts with multiple options
-  /Select.*files?.*to/i,
-  /Choose.*option/i,
-  // Multi-select indicators
-  /Space\s+to\s+select/i,
-  /Press\s+space\s+to\s+toggle/i,
-  // Claude Code specific patterns
-  /Allow\s+tool/i,
-  /Deny\s+tool/i,
-  // Input field indicators (not just Y/N)
-  /Enter\s+.*:/,
-  /Type\s+.*:/,
-  /Input:/i,
-];
-
-/**
- * Detect if a TUI is showing an interactive prompt that needs user navigation
- * (Tab, arrow keys, space to select, etc.) - NOT a simple Y/N or confirmation
- * @param {string} cleanText - ANSI-stripped text buffer
- * @returns {{ detected: boolean, type: string }}
- */
-function detectInteractiveTUI(cleanText) {
-  // Check for TUI frame first (box characters)
-  const hasTuiFrame = TUI_FRAME_INDICATORS.some(p => p.test(cleanText));
-  
-  // Check for interactive navigation patterns
-  const hasInteractivePattern = INTERACTIVE_TUI_PATTERNS.some(p => p.test(cleanText));
-  
-  if (hasInteractivePattern) {
-    return { detected: true, type: 'interactive-wizard' };
-  }
-  
-  // If we have a TUI frame but no Y/N and no "Yes selected", it might be interactive
-  if (hasTuiFrame) {
-    const hasYesSelected = MENU_SELECTION_PATTERNS.some(p => p.test(cleanText));
-    const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(cleanText));
-    
-    // TUI frame without clear confirmation pattern = likely interactive
-    if (!hasYesSelected && !hasYnPrompt) {
-      return { detected: true, type: 'tui-active' };
-    }
-  }
-  
-  return { detected: false, type: null };
-}
 
 // ----------------------------------------------------------------------------
 // DETECTION FUNCTIONS
@@ -263,13 +199,9 @@ function detectYnPrompt(cleanText, debugLog = false) {
   // Get last few lines for y/n detection (these appear at end)
   // Use more lines for PowerShell prompts which can span multiple lines
   const lines = cleanText.split(/[\r\n]/).filter(l => l.trim());
-  const lastLines = lines.slice(-5); // Array of last 5 lines
+  const lastLines = lines.slice(-5).join('\n'); // Increased from 3 to 5 lines
   
-  // Check if ANY of the last lines matches the pattern
-  // This handles cases where the prompt is followed by a cursor or empty line
-  const hasYnPrompt = lastLines.some(line => 
-    YN_PROMPT_PATTERNS.some(p => p.test(line))
-  );
+  const hasYnPrompt = YN_PROMPT_PATTERNS.some(p => p.test(lastLines));
   
   return { detected: hasYnPrompt };
 }
@@ -288,14 +220,8 @@ function detectCliPrompt(text, debugLog = false) {
   // Strip ANSI escape codes
   const cleanText = stripAnsi(text);
   
-  // IGNORE: Image paste markdown format [📷 filename]
-  // Don't treat image pastes as CLI prompts
-  if (/\[📷\s+[^\]]+\]\s*$/.test(cleanText.trimEnd())) {
-    return { waiting: false, responseType: null, confidence: 'none' };
-  }
-  
-  // Use full buffer for Copilot CLI detection (menus can be large)
-  const bufferToCheck = cleanText.slice(-2000);
+  // Use smaller buffer for performance (reduced from 2000)
+  const bufferToCheck = cleanText.slice(-800);
   
   // Priority 1: Check for menu-style prompts (Copilot, Claude, etc.)
   const menuResult = detectMenuPrompt(bufferToCheck, debugLog);
@@ -433,9 +359,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
-  onTerminalCommand = null, // Callback when command is executed (for model tier detection)
-  onRoutingUpdate = null, // Callback when smart routing executes (for badge sync)
-  onInteractiveTUI = null, // Callback when interactive TUI detected (triggers switch to terminal view)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name (for AM logging)
@@ -443,7 +366,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   autoRespond = false, // Auto-respond "yes" to CLI confirmation prompts
   amEnabled = false, // AM (Artificial Memory) logging enabled
   currentDirectory = null, // Current working directory to restore on connect
-  onSwitchToChat = null, // Callback to switch to chat view
+  visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
+  assistantEnabled = false, // Forge Assistant panel enabled (Dev Mode)
+  isAgentMode = false, // New prop: Agent Mode (full screen chat)
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -455,10 +380,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const shellConfigRef = useRef(shellConfig);
   const currentDirectoryRef = useRef(currentDirectory);
   const connectFnRef = useRef(null);
-  // v2.0.1 EXACT: Use outputBufferRef with 2000 char sliding window (increased for Copilot CLI menus)
-  const outputBufferRef = useRef({ data: '' });
-  const lastOutputRef = useRef(''); // Keep for compatibility
-  const waitingCheckTimeoutRef = useRef(null); // v2.2.6: Use setTimeout for reliable detection
+  // PERF FIX: Use a fixed-size circular buffer instead of string concat
+  const outputBufferRef = useRef({ data: '', writePos: 0 });
+  const lastOutputRef = useRef(''); // Keep for compatibility but update less often
+  const waitingCheckIdleRef = useRef(null); // Changed from timeout to idle callback
   const autoRespondRef = useRef(autoRespond);
   const amEnabledRef = useRef(amEnabled);
   const tabNameRef = useRef(tabName);
@@ -466,61 +391,29 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const onDirectoryChangeRef = useRef(onDirectoryChange);
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
-  const onTerminalCommandRef = useRef(onTerminalCommand);
-  const onRoutingUpdateRef = useRef(onRoutingUpdate);
-  const commandBufferRef = useRef(''); // Track current command line for model tier detection
-  // AM logging refs
-  const amLogBufferRef = useRef('');
-  const amLogTimeoutRef = useRef(null);
+  // PERF FIX: Batch AM logs instead of per-message
+  const amLogQueueRef = useRef([]);
+  const amLogFlushIdleRef = useRef(null);
   const amInputBufferRef = useRef('');
   const amInputTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 5;
   const isCopyingRef = useRef(false); // Prevent clipboard spam
-  const onInteractiveTUIRef = useRef(onInteractiveTUI);
-  const lastTUIStateRef = useRef(false); // Track if we already fired TUI callback
-  const chatOutputHandlerRef = useRef(null); // v3.5.3: Handler for Chat PTY bridge output
-  const chatResponseCompleteHandlerRef = useRef(null); // v3.5.3: Handler for response completion
-  const chatPromptWaitingHandlerRef = useRef(null); // v3.5.3: Handler for prompt waiting state
-  const chatCommandInitHandlerRef = useRef(null); // v3.6.4: Handler to init ChatView state for external commands
-  const isVisibleRef = useRef(isVisible); // v3.7.1: Track visibility for focus management
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
-
-  // Keep onInteractiveTUI ref updated
-  useEffect(() => {
-    onInteractiveTUIRef.current = onInteractiveTUI;
-  }, [onInteractiveTUI]);
-
-  // v3.7.1: Keep isVisible ref updated (for mount-time focus checks)
-  useEffect(() => {
-    isVisibleRef.current = isVisible;
-  }, [isVisible]);
+  
+  // Vision state
+  const visionEnabledRef = useRef(visionEnabled);
 
   // Keep autoRespond ref updated
   useEffect(() => {
-    if (autoRespond) {
-      console.log('%c[Auto-Respond] ENABLED', 'background: #ffa500; color: #000; font-weight: bold; padding: 2px 5px;', { tabId });
-    } else {
-      console.log('[Auto-Respond] Disabled', { tabId });
-    }
     autoRespondRef.current = autoRespond;
-    
-    // v3.4.1 FIX: Send AUTO_RESPOND_TOGGLE to backend WebSocket
-    // The backend PrecisionAutoResponder needs to know the toggle state
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'AUTO_RESPOND_TOGGLE',
-        enabled: autoRespond
-      }));
-      console.log('[Auto-Respond] Sent toggle to backend:', autoRespond);
-    }
-  }, [autoRespond, tabId]);
+  }, [autoRespond]);
 
   // Keep amEnabled ref updated
   useEffect(() => {
@@ -557,17 +450,21 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     onPasteRef.current = onPaste;
   }, [onPaste]);
   
-  // Keep onTerminalCommand ref updated
+  // Keep visionEnabled ref updated and send control message to backend
   useEffect(() => {
-    onTerminalCommandRef.current = onTerminalCommand;
-  }, [onTerminalCommand]);
+    visionEnabledRef.current = visionEnabled;
+    
+    // Send enable/disable message to backend
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const msg = {
+        type: visionEnabled ? 'VISION_ENABLE' : 'VISION_DISABLE'
+      };
+      wsRef.current.send(JSON.stringify(msg));
+      logger.terminal(`Vision ${visionEnabled ? 'enabled' : 'disabled'}`, { tabId });
+    }
+  }, [visionEnabled, tabId]);
 
-  // Keep onRoutingUpdate ref updated
-  useEffect(() => {
-    onRoutingUpdateRef.current = onRoutingUpdate;
-  }, [onRoutingUpdate]);
-
-  // Refit terminal when becoming visible, blur when hidden
+  // Refit terminal when becoming visible
   useEffect(() => {
     if (isVisible && fitAddonRef.current && xtermRef.current) {
       // Small delay to ensure the container is properly sized
@@ -575,18 +472,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         fitAddonRef.current.fit();
         // Critical fix: Re-focus after fit on visibility change
         queueMicrotask(() => {
-          if (xtermRef.current && isVisibleRef.current) {
+          if (xtermRef.current) {
             xtermRef.current.focus();
           }
         });
       }, 50);
-    } else if (!isVisible && xtermRef.current) {
-      // v3.7.1 FIX: Explicitly blur terminal when it becomes hidden
-      // This prevents keystrokes from going to hidden terminals
-      const textarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
-      if (textarea && document.activeElement === textarea) {
-        textarea.blur();
-      }
     }
   }, [isVisible]);
 
@@ -623,60 +513,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       window.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isVisible]);
-
-  // v3.5.2 Fix: Prevent hidden terminals from stealing focus
-  // When a terminal is hidden, set tabIndex=-1 on its helper textarea
-  // This removes it from keyboard tab order and prevents spacebar focus stealing
-  // Uses MutationObserver to handle dynamically created textareas
-  useEffect(() => {
-    if (!terminalRef.current) return;
-    
-    const updateTextareaTabIndex = () => {
-      // Find the xterm helper textarea (xterm creates this for keyboard input)
-      const textarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
-      if (!textarea) return;
-      
-      if (isVisible) {
-        // Active terminal: make textarea focusable
-        textarea.tabIndex = 0;
-      } else {
-        // Hidden terminal: remove from tab order
-        textarea.tabIndex = -1;
-        // Also blur if currently focused (shouldn't happen, but safety)
-        if (document.activeElement === textarea) {
-          textarea.blur();
-        }
-      }
-    };
-    
-    // Initial update
-    updateTextareaTabIndex();
-    
-    // Watch for dynamically added textareas (xterm creates these after init)
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          // Check if any added nodes contain the helper textarea
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              if (node.classList?.contains('xterm-helper-textarea') ||
-                  node.querySelector?.('.xterm-helper-textarea')) {
-                updateTextareaTabIndex();
-                return;
-              }
-            }
-          }
-        }
-      }
-    });
-    
-    observer.observe(terminalRef.current, {
-      childList: true,
-      subtree: true
-    });
-    
-    return () => observer.disconnect();
   }, [isVisible]);
 
   // Expose methods to parent via ref
@@ -808,66 +644,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
     },
     isWaitingForPrompt: () => isWaiting,
-    // v3.4.1: Auto-respond control for backend sync
-    setAutoRespond: (enabled) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'AUTO_RESPOND_TOGGLE',
-          enabled: enabled
-        }));
-        console.log('[Auto-Respond] Manual toggle sent to backend:', enabled);
-        return true;
-      }
-      console.warn('[Auto-Respond] Cannot send toggle - WebSocket not connected');
-      return false;
-    },
-    // v3.5.3: Chat PTY Bridge - send chat commands through terminal WebSocket
-    sendChatCommand: (chatCommand) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        // v3.6.4: Notify ChatView to init state before sending command
-        // This ensures chat UI is ready to receive response
-        if (chatCommandInitHandlerRef.current && chatCommand.command) {
-          chatCommandInitHandlerRef.current(chatCommand);
-        }
-        
-        // Send command to backend
-        wsRef.current.send(JSON.stringify(chatCommand));
-        console.log('[ChatBridge] Sent chat command:', chatCommand.cli, chatCommand.model);
-        return true;
-      }
-      console.warn('[ChatBridge] Cannot send chat command - WebSocket not connected');
-      return false;
-    },
-    // v3.5.3: Register handler for chat output from PTY
-    registerChatOutputHandler: (handler) => {
-      chatOutputHandlerRef.current = handler;
-    },
-    unregisterChatOutputHandler: () => {
-      chatOutputHandlerRef.current = null;
-    },
-    // v3.5.3: Register handler for response completion (from PromptDetector)
-    registerChatResponseCompleteHandler: (handler) => {
-      chatResponseCompleteHandlerRef.current = handler;
-    },
-    unregisterChatResponseCompleteHandler: () => {
-      chatResponseCompleteHandlerRef.current = null;
-    },
-    // v3.5.3: Register handler for prompt waiting state
-    registerChatPromptWaitingHandler: (handler) => {
-      chatPromptWaitingHandlerRef.current = handler;
-    },
-    unregisterChatPromptWaitingHandler: () => {
-      chatPromptWaitingHandlerRef.current = null;
-    },
-    // v3.6.4: Register handler for initializing chat state from external commands (command cards)
-    registerChatCommandInitHandler: (handler) => {
-      chatCommandInitHandlerRef.current = handler;
-    },
-    unregisterChatCommandInitHandler: () => {
-      chatCommandInitHandlerRef.current = null;
-    },
   }));
-
+  
+  // Vision action handler
+  const handleVisionAction = useCallback((action) => {
+    if (action.type === 'INJECT_COMMAND' && action.command) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(action));
+        logger.terminal('Vision command injected', { tabId, command: action.command });
+      }
+    } else if (action.type === 'SHOW_ERROR' && action.message) {
+      // Show error via terminal write
+      if (xtermRef.current) {
+        xtermRef.current.writeln(`\r\n\x1b[31mError: ${action.message}\x1b[0m\r\n`);
+      }
+    }
+  }, [tabId]);
+  
   // Update terminal theme when theme or colorTheme prop changes
   useEffect(() => {
     if (xtermRef.current) {
@@ -921,11 +714,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.loadAddon(fitAddon);
     fitAddonRef.current = fitAddon;
     
-    // v3.7.1 FIX: Only focus if terminal is visible (prevents stealing focus from ChatView)
+    // Critical fix: Re-focus after fit addon loads (it steals focus during init)
     queueMicrotask(() => {
-      if (isVisibleRef.current) {
-        term.focus();
-      }
+      term.focus();
     });
 
     // Add search addon
@@ -933,11 +724,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.loadAddon(searchAddon);
     searchAddonRef.current = searchAddon;
     
-    // v3.7.1 FIX: Only focus if terminal is visible
+    // Critical fix: Re-focus after search addon loads
     queueMicrotask(() => {
-      if (isVisibleRef.current) {
-        term.focus();
-      }
+      term.focus();
     });
 
     // Open terminal
@@ -945,57 +734,43 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     xtermRef.current = term;
     diagnosticCore.recordInitEvent('xterm_created', { tabId });
     
-    // v3.7.1 FIX: Only focus if terminal is visible
+    // Critical fix: Force focus immediately after terminal.open()
+    // This ensures the terminal textarea receives focus before React re-renders
     queueMicrotask(() => {
-      if (isVisibleRef.current) {
-        term.focus();
-      }
+      term.focus();
     });
 
-    // PASTE HANDLER: Handle both text and images
+    // ROBUST PASTE HANDLER: Listen for the native paste event on the textarea
+    // This works even when navigator.clipboard.read() is blocked or fails
+    // We use the container and capture phase to ensure we get the event before xterm swallows it
     const handlePaste = async (e) => {
-      // Check for clipboard data
-      if (!e.clipboardData || !e.clipboardData.items) return;
+      // We only care about images here. Text is handled by xterm natively if we don't preventDefault.
       
-      let hasImage = false;
-      
-      // Check what's in the clipboard
-      for (const item of e.clipboardData.items) {
-        if (item.type.startsWith('image/')) {
-          hasImage = true;
-        }
-      }
-      
-      // Only handle image paste here - text paste is handled by Ctrl+V key handler
-      // This prevents double-pasting when user presses Ctrl+V
-      if (!hasImage) {
-        return;
-      }
-      
-      // Handle image paste only
-      e.preventDefault();
-      e.stopPropagation();
-      
-      for (const item of e.clipboardData.items) {
-        if (item.type.startsWith('image/')) {
-          console.log('[Terminal] Image paste detected:', item.type);
-          
-          // v3.7.2: Async upload with better UX
-          const blob = item.getAsFile();
-          if (!blob) continue;
-          
-          const formData = new FormData();
-          formData.append('image', blob);
-          
-          // Show immediate feedback (non-blocking indicator)
-          if (xtermRef.current) {
-            xtermRef.current.write('\x1b[90m[📷 Processing image...]\x1b[0m');
-          }
-          
-          // Async upload - doesn't block terminal
-          const uploadAsync = async () => {
+      // Check for images in the paste event
+      if (e.clipboardData && e.clipboardData.items) {
+        let imageFound = false;
+        for (const item of e.clipboardData.items) {
+          if (item.type.startsWith('image/')) {
+            imageFound = true;
+            e.preventDefault(); // Stop xterm from handling it
+            e.stopPropagation(); // Stop bubbling
+            
+            console.log('[Terminal] Image detected in paste event:', item.type);
+            
             try {
-              const response = await fetch('/api/temp-image', {
+              const blob = item.getAsFile();
+              if (!blob) continue;
+              
+              const formData = new FormData();
+              const filename = `clipboard-${Date.now()}.png`;
+              formData.append('file', blob, filename);
+              
+              // Show uploading indicator
+              if (xtermRef.current) {
+                xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
+              }
+              
+              const response = await fetch('/api/files/upload', {
                 method: 'POST',
                 body: formData
               });
@@ -1003,43 +778,32 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
               
               const data = await response.json();
-              const filePath = data.filePath;
-              const filename = data.filename;
+              const filePath = data.path;
               
-              // Send structured message instead of raw text
-              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.send(JSON.stringify({
-                  type: 'IMAGE_ATTACH',
-                  path: filePath,
-                  filename: filename,
-                  mimeType: blob.type,
-                  size: blob.size,
-                  timestamp: Date.now()
-                }));
-                console.log('[Terminal] Sent IMAGE_ATTACH message:', filename);
-              }
-              
-              // Update indicator - success
+              // Clear uploading indicator
               if (xtermRef.current) {
-                xtermRef.current.write('\r\x1b[K\x1b[32m[✓ Image attached: ' + filename + ']\x1b[0m\r\n');
+                xtermRef.current.write('\r\x1b[K');
               }
               
-              // Trigger paste callback with image type
-              if (onPasteRef.current) onPasteRef.current('image');
-              
+              // Send file path to terminal
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
+                const textToSend = `see file at ${pathStr}`;
+                wsRef.current.send(textToSend);
+                console.log('[Terminal] Sent image path to backend:', textToSend);
+                if (onPasteRef.current) onPasteRef.current();
+              }
             } catch (err) {
               console.error('[Terminal] Image upload failed:', err);
               if (xtermRef.current) {
-                xtermRef.current.write(`\r\x1b[K\x1b[31m[✗ Image upload failed: ${err.message}]\x1b[0m\r\n`);
+                xtermRef.current.write(`\r\x1b[K\x1b[31m[Image upload failed: ${err.message}]\x1b[0m\r\n`);
               }
             }
-          };
-          
-          // Execute async (non-blocking)
-          uploadAsync();
-          
-          break;
+            break; // Only handle one image
+          }
         }
+        
+        if (imageFound) return;
       }
     };
 
@@ -1051,19 +815,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
     // This runs BEFORE xterm processes the key and allows conditional intercept
     term.attachCustomKeyEventHandler((arg) => {
-      // v3.7.1 CRITICAL FIX: Block ALL key events when terminal is not visible
-      // This prevents keystrokes from leaking to hidden terminals
-      if (!isVisibleRef.current) {
-        return false; // Block the key event entirely
-      }
-
       // PERF FIX: Only record diagnostics when explicitly enabled (avoid function call overhead)
-      try {
-        if (diagnosticCore.isEnabled()) {
-          diagnosticCore.recordKeyboardEvent(arg);
-        }
-      } catch (err) {
-        // Silently catch diagnostic errors to prevent error count inflation
+      if (diagnosticCore.isEnabled()) {
+        diagnosticCore.recordKeyboardEvent(arg);
       }
 
       // CRITICAL FIX: Explicitly allow spacebar no matter what
@@ -1112,22 +866,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // Handle Ctrl+V (Paste) - Use Clipboard API for reliable paste
+      // Handle Ctrl+V (Paste) - REMOVED
+      // We now use the native 'paste' event listener on the textarea (see above)
+      // This is more robust and handles images correctly without needing Clipboard API permissions
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        // Use Clipboard API to read clipboard and send to terminal
-        navigator.clipboard.readText()
-          .then((text) => {
-            if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(text);
-              console.log('[Terminal] Ctrl+V: Pasted', text.length, 'chars');
-              // v3.7.2: Pass text flag to differentiate from image paste
-              if (onPasteRef.current) onPasteRef.current('text');
-            }
-          })
-          .catch((err) => {
-            console.error('[Terminal] Clipboard read failed:', err);
-          });
-        return false; // Prevent default xterm handling
+        return true; // Let xterm handle the key event (which triggers the paste event)
       }
 
       return true; // Let all other keys pass through standard xterm processing
@@ -1135,11 +878,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // Initial fit - PERFORMANCE FIX: Call directly instead of setTimeout(0)
     fitAddon.fit();
-    // v3.7.1 FIX: Only focus if terminal is visible
+    // Critical fix: Re-focus after fit() call (fit triggers hidden re-render)
     queueMicrotask(() => {
-      if (isVisibleRef.current) {
-        term.focus();
-      }
+      term.focus();
     });
 
     // Record that handlers are now attached
@@ -1163,8 +904,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       const params = new URLSearchParams();
       // CRITICAL: Pass tabID for AM/LLM logging
       params.set('tabId', tabId);
-      // CRITICAL: Pass amEnabled status so backend knows whether to create LLM Logger
-      params.set('amEnabled', amEnabled ? 'true' : 'false');
       if (cfg && cfg.shellType) {
         params.set('shell', cfg.shellType);
         if (cfg.shellType === 'wsl') {
@@ -1205,16 +944,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         const { cols, rows } = term;
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
         logger.terminal('Initial size sent', { tabId, cols, rows });
-
-        // v3.4.1 FIX: Send current auto-respond state to backend on connect
-        // This ensures backend is in sync after reconnection or session restore
-        if (autoRespondRef.current) {
-          ws.send(JSON.stringify({
-            type: 'AUTO_RESPOND_TOGGLE',
-            enabled: true
-          }));
-          console.log('[Auto-Respond] Synced enabled state on connect');
-        }
 
         // Restore directory if available
         if (currentDirectoryRef.current) {
@@ -1290,73 +1019,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 // Don't close connection - let normal close handling manage reconnection
                 return;
               }
-
-              // Task 4: Handle smart routing notifications - badge sync
-              if (msg.type === 'ROUTING_ACTIVE') {
-                logger.terminal('Smart routing executed', {
-                  tier: msg.tier,
-                  toolName: msg.toolName,
-                  actuallyRunning: msg.actuallyRunning,
-                  tierMismatch: msg.tierMismatch,
-                  action: msg.action
-                });
-                if (onRoutingUpdateRef.current) {
-                  onRoutingUpdateRef.current({
-                    tier: msg.tier,
-                    toolName: msg.toolName,
-                    prompt: msg.prompt,
-                    actuallyRunning: msg.actuallyRunning,
-                    tierMismatch: msg.tierMismatch,
-                    previousTier: msg.previousTier,
-                    action: msg.action
-                  });
-                }
-                return; // Don't write to terminal
-              }
-
-              if (msg.type === 'ROUTING_ERROR') {
-                console.warn('[SmartRouter] Routing error:', msg.error);
-                logger.terminal('Smart routing error', { error: msg.error, prompt: msg.prompt });
-                return; // Don't write to terminal
-              }
-
-              // v3.5.3: Handle Chat bridge responses
-              if (msg.type === 'CHAT_COMMAND_SENT') {
-                console.log('[ChatBridge] Command sent confirmation:', msg);
-                return; // Don't write to terminal
-              }
-              
-              if (msg.type === 'CHAT_ERROR') {
-                console.error('[ChatBridge] Error:', msg.error);
-                // Notify chat output handler of error
-                if (chatOutputHandlerRef.current) {
-                  chatOutputHandlerRef.current(`\n[Error: ${msg.error}]\n`);
-                }
-                return; // Don't write to terminal
-              }
-
-              // v3.5.3: Handle response completion from PromptDetector
-              if (msg.type === 'CHAT_RESPONSE_COMPLETE') {
-                console.log('[ChatBridge] Response complete detected:', msg.response?.length, 'chars');
-                if (chatResponseCompleteHandlerRef.current) {
-                  chatResponseCompleteHandlerRef.current(msg.response);
-                }
-                return; // Don't write to terminal
-              }
-
-              // v3.5.3: Handle prompt state changes
-              if (msg.type === 'PROMPT_WAITING_FOR_INPUT') {
-                console.log('[PromptDetector] Waiting for input:', msg.promptText);
-                if (chatPromptWaitingHandlerRef.current) {
-                  chatPromptWaitingHandlerRef.current(msg.promptText); // v3.7.1: Pass prompt text
-                }
-                return; // Don't write to terminal
-              }
-              
-              if (msg.type === 'PROMPT_STATE_CHANGE') {
-                console.log('[PromptDetector] State change:', msg.oldState, '->', msg.newState);
-                return; // Don't write to terminal
-              }
             } catch (e) {
               // Malformed JSON starting with { - just write it
               term.write(str);
@@ -1372,97 +1034,69 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           textData = String(event.data);
         }
 
-        // v2.0.1 EXACT: 2000 char buffer with object ref (increased for Copilot CLI menus)
+        // PERF FIX: Append to buffer efficiently (reuse buffer object)
         const buf = outputBufferRef.current;
-        buf.data = (buf.data + textData).slice(-2000);
+        buf.data = (buf.data + textData).slice(-800);
 
-        // v3.5.3: Forward PTY output to Chat handler if registered
-        if (textData && chatOutputHandlerRef.current) {
-          chatOutputHandlerRef.current(textData);
-        }
-
-        // v1.23.8 EXACT: AM logging with 5 second debounce
+        // PERF FIX: Batch AM logging - just queue, flush in idle time
         if (amEnabledRef.current && textData) {
-          // Limit buffer growth to prevent memory issues during high-volume output
-          if (amLogBufferRef.current.length > 100000) {
-             // Keep last 20k chars if buffer gets too big
-             amLogBufferRef.current = amLogBufferRef.current.slice(-20000);
-          }
-          amLogBufferRef.current += textData;
+          amLogQueueRef.current.push(textData);
 
-          if (amLogTimeoutRef.current) {
-            clearTimeout(amLogTimeoutRef.current);
-          }
-          amLogTimeoutRef.current = setTimeout(() => {
-            if (amLogBufferRef.current) {
-              // PERF FIX: Slice BEFORE stripAnsi to avoid freezing on large buffers
-              // We only need the last 1500 chars for the API, so processing 10k is plenty safe
-              const rawContent = amLogBufferRef.current.length > 10000 
-                ? amLogBufferRef.current.slice(-10000) 
-                : amLogBufferRef.current;
-                
-              const cleanContent = stripAnsi(rawContent);
-              if (cleanContent.trim()) {
-                fetch('/api/am/log', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    tabId: tabId,
-                    tabName: tabNameRef.current || 'Terminal',
-                    workspace: window.location.pathname,
-                    entryType: 'AGENT_OUTPUT',
-                    content: cleanContent.slice(-1500),
-                  }),
-                }).catch(() => {});
+          // Schedule flush during idle time (not on every message)
+          if (!amLogFlushIdleRef.current) {
+            amLogFlushIdleRef.current = scheduleIdleWork(() => {
+              amLogFlushIdleRef.current = null;
+              const queue = amLogQueueRef.current;
+              if (queue.length > 0) {
+                const combined = queue.join('');
+                amLogQueueRef.current = [];
+                const cleanContent = stripAnsi(combined);
+                if (cleanContent.trim()) {
+                  fetch('/api/am/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      tabId: tabId,
+                      tabName: tabNameRef.current || 'Terminal',
+                      workspace: window.location.pathname,
+                      entryType: 'AGENT_OUTPUT',
+                      content: cleanContent.slice(-1500),
+                    }),
+                  }).catch(() => {});
+                }
               }
-              amLogBufferRef.current = '';
-            }
-          }, 5000);
-        }
-
-        // v2.2.6 FIX: Use setTimeout for reliable prompt detection (not requestIdleCallback)
-        if (waitingCheckTimeoutRef.current) {
-          cancelDetection(waitingCheckTimeoutRef.current);
-        }
-        waitingCheckTimeoutRef.current = scheduleDetection(() => {
-          waitingCheckTimeoutRef.current = null;
-          
-          // Strip ANSI for pattern matching
-          const cleanBuffer = stripAnsi(buf.data);
-          
-          // CRITICAL FIX: Use buf.data not lastOutputRef
-          const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
-
-          // v3.4.0: Detect interactive TUI (Claude Code multi-question wizards, etc.)
-          // This should trigger auto-switch to terminal view
-          const tuiResult = detectInteractiveTUI(cleanBuffer);
-          if (tuiResult.detected && !lastTUIStateRef.current) {
-            lastTUIStateRef.current = true;
-            console.log('%c[TUI Detected] Interactive prompt requires user input', 
-              'background: #8b5cf6; color: #fff; font-weight: bold; padding: 2px 5px;', 
-              { type: tuiResult.type, tabId }
-            );
-            if (onInteractiveTUIRef.current) {
-              onInteractiveTUIRef.current(tuiResult.type);
-            }
-          } else if (!tuiResult.detected && lastTUIStateRef.current) {
-            // TUI ended - reset state
-            lastTUIStateRef.current = false;
-            console.log('[TUI Ended] Interactive prompt completed', { tabId });
+            });
           }
+        }
 
-          // CRITICAL DEBUG: Always log what we're checking
-          const bufferPreview = buf.data.slice(-300);
-          const cleanPreview = stripAnsi(bufferPreview);
-          console.log('[Auto-Respond] Detection check:', {
-            waiting,
-            responseType,
-            confidence,
-            autoRespondEnabled: autoRespondRef.current,
-            wsOpen: ws.readyState === WebSocket.OPEN,
-            bufferLength: buf.data.length,
-            cleanPreview: cleanPreview.slice(-150)
-          });
+        // Simple debounce pattern matching v1.23.8 proven behavior
+        // 1. Cancel any pending check (new data arrived)
+        // 2. Schedule a new check after 1500ms of idle time
+        // This ensures we only check when the stream settles
+        if (waitingCheckIdleRef.current) {
+          cancelIdleWork(waitingCheckIdleRef.current);
+        }
+        
+        waitingCheckIdleRef.current = scheduleIdleWork(() => {
+          waitingCheckIdleRef.current = null;
+
+          // Update lastOutputRef for compatibility
+          lastOutputRef.current = buf.data;
+
+          // Now do the expensive regex work
+          const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
+          
+          // DEBUG: Log auto-respond check (uncomment for debugging)
+          if (autoRespondRef.current) {
+            console.log('[AutoRespond] Check:', { 
+              waiting, 
+              responseType, 
+              confidence,
+              autoRespondEnabled: autoRespondRef.current,
+              wsReady: ws.readyState === WebSocket.OPEN,
+              bufferLen: buf.data.length
+            });
+          }
 
           if (waiting !== isWaiting) {
             setIsWaiting(waiting);
@@ -1471,7 +1105,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Directory detection
+          // Directory detection (also uses regex)
           const detectedDir = extractDirectory(buf.data);
           if (detectedDir && detectedDir !== lastDirectoryRef.current) {
             lastDirectoryRef.current = detectedDir;
@@ -1481,31 +1115,24 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // v1.23.8 EXACT: Auto-respond logic
-          // IMPORTANT: Do NOT auto-respond if interactive TUI is active
-          const shouldAutoRespond = waiting &&
-            autoRespondRef.current &&
-            ws.readyState === WebSocket.OPEN &&
-            !tuiResult.detected; // Skip auto-respond for interactive TUIs
-
+          // Auto-respond logic - CRITICAL: Match v1.23.8 exactly
+          const shouldAutoRespond = waiting && 
+            autoRespondRef.current && 
+            ws.readyState === WebSocket.OPEN;
+            
           if (shouldAutoRespond) {
-            // Log to browser console for user visibility
-            console.log('%c[Auto-Respond] ACTIVATED', 'background: #00ff00; color: #000; font-weight: bold; padding: 2px 5px;', {
-              responseType,
-              confidence,
-              tabId,
-              bufferPreview: buf.data.slice(-150)
-            });
+            console.log('[AutoRespond] SENDING response:', { responseType, confidence });
             logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
-
+            
             if (responseType === 'enter') {
               ws.send('\r');
             } else {
               ws.send('y\r');
             }
-
-            // Clear buffer after responding
+            
+            // Clear buffer and state after auto-respond
             buf.data = '';
+            lastOutputRef.current = '';
             setIsWaiting(false);
             if (onWaitingChange) {
               onWaitingChange(false);
@@ -1623,11 +1250,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
       // Handle terminal input
       term.onData((data) => {
-        // v3.7.1 FIX: Don't send data from hidden terminals
-        if (!isVisibleRef.current) {
-          return; // Discard input from hidden terminals
-        }
-
         // PERF FIX: Only record diagnostics when explicitly enabled
         if (diagnosticCore.isEnabled()) {
           diagnosticCore.recordTerminalData(data);
@@ -1636,36 +1258,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
           
-          // Track command buffer for model tier detection
-          if (onTerminalCommandRef.current) {
-            // Check if Enter key was pressed
-            if (data === '\r' || data === '\n' || data === '\r\n') {
-              const command = commandBufferRef.current.trim();
-              if (command.length >= 10) {
-                // Only analyze substantial commands
-                onTerminalCommandRef.current(command);
-              }
-              commandBufferRef.current = ''; // Reset after Enter
-            } else if (data === '\x7f' || data === '\b') {
-              // Backspace - remove last character
-              commandBufferRef.current = commandBufferRef.current.slice(0, -1);
-            } else if (data === '\x03') {
-              // Ctrl+C - clear buffer
-              commandBufferRef.current = '';
-            } else if (data.charCodeAt(0) >= 32) {
-              // Printable character - add to buffer
-              commandBufferRef.current += data;
-            }
-          }
-          
           // AM logging: Optimized input capture - only when AM enabled
           if (amEnabledRef.current) {
             amInputBufferRef.current += data;
-            
-            // Limit input buffer size
-            if (amInputBufferRef.current.length > 5000) {
-              amInputBufferRef.current = amInputBufferRef.current.slice(-5000);
-            }
             
             if (amInputTimeoutRef.current) {
               clearTimeout(amInputTimeoutRef.current);
@@ -1749,36 +1344,33 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     return () => {
       // No cleanup needed for attachCustomKeyEventHandler - xterm handles it
 
-      // Clean up paste event listener
-      if (terminalRef.current) {
-        terminalRef.current.removeEventListener('paste', handlePaste, true);
-      }
-
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();
 
-      // v2.2.6: Cancel detection timeout
-      if (waitingCheckTimeoutRef.current) {
-        cancelDetection(waitingCheckTimeoutRef.current);
-        waitingCheckTimeoutRef.current = null;
+      // PERF FIX: Cancel idle callbacks instead of timeouts
+      if (waitingCheckIdleRef.current) {
+        cancelIdleWork(waitingCheckIdleRef.current);
+        waitingCheckIdleRef.current = null;
       }
-      if (amLogTimeoutRef.current) {
-        clearTimeout(amLogTimeoutRef.current);
-        amLogTimeoutRef.current = null;
+      if (amLogFlushIdleRef.current) {
+        cancelIdleWork(amLogFlushIdleRef.current);
+        amLogFlushIdleRef.current = null;
       }
       if (amInputTimeoutRef.current) {
         clearTimeout(amInputTimeoutRef.current);
       }
 
       // Flush any pending AM logs before closing
-      if (amLogBufferRef.current || amInputBufferRef.current) {
+      const amQueue = amLogQueueRef.current;
+      if (amQueue.length > 0 || amInputBufferRef.current) {
         const flushData = [];
-        if (amLogBufferRef.current) {
-          const cleanContent = stripAnsi(amLogBufferRef.current);
+        if (amQueue.length > 0) {
+          const combined = amQueue.join('');
+          const cleanContent = stripAnsi(combined);
           if (cleanContent.trim()) {
             flushData.push({ entryType: 'AGENT_OUTPUT', content: cleanContent.slice(-2000) });
           }
-          amLogBufferRef.current = '';
+          amLogQueueRef.current = [];
         }
         if (amInputBufferRef.current) {
           const cleanInput = amInputBufferRef.current
@@ -1804,7 +1396,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
 
       // Clear buffer
-      outputBufferRef.current = { data: '' };
+      outputBufferRef.current = { data: '', writePos: 0 };
 
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Remove onclose handler before closing to avoid race condition
@@ -1888,19 +1480,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           aria-label="Scroll to bottom"
         >
           <ArrowDownToLine size={16} />
-        </button>
-      )}
-      
-      {/* Switch to Chat button */}
-      {onSwitchToChat && isVisible && (
-        <button
-          className="switch-to-chat-btn"
-          onClick={onSwitchToChat}
-          title="Switch to Chat"
-          aria-label="Switch to Chat"
-        >
-          <MessageSquare size={16} />
-          <span>Chat</span>
         </button>
       )}
     </div>
