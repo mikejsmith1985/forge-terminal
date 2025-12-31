@@ -230,6 +230,16 @@
   color: #fca5a5;
 }
 
+/* Message timestamp */
+.chat-view-timestamp {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-bottom: 6px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  letter-spacing: 0.5px;
+}
+
 /* v3.7.1: Interactive prompt styling */
 .chat-view-message-prompt .chat-view-content,
 .interactive-prompt .chat-view-content {

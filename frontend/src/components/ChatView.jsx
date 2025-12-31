@@ -114,6 +114,7 @@ const ChatView = ({
               content: m.content,
               workerName: m.workerName,
               metadata: m.metadata,
+              timestamp: m.timestamp || m.createdAt,
             }));
             setMessages(formatted);
           }
@@ -144,6 +145,7 @@ const ChatView = ({
               content: msg.content,
               workerName: msg.workerName,
               metadata: msg.metadata,
+              timestamp: msg.timestamp || new Date(msg.createdAt),
             };
             setMessages(prev => {
               // Avoid duplicates
@@ -260,15 +262,17 @@ const ChatView = ({
     const handleExternalCommand = (chatCommand) => {
       console.log('[ChatView] External command received:', chatCommand.command?.substring(0, 50));
       
-      // Generate IDs for messages
+      // Generate IDs and timestamp for messages
       const userMessageId = `user-ext-${Date.now()}`;
       const newAssistantMessageId = `assistant-ext-${Date.now()}`;
+      const timestamp = new Date();
       
       // Add user message
       const userMsg = {
         id: userMessageId,
         role: 'user',
         content: chatCommand.command,
+        timestamp,
       };
       
       // Add placeholder assistant message
@@ -276,6 +280,7 @@ const ChatView = ({
         id: newAssistantMessageId,
         role: 'assistant',
         content: '⏳ Waiting for response...',
+        timestamp,
         workerName: chatCommand.model || chatCommand.cli || 'AI',
       };
       
@@ -366,6 +371,7 @@ const ChatView = ({
     }
 
     const assistantMessageId = `msg-${Date.now() + 1}`;
+    const timestamp = new Date();
     assistantMessageIdRef.current = assistantMessageId;
     responseAccumulatorRef.current = '';
 
@@ -386,6 +392,7 @@ const ChatView = ({
       role: 'assistant', 
       content: '⏳ Waiting for response...', 
       id: assistantMessageId,
+      timestamp,
       workerName: model || 'AI',
       metadata: slmResult ? { complexity: slmResult.complexity } : null,
     }]);
@@ -461,6 +468,7 @@ const ChatView = ({
     const decoder = new TextDecoder();
     let fullResponse = '';
     const assistantMessageId = `msg-${Date.now() + 1}`;
+    const timestamp = new Date();
     let messageAdded = false;
 
     while (true) {
@@ -475,6 +483,7 @@ const ChatView = ({
           role: 'assistant', 
           content: fullResponse, 
           id: assistantMessageId,
+          timestamp,
           workerName: routedModel || 'AI',
           metadata: slmResult ? { complexity: slmResult.complexity } : null,
         }]);
@@ -517,8 +526,9 @@ const ChatView = ({
 
     const userMessage = inputValue.trim();
     const userMsgId = `msg-${Date.now()}`;
+    const timestamp = new Date();
     setInputValue('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage, id: userMsgId }]);
+    setMessages(prev => [...prev, { role: 'user', content: userMessage, id: userMsgId, timestamp }]);
     setIsLoading(true);
     setError(null);
 
@@ -795,6 +805,9 @@ const ChatView = ({
                 {msg.workerName && msg.role === 'assistant' && (
                   <div className="chat-view-worker-badge">{msg.workerName}</div>
                 )}
+                {msg.timestamp && (
+                  <div className="chat-view-timestamp">{formatTimestamp(msg.timestamp)}</div>
+                )}
                 {msg.isInteractive && (
                   <div className="chat-view-prompt-indicator">⚡ Input needed - type your response below</div>
                 )}
@@ -910,6 +923,16 @@ const ChatView = ({
       />
     </div>
   );
+};
+
+// Helper function to format timestamp
+const formatTimestamp = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  const hours = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const secs = String(d.getSeconds()).padStart(2, '0');
+  return `${hours}:${mins}:${secs}`;
 };
 
 /**
