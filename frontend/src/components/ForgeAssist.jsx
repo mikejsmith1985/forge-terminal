@@ -1,540 +1,640 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Command, Terminal, MessageSquare, Search, Zap, Hash, X, Copy, Play, Target, FileCode, Brain, CheckCircle, Rocket, ChevronRight, Loader2 } from 'lucide-react';
+import { 
+  Search, X, Copy, Play, ChevronRight, ChevronDown,
+  Zap, Settings, GitBranch, FileCode, Brain, Bot, Terminal,
+  Shield, Workflow, BookOpen, Sparkles, AlertTriangle, ExternalLink
+} from 'lucide-react';
 import './ForgeAssist.css';
 
 /**
- * ForgeAssist - Context-aware command palette for CLI tools
- * v3.9.0: Enhanced with Task Mode + SLM Integration
+ * ForgeAssist - Power Features Discovery for CLI Tools
+ * v3.9.1: Complete redesign - surfaces hidden CLI capabilities
  * 
- * Features:
- * - Context-aware CLI detection (Copilot, Claude, Git, npm)
- * - Task Mode with 5 stages: Context → Plan → Implement → Validate → Deliver
- * - SLM-powered command suggestions (local AI, zero cost)
- * - Quick command execution to terminal
+ * Purpose: Help users discover powerful features they don't know about
+ * - Subagents, Hooks, Planning Mode for Claude
+ * - MCP integration, Session management for Copilot
+ * - Manual CLI selection (not auto-detect)
  * 
  * Triggered by Ctrl+/ or button click
  */
 
-// Task stages for Task Mode
-const TASK_STAGES = [
-  { id: 'context', name: 'Context', icon: FileCode, color: '#3b82f6', desc: 'Gather files and understand scope' },
-  { id: 'plan', name: 'Plan', icon: Brain, color: '#8b5cf6', desc: 'AI generates approach' },
-  { id: 'implement', name: 'Implement', icon: Terminal, color: '#f59e0b', desc: 'Work in terminal' },
-  { id: 'validate', name: 'Validate', icon: CheckCircle, color: '#10b981', desc: 'Run tests and checks' },
-  { id: 'deliver', name: 'Deliver', icon: Rocket, color: '#ef4444', desc: 'Commit and deploy' },
-];
-
-// Stage-specific command suggestions
-const STAGE_COMMANDS = {
-  context: [
-    { cmd: 'git status', desc: 'Check current changes', name: 'Git Status' },
-    { cmd: 'git diff', desc: 'Review file changes', name: 'Git Diff' },
-    { cmd: 'ls -la', desc: 'List directory contents', name: 'List Files' },
-  ],
-  plan: [
-    { cmd: 'copilot', desc: 'Start Copilot for planning', name: 'Copilot Session' },
-    { cmd: 'claude', desc: 'Start Claude for planning', name: 'Claude Session' },
-    { cmd: 'cat README.md', desc: 'Review project docs', name: 'Read README' },
-  ],
-  implement: [
-    { cmd: 'copilot --continue', desc: 'Continue last session', name: 'Continue Copilot' },
-    { cmd: 'claude --continue', desc: 'Continue last session', name: 'Continue Claude' },
-    { cmd: 'npm run dev', desc: 'Start dev server', name: 'Dev Server' },
-  ],
-  validate: [
-    { cmd: 'npm test', desc: 'Run test suite', name: 'Run Tests' },
-    { cmd: 'npm run lint', desc: 'Check code quality', name: 'Lint Code' },
-    { cmd: 'npm run build', desc: 'Verify build works', name: 'Build Check' },
-  ],
-  deliver: [
-    { cmd: 'git add .', desc: 'Stage all changes', name: 'Stage All' },
-    { cmd: 'git commit -m "', desc: 'Commit with message', name: 'Commit', appendCursor: true },
-    { cmd: 'git push', desc: 'Push to remote', name: 'Push' },
-  ],
-};
-
-// Command definitions for each CLI tool
-const CLI_COMMANDS = {
+// Power features organized by category for each CLI
+const CLI_POWER_FEATURES = {
+  claude: {
+    name: 'Claude Code',
+    icon: '🧠',
+    color: '#f59e0b',
+    categories: [
+      {
+        name: 'Subagents',
+        icon: Bot,
+        description: 'Specialized AI assistants for specific tasks',
+        features: [
+          { 
+            name: 'Create Subagent', 
+            cmd: 'mkdir -p .claude/agents && echo "---\nname: reviewer\ndescription: Code review specialist\ntools: [Read, Grep]\n---\nYou are a code review expert. Focus on security, performance, and best practices." > .claude/agents/reviewer.md',
+            desc: 'Create a code-reviewer subagent with its own context',
+            category: 'setup',
+            learnMore: 'https://code.claude.com/docs/en/sub-agents'
+          },
+          { 
+            name: 'Use Subagent', 
+            cmd: '@reviewer ',
+            desc: 'Invoke a subagent by name (type @name in Claude)',
+            category: 'usage',
+            appendCursor: true
+          },
+          { 
+            name: 'List Subagents', 
+            cmd: 'ls -la .claude/agents/ 2>/dev/null || echo "No subagents yet. Create .claude/agents/ directory."',
+            desc: 'Show available project subagents',
+            category: 'info'
+          },
+        ]
+      },
+      {
+        name: 'Hooks & Automation',
+        icon: Workflow,
+        description: 'Auto-run commands on file changes',
+        features: [
+          { 
+            name: 'Auto-Format Hook', 
+            cmd: 'echo \'{"hooks":{"PostToolUse":[{"matcher":"Write(*.py)","hooks":[{"type":"command","command":"python -m black $CLAUDE_FILE_PATH"}]}]}}\' > .claude/settings.json',
+            desc: 'Auto-format Python files after Claude writes them',
+            category: 'setup'
+          },
+          { 
+            name: 'Auto-Lint Hook', 
+            cmd: 'echo \'{"hooks":{"PostToolUse":[{"matcher":"Write(*.ts)","hooks":[{"type":"command","command":"npx eslint --fix $CLAUDE_FILE_PATH"}]}]}}\' > .claude/settings.json',
+            desc: 'Auto-lint TypeScript files after writes',
+            category: 'setup'
+          },
+          { 
+            name: 'View Hooks Config', 
+            cmd: 'cat .claude/settings.json 2>/dev/null || echo "No hooks configured. Create .claude/settings.json"',
+            desc: 'Show current hook configuration',
+            category: 'info'
+          },
+        ]
+      },
+      {
+        name: 'Planning & Thinking',
+        icon: Brain,
+        description: 'Extended reasoning for complex tasks',
+        features: [
+          { 
+            name: 'Deep Think Mode', 
+            cmd: 'think harder about ',
+            desc: 'Expand reasoning window (4k→32k tokens)',
+            category: 'prompt',
+            appendCursor: true
+          },
+          { 
+            name: 'Ultra Think Mode', 
+            cmd: 'ultrathink ',
+            desc: 'Maximum reasoning (128k tokens) for architecture',
+            category: 'prompt',
+            appendCursor: true
+          },
+          { 
+            name: 'Planning Prompt', 
+            cmd: 'Create a detailed implementation plan for: ',
+            desc: 'Ask Claude to plan before implementing',
+            category: 'prompt',
+            appendCursor: true
+          },
+        ]
+      },
+      {
+        name: 'Memory & Context',
+        icon: BookOpen,
+        description: 'Persistent project memory via CLAUDE.md',
+        features: [
+          { 
+            name: 'Init CLAUDE.md', 
+            cmd: '/init',
+            desc: 'Create project memory file with defaults',
+            category: 'slash'
+          },
+          { 
+            name: 'Edit Memory', 
+            cmd: '/memory',
+            desc: 'Edit CLAUDE.md in your editor',
+            category: 'slash'
+          },
+          { 
+            name: 'Compact Context', 
+            cmd: '/compact',
+            desc: 'Compress conversation to save tokens',
+            category: 'slash'
+          },
+          { 
+            name: 'View CLAUDE.md', 
+            cmd: 'cat CLAUDE.md 2>/dev/null || echo "No CLAUDE.md found. Run /init to create one."',
+            desc: 'Show current project memory',
+            category: 'info'
+          },
+        ]
+      },
+      {
+        name: 'Session Control',
+        icon: Terminal,
+        description: 'Manage conversations and history',
+        features: [
+          { 
+            name: 'Continue Session', 
+            cmd: 'claude --continue',
+            desc: 'Resume last conversation',
+            category: 'cli'
+          },
+          { 
+            name: 'Resume Specific', 
+            cmd: 'claude --resume',
+            desc: 'Pick from recent sessions',
+            category: 'cli'
+          },
+          { 
+            name: 'Clear History', 
+            cmd: '/clear',
+            desc: 'Start fresh conversation',
+            category: 'slash'
+          },
+          { 
+            name: 'Show Cost', 
+            cmd: '/cost',
+            desc: 'Display token usage and cost',
+            category: 'slash'
+          },
+        ]
+      },
+      {
+        name: 'Dangerous Power',
+        icon: AlertTriangle,
+        description: 'Use with caution - skips safety checks',
+        features: [
+          { 
+            name: 'Full Auto Mode', 
+            cmd: 'claude --dangerously-skip-permissions',
+            desc: '⚠️ Skip ALL confirmation prompts',
+            category: 'cli',
+            dangerous: true
+          },
+          { 
+            name: 'Yolo Single Task', 
+            cmd: 'claude -p "',
+            desc: 'One-shot prompt, no session',
+            category: 'cli',
+            appendCursor: true
+          },
+        ]
+      },
+    ]
+  },
   copilot: {
     name: 'GitHub Copilot CLI',
     icon: '🤖',
     color: '#8b5cf6',
-    slashCommands: [
-      { cmd: '/help', desc: 'Show all available commands' },
-      { cmd: '/model', desc: 'Switch AI model' },
-      { cmd: '/clear', desc: 'Clear conversation' },
-      { cmd: '/usage', desc: 'Show token usage stats' },
-      { cmd: '/explain', desc: 'Explain code' },
-      { cmd: '/fix', desc: 'Fix code issues' },
-      { cmd: '/tests', desc: 'Generate tests' },
-    ],
-    quickCommands: [
-      { name: 'Continue Session', cmd: 'copilot --continue', desc: 'Resume last conversation' },
-      { name: 'Quick Question', cmd: 'copilot -p "', desc: 'One-off prompt', appendCursor: true },
-      { name: 'Resume Specific', cmd: 'copilot --resume', desc: 'Pick from recent sessions' },
-    ],
-    contextVars: ['#file', '#selection', '#function', '#class', '#block', '#line'],
-  },
-  claude: {
-    name: 'Claude Code CLI',
-    icon: '🧠',
-    color: '#f59e0b',
-    slashCommands: [
-      { cmd: '/help', desc: 'Show all commands' },
-      { cmd: '/model', desc: 'Switch model' },
-      { cmd: '/clear', desc: 'Clear history' },
-      { cmd: '/compact', desc: 'Compress context' },
-      { cmd: '/cost', desc: 'Show usage cost' },
-      { cmd: '/doctor', desc: 'Health check' },
-      { cmd: '/init', desc: 'Initialize CLAUDE.md' },
-      { cmd: '/memory', desc: 'Edit memory file' },
-      { cmd: '/review', desc: 'Code review' },
-    ],
-    quickCommands: [
-      { name: 'Continue Session', cmd: 'claude --continue', desc: 'Resume last conversation' },
-      { name: 'Plan Mode (Opus)', cmd: 'claude --model opus', desc: 'Use Opus for planning' },
-      { name: 'Quick Question', cmd: 'claude -p "', desc: 'One-off prompt', appendCursor: true },
-      { name: 'Full Auto', cmd: 'claude --dangerously-skip-permissions', desc: '⚠️ Skip all prompts' },
-    ],
-    contextVars: [],
+    categories: [
+      {
+        name: 'Session Management',
+        icon: Terminal,
+        description: 'Control conversation state',
+        features: [
+          { 
+            name: 'Continue Session', 
+            cmd: 'copilot --continue',
+            desc: 'Resume last conversation',
+            category: 'cli'
+          },
+          { 
+            name: 'Resume Specific', 
+            cmd: 'copilot --resume',
+            desc: 'Pick from recent sessions',
+            category: 'cli'
+          },
+          { 
+            name: 'Quick Prompt', 
+            cmd: 'copilot -p "',
+            desc: 'One-off question, no session',
+            category: 'cli',
+            appendCursor: true
+          },
+        ]
+      },
+      {
+        name: 'Model & Output',
+        icon: Sparkles,
+        description: 'Control AI behavior',
+        features: [
+          { 
+            name: 'Switch Model', 
+            cmd: '/model',
+            desc: 'Choose different AI model',
+            category: 'slash'
+          },
+          { 
+            name: 'Stream Output', 
+            cmd: 'copilot --stream',
+            desc: 'Token-by-token output',
+            category: 'cli'
+          },
+          { 
+            name: 'Show Banner', 
+            cmd: 'copilot --banner',
+            desc: 'Display animated startup banner',
+            category: 'cli'
+          },
+          { 
+            name: 'Screen Reader', 
+            cmd: 'copilot --screen-reader',
+            desc: 'Optimize output for accessibility',
+            category: 'cli'
+          },
+        ]
+      },
+      {
+        name: 'Security & Permissions',
+        icon: Shield,
+        description: 'Control what Copilot can access',
+        features: [
+          { 
+            name: 'Allow Tool', 
+            cmd: 'copilot --allow-tool ',
+            desc: 'Explicitly allow a system tool',
+            category: 'cli',
+            appendCursor: true
+          },
+          { 
+            name: 'Deny Tool', 
+            cmd: 'copilot --deny-tool ',
+            desc: 'Block a specific tool',
+            category: 'cli',
+            appendCursor: true
+          },
+          { 
+            name: 'Allow All Paths', 
+            cmd: 'copilot --allow-all-paths',
+            desc: '⚠️ Bypass path approvals',
+            category: 'cli',
+            dangerous: true
+          },
+          { 
+            name: 'Serial Execution', 
+            cmd: 'copilot --disable-parallel-tools-execution',
+            desc: 'Run tools one at a time (safer)',
+            category: 'cli'
+          },
+        ]
+      },
+      {
+        name: 'Context Variables',
+        icon: FileCode,
+        description: 'Reference code in prompts',
+        features: [
+          { 
+            name: '#file', 
+            cmd: '#file:',
+            desc: 'Reference a specific file',
+            category: 'context',
+            appendCursor: true
+          },
+          { 
+            name: '#selection', 
+            cmd: '#selection',
+            desc: 'Reference current selection',
+            category: 'context'
+          },
+          { 
+            name: '#function', 
+            cmd: '#function:',
+            desc: 'Reference a function by name',
+            category: 'context',
+            appendCursor: true
+          },
+          { 
+            name: '#class', 
+            cmd: '#class:',
+            desc: 'Reference a class by name',
+            category: 'context',
+            appendCursor: true
+          },
+        ]
+      },
+      {
+        name: 'Built-in Commands',
+        icon: Zap,
+        description: 'Slash commands in conversation',
+        features: [
+          { 
+            name: 'Explain Code', 
+            cmd: '/explain',
+            desc: 'Get explanation of code',
+            category: 'slash'
+          },
+          { 
+            name: 'Fix Issues', 
+            cmd: '/fix',
+            desc: 'Auto-fix code problems',
+            category: 'slash'
+          },
+          { 
+            name: 'Generate Tests', 
+            cmd: '/tests',
+            desc: 'Create tests for code',
+            category: 'slash'
+          },
+          { 
+            name: 'Show Usage', 
+            cmd: '/usage',
+            desc: 'Display token statistics',
+            category: 'slash'
+          },
+        ]
+      },
+      {
+        name: 'MCP Integration',
+        icon: Settings,
+        description: 'Connect external AI tools',
+        features: [
+          { 
+            name: 'View Config', 
+            cmd: 'cat ~/.copilot/config.json 2>/dev/null || echo "No config found at ~/.copilot/config.json"',
+            desc: 'Show Copilot configuration',
+            category: 'info'
+          },
+          { 
+            name: 'Config Location', 
+            cmd: 'echo "Windows: %USERPROFILE%\\.copilot\\config.json" && echo "macOS/Linux: ~/.copilot/config.json"',
+            desc: 'Where to edit settings',
+            category: 'info'
+          },
+        ]
+      },
+    ]
   },
   git: {
     name: 'Git',
     icon: '⎇',
     color: '#f14e32',
-    slashCommands: [],
-    quickCommands: [
-      { name: 'Status', cmd: 'git status', desc: 'Show working tree status' },
-      { name: 'Diff', cmd: 'git diff', desc: 'Show changes' },
-      { name: 'Stage All', cmd: 'git add .', desc: 'Stage all changes' },
-      { name: 'Commit', cmd: 'git commit -m "', desc: 'Commit with message', appendCursor: true },
-      { name: 'Push', cmd: 'git push', desc: 'Push to remote' },
-      { name: 'Pull', cmd: 'git pull', desc: 'Pull from remote' },
-      { name: 'Log', cmd: 'git log --oneline -10', desc: 'Recent commits' },
-      { name: 'Stash', cmd: 'git stash', desc: 'Stash changes' },
-      { name: 'Stash Pop', cmd: 'git stash pop', desc: 'Apply stashed changes' },
-    ],
-    contextVars: [],
-  },
-  npm: {
-    name: 'npm',
-    icon: '📦',
-    color: '#cb3837',
-    slashCommands: [],
-    quickCommands: [
-      { name: 'Install', cmd: 'npm install', desc: 'Install dependencies' },
-      { name: 'Run Dev', cmd: 'npm run dev', desc: 'Start dev server' },
-      { name: 'Run Build', cmd: 'npm run build', desc: 'Production build' },
-      { name: 'Run Test', cmd: 'npm test', desc: 'Run tests' },
-      { name: 'Update', cmd: 'npm update', desc: 'Update packages' },
-      { name: 'Audit', cmd: 'npm audit', desc: 'Security audit' },
-    ],
-    contextVars: [],
-  },
-  general: {
-    name: 'General',
-    icon: '💻',
-    color: '#888',
-    slashCommands: [],
-    quickCommands: [
-      { name: 'Start Copilot', cmd: 'copilot', desc: 'Launch Copilot CLI' },
-      { name: 'Start Claude', cmd: 'claude', desc: 'Launch Claude Code' },
-      { name: 'List Files', cmd: 'ls -la', desc: 'List directory contents' },
-      { name: 'Clear Terminal', cmd: 'clear', desc: 'Clear screen' },
-    ],
-    contextVars: [],
+    categories: [
+      {
+        name: 'Common Operations',
+        icon: GitBranch,
+        description: 'Everyday git commands',
+        features: [
+          { name: 'Status', cmd: 'git status', desc: 'Show working tree status', category: 'basic' },
+          { name: 'Diff', cmd: 'git diff', desc: 'Show changes', category: 'basic' },
+          { name: 'Stage All', cmd: 'git add .', desc: 'Stage all changes', category: 'basic' },
+          { name: 'Commit', cmd: 'git commit -m "', desc: 'Commit with message', category: 'basic', appendCursor: true },
+          { name: 'Push', cmd: 'git push', desc: 'Push to remote', category: 'basic' },
+          { name: 'Pull', cmd: 'git pull', desc: 'Pull from remote', category: 'basic' },
+        ]
+      },
+      {
+        name: 'History & Stash',
+        icon: BookOpen,
+        description: 'Navigate history',
+        features: [
+          { name: 'Log (compact)', cmd: 'git log --oneline -20', desc: 'Recent commits', category: 'history' },
+          { name: 'Log (graph)', cmd: 'git log --oneline --graph -20', desc: 'Visual branch history', category: 'history' },
+          { name: 'Stash', cmd: 'git stash', desc: 'Stash changes', category: 'stash' },
+          { name: 'Stash Pop', cmd: 'git stash pop', desc: 'Apply stashed changes', category: 'stash' },
+          { name: 'Stash List', cmd: 'git stash list', desc: 'Show all stashes', category: 'stash' },
+        ]
+      },
+    ]
   },
 };
-
-// Detect which CLI is likely active based on terminal buffer
-function detectActiveCLI(terminalBuffer) {
-  if (!terminalBuffer) return 'general';
-  
-  const buffer = terminalBuffer.toLowerCase();
-  const lastChunk = buffer.slice(-2000); // Check last portion
-  
-  // Check for active CLI indicators
-  if (lastChunk.includes('copilot>') || lastChunk.includes('github copilot') || 
-      lastChunk.includes('copilot cli') || /copilot\s*$/.test(lastChunk)) {
-    return 'copilot';
-  }
-  if (lastChunk.includes('claude>') || lastChunk.includes('claude code') ||
-      lastChunk.includes('anthropic') || /claude\s*$/.test(lastChunk)) {
-    return 'claude';
-  }
-  if (lastChunk.includes('on branch') || lastChunk.includes('git status') ||
-      lastChunk.includes('changes not staged') || lastChunk.includes('untracked files')) {
-    return 'git';
-  }
-  if (lastChunk.includes('npm run') || lastChunk.includes('package.json') ||
-      lastChunk.includes('node_modules')) {
-    return 'npm';
-  }
-  
-  return 'general';
-}
 
 export default function ForgeAssist({ 
   isOpen, 
   onClose, 
   onSendToTerminal, 
-  terminalBuffer,
-  activeView = 'terminal', // v3.8.2: Only terminal view remains
   onToast,
-  contextFiles = [], // v3.9.0: Files from LensFilePicker for context
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [detectedCLI, setDetectedCLI] = useState('general');
-  const [mode, setMode] = useState('commands'); // 'commands' or 'task'
-  const [taskStage, setTaskStage] = useState('context');
-  const [slmStatus, setSlmStatus] = useState(null);
-  const [slmLoading, setSlmLoading] = useState(false);
+  const [selectedCLI, setSelectedCLI] = useState('claude'); // Manual selection
+  const [expandedCategories, setExpandedCategories] = useState(new Set(['Subagents', 'Session Management']));
   const inputRef = useRef(null);
-  const listRef = useRef(null);
 
-  // Detect CLI when opened or buffer changes
+  // Focus search on open
   useEffect(() => {
     if (isOpen) {
-      const cli = detectActiveCLI(terminalBuffer);
-      setDetectedCLI(cli);
       setSearchQuery('');
-      setSelectedIndex(0);
-      // Focus input after render
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen, terminalBuffer]);
+  }, [isOpen]);
 
-  // Fetch SLM status on mount
-  useEffect(() => {
-    if (isOpen && !slmStatus) {
-      fetch('/api/slm/status')
-        .then(res => res.json())
-        .then(data => setSlmStatus(data.status))
-        .catch(() => setSlmStatus(null));
-    }
-  }, [isOpen, slmStatus]);
-
-  // Get current CLI config
-  const cliConfig = CLI_COMMANDS[detectedCLI] || CLI_COMMANDS.general;
-
-  // Build filtered command list
-  const getFilteredCommands = useCallback(() => {
-    const query = searchQuery.toLowerCase();
-    const commands = [];
-    
-    // In Task Mode, show stage-specific commands
-    if (mode === 'task') {
-      const stageCommands = STAGE_COMMANDS[taskStage] || [];
-      stageCommands.forEach(cmd => {
-        if (!query || cmd.name.toLowerCase().includes(query) || cmd.cmd.toLowerCase().includes(query)) {
-          commands.push({ ...cmd, type: 'stage', category: `${TASK_STAGES.find(s => s.id === taskStage)?.name || 'Task'} Commands` });
-        }
-      });
-      return commands;
-    }
-
-    // Add slash commands
-    cliConfig.slashCommands.forEach(cmd => {
-      if (!query || cmd.cmd.toLowerCase().includes(query) || cmd.desc.toLowerCase().includes(query)) {
-        commands.push({ ...cmd, type: 'slash', category: 'Slash Commands' });
-      }
-    });
-
-    // Add quick commands
-    cliConfig.quickCommands.forEach(cmd => {
-      if (!query || cmd.name.toLowerCase().includes(query) || cmd.cmd.toLowerCase().includes(query) || cmd.desc.toLowerCase().includes(query)) {
-        commands.push({ ...cmd, type: 'quick', category: 'Quick Commands' });
-      }
-    });
-
-    // Add context variables
-    if (cliConfig.contextVars.length > 0) {
-      cliConfig.contextVars.forEach(v => {
-        if (!query || v.toLowerCase().includes(query)) {
-          commands.push({ cmd: v, desc: 'Context variable', type: 'context', category: 'Context Variables' });
-        }
-      });
-    }
-
-    // If searching across all CLIs
-    if (query && commands.length === 0) {
-      Object.entries(CLI_COMMANDS).forEach(([key, config]) => {
-        if (key === detectedCLI) return;
-        config.quickCommands.forEach(cmd => {
-          if (cmd.name.toLowerCase().includes(query) || cmd.cmd.toLowerCase().includes(query)) {
-            commands.push({ ...cmd, type: 'quick', category: `${config.name}` });
-          }
-        });
-      });
-    }
-
-    return commands;
-  }, [searchQuery, cliConfig, detectedCLI, mode, taskStage]);
-
-  const filteredCommands = getFilteredCommands();
-
-  // Keyboard navigation
+  // Keyboard handler
   useEffect(() => {
     if (!isOpen) return;
-
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
-        return;
-      }
-      // Tab to switch modes
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        setMode(prev => prev === 'commands' ? 'task' : 'commands');
-        setSelectedIndex(0);
-        return;
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex(prev => Math.min(prev + 1, filteredCommands.length - 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex(prev => Math.max(prev - 1, 0));
-      } else if (e.key === 'Enter' && filteredCommands.length > 0) {
-        e.preventDefault();
-        executeCommand(filteredCommands[selectedIndex]);
       }
     };
-
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, filteredCommands, selectedIndex, onClose, mode]);
+  }, [isOpen, onClose]);
 
-  // Scroll selected item into view
-  useEffect(() => {
-    if (listRef.current) {
-      const selectedItem = listRef.current.querySelector(`[data-index="${selectedIndex}"]`);
-      selectedItem?.scrollIntoView({ block: 'nearest' });
-    }
-  }, [selectedIndex]);
+  // Get current CLI config
+  const cliConfig = CLI_POWER_FEATURES[selectedCLI];
 
-  // Execute command
-  const executeCommand = (command) => {
-    if (!command) return;
-
-    // v3.8.2: Terminal is the only view
-    if (command.appendCursor) {
-      // For commands that need user input, just insert and let them type
-      onSendToTerminal(command.cmd);
-      if (onToast) onToast(`Inserted: ${command.cmd}`, 'info', 1500);
-    } else {
-      onSendToTerminal(command.cmd);
-      if (onToast) onToast(`Sent: ${command.cmd}`, 'success', 1500);
-    }
+  // Filter features by search query
+  const getFilteredCategories = useCallback(() => {
+    if (!cliConfig) return [];
+    const query = searchQuery.toLowerCase().trim();
     
+    return cliConfig.categories.map(category => {
+      const filteredFeatures = category.features.filter(feature => {
+        if (!query) return true;
+        return (
+          feature.name.toLowerCase().includes(query) ||
+          feature.cmd.toLowerCase().includes(query) ||
+          feature.desc.toLowerCase().includes(query)
+        );
+      });
+      return { ...category, features: filteredFeatures };
+    }).filter(category => category.features.length > 0);
+  }, [cliConfig, searchQuery]);
+
+  const filteredCategories = getFilteredCategories();
+
+  // Toggle category expansion
+  const toggleCategory = (categoryName) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryName)) {
+        next.delete(categoryName);
+      } else {
+        next.add(categoryName);
+      }
+      return next;
+    });
+  };
+
+  // Execute a feature command
+  const executeFeature = (feature) => {
+    if (!feature) return;
+    
+    if (feature.appendCursor) {
+      onSendToTerminal(feature.cmd);
+      if (onToast) onToast(`Inserted: ${feature.name}`, 'info', 1500);
+    } else {
+      onSendToTerminal(feature.cmd);
+      if (onToast) onToast(`Sent: ${feature.name}`, 'success', 1500);
+    }
     onClose();
   };
 
   // Copy command to clipboard
-  const copyCommand = (cmd, e) => {
+  const copyCommand = (feature, e) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(cmd);
-    if (onToast) onToast(`Copied: ${cmd}`, 'success', 1500);
+    navigator.clipboard.writeText(feature.cmd);
+    if (onToast) onToast(`Copied: ${feature.cmd}`, 'success', 1500);
   };
 
   if (!isOpen) return null;
 
-  // Advance to next task stage
-  const advanceStage = () => {
-    const currentIdx = TASK_STAGES.findIndex(s => s.id === taskStage);
-    if (currentIdx < TASK_STAGES.length - 1) {
-      setTaskStage(TASK_STAGES[currentIdx + 1].id);
-      setSelectedIndex(0);
-      if (onToast) onToast(`Stage: ${TASK_STAGES[currentIdx + 1].name}`, 'info', 1500);
-    } else {
-      if (onToast) onToast('🎉 Task complete!', 'success', 2000);
-    }
-  };
-
-  // Group commands by category
-  const groupedCommands = {};
-  filteredCommands.forEach((cmd, idx) => {
-    if (!groupedCommands[cmd.category]) {
-      groupedCommands[cmd.category] = [];
-    }
-    groupedCommands[cmd.category].push({ ...cmd, globalIndex: idx });
-  });
-
-  // Get current task stage info
-  const currentStage = TASK_STAGES.find(s => s.id === taskStage);
+  const cliOptions = Object.entries(CLI_POWER_FEATURES).map(([key, config]) => ({
+    key,
+    name: config.name,
+    icon: config.icon,
+    color: config.color,
+  }));
 
   return (
     <div className="forge-assist-overlay" onClick={onClose}>
       <div className="forge-assist-modal" onClick={e => e.stopPropagation()}>
-        {/* Header */}
+        {/* Header with CLI Selector */}
         <div className="forge-assist-header">
           <div className="forge-assist-title">
-            <Command size={18} />
-            <span>Forge Assist</span>
-            {mode === 'commands' ? (
-              <span 
-                className="forge-assist-cli-badge"
-                style={{ background: cliConfig.color + '33', color: cliConfig.color, borderColor: cliConfig.color }}
-              >
-                {cliConfig.icon} {cliConfig.name}
-              </span>
-            ) : (
-              <span 
-                className="forge-assist-cli-badge"
-                style={{ background: currentStage?.color + '33', color: currentStage?.color, borderColor: currentStage?.color }}
-              >
-                <Target size={12} /> Task Mode
-              </span>
-            )}
+            <Zap size={20} />
+            <span>Power Features</span>
           </div>
+          
+          {/* CLI Selector Tabs */}
+          <div className="forge-assist-cli-tabs">
+            {cliOptions.map(({ key, name, icon, color }) => (
+              <button
+                key={key}
+                className={`forge-assist-cli-tab ${selectedCLI === key ? 'active' : ''}`}
+                onClick={() => setSelectedCLI(key)}
+                style={{ '--cli-color': color }}
+              >
+                <span className="cli-icon">{icon}</span>
+                <span className="cli-name">{name}</span>
+              </button>
+            ))}
+          </div>
+          
           <button className="forge-assist-close" onClick={onClose}>
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Mode Toggle + Search */}
+        {/* Search */}
         <div className="forge-assist-search">
-          <div className="forge-assist-mode-toggle">
-            <button 
-              className={`mode-btn ${mode === 'commands' ? 'active' : ''}`}
-              onClick={() => { setMode('commands'); setSelectedIndex(0); }}
-            >
-              <Command size={14} /> Commands
+          <Search size={16} />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={`Search ${cliConfig?.name || 'CLI'} features...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="forge-assist-search-clear">
+              <X size={14} />
             </button>
-            <button 
-              className={`mode-btn ${mode === 'task' ? 'active' : ''}`}
-              onClick={() => { setMode('task'); setSelectedIndex(0); }}
-            >
-              <Target size={14} /> Task
-            </button>
-          </div>
-          <div className="forge-assist-search-row">
-            <Search size={16} className="forge-assist-search-icon" />
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder={mode === 'task' ? `Search ${currentStage?.name} commands...` : "Search commands..."}
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setSelectedIndex(0);
-              }}
-              className="forge-assist-search-input"
-            />
-            {slmStatus?.model_loaded && (
-              <div className="forge-assist-slm-badge" title="SLM Active - Local AI suggestions">
-                🧠 SLM
-              </div>
-            )}
-            {slmStatus && !slmStatus.model_loaded && mode === 'task' && (
-              <div 
-                className="forge-assist-slm-badge slm-inactive" 
-                title="Enable Smart Routing in Settings for AI-powered suggestions"
-                style={{ background: '#1c1917', borderColor: '#44403c', color: '#888', cursor: 'pointer' }}
-                onClick={() => {
-                  if (onToast) onToast('Open Settings (⚙️) → Smart Routing to install local AI', 'info', 4000);
-                }}
-              >
-                🧠 Enable SLM
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Task Stage Progress (only in Task Mode) */}
-        {mode === 'task' && (
-          <div className="forge-assist-stages">
-            {TASK_STAGES.map((stage, idx) => {
-              const StageIcon = stage.icon;
-              const isActive = stage.id === taskStage;
-              const isPast = TASK_STAGES.findIndex(s => s.id === taskStage) > idx;
-              return (
-                <React.Fragment key={stage.id}>
-                  <button
-                    className={`stage-dot ${isActive ? 'active' : ''} ${isPast ? 'complete' : ''}`}
-                    style={{ 
-                      '--stage-color': stage.color,
-                      background: isActive || isPast ? stage.color : 'transparent',
-                      borderColor: stage.color
-                    }}
-                    onClick={() => { setTaskStage(stage.id); setSelectedIndex(0); }}
-                    title={`${stage.name}: ${stage.desc}`}
-                  >
-                    <StageIcon size={12} />
-                  </button>
-                  {idx < TASK_STAGES.length - 1 && (
-                    <div className={`stage-line ${isPast ? 'complete' : ''}`} />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Context Summary (Task Mode only) */}
-        {mode === 'task' && taskStage === 'context' && contextFiles.length > 0 && (
-          <div className="forge-assist-context-summary">
-            <FileCode size={14} />
-            <span>{contextFiles.length} files in context</span>
-          </div>
-        )}
-
-        {/* Commands List */}
-        <div className="forge-assist-list" ref={listRef}>
-          {Object.entries(groupedCommands).map(([category, commands]) => (
-            <div key={category} className="forge-assist-group">
-              <div className="forge-assist-group-header">
-                {category === 'Slash Commands' && <Zap size={12} />}
-                {category === 'Quick Commands' && <Play size={12} />}
-                {category === 'Context Variables' && <Hash size={12} />}
-                {category.includes('Commands') && mode === 'task' && <Target size={12} />}
-                {category}
-              </div>
-              {commands.map((cmd) => (
-                <div
-                  key={cmd.globalIndex}
-                  data-index={cmd.globalIndex}
-                  className={`forge-assist-item ${cmd.globalIndex === selectedIndex ? 'selected' : ''}`}
-                  onClick={() => executeCommand(cmd)}
-                >
-                  <div className="forge-assist-item-content">
-                    <code className="forge-assist-cmd">{cmd.cmd}</code>
-                    {cmd.name && <span className="forge-assist-name">{cmd.name}</span>}
-                    <span className="forge-assist-desc">{cmd.desc}</span>
-                  </div>
-                  <div className="forge-assist-item-actions">
-                    <button 
-                      className="forge-assist-copy"
-                      onClick={(e) => copyCommand(cmd.cmd, e)}
-                      title="Copy to clipboard"
-                    >
-                      <Copy size={12} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-
-          {filteredCommands.length === 0 && (
+        {/* Feature Categories */}
+        <div className="forge-assist-content">
+          {filteredCategories.length === 0 ? (
             <div className="forge-assist-empty">
-              No commands found for "{searchQuery}"
+              <span>No features match "{searchQuery}"</span>
             </div>
+          ) : (
+            filteredCategories.map((category) => {
+              const isExpanded = expandedCategories.has(category.name);
+              const CategoryIcon = category.icon;
+              
+              return (
+                <div key={category.name} className="forge-assist-category">
+                  <button 
+                    className="forge-assist-category-header"
+                    onClick={() => toggleCategory(category.name)}
+                  >
+                    <div className="category-left">
+                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      <CategoryIcon size={18} />
+                      <span className="category-name">{category.name}</span>
+                      <span className="category-count">{category.features.length}</span>
+                    </div>
+                    <span className="category-desc">{category.description}</span>
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="forge-assist-features">
+                      {category.features.map((feature, idx) => (
+                        <div 
+                          key={idx}
+                          className={`forge-assist-feature ${feature.dangerous ? 'dangerous' : ''}`}
+                          onClick={() => executeFeature(feature)}
+                        >
+                          <div className="feature-main">
+                            <div className="feature-name">
+                              {feature.dangerous && <AlertTriangle size={14} className="danger-icon" />}
+                              {feature.name}
+                            </div>
+                            <div className="feature-desc">{feature.desc}</div>
+                          </div>
+                          <div className="feature-actions">
+                            <code className="feature-cmd">{feature.cmd.length > 40 ? feature.cmd.slice(0, 40) + '...' : feature.cmd}</code>
+                            <button 
+                              className="feature-copy" 
+                              onClick={(e) => copyCommand(feature, e)}
+                              title="Copy command"
+                            >
+                              <Copy size={14} />
+                            </button>
+                            <button 
+                              className="feature-run" 
+                              onClick={(e) => { e.stopPropagation(); executeFeature(feature); }}
+                              title="Run in terminal"
+                            >
+                              <Play size={14} />
+                            </button>
+                            {feature.learnMore && (
+                              <a 
+                                href={feature.learnMore} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="feature-learn"
+                                onClick={(e) => e.stopPropagation()}
+                                title="Learn more"
+                              >
+                                <ExternalLink size={14} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
 
         {/* Footer */}
         <div className="forge-assist-footer">
-          <span>↑↓ Navigate</span>
-          <span>Enter Send</span>
-          <span>Tab Switch Mode</span>
-          {mode === 'task' && (
-            <button className="footer-advance-btn" onClick={advanceStage}>
-              Next Stage <ChevronRight size={12} />
-            </button>
-          )}
-          <span>Esc Close</span>
+          <span className="forge-assist-hint">
+            Press <kbd>Esc</kbd> to close • Click to run • <Copy size={12} /> to copy
+          </span>
         </div>
       </div>
     </div>

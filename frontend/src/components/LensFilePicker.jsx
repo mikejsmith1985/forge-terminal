@@ -216,42 +216,164 @@ const SearchLens = ({ files, selectedPaths, onToggle, onOpen }) => {
 };
 
 // Feature detection - extracts feature names from file paths
+// v3.9.1: Enhanced to match both file names and directory patterns
 const detectFeature = (filePath) => {
-  const normalized = filePath.toLowerCase();
+  // Normalize: lowercase and convert backslashes to forward slashes
+  const normalized = filePath.toLowerCase().replace(/\\/g, '/');
+  const fileName = normalized.split('/').pop() || '';
   
-  // Check for common feature patterns
-  if (normalized.includes('/auth/') || normalized.includes('auth.')) return 'Authentication';
-  if (normalized.includes('/chat/') || normalized.includes('chat.')) return 'Chat';
-  if (normalized.includes('/terminal/') || normalized.includes('terminal.')) return 'Terminal';
-  if (normalized.includes('/workflow/') || normalized.includes('workflow.')) return 'Workflows';
-  if (normalized.includes('/command') || normalized.includes('command.')) return 'Command Cards';
-  if (normalized.includes('/file') || normalized.includes('file.')) return 'File System';
-  if (normalized.includes('/settings/') || normalized.includes('settings.')) return 'Settings';
-  if (normalized.includes('/theme') || normalized.includes('theme.')) return 'Themes';
-  if (normalized.includes('/am/') || normalized.includes('am.')) return 'Artificial Memory';
-  if (normalized.includes('/slm/') || normalized.includes('slm.')) return 'Smart Routing';
-  if (normalized.includes('/llm/') || normalized.includes('llm.')) return 'LLM Integration';
-  if (normalized.includes('/vision/') || normalized.includes('vision.')) return 'Vision';
-  if (normalized.includes('/tour/') || normalized.includes('tour.')) return 'Tour';
-  if (normalized.includes('/assist') || normalized.includes('assist.')) return 'Forge Assist';
-  if (normalized.includes('/editor') || normalized.includes('editor.')) return 'Editor';
-  if (normalized.includes('/modal') || normalized.includes('modal.')) return 'Modals';
-  if (normalized.includes('/debug') || normalized.includes('debug.')) return 'Debug';
-  if (normalized.includes('/search') || normalized.includes('search.')) return 'Search';
-  if (normalized.includes('/storage') || normalized.includes('storage.')) return 'Storage';
-  if (normalized.includes('/api/') || normalized.includes('api.')) return 'API';
-  if (normalized.includes('/utils/') || normalized.includes('utils.')) return 'Utilities';
-  if (normalized.includes('/hooks/') || normalized.includes('hook.')) return 'Hooks';
-  if (normalized.includes('/components/')) return 'Components';
-  if (normalized.includes('/config/')) return 'Configuration';
-  if (normalized.includes('/styles/') || normalized.endsWith('.css')) return 'Styles';
-  if (normalized.includes('test.') || normalized.includes('spec.')) return 'Tests';
-  if (normalized.includes('readme') || normalized.includes('doc')) return 'Documentation';
+  // AM / Artificial Memory - match directory OR filename patterns
+  if (normalized.includes('/am/') || fileName.startsWith('am_') || 
+      fileName.includes('llm_logger') || fileName.includes('health_monitor') ||
+      fileName.includes('snapshot') || fileName.includes('artificial_memory')) {
+    return 'Artificial Memory';
+  }
   
-  // Fallback to directory-based grouping
-  const parts = filePath.split('/');
-  if (parts.length > 1) return parts[0] || 'Root';
-  return 'Ungrouped';
+  // Auto Response / Prompt Detection
+  if (fileName.includes('prompt_detect') || fileName.includes('auto_respond') ||
+      fileName.includes('autorespond') || fileName.includes('executive_trigger') ||
+      normalized.includes('/autoresponse/')) {
+    return 'Auto Response';
+  }
+  
+  // Terminal / PTY
+  if (normalized.includes('/terminal/') || fileName.includes('terminal') ||
+      fileName.includes('pty_') || fileName.includes('_pty')) {
+    return 'Terminal';
+  }
+  
+  // SLM / Smart Routing
+  if (normalized.includes('/slm/') || fileName.includes('slm') ||
+      fileName.includes('routing') || fileName.includes('classifier')) {
+    return 'Smart Routing';
+  }
+  
+  // LLM Integration
+  if (normalized.includes('/llm/') || fileName.includes('llm') ||
+      fileName.includes('model_tier') || fileName.includes('provider')) {
+    return 'LLM Integration';
+  }
+  
+  // Authentication
+  if (normalized.includes('/auth/') || fileName.includes('auth')) {
+    return 'Authentication';
+  }
+  
+  // Chat / UI
+  if (normalized.includes('/chat/') || fileName.includes('chat')) {
+    return 'Chat';
+  }
+  
+  // Workflows
+  if (normalized.includes('/workflow/') || fileName.includes('workflow')) {
+    return 'Workflows';
+  }
+  
+  // Command Cards
+  if (normalized.includes('/command') || fileName.includes('command_card') ||
+      fileName.includes('commandcard')) {
+    return 'Command Cards';
+  }
+  
+  // File System
+  if (normalized.includes('/files/') || fileName.includes('file_') ||
+      fileName.includes('_file') || fileName.includes('handler_file')) {
+    return 'File System';
+  }
+  
+  // Settings
+  if (normalized.includes('/settings/') || fileName.includes('settings') ||
+      fileName.includes('config')) {
+    return 'Settings';
+  }
+  
+  // Themes
+  if (normalized.includes('/theme') || fileName.includes('theme')) {
+    return 'Themes';
+  }
+  
+  // Vision
+  if (normalized.includes('/vision/') || fileName.includes('vision') ||
+      fileName.includes('image')) {
+    return 'Vision';
+  }
+  
+  // Forge Assist
+  if (normalized.includes('/assist') || fileName.includes('assist') ||
+      fileName.includes('forgeassist')) {
+    return 'Forge Assist';
+  }
+  
+  // Editor
+  if (normalized.includes('/editor') || fileName.includes('editor') ||
+      fileName.includes('codemirror')) {
+    return 'Editor';
+  }
+  
+  // Modals
+  if (fileName.includes('modal')) {
+    return 'Modals';
+  }
+  
+  // Search
+  if (fileName.includes('search') || fileName.includes('grep') ||
+      fileName.includes('find')) {
+    return 'Search';
+  }
+  
+  // API / Handlers
+  if (normalized.includes('/api/') || fileName.startsWith('handler')) {
+    return 'API';
+  }
+  
+  // Tests
+  if (fileName.includes('_test.') || fileName.includes('.test.') ||
+      fileName.includes('spec.') || normalized.includes('/tests/')) {
+    return 'Tests';
+  }
+  
+  // Styles
+  if (fileName.endsWith('.css') || normalized.includes('/styles/')) {
+    return 'Styles';
+  }
+  
+  // Documentation
+  if (fileName.includes('readme') || fileName.includes('.md') ||
+      normalized.includes('/docs/')) {
+    return 'Documentation';
+  }
+  
+  // Components (React)
+  if (normalized.includes('/components/')) {
+    return 'Components';
+  }
+  
+  // Hooks
+  if (normalized.includes('/hooks/') || fileName.startsWith('use')) {
+    return 'Hooks';
+  }
+  
+  // Utilities
+  if (normalized.includes('/utils/') || fileName.includes('util') ||
+      fileName.includes('helper')) {
+    return 'Utilities';
+  }
+  
+  // Configuration
+  if (normalized.includes('/config/') || fileName.includes('.json') ||
+      fileName.includes('.toml') || fileName.includes('.yaml')) {
+    return 'Configuration';
+  }
+  
+  // Fallback: use first directory segment
+  const parts = normalized.split('/').filter(p => p && p !== '.');
+  if (parts.length > 1) {
+    // Capitalize first letter
+    const dir = parts[0];
+    return dir.charAt(0).toUpperCase() + dir.slice(1);
+  }
+  
+  return 'Other';
 };
 
 // Features Lens - group files by feature/functionality
