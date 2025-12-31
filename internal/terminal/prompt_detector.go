@@ -52,6 +52,7 @@ type PromptDetector struct {
 	// Timing
 	lastActivity    time.Time
 	quiescenceDelay time.Duration
+	lastHeuristicLog time.Time // v3.9.1: Rate-limit log spam
 
 	// Response accumulation
 	responseBuffer  strings.Builder
@@ -299,7 +300,11 @@ func (d *PromptDetector) analyzeForPrompt() {
 	// Check for shell prompt patterns (ends with $, #, >, etc.)
 	shellPrompt := regexp.MustCompile(`[$#>%]\s*$`)
 	if shellPrompt.MatchString(lastLine) {
-		log.Printf("[PromptDetector] Heuristic: Shell prompt detected")
+		// v3.9.1: Rate-limit log spam to once per 5 seconds per detector
+		if time.Since(d.lastHeuristicLog) > 5*time.Second {
+			log.Printf("[PromptDetector] Heuristic: Shell prompt detected")
+			d.lastHeuristicLog = time.Now()
+		}
 		
 		oldState := d.state
 		// v3.7.1: Use debounced response completion to avoid triggering too early

@@ -495,7 +495,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			readStart := time.Now()
 			n, err := session.Read(buf)
 			readDuration := time.Since(readStart)
-			if readDuration > 100*time.Millisecond {
+			// v3.9.1: Increase threshold to 500ms to reduce log noise
+			if readDuration > 500*time.Millisecond {
 				log.Printf("[FREEZE-DEBUG] Slow PTY read: %v for %d bytes", readDuration, n)
 			}
 			
@@ -523,7 +524,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					maxWriteTime = writeDuration
 				}
 				
-				if writeDuration > 50*time.Millisecond {
+				// v3.9.1: Increase threshold to 200ms to reduce log noise
+				if writeDuration > 200*time.Millisecond {
 					log.Printf("[FREEZE-DEBUG] Slow WebSocket write: %v for %d bytes", writeDuration, n)
 				}
 				if writeDuration > 500*time.Millisecond {
@@ -668,7 +670,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// v3.5.3: Check for Chat command messages (Chat→PTY bridge)
 				var chatMsg ChatCommandMessage
 				if err := json.Unmarshal(data, &chatMsg); err != nil {
-					log.Printf("[ChatBridge] JSON parse error: %v", err)
+					// v3.9.1: Only log errors if data looks like JSON (starts with '{')
+					if len(data) > 0 && data[0] == '{' {
+						log.Printf("[ChatBridge] JSON parse error: %v", err)
+					}
 				} else if chatMsg.Type == "CHAT_COMMAND" {
 					log.Printf("[ChatBridge] Received chat command for session %s: cli=%s, model=%s, cmd=%s", 
 						sessionID, chatMsg.CLI, chatMsg.Model, truncate(chatMsg.Command, 50))
@@ -719,7 +724,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// v3.7.2: Check for Image Attach messages (async image upload)
 				var imgMsg ImageAttachMessage
 				if err := json.Unmarshal(data, &imgMsg); err != nil {
-					log.Printf("[ImageAttach] JSON parse error: %v", err)
+					// v3.9.1: Only log errors if data looks like JSON (starts with '{')
+					if len(data) > 0 && data[0] == '{' {
+						log.Printf("[ImageAttach] JSON parse error: %v", err)
+					}
 				} else if imgMsg.Type == "IMAGE_ATTACH" {
 					log.Printf("[ImageAttach] Received image for session %s: %s (%d bytes)", 
 						sessionID, imgMsg.Filename, imgMsg.Size)
