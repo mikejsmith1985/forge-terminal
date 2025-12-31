@@ -937,6 +937,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       const params = new URLSearchParams();
       // CRITICAL: Pass tabID for AM/LLM logging
       params.set('tabId', tabId);
+      // v3.9.1: Pass amEnabled to backend for LLM conversation capture
+      params.set('amEnabled', amEnabledRef.current ? 'true' : 'false');
       if (cfg && cfg.shellType) {
         params.set('shell', cfg.shellType);
         if (cfg.shellType === 'wsl') {

@@ -666,10 +666,15 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// v3.5.3: Check for Chat command messages (Chat→PTY bridge)
+				// Only attempt JSON parse if data looks like JSON (starts with '{')
 				var chatMsg ChatCommandMessage
-				if err := json.Unmarshal(data, &chatMsg); err != nil {
-					log.Printf("[ChatBridge] JSON parse error: %v", err)
-				} else if chatMsg.Type == "CHAT_COMMAND" {
+				if len(data) > 0 && data[0] == '{' {
+					if err := json.Unmarshal(data, &chatMsg); err != nil {
+						// Only log if it actually looked like JSON but failed to parse
+						log.Printf("[ChatBridge] JSON parse error: %v", err)
+					}
+				}
+				if chatMsg.Type == "CHAT_COMMAND" {
 					log.Printf("[ChatBridge] Received chat command for session %s: cli=%s, model=%s, cmd=%s", 
 						sessionID, chatMsg.CLI, chatMsg.Model, truncate(chatMsg.Command, 50))
 					
