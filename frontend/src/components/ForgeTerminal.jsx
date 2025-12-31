@@ -102,6 +102,11 @@ const MENU_CONTEXT_PATTERNS = [
   /Do you want to run\??/i,
   // Cancel with Esc instruction (common in TUI prompts)
   /Cancel with Esc/i,
+  // Copilot path confirmation and permission dialogs
+  /Path confirmation/i,
+  /Allow directory access/i,
+  /allowed directory list/i,
+  /Do you want to add these directories/i,
 ];
 
 // Y/N style prompts: These expect typing 'y' or 'n' then Enter
@@ -873,11 +878,26 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // Handle Ctrl+V (Paste) - REMOVED
-      // We now use the native 'paste' event listener on the textarea (see above)
-      // This is more robust and handles images correctly without needing Clipboard API permissions
+      // Handle Ctrl+V (Paste) - Read from clipboard and send to PTY
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        return true; // Let xterm handle the key event (which triggers the paste event)
+        console.log('[Terminal] Ctrl+V pressed - reading clipboard');
+        navigator.clipboard.readText()
+          .then((text) => {
+            console.log('[Terminal] Clipboard read successful:', text.length, 'chars');
+            if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              console.log('[Terminal] Sending pasted text to PTY:', text.length, 'chars');
+              wsRef.current.send(text);
+              if (onPasteRef.current) onPasteRef.current();
+            } else if (!text) {
+              console.warn('[Terminal] Clipboard is empty');
+            } else if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+              console.warn('[Terminal] WebSocket not ready, status:', wsRef.current?.readyState);
+            }
+          })
+          .catch((err) => {
+            console.error('[Terminal] Clipboard read failed:', err.message);
+          });
+        return false; // Prevent xterm from handling (we already sent it)
       }
 
       return true; // Let all other keys pass through standard xterm processing

@@ -16,6 +16,7 @@ function TabBar({
   onToggleAutoRespond = null, // Callback to toggle auto-respond for a tab
   onToggleAM = null, // Callback to toggle AM logging for a tab
   onToggleMode = null, // Callback to toggle light/dark mode for a tab
+  onToggleViewMode = null, // Callback to toggle view mode (chat/terminal/notebook) for a tab
   disableNewTab = false,
   waitingTabs = {}, // Map of tabId -> isWaiting
   mode = 'dark', // 'dark' or 'light' for theme mode
@@ -53,6 +54,12 @@ function TabBar({
     }
   };
 
+  const handleToggleViewMode = (tabId) => {
+    if (onToggleViewMode) {
+      onToggleViewMode(tabId);
+    }
+  };
+
   return (
     <div className="tab-bar" role="tablist">
       <div className="tab-bar-scroll">
@@ -69,6 +76,7 @@ function TabBar({
             onToggleAutoRespond={() => handleToggleAutoRespond(tab.id)}
             onToggleAM={devMode ? () => handleToggleAM(tab.id) : null}
             onToggleMode={() => handleToggleMode(tab.id)}
+            onToggleViewMode={() => handleToggleViewMode(tab.id)}
             devMode={devMode}
           />
         ))}

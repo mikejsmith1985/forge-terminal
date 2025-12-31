@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon, MessageSquare } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -32,7 +32,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleMode, isWaiting = false, mode = 'dark', devMode = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleMode, onToggleViewMode, isWaiting = false, mode = 'dark', devMode = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -227,6 +227,16 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
           >
             {tabMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             {tabMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </button>
+          <button 
+            onClick={() => { 
+              setShowContextMenu(false); 
+              if (onToggleViewMode) onToggleViewMode(); 
+            }}
+            title="Cycle: Chat → Terminal → Notebook"
+          >
+            <MessageSquare size={14} />
+            View Mode: {tab.viewMode || 'chat'}
           </button>
           {devMode && onToggleAM && (
             <button 

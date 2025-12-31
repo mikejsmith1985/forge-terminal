@@ -114,7 +114,9 @@ frontend/src/components/notebook/
 
 | File | Changes |
 |------|---------|
-| `frontend/src/App.jsx` | +45 lines: Added NotebookLayout import, view layer, props |
+| `frontend/src/App.jsx` | +1 line: Added `onToggleViewMode={toggleTabViewMode}` to TabBar props |
+| `frontend/src/components/TabBar.jsx` | +8 lines: Added `onToggleViewMode` callback and handler |
+| `frontend/src/components/Tab.jsx` | +13 lines: Added view mode toggle button to context menu |
 | `frontend/src/hooks/useTabManager.js` | Updated `toggleTabViewMode()` to cycle 3 modes + support target mode |
 | `frontend/src/components/ForgeTerminal.jsx` | +8 lines: Clipboard paste fix (write to xterm immediately) |
 | `frontend/src/config/tourSteps.js` | Updated Command Cards help text |
@@ -126,13 +128,12 @@ frontend/src/components/notebook/
 ## 🚀 How to Use Notebook
 
 1. **Open a tab** - Click to create new terminal tab
-2. **Toggle view mode** - Click view button to cycle through modes
-3. **Navigate to Notebook** - Click twice to reach notebook view (Chat → Terminal → Notebook)
-4. **Add cells** - Use toolbar buttons or quick-add button at bottom
-5. **Run commands** - Type command and press Enter in TerminalBlock
-6. **Plan with AI** - Add AgentBlock for reasoning/planning
-7. **Reference files** - Select files in sidebar Lens picker to auto-inject LensBlocks
-8. **Organize** - Reorder cells, collapse/expand sections as needed
+2. **Toggle view mode** - Right-click on tab and select "View Mode: chat" to cycle through Chat → Terminal → Notebook
+3. **In Notebook** - Add Terminal, Agent (AI), or File (Lens) cells
+4. **Run commands** - Type command and press Enter in TerminalBlock
+5. **Plan with AI** - Add AgentBlock for reasoning/planning
+6. **Reference files** - Select files in sidebar Lens picker to auto-inject LensBlocks
+7. **Organize** - Reorder cells, collapse/expand sections as needed
 
 ---
 

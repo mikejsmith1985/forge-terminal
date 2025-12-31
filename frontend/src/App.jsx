@@ -1820,6 +1820,7 @@ function App() {
           onToggleAutoRespond={toggleTabAutoRespond}
           onToggleAM={handleToggleAM}
           onToggleMode={toggleTabMode}
+          onToggleViewMode={toggleTabViewMode}
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}
           mode={theme}
