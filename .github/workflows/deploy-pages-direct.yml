@@ -43,7 +43,7 @@ jobs:
       - name: Build frontend for GitHub Pages
         run: |
           cd frontend
-          npm run build -- --config vite.pages.config.js
+          npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -51,7 +51,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "frontend/dist"
+          path: "cmd/forge/web"
 
   deploy:
     name: Deploy to GitHub Pages

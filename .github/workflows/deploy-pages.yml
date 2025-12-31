@@ -44,8 +44,8 @@ jobs:
       - name: Build frontend for GitHub Pages
         run: |
           cd frontend
-          npm run build -- --config vite.pages.config.js
-          echo "✓ Frontend built to frontend/dist"
+          npm run build
+          echo "✓ Frontend built to cmd/forge/web"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -54,13 +54,13 @@ jobs:
         id: upload
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "frontend/dist"
+          path: "cmd/forge/web"
 
       - name: Debug artifact upload
         run: |
           echo "✓ Artifact uploaded successfully"
           echo "  Name: github-pages"
-          echo "  Path: frontend/dist"
+          echo "  Path: cmd/forge/web"
 
   deploy:
     name: Deploy to GitHub Pages
