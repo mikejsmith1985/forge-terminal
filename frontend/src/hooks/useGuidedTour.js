@@ -274,6 +274,4 @@ export const useGuidedTour = (actionHandlers = {}) => {
   };
 };
 
-// Named exports for flexibility
-export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
 export default useGuidedTour;

@@ -36,7 +36,7 @@ import { useWorkflowManager } from './hooks/useWorkflowManager'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { useGuidedTour } from './hooks/useGuidedTour'
+import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
 
 const MAX_TABS = 20;
