@@ -38,7 +38,7 @@ export const getRect = (selector) => {
   return null;
 };
 
-export const useGuidedTour = (actionHandlers = {}) => {
+const useGuidedTour = (actionHandlers = {}) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [targetRect, setTargetRect] = useState(null);

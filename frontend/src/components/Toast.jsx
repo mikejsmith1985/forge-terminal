@@ -85,7 +85,7 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose, action, onAct
 };
 
 // Toast Container manages multiple toasts
-export const ToastContainer = ({ toasts, removeToast }) => {
+const ToastContainer = ({ toasts, removeToast }) => {
   return (
     <div className="toast-container">
       {toasts.map((toast) => (
@@ -106,7 +106,7 @@ export const ToastContainer = ({ toasts, removeToast }) => {
 };
 
 // Hook for managing toasts
-export const useToast = () => {
+const useToast = () => {
   const [toasts, setToasts] = useState([]);
 
   const addToast = (message, type = 'info', duration = 3000, options = {}) => {
@@ -131,4 +131,5 @@ export const useToast = () => {
   return { toasts, addToast, removeToast };
 };
 
+export { ToastContainer, useToast };
 export default Toast;

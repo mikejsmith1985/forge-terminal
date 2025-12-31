@@ -1,7 +1,7 @@
 // Forge Terminal Themes
 // Each theme has dark and light variants for both UI (CSS variables) and terminal (xterm)
 
-export const themes = {
+const themes = {
   molten: {
     name: 'Molten Metal',
     dark: {
@@ -904,9 +904,9 @@ export const themes = {
   }
 };
 
-export const themeOrder = ['molten', 'ocean', 'forest', 'midnight', 'rose', 'arctic', 'highContrastDark', 'highContrastLight', 'highContrastBlue', 'highContrastYellow'];
+const themeOrder = ['molten', 'ocean', 'forest', 'midnight', 'rose', 'arctic', 'highContrastDark', 'highContrastLight', 'highContrastBlue', 'highContrastYellow'];
 
-export function applyTheme(themeId, mode) {
+function applyTheme(themeId, mode) {
   const theme = themes[themeId];
   if (!theme) return;
   
@@ -953,8 +953,10 @@ export function applyTheme(themeId, mode) {
   root.style.setProperty('--shadow-glow', `0 0 20px ${ui.accentGlow}`);
 }
 
-export function getTerminalTheme(themeId, mode) {
+function getTerminalTheme(themeId, mode) {
   const theme = themes[themeId];
   if (!theme) return themes.molten[mode].terminal;
   return theme[mode]?.terminal || themes.molten[mode].terminal;
 }
+
+export { themes, themeOrder, applyTheme, getTerminalTheme };
