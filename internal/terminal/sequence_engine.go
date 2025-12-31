@@ -52,6 +52,7 @@ type SequenceEngine struct {
 }
 
 // DefaultSequences contains pre-configured patterns for common CLI tools.
+// NOTE: More specific patterns should come BEFORE generic ones!
 var DefaultSequences = []*Sequence{
 	// Copilot CLI: "[Y/n]" confirmation prompt
 	{
@@ -73,13 +74,23 @@ var DefaultSequences = []*Sequence{
 			{Type: ActionKey, Key: '\r'},
 		},
 	},
-	// Copilot CLI: Menu with "> 1. Yes" selected
+	// Copilot CLI: "Do you want to add these directories to the allowed list?"
+	// MUST come before copilot-menu-yes-selected since it also has "> 1. Yes"
 	{
-		Name:       "copilot-menu-yes-selected",
-		Pattern:    regexp.MustCompile(`(?m)^[>❯›]\s*1\.\s*Yes`),
-		SettleTime: 300 * time.Millisecond,
+		Name:       "copilot-add-to-allowed-list",
+		Pattern:    regexp.MustCompile(`(?i)Do you want to add.*to the allowed list\?`),
+		SettleTime: 400 * time.Millisecond,
 		Actions: []Action{
-			{Type: ActionKey, Key: '\r'}, // Just press Enter
+			{Type: ActionKey, Key: '\r'}, // Press Enter (Yes is default/selected)
+		},
+	},
+	// Copilot CLI: Menu with "> 1. Yes" OR ">\n1. Yes" (cursor on separate line)
+	{
+		Name:       "copilot-menu-confirm-with-keys",
+		Pattern:    regexp.MustCompile(`(?s)Confirm with number keys.*and Enter`),
+		SettleTime: 400 * time.Millisecond,
+		Actions: []Action{
+			{Type: ActionKey, Key: '\r'}, // Press Enter to confirm selection
 		},
 	},
 	// Copilot CLI: "Do you want to run this command?" with selection
@@ -89,6 +100,15 @@ var DefaultSequences = []*Sequence{
 		SettleTime: 400 * time.Millisecond,
 		Actions: []Action{
 			{Type: ActionKey, Key: '\r'}, // Press Enter to confirm
+		},
+	},
+	// Copilot CLI: Menu with "> 1. Yes" selected (GENERIC - put after specific patterns)
+	{
+		Name:       "copilot-menu-yes-selected",
+		Pattern:    regexp.MustCompile(`(?m)^[>❯›]\s*1\.\s*Yes`),
+		SettleTime: 300 * time.Millisecond,
+		Actions: []Action{
+			{Type: ActionKey, Key: '\r'}, // Just press Enter
 		},
 	},
 	// Copilot CLI: Error message "Copilot couldn't generate a response"

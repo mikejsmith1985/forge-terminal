@@ -11,7 +11,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Flame, Network, Search, ShoppingCart, X, Check, ChevronRight,
-  FileCode, Trash2, RefreshCw, Package
+  FileCode, Trash2, RefreshCw, Package, Layers
 } from 'lucide-react';
 import './LensFilePicker.css';
 
@@ -20,6 +20,7 @@ const LENS_TYPES = {
   HEATMAP: 'heatmap',
   GRAPH: 'graph',
   SEARCH: 'search',
+  FEATURES: 'features', // NEW: Group files by feature/functionality
 };
 
 // Token budget (128k default)
@@ -214,6 +215,107 @@ const SearchLens = ({ files, selectedPaths, onToggle, onOpen }) => {
   );
 };
 
+// Feature detection - extracts feature names from file paths
+const detectFeature = (filePath) => {
+  const normalized = filePath.toLowerCase();
+  
+  // Check for common feature patterns
+  if (normalized.includes('/auth/') || normalized.includes('auth.')) return 'Authentication';
+  if (normalized.includes('/chat/') || normalized.includes('chat.')) return 'Chat';
+  if (normalized.includes('/terminal/') || normalized.includes('terminal.')) return 'Terminal';
+  if (normalized.includes('/workflow/') || normalized.includes('workflow.')) return 'Workflows';
+  if (normalized.includes('/command') || normalized.includes('command.')) return 'Command Cards';
+  if (normalized.includes('/file') || normalized.includes('file.')) return 'File System';
+  if (normalized.includes('/settings/') || normalized.includes('settings.')) return 'Settings';
+  if (normalized.includes('/theme') || normalized.includes('theme.')) return 'Themes';
+  if (normalized.includes('/am/') || normalized.includes('am.')) return 'Artificial Memory';
+  if (normalized.includes('/slm/') || normalized.includes('slm.')) return 'Smart Routing';
+  if (normalized.includes('/llm/') || normalized.includes('llm.')) return 'LLM Integration';
+  if (normalized.includes('/vision/') || normalized.includes('vision.')) return 'Vision';
+  if (normalized.includes('/tour/') || normalized.includes('tour.')) return 'Tour';
+  if (normalized.includes('/assist') || normalized.includes('assist.')) return 'Forge Assist';
+  if (normalized.includes('/editor') || normalized.includes('editor.')) return 'Editor';
+  if (normalized.includes('/modal') || normalized.includes('modal.')) return 'Modals';
+  if (normalized.includes('/debug') || normalized.includes('debug.')) return 'Debug';
+  if (normalized.includes('/search') || normalized.includes('search.')) return 'Search';
+  if (normalized.includes('/storage') || normalized.includes('storage.')) return 'Storage';
+  if (normalized.includes('/api/') || normalized.includes('api.')) return 'API';
+  if (normalized.includes('/utils/') || normalized.includes('utils.')) return 'Utilities';
+  if (normalized.includes('/hooks/') || normalized.includes('hook.')) return 'Hooks';
+  if (normalized.includes('/components/')) return 'Components';
+  if (normalized.includes('/config/')) return 'Configuration';
+  if (normalized.includes('/styles/') || normalized.endsWith('.css')) return 'Styles';
+  if (normalized.includes('test.') || normalized.includes('spec.')) return 'Tests';
+  if (normalized.includes('readme') || normalized.includes('doc')) return 'Documentation';
+  
+  // Fallback to directory-based grouping
+  const parts = filePath.split('/');
+  if (parts.length > 1) return parts[0] || 'Root';
+  return 'Ungrouped';
+};
+
+// Features Lens - group files by feature/functionality
+const FeaturesLens = ({ files, selectedPaths, onToggle, onOpen }) => {
+  const grouped = useMemo(() => {
+    const groups = {};
+    files.forEach(file => {
+      const feature = detectFeature(file.path);
+      if (!groups[feature]) groups[feature] = [];
+      groups[feature].push(file);
+    });
+    
+    // Sort features by file count (descending)
+    return Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  }, [files]);
+
+  return (
+    <div className="lens-content">
+      <div className="lens-subtitle">Files grouped by feature/functionality</div>
+      <div className="lens-features-groups">
+        {grouped.map(([feature, featureFiles]) => {
+          const totalTokens = featureFiles.reduce((sum, f) => 
+            sum + (f.tokenCount || estimateTokens(f.size || 0)), 0
+          );
+          const selectedCount = featureFiles.filter(f => selectedPaths.has(f.path)).length;
+          
+          return (
+            <div key={feature} className="lens-feature-group">
+              <div className="lens-feature-header">
+                <div className="lens-feature-title">
+                  <ChevronRight size={14} />
+                  <span className="lens-feature-name">{feature}</span>
+                  <span className="lens-feature-badge">
+                    {featureFiles.length} file{featureFiles.length !== 1 ? 's' : ''}
+                  </span>
+                  {selectedCount > 0 && (
+                    <span className="lens-feature-selected">
+                      {selectedCount} selected
+                    </span>
+                  )}
+                </div>
+                <div className="lens-feature-tokens">
+                  {totalTokens.toLocaleString()} tokens
+                </div>
+              </div>
+              <div className="lens-feature-files">
+                {featureFiles.map(file => (
+                  <FileItem
+                    key={file.path}
+                    file={file}
+                    isSelected={selectedPaths.has(file.path)}
+                    onToggle={onToggle}
+                    onOpen={onOpen}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // Context Cart component
 const ContextCart = ({ items, budget, onRemove, onClear }) => {
   const totalTokens = useMemo(() => {
@@ -394,6 +496,7 @@ export default function LensFilePicker({
   // Lens tabs
   const lenses = [
     { type: LENS_TYPES.HEATMAP, icon: Flame, label: 'Heatmap' },
+    { type: LENS_TYPES.FEATURES, icon: Layers, label: 'Features' },
     { type: LENS_TYPES.GRAPH, icon: Network, label: 'Graph' },
     { type: LENS_TYPES.SEARCH, icon: Search, label: 'Search' },
   ];
@@ -402,6 +505,8 @@ export default function LensFilePicker({
   const renderLens = () => {
     const props = { files, selectedPaths, onToggle: toggleFile, onOpen: handleFileOpen };
     switch (activeLens) {
+      case LENS_TYPES.FEATURES:
+        return <FeaturesLens {...props} />;
       case LENS_TYPES.GRAPH:
         return <GraphLens {...props} />;
       case LENS_TYPES.SEARCH:

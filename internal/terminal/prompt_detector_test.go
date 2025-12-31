@@ -184,7 +184,7 @@ func TestCopilotConfirmationPromptDetection(t *testing.T) {
 	detector.SetHeuristicMode(true)
 	
 	var waitingForInput bool
-	detector.OnWaitingForInput(func() { waitingForInput = true })
+	detector.OnWaitingForInput(func(promptText string) { waitingForInput = true })
 	
 	// WHEN: Copilot outputs a confirmation prompt
 	detector.ProcessOutput([]byte("Do you want to apply these changes? [Y/n] "))
@@ -208,7 +208,7 @@ func TestClaudeToolApprovalDetection(t *testing.T) {
 	detector.SetHeuristicMode(true)
 	
 	var waitingForInput bool
-	detector.OnWaitingForInput(func() { waitingForInput = true })
+	detector.OnWaitingForInput(func(promptText string) { waitingForInput = true })
 	
 	// WHEN: Claude outputs a tool approval prompt
 	detector.ProcessOutput([]byte("Claude wants to run: bash\n> Allow? (y/n) "))

@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Loader2, Terminal, Brain, Settings, Play, Search, Image as ImageIcon } from 'lucide-react';
+import { Send, Loader2, Terminal, Brain, Settings, Play, Search, Image as ImageIcon, Command } from 'lucide-react';
 import ChatSearchOverlay from './ChatSearchOverlay';
 import './ChatView.css';
 
@@ -23,6 +23,7 @@ const ChatView = ({
   fontSize = 14, 
   onToggleTerminal,
   onOpenSettings,
+  onToggleForgeAssist,
   onRunInTerminal,
   terminalRef, // v3.5.3: Reference to ForgeTerminal for PTY WebSocket access
   getTerminalRef, // Issue #52: Getter function for lazy ref access
@@ -52,6 +53,14 @@ const ChatView = ({
     const saved = localStorage.getItem('chat_enter_to_send');
     return saved !== null ? saved === 'true' : true; // Default: Enter sends
   });
+  
+  // v3.7.2: Draggable Forge Assist button
+  const [forgeAssistBtnPos, setForgeAssistBtnPos] = useState(() => {
+    const saved = localStorage.getItem('forge_assist_btn_pos');
+    return saved ? JSON.parse(saved) : { right: 60, bottom: 80 }; // Default: right edge of input bar
+  });
+  const [isDraggingBtn, setIsDraggingBtn] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
   const messagesEndRef = useRef(null);
   const messageRefs = useRef({}); // For scrolling to search results
@@ -147,9 +156,16 @@ const ChatView = ({
               metadata: msg.metadata,
               timestamp: msg.timestamp || new Date(msg.createdAt),
             };
+            
+            console.log('[ChatView] WebSocket message received:', formatted.id, formatted.role);
+            
             setMessages(prev => {
-              // Avoid duplicates
-              if (prev.some(m => m.id === formatted.id)) return prev;
+              // Avoid duplicates - this is critical!
+              if (prev.some(m => m.id === formatted.id)) {
+                console.log('[ChatView] Duplicate message detected, skipping:', formatted.id);
+                return prev;
+              }
+              console.log('[ChatView] Adding new message from WebSocket:', formatted.id);
               return [...prev, formatted];
             });
           }
@@ -293,6 +309,7 @@ const ChatView = ({
       setError(null);
       
       // Persist user message to SQLite
+      // v3.7.2 FIX: Don't persist if message already exists (prevents WebSocket duplication)
       fetch('/api/chat/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -375,14 +392,13 @@ const ChatView = ({
     assistantMessageIdRef.current = assistantMessageId;
     responseAccumulatorRef.current = '';
 
-    // v3.7.1 SIMPLIFIED: Always send directly to PTY (empty cli)
-    // This works correctly when user has an LLM CLI already running (the expected use case)
-    // If no CLI is running, the message goes to the shell - user should start CLI first
-    const cli = '';  // Direct to PTY
+    // v3.7.2 FIX: Actually invoke copilot CLI, don't just paste to PTY
+    // Default to copilot for LLM invocation
+    const cli = 'copilot';
     const model = slmResult?.recommendedModel || slmResult?.model || '';
 
     console.log('[ChatView] Sending via PTY bridge:', { 
-      cli: '(direct to PTY)', 
+      cli: cli, 
       model,
       messagePreview: userMessage.substring(0, 50)
     });
@@ -398,7 +414,8 @@ const ChatView = ({
     }]);
 
     // Send CHAT_COMMAND to terminal WebSocket
-    // cli is empty, so backend will use SendMessage (direct to PTY)
+    // v3.7.2: cli is set to 'copilot', so backend will use SendCLICommand
+    // This invokes: copilot --model <model> -p "<userMessage>"
     const success = ref.sendChatCommand({
       type: 'CHAT_COMMAND',
       command: userMessage,
@@ -522,15 +539,23 @@ const ChatView = ({
   }, [tabId]);
 
   const handleSendMessage = useCallback(async () => {
-    if (!inputValue.trim() || isLoading) return;
+    // v3.7.2 FIX: Prevent duplicate sends if already loading
+    if (!inputValue.trim() || isLoading) {
+      console.log('[ChatView] Skipping send - already loading or empty input');
+      return;
+    }
 
     const userMessage = inputValue.trim();
     const userMsgId = `msg-${Date.now()}`;
     const timestamp = new Date();
+    
+    // v3.7.2 FIX: Clear input and set loading state IMMEDIATELY to prevent double-sends
     setInputValue('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage, id: userMsgId, timestamp }]);
     setIsLoading(true);
     setError(null);
+    
+    // Then add message to UI
+    setMessages(prev => [...prev, { role: 'user', content: userMessage, id: userMsgId, timestamp }]);
 
     try {
       // Persist user message to SQLite
@@ -638,6 +663,56 @@ const ChatView = ({
       return newValue;
     });
   }, []);
+
+  // v3.7.2: Draggable Forge Assist button handlers
+  const handleBtnMouseDown = useCallback((e) => {
+    if (e.button !== 0) return; // Only left click
+    e.preventDefault();
+    setIsDraggingBtn(true);
+    
+    // Calculate offset from button position to mouse
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  }, []);
+
+  const handleBtnMouseMove = useCallback((e) => {
+    if (!isDraggingBtn) return;
+    
+    // Calculate new position relative to viewport
+    const newRight = window.innerWidth - e.clientX - dragOffset.x;
+    const newBottom = window.innerHeight - e.clientY - dragOffset.y;
+    
+    // Constrain to viewport
+    const constrainedPos = {
+      right: Math.max(10, Math.min(window.innerWidth - 60, newRight)),
+      bottom: Math.max(10, Math.min(window.innerHeight - 60, newBottom)),
+    };
+    
+    setForgeAssistBtnPos(constrainedPos);
+  }, [isDraggingBtn, dragOffset]);
+
+  const handleBtnMouseUp = useCallback(() => {
+    if (isDraggingBtn) {
+      setIsDraggingBtn(false);
+      // Save position to localStorage
+      localStorage.setItem('forge_assist_btn_pos', JSON.stringify(forgeAssistBtnPos));
+    }
+  }, [isDraggingBtn, forgeAssistBtnPos]);
+
+  // Add/remove mouse event listeners for dragging
+  useEffect(() => {
+    if (isDraggingBtn) {
+      window.addEventListener('mousemove', handleBtnMouseMove);
+      window.addEventListener('mouseup', handleBtnMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleBtnMouseMove);
+        window.removeEventListener('mouseup', handleBtnMouseUp);
+      };
+    }
+  }, [isDraggingBtn, handleBtnMouseMove, handleBtnMouseUp]);
 
   // Image upload handlers
   const handleImageUpload = useCallback(async (file) => {
@@ -921,6 +996,54 @@ const ChatView = ({
         onClose={() => setIsSearchOpen(false)}
         onScrollToMessage={scrollToMessage}
       />
+
+      {/* v3.7.2: Draggable Forge Assist button */}
+      {onToggleForgeAssist && (
+        <button
+          className={`forge-assist-floating-btn ${isDraggingBtn ? 'dragging' : ''}`}
+          style={{
+            position: 'fixed',
+            right: `${forgeAssistBtnPos.right}px`,
+            bottom: `${forgeAssistBtnPos.bottom}px`,
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            background: 'var(--accent-color, #8b5cf6)',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            cursor: isDraggingBtn ? 'grabbing' : 'grab',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            zIndex: 1000,
+            transition: isDraggingBtn ? 'none' : 'transform 0.2s, box-shadow 0.2s',
+            userSelect: 'none',
+          }}
+          onMouseDown={handleBtnMouseDown}
+          onClick={(e) => {
+            // Only trigger if not dragging (small movement threshold)
+            if (!isDraggingBtn) {
+              onToggleForgeAssist();
+            }
+          }}
+          onMouseEnter={(e) => {
+            if (!isDraggingBtn) {
+              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isDraggingBtn) {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            }
+          }}
+          title="Forge Assist - Drag to reposition (Ctrl+/)"
+        >
+          <Command size={24} />
+        </button>
+      )}
     </div>
   );
 };

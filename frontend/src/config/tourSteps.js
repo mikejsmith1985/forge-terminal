@@ -102,6 +102,16 @@ export const TOUR_STEPS = [
     spotlight: true,
   },
   {
+    id: 'forge-assist-button',
+    selector: '.forge-assist-floating-btn',
+    fallbackSelector: '.chat-view-input-area',
+    title: 'Forge Assist Button 🎯',
+    content: 'In Chat view, you\'ll see a floating purple button. Click it to open Forge Assist, or press Ctrl+/. You can drag this button anywhere on screen - your preferred position is saved!',
+    placement: 'left',
+    spotlight: true,
+    onAdvance: 'ensureChatView', // Switch to chat view to show the button
+  },
+  {
     id: 'command-cards',
     selector: '.command-cards-container, .commands-panel, .sidebar-content',
     fallbackSelector: '.sidebar',
@@ -132,9 +142,19 @@ export const TOUR_STEPS = [
     id: 'files',
     selector: '.sidebar-view-tab:nth-child(3), button:has(svg):contains("Files")',
     fallbackSelector: '.sidebar-view-tabs',
-    title: 'File Explorer 📁',
-    content: 'Browse and edit files directly in Forge. Click "Files" in the sidebar tabs to open the explorer. Includes a built-in Monaco editor with syntax highlighting.',
+    title: 'Lens File Picker 🔍',
+    content: 'Click "Files" to open the Lens File Picker - an intelligent context builder with four views: 🔥 Heatmap (recent activity), 📐 Features (grouped by functionality), 📊 Graph (dependencies), and 🔎 Search (fuzzy find).',
     placement: 'right',
+    spotlight: true,
+    onAdvance: 'showFilesTab', // Switch to Files tab
+  },
+  {
+    id: 'files-features',
+    selector: '.lens-file-picker, .lens-context-cart',
+    fallbackSelector: '.sidebar-content',
+    title: 'Features View & Context Cart 🛒',
+    content: 'The Features view automatically groups files by functionality (Auth, Chat, Terminal, etc.) - perfect for understanding feature scope! Select files to add to your Context Cart with real-time token counting (128k budget).',
+    placement: 'left',
     spotlight: true,
   },
   {
@@ -184,19 +204,19 @@ export const TOUR_STEPS = [
   },
   {
     id: 'forge-assist',
-    selector: '.terminal-container',
-    fallbackSelector: '.terminal-outer-container',
-    title: 'Forge Assist ⚡ (NEW)',
-    content: 'Press Ctrl+/ anywhere to open Forge Assist - a context-aware command palette. It detects which CLI you\'re using (Copilot, Claude, Git) and shows relevant slash commands, quick actions, and context variables. Click any command to send it to the terminal!',
-    placement: 'center',
-    spotlight: false,
+    selector: 'button[title*="Forge Assist"]',
+    fallbackSelector: '.theme-controls',
+    title: 'Forge Assist ⚡ (Ctrl+/)',
+    content: 'Press Ctrl+/ anywhere to open Forge Assist - a context-aware command palette. It detects which CLI you\'re using (Copilot, Claude, Git, npm) and shows relevant slash commands, quick actions, and context variables.',
+    placement: 'bottom',
+    spotlight: true,
   },
   {
     id: 'complete',
     selector: null,
     fallbackPosition: 'center',
     title: 'You\'re Ready! 🚀',
-    content: 'Try Forge Assist with Ctrl+/ or Smart Routing with "? your task" to see AI-powered features in action. Explore the terminal, try the command cards, and check Settings for more options. You can replay this tour anytime from Settings → Shell tab.',
+    content: 'Try these features: Ctrl+/ for Forge Assist, drag the floating button in Chat view, "? your task" for Smart Routing, or browse files in the Files tab. Check Settings → Intelligence for Smart Routing setup. Replay this tour anytime from Settings → Shell.',
     placement: 'center',
     spotlight: false,
     isFinal: true,
@@ -204,4 +224,4 @@ export const TOUR_STEPS = [
 ];
 
 export const TOUR_STORAGE_KEY = 'forge_tour_completed';
-export const TOUR_VERSION = '3.7.0'; // v3.7.0: Forge Assist, enhanced CLI settings, removed Vision
+export const TOUR_VERSION = '3.7.2'; // v3.7.2: Draggable Forge Assist button, async image upload, light mode fixes

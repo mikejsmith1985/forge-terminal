@@ -499,3 +499,77 @@
     max-height: 200px;
   }
 }
+
+/* Features Lens - Group files by feature/functionality */
+.lens-features-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+}
+
+.lens-feature-group {
+  border: 1px solid var(--lens-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--lens-surface);
+}
+
+.lens-feature-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(125, 86, 244, 0.1);
+  border-bottom: 1px solid var(--lens-border);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.lens-feature-header:hover {
+  background: rgba(125, 86, 244, 0.15);
+}
+
+.lens-feature-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.lens-feature-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--lens-text);
+}
+
+.lens-feature-badge {
+  padding: 2px 8px;
+  background: var(--lens-accent-dim);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--lens-accent);
+  font-weight: 500;
+}
+
+.lens-feature-selected {
+  padding: 2px 8px;
+  background: rgba(4, 181, 117, 0.2);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--lens-selected);
+  font-weight: 500;
+}
+
+.lens-feature-tokens {
+  font-size: 12px;
+  color: var(--lens-text-dim);
+  font-weight: 500;
+}
+
+.lens-feature-files {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 4px;
+}

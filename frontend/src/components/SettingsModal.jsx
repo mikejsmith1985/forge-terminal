@@ -347,7 +347,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
         <>
           {/* Budget Progress Bar */}
           <div style={{ 
-            background: '#1a1a1a', 
+            background: 'var(--bg-secondary)', 
             borderRadius: '12px', 
             padding: '16px',
             marginBottom: '16px'
@@ -397,7 +397,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
 
           {/* Budget Configuration */}
           <div style={{ 
-            background: '#1a1a1a', 
+            background: 'var(--bg-secondary)', 
             borderRadius: '12px', 
             padding: '16px',
             marginBottom: '16px'
@@ -506,20 +506,21 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
 
           {/* Model Pricing Info */}
           <div style={{ 
-            background: '#1a1a1a', 
+            background: 'var(--bg-secondary)', 
             borderRadius: '12px', 
             padding: '16px'
           }}>
-            <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>
+            <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
               Smart Model Routing (Not Hardcoded)
             </label>
             
             <div style={{ 
-              background: '#0a0a0a', 
+              background: 'var(--bg-tertiary)', 
               borderRadius: '8px', 
               padding: '12px',
               fontSize: '0.85rem',
-              lineHeight: '1.6'
+              lineHeight: '1.6',
+              color: 'var(--text-secondary)'
             }}>
               {/* Issue #52: Clearer explanation that this is about cost, not capability */}
               <div style={{ 
@@ -539,19 +540,19 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <Zap size={14} style={{ color: '#22c55e' }} />
-                <strong>Economy Tier</strong>
-                <span style={{ color: '#888' }}>- Simple tasks (0.25-0.33 credits)</span>
+                <strong style={{ color: 'var(--text-primary)' }}>Economy Tier</strong>
+                <span style={{ color: 'var(--text-muted)' }}>- Simple tasks (0.25-0.33 credits)</span>
               </div>
-              <div style={{ paddingLeft: '22px', color: '#666', marginBottom: '12px' }}>
+              <div style={{ paddingLeft: '22px', color: 'var(--text-muted)', marginBottom: '12px' }}>
                 GPT-4o-mini, Claude Haiku — fast, cheap, great for quick answers
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <Brain size={14} style={{ color: '#8b5cf6' }} />
-                <strong>Power Tier</strong>
-                <span style={{ color: '#888' }}>- Complex tasks (1.0+ credits)</span>
+                <strong style={{ color: 'var(--text-primary)' }}>Power Tier</strong>
+                <span style={{ color: 'var(--text-muted)' }}>- Complex tasks (1.0+ credits)</span>
               </div>
-              <div style={{ paddingLeft: '22px', color: '#666', marginBottom: '12px' }}>
+              <div style={{ paddingLeft: '22px', color: 'var(--text-muted)', marginBottom: '12px' }}>
                 GPT-4o, Claude Sonnet/Opus — used when task requires deeper reasoning
               </div>
 
@@ -570,20 +571,20 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               <div style={{ 
                 marginTop: '12px',
                 padding: '12px',
-                background: slmStatus?.active_provider === 'ollama' || slmStatus?.active_provider === 'llama-cpp' ? '#052e16' : 
-                           slmStatus?.active_provider === 'disabled' ? '#1c1917' : '#1c1917',
+                background: slmStatus?.active_provider === 'ollama' || slmStatus?.active_provider === 'llama-cpp' ? 'rgba(5, 46, 22, 0.3)' : 
+                           'var(--bg-tertiary)',
                 border: `1px solid ${slmStatus?.active_provider === 'ollama' || slmStatus?.active_provider === 'llama-cpp' ? '#22c55e' : 
-                                    slmStatus?.active_provider === 'disabled' ? '#44403c' : '#44403c'}`,
+                                    'var(--border-color)'}`,
                 borderRadius: '8px',
                 fontSize: '0.85rem'
               }}>
-                <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
                   <Brain size={16} />
                   Smart Routing Status
                 </div>
                 
                 {/* Status Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '8px' }}>
                   <span>Engine:</span>
                   <span style={{ color: slmStatus?.active_provider === 'disabled' ? '#888' : '#22c55e' }}>
                     {slmStatus?.active_provider === 'disabled' && '⏸️ Not Installed'}
@@ -694,9 +695,9 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
                     <div style={{ 
                       marginTop: '10px', 
                       padding: '10px', 
-                      background: '#0a0a0a', 
+                      background: 'var(--bg-tertiary)', 
                       borderRadius: '6px',
-                      border: '1px solid #333'
+                      border: '1px solid var(--border-color)'
                     }}>
                       <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '6px' }}>
                         After installing Ollama, run this command to download a model:

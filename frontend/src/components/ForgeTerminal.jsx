@@ -825,9 +825,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     sendChatCommand: (chatCommand) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // v3.6.4: Notify ChatView to init state before sending command
+        // This ensures chat UI is ready to receive response
         if (chatCommandInitHandlerRef.current && chatCommand.command) {
           chatCommandInitHandlerRef.current(chatCommand);
         }
+        
+        // Send command to backend
         wsRef.current.send(JSON.stringify(chatCommand));
         console.log('[ChatBridge] Sent chat command:', chatCommand.cli, chatCommand.model);
         return true;
@@ -977,47 +980,64 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         if (item.type.startsWith('image/')) {
           console.log('[Terminal] Image paste detected:', item.type);
           
-          try {
-            const blob = item.getAsFile();
-            if (!blob) continue;
-            
-            const formData = new FormData();
-            formData.append('image', blob);
-            
-            // Show uploading indicator
-            if (xtermRef.current) {
-              xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
-            }
-            
-            const response = await fetch('/api/temp-image', {
-              method: 'POST',
-              body: formData
-            });
-            
-            if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
-            
-            const data = await response.json();
-            const filePath = data.filePath;
-            const filename = data.filename;
-            
-            // Clear uploading indicator
-            if (xtermRef.current) {
-              xtermRef.current.write('\r\x1b[K');
-            }
-            
-            // Send absolute file path to terminal so Copilot CLI can access it
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              const textToSend = `[📷 ${filePath}]`;
-              wsRef.current.send(textToSend);
-              console.log('[Terminal] Sent image path to backend:', textToSend);
-              if (onPasteRef.current) onPasteRef.current();
-            }
-          } catch (err) {
-            console.error('[Terminal] Image upload failed:', err);
-            if (xtermRef.current) {
-              xtermRef.current.write(`\r\x1b[K\x1b[31m[Image upload failed: ${err.message}]\x1b[0m\r\n`);
-            }
+          // v3.7.2: Async upload with better UX
+          const blob = item.getAsFile();
+          if (!blob) continue;
+          
+          const formData = new FormData();
+          formData.append('image', blob);
+          
+          // Show immediate feedback (non-blocking indicator)
+          if (xtermRef.current) {
+            xtermRef.current.write('\x1b[90m[📷 Processing image...]\x1b[0m');
           }
+          
+          // Async upload - doesn't block terminal
+          const uploadAsync = async () => {
+            try {
+              const response = await fetch('/api/temp-image', {
+                method: 'POST',
+                body: formData
+              });
+              
+              if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+              
+              const data = await response.json();
+              const filePath = data.filePath;
+              const filename = data.filename;
+              
+              // Send structured message instead of raw text
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                  type: 'IMAGE_ATTACH',
+                  path: filePath,
+                  filename: filename,
+                  mimeType: blob.type,
+                  size: blob.size,
+                  timestamp: Date.now()
+                }));
+                console.log('[Terminal] Sent IMAGE_ATTACH message:', filename);
+              }
+              
+              // Update indicator - success
+              if (xtermRef.current) {
+                xtermRef.current.write('\r\x1b[K\x1b[32m[✓ Image attached: ' + filename + ']\x1b[0m\r\n');
+              }
+              
+              // Trigger paste callback with image type
+              if (onPasteRef.current) onPasteRef.current('image');
+              
+            } catch (err) {
+              console.error('[Terminal] Image upload failed:', err);
+              if (xtermRef.current) {
+                xtermRef.current.write(`\r\x1b[K\x1b[31m[✗ Image upload failed: ${err.message}]\x1b[0m\r\n`);
+              }
+            }
+          };
+          
+          // Execute async (non-blocking)
+          uploadAsync();
+          
           break;
         }
       }
@@ -1100,7 +1120,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
               wsRef.current.send(text);
               console.log('[Terminal] Ctrl+V: Pasted', text.length, 'chars');
-              if (onPasteRef.current) onPasteRef.current();
+              // v3.7.2: Pass text flag to differentiate from image paste
+              if (onPasteRef.current) onPasteRef.current('text');
             }
           })
           .catch((err) => {

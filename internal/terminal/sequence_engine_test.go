@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"bytes"
 	"regexp"
 	"sync"
 	"sync/atomic"
@@ -249,4 +250,110 @@ func TestDefaultSequences_Patterns(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test Copilot allowed directory prompt detection
+func TestSequenceEngine_CopilotAllowedDirectoryPrompt(t *testing.T) {
+var executed atomic.Bool
+var receivedData []byte
+var mu sync.Mutex
+
+se := NewSequenceEngine(func(data []byte) error {
+mu.Lock()
+receivedData = append(receivedData, data...)
+mu.Unlock()
+executed.Store(true)
+return nil
+})
+se.SetEnabled(true)
+
+// Use default sequences (includes copilot-add-to-allowed-list)
+se.sequences = DefaultSequences
+
+// Simulate Copilot prompt
+prompt := `
+Allow directory access
+
+Copilot is attempting to read the following path outside your allowed directory list.
+
+Do you want to add these directories to the allowed list?
+
+> 1. Yes
+  2. No (Esc)
+`
+
+se.ProcessOutput([]byte(prompt))
+
+// Wait for settle time (400ms) plus buffer
+time.Sleep(450 * time.Millisecond)
+se.CheckSettle()
+
+// Wait for execution to complete (actions + sleeps)
+time.Sleep(200 * time.Millisecond)
+
+// Check that Enter was sent
+mu.Lock()
+data := string(receivedData)
+mu.Unlock()
+
+if !executed.Load() {
+t.Error("Expected sequence to execute for Copilot allowed directory prompt")
+}
+
+if !bytes.Contains(receivedData, []byte{'\r'}) {
+t.Errorf("Expected Enter key, got: %q", data)
+}
+}
+
+// Test Copilot "Confirm with number keys" prompt
+func TestSequenceEngine_CopilotConfirmWithNumberKeys(t *testing.T) {
+var executed atomic.Bool
+var receivedData []byte
+var mu sync.Mutex
+
+se := NewSequenceEngine(func(data []byte) error {
+mu.Lock()
+receivedData = append(receivedData, data...)
+mu.Unlock()
+executed.Store(true)
+return nil
+})
+se.SetEnabled(true)
+se.sequences = DefaultSequences
+
+// Simulate the exact prompt from screenshot
+prompt := `Allow directory access
+
+Copilot is attempting to read the following path outside your allowed directory list.
+
+// Test Copilot allowed directory prompt detection
+
+Do you want to add these directories to the allowed list?
+
+> 1. Yes
+  2. No (Esc)
+
+Confirm with number keys or ↑↓ keys and Enter, Cancel with Esc
+`
+
+se.ProcessOutput([]byte(prompt))
+
+// Wait for settle time (400ms) plus buffer
+time.Sleep(450 * time.Millisecond)
+se.CheckSettle()
+
+// Wait for execution
+time.Sleep(200 * time.Millisecond)
+
+mu.Lock()
+data := string(receivedData)
+mu.Unlock()
+
+if !executed.Load() {
+t.Error("Expected sequence to execute for Copilot 'Confirm with number keys' prompt")
+}
+
+if !bytes.Contains(receivedData, []byte{'\r'}) {
+t.Errorf("Expected Enter key, got: %q", data)
+}
 }

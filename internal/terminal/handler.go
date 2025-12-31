@@ -3,6 +3,7 @@ package terminal
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -102,6 +103,17 @@ type ChatCommandMessage struct {
 	Command string `json:"command"` // The command/message to inject
 	CLI     string `json:"cli,omitempty"`   // "copilot" or "claude" - if set, wraps as CLI command
 	Model   string `json:"model,omitempty"` // Model to use with CLI (from SLM routing)
+}
+
+// ImageAttachMessage represents an image attachment from clipboard paste.
+// v3.7.2: Structured image attachment instead of sending raw text path.
+type ImageAttachMessage struct {
+	Type      string `json:"type"`      // "IMAGE_ATTACH"
+	Path      string `json:"path"`      // Absolute path to image file
+	Filename  string `json:"filename"`  // Original filename
+	MimeType  string `json:"mimeType"`  // MIME type (e.g., "image/png")
+	Size      int64  `json:"size"`      // File size in bytes
+	Timestamp int64  `json:"timestamp"` // Unix timestamp (ms)
 }
 
 // ChatOutputMessage represents PTY output formatted for Chat display.
@@ -700,6 +712,35 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 								"command": truncate(chatMsg.Command, 50),
 							})
 						}
+					}
+					continue
+				}
+
+				// v3.7.2: Check for Image Attach messages (async image upload)
+				var imgMsg ImageAttachMessage
+				if err := json.Unmarshal(data, &imgMsg); err != nil {
+					log.Printf("[ImageAttach] JSON parse error: %v", err)
+				} else if imgMsg.Type == "IMAGE_ATTACH" {
+					log.Printf("[ImageAttach] Received image for session %s: %s (%d bytes)", 
+						sessionID, imgMsg.Filename, imgMsg.Size)
+					
+					// Send formatted path to PTY so CLI can access it
+					// This maintains compatibility with existing Copilot/Claude behavior
+					textToSend := fmt.Sprintf("[📷 %s]", imgMsg.Path)
+					if _, err := session.Write([]byte(textToSend)); err != nil {
+						log.Printf("[ImageAttach] PTY write error: %v", err)
+						_ = conn.WriteJSON(map[string]interface{}{
+							"type":  "IMAGE_ATTACH_ERROR",
+							"error": err.Error(),
+						})
+					} else {
+						// Send confirmation back to frontend
+						_ = conn.WriteJSON(map[string]interface{}{
+							"type":     "IMAGE_ATTACH_CONFIRMED",
+							"filename": imgMsg.Filename,
+							"path":     imgMsg.Path,
+						})
+						log.Printf("[ImageAttach] Image path sent to PTY: %s", imgMsg.Filename)
 					}
 					continue
 				}

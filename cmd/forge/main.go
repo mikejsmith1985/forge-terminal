@@ -27,6 +27,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm/ledger"
+	"github.com/mikejsmith1985/forge-terminal/internal/lockfile"
 	"github.com/mikejsmith1985/forge-terminal/internal/slm"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
@@ -69,6 +70,20 @@ func (w *headerFixingResponseWriter) WriteHeader(statusCode int) {
 }
 
 func main() {
+	// v3.7.2: Acquire instance lock to prevent multiple instances
+	// This prevents resource contention and keystroke latency issues
+	forgeDir := filepath.Join(os.Getenv("HOME"), ".forge")
+	lock, err := lockfile.Acquire(forgeDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %v\n\n", err)
+		fmt.Fprintf(os.Stderr, "If you're sure no other instance is running, remove:\n")
+		fmt.Fprintf(os.Stderr, "  %s\n", filepath.Join(forgeDir, "forge.lock"))
+		os.Exit(1)
+	}
+	defer lock.Release()
+	
+	log.Printf("[Forge] Instance lock acquired (PID: %d)", os.Getpid())
+	
 	// v3.7.1: Handle subcommands before starting web server
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -135,7 +150,7 @@ func main() {
 	}
 
 	// v3.5.1: Initialize Chat Store (SQLite-backed persistent chat)
-	forgeDir := filepath.Join(os.Getenv("HOME"), ".forge")
+	// forgeDir already declared at top of main() for lockfile
 	if err := initChatStore(forgeDir); err != nil {
 		log.Printf("[Chat] Warning: failed to initialize chat store: %v", err)
 	} else {

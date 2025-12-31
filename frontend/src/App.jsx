@@ -99,6 +99,27 @@ function App() {
     return saved ? parseInt(saved, 10) : 360;
   });
   
+  // Store the previous sidebar width before Files view expansion
+  const [prevSidebarWidth, setPrevSidebarWidth] = useState(null);
+  
+  // v3.7.2: Auto-expand sidebar for Files view (Lens File Picker needs space)
+  useEffect(() => {
+    const EXPANDED_WIDTH = 600; // Wider for Lens File Picker
+    const MIN_EXPANDED_WIDTH = 500;
+    
+    if (sidebarView === 'files') {
+      // Switching TO Files view - expand if needed
+      if (sidebarWidth < MIN_EXPANDED_WIDTH) {
+        setPrevSidebarWidth(sidebarWidth); // Remember current width
+        setSidebarWidth(EXPANDED_WIDTH);
+      }
+    } else if (prevSidebarWidth !== null) {
+      // Switching FROM Files view - restore previous width
+      setSidebarWidth(prevSidebarWidth);
+      setPrevSidebarWidth(null);
+    }
+  }, [sidebarView]);
+  
   // Update state - persists across toast dismissal
   const [updateInfo, setUpdateInfo] = useState(null)
   const [currentVersion, setCurrentVersion] = useState('')
@@ -181,7 +202,17 @@ function App() {
   const tourActionHandlers = useMemo(() => ({
     openRouterConfig: () => setIsRouterConfigOpen(true),
     closeRouterConfig: () => setIsRouterConfigOpen(false),
-  }), []);
+    ensureChatView: () => {
+      // Switch active tab to chat view if not already
+      if (activeTab && activeTab.viewMode !== 'chat') {
+        toggleTabViewMode(activeTab.id);
+      }
+    },
+    showFilesTab: () => {
+      // Switch sidebar to Files tab
+      setSidebarView('files');
+    },
+  }), [activeTab, toggleTabViewMode]);
 
   // Guided Tour for first-run experience
   const {
@@ -1831,6 +1862,7 @@ function App() {
                       setSettingsInitialTab('budget');
                       setIsSettingsModalOpen(true);
                     }}
+                    onToggleForgeAssist={() => setIsForgeAssistOpen(prev => !prev)}
                     onRunInTerminal={(command) => {
                       // Ghost Driver: Switch to terminal and inject command
                       toggleTabViewMode(tab.id);
@@ -1868,7 +1900,13 @@ function App() {
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                     onInteractiveTUI={(tuiType) => handleInteractiveTUI(tab.id, tuiType)}
                     onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
-                    onPaste={() => addToast('Text pasted from clipboard', 'success', 1500)}
+                    onPaste={(type) => {
+                      if (type === 'image') {
+                        addToast('Image pasted', 'success', 1500);
+                      } else {
+                        addToast('Text pasted from clipboard', 'success', 1500);
+                      }
+                    }}
                     onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                     onTerminalCommand={queryModelTier}
                     onRoutingUpdate={handleRoutingUpdate}
