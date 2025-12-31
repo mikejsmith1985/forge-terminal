@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle, MessageSquare, Clock } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle, MessageSquare, Clock, BookOpen } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
@@ -28,6 +28,7 @@ import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 import ChatSidebar from './components/ChatSidebar'
 import ChatView, { cleanupChatMessages } from './components/ChatView'
+import { NotebookLayout } from './components/notebook'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -1852,7 +1853,8 @@ function App() {
                 className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
               >
                 {/* v3.3.0: Render BOTH ChatView and ForgeTerminal, show/hide based on viewMode
-                    This preserves terminal state when switching between views */}
+                    This preserves terminal state when switching between views
+                    v3.8.0: Added NotebookLayout as third view mode */}
                 <div className={`view-layer chat-layer ${tab.viewMode === 'chat' ? 'active' : ''}`}>
                   <ChatView
                     tabId={tab.id}
@@ -1865,7 +1867,7 @@ function App() {
                     onToggleForgeAssist={() => setIsForgeAssistOpen(prev => !prev)}
                     onRunInTerminal={(command) => {
                       // Ghost Driver: Switch to terminal and inject command
-                      toggleTabViewMode(tab.id);
+                      toggleTabViewMode(tab.id, 'terminal');
                       setTimeout(() => {
                         const termRef = terminalRefs.current[tab.id];
                         if (termRef) {
@@ -1910,7 +1912,22 @@ function App() {
                     onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                     onTerminalCommand={queryModelTier}
                     onRoutingUpdate={handleRoutingUpdate}
-                    onSwitchToChat={() => toggleTabViewMode(tab.id)}
+                    onSwitchToChat={() => toggleTabViewMode(tab.id, 'chat')}
+                  />
+                </div>
+                {/* v3.8.0: Notebook view - Agentic Notebook interface */}
+                <div className={`view-layer notebook-layer ${tab.viewMode === 'notebook' ? 'active' : ''}`}>
+                  <NotebookLayout
+                    tabId={tab.id}
+                    fontSize={fontSize}
+                    colorTheme={tab.colorTheme || colorTheme}
+                    theme={tab.mode || 'dark'}
+                    shellConfig={tab.shellConfig}
+                    onToggleTerminal={() => toggleTabViewMode(tab.id)}
+                    onOpenSettings={() => {
+                      setSettingsInitialTab('budget');
+                      setIsSettingsModalOpen(true);
+                    }}
                   />
                 </div>
               </div>
@@ -2111,7 +2128,7 @@ function App() {
           const termRef = getActiveTerminalRef();
           return termRef?.getBuffer?.() || '';
         })()}
-        activeView={activeTab?.viewMode === 'chat' ? 'chat' : 'terminal'}
+        activeView={activeTab?.viewMode || 'chat'}
         onToast={addToast}
       />
 

@@ -106,7 +106,24 @@ func LoadCommands() ([]Command, error) {
 		return nil, fmt.Errorf("failed to parse commands JSON: %w", err)
 	}
 
-	return commands, nil
+	// Deduplicate by ID - keep first occurrence
+	seen := make(map[int]bool)
+	deduplicated := make([]Command, 0, len(commands))
+	for _, cmd := range commands {
+		if !seen[cmd.ID] {
+			seen[cmd.ID] = true
+			deduplicated = append(deduplicated, cmd)
+		}
+	}
+	
+	// If we removed duplicates, save the cleaned version
+	if len(deduplicated) < len(commands) {
+		if err := SaveCommands(deduplicated); err != nil {
+			return nil, fmt.Errorf("failed to save deduplicated commands: %w", err)
+		}
+	}
+
+	return deduplicated, nil
 }
 
 // SaveCommands saves commands to the JSON file

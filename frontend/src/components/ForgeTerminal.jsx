@@ -564,6 +564,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Sanitize text: replace all newlines/carriage returns with spaces
         // This prevents each line from being executed as a separate command
         const sanitized = text.replace(/[\r\n]+/g, ' ').trim();
+        
+        // CRITICAL FIX: Write to local terminal FIRST so user sees what was pasted
+        // The backend will echo it back, but that can be delayed
+        if (xtermRef.current && sanitized) {
+          xtermRef.current.write(sanitized);
+        }
+        
         // Send text WITHOUT Enter key - user can continue typing
         wsRef.current.send(sanitized);
         

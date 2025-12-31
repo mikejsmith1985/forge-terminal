@@ -116,7 +116,7 @@ const TOUR_STEPS = [
     selector: '.command-cards-container, .commands-panel, .sidebar-content',
     fallbackSelector: '.sidebar',
     title: 'Command Cards ⚡',
-    content: 'Save frequently-used commands as cards. Execute with a click or keyboard shortcuts (Ctrl+Shift+1-9). Drag to reorder, right-click to edit.',
+    content: 'Save frequently-used commands as cards. Execute with a click or keyboard shortcuts (Ctrl+Shift+1-9). Drag to reorder, click the pencil icon to edit.',
     placement: 'left',
     spotlight: true,
   },

@@ -615,11 +615,12 @@ export function useTabManager(initialShellConfig) {
   }, []);
 
   /**
-   * Toggle view mode for a tab (chat <-> terminal)
+   * Toggle view mode for a tab (chat -> terminal -> notebook -> chat)
    * @param {string} tabId - ID of tab to update
+   * @param {string} targetMode - Optional: directly set to a specific mode
    */
-  const toggleTabViewMode = useCallback((tabId) => {
-    logger.tabs('Toggling tab view mode', { tabId });
+  const toggleTabViewMode = useCallback((tabId, targetMode = null) => {
+    logger.tabs('Toggling tab view mode', { tabId, targetMode });
     
     setState(prev => {
       const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
@@ -629,7 +630,19 @@ export function useTabManager(initialShellConfig) {
       }
 
       const oldViewMode = prev.tabs[tabIndex].viewMode || 'chat';
-      const newViewMode = oldViewMode === 'chat' ? 'terminal' : 'chat';
+      
+      // If targetMode is specified, use it directly
+      // Otherwise cycle: chat -> terminal -> notebook -> chat
+      let newViewMode;
+      if (targetMode && ['chat', 'terminal', 'notebook'].includes(targetMode)) {
+        newViewMode = targetMode;
+      } else {
+        const viewModes = ['chat', 'terminal', 'notebook'];
+        const currentIndex = viewModes.indexOf(oldViewMode);
+        const nextIndex = (currentIndex + 1) % viewModes.length;
+        newViewMode = viewModes[nextIndex];
+      }
+      
       const newTabs = [...prev.tabs];
       newTabs[tabIndex] = { ...newTabs[tabIndex], viewMode: newViewMode };
       
