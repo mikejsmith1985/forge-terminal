@@ -87,8 +87,8 @@
 /* Search */
 .forge-assist-search {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px 16px;
   border-bottom: 1px solid #333;
   background: #0f0f0f;
@@ -304,4 +304,138 @@
   border-radius: 4px;
   font-size: 0.7rem;
   font-family: inherit;
+}
+
+/* v3.9.0: Mode Toggle */
+.forge-assist-mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.forge-assist-mode-toggle .mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #888;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.forge-assist-mode-toggle .mode-btn:hover {
+  background: #262626;
+  color: #fff;
+}
+
+.forge-assist-mode-toggle .mode-btn.active {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #fff;
+}
+
+.forge-assist-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+/* v3.9.0: SLM Badge */
+.forge-assist-slm-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #052e16;
+  border: 1px solid #22c55e;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  color: #22c55e;
+  white-space: nowrap;
+}
+
+/* v3.9.0: Task Stage Progress */
+.forge-assist-stages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+  background: #0a0a0a;
+}
+
+.forge-assist-stages .stage-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--stage-color);
+}
+
+.forge-assist-stages .stage-dot:hover {
+  transform: scale(1.1);
+}
+
+.forge-assist-stages .stage-dot.active {
+  color: #fff;
+  box-shadow: 0 0 12px var(--stage-color);
+}
+
+.forge-assist-stages .stage-dot.complete {
+  color: #fff;
+}
+
+.forge-assist-stages .stage-line {
+  width: 32px;
+  height: 2px;
+  background: #333;
+}
+
+.forge-assist-stages .stage-line.complete {
+  background: linear-gradient(90deg, var(--stage-color, #8b5cf6), var(--stage-color, #8b5cf6));
+}
+
+/* v3.9.0: Context Summary */
+.forge-assist-context-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #0f2744;
+  border-bottom: 1px solid #1e4976;
+  font-size: 0.75rem;
+  color: #60a5fa;
+}
+
+/* v3.9.0: Footer Advance Button */
+.footer-advance-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #22c55e;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-left: auto;
+}
+
+.footer-advance-btn:hover {
+  background: #16a34a;
 }

@@ -1,22 +1,24 @@
 /**
- * tourSteps.js - Guided Tour Configuration for Forge Terminal v3.6.0
+ * tourSteps.js - Guided Tour Configuration for Forge Terminal v3.9.0
  *
  * Comprehensive tour showcasing all Forge Terminal features.
  * Replaces the static splash page with an interactive guided experience.
  *
  * Features covered:
  * - Terminal & CLI integration
- * - Chat UI (Enhanced UX layer)
  * - Command Cards
  * - Tab management
  * - Themes & accessibility
  * - Time Travel
- * - File Explorer
+ * - File Explorer (Lens)
  * - AM (Artificial Memory)
- * - Smart Model Selection with SLM (NEW v3.6.0)
+ * - Smart Model Selection with SLM
+ * - Forge Assist with Task Mode (NEW v3.9.0)
  * - CLI Configuration (Copilot/Claude)
  * - Budget & Intelligence
- * - Workflows
+ * 
+ * v3.9.0: Workflows REMOVED, Forge Assist enhanced with Task Mode + SLM
+ * v3.8.2: ChatView and NotebookLayout removed - Terminal is the only view
  */
 
 const TOUR_STEPS = [
@@ -42,45 +44,9 @@ const TOUR_STEPS = [
     id: 'smart-routing',
     selector: '.terminal-container',
     fallbackSelector: '.terminal-outer-container',
-    title: 'Smart Model Selection 🎯 (NEW v3.6.0)',
+    title: 'Smart Model Selection 🎯',
     content: 'Type "?" before any prompt to use Smart Routing. Forge analyzes your task intent (debug, refactor, generate, etc.) and complexity to automatically select the best model: Haiku for simple tasks, Sonnet for medium, Opus for complex architecture.',
     placement: 'left',
-    spotlight: true,
-  },
-  {
-    id: 'smart-routing-example',
-    selector: '.model-tier-indicator, .terminal-container',
-    fallbackSelector: '.terminal-outer-container',
-    title: 'See Real Task Analysis',
-    content: 'After typing "? your prompt", watch the badge update. It shows the actual task type (🐛 debug, 🔧 refactor, etc.), complexity score (1-10), and which model is running. This is powered by real AI analysis, not just pattern matching!',
-    placement: 'left',
-    spotlight: true,
-  },
-  {
-    id: 'slm-options',
-    selector: '.sidebar',
-    fallbackSelector: '.terminal-container',
-    title: 'Smart Routing Options 🧠',
-    content: 'Two ways to enable Smart Routing: 1) Built-in SLM - Forge auto-downloads a small AI (~100MB) on first launch. 2) Ollama - If you have Ollama installed with a model like qwen2.5:0.5b, Forge uses it automatically (faster & more accurate). Check Settings → Intelligence.',
-    placement: 'right',
-    spotlight: true,
-  },
-  {
-    id: 'ollama-setup',
-    selector: '.sidebar',
-    fallbackSelector: '.terminal-container',
-    title: 'Using Ollama (Recommended) 🚀',
-    content: 'For best results: Install Ollama from ollama.ai, then run "ollama pull qwen2.5:0.5b" (~400MB). Forge auto-detects Ollama and uses it for faster, more accurate task analysis. The command is in Settings → Intelligence with a copy button.',
-    placement: 'right',
-    spotlight: true,
-  },
-  {
-    id: 'slm-disabled',
-    selector: '.sidebar',
-    fallbackSelector: '.terminal-container',
-    title: 'Without Smart Routing ⚠️',
-    content: 'If neither SLM nor Ollama is available: Smart Routing is DISABLED. All prompts use your default model (no optimization). You can set this up later from Settings → Intelligence.',
-    placement: 'right',
     spotlight: true,
   },
   {
@@ -93,23 +59,46 @@ const TOUR_STEPS = [
     spotlight: true,
   },
   {
-    id: 'chat-sidebar',
-    selector: '.chat-sidebar, .chat-toggle-btn, .view-layer.chat-layer',
-    fallbackSelector: '.terminal-container',
-    title: 'Chat Interface',
-    content: 'Toggle between Terminal and Chat views. The Chat view provides an enhanced UX for AI interactions while using the same CLI authentication - no API keys needed.',
-    placement: 'left',
-    spotlight: true,
-  },
-  {
     id: 'forge-assist-button',
     selector: '.forge-assist-floating-btn',
-    fallbackSelector: '.chat-view-input-area',
+    fallbackSelector: '.terminal-container',
     title: 'Forge Assist Button 🎯',
-    content: 'In Chat view, you\'ll see a floating purple button. Click it to open Forge Assist, or press Ctrl+/. You can drag this button anywhere on screen - your preferred position is saved!',
+    content: 'Press Ctrl+/ to open Forge Assist - a context-aware command palette. You can also click the floating purple button and drag it anywhere on screen!',
     placement: 'left',
     spotlight: true,
-    onAdvance: 'ensureChatView', // Switch to chat view to show the button
+    action: 'openForgeAssist', // Opens Forge Assist modal
+  },
+  {
+    id: 'forge-assist-commands',
+    selector: '.forge-assist-modal',
+    fallbackSelector: '.forge-assist-overlay',
+    title: 'Forge Assist - Commands Mode 📋',
+    content: 'In Commands mode, Forge Assist detects which CLI you\'re using (Copilot, Claude, Git, npm) and shows relevant slash commands, quick actions, and context variables. Use arrow keys to navigate and Enter to send.',
+    placement: 'right',
+    spotlight: true,
+    requiresOpen: 'forgeAssist',
+  },
+  {
+    id: 'forge-assist-task',
+    selector: '.forge-assist-modal',
+    fallbackSelector: '.forge-assist-overlay',
+    title: 'Forge Assist - Task Mode 🎯 (NEW v3.9.0)',
+    content: 'Press Tab to switch to Task Mode! This gives you a 5-stage workflow: Context → Plan → Implement → Validate → Deliver. Each stage has smart command suggestions. Click the stage dots or use "Next Stage" to progress.',
+    placement: 'right',
+    spotlight: true,
+    action: 'switchToTaskMode', // Switches Forge Assist to Task mode
+    requiresOpen: 'forgeAssist',
+  },
+  {
+    id: 'forge-assist-slm',
+    selector: '.forge-assist-slm-badge',
+    fallbackSelector: '.forge-assist-modal',
+    title: 'SLM-Powered Suggestions 🧠',
+    content: 'When you see the "🧠 SLM" badge, your local AI is active! It analyzes prompts to provide intelligent suggestions. If you see "Enable SLM", go to Settings → Intelligence to install the free local AI (~150MB).',
+    placement: 'bottom',
+    spotlight: true,
+    requiresOpen: 'forgeAssist',
+    action: 'closeForgeAssist', // Close after this step
   },
   {
     id: 'command-cards',
@@ -140,56 +129,60 @@ const TOUR_STEPS = [
   },
   {
     id: 'files',
-    selector: '.sidebar-view-tab:nth-child(3), button:has(svg):contains("Files")',
+    selector: '.sidebar-view-tab:nth-child(2)',
     fallbackSelector: '.sidebar-view-tabs',
     title: 'Lens File Picker 🔍',
     content: 'Click "Files" to open the Lens File Picker - an intelligent context builder with four views: 🔥 Heatmap (recent activity), 📐 Features (grouped by functionality), 📊 Graph (dependencies), and 🔎 Search (fuzzy find).',
     placement: 'right',
     spotlight: true,
-    onAdvance: 'showFilesTab', // Switch to Files tab
+    action: 'showFilesTab', // Switch to Files tab
   },
   {
     id: 'files-features',
     selector: '.lens-file-picker, .lens-context-cart',
     fallbackSelector: '.sidebar-content',
     title: 'Features View & Context Cart 🛒',
-    content: 'The Features view automatically groups files by functionality (Auth, Chat, Terminal, etc.) - perfect for understanding feature scope! Select files to add to your Context Cart with real-time token counting (128k budget).',
+    content: 'The Features view automatically groups files by functionality (Auth, Terminal, etc.) - perfect for understanding feature scope! Select files to add to your Context Cart with real-time token counting (128k budget).',
     placement: 'left',
     spotlight: true,
   },
   {
-    id: 'workflows',
-    selector: '.sidebar-view-tab:nth-child(2)',
-    fallbackSelector: '.sidebar-view-tabs',
-    title: 'Workflows 🔄',
-    content: 'Chain command cards into automated workflows. Create multi-step sequences that run with a single click.',
+    id: 'settings-open',
+    selector: 'button[title="Shell Settings"], .settings-btn',
+    fallbackSelector: '.terminal-controls',
+    title: 'Settings ⚙️',
+    content: 'Let\'s open Settings to see all configuration options. Click the gear icon or use Ctrl+,',
+    placement: 'bottom',
+    spotlight: true,
+    action: 'openSettings', // Opens Settings modal
+  },
+  {
+    id: 'settings-intelligence',
+    selector: '.settings-modal, .modal-content',
+    fallbackSelector: '.modal-overlay',
+    title: 'Intelligence & SLM Setup 🧠',
+    content: 'The Intelligence tab shows Smart Routing status. If not installed, click "Install Smart Routing" to download the free local AI (~150MB). Or install Ollama for faster analysis. This powers Forge Assist suggestions!',
     placement: 'right',
     spotlight: true,
+    requiresOpen: 'settings',
   },
   {
     id: 'settings-cli',
-    selector: 'button[title="Shell Settings"], .settings-btn',
-    fallbackSelector: '.terminal-controls',
+    selector: '.settings-modal, .modal-content',
+    fallbackSelector: '.modal-overlay',
     title: 'CLI Configuration 🔧',
-    content: 'Open Settings → CLI to configure GitHub Copilot and Claude CLI options. Set your preferred model, trusted folders, and more - all from the UI!',
-    placement: 'bottom',
+    content: 'The CLI tab lets you configure GitHub Copilot and Claude CLI options. Set your preferred model, trusted folders, and more - all from the UI! Close settings when done.',
+    placement: 'right',
     spotlight: true,
-  },
-  {
-    id: 'settings-budget',
-    selector: 'button[title="Shell Settings"], .settings-btn',
-    fallbackSelector: '.terminal-controls',
-    title: 'Intelligence & Budget 💰',
-    content: 'Settings → Intelligence lets you configure your monthly budget and see Smart Routing status. Forge optimizes model selection to stretch your credits with SLM-powered task analysis.',
-    placement: 'bottom',
-    spotlight: true,
+    requiresOpen: 'settings',
+    action: 'closeSettings', // Close settings after
   },
   {
     id: 'am-logging',
     selector: '.tab-bar .tab',
     fallbackSelector: '.terminal-pane',
     title: 'Artificial Memory (AM) 🧠',
-    content: 'AM logs all terminal activity for crash recovery and legal compliance. Right-click any tab to toggle AM logging. Enable Dev Mode in Settings for advanced AM features.',
+    content: 'AM logs all terminal activity for crash recovery and analysis. Right-click any tab to toggle AM logging. Enable Dev Mode in Settings for advanced AM features.',
     placement: 'bottom',
     spotlight: true,
   },
@@ -203,20 +196,11 @@ const TOUR_STEPS = [
     spotlight: false,
   },
   {
-    id: 'forge-assist',
-    selector: 'button[title*="Forge Assist"]',
-    fallbackSelector: '.theme-controls',
-    title: 'Forge Assist ⚡ (Ctrl+/)',
-    content: 'Press Ctrl+/ anywhere to open Forge Assist - a context-aware command palette. It detects which CLI you\'re using (Copilot, Claude, Git, npm) and shows relevant slash commands, quick actions, and context variables.',
-    placement: 'bottom',
-    spotlight: true,
-  },
-  {
     id: 'complete',
     selector: null,
     fallbackPosition: 'center',
     title: 'You\'re Ready! 🚀',
-    content: 'Try these features: Ctrl+/ for Forge Assist, drag the floating button in Chat view, "? your task" for Smart Routing, or browse files in the Files tab. Check Settings → Intelligence for Smart Routing setup. Replay this tour anytime from Settings → Shell.',
+    content: 'Try these features: Ctrl+/ for Forge Assist (Tab for Task Mode!), "? your task" for Smart Routing, or browse files in the Files tab. Replay this tour anytime from Settings → Shell.',
     placement: 'center',
     spotlight: false,
     isFinal: true,
@@ -224,6 +208,7 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '3.7.2'; // v3.7.2: Draggable Forge Assist button, async image upload, light mode fixes
+const TOUR_VERSION = '3.9.0'; // v3.9.0: Workflows removed, Forge Assist + Task Mode + SLM
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
+

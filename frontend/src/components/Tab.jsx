@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon, MessageSquare } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -228,16 +228,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             {tabMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             {tabMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
-          <button 
-            onClick={() => { 
-              setShowContextMenu(false); 
-              if (onToggleViewMode) onToggleViewMode(); 
-            }}
-            title="Cycle: Chat → Terminal → Notebook"
-          >
-            <MessageSquare size={14} />
-            View Mode: {tab.viewMode || 'chat'}
-          </button>
+          {/* v3.8.2: View Mode toggle REMOVED - Terminal is the only view */}
           {devMode && onToggleAM && (
             <button 
               onClick={() => { 

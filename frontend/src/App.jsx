@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, Workflow, MessageCircle, MessageSquare, Clock, BookOpen } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen, Target } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
@@ -11,9 +11,7 @@ import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import UpdateModal from './components/UpdateModal'
 // WelcomeModal REMOVED - replaced by guided tour (user request: 20+ times)
-import WorkflowCards from './components/WorkflowCards'
-import { WorkflowCanvas } from './components/workflow/WorkflowCanvas'
-import { WorkflowExecutor } from './components/workflow/WorkflowExecutor'
+// Workflows REMOVED - v3.9.0: Consolidating to SLM-enhanced Forge Assist
 import FileAccessPrompt from './components/FileAccessPrompt'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
@@ -26,14 +24,12 @@ import AMMonitor from './components/AMMonitor'
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
-import ChatSidebar from './components/ChatSidebar'
-import ChatView, { cleanupChatMessages } from './components/ChatView'
-import { NotebookLayout } from './components/notebook'
+import { TaskDashboard } from './components/task'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
 import { useDevMode } from './hooks/useDevMode'
-import { useWorkflowManager } from './hooks/useWorkflowManager'
+// useWorkflowManager REMOVED - v3.9.0: Workflows deleted
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
@@ -71,7 +67,7 @@ function App() {
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
   // WelcomeModal state REMOVED - replaced by guided tour
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
-  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false)
+  // ChatView and NotebookLayout REMOVED in v3.8.2 - Terminal is the only view
   const [settingsInitialTab, setSettingsInitialTab] = useState('shell') // For opening Settings to specific tab
   const [editingCommand, setEditingCommand] = useState(null)
   const [theme, setTheme] = useState('dark')
@@ -120,7 +116,7 @@ function App() {
   const [waitingTabs, setWaitingTabs] = useState({})
   
   // File explorer and editor state
-  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', 'workflows', or 'debug'
+  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', or 'debug' (workflows removed v3.9.0)
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   const [editorMode, setEditorMode] = useState('agentic') // 'agentic' or 'classic' (Monaco)
@@ -152,14 +148,22 @@ function App() {
   // Forge Assist state
   const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
   
-  // Workflow UI state
-  const [isWorkflowCanvasOpen, setIsWorkflowCanvasOpen] = useState(false)
-  const [editingWorkflow, setEditingWorkflow] = useState(null)
-  const [isWorkflowExecutorOpen, setIsWorkflowExecutorOpen] = useState(false)
-  const [executingWorkflow, setExecutingWorkflow] = useState(null)
+  // v3.8.2: Draggable Forge Assist floating button
+  const [forgeAssistBtnPos, setForgeAssistBtnPos] = useState(() => {
+    const saved = localStorage.getItem('forge_assist_btn_pos');
+    return saved ? JSON.parse(saved) : { right: 60, bottom: 80 };
+  });
+  const [isDraggingBtn, setIsDraggingBtn] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
+  // Workflow UI state - REMOVED v3.9.0: Workflows deleted, using Task Dashboard instead
   
   // Time-Travel UI state
   const [isHistorySliderOpen, setIsHistorySliderOpen] = useState(false)
+  
+  // v3.8.2: Task Dashboard state
+  const [isTaskDashboardOpen, setIsTaskDashboardOpen] = useState(false)
+  const [contextFiles, setContextFiles] = useState([])
   
   // Model Router state
   const [currentModelTier, setCurrentModelTier] = useState(null)
@@ -188,32 +192,28 @@ function App() {
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
   
-  // Workflow management
-  const {
-    workflows,
-    loading: workflowsLoading,
-    error: workflowsError,
-    loadWorkflows,
-    createWorkflow,
-    updateWorkflow,
-    deleteWorkflow,
-  } = useWorkflowManager();
+  // Workflow management - REMOVED v3.9.0: Consolidating to SLM-enhanced Forge Assist
 
   // Tour action handlers for interactive steps
+  // v3.9.0: Added ForgeAssist and Settings modal actions
   const tourActionHandlers = useMemo(() => ({
     openRouterConfig: () => setIsRouterConfigOpen(true),
     closeRouterConfig: () => setIsRouterConfigOpen(false),
-    ensureChatView: () => {
-      // Switch active tab to chat view if not already
-      if (activeTab && activeTab.viewMode !== 'chat') {
-        toggleTabViewMode(activeTab.id);
-      }
-    },
     showFilesTab: () => {
       // Switch sidebar to Files tab
       setSidebarView('files');
     },
-  }), [activeTab, toggleTabViewMode]);
+    // v3.9.0: Forge Assist actions
+    openForgeAssist: () => setIsForgeAssistOpen(true),
+    closeForgeAssist: () => setIsForgeAssistOpen(false),
+    switchToTaskMode: () => {
+      // ForgeAssist handles its own mode state, we just ensure it's open
+      setIsForgeAssistOpen(true);
+    },
+    // v3.9.0: Settings modal actions
+    openSettings: () => setIsSettingsModalOpen(true),
+    closeSettings: () => setIsSettingsModalOpen(false),
+  }), []);
 
   // Guided Tour for first-run experience
   const {
@@ -1001,10 +1001,51 @@ function App() {
         delete newState[tabId];
         return newState;
       });
-      // Clean up chat messages for this tab
-      cleanupChatMessages(tabId);
+      // cleanupChatMessages REMOVED in v3.8.2 - ChatView removed
     }
   }, [tabs.length, closeTab]);
+
+  // v3.8.2: Draggable Forge Assist button handlers
+  const handleBtnMouseDown = useCallback((e) => {
+    if (e.button !== 0) return; // Only left click
+    e.preventDefault();
+    setIsDraggingBtn(true);
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  }, []);
+
+  const handleBtnMouseMove = useCallback((e) => {
+    if (!isDraggingBtn) return;
+    const newRight = window.innerWidth - e.clientX - dragOffset.x;
+    const newBottom = window.innerHeight - e.clientY - dragOffset.y;
+    const constrainedPos = {
+      right: Math.max(10, Math.min(window.innerWidth - 60, newRight)),
+      bottom: Math.max(10, Math.min(window.innerHeight - 60, newBottom)),
+    };
+    setForgeAssistBtnPos(constrainedPos);
+  }, [isDraggingBtn, dragOffset]);
+
+  const handleBtnMouseUp = useCallback(() => {
+    if (isDraggingBtn) {
+      setIsDraggingBtn(false);
+      localStorage.setItem('forge_assist_btn_pos', JSON.stringify(forgeAssistBtnPos));
+    }
+  }, [isDraggingBtn, forgeAssistBtnPos]);
+
+  // Add/remove mouse event listeners for dragging
+  useEffect(() => {
+    if (isDraggingBtn) {
+      window.addEventListener('mousemove', handleBtnMouseMove);
+      window.addEventListener('mouseup', handleBtnMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleBtnMouseMove);
+        window.removeEventListener('mouseup', handleBtnMouseUp);
+      };
+    }
+  }, [isDraggingBtn, handleBtnMouseMove, handleBtnMouseUp]);
 
   // Handle tab rename
   const handleTabRename = useCallback((tabId, newTitle) => {
@@ -1024,24 +1065,8 @@ function App() {
   // This is triggered when Claude Code or similar shows a multi-question wizard
   const handleInteractiveTUI = useCallback((tabId, tuiType) => {
     logger.terminal('Interactive TUI detected', { tabId, tuiType });
-    
-    // v3.7.1: Don't auto-switch to terminal if user is working in chat mode
-    // If they launched a CLI from chat, they want to stay in chat
-    // Only switch if they were already in terminal mode (shouldn't happen)
-    // or if this is a complex wizard that truly needs direct terminal interaction
-    const tab = tabs.find(t => t.id === tabId);
-    if (tab && tab.viewMode === 'chat') {
-      // User is in chat mode - don't interrupt their workflow
-      logger.terminal('User in chat mode, not switching to terminal');
-      return;
-    }
-    
-    if (tab && tab.viewMode !== 'terminal') {
-      // Switch to terminal view so user can interact directly
-      toggleTabViewMode(tabId);
-      addToast('Interactive prompt detected - switched to terminal', 'info', 3000);
-    }
-  }, [tabs, toggleTabViewMode, addToast]);
+    // v3.8.2: Terminal is the only view, no switching needed
+  }, []);
 
   // Handle directory change from terminal - auto-rename tab and save directory
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
@@ -1159,82 +1184,7 @@ function App() {
     }
   }, [addToast]);
   
-  // Workflow handlers
-  const handleWorkflowRun = useCallback((workflow) => {
-    logger.workflows('Workflow run requested', { workflowId: workflow.id, name: workflow.name });
-    setExecutingWorkflow(workflow);
-    setIsWorkflowExecutorOpen(true);
-  }, []);
-  
-  const handleWorkflowEdit = useCallback((workflow) => {
-    logger.workflows('Workflow edit requested', { workflowId: workflow.id });
-    setEditingWorkflow(workflow);
-    setIsWorkflowCanvasOpen(true);
-  }, []);
-  
-  const handleWorkflowDelete = useCallback(async (workflowId) => {
-    const workflow = workflows.find(wf => wf.id === workflowId);
-    if (!workflow) return;
-    
-    const confirmed = window.confirm(`Delete workflow "${workflow.name}"?`);
-    if (!confirmed) return;
-    
-    const result = await deleteWorkflow(workflowId);
-    if (result.success) {
-      addToast('Workflow deleted', 'success', 2000);
-    } else {
-      addToast(`Failed to delete workflow: ${result.error}`, 'error', 3000);
-    }
-  }, [workflows, deleteWorkflow, addToast]);
-  
-  const handleNewWorkflow = useCallback(() => {
-    logger.workflows('New workflow requested');
-    setEditingWorkflow(null);
-    setIsWorkflowCanvasOpen(true);
-  }, []);
-  
-  const handleWorkflowCanvasSave = useCallback(async (workflowData) => {
-    let result;
-    if (editingWorkflow) {
-      // Update existing workflow
-      result = await updateWorkflow(editingWorkflow.id, workflowData);
-      if (result.success) {
-        addToast('Workflow updated', 'success', 2000);
-      }
-    } else {
-      // Create new workflow
-      result = await createWorkflow(workflowData);
-      if (result.success) {
-        addToast('Workflow created', 'success', 2000);
-      }
-    }
-    
-    if (result.success) {
-      setIsWorkflowCanvasOpen(false);
-      setEditingWorkflow(null);
-    } else {
-      addToast(`Failed to save workflow: ${result.error}`, 'error', 3000);
-    }
-  }, [editingWorkflow, updateWorkflow, createWorkflow, addToast]);
-  
-  const handleWorkflowCanvasClose = useCallback(() => {
-    setIsWorkflowCanvasOpen(false);
-    setEditingWorkflow(null);
-  }, []);
-  
-  const handleWorkflowExecutorClose = useCallback(() => {
-    setIsWorkflowExecutorOpen(false);
-    setExecutingWorkflow(null);
-  }, []);
-  
-  const handleWorkflowExecuteCommand = useCallback((commandCard) => {
-    // Execute command in terminal
-    const terminalRef = getActiveTerminalRef();
-    if (terminalRef && commandCard) {
-      terminalRef.sendCommand(commandCard.command, commandCard.delay);
-      terminalRef.focus();
-    }
-  }, [getActiveTerminalRef]);
+  // Workflow handlers - REMOVED v3.9.0: Workflows deleted
 
   const loadCommands = () => {
     setCommandsLoading(true);
@@ -1500,13 +1450,7 @@ function App() {
           <Command size={16} />
           Cards
         </button>
-        <button 
-          className={`sidebar-view-tab ${sidebarView === 'workflows' ? 'active' : ''}`}
-          onClick={() => setSidebarView('workflows')}
-        >
-          <Workflow size={16} />
-          Flows
-        </button>
+        {/* Workflows tab REMOVED v3.9.0 - consolidated to Forge Assist */}
         <button 
           className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
           onClick={() => {
@@ -1542,13 +1486,6 @@ function App() {
             <h3>⚡ Commands</h3>
             <button className="btn btn-primary" onClick={handleAdd}>
               <Plus size={16} /> Add
-            </button>
-          </>
-        ) : sidebarView === 'workflows' ? (
-          <>
-            <h3>🔄 Workflows</h3>
-            <button className="btn btn-primary" onClick={handleNewWorkflow}>
-              <Plus size={16} /> New
             </button>
           </>
         ) : sidebarView === 'files' ? (
@@ -1665,6 +1602,15 @@ function App() {
             <span role="img" aria-label="assistant">🤖</span>
           </button>
         </div>
+        {/* v3.8.2: Task Dashboard toggle */}
+        <button 
+          className={`btn btn-ghost btn-icon ${isTaskDashboardOpen ? 'active' : ''}`}
+          onClick={() => setIsTaskDashboardOpen(prev => !prev)} 
+          title="Toggle Task Dashboard"
+          style={{ color: isTaskDashboardOpen ? 'var(--accent-color)' : undefined }}
+        >
+          <Target size={18} />
+        </button>
         <button 
           className="btn btn-ghost btn-icon" 
           onClick={() => setIsSettingsModalOpen(true)} 
@@ -1757,20 +1703,11 @@ function App() {
               shellType={shellConfig.shellType}
             />
           </DndContext>
-        ) : sidebarView === 'workflows' ? (
-          <WorkflowCards
-            workflows={workflows}
-            loading={workflowsLoading}
-            error={workflowsError}
-            onRun={handleWorkflowRun}
-            onEdit={handleWorkflowEdit}
-            onDelete={handleWorkflowDelete}
-            onNewWorkflow={handleNewWorkflow}
-          />
         ) : sidebarView === 'files' ? (
           <LensFilePicker
             currentPath={activeTab?.currentDirectory}
             onFileSelect={handleFileOpen}
+            onSelectionChange={setContextFiles}
             terminalRef={getActiveTerminalRef()}
           />
         ) : sidebarView === 'debug' ? (
@@ -1851,38 +1788,31 @@ function App() {
             ) : tabs.map((tab) => (
               <div
                 key={tab.id}
-                className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
+                className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''} ${isTaskDashboardOpen ? 'with-dashboard' : ''}`}
               >
-                {/* v3.3.0: Render BOTH ChatView and ForgeTerminal, show/hide based on viewMode
-                    This preserves terminal state when switching between views
-                    v3.8.0: Added NotebookLayout as third view mode */}
-                <div className={`view-layer chat-layer ${tab.viewMode === 'chat' ? 'active' : ''}`}>
-                  <ChatView
-                    tabId={tab.id}
-                    fontSize={chatFontSize}
-                    onToggleTerminal={() => toggleTabViewMode(tab.id)}
-                    onOpenSettings={() => {
-                      setSettingsInitialTab('budget');
-                      setIsSettingsModalOpen(true);
-                    }}
-                    onToggleForgeAssist={() => setIsForgeAssistOpen(prev => !prev)}
-                    onRunInTerminal={(command) => {
-                      // Ghost Driver: Switch to terminal and inject command
-                      toggleTabViewMode(tab.id, 'terminal');
-                      setTimeout(() => {
+                {/* v3.8.2: Task Dashboard - Workflow Stage Orchestration */}
+                {isTaskDashboardOpen && tab.id === activeTabId && (
+                  <div className="task-dashboard-panel">
+                    <TaskDashboard
+                      tabId={tab.id}
+                      contextFiles={contextFiles}
+                      commandCards={commands}
+                      terminalRef={terminalRefs.current[tab.id]}
+                      onStageChange={(stage) => logger.info('Stage changed:', stage)}
+                      onTaskComplete={() => addToast('🎉 Task complete!', 'success', 3000)}
+                      onOpenContextCart={() => setSidebarView('files')}
+                      onRunCommand={(cmd) => {
                         const termRef = terminalRefs.current[tab.id];
-                        if (termRef) {
-                          termRef.sendCommand(command);
-                          termRef.focus();
+                        if (termRef?.sendCommand) {
+                          termRef.sendCommand(cmd);
                         }
-                      }, 100);
-                    }}
-                    // v3.5.3: PTY bridge connection - use getter to ensure ref is current
-                    terminalRef={terminalRefs.current[tab.id]}
-                    getTerminalRef={() => terminalRefs.current[tab.id]}
-                  />
-                </div>
-                <div className={`view-layer terminal-layer ${tab.viewMode === 'terminal' ? 'active' : ''}`}>
+                      }}
+                      onToast={addToast}
+                    />
+                  </div>
+                )}
+                {/* v3.8.2: Terminal is the only view - ChatView and NotebookLayout removed */}
+                <div className="view-layer terminal-layer active">
                   <ForgeTerminal
                     ref={(el) => {
                       if (el) {
@@ -1890,7 +1820,7 @@ function App() {
                       }
                     }}
                     tabId={tab.id}
-                    isVisible={tab.id === activeTabId && tab.viewMode === 'terminal'}
+                    isVisible={tab.id === activeTabId}
                     theme={tab.mode || 'dark'}
                     colorTheme={tab.colorTheme || colorTheme}
                     fontSize={fontSize}
@@ -1913,24 +1843,9 @@ function App() {
                     onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                     onTerminalCommand={queryModelTier}
                     onRoutingUpdate={handleRoutingUpdate}
-                    onSwitchToChat={() => toggleTabViewMode(tab.id, 'chat')}
                   />
                 </div>
-                {/* v3.8.0: Notebook view - Agentic Notebook interface */}
-                <div className={`view-layer notebook-layer ${tab.viewMode === 'notebook' ? 'active' : ''}`}>
-                  <NotebookLayout
-                    tabId={tab.id}
-                    fontSize={fontSize}
-                    colorTheme={tab.colorTheme || colorTheme}
-                    theme={tab.mode || 'dark'}
-                    shellConfig={tab.shellConfig}
-                    onToggleTerminal={() => toggleTabViewMode(tab.id)}
-                    onOpenSettings={() => {
-                      setSettingsInitialTab('budget');
-                      setIsSettingsModalOpen(true);
-                    }}
-                  />
-                </div>
+                {/* v3.8.2: NotebookLayout REMOVED - Terminal is the only view */}
               </div>
             ))}
           </div>
@@ -2046,37 +1961,9 @@ function App() {
         position={sidebarPosition === 'right' ? 'left' : 'right'}
       />
 
-      {/* Workflow Canvas - Full-screen workflow editor */}
-      {isWorkflowCanvasOpen && (
-        <WorkflowCanvas
-          workflow={editingWorkflow}
-          onSave={handleWorkflowCanvasSave}
-          onClose={handleWorkflowCanvasClose}
-          commandCards={commands}
-        />
-      )}
-
-      {/* Workflow Executor - Step-by-step execution panel */}
-      {isWorkflowExecutorOpen && executingWorkflow && (
-        <WorkflowExecutor
-          workflow={executingWorkflow}
-          onClose={handleWorkflowExecutorClose}
-          onExecuteCommand={handleWorkflowExecuteCommand}
-          commandCards={commands}
-        />
-      )}
+      {/* v3.9.0: Workflow Canvas and Executor REMOVED - consolidated to Forge Assist + Task Dashboard */}
       
-      {/* Chat Sidebar - AI assistant for terminal context */}
-      <ChatSidebar
-        isOpen={isChatSidebarOpen}
-        onClose={() => setIsChatSidebarOpen(false)}
-        tabId={activeTabId}
-        fontSize={chatFontSize}
-        onOpenSettings={() => {
-          setSettingsInitialTab('budget');
-          setIsSettingsModalOpen(true);
-        }}
-      />
+      {/* v3.8.2: ChatSidebar and NotebookLayout REMOVED - Terminal is the only view */}
       
       {/* History Slider - Time-Travel Scrubber */}
       {activeTabId && (
@@ -2090,21 +1977,17 @@ function App() {
             }
           }}
           onChatAboutHistory={(content, timestamp) => {
-            // Switch to chat mode if in terminal mode
-            if (activeTab?.viewMode === 'terminal') {
-              toggleTabViewMode(activeTabId);
-            }
-            // Close history slider
+            // v3.8.2: Just show toast, terminal is the only view
             setIsHistorySliderOpen(false);
-            // Show toast with hint
-            addToast(`Analyzing terminal state from ${timestamp.toLocaleTimeString()}. Ask your question in chat.`, 'info', 4000);
-            // TODO: Could pre-populate chat context with historical content
+            addToast(`Terminal state from ${timestamp.toLocaleTimeString()} available in history`, 'info', 4000);
           }}
           position="bottom"
         />
       )}
 
       {/* Forge Assist - Context-aware command palette (Ctrl+/) */}
+      {/* Forge Assist - Context-aware command palette (Ctrl+/) */}
+      {/* v3.9.0: Enhanced with Task Mode + SLM Integration */}
       <ForgeAssist
         isOpen={isForgeAssistOpen}
         onClose={() => setIsForgeAssistOpen(false)}
@@ -2116,22 +1999,60 @@ function App() {
             termRef.write(cmd);
           }
         }}
-        onSendToChat={(cmd) => {
-          // If in chat view, would send to chat input
-          // For now, just send to terminal
-          const termRef = getActiveTerminalRef();
-          if (termRef?.sendCommand) {
-            termRef.sendCommand(cmd);
-          }
-        }}
         terminalBuffer={(() => {
           // Get terminal buffer on demand when ForgeAssist is open
           const termRef = getActiveTerminalRef();
           return termRef?.getBuffer?.() || '';
         })()}
-        activeView={activeTab?.viewMode || 'chat'}
+        activeView="terminal"
         onToast={addToast}
+        contextFiles={contextFiles}
       />
+
+      {/* v3.8.2: Draggable Forge Assist floating button */}
+      <button
+        className={`forge-assist-floating-btn ${isDraggingBtn ? 'dragging' : ''}`}
+        style={{
+          position: 'fixed',
+          right: `${forgeAssistBtnPos.right}px`,
+          bottom: `${forgeAssistBtnPos.bottom}px`,
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          background: 'var(--accent-color, #8b5cf6)',
+          border: 'none',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          cursor: isDraggingBtn ? 'grabbing' : 'grab',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          zIndex: 1000,
+          transition: isDraggingBtn ? 'none' : 'transform 0.2s, box-shadow 0.2s',
+          userSelect: 'none',
+        }}
+        onMouseDown={handleBtnMouseDown}
+        onClick={(e) => {
+          if (!isDraggingBtn) {
+            setIsForgeAssistOpen(prev => !prev);
+          }
+        }}
+        onMouseEnter={(e) => {
+          if (!isDraggingBtn) {
+            e.currentTarget.style.transform = 'scale(1.1)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isDraggingBtn) {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+          }
+        }}
+        title="Forge Assist - Drag to reposition (Ctrl+/)"
+      >
+        <Command size={24} />
+      </button>
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (

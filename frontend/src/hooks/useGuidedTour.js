@@ -189,10 +189,20 @@ const useGuidedTour = (actionHandlers = {}) => {
   const nextStep = useCallback(() => {
     const currentStepData = TOUR_STEPS[currentStep];
     
-    // Execute onAdvance action if defined
-    if (currentStepData?.onAdvance) {
-      executeAction(currentStepData.onAdvance);
+    // Execute action if defined (v3.9.0: runs before advancing)
+    if (currentStepData?.action) {
+      executeAction(currentStepData.action);
       // Small delay to let the action complete (e.g., modal opening)
+      setTimeout(() => {
+        if (currentStep < TOUR_STEPS.length - 1) {
+          setCurrentStep((prev) => prev + 1);
+        } else {
+          completeTour();
+        }
+      }, 400);
+    } else if (currentStepData?.onAdvance) {
+      // Legacy support for onAdvance
+      executeAction(currentStepData.onAdvance);
       setTimeout(() => {
         if (currentStep < TOUR_STEPS.length - 1) {
           setCurrentStep((prev) => prev + 1);

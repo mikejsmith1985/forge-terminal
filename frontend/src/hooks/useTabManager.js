@@ -51,7 +51,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
-    viewMode: 'chat', // v3.3.0: New tabs start in chat mode ('chat' or 'terminal')
+    viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
     autoRespond: false, // Auto-respond to CLI confirmation prompts
     amEnabled: true, // AM (Artificial Memory) logging - DEFAULT ON for legal compliance
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
@@ -87,7 +87,7 @@ function tabsToSession(tabs, activeTabId) {
       },
       colorTheme: tab.colorTheme,
       mode: tab.mode || 'dark',
-      viewMode: tab.viewMode || 'chat', // v3.3.0: Persist view mode
+      viewMode: 'terminal', // v3.8.2: Terminal only (viewMode no longer needed)
       autoRespond: tab.autoRespond || false,
       amEnabled: tab.amEnabled || false,
       visionEnabled: tab.visionEnabled || false,
@@ -201,7 +201,7 @@ export function useTabManager(initialShellConfig) {
           shellConfig: tabState.shellConfig || configRef.current,
           colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
           mode: tabState.mode || 'dark',
-          viewMode: tabState.viewMode || 'chat', // v3.3.0: Restore view mode
+          viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
           autoRespond: tabState.autoRespond || false,
           amEnabled: tabState.amEnabled || false,
           visionEnabled: tabState.visionEnabled || false,
@@ -620,43 +620,10 @@ export function useTabManager(initialShellConfig) {
    * @param {string} targetMode - Optional: directly set to a specific mode
    */
   const toggleTabViewMode = useCallback((tabId, targetMode = null) => {
-    logger.tabs('Toggling tab view mode', { tabId, targetMode });
-    
-    setState(prev => {
-      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
-      if (tabIndex === -1) {
-        logger.tabs('Tab not found for view mode toggle', { tabId });
-        return prev;
-      }
-
-      const oldViewMode = prev.tabs[tabIndex].viewMode || 'chat';
-      
-      // If targetMode is specified, use it directly
-      // Otherwise cycle: chat -> terminal -> notebook -> chat
-      let newViewMode;
-      if (targetMode && ['chat', 'terminal', 'notebook'].includes(targetMode)) {
-        newViewMode = targetMode;
-      } else {
-        const viewModes = ['chat', 'terminal', 'notebook'];
-        const currentIndex = viewModes.indexOf(oldViewMode);
-        const nextIndex = (currentIndex + 1) % viewModes.length;
-        newViewMode = viewModes[nextIndex];
-      }
-      
-      const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], viewMode: newViewMode };
-      
-      logger.tabs('Tab view mode toggled', { 
-        tabId, 
-        oldViewMode, 
-        newViewMode 
-      });
-      
-      return {
-        ...prev,
-        tabs: newTabs,
-      };
-    });
+    // v3.8.2: Notebook removed - terminal is the only view mode
+    // This function is kept for API compatibility but does nothing
+    logger.tabs('toggleTabViewMode called but viewMode is now terminal-only', { tabId, targetMode });
+    return; // No-op
   }, []);
 
   return {
