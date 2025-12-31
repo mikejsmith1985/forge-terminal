@@ -76,12 +76,12 @@ func NewExecutiveTriggerHandler(vp *vision.Parser) *ExecutiveTriggerHandler {
 	return handler
 }
 
-// initSLMProvider initializes the SLM provider (Ollama or LlamaCpp).
+// initSLMProvider initializes the SLM provider (Ollama only as of v3.9.1).
 func (eth *ExecutiveTriggerHandler) initSLMProvider() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	
-	// Try Ollama first (most common)
+	// v3.9.1: Ollama only - embedded SLM removed
 	ollamaProvider := slm.NewOllamaProvider()
 	if ollamaProvider.IsAvailable() {
 		if err := ollamaProvider.Initialize(ctx); err == nil {
@@ -91,18 +91,8 @@ func (eth *ExecutiveTriggerHandler) initSLMProvider() {
 		}
 	}
 	
-	// Try LlamaCpp as fallback
-	llamaProvider := slm.NewLlamaCppProvider()
-	if llamaProvider.IsAvailable() {
-		if err := llamaProvider.Initialize(ctx); err == nil {
-			eth.slmProvider = llamaProvider
-			log.Printf("[Executive] SLM initialized with LlamaCpp provider")
-			return
-		}
-	}
-	
 	// No SLM available - will fall back to heuristic classifier
-	log.Printf("[Executive] No SLM provider available - using heuristic fallback")
+	log.Printf("[Executive] No SLM provider available (install Ollama for smart routing)")
 }
 
 // SetActiveProcess updates the currently active LLM process.

@@ -44,83 +44,29 @@ func NewEngine() *Engine {
 }
 
 // Initialize sets up the engine with available providers.
-// Priority: Ollama (if installed) > LlamaCpp with auto-download
-// NO external API calls for inference - all local and free.
-// Issue #52: Auto-downloads model if not present. NO HEURISTICS.
+// v3.9.1: Ollama-only - removed broken embedded SLM.
 func (e *Engine) Initialize(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Priority 1 - Ollama (if user has it installed, use it - it's optimized)
+	// Only provider: Ollama
 	ollamaProvider := NewOllamaProvider()
 	if ollamaProvider.IsAvailable() {
 		log.Printf("[SLM] Ollama detected, checking for suitable models...")
 		if err := ollamaProvider.Initialize(ctx); err == nil {
 			e.provider = ollamaProvider
 			e.noSLMAvailable = false
-			log.Printf("[SLM] ✓ Using Ollama as primary provider (FREE local AI)")
+			log.Printf("[SLM] ✓ Using Ollama for smart routing (free, local AI)")
 			return nil
 		} else {
 			log.Printf("[SLM] Ollama init failed: %v", err)
 		}
 	}
 
-	// Priority 2 - LlamaCpp with auto-download
-	// This ensures SLM works out of the box with NO external dependencies
-	log.Printf("[SLM] Checking for bundled model...")
-	
-	// Auto-download model if not present
-	modelJustDownloaded := false
-	if !ModelExists() {
-		log.Printf("[SLM] Model not found, downloading SmolLM2-135M (~100MB)...")
-		log.Printf("[SLM] This is a one-time download for intelligent routing.")
-		
-		err := EnsureModelAvailable(func(p DownloadProgress) {
-			if int(p.Percent)%10 == 0 {
-				log.Printf("[SLM] Download progress: %.0f%% (%.1f MB/s)", 
-					p.Percent, p.Speed/1_000_000)
-			}
-		})
-		if err != nil {
-			log.Printf("[SLM] Model download failed: %v", err)
-			log.Printf("[SLM] ⚠ Routing disabled - install Ollama or download model manually")
-			e.provider = nil
-			e.noSLMAvailable = true
-			return nil
-		}
-		log.Printf("[SLM] ✓ Model downloaded successfully!")
-		modelJustDownloaded = true
-	}
-
-	// Apply initial training after first model download
-	if modelJustDownloaded {
-		log.Printf("[SLM] Applying initial training data...")
-		if err := ApplyInitialTraining(); err != nil {
-			log.Printf("[SLM] Warning: Failed to apply initial training: %v", err)
-		}
-	}
-
-	// Try to initialize LlamaCpp provider
-	llamaCppProvider := NewLlamaCppProvider()
-	if llamaCppProvider.IsAvailable() {
-		log.Printf("[SLM] llama-cli binary detected, initializing...")
-		if err := llamaCppProvider.Initialize(ctx); err == nil {
-			e.provider = llamaCppProvider
-			e.noSLMAvailable = false
-			log.Printf("[SLM] ✓ Using embedded SLM (SmolLM2-135M) - NO external dependencies!")
-			return nil
-		} else {
-			log.Printf("[SLM] llama-cli init failed: %v", err)
-		}
-	} else {
-		log.Printf("[SLM] llama-cli binary not found")
-		log.Printf("[SLM] Download from: https://github.com/ggerganov/llama.cpp/releases")
-		log.Printf("[SLM] Place in: %s", GetBinDir())
-	}
-
-	// No SLM available - routing disabled, use user's default model
-	log.Printf("[SLM] ⚠ No SLM available - routing DISABLED")
-	log.Printf("[SLM] Prompts will use your default model without smart routing")
+	// No Ollama available - routing disabled
+	log.Printf("[SLM] ⚠ Ollama not detected - smart routing DISABLED")
+	log.Printf("[SLM] Install Ollama from https://ollama.ai/download")
+	log.Printf("[SLM] Then run: ollama pull qwen2.5:0.5b")
 	e.provider = nil
 	e.noSLMAvailable = true
 

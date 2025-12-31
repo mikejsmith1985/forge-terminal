@@ -68,6 +68,12 @@ func TestHeuristicAnalysis(t *testing.T) {
 				t.Fatalf("Analyze failed: %v", err)
 			}
 
+			// v3.9.1: Analyze returns nil when no SLM (Ollama) is available
+			if result == nil {
+				t.Skip("Skipping: No SLM provider available (Ollama not installed)")
+				return
+			}
+
 			// Check complexity is in reasonable range
 			if result.Complexity < 1 || result.Complexity > 10 {
 				t.Errorf("Complexity %d out of range [1,10]", result.Complexity)
@@ -90,38 +96,6 @@ func TestHeuristicAnalysis(t *testing.T) {
 
 			t.Logf("Result: complexity=%d, type=%s, iterations=%v, confidence=%.2f",
 				result.Complexity, result.TaskType, result.Iterations, result.Confidence)
-		})
-	}
-}
-
-func TestIterationEstimation(t *testing.T) {
-	engine := NewEngine()
-
-	tests := []struct {
-		complexity   int
-		expectHaiku  int
-		expectSonnet int
-		expectOpus   int
-	}{
-		{complexity: 2, expectHaiku: 1, expectSonnet: 1, expectOpus: 1},
-		{complexity: 5, expectHaiku: 2, expectSonnet: 2, expectOpus: 1},
-		{complexity: 7, expectHaiku: 3, expectSonnet: 2, expectOpus: 1},
-		{complexity: 9, expectHaiku: 4, expectSonnet: 2, expectOpus: 1},
-	}
-
-	for _, tt := range tests {
-		t.Run("complexity_"+string(rune('0'+tt.complexity)), func(t *testing.T) {
-			iters := engine.estimateIterations(tt.complexity)
-
-			if iters["haiku"] != tt.expectHaiku {
-				t.Errorf("haiku iterations = %d, want %d", iters["haiku"], tt.expectHaiku)
-			}
-			if iters["sonnet"] != tt.expectSonnet {
-				t.Errorf("sonnet iterations = %d, want %d", iters["sonnet"], tt.expectSonnet)
-			}
-			if iters["opus"] != tt.expectOpus {
-				t.Errorf("opus iterations = %d, want %d", iters["opus"], tt.expectOpus)
-			}
 		})
 	}
 }

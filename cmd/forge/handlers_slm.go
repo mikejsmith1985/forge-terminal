@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/slm"
@@ -235,32 +234,20 @@ func handleOllamaStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSLMModelStatus handles GET /api/slm/model
-// Returns the status of the embedded SLM model.
+// v3.9.1: Embedded SLM removed - always returns "use Ollama"
 func handleSLMModelStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	modelExists := slm.ModelExists()
-	binaryExists := slm.BinaryExists()
-	modelPath := slm.GetExpectedModelPath()
-	binaryPath := slm.GetExpectedBinaryPath()
-
+	// v3.9.1: Embedded SLM removed, only Ollama supported
 	status := map[string]interface{}{
-		"model_exists":  modelExists,
-		"binary_exists": binaryExists,
-		"model_path":    modelPath,
-		"binary_path":   binaryPath,
-		"model_name":    slm.DefaultModelName,
-		"ready":         modelExists && binaryExists,
-	}
-
-	// Get file size if exists
-	if modelExists {
-		if info, err := os.Stat(modelPath); err == nil {
-			status["model_size_mb"] = info.Size() / 1_000_000
-		}
+		"model_exists":  false,
+		"binary_exists": false,
+		"ready":         false,
+		"message":       "Embedded SLM removed in v3.9.1. Install Ollama for smart routing.",
+		"ollama_url":    "https://ollama.ai/download",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -268,213 +255,77 @@ func handleSLMModelStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSLMModelDownload handles POST /api/slm/model/download
-// Triggers download of the embedded SLM model.
+// v3.9.1: Embedded SLM removed - returns error directing to Ollama
 func handleSLMModelDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Check if already exists
-	if slm.ModelExists() {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":  "exists",
-			"message": "Model already downloaded",
-			"path":    slm.GetExpectedModelPath(),
-		})
-		return
-	}
-
-	// Start download (this is synchronous for now - could be made async with SSE)
-	log.Printf("[SLM API] Starting model download...")
-	
-	var lastProgress slm.DownloadProgress
-	err := slm.DownloadModel(func(p slm.DownloadProgress) {
-		lastProgress = p
-		if int(p.Percent)%20 == 0 {
-			log.Printf("[SLM API] Download: %.0f%%", p.Percent)
-		}
-	})
-
-	if err != nil {
-		log.Printf("[SLM API] Download failed: %v", err)
-		http.Error(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Re-initialize the SLM engine with the new model
-	engine := slm.GetEngine()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	engine.Initialize(ctx)
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":      "downloaded",
-		"message":     "Model downloaded successfully",
-		"path":        slm.GetExpectedModelPath(),
-		"size_mb":     lastProgress.Downloaded / 1_000_000,
+		"status":     "unsupported",
+		"message":    "Embedded SLM removed in v3.9.1. Install Ollama instead.",
+		"ollama_url": "https://ollama.ai/download",
+		"command":    "ollama pull qwen2.5:0.5b",
 	})
 }
 
 // handleSLMBinaryDownload handles POST /api/slm/binary/download
-// Triggers download of the llama-cli binary.
+// v3.9.1: Embedded SLM removed - returns error directing to Ollama
 func handleSLMBinaryDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Check if already exists
-	if slm.BinaryExists() {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":  "exists",
-			"message": "Binary already installed",
-			"path":    slm.GetExpectedBinaryPath(),
-		})
-		return
-	}
-
-	// Start download
-	log.Printf("[SLM API] Starting binary download...")
-	
-	var lastProgress slm.DownloadProgress
-	err := slm.DownloadBinary(func(p slm.DownloadProgress) {
-		lastProgress = p
-		if int(p.Percent)%20 == 0 {
-			log.Printf("[SLM API] Binary download: %.0f%%", p.Percent)
-		}
-	})
-
-	if err != nil {
-		log.Printf("[SLM API] Binary download failed: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":  "error",
-			"message": err.Error(),
-		})
-		return
-	}
-
-	// Re-initialize the SLM engine with the new binary
-	engine := slm.GetEngine()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	engine.Initialize(ctx)
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":      "downloaded",
-		"message":     "Binary installed successfully",
-		"path":        slm.GetExpectedBinaryPath(),
-		"size_mb":     lastProgress.Downloaded / 1_000_000,
+		"status":     "unsupported",
+		"message":    "Embedded SLM removed in v3.9.1. Install Ollama instead.",
+		"ollama_url": "https://ollama.ai/download",
+		"command":    "ollama pull qwen2.5:0.5b",
 	})
 }
 
 // handleSLMInstall handles POST /api/slm/install
-// Downloads both model and binary to fully set up SLM.
+// v3.9.1: Embedded SLM removed - returns error directing to Ollama
 func handleSLMInstall(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	log.Printf("[SLM API] Starting full SLM installation...")
-	
-	results := map[string]interface{}{
-		"model":  map[string]interface{}{"status": "pending"},
-		"binary": map[string]interface{}{"status": "pending"},
-	}
-
-	// Download model
-	if slm.ModelExists() {
-		results["model"] = map[string]interface{}{
-			"status":  "exists",
-			"message": "Model already downloaded",
-			"path":    slm.GetExpectedModelPath(),
-		}
-	} else {
-		log.Printf("[SLM API] Downloading model...")
-		err := slm.DownloadModel(func(p slm.DownloadProgress) {
-			if int(p.Percent)%25 == 0 {
-				log.Printf("[SLM API] Model: %.0f%%", p.Percent)
-			}
-		})
-		if err != nil {
-			results["model"] = map[string]interface{}{
-				"status":  "error",
-				"message": err.Error(),
-			}
-		} else {
-			results["model"] = map[string]interface{}{
-				"status":  "downloaded",
-				"message": "Model downloaded successfully",
-				"path":    slm.GetExpectedModelPath(),
-			}
-		}
-	}
-
-	// Download binary
-	if slm.BinaryExists() {
-		results["binary"] = map[string]interface{}{
-			"status":  "exists",
-			"message": "Binary already installed",
-			"path":    slm.GetExpectedBinaryPath(),
-		}
-	} else {
-		log.Printf("[SLM API] Downloading binary...")
-		err := slm.DownloadBinary(func(p slm.DownloadProgress) {
-			if int(p.Percent)%25 == 0 {
-				log.Printf("[SLM API] Binary: %.0f%%", p.Percent)
-			}
-		})
-		if err != nil {
-			results["binary"] = map[string]interface{}{
-				"status":  "error",
-				"message": err.Error(),
-			}
-		} else {
-			results["binary"] = map[string]interface{}{
-				"status":  "downloaded",
-				"message": "Binary installed successfully",
-				"path":    slm.GetExpectedBinaryPath(),
-			}
-		}
-	}
-
-	// Re-initialize the SLM engine
-	engine := slm.GetEngine()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	engine.Initialize(ctx)
-
-	// Check final status
-	ready := slm.ModelExists() && slm.BinaryExists()
-	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  "complete",
-		"ready":   ready,
-		"model":   results["model"],
-		"binary":  results["binary"],
+		"status":     "unsupported",
+		"message":    "Embedded SLM removed in v3.9.1. Install Ollama instead.",
+		"ollama_url": "https://ollama.ai/download",
+		"command":    "ollama pull qwen2.5:0.5b",
 	})
 }
 
 // handleSLMInstallStatus handles GET /api/slm/install/status
-// Returns detailed installation status.
+// v3.9.1: Embedded SLM removed - returns not ready with Ollama guidance
 func handleSLMInstallStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	status := slm.GetInstallationStatus()
-
+	// Check if Ollama is available instead
+	engine := slm.GetEngine()
+	status := engine.Status()
+	
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"model_exists":  false,
+		"binary_exists": false,
+		"ready":         status.ActiveProvider == "ollama",
+		"ollama_active": status.ActiveProvider == "ollama",
+		"message":       "Embedded SLM removed. Use Ollama for smart routing.",
+		"ollama_url":    "https://ollama.ai/download",
+	})
 }
 
 // registerSLMHandlers registers all SLM-related API endpoints.
@@ -492,5 +343,5 @@ func registerSLMHandlers() {
 	http.HandleFunc("/api/slm/install/status", handleSLMInstallStatus)
 	http.HandleFunc("/api/ollama/status", handleOllamaStatus)
 
-	log.Printf("[SLM] Registered API endpoints")
+	log.Printf("[SLM] Registered API endpoints (v3.9.1: Ollama-only)")
 }
