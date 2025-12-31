@@ -1,0 +1,678 @@
+/**
+ * AgenticEditor.css - Cyberpunk-lite styling for the Director's Monitor
+ * 
+ * Color scheme:
+ * - Background: Dark with subtle gradients
+ * - Additions: Cyan/Teal glow
+ * - Deletions: Red/Magenta glow
+ * - Current chunk: Purple highlight
+ * - Anchors: Yellow/Gold accent
+ */
+
+.agentic-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  position: relative;
+}
+
+.agentic-editor.light {
+  background: #ffffff;
+  color: #24292f;
+}
+
+/* Spec Header - Top 10% natural language spec */
+.spec-header {
+  flex-shrink: 0;
+  min-height: 80px;
+  max-height: 15%;
+  padding: 12px 16px;
+  background: linear-gradient(180deg, #161b22 0%, #0d1117 100%);
+  border-bottom: 1px solid #30363d;
+  overflow-y: auto;
+}
+
+.spec-header.editing {
+  background: #1c2128;
+}
+
+.spec-editor {
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  background: transparent;
+  border: 1px solid #58a6ff;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 12px;
+  resize: none;
+}
+
+.spec-editor:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+}
+
+.spec-content {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.spec-content:hover {
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.spec-placeholder {
+  color: #6e7681;
+  font-style: italic;
+}
+
+.md-content h1 {
+  font-size: 1.2em;
+  color: #58a6ff;
+  margin: 0 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #30363d;
+}
+
+.md-content h2 {
+  font-size: 1em;
+  color: #8b949e;
+  margin: 8px 0 4px 0;
+}
+
+.md-content p {
+  margin: 4px 0;
+}
+
+.md-content li {
+  margin-left: 20px;
+  list-style-type: disc;
+}
+
+/* Toolbar */
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  gap: 16px;
+}
+
+.file-name {
+  font-weight: 600;
+  color: #f0f6fc;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.toolbar-actions button,
+.run-agent-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toolbar-actions button:hover,
+.run-agent-button:hover {
+  background: #30363d;
+  border-color: #8b949e;
+}
+
+.run-agent-button {
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border-color: #238636;
+  color: #ffffff;
+}
+
+.run-agent-button:hover {
+  background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
+}
+
+/* Chunk Indicator */
+.chunk-indicator {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 12px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.chunk-stats {
+  display: flex;
+  gap: 12px;
+}
+
+.chunk-stats .pending {
+  color: #f0f6fc;
+}
+
+.chunk-stats .accepted {
+  color: #3fb950;
+}
+
+.chunk-stats .rejected {
+  color: #f85149;
+}
+
+.chunk-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.chunk-nav button {
+  padding: 2px 6px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #8b949e;
+  cursor: pointer;
+}
+
+.chunk-nav button:hover {
+  background: #30363d;
+  color: #f0f6fc;
+}
+
+/* Editor Content */
+.editor-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+/* Line styling */
+.editor-line {
+  display: flex;
+  align-items: flex-start;
+  padding: 0 16px;
+  min-height: 24px;
+  position: relative;
+  transition: background 0.15s;
+}
+
+.editor-line:hover {
+  background: rgba(88, 166, 255, 0.05);
+}
+
+.line-number {
+  flex-shrink: 0;
+  width: 48px;
+  padding-right: 16px;
+  color: #6e7681;
+  text-align: right;
+  user-select: none;
+  cursor: pointer;
+}
+
+.line-number:hover {
+  color: #8b949e;
+}
+
+.line-content {
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Selection */
+.editor-line.line-selected {
+  background: rgba(88, 166, 255, 0.15);
+}
+
+.editor-line.line-selected .line-number {
+  color: #58a6ff;
+}
+
+.range-selected {
+  background: rgba(88, 166, 255, 0.2);
+}
+
+/* Chunk styles - Ghost Layer (Layer 2) */
+.editor-line.chunk-add {
+  background: rgba(63, 185, 80, 0.1);
+  border-left: 3px solid #3fb950;
+}
+
+.editor-line.chunk-delete {
+  background: rgba(248, 81, 73, 0.1);
+  border-left: 3px solid #f85149;
+}
+
+.editor-line.chunk-modify {
+  background: rgba(210, 153, 34, 0.1);
+  border-left: 3px solid #d29922;
+}
+
+.editor-line.chunk-current {
+  background: rgba(139, 92, 246, 0.2) !important;
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.5);
+}
+
+.editor-line.chunk-accepted {
+  opacity: 0.7;
+  border-left-color: #3fb950;
+}
+
+.editor-line.chunk-rejected {
+  opacity: 0.5;
+  text-decoration: line-through;
+  border-left-color: #6e7681;
+}
+
+.editor-line.chunk-editing {
+  background: rgba(56, 139, 253, 0.15);
+}
+
+/* Ghost overlays */
+.ghost-add {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.15);
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+.ghost-delete {
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.15);
+  text-decoration: line-through;
+  padding: 0 4px;
+  border-radius: 2px;
+  margin-right: 8px;
+}
+
+.diff-addition {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.2);
+}
+
+.diff-deletion {
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.2);
+  text-decoration: line-through;
+}
+
+/* Out of compliance (spec violation) */
+.out-of-compliance,
+.spec-violation {
+  text-decoration: underline wavy #f85149;
+  text-underline-offset: 3px;
+}
+
+/* Chunk controls (HUD Layer 3) */
+.chunk-controls {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.editor-line.chunk-current .chunk-controls {
+  opacity: 1;
+}
+
+.chunk-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chunk-btn:hover {
+  transform: scale(1.1);
+}
+
+.chunk-btn.accept {
+  background: rgba(63, 185, 80, 0.2);
+  border-color: #3fb950;
+  color: #3fb950;
+}
+
+.chunk-btn.accept:hover {
+  background: rgba(63, 185, 80, 0.4);
+}
+
+.chunk-btn.reject {
+  background: rgba(248, 81, 73, 0.2);
+  border-color: #f85149;
+  color: #f85149;
+}
+
+.chunk-btn.reject:hover {
+  background: rgba(248, 81, 73, 0.4);
+}
+
+.chunk-btn.edit {
+  background: rgba(56, 139, 253, 0.2);
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
+.chunk-btn.edit:hover {
+  background: rgba(56, 139, 253, 0.4);
+}
+
+/* Chunk editor textarea */
+.chunk-editor {
+  width: 100%;
+  min-height: 100px;
+  background: #0d1117;
+  border: 1px solid #58a6ff;
+  border-radius: 4px;
+  color: #c9d1d9;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 8px;
+  resize: vertical;
+}
+
+.chunk-editor:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+}
+
+.edit-mode {
+  background: rgba(56, 139, 253, 0.1);
+}
+
+/* Anchor styles */
+.anchor-icon {
+  position: absolute;
+  left: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: #d29922;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.anchor-icon:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(210, 153, 34, 0.5);
+}
+
+.anchor-icon.anchor-pending {
+  background: #d29922;
+  color: #0d1117;
+}
+
+.anchor-icon.anchor-applied {
+  background: #3fb950;
+  color: #0d1117;
+}
+
+.anchor-icon.anchor-rejected {
+  background: #6e7681;
+  color: #c9d1d9;
+}
+
+.thread-icon {
+  color: #d29922;
+}
+
+/* Anchor input popup */
+.anchor-input-popup {
+  position: absolute;
+  left: 80px;
+  right: 80px;
+  background: #161b22;
+  border: 1px solid #d29922;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+}
+
+.anchor-input-popup .anchor-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-size: 14px;
+}
+
+.anchor-input-popup .anchor-input:focus {
+  outline: none;
+  border-color: #d29922;
+}
+
+.anchor-input-popup button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #d29922 0%, #e3b341 100%);
+  border: none;
+  border-radius: 6px;
+  color: #0d1117;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.anchor-input-popup button:hover {
+  background: linear-gradient(135deg, #e3b341 0%, #f0c75e 100%);
+}
+
+.sticky-note-input {
+  background: #0d1117;
+  border: 1px solid #d29922;
+  padding: 8px;
+  border-radius: 4px;
+  color: #c9d1d9;
+}
+
+/* Anchor thread panel */
+.anchor-thread,
+.thread-panel {
+  position: absolute;
+  right: 20px;
+  top: 120px;
+  width: 320px;
+  max-height: 400px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  z-index: 200;
+}
+
+.thread-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #21262d;
+  border-bottom: 1px solid #30363d;
+  font-size: 13px;
+}
+
+.thread-header button {
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+}
+
+.thread-header button:hover {
+  color: #f0f6fc;
+}
+
+.anchor-status {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.anchor-status.pending {
+  background: rgba(210, 153, 34, 0.2);
+  color: #d29922;
+}
+
+.anchor-status.applied {
+  background: rgba(63, 185, 80, 0.2);
+  color: #3fb950;
+}
+
+.anchor-status.rejected {
+  background: rgba(110, 118, 129, 0.2);
+  color: #8b949e;
+}
+
+.thread-content {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 280px;
+}
+
+.thread-prompt,
+.anchor-prompt {
+  padding: 12px;
+  background: #0d1117;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.thread-prompt strong,
+.anchor-prompt strong {
+  color: #58a6ff;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.thread-reply {
+  padding: 12px;
+  background: rgba(63, 185, 80, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid #3fb950;
+}
+
+.thread-reply strong {
+  color: #3fb950;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.thread-actions {
+  padding: 12px 16px;
+  border-top: 1px solid #30363d;
+  background: #21262d;
+}
+
+.thread-actions button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.thread-actions button:hover {
+  background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
+}
+
+/* Light theme overrides */
+.agentic-editor.light .spec-header {
+  background: linear-gradient(180deg, #f6f8fa 0%, #ffffff 100%);
+  border-bottom-color: #d0d7de;
+}
+
+.agentic-editor.light .editor-toolbar {
+  background: #f6f8fa;
+  border-bottom-color: #d0d7de;
+}
+
+.agentic-editor.light .editor-line:hover {
+  background: rgba(31, 35, 40, 0.05);
+}
+
+.agentic-editor.light .line-number {
+  color: #8b949e;
+}
+
+.agentic-editor.light .chunk-btn {
+  background: #ffffff;
+  border-color: #d0d7de;
+}
+
+/* Scrollbar styling */
+.editor-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.editor-content::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+.editor-content::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+}
+
+.editor-content::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* Focus styles */
+.agentic-editor:focus {
+  outline: none;
+}
+
+.agentic-editor:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.5);
+}

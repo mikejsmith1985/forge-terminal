@@ -21,6 +21,7 @@ import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import LensFilePicker from './components/LensFilePicker'
 import MonacoEditor from './components/MonacoEditor'
+import AgenticEditor from './components/AgenticEditor'
 import AMMonitor from './components/AMMonitor'
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
@@ -118,6 +119,9 @@ function App() {
   const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', 'workflows', or 'debug'
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
+  const [editorMode, setEditorMode] = useState('agentic') // 'agentic' or 'classic' (Monaco)
+  const [editorProposedChanges, setEditorProposedChanges] = useState([]) // Agent diff proposals
+  const [editorAnchors, setEditorAnchors] = useState([]) // Conversational anchors
   
   // File access permission state
   const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false)
@@ -1895,14 +1899,48 @@ function App() {
       </div>
       {showEditor && editorFile && (
         <div className="editor-panel">
-          <MonacoEditor
-            file={editorFile}
-            onClose={handleEditorClose}
-            onSave={handleEditorSave}
-            theme={activeTab?.mode || theme}
-            rootPath={activeTab?.currentDirectory || '.'}
-            terminalRef={getActiveTerminalRef()}
-          />
+          {editorMode === 'agentic' ? (
+            <AgenticEditor
+              file={editorFile}
+              proposedChanges={editorProposedChanges}
+              anchors={editorAnchors}
+              onClose={handleEditorClose}
+              onSave={(content) => {
+                handleEditorSave(editorFile);
+                // TODO: Actually save content via API
+              }}
+              onRunAgent={(content, anchors) => {
+                // Send to terminal as a copilot command with context
+                const termRef = getActiveTerminalRef();
+                if (termRef) {
+                  const context = anchors?.length > 0 
+                    ? `Focus on lines ${anchors[0].startLine}-${anchors[0].endLine}: ${anchors[0].prompt}`
+                    : `Review and improve this file: ${editorFile.name}`;
+                  addToast(`🤖 Agent context: ${context.substring(0, 50)}...`, 'info', 3000);
+                }
+              }}
+              onAnchorCreate={(anchor) => {
+                setEditorAnchors(prev => [...prev, anchor]);
+                addToast(`📌 Anchor created on lines ${anchor.startLine}-${anchor.endLine}`, 'success', 2000);
+              }}
+              onChunkAccept={(chunk) => {
+                addToast('✅ Change accepted', 'success', 1500);
+              }}
+              onChunkReject={(chunk) => {
+                addToast('❌ Change rejected', 'info', 1500);
+              }}
+              theme={activeTab?.mode || theme}
+            />
+          ) : (
+            <MonacoEditor
+              file={editorFile}
+              onClose={handleEditorClose}
+              onSave={handleEditorSave}
+              theme={activeTab?.mode || theme}
+              rootPath={activeTab?.currentDirectory || '.'}
+              terminalRef={getActiveTerminalRef()}
+            />
+          )}
         </div>
       )}
       {sidebarPosition === 'right' && (<><div className="sidebar-resizer" onMouseDown={startDrag} />{sidebar}</>)}
