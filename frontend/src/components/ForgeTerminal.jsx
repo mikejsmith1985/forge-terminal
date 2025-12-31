@@ -898,12 +898,94 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // v3.8.2 FIX: Let Ctrl+V pass through to trigger native paste event
-      // The paste event handler above now handles both text AND images synchronously
-      // This is MUCH faster than the async navigator.clipboard.readText() API
+      // v3.9.1 FIX: Handle Ctrl+V ourselves since clipboardMode is 'off'
+      // Previously we returned true hoping xterm would trigger paste, but it doesn't
+      // because clipboardMode: 'off' disables that behavior
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        console.log('[Terminal] Ctrl+V pressed - letting xterm trigger paste event');
-        return true; // Let xterm handle it, which triggers paste event -> our handler
+        console.log('[Terminal] Ctrl+V pressed - manually reading clipboard');
+        
+        // Try to read from clipboard directly
+        (async () => {
+          try {
+            // First try to read text (most common, fastest)
+            const text = await navigator.clipboard.readText();
+            if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              console.log('[Terminal] Pasting text from clipboard:', text.length, 'chars');
+              wsRef.current.send(text);
+              if (onPasteRef.current) onPasteRef.current();
+              return;
+            }
+          } catch (textErr) {
+            console.log('[Terminal] Text read failed, trying clipboard items:', textErr.message);
+          }
+          
+          // Try to read items (for images)
+          try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+              // Check for images
+              const imageType = item.types.find(t => t.startsWith('image/'));
+              if (imageType) {
+                console.log('[Terminal] Found image in clipboard:', imageType);
+                const blob = await item.getType(imageType);
+                
+                // Show uploading indicator
+                if (xtermRef.current) {
+                  xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
+                }
+                
+                const formData = new FormData();
+                const filename = `clipboard-${Date.now()}.png`;
+                formData.append('file', blob, filename);
+                
+                const response = await fetch('/api/files/upload', {
+                  method: 'POST',
+                  body: formData
+                });
+                
+                if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+                
+                const data = await response.json();
+                const filePath = data.path;
+                
+                // Clear uploading indicator
+                if (xtermRef.current) {
+                  xtermRef.current.write('\r\x1b[K');
+                }
+                
+                // Send file path to terminal
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
+                  const textToSend = `see file at ${pathStr}`;
+                  wsRef.current.send(textToSend);
+                  console.log('[Terminal] Sent image path to PTY:', textToSend);
+                  if (onPasteRef.current) onPasteRef.current('image');
+                }
+                return;
+              }
+              
+              // Check for text in items
+              const textType = item.types.find(t => t === 'text/plain');
+              if (textType) {
+                const textBlob = await item.getType(textType);
+                const text = await textBlob.text();
+                if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  console.log('[Terminal] Pasting text from clipboard items:', text.length, 'chars');
+                  wsRef.current.send(text);
+                  if (onPasteRef.current) onPasteRef.current();
+                  return;
+                }
+              }
+            }
+          } catch (itemsErr) {
+            console.error('[Terminal] Clipboard read failed:', itemsErr);
+            if (xtermRef.current) {
+              xtermRef.current.write(`\x1b[31m[Paste failed: ${itemsErr.message}]\x1b[0m\r\n`);
+            }
+          }
+        })();
+        
+        return false; // We handled it, don't let xterm process
       }
 
       return true; // Let all other keys pass through standard xterm processing

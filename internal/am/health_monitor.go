@@ -303,6 +303,86 @@ func (hm *HealthMonitor) RecordPTYHeartbeat() {
 	// No-op - legacy compatibility
 }
 
+// TabCaptureStatus represents the capture status for a specific tab.
+// v3.9.1: Used by frontend to show accurate 3-state AM indicator.
+type TabCaptureStatus struct {
+	TabID              string    `json:"tabId"`
+	Status             string    `json:"status"` // "active", "disabled", "broken"
+	StatusText         string    `json:"statusText"`
+	IsCapturing        bool      `json:"isCapturing"`
+	HasActiveConv      bool      `json:"hasActiveConversation"`
+	LastCaptureTime    time.Time `json:"lastCaptureTime,omitempty"`
+	SecondsSinceCapture int64    `json:"secondsSinceCapture,omitempty"`
+	TurnsCaptured      int       `json:"turnsCaptured"`
+}
+
+// GetTabCaptureStatus returns capture status for a specific tab.
+// Status logic:
+//   - "active": amEnabled=true AND (capturing OR no active conversation yet)
+//   - "disabled": amEnabled=false 
+//   - "broken": amEnabled=true AND active conversation but no captures in 30s
+func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabCaptureStatus {
+	status := &TabCaptureStatus{
+		TabID: tabID,
+	}
+
+	if !amEnabled {
+		status.Status = "disabled"
+		status.StatusText = "AM Logging is Disabled for this tab"
+		return status
+	}
+
+	// Check if there's an active conversation for this tab
+	logger := GetLLMLoggerIfExists(tabID)
+	if logger == nil {
+		// No logger yet - that's OK, waiting for LLM activity
+		status.Status = "active"
+		status.StatusText = "AM Logging is Active in this tab"
+		status.IsCapturing = false
+		return status
+	}
+
+	conv := logger.GetActiveConversation()
+	if conv == nil {
+		// Logger exists but no active conversation - idle but ready
+		status.Status = "active"
+		status.StatusText = "AM Logging is Active in this tab"
+		status.IsCapturing = false
+		return status
+	}
+
+	// There's an active conversation - check if we're capturing
+	status.HasActiveConv = true
+	status.TurnsCaptured = len(conv.Turns)
+
+	// Find last capture time from turns
+	var lastCapture time.Time
+	for _, turn := range conv.Turns {
+		if turn.Timestamp.After(lastCapture) {
+			lastCapture = turn.Timestamp
+		}
+	}
+	
+	if !lastCapture.IsZero() {
+		status.LastCaptureTime = lastCapture
+		status.SecondsSinceCapture = int64(time.Since(lastCapture).Seconds())
+	}
+
+	// Determine if we're actively capturing or broken
+	// "Broken" = active conversation but no captures in 30+ seconds
+	if status.SecondsSinceCapture > 30 && status.TurnsCaptured == 0 {
+		status.Status = "broken"
+		status.StatusText = "AM Logging is enabled but not capturing data"
+		status.IsCapturing = false
+	} else {
+		status.Status = "active"
+		status.StatusText = "AM Logging is Active in this tab"
+		status.IsCapturing = status.SecondsSinceCapture < 10 // Recent activity
+	}
+
+	return status
+}
+
 // ValidateConversationContent checks if a conversation file has valid, clean content.
 // Uses ContainsANSIArtifacts from parser_core.go instead of regex.
 func ValidateConversationContent(filePath string) (bool, string) {

@@ -260,6 +260,7 @@ func main() {
 	http.HandleFunc("/api/am/llm/conversations/", WrapWithMiddleware(handleAMLLMConversations))
 	http.HandleFunc("/api/am/llm/conversation/", WrapWithMiddleware(handleAMLLMConversationDetail))
 	http.HandleFunc("/api/am/health", WrapWithMiddleware(handleAMHealth))
+	http.HandleFunc("/api/am/tab-status/", WrapWithMiddleware(handleAMTabStatus)) // v3.9.1: Per-tab capture status
 	http.HandleFunc("/api/am/conversations", WrapWithMiddleware(handleAMActiveConversations))
 	http.HandleFunc("/api/am/master-control", WrapWithMiddleware(handleAMMasterControl))
 	http.HandleFunc("/api/am/restore/sessions", WrapWithMiddleware(handleAMRestoreSessions))
@@ -1407,6 +1408,43 @@ func handleAMHealth(w http.ResponseWriter, r *http.Request) {
 
 	health := system.GetHealth()
 	json.NewEncoder(w).Encode(health)
+}
+
+// handleAMTabStatus returns capture status for a specific tab.
+// v3.9.1: Powers the 3-state AM indicator (active/disabled/broken).
+// Path: /api/am/tab-status/{tabId}?amEnabled=true|false
+func handleAMTabStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract tabId from path
+	tabID := strings.TrimPrefix(r.URL.Path, "/api/am/tab-status/")
+	if tabID == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "tabId required",
+		})
+		return
+	}
+
+	// Get amEnabled from query param
+	amEnabled := r.URL.Query().Get("amEnabled") == "true"
+
+	system := am.GetSystem()
+	if system == nil || system.HealthMonitor == nil {
+		json.NewEncoder(w).Encode(&am.TabCaptureStatus{
+			TabID:      tabID,
+			Status:     "disabled",
+			StatusText: "AM System not initialized",
+		})
+		return
+	}
+
+	status := system.HealthMonitor.GetTabCaptureStatus(tabID, amEnabled)
+	json.NewEncoder(w).Encode(status)
 }
 
 func handleAMActiveConversations(w http.ResponseWriter, r *http.Request) {

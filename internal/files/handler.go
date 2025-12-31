@@ -729,13 +729,24 @@ func HandleReadStream(w http.ResponseWriter, r *http.Request) {
 }
 
 
-// HandleFlatList returns a flat JSON array of relative file paths (v3.3.6 @ mentions)
+// FlatFileInfo represents a file with metadata for LensFilePicker
+type FlatFileInfo struct {
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	ModTime string `json:"modTime"` // ISO 8601 timestamp
+}
+
+// HandleFlatList returns file objects with metadata for LensFilePicker (v3.3.6 @ mentions, v3.8.2 enhanced)
 // Respects common ignore patterns like .git, node_modules, dist
 func HandleFlatList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// VERIFICATION: Log that we're in the NEW version
+	log.Printf("[Files] HandleFlatList NEW VERSION CALLED - will return FlatFileInfo structs")
 
 	dirPath := r.URL.Query().Get("path")
 	if dirPath == "" {
@@ -745,6 +756,15 @@ func HandleFlatList(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, "Failed to get working directory", http.StatusInternalServerError)
 			return
+		}
+	}
+
+	// Get limit parameter (default 500 for LensFilePicker)
+	limitStr := r.URL.Query().Get("limit")
+	maxFiles := 500
+	if limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+			maxFiles = parsed
 		}
 	}
 
@@ -783,8 +803,7 @@ func HandleFlatList(w http.ResponseWriter, r *http.Request) {
 		".nyc_output":  true,
 	}
 
-	var files []string
-	maxFiles := 5000 // Limit to prevent huge responses
+	var files []FlatFileInfo
 
 	err = filepath.Walk(absPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -829,8 +848,13 @@ func HandleFlatList(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 
-		// Add file (use forward slashes for cross-platform consistency)
-		files = append(files, strings.ReplaceAll(relPath, "\\", "/"))
+		// Add file with metadata (use forward slashes for cross-platform consistency)
+		files = append(files, FlatFileInfo{
+			Name:    info.Name(),
+			Path:    strings.ReplaceAll(relPath, "\\", "/"),
+			Size:    info.Size(),
+			ModTime: info.ModTime().Format(time.RFC3339), // ISO 8601 format
+		})
 
 		// Limit files
 		if len(files) >= maxFiles {
@@ -844,8 +868,16 @@ func HandleFlatList(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Files] Walk error: %v", err)
 	}
 
-	// Sort files alphabetically
-	sort.Strings(files)
+	// Sort files alphabetically by path
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Path < files[j].Path
+	})
+
+	log.Printf("[Files] HandleFlatList returning %d files with metadata", len(files))
+	if len(files) > 0 {
+		log.Printf("[Files] First file: name=%s, path=%s, size=%d, modTime=%s", 
+			files[0].Name, files[0].Path, files[0].Size, files[0].ModTime)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(files)
