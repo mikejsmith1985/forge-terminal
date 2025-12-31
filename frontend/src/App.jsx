@@ -10,7 +10,7 @@ import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import UpdateModal from './components/UpdateModal'
-import WelcomeModal from './components/WelcomeModal'
+// WelcomeModal REMOVED - replaced by guided tour (user request: 20+ times)
 import WorkflowCards from './components/WorkflowCards'
 import { WorkflowCanvas } from './components/workflow/WorkflowCanvas'
 import { WorkflowExecutor } from './components/workflow/WorkflowExecutor'
@@ -68,7 +68,7 @@ function App() {
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false)
+  // WelcomeModal state REMOVED - replaced by guided tour
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
   const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState('shell') // For opening Settings to specific tab
@@ -685,24 +685,7 @@ function App() {
     }
   }
 
-  const dismissWelcome = async () => {
-    setIsWelcomeModalOpen(false);
-    
-    // Mark welcome as shown
-    try {
-      await fetch('/api/welcome', { method: 'POST' });
-    } catch (err) {
-      console.error('Failed to save welcome status:', err);
-    }
-    
-    // Focus the terminal after dismissing welcome
-    setTimeout(() => {
-      const termRef = getActiveTerminalRef();
-      if (termRef) {
-        termRef.focus();
-      }
-    }, 100);
-  }
+  // dismissWelcome REMOVED - WelcomeModal removed in favor of guided tour
 
   // Check and prompt for file access permission if needed
   const checkFileAccessPermission = () => {
@@ -1991,11 +1974,7 @@ function App() {
         isDevMode={window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'}
       />
 
-      <WelcomeModal
-        isOpen={isWelcomeModalOpen}
-        onClose={dismissWelcome}
-        version={currentVersion}
-      />
+      {/* WelcomeModal REMOVED per user request - replaced by guided tour */}
 
       <FileAccessPrompt
         isOpen={showFileAccessPrompt}

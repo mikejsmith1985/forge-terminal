@@ -55,6 +55,14 @@ export const useGuidedTour = (actionHandlers = {}) => {
   // Check if tour should start on mount
   useEffect(() => {
     const checkTourStatus = () => {
+      // DEV MODE: Skip tour entirely when running on localhost
+      const isDevMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isDevMode) {
+        console.log('[Tour] Dev mode detected - skipping tour');
+        setIsReady(true);
+        return;
+      }
+
       const storedData = localStorage.getItem(TOUR_STORAGE_KEY);
 
       if (!storedData) {

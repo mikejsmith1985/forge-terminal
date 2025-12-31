@@ -60,7 +60,7 @@ const humanizeTime = (date) => {
 };
 
 // File item component
-const FileItem = ({ file, isSelected, onToggle, showHeat = false }) => {
+const FileItem = ({ file, isSelected, onToggle, onOpen, showHeat = false }) => {
   const heat = showHeat ? getHeatScore(file.modTime) : 0;
   const tokens = file.tokenCount || estimateTokens(file.size || 0);
   
@@ -68,6 +68,7 @@ const FileItem = ({ file, isSelected, onToggle, showHeat = false }) => {
     <div 
       className={`lens-file-item ${isSelected ? 'selected' : ''}`}
       onClick={() => onToggle(file)}
+      onDoubleClick={() => onOpen && onOpen(file)}
       style={showHeat ? { borderLeftColor: getHeatColor(heat) } : {}}
     >
       <div className="lens-file-icon">
@@ -90,7 +91,7 @@ const FileItem = ({ file, isSelected, onToggle, showHeat = false }) => {
 };
 
 // Heatmap Lens - sorted by modification time
-const HeatmapLens = ({ files, selectedPaths, onToggle }) => {
+const HeatmapLens = ({ files, selectedPaths, onToggle, onOpen }) => {
   const sortedFiles = useMemo(() => {
     return [...files].sort((a, b) => {
       const aTime = new Date(a.modTime || 0).getTime();
@@ -109,6 +110,7 @@ const HeatmapLens = ({ files, selectedPaths, onToggle }) => {
             file={file}
             isSelected={selectedPaths.has(file.path)}
             onToggle={onToggle}
+            onOpen={onOpen}
             showHeat={true}
           />
         ))}
@@ -118,7 +120,7 @@ const HeatmapLens = ({ files, selectedPaths, onToggle }) => {
 };
 
 // Graph Lens - dependency view (mock for now)
-const GraphLens = ({ files, selectedPaths, onToggle }) => {
+const GraphLens = ({ files, selectedPaths, onToggle, onOpen }) => {
   // Group files by directory for a tree-like view
   const grouped = useMemo(() => {
     const groups = {};
@@ -148,6 +150,7 @@ const GraphLens = ({ files, selectedPaths, onToggle }) => {
                   file={file}
                   isSelected={selectedPaths.has(file.path)}
                   onToggle={onToggle}
+                  onOpen={onOpen}
                 />
               ))}
             </div>
@@ -159,7 +162,7 @@ const GraphLens = ({ files, selectedPaths, onToggle }) => {
 };
 
 // Search Lens - fuzzy search
-const SearchLens = ({ files, selectedPaths, onToggle }) => {
+const SearchLens = ({ files, selectedPaths, onToggle, onOpen }) => {
   const [query, setQuery] = useState('');
   const inputRef = useRef(null);
 
@@ -200,6 +203,7 @@ const SearchLens = ({ files, selectedPaths, onToggle }) => {
             file={file}
             isSelected={selectedPaths.has(file.path)}
             onToggle={onToggle}
+            onOpen={onOpen}
           />
         ))}
         {filteredFiles.length === 0 && (
@@ -279,43 +283,57 @@ const ContextCart = ({ items, budget, onRemove, onClear }) => {
 // Main LensFilePicker component
 export default function LensFilePicker({ 
   rootPath = '.', 
+  currentPath,  // Alias for rootPath from App.jsx
   onSelectionChange,
+  onFileSelect,  // Called when file is double-clicked to open
   tokenBudget = DEFAULT_TOKEN_BUDGET,
 }) {
+  // Use currentPath if provided (from App.jsx), otherwise use rootPath
+  const effectivePath = currentPath || rootPath;
+  
   const [files, setFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState(new Map()); // path -> file
   const [activeLens, setActiveLens] = useState(LENS_TYPES.HEATMAP);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Handle file open (double-click)
+  const handleFileOpen = useCallback((file) => {
+    if (onFileSelect) {
+      // Pass the full file object so the parent can access path, name, etc.
+      onFileSelect(file);
+    }
+  }, [onFileSelect]);
+
   // Fetch files from API
   const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/files/flat?path=${encodeURIComponent(rootPath)}&limit=500`);
+      const response = await fetch(`/api/files/flat?path=${encodeURIComponent(effectivePath)}&limit=500`);
       if (!response.ok) throw new Error('Failed to load files');
       const data = await response.json();
       
       // API returns array of file path strings, transform to our format
       let fileList = [];
       if (Array.isArray(data)) {
-        // Flat array of paths
-        fileList = data.map(path => {
-          const parts = path.split('/');
-          const name = parts[parts.length - 1];
+        // Flat array of paths - handle both Windows (\) and Unix (/) separators
+        fileList = data.map(filePath => {
+          // Split on both forward and back slashes for cross-platform support
+          const parts = filePath.split(/[/\\]/);
+          const name = parts[parts.length - 1] || filePath;
           return {
             name,
-            path,
+            path: filePath,
             size: 0, // Size unknown from flat API
             modTime: null,
             tokenCount: 0,
           };
         });
       } else if (data.files && Array.isArray(data.files)) {
-        // Object with files array
+        // Object with files array - handle both Windows and Unix paths
         fileList = data.files.map(f => ({
-          name: f.name || f.path?.split('/').pop() || 'unknown',
+          name: f.name || f.path?.split(/[/\\]/).pop() || 'unknown',
           path: f.path,
           size: f.size || 0,
           modTime: f.modTime,
@@ -330,7 +348,7 @@ export default function LensFilePicker({
     } finally {
       setLoading(false);
     }
-  }, [rootPath]);
+  }, [effectivePath]);
 
   useEffect(() => {
     loadFiles();
@@ -382,7 +400,7 @@ export default function LensFilePicker({
 
   // Render active lens
   const renderLens = () => {
-    const props = { files, selectedPaths, onToggle: toggleFile };
+    const props = { files, selectedPaths, onToggle: toggleFile, onOpen: handleFileOpen };
     switch (activeLens) {
       case LENS_TYPES.GRAPH:
         return <GraphLens {...props} />;
