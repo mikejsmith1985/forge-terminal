@@ -416,24 +416,36 @@ export default function LensFilePicker({
       if (!response.ok) throw new Error('Failed to load files');
       const data = await response.json();
       
-      // API returns array of file path strings, transform to our format
+      // API returns array - handle both old string format and new object format
       let fileList = [];
       if (Array.isArray(data)) {
-        // Flat array of paths - handle both Windows (\) and Unix (/) separators
-        fileList = data.map(filePath => {
-          // Split on both forward and back slashes for cross-platform support
-          const parts = filePath.split(/[/\\]/);
-          const name = parts[parts.length - 1] || filePath;
-          return {
-            name,
-            path: filePath,
-            size: 0, // Size unknown from flat API
-            modTime: null,
-            tokenCount: 0,
-          };
-        });
+        fileList = data.map(item => {
+          // New format: { name, path, size, modTime }
+          if (typeof item === 'object' && item.path) {
+            return {
+              name: item.name || item.path.split(/[/\\]/).pop() || 'unknown',
+              path: item.path,
+              size: item.size || 0,
+              modTime: item.modTime || null,
+              tokenCount: estimateTokens(item.size || 0),
+            };
+          }
+          // Old format: string path (backward compatibility)
+          else if (typeof item === 'string') {
+            const parts = item.split(/[/\\]/);
+            const name = parts[parts.length - 1] || item;
+            return {
+              name,
+              path: item,
+              size: 0, // Size unknown in old format
+              modTime: null,
+              tokenCount: 0,
+            };
+          }
+          return null;
+        }).filter(Boolean);
       } else if (data.files && Array.isArray(data.files)) {
-        // Object with files array - handle both Windows and Unix paths
+        // Alternative format: { files: [...] }
         fileList = data.files.map(f => ({
           name: f.name || f.path?.split(/[/\\]/).pop() || 'unknown',
           path: f.path,

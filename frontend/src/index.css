@@ -1851,15 +1851,15 @@ body {
   }
 }
 
-/* AM Disabled - Logging OFF (gray) */
+/* AM Disabled - Logging OFF (yellow) */
 .am-monitor.am-disabled {
-  background: #262626;
-  color: #666;
-  border: 1px solid #33333340;
+  background: #2e2a1a;
+  color: #fbbf24;
+  border: 1px solid #f59e0b40;
 }
 
 .am-monitor.am-disabled:hover {
-  color: #888;
+  color: #fcd34d;
 }
 
 /* AM Stale - Data not updated recently (orange warning) */
@@ -1869,7 +1869,14 @@ body {
   border: 1px solid #ea580c40;
 }
 
-/* AM Warning state (yellow) */
+/* AM Broken - Enabled but not capturing (red warning) */
+.am-monitor.am-broken {
+  background: #2e1a1a;
+  color: #ef4444;
+  border: 1px solid #dc262640;
+}
+
+/* AM Warning state (yellow) - used for disabled */
 .am-monitor.am-warning {
   background: #2e2a1a;
   color: #fbbf24;

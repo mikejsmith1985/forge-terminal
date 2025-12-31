@@ -179,6 +179,15 @@ func GetLLMLogger(tabID string, amDir string) *LLMLogger {
 	return newLogger
 }
 
+// GetLLMLoggerIfExists returns a logger for a tab if it exists, nil otherwise.
+// Unlike GetLLMLogger, this does NOT create a new logger.
+// v3.9.1: Used for status checks without side effects.
+func GetLLMLoggerIfExists(tabID string) *LLMLogger {
+	llmLoggersMu.RLock()
+	defer llmLoggersMu.RUnlock()
+	return llmLoggers[tabID]
+}
+
 // RemoveLLMLogger removes a logger when tab closes.
 func RemoveLLMLogger(tabID string) {
 	llmLoggersMu.Lock()
@@ -1369,6 +1378,17 @@ func (l *LLMLogger) GetActiveConversationID() string {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	return l.activeConvID
+}
+
+// GetActiveConversation returns the current active conversation, or nil.
+// v3.9.1: Used for status checks.
+func (l *LLMLogger) GetActiveConversation() *LLMConversation {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	if l.activeConvID == "" {
+		return nil
+	}
+	return l.conversations[l.activeConvID]
 }
 
 // GetConversations returns all conversations for this tab.

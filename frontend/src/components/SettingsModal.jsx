@@ -504,14 +504,14 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             </button>
           </div>
 
-          {/* Model Pricing Info */}
+          {/* Smart Routing - v3.9.1 Simplified */}
           <div style={{ 
             background: 'var(--bg-secondary)', 
             borderRadius: '12px', 
             padding: '16px'
           }}>
             <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
-              Smart Model Routing (Not Hardcoded)
+              Smart Routing (Requires Ollama)
             </label>
             
             <div style={{ 
@@ -522,49 +522,10 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               lineHeight: '1.6',
               color: 'var(--text-secondary)'
             }}>
-              {/* Issue #52: Clearer explanation that this is about cost, not capability */}
-              <div style={{ 
-                background: '#14532d', 
-                border: '1px solid #22c55e',
-                borderRadius: '6px',
-                padding: '10px',
-                fontSize: '0.8rem',
-                marginBottom: '12px'
-              }}>
-                ⚡ <strong>Economy vs Power:</strong> Forge analyzes your task to choose the most cost-effective model.
-                A simple question doesn't need a $1 model when a $0.25 model works just as well.
-                <br/><br/>
-                📈 For complex tasks (architecture, large refactors), it automatically uses more powerful models.
-                <strong> You're not getting worse models - you're getting smarter spending.</strong>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <Zap size={14} style={{ color: '#22c55e' }} />
-                <strong style={{ color: 'var(--text-primary)' }}>Economy Tier</strong>
-                <span style={{ color: 'var(--text-muted)' }}>- Simple tasks (0.25-0.33 credits)</span>
-              </div>
-              <div style={{ paddingLeft: '22px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                GPT-4o-mini, Claude Haiku — fast, cheap, great for quick answers
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <Brain size={14} style={{ color: '#8b5cf6' }} />
-                <strong style={{ color: 'var(--text-primary)' }}>Power Tier</strong>
-                <span style={{ color: 'var(--text-muted)' }}>- Complex tasks (1.0+ credits)</span>
-              </div>
-              <div style={{ paddingLeft: '22px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                GPT-4o, Claude Sonnet/Opus — used when task requires deeper reasoning
-              </div>
-
-              <div style={{ 
-                background: '#1e3a5f', 
-                border: '1px solid #3b82f6',
-                borderRadius: '6px',
-                padding: '10px',
-                fontSize: '0.8rem'
-              }}>
-                💡 <strong>Budget-Aware:</strong> Forge considers task complexity AND your remaining budget.
-                One Opus prompt that solves the problem is better than 10 Haiku prompts that don't.
+              {/* Honest explanation */}
+              <div style={{ marginBottom: '12px' }}>
+                Smart Routing uses a local AI to analyze prompts and suggest appropriate models.
+                Install Ollama (free) to enable this feature.
               </div>
               
               {/* SLM Status indicator visible to all users */}
