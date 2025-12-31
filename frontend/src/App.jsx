@@ -102,24 +102,6 @@ function App() {
   // Store the previous sidebar width before Files view expansion
   const [prevSidebarWidth, setPrevSidebarWidth] = useState(null);
   
-  // v3.7.2: Auto-expand sidebar for Files view (Lens File Picker needs space)
-  useEffect(() => {
-    const EXPANDED_WIDTH = 600; // Wider for Lens File Picker
-    const MIN_EXPANDED_WIDTH = 500;
-    
-    if (sidebarView === 'files') {
-      // Switching TO Files view - expand if needed
-      if (sidebarWidth < MIN_EXPANDED_WIDTH) {
-        setPrevSidebarWidth(sidebarWidth); // Remember current width
-        setSidebarWidth(EXPANDED_WIDTH);
-      }
-    } else if (prevSidebarWidth !== null) {
-      // Switching FROM Files view - restore previous width
-      setSidebarWidth(prevSidebarWidth);
-      setPrevSidebarWidth(null);
-    }
-  }, [sidebarView]);
-  
   // Update state - persists across toast dismissal
   const [updateInfo, setUpdateInfo] = useState(null)
   const [currentVersion, setCurrentVersion] = useState('')
@@ -143,6 +125,24 @@ function App() {
   const [editorMode, setEditorMode] = useState('agentic') // 'agentic' or 'classic' (Monaco)
   const [editorProposedChanges, setEditorProposedChanges] = useState([]) // Agent diff proposals
   const [editorAnchors, setEditorAnchors] = useState([]) // Conversational anchors
+  
+  // v3.7.2: Auto-expand sidebar for Files view (Lens File Picker needs space)
+  useEffect(() => {
+    const EXPANDED_WIDTH = 600; // Wider for Lens File Picker
+    const MIN_EXPANDED_WIDTH = 500;
+    
+    if (sidebarView === 'files') {
+      // Switching TO Files view - expand if needed
+      if (sidebarWidth < MIN_EXPANDED_WIDTH) {
+        setPrevSidebarWidth(sidebarWidth); // Remember current width
+        setSidebarWidth(EXPANDED_WIDTH);
+      }
+    } else if (prevSidebarWidth !== null) {
+      // Switching FROM Files view - restore previous width
+      setSidebarWidth(prevSidebarWidth);
+      setPrevSidebarWidth(null);
+    }
+  }, [sidebarView]);
   
   // File access permission state
   const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false)

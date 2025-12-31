@@ -19,7 +19,7 @@
  * - Workflows
  */
 
-export const TOUR_STEPS = [
+const TOUR_STEPS = [
   {
     id: 'welcome',
     selector: '.terminal-container',
@@ -223,5 +223,7 @@ export const TOUR_STEPS = [
   },
 ];
 
-export const TOUR_STORAGE_KEY = 'forge_tour_completed';
-export const TOUR_VERSION = '3.7.2'; // v3.7.2: Draggable Forge Assist button, async image upload, light mode fixes
+const TOUR_STORAGE_KEY = 'forge_tour_completed';
+const TOUR_VERSION = '3.7.2'; // v3.7.2: Draggable Forge Assist button, async image upload, light mode fixes
+
+export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
