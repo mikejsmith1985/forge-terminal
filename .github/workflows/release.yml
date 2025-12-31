@@ -55,6 +55,8 @@ jobs:
           cd frontend
           npm install
           npm run build
+          echo "Frontend build complete. Checking output..."
+          ls -R ../cmd/forge/web || echo "Output directory not found!"
 
       - name: Normalize asset directory case
         run: |
