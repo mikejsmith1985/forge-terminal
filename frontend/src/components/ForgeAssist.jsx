@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, X, Copy, Play, ChevronRight, ChevronDown,
   Zap, Settings, GitBranch, FileCode, Brain, Bot, Terminal,
-  Shield, Workflow, BookOpen, Sparkles, AlertTriangle, ExternalLink
+  Shield, Workflow, BookOpen, Sparkles, AlertTriangle, ExternalLink, FileText, Edit, Save, Loader2
 } from 'lucide-react';
 import './ForgeAssist.css';
 
@@ -416,6 +416,70 @@ export default function ForgeAssist({
   const [selectedCLI, setSelectedCLI] = useState('claude'); // Manual selection
   const [expandedCategories, setExpandedCategories] = useState(new Set(['Subagents', 'Session Management']));
   const inputRef = useRef(null);
+  
+  // Instruction Mode state
+  const [isInstructionMode, setIsInstructionMode] = useState(() => {
+    return localStorage.getItem('forgeAssist_instructionMode') === 'true';
+  });
+  const [showInstructionEditor, setShowInstructionEditor] = useState(false);
+  const [instructionContent, setInstructionContent] = useState('');
+  const [isSavingInstructions, setIsSavingInstructions] = useState(false);
+
+  // Toggle instruction mode and persist
+  const toggleInstructionMode = useCallback(() => {
+    setIsInstructionMode(prev => {
+      const newValue = !prev;
+      localStorage.setItem('forgeAssist_instructionMode', newValue.toString());
+      return newValue;
+    });
+  }, []);
+
+  // Load instructions file
+  const openInstructionEditor = useCallback(async () => {
+    try {
+      setIsSavingInstructions(true);
+      const filename = 'copilot-instructions.md';
+      
+      const response = await fetch(`/api/files/read?path=${filename}`);
+      if (response.ok) {
+        const data = await response.json();
+        setInstructionContent(data.content || '');
+      } else {
+        setInstructionContent('');
+      }
+      setShowInstructionEditor(true);
+    } catch (err) {
+      console.error('[ForgeAssist] Failed to load instructions:', err);
+      setInstructionContent('');
+      setShowInstructionEditor(true);
+    } finally {
+      setIsSavingInstructions(false);
+    }
+  }, []);
+
+  // Save instructions file
+  const saveInstructions = useCallback(async () => {
+    try {
+      setIsSavingInstructions(true);
+      const filename = 'copilot-instructions.md';
+      
+      await fetch('/api/files/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: filename,
+          content: instructionContent
+        })
+      });
+      setShowInstructionEditor(false);
+      if (onToast) onToast('Instructions saved!', 'success', 2000);
+    } catch (err) {
+      console.error('[ForgeAssist] Failed to save instructions:', err);
+      if (onToast) onToast('Failed to save instructions', 'error', 3000);
+    } finally {
+      setIsSavingInstructions(false);
+    }
+  }, [instructionContent, onToast]);
 
   // Focus search on open
   useEffect(() => {
@@ -477,11 +541,18 @@ export default function ForgeAssist({
   const executeFeature = (feature) => {
     if (!feature) return;
     
+    let finalCmd = feature.cmd;
+    
+    // Append instruction reminder if instruction mode is active
+    if (isInstructionMode && instructionContent.trim()) {
+      finalCmd += `\n\n# Please follow and reference the instructions in copilot-instructions.md`;
+    }
+    
     if (feature.appendCursor) {
-      onSendToTerminal(feature.cmd);
+      onSendToTerminal(finalCmd);
       if (onToast) onToast(`Inserted: ${feature.name}`, 'info', 1500);
     } else {
-      onSendToTerminal(feature.cmd);
+      onSendToTerminal(finalCmd);
       if (onToast) onToast(`Sent: ${feature.name}`, 'success', 1500);
     }
     onClose();
@@ -526,6 +597,50 @@ export default function ForgeAssist({
                 <span className="cli-name">{name}</span>
               </button>
             ))}
+          </div>
+          
+          {/* Instruction Mode Toggle */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              className={`forge-assist-instruction-toggle ${isInstructionMode ? 'active' : ''}`}
+              onClick={toggleInstructionMode}
+              title="Toggle Instruction Mode (append copilot-instructions.md)"
+              style={{ 
+                background: isInstructionMode ? 'var(--accent-color, #8b5cf6)' : 'transparent',
+                border: `1px solid ${isInstructionMode ? 'var(--accent-color, #8b5cf6)' : '#444'}`,
+                color: isInstructionMode ? '#fff' : '#aaa',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <FileText size={16} />
+              {isInstructionMode && <span>ON</span>}
+            </button>
+            {isInstructionMode && (
+              <button 
+                className="forge-assist-edit-instructions"
+                onClick={openInstructionEditor}
+                title="Edit Instructions"
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #444',
+                  color: '#aaa',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Edit size={14} />
+              </button>
+            )}
           </div>
           
           <button className="forge-assist-close" onClick={onClose}>
@@ -637,6 +752,113 @@ export default function ForgeAssist({
           </span>
         </div>
       </div>
+
+      {/* Instruction Editor Modal */}
+      {showInstructionEditor && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 3000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--bg-secondary, #1a1a1a)',
+            width: '100%',
+            maxWidth: '800px',
+            height: '80%',
+            borderRadius: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+            border: '1px solid var(--border-color, #333)'
+          }}>
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid var(--border-color, #333)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#fff'}}>
+                <FileText size={20} style={{color: 'var(--accent-color, #8b5cf6)'}} />
+                Edit Instructions (copilot-instructions.md)
+              </h3>
+              <button 
+                onClick={() => setShowInstructionEditor(false)}
+                style={{background: 'none', border: 'none', color: '#aaa', cursor: 'pointer'}}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div style={{flex: 1, padding: '20px', display: 'flex', flexDirection: 'column'}}>
+              <textarea
+                value={instructionContent}
+                onChange={(e) => setInstructionContent(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: 'var(--bg-tertiary, #0a0a0a)',
+                  border: '1px solid var(--border-color, #333)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  color: '#fff',
+                  fontFamily: 'monospace',
+                  fontSize: '14px',
+                  resize: 'none',
+                  outline: 'none'
+                }}
+                placeholder="# Copilot Instructions\n\nAdd your custom instructions here...\nThese will be appended to every command when Instruction Mode is enabled."
+              />
+            </div>
+            <div style={{
+              padding: '16px 20px',
+              borderTop: '1px solid var(--border-color, #333)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <button 
+                onClick={() => setShowInstructionEditor(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color, #333)',
+                  background: 'transparent',
+                  color: '#aaa',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveInstructions}
+                disabled={isSavingInstructions}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: 'var(--accent-color, #8b5cf6)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  opacity: isSavingInstructions ? 0.7 : 1
+                }}
+              >
+                {isSavingInstructions ? <Loader2 size={16} style={{animation: 'spin 1s linear infinite'}} /> : <Save size={16} />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

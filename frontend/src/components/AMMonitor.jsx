@@ -38,14 +38,38 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
 
         if (!isMounted) return;
 
-        if (statusRes.ok) {
+        // Process status response
+        if (statusRes && statusRes.ok) {
           const statusData = await statusRes.json();
-          setStatus(statusData);
+          if (isMounted) {
+            setStatus(statusData);
+          }
+        } else if (statusRes && !statusRes.ok) {
+          console.warn('[AMMonitor] Status endpoint returned', statusRes.status);
+          if (isMounted) {
+            setStatus({
+              tabId,
+              status: amEnabled ? 'active' : 'disabled',
+              statusText: amEnabled ? 'AM Active' : 'AM Disabled'
+            });
+          }
         }
 
+        // Process conversations response
         if (convRes && convRes.ok) {
           const convData = await convRes.json();
-          setConversations(convData.conversations || []);
+          if (isMounted) {
+            // Handle both response formats
+            const convArray = Array.isArray(convData) 
+              ? convData 
+              : convData.conversations || [];
+            setConversations(convArray);
+          }
+        } else if (convRes) {
+          // If conversations endpoint fails, just set empty array
+          if (isMounted) {
+            setConversations([]);
+          }
         }
       } catch (err) {
         if (!isMounted) return;
@@ -53,6 +77,14 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
         const isConnectionError = err.message?.includes('Failed to fetch');
         if (!isConnectionError) {
           console.error('[AMMonitor] Status check failed:', err);
+        }
+        // Set default status on error
+        if (isMounted) {
+          setStatus({
+            tabId,
+            status: amEnabled ? 'active' : 'disabled',
+            statusText: amEnabled ? 'AM Active' : 'AM Disabled'
+          });
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -94,10 +126,17 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
   // Map status to icon
   const getIcon = () => {
     switch (statusType) {
-      case 'active':
-        return status?.isCapturing 
-          ? <Circle size={14} className="recording-dot" fill="currentColor" />
-          : <Eye size={14} />;
+      case 'active': {
+        // Show recording dot when actively capturing
+        if (status?.isCapturing) {
+          return (
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Circle size={14} className="recording-dot" fill="currentColor" />
+            </div>
+          );
+        }
+        return <Eye size={14} />;
+      }
       case 'disabled':
         return <EyeOff size={14} />;
       case 'broken':
@@ -156,8 +195,13 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
   };
 
   const handleClick = () => {
-    if (hasConversations) {
-      setViewingConversation(conversations[0]);
+    // Only handle click if we have conversations
+    if (hasConversations && conversations.length > 0) {
+      // Always view the most recent conversation
+      const mostRecent = conversations[0];
+      if (mostRecent && mostRecent.conversationId) {
+        setViewingConversation(mostRecent);
+      }
     }
   };
 
