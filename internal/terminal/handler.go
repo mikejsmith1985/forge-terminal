@@ -314,7 +314,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		if amSystem != nil && amEnabled {
 			log.Printf("[Terminal] AM is ENABLED for tab %s - initializing LLM Logger", tabID)
-			llmLogger := amSystem.GetLLMLogger(tabID)
+			llmLogger := am.GetLLMLogger(tabID, amSystem.AMDir)
 			llmLoggerAtomic.Store(llmLogger)
 			if llmLogger != nil {
 				activeConv := llmLogger.GetActiveConversationID()

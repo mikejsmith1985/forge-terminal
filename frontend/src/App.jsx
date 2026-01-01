@@ -1620,68 +1620,6 @@ function App() {
         </button>
       </div>
 
-      {/* AM Monitor - Shows LLM activity status (Dev Mode only) */}
-      {activeTab && devMode && (
-        <AMMonitor 
-          tabId={activeTab.id} 
-          amEnabled={activeTab.amEnabled || false}
-          devMode={devMode}
-        />
-      )}
-      
-      {/* Model Router Indicator - Task 4: Shows what's ACTUALLY running */}
-      {currentModelTier && (
-        <div className="model-tier-indicator" style={{
-          padding: '8px 12px',
-          margin: '8px 0',
-          background: routingInfo?.tierMismatch
-            ? 'rgba(251, 191, 36, 0.15)' // Yellow for mismatch
-            : 'rgba(139, 92, 246, 0.15)', // Purple for normal
-          border: `1px solid ${routingInfo?.tierMismatch
-            ? 'rgba(251, 191, 36, 0.3)'
-            : 'rgba(139, 92, 246, 0.3)'}`,
-          borderRadius: '6px',
-          fontSize: '12px',
-          color: routingInfo?.tierMismatch ? '#fbbf24' : '#a78bfa',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <span style={{ fontWeight: 600 }}>
-            Running: {currentModelTier}
-          </span>
-          {/* v3.5.3: Use real task type from SLM analysis */}
-          <span style={{ opacity: 0.7 }}>
-            {getTaskTypeIcon(routingInfo?.taskType)} {formatTaskType(routingInfo?.taskType) || 'Analyzing...'}
-          </span>
-          {/* Show complexity if available from SLM */}
-          {routingInfo?.complexity > 0 && (
-            <span style={{ 
-              fontSize: '10px', 
-              opacity: 0.6,
-              background: routingInfo.complexity >= 7 ? 'rgba(239, 68, 68, 0.2)' : 
-                         routingInfo.complexity >= 4 ? 'rgba(251, 191, 36, 0.2)' : 
-                         'rgba(34, 197, 94, 0.2)',
-              padding: '2px 6px',
-              borderRadius: '4px'
-            }}>
-              {routingInfo.complexity}/10
-            </span>
-          )}
-          {routingInfo?.tierMismatch && (
-            <span style={{ fontSize: '10px', opacity: 0.6 }}>
-              (switched from {routingInfo.previousTier})
-            </span>
-          )}
-          {/* SLM indicator */}
-          {routingInfo?.usedSLM === false && (
-            <span style={{ fontSize: '9px', opacity: 0.4 }} title="Using heuristic fallback (SLM not available)">
-              ⚠️
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Content area - Cards, Workflows, Files, Assistant, or Debug */}
       <div className="sidebar-content">
         {sidebarView === 'cards' ? (
@@ -1763,6 +1701,17 @@ function App() {
           mode={theme}
           devMode={devMode}
         />
+
+        {/* AM Monitor - Shows LLM activity status in bottom bar */}
+        <div style={{ display: 'flex', gap: '12px', padding: '8px 16px', borderBottom: '1px solid var(--overlay)', alignItems: 'center', background: 'rgba(255,0,0,0.1)' }}>
+          <span style={{ color: 'red', fontSize: '10px' }}>AM Monitor Container (v3.9.2)</span>
+          <AMMonitor 
+            tabId={activeTab?.id || 'no-tab'} 
+            amEnabled={activeTab?.amEnabled || false}
+            devMode={devMode}
+          />
+        </div>
+
         <SearchBar
           isOpen={isSearchOpen}
           onClose={handleSearchClose}

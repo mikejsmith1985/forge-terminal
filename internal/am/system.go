@@ -10,13 +10,13 @@ import (
 )
 
 // System is the main AM system orchestrator.
-// Uses async pipeline for non-blocking capture to prevent UI freezes.
+// Monitors native AI CLI sessions (Copilot/Claude) for recovery support.
 type System struct {
-	Detector      *llm.Detector
-	HealthMonitor *HealthMonitor
-	Pipeline      *AsyncPipeline // Async non-blocking pipeline
-	AMDir         string
-	enabled       bool
+	Detector        *llm.Detector
+	HealthMonitor   *HealthMonitor
+	RecoveryManager *RecoveryManager // Native session recovery
+	AMDir           string
+	enabled         bool
 }
 
 // NewSystem creates and initializes the AM system.
@@ -34,7 +34,7 @@ func (s *System) Start() error {
 		return nil
 	}
 
-	log.Printf("[AM System] Initializing Artificial Memory")
+	log.Printf("[AM System] Initializing Native Session Recovery")
 
 	// Ensure AM directory exists
 	if err := os.MkdirAll(s.AMDir, 0755); err != nil {
@@ -42,14 +42,13 @@ func (s *System) Start() error {
 		return err
 	}
 
-	// Health Monitor (simplified - tracks capture metrics)
+	// Health Monitor (tracks native session health)
 	s.HealthMonitor = NewHealthMonitor()
 	log.Printf("[AM System] Health monitor initialized")
 
-	// Initialize async pipeline for non-blocking capture
-	s.Pipeline = NewAsyncPipeline(DefaultPipelineConfig())
-	s.Pipeline.Start(s)
-	log.Printf("[AM System] Async pipeline initialized")
+	// Initialize native session recovery manager
+	s.RecoveryManager = NewRecoveryManager()
+	log.Printf("[AM System] Native session recovery manager initialized")
 
 	s.enabled = true
 	log.Printf("[AM System] Initialized (dir: %s)", s.AMDir)
@@ -65,12 +64,6 @@ func (s *System) Stop() {
 
 	log.Printf("[AM System] Shutting down")
 	
-	// Stop the async pipeline first
-	if s.Pipeline != nil {
-		s.Pipeline.Stop()
-		s.Pipeline = nil
-	}
-	
 	s.enabled = false
 	log.Printf("[AM System] Shutdown complete")
 }
@@ -80,12 +73,9 @@ func (s *System) IsEnabled() bool {
 	return s.enabled
 }
 
-// GetLLMLogger returns an LLM logger for a specific tab.
-func (s *System) GetLLMLogger(tabID string) *LLMLogger {
-	if !s.enabled {
-		return nil
-	}
-	return GetLLMLogger(tabID, s.AMDir)
+// GetRecoveryManager returns the recovery manager for native sessions
+func (s *System) GetRecoveryManager() *RecoveryManager {
+	return s.RecoveryManager
 }
 
 // GetHealth returns current system health.
@@ -105,42 +95,27 @@ func (s *System) GetActiveConversations() map[string]*LLMConversation {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NON-BLOCKING PRODUCER METHODS
-// These are called from the PTY read loop and MUST NOT block.
+// Replaced with native session monitoring - no custom capture needed.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// EnqueueInput sends input data to the async pipeline without blocking.
-// Safe to call from the PTY read loop - will drop data if pipeline is full.
+// EnqueueInput - No-op: Native sessions managed by AI CLI tools
 func (s *System) EnqueueInput(tabID string, data []byte) bool {
-	if !s.enabled || s.Pipeline == nil {
-		return false
-	}
-	return s.Pipeline.EnqueueInput(tabID, data)
+	return true // Always return true to avoid breaking callers
 }
 
-// EnqueueOutput sends output data to the async pipeline without blocking.
-// Safe to call from the PTY read loop - will drop data if pipeline is full.
+// EnqueueOutput - No-op: Native sessions managed by AI CLI tools
 func (s *System) EnqueueOutput(tabID string, data []byte) bool {
-	if !s.enabled || s.Pipeline == nil {
-		return false
-	}
-	return s.Pipeline.EnqueueOutput(tabID, data)
+	return true // Always return true to avoid breaking callers
 }
 
-// EnqueueCommand sends a command for LLM detection without blocking.
-// Safe to call from the PTY read loop - will drop data if pipeline is full.
+// EnqueueCommand - No-op: Native sessions managed by AI CLI tools
 func (s *System) EnqueueCommand(tabID string, command string) bool {
-	if !s.enabled || s.Pipeline == nil {
-		return false
-	}
-	return s.Pipeline.EnqueueCommand(tabID, command)
+	return true // Always return true to avoid breaking callers
 }
 
-// GetPipelineStats returns pipeline statistics (processed, dropped).
+// GetPipelineStats returns pipeline statistics (always 0 with native approach)
 func (s *System) GetPipelineStats() (processed, dropped int64) {
-	if s.Pipeline == nil {
-		return 0, 0
-	}
-	return s.Pipeline.GetStats()
+	return 0, 0
 }
 
 // DefaultAMDir returns the default AM directory path.

@@ -312,7 +312,8 @@ func (p *AsyncPipeline) ProcessLoop(amSystem *System) {
 				// Flush and end conversation
 				log.Printf("[AsyncPipeline] Tab %s: Ending conversation", msg.TabID)
 				p.flushTabBuffer(amSystem, msg.TabID, buf)
-				if logger := amSystem.GetLLMLogger(msg.TabID); logger != nil {
+				// Native sessions: No custom logger needed
+				if logger := GetLLMLogger(msg.TabID, amSystem.AMDir); logger != nil {
 					logger.EndConversation()
 				}
 			}
@@ -365,7 +366,7 @@ func (p *AsyncPipeline) processCommand(amSystem *System, tabID string, command s
 		return
 	}
 	
-	logger := amSystem.GetLLMLogger(tabID)
+	logger := GetLLMLogger(tabID, amSystem.AMDir)
 	if logger == nil {
 		return
 	}
@@ -397,7 +398,7 @@ func (p *AsyncPipeline) flushTabBuffer(amSystem *System, tabID string, buf *tabB
 		return
 	}
 	
-	logger := amSystem.GetLLMLogger(tabID)
+	logger := GetLLMLogger(tabID, amSystem.AMDir)
 	if logger == nil {
 		if buf.input.Len() > 0 || buf.output.Len() > 0 {
 			log.Printf("[AsyncPipeline] Tab %s: No logger, discarding %d input + %d output bytes",

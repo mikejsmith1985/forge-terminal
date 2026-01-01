@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -1757,7 +1758,7 @@ func handleAMLog(w http.ResponseWriter, r *http.Request) {
 	if req.TriggerAM && provider != "" {
 		amSystem := am.GetSystem()
 		if amSystem != nil {
-			logger := amSystem.GetLLMLogger(req.TabID)
+			logger := am.GetLLMLogger(req.TabID, amSystem.AMDir)
 			if logger != nil {
 				// Only start if no active conversation
 				if logger.GetActiveConversationID() == "" {
@@ -1783,6 +1784,105 @@ func handleAMLog(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 	})
+}
+
+// handleAMNativeSessions returns list of recoverable native AI sessions
+func handleAMNativeSessions(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodGet {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+w.Header().Set("Content-Type", "application/json")
+
+system := am.GetSystem()
+if system == nil || system.GetRecoveryManager() == nil {
+json.NewEncoder(w).Encode(map[string]interface{}{
+"error": "AM system not initialized",
+})
+return
+}
+
+// Get query parameter for limit
+limitStr := r.URL.Query().Get("limit")
+limit := 20
+if limitStr != "" {
+if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+limit = parsed
+}
+}
+
+sessions, err := system.GetRecoveryManager().ListRecoverableSessions(limit)
+if err != nil {
+json.NewEncoder(w).Encode(map[string]interface{}{
+"error": err.Error(),
+})
+return
+}
+
+json.NewEncoder(w).Encode(map[string]interface{}{
+"sessions": sessions,
+"count":    len(sessions),
+})
+}
+
+// handleAMNativeRecover gets recovery command for a session
+func handleAMNativeRecover(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodPost {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+w.Header().Set("Content-Type", "application/json")
+
+system := am.GetSystem()
+if system == nil || system.GetRecoveryManager() == nil {
+json.NewEncoder(w).Encode(map[string]interface{}{
+"error": "AM system not initialized",
+})
+return
+}
+
+// Parse request body
+var req struct {
+SessionID string `json:"sessionId"`
+Provider  string `json:"provider"`
+}
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+json.NewEncoder(w).Encode(map[string]interface{}{
+"error": "Invalid request body",
+})
+return
+}
+
+// Convert provider string to Provider type
+var provider am.Provider
+switch req.Provider {
+case "copilot":
+provider = am.ProviderCopilot
+case "claude":
+provider = am.ProviderClaude
+default:
+json.NewEncoder(w).Encode(map[string]interface{}{
+"error": "Invalid provider: must be 'copilot' or 'claude'",
+})
+return
+}
+
+// Get recovery command
+cmd, err := system.GetRecoveryManager().GetRecoveryCommand(req.SessionID, provider)
+if err != nil {
+json.NewEncoder(w).Encode(map[string]interface{}{
+"error": err.Error(),
+})
+return
+}
+
+json.NewEncoder(w).Encode(map[string]interface{}{
+"command":   cmd,
+"sessionId": req.SessionID,
+"provider":  req.Provider,
+})
 }
 
 func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {

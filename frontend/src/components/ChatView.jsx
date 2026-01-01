@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Loader2, Terminal, Brain, Settings, Play, Search, Image as ImageIcon, Command } from 'lucide-react';
+import { Send, Loader2, Terminal, Brain, Settings, Play, Search, Image as ImageIcon, Command, FileText, Edit, X, Save } from 'lucide-react';
 import ChatSearchOverlay from './ChatSearchOverlay';
 import './ChatView.css';
 
@@ -61,6 +61,12 @@ const ChatView = ({
   });
   const [isDraggingBtn, setIsDraggingBtn] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
+  // Instruction Mode State
+  const [isInstructionMode, setIsInstructionMode] = useState(false);
+  const [showInstructionEditor, setShowInstructionEditor] = useState(false);
+  const [instructionContent, setInstructionContent] = useState('');
+  const [isSavingInstructions, setIsSavingInstructions] = useState(false);
   
   const messagesEndRef = useRef(null);
   const messageRefs = useRef({}); // For scrolling to search results
@@ -554,6 +560,12 @@ const ChatView = ({
     setIsLoading(true);
     setError(null);
     
+    // Append instructions if mode is active
+    let finalUserMessage = userMessage;
+    if (isInstructionMode) {
+      finalUserMessage += `\n\n(Please follow and reference the instructions in copilot-instructions.md)`;
+    }
+
     // Then add message to UI
     setMessages(prev => [...prev, { role: 'user', content: userMessage, id: userMsgId, timestamp }]);
 
@@ -565,7 +577,7 @@ const ChatView = ({
         body: JSON.stringify({
           id: userMsgId,
           type: 'user',
-          content: userMessage,
+          content: finalUserMessage, // Persist the full message with instructions
           workerId: tabId || 'default',
         })
       }).catch(err => console.warn('[ChatView] Failed to persist user message:', err));
@@ -579,7 +591,7 @@ const ChatView = ({
         const slmResponse = await fetch('/api/slm/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: userMessage })
+          body: JSON.stringify({ prompt: finalUserMessage }) // Analyze full message
         });
         if (slmResponse.ok) {
           slmResult = await slmResponse.json();
@@ -600,14 +612,14 @@ const ChatView = ({
       const ref = getActiveTerminalRef();
       if (usePTYBridge && ref && ref.sendChatCommand) {
         console.log('[ChatView] Using PTY bridge mode');
-        await sendViaPTYBridge(userMessage, slmResult);
+        await sendViaPTYBridge(finalUserMessage, slmResult);
         // Note: isLoading will be cleared by the timeout in sendViaPTYBridge
         return;
       }
 
       // Fallback: Use HTTP API
       console.log('[ChatView] Using HTTP fallback mode');
-      await sendViaHTTP(userMessage, slmResult);
+      await sendViaHTTP(finalUserMessage, slmResult);
 
       // Clear analysis status after response
       setAnalysisStatus(null);
@@ -781,6 +793,57 @@ const ChatView = ({
     setPendingImages(prev => prev.filter(img => img.id !== id));
   }, []);
 
+  // Instruction Mode Handlers
+  const toggleInstructionMode = useCallback(() => {
+    setIsInstructionMode(prev => !prev);
+  }, []);
+
+  const openInstructionEditor = useCallback(async () => {
+    try {
+      setIsSavingInstructions(true);
+      // Default to copilot-instructions.md as per requirements
+      const filename = 'copilot-instructions.md';
+      
+      const response = await fetch(`/api/files/read?path=${filename}`);
+      if (response.ok) {
+        const data = await response.json();
+        setInstructionContent(data.content || '');
+      } else {
+        // File might not exist, start empty
+        setInstructionContent('');
+      }
+      setShowInstructionEditor(true);
+    } catch (err) {
+      console.error('[ChatView] Failed to load instructions:', err);
+      setInstructionContent('');
+      setShowInstructionEditor(true);
+    } finally {
+      setIsSavingInstructions(false);
+    }
+  }, []);
+
+  const saveInstructions = useCallback(async () => {
+    try {
+      setIsSavingInstructions(true);
+      const filename = 'copilot-instructions.md';
+      
+      await fetch('/api/files/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: filename,
+          content: instructionContent
+        })
+      });
+      setShowInstructionEditor(false);
+    } catch (err) {
+      console.error('[ChatView] Failed to save instructions:', err);
+      // Could add toast here
+    } finally {
+      setIsSavingInstructions(false);
+    }
+  }, [instructionContent]);
+
   return (
     <div 
       className={`chat-view ${isDragOver ? 'drag-over' : ''}`}
@@ -795,6 +858,27 @@ const ChatView = ({
           <h2>AI Assistant</h2>
         </div>
         <div className="chat-view-actions">
+          <button 
+            className={`chat-view-btn instruction-toggle-btn ${isInstructionMode ? 'active' : ''}`}
+            onClick={toggleInstructionMode}
+            title="Toggle Instruction Mode (Append copilot-instructions.md)"
+            style={{ 
+              borderColor: isInstructionMode ? 'var(--accent-color)' : '',
+              color: isInstructionMode ? 'var(--accent-color)' : ''
+            }}
+          >
+            <FileText size={18} />
+            {isInstructionMode && <span style={{fontSize: '11px', fontWeight: 'bold'}}>ON</span>}
+          </button>
+          {isInstructionMode && (
+            <button 
+              className="chat-view-btn edit-instructions-btn"
+              onClick={openInstructionEditor}
+              title="Edit Instructions"
+            >
+              <Edit size={18} />
+            </button>
+          )}
           <button 
             className="chat-view-btn search-btn"
             onClick={() => setIsSearchOpen(true)}
@@ -996,6 +1080,113 @@ const ChatView = ({
         onClose={() => setIsSearchOpen(false)}
         onScrollToMessage={scrollToMessage}
       />
+
+      {/* Instruction Editor Modal */}
+      {showInstructionEditor && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--bg-secondary)',
+            width: '100%',
+            maxWidth: '800px',
+            height: '80%',
+            borderRadius: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+            border: '1px solid var(--border-color)'
+          }}>
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid var(--border-color)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '10px'}}>
+                <FileText size={20} color="var(--accent-color)" />
+                Edit Instructions (copilot-instructions.md)
+              </h3>
+              <button 
+                onClick={() => setShowInstructionEditor(false)}
+                style={{background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer'}}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div style={{flex: 1, padding: '20px', display: 'flex', flexDirection: 'column'}}>
+              <textarea
+                value={instructionContent}
+                onChange={(e) => setInstructionContent(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  color: 'var(--text-primary)',
+                  fontFamily: 'monospace',
+                  fontSize: '14px',
+                  resize: 'none',
+                  outline: 'none'
+                }}
+                placeholder="# Copilot Instructions\n\nAdd your custom instructions here..."
+              />
+            </div>
+            <div style={{
+              padding: '16px 20px',
+              borderTop: '1px solid var(--border-color)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <button 
+                onClick={() => setShowInstructionEditor(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveInstructions}
+                disabled={isSavingInstructions}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: 'var(--accent-color)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  opacity: isSavingInstructions ? 0.7 : 1
+                }}
+              >
+                {isSavingInstructions ? <Loader2 size={16} className="spinner" /> : <Save size={16} />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* v3.7.2: Draggable Forge Assist button */}
       {onToggleForgeAssist && (

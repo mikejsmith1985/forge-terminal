@@ -30,24 +30,35 @@ type LayerStatus struct {
 
 // SystemHealth represents the complete health status.
 type SystemHealth struct {
-	Status     string             `json:"status"` // HEALTHY, DEGRADED, FAILED
-	Metrics    *CaptureMetrics    `json:"metrics"`
-	Layers     []LayerStatus      `json:"layers,omitempty"`
-	Validation *ContentValidation `json:"validation,omitempty"`
+	Status          string             `json:"status"` // HEALTHY, DEGRADED, FAILED
+	Metrics         *CaptureMetrics    `json:"metrics"`
+	Layers          []LayerStatus      `json:"layers,omitempty"`
+	Validation      *ContentValidation `json:"validation,omitempty"`
+	NativeSessions  *NativeSessionHealth `json:"nativeSessions,omitempty"`
+}
+
+// NativeSessionHealth represents native AI session recovery status
+type NativeSessionHealth struct {
+	TotalSessions       int       `json:"totalSessions"`
+	RecoverableSessions int       `json:"recoverableSessions"`
+	MostRecentSession   *NativeSession `json:"mostRecentSession,omitempty"`
+	LastScanTime        time.Time `json:"lastScanTime"`
 }
 
 // HealthMonitor tracks the health of the AM capture pipeline.
 type HealthMonitor struct {
-	mutex     sync.RWMutex
-	metrics   *CaptureMetrics
-	startTime time.Time
+	mutex          sync.RWMutex
+	metrics        *CaptureMetrics
+	startTime      time.Time
+	nativeMonitor  *NativeMonitor
 }
 
 // NewHealthMonitor creates a new health monitor.
 func NewHealthMonitor() *HealthMonitor {
 	hm := &HealthMonitor{
-		metrics:   &CaptureMetrics{},
-		startTime: time.Now(),
+		metrics:       &CaptureMetrics{},
+		startTime:     time.Now(),
+		nativeMonitor: NewNativeMonitor(),
 	}
 
 	// Subscribe to events from capture pipeline
@@ -167,11 +178,15 @@ func (hm *HealthMonitor) GetSystemHealth() *SystemHealth {
 
 	// Build layer status information
 	layers := hm.buildLayerStatus()
+	
+	// Scan native sessions
+	nativeHealth := hm.scanNativeSessions()
 
 	return &SystemHealth{
-		Status:  status,
-		Metrics: metrics,
-		Layers:  layers,
+		Status:         status,
+		Metrics:        metrics,
+		Layers:         layers,
+		NativeSessions: nativeHealth,
 	}
 }
 
@@ -486,4 +501,36 @@ func (hm *HealthMonitor) ValidateAllConversations(amDir string) *ContentValidati
 		validation.ValidFiles, validation.CorruptedFiles, validation.TotalFiles)
 
 	return validation
+}
+
+// scanNativeSessions scans for native AI sessions
+func (hm *HealthMonitor) scanNativeSessions() *NativeSessionHealth {
+sessions, err := hm.nativeMonitor.Scan()
+if err != nil {
+log.Printf("[Health] Failed to scan native sessions: %v", err)
+return &NativeSessionHealth{
+LastScanTime: time.Now(),
+}
+}
+
+// Count recoverable sessions
+recoverable := 0
+for _, s := range sessions {
+status := hm.nativeMonitor.ValidateRecovery(s.ID, s.Provider)
+if status.Recoverable {
+recoverable++
+}
+}
+
+var mostRecent *NativeSession
+if len(sessions) > 0 {
+mostRecent = sessions[0]
+}
+
+return &NativeSessionHealth{
+TotalSessions:       len(sessions),
+RecoverableSessions: recoverable,
+MostRecentSession:   mostRecent,
+LastScanTime:        time.Now(),
+}
 }
