@@ -333,9 +333,9 @@ type TabCaptureStatus struct {
 
 // GetTabCaptureStatus returns capture status for a specific tab.
 // Status logic:
-//   - "active": amEnabled=true AND (capturing OR no active conversation yet)
+//   - "active": amEnabled=true AND (capturing OR ready to capture)
 //   - "disabled": amEnabled=false 
-//   - "broken": amEnabled=true AND active conversation but no captures in 30s
+//   - "broken": amEnabled=true AND active conversation but no captures for extended period
 func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabCaptureStatus {
 	status := &TabCaptureStatus{
 		TabID: tabID,
@@ -391,41 +391,41 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 		status.SecondsSinceCapture = int64(time.Since(lastCapture).Seconds())
 	}
 
-	// FIXED: Detect broken capture more accurately
-	// Case 1: Only system turn exists for 10+ seconds (conversation started but no content)
-	if totalTurns == 1 && status.SecondsSinceCapture > 10 {
-		status.Status = "broken"
-		status.StatusText = "AM Logging is enabled but not capturing data"
-		status.IsCapturing = false
-		log.Printf("[Health] Tab %s BROKEN: Only 1 turn (system) after %d seconds", 
-			tabID, status.SecondsSinceCapture)
+	// FIXED v3.9.3: Relaxed timing to avoid false "broken" states during active chats
+	// Only mark as broken if we have real evidence of capture failure
+	
+	// If we have at least 1 user turn, we're successfully capturing
+	if userTurns > 0 {
+		status.Status = "active"
+		status.StatusText = "AM Logging is Active in this tab"
+		status.IsCapturing = status.SecondsSinceCapture < 30 // Recent activity within 30s
 		return status
 	}
 	
-	// Case 2: Has turns but NO user/assistant turns after 30s (system turns only)
-	if userTurns == 0 && assistantTurns == 0 && status.SecondsSinceCapture > 30 {
-		status.Status = "broken"
-		status.StatusText = "AM Logging is enabled but not capturing data"
-		status.IsCapturing = false
-		log.Printf("[Health] Tab %s BROKEN: %d turns but no user/assistant turns after %d seconds",
-			tabID, totalTurns, status.SecondsSinceCapture)
+	// If conversation is very new (< 60s) and has ANY turns, consider it active
+	// This allows time for native session to detect and start capturing
+	conversationAge := time.Since(conv.StartTime).Seconds()
+	if conversationAge < 60 && totalTurns > 0 {
+		status.Status = "active"
+		status.StatusText = "AM Logging is Active in this tab"
+		status.IsCapturing = true
 		return status
 	}
 	
-	// Case 3: No captures at all for 30+ seconds
-	if status.SecondsSinceCapture > 30 && totalTurns == 0 {
+	// Only mark as broken if conversation is old (> 60s) with no user/assistant turns
+	if conversationAge > 60 && userTurns == 0 && assistantTurns == 0 {
 		status.Status = "broken"
 		status.StatusText = "AM Logging is enabled but not capturing data"
 		status.IsCapturing = false
-		log.Printf("[Health] Tab %s BROKEN: No turns after %d seconds", 
-			tabID, status.SecondsSinceCapture)
+		log.Printf("[Health] Tab %s BROKEN: %d turns but no user/assistant turns after %.0fs",
+			tabID, totalTurns, conversationAge)
 		return status
 	}
 
-	// Active and capturing
+	// Default to active - optimistic approach
 	status.Status = "active"
 	status.StatusText = "AM Logging is Active in this tab"
-	status.IsCapturing = status.SecondsSinceCapture < 10 // Recent activity
+	status.IsCapturing = status.SecondsSinceCapture < 30
 	
 	return status
 }

@@ -1,0 +1,354 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - tablist [ref=e5]:
+      - generic [ref=e6]:
+        - tab "Forge-Terminal Close tab" [ref=e7] [cursor=pointer]:
+          - img [ref=e9]
+          - generic "AM Logging enabled" [ref=e11]:
+            - img [ref=e12]
+          - generic "Auto-respond enabled" [ref=e14]:
+            - img [ref=e15]
+          - generic [ref=e17]: Forge-Terminal
+          - button "Close tab" [ref=e18]:
+            - img [ref=e19]
+        - tab "Forge-Terminal Close tab" [ref=e22] [cursor=pointer]:
+          - img [ref=e24]
+          - generic "AM Logging enabled" [ref=e26]:
+            - img [ref=e27]
+          - generic "Auto-respond enabled" [ref=e29]:
+            - img [ref=e30]
+          - generic [ref=e32]: Forge-Terminal
+          - button "Close tab" [ref=e33]:
+            - img [ref=e34]
+        - tab "jira-automation Close tab" [selected] [ref=e37] [cursor=pointer]:
+          - img [ref=e39]
+          - generic "AM Logging enabled" [ref=e41]:
+            - img [ref=e42]
+          - generic [ref=e44]: jira-automation
+          - button "Close tab" [ref=e45]:
+            - img [ref=e46]
+        - tab "jira-automation Close tab" [ref=e49] [cursor=pointer]:
+          - img [ref=e51]
+          - generic "AM Logging enabled" [ref=e53]:
+            - img [ref=e54]
+          - generic "Auto-respond enabled" [ref=e56]:
+            - img [ref=e57]
+          - generic [ref=e59]: jira-automation
+          - button "Close tab" [ref=e60]:
+            - img [ref=e61]
+        - tab "Forge-Terminal Close tab" [ref=e64] [cursor=pointer]:
+          - img [ref=e66]
+          - generic "AM Logging enabled" [ref=e68]:
+            - img [ref=e69]
+          - generic [ref=e71]: Forge-Terminal
+          - button "Close tab" [ref=e72]:
+            - img [ref=e73]
+      - button "New tab" [ref=e76] [cursor=pointer]:
+        - img [ref=e77]
+    - generic [ref=e78]:
+      - generic [ref=e79]: AM Monitor Container (v3.9.2)
+      - generic "AM Logging is enabled but not capturing data" [ref=e80] [cursor=pointer]:
+        - img [ref=e81]
+        - generic [ref=e83]: AM Error
+    - generic [ref=e85]:
+      - generic [ref=e91]:
+        - textbox "Terminal input" [ref=e92]
+        - generic [ref=e93]:
+          - generic [ref=e95]: Windows PowerShell
+          - generic [ref=e97]: Copyright (C) Microsoft Corporation. All rights reserved.
+          - generic [ref=e100]: Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows
+          - generic [ref=e102]:
+            - generic [ref=e103]: PS C:\Users\mikej\Downloads>
+            - generic [ref=e104]: cd
+            - generic [ref=e105]: "\"C:\\ProjectsWin\\Forge-Terminal\""
+          - generic [ref=e107]: PS C:\ProjectsWin\Forge-Terminal>
+      - generic [ref=e145]:
+        - textbox "Terminal input" [ref=e146]
+        - generic [ref=e147]:
+          - generic [ref=e149]: Windows PowerShell
+          - generic [ref=e151]: Copyright (C) Microsoft Corporation. All rights reserved.
+          - generic [ref=e154]: Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows
+          - generic [ref=e156]:
+            - generic [ref=e157]: PS C:\Users\mikej\Downloads>
+            - generic [ref=e158]: cd
+            - generic [ref=e159]: "\"C:\\ProjectsWin\\Forge-Terminal\""
+          - generic [ref=e161]: PS C:\ProjectsWin\Forge-Terminal>
+      - generic [ref=e200]:
+        - textbox "Terminal input" [ref=e201]
+        - generic [ref=e202]:
+          - generic [ref=e204]: Windows PowerShell
+          - generic [ref=e206]: Copyright (C) Microsoft Corporation. All rights reserved.
+          - generic [ref=e209]: Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows
+          - generic [ref=e211]:
+            - generic [ref=e212]: PS C:\Users\mikej\Downloads>
+            - generic [ref=e213]: cd
+            - generic [ref=e214]: "\"C:\\ProjectsWin\\jira-automation\""
+          - generic [ref=e216]: PS C:\ProjectsWin\jira-automation>
+      - generic [ref=e254]:
+        - textbox "Terminal input" [ref=e255]
+        - generic [ref=e256]:
+          - generic [ref=e258]: Windows PowerShell
+          - generic [ref=e260]: Copyright (C) Microsoft Corporation. All rights reserved.
+          - generic [ref=e263]: Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows
+          - generic [ref=e265]:
+            - generic [ref=e266]: PS C:\Users\mikej\Downloads>
+            - generic [ref=e267]: cd
+            - generic [ref=e268]: "\"C:\\ProjectsWin\\jira-automation\""
+          - generic [ref=e270]: PS C:\ProjectsWin\jira-automation>
+      - generic [ref=e308]:
+        - textbox "Terminal input" [active] [ref=e309]
+        - generic [ref=e310]:
+          - generic [ref=e312]: Windows PowerShell
+          - generic [ref=e314]: Copyright (C) Microsoft Corporation. All rights reserved.
+          - generic [ref=e317]: Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows
+          - generic [ref=e319]:
+            - generic [ref=e320]: PS C:\Users\mikej\Downloads>
+            - generic [ref=e321]: cd
+            - generic [ref=e322]: "\"C:\\ProjectsWin\\Forge-Terminal\""
+          - generic [ref=e324]: PS C:\ProjectsWin\Forge-Terminal>
+  - generic [ref=e358]:
+    - generic [ref=e359]:
+      - button "Cards" [ref=e360] [cursor=pointer]:
+        - img [ref=e361]
+        - text: Cards
+      - button "Files" [ref=e363] [cursor=pointer]:
+        - img [ref=e364]
+        - text: Files
+      - button "Debug" [ref=e366] [cursor=pointer]:
+        - img [ref=e367]
+        - text: Debug
+    - generic [ref=e376]:
+      - heading "⚡ Commands" [level=3] [ref=e377]
+      - button "Add" [ref=e378] [cursor=pointer]:
+        - img [ref=e379]
+        - text: Add
+    - generic [ref=e380]:
+      - 'button "Theme: Emerald Forest" [ref=e381] [cursor=pointer]':
+        - img [ref=e382]
+      - button "Toggle Light/Dark" [ref=e388] [cursor=pointer]:
+        - img [ref=e389]
+      - button "Move sidebar to left" [ref=e391] [cursor=pointer]:
+        - img [ref=e392]
+      - button "Time Travel (Ctrl+Shift+H)" [ref=e394] [cursor=pointer]:
+        - img [ref=e395]
+      - button "Send Feedback" [ref=e398] [cursor=pointer]:
+        - img [ref=e399]
+      - button "Version v3.9.3" [ref=e401] [cursor=pointer]:
+        - img [ref=e402]
+      - button "Quit Forge" [ref=e405] [cursor=pointer]:
+        - img [ref=e406]
+    - generic [ref=e408]:
+      - button "PS" [ref=e409] [cursor=pointer]:
+        - img [ref=e410]
+        - generic [ref=e412]: PS
+      - generic [ref=e413]:
+        - button "terminal" [pressed] [ref=e414] [cursor=pointer]:
+          - img "terminal" [ref=e415]: ⌨️
+        - button "Decrease Font Size" [ref=e416] [cursor=pointer]:
+          - img [ref=e417]
+        - generic "Font Size" [ref=e418]: 14px
+        - button "Increase Font Size" [ref=e419] [cursor=pointer]:
+          - img [ref=e420]
+        - button "assistant" [ref=e421] [cursor=pointer]:
+          - img "assistant" [ref=e422]: 🤖
+      - button "Toggle Task Dashboard" [ref=e423] [cursor=pointer]:
+        - img [ref=e424]
+      - button "Shell Settings" [ref=e428] [cursor=pointer]:
+        - img [ref=e429]
+    - generic [ref=e432]:
+      - generic [ref=e433]:
+        - generic [ref=e434]:
+          - generic [ref=e435]:
+            - generic [ref=e437]: Ctrl+Shift+0
+            - generic [ref=e438]:
+              - button "Drag to reorder" [ref=e439]:
+                - img [ref=e440]
+              - generic "Edit Command" [ref=e447] [cursor=pointer]:
+                - img [ref=e448]
+              - generic "Delete Command" [ref=e450] [cursor=pointer]:
+                - img [ref=e451]
+          - generic "cd C:\\ProjectsWin\\Forge-Terminal" [ref=e455]: 🖥️Open Forge Project
+          - generic [ref=e456]:
+            - button "Paste" [ref=e457] [cursor=pointer]:
+              - img [ref=e458]
+              - text: Paste
+            - button "Run" [ref=e461] [cursor=pointer]:
+              - img [ref=e462]
+              - text: Run
+        - generic [ref=e464]:
+          - generic [ref=e465]:
+            - generic [ref=e467]: Ctrl+Shift+1
+            - generic [ref=e468]:
+              - generic "Triggers AM on execute" [ref=e469] [cursor=pointer]:
+                - img [ref=e470]
+              - button "Drag to reorder" [ref=e478]:
+                - img [ref=e479]
+              - generic "Edit Command" [ref=e486] [cursor=pointer]:
+                - img [ref=e487]
+              - generic "Delete Command" [ref=e489] [cursor=pointer]:
+                - img [ref=e490]
+          - generic "copilot --allow-all-tools" [ref=e494]: 🤖 Run Copilot
+          - generic [ref=e495]:
+            - button "Paste" [ref=e496] [cursor=pointer]:
+              - img [ref=e497]
+              - text: Paste
+            - button "Run" [ref=e500] [cursor=pointer]:
+              - img [ref=e501]
+              - text: Run
+        - generic [ref=e503]:
+          - generic [ref=e504]:
+            - generic [ref=e506]: Ctrl+Shift+4
+            - generic [ref=e507]:
+              - button "Drag to reorder" [ref=e508]:
+                - img [ref=e509]
+              - generic "Edit Command" [ref=e516] [cursor=pointer]:
+                - img [ref=e517]
+              - generic "Delete Command" [ref=e519] [cursor=pointer]:
+                - img [ref=e520]
+          - 'generic "STOP. You are stuck in a loop or not following instructions. Take a breath. Here''s what I need you to do: 1. Acknowledge what went wrong (one sentence) 2. State the ACTUAL goal we''re trying to achieve 3. Propose ONE concrete next step 4. Wait for my confirmation before proceeding Do not apologize. Do not repeat previous attempts. Do not continue what you were doing. The task is:" [ref=e524]': 🛑 F*** THIS!
+          - button "Paste" [ref=e526] [cursor=pointer]:
+            - img [ref=e527]
+            - text: Paste
+        - generic [ref=e530]:
+          - generic [ref=e531]:
+            - generic [ref=e533]: Ctrl+Shift+6
+            - generic [ref=e534]:
+              - generic "Triggers AM on execute" [ref=e535] [cursor=pointer]:
+                - img [ref=e536]
+              - button "Drag to reorder" [ref=e544]:
+                - img [ref=e545]
+              - generic "Edit Command" [ref=e552] [cursor=pointer]:
+                - img [ref=e553]
+              - generic "Delete Command" [ref=e555] [cursor=pointer]:
+                - img [ref=e556]
+          - generic [ref=e560]: 💯E2E Command
+          - button "Paste" [ref=e562] [cursor=pointer]:
+            - img [ref=e563]
+            - text: Paste
+        - generic [ref=e566]:
+          - generic [ref=e567]:
+            - generic [ref=e569]: Ctrl+Shift+2
+            - generic [ref=e570]:
+              - generic "Triggers AM on execute" [ref=e571] [cursor=pointer]:
+                - img [ref=e572]
+              - button "Drag to reorder" [ref=e580]:
+                - img [ref=e581]
+              - generic "Edit Command" [ref=e588] [cursor=pointer]:
+                - img [ref=e589]
+              - generic "Delete Command" [ref=e591] [cursor=pointer]:
+                - img [ref=e592]
+          - 'generic "You are an expert software architect. Produce a clear, actionable design specification. Requirements: - Specific file paths and names - Interface definitions before implementations - Data structures with field types - Edge cases identified upfront - No implementation code yet Design the following:" [ref=e596]': 📝 Design Command
+          - button "Paste" [ref=e598] [cursor=pointer]:
+            - img [ref=e599]
+            - text: Paste
+        - generic [ref=e602]:
+          - generic [ref=e603]:
+            - generic [ref=e605]: Ctrl+Shift+3
+            - generic [ref=e606]:
+              - generic "Triggers AM on execute" [ref=e607] [cursor=pointer]:
+                - img [ref=e608]
+              - button "Drag to reorder" [ref=e616]:
+                - img [ref=e617]
+              - generic "Edit Command" [ref=e624] [cursor=pointer]:
+                - img [ref=e625]
+              - generic "Delete Command" [ref=e627] [cursor=pointer]:
+                - img [ref=e628]
+          - 'generic "Implement the design from our last conversation. Follow the copilot-instructions.md and Follow these rules exactly: 1. Write tests FIRST (TDD) - failing tests before any implementation 2. Implement minimal code to pass each test 3. Production-ready code, not stubs or pseudocode 4. Handle errors explicitly - no silent failures 5. One file at a time, complete each before moving on Start with the first test file now." [ref=e632]': ⚡ Execute Command
+          - generic [ref=e633]:
+            - button "Paste" [ref=e634] [cursor=pointer]:
+              - img [ref=e635]
+              - text: Paste
+            - button "Run" [ref=e638] [cursor=pointer]:
+              - img [ref=e639]
+              - text: Run
+        - generic [ref=e641]:
+          - generic [ref=e642]:
+            - generic [ref=e644]: Ctrl+Shift+5
+            - generic [ref=e645]:
+              - button "Drag to reorder" [ref=e646]:
+                - img [ref=e647]
+              - generic "Edit Command" [ref=e654] [cursor=pointer]:
+                - img [ref=e655]
+              - generic "Delete Command" [ref=e657] [cursor=pointer]:
+                - img [ref=e658]
+          - 'generic "Read and analyze the most recent LLM conversation from the AM (Artificial Memory) system. For the conversation JSON logs: - Location: ~/.forge/am/llm-conv-*.json - Each file contains: conversation turns, screen snapshots, metadata (provider, timestamps) For production logs: - Location: ~/.forge/forge.log (streaming logs from the running instance) - Use: tail -f ~/.forge/forge.log to monitor in real-time - Filter: grep -E \"AM API|LLM Logger|StartConversation\" to find relevant entries Provide a concise summary covering: 1. What was discussed or worked on 2. Key insights or outputs from the conversation 3. Any issues or incomplete tasks 4. Suggested next steps Keep it under 200 words. Be direct and actionable." [ref=e662]': 👀📖 Summarize Last Conversation
+          - generic [ref=e663]:
+            - button "Paste" [ref=e664] [cursor=pointer]:
+              - img [ref=e665]
+              - text: Paste
+            - button "Run" [ref=e668] [cursor=pointer]:
+              - img [ref=e669]
+              - text: Run
+        - generic [ref=e671]:
+          - generic [ref=e672]:
+            - generic [ref=e674]: Ctrl+Shift+7
+            - generic [ref=e675]:
+              - button "Drag to reorder" [ref=e676]:
+                - img [ref=e677]
+              - generic "Edit Command" [ref=e684] [cursor=pointer]:
+                - img [ref=e685]
+              - generic "Delete Command" [ref=e687] [cursor=pointer]:
+                - img [ref=e688]
+          - generic ".\\run-dev.ps1" [ref=e692]: 💥Run Dev Instance
+          - generic [ref=e693]:
+            - button "Paste" [ref=e694] [cursor=pointer]:
+              - img [ref=e695]
+              - text: Paste
+            - button "Run" [ref=e698] [cursor=pointer]:
+              - img [ref=e699]
+              - text: Run
+        - generic [ref=e701]:
+          - generic [ref=e702]:
+            - generic [ref=e704]: Ctrl+Shift+8
+            - generic [ref=e705]:
+              - button "Drag to reorder" [ref=e706]:
+                - img [ref=e707]
+              - generic "Edit Command" [ref=e714] [cursor=pointer]:
+                - img [ref=e715]
+              - generic "Delete Command" [ref=e717] [cursor=pointer]:
+                - img [ref=e718]
+          - generic "cd C:\\ProjectsWin\\jira-automation" [ref=e722]: 🔗Open JiraAutomation Project
+          - generic [ref=e723]:
+            - button "Paste" [ref=e724] [cursor=pointer]:
+              - img [ref=e725]
+              - text: Paste
+            - button "Run" [ref=e728] [cursor=pointer]:
+              - img [ref=e729]
+              - text: Run
+        - generic [ref=e731]:
+          - generic [ref=e732]:
+            - generic [ref=e734]: Ctrl+Shift+9
+            - generic [ref=e735]:
+              - button "Drag to reorder" [ref=e736]:
+                - img [ref=e737]
+              - generic "Edit Command" [ref=e744] [cursor=pointer]:
+                - img [ref=e745]
+              - generic "Delete Command" [ref=e747] [cursor=pointer]:
+                - img [ref=e748]
+          - generic "python app.py" [ref=e752]: ⚡Run Waypoint
+          - generic [ref=e753]:
+            - button "Paste" [ref=e754] [cursor=pointer]:
+              - img [ref=e755]
+              - text: Paste
+            - button "Run" [ref=e758] [cursor=pointer]:
+              - img [ref=e759]
+              - text: Run
+      - status [ref=e761]
+  - button "Forge Assist - Drag to reposition (Ctrl+/)" [ref=e762]:
+    - img [ref=e763]
+  - generic [ref=e767]:
+    - generic [ref=e768]:
+      - img [ref=e770]
+      - heading "Welcome to Forge Terminal! 🔥" [level=3] [ref=e773]
+      - button "Skip tour" [ref=e774] [cursor=pointer]:
+        - img [ref=e775]
+    - paragraph [ref=e778]: A powerful terminal that enhances GitHub Copilot CLI and Claude CLI with intelligent features. Let's take a quick tour of what you can do.
+    - generic [ref=e797]:
+      - button "Skip" [ref=e798] [cursor=pointer]
+      - button "Next" [ref=e799] [cursor=pointer]:
+        - text: Next
+        - img [ref=e800]
+```

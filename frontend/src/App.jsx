@@ -1484,26 +1484,53 @@ function App() {
         {sidebarView === 'cards' ? (
           <>
             <h3>⚡ Commands</h3>
-            <button className="btn btn-primary" onClick={handleAdd}>
-              <Plus size={16} /> Add
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {devMode && (
+                <AMMonitor 
+                  tabId={activeTab?.id || 'no-tab'} 
+                  amEnabled={activeTab?.amEnabled || false}
+                  devMode={devMode}
+                />
+              )}
+              <button className="btn btn-primary" onClick={handleAdd}>
+                <Plus size={16} /> Add
+              </button>
+            </div>
           </>
         ) : sidebarView === 'files' ? (
           <>
             <h3>📁 Files</h3>
-            <span className="sidebar-path-hint">{activeTab?.currentDirectory ? getFolderNameFromPath(activeTab.currentDirectory) : 'Root'}</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {devMode && (
+                <AMMonitor 
+                  tabId={activeTab?.id || 'no-tab'} 
+                  amEnabled={activeTab?.amEnabled || false}
+                  devMode={devMode}
+                />
+              )}
+              <span className="sidebar-path-hint">{activeTab?.currentDirectory ? getFolderNameFromPath(activeTab.currentDirectory) : 'Root'}</span>
+            </div>
           </>
         ) : sidebarView === 'debug' ? (
           <>
             <h3>🐛 Debug</h3>
-            {devMode && (
-              <button 
-                className="btn btn-primary"
-                onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
-              >
-                {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {devMode && (
+                <>
+                  <AMMonitor 
+                    tabId={activeTab?.id || 'no-tab'} 
+                    amEnabled={activeTab?.amEnabled || false}
+                    devMode={devMode}
+                  />
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
+                  >
+                    {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
+                  </button>
+                </>
+              )}
+            </div>
           </>
         ) : null}
       </div>
@@ -1701,16 +1728,6 @@ function App() {
           mode={theme}
           devMode={devMode}
         />
-
-        {/* AM Monitor - Shows LLM activity status in bottom bar */}
-        <div style={{ display: 'flex', gap: '12px', padding: '8px 16px', borderBottom: '1px solid var(--overlay)', alignItems: 'center', background: 'rgba(255,0,0,0.1)' }}>
-          <span style={{ color: 'red', fontSize: '10px' }}>AM Monitor Container (v3.9.2)</span>
-          <AMMonitor 
-            tabId={activeTab?.id || 'no-tab'} 
-            amEnabled={activeTab?.amEnabled || false}
-            devMode={devMode}
-          />
-        </div>
 
         <SearchBar
           isOpen={isSearchOpen}
