@@ -561,10 +561,65 @@
   font-weight: 500;
 }
 
+.lens-feature-category {
+  padding: 2px 8px;
+  background: rgba(255, 230, 109, 0.15);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--lens-warm);
+  font-weight: 500;
+}
+
 .lens-feature-tokens {
   font-size: 12px;
   color: var(--lens-text-dim);
   font-weight: 500;
+}
+
+.lens-feature-description {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--lens-text-dim);
+  line-height: 1.5;
+  border-bottom: 1px solid var(--lens-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.lens-feature-capabilities {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--lens-text-dim);
+  border-bottom: 1px solid var(--lens-border);
+}
+
+.lens-feature-capabilities strong {
+  color: var(--lens-accent);
+  margin-right: 6px;
+}
+
+.lens-feature-endpoints {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--lens-text-dim);
+  border-bottom: 1px solid var(--lens-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lens-feature-endpoints strong {
+  color: var(--lens-accent);
+}
+
+.lens-endpoint {
+  padding: 2px 6px;
+  background: rgba(0, 217, 255, 0.1);
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 11px;
+  color: var(--lens-cart-border);
 }
 
 .lens-feature-files {

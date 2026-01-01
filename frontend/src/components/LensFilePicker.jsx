@@ -378,37 +378,105 @@ const detectFeature = (filePath) => {
 
 // Features Lens - group files by feature/functionality
 const FeaturesLens = ({ files, selectedPaths, onToggle, onOpen }) => {
-  const grouped = useMemo(() => {
-    const groups = {};
-    files.forEach(file => {
-      const feature = detectFeature(file.path);
-      if (!groups[feature]) groups[feature] = [];
-      groups[feature].push(file);
-    });
-    
-    // Sort features by file count (descending)
-    return Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
-  }, [files]);
+  const [featureMap, setFeatureMap] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const currentPath = files.length > 0 ? files[0].path.split('/').slice(0, -1).join('/') : '.';
+
+  useEffect(() => {
+    const fetchFeatures = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/files/analyze?path=${encodeURIComponent(currentPath || '.')}`);
+        if (!res.ok) throw new Error('Feature analysis failed');
+        const data = await res.json();
+        setFeatureMap(data);
+      } catch (err) {
+        console.error('[FeaturesLens] Failed to analyze:', err);
+        setError(err.message);
+        // Fallback to static grouping
+        const fallbackGroups = {};
+        files.forEach(file => {
+          const feature = detectFeature(file.path);
+          if (!fallbackGroups[feature]) fallbackGroups[feature] = [];
+          fallbackGroups[feature].push(file);
+        });
+        setFeatureMap({
+          features: Object.entries(fallbackGroups).map(([name, fileList]) => ({
+            name,
+            files: fileList.map(f => f.path),
+            capabilities: [],
+            apiEndpoints: [],
+            category: name
+          }))
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeatures();
+  }, [currentPath, files]);
+
+  if (loading) {
+    return (
+      <div className="lens-content">
+        <div className="lens-loading">
+          <RefreshCw className="spinning" size={24} />
+          <span>Analyzing codebase features...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !featureMap) {
+    return (
+      <div className="lens-content">
+        <div className="lens-error">
+          <span>Analysis failed: {error}</span>
+          <button onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
+  const features = featureMap?.features || [];
 
   return (
     <div className="lens-content">
-      <div className="lens-subtitle">Files grouped by feature/functionality</div>
+      <div className="lens-subtitle">
+        Features discovered by code analysis
+        {error && <span style={{color: 'var(--lens-warm)', fontSize: '0.85em', marginLeft: '8px'}}>
+          (Using fallback grouping)
+        </span>}
+      </div>
       <div className="lens-features-groups">
-        {grouped.map(([feature, featureFiles]) => {
+        {features.map((feature) => {
+          // Map file paths to file objects
+          const featureFiles = feature.files
+            .map(path => files.find(f => f.path === path || f.path.endsWith(path)))
+            .filter(Boolean);
+          
+          if (featureFiles.length === 0) return null;
+
           const totalTokens = featureFiles.reduce((sum, f) => 
             sum + (f.tokenCount || estimateTokens(f.size || 0)), 0
           );
           const selectedCount = featureFiles.filter(f => selectedPaths.has(f.path)).length;
           
           return (
-            <div key={feature} className="lens-feature-group">
+            <div key={feature.name} className="lens-feature-group">
               <div className="lens-feature-header">
                 <div className="lens-feature-title">
                   <ChevronRight size={14} />
-                  <span className="lens-feature-name">{feature}</span>
+                  <span className="lens-feature-name">{feature.name}</span>
                   <span className="lens-feature-badge">
                     {featureFiles.length} file{featureFiles.length !== 1 ? 's' : ''}
                   </span>
+                  {feature.category && (
+                    <span className="lens-feature-category">{feature.category}</span>
+                  )}
                   {selectedCount > 0 && (
                     <span className="lens-feature-selected">
                       {selectedCount} selected
@@ -419,6 +487,27 @@ const FeaturesLens = ({ files, selectedPaths, onToggle, onOpen }) => {
                   {totalTokens.toLocaleString()} tokens
                 </div>
               </div>
+              
+              {feature.description && (
+                <div className="lens-feature-description">
+                  {feature.description}
+                </div>
+              )}
+              
+              {feature.capabilities && feature.capabilities.length > 0 && (
+                <div className="lens-feature-capabilities">
+                  <strong>Capabilities:</strong> {feature.capabilities.join(', ')}
+                </div>
+              )}
+              
+              {feature.apiEndpoints && feature.apiEndpoints.length > 0 && (
+                <div className="lens-feature-endpoints">
+                  <strong>API:</strong> {feature.apiEndpoints.map(ep => (
+                    <code key={ep} className="lens-endpoint">{ep}</code>
+                  ))}
+                </div>
+              )}
+              
               <div className="lens-feature-files">
                 {featureFiles.map(file => (
                   <FileItem
@@ -433,6 +522,13 @@ const FeaturesLens = ({ files, selectedPaths, onToggle, onOpen }) => {
             </div>
           );
         })}
+        
+        {features.length === 0 && (
+          <div className="lens-empty">
+            <Layers size={32} />
+            <span>No features discovered</span>
+          </div>
+        )}
       </div>
     </div>
   );
