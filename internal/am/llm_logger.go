@@ -594,8 +594,13 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 	defer l.mu.Unlock()
 
 	if l.activeConvID == "" {
+		log.Printf("[LLM Logger] ⚠️ Tab %s: Discarding OUTPUT - no active conversation (%d bytes)",
+			l.tabID, len(rawOutput))
 		return
 	}
+
+	log.Printf("[LLM Logger] Tab %s: AddOutput called for conv %s (%d bytes, tuiMode: %v)",
+		l.tabID, l.activeConvID, len(rawOutput), l.tuiCaptureMode)
 
 	// CRITICAL: Detect if shell prompt returned (LLM TUI exited)
 	// This ends the conversation to prevent unbounded growth
@@ -609,6 +614,7 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 	if l.tuiCaptureMode {
 		l.currentScreen.WriteString(rawOutput)
 		l.lastOutputTime = time.Now()
+		log.Printf("[LLM Logger] Tab %s: TUI buffer size now %d bytes", l.tabID, l.currentScreen.Len())
 
 		// Trigger snapshot on screen clear (event-based trigger)
 		if l.detectScreenClear(rawOutput) {
@@ -623,6 +629,7 @@ func (l *LLMLogger) AddOutput(rawOutput string) {
 	// Traditional line-based capture
 	l.outputBuffer += rawOutput
 	l.lastOutputTime = time.Now()
+	log.Printf("[LLM Logger] Tab %s: Output buffer size now %d bytes", l.tabID, len(l.outputBuffer))
 
 	// v3.5.0: Detect model from output for SLM tracking
 	l.detectModelFromOutput(rawOutput)

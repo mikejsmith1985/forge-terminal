@@ -24,7 +24,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		ChannelSize:     1024,
 		FlushInterval:   5 * time.Second,
 		MaxBufferSize:   8 * 1024, // 8KB
-		EnableDebugLogs: false,
+		EnableDebugLogs: false, // Disabled for production
 	}
 }
 
@@ -283,23 +283,34 @@ func (p *AsyncPipeline) ProcessLoop(amSystem *System) {
 			if !ok {
 				buf = newTabBuffer()
 				buffers[msg.TabID] = buf
+				log.Printf("[AsyncPipeline] Created new buffer for tab %s", msg.TabID)
 			}
 
 			switch msg.Type {
 			case MsgTypeInput:
 				buf.input.Write(msg.Data)
 				buf.lastInput = msg.Timestamp
+				if p.config.EnableDebugLogs {
+					log.Printf("[AsyncPipeline] Tab %s: Buffered INPUT (%d bytes, total: %d)", 
+						msg.TabID, len(msg.Data), buf.input.Len())
+				}
 
 			case MsgTypeOutput:
 				buf.output.Write(msg.Data)
 				buf.lastOutput = msg.Timestamp
+				if p.config.EnableDebugLogs {
+					log.Printf("[AsyncPipeline] Tab %s: Buffered OUTPUT (%d bytes, total: %d)", 
+						msg.TabID, len(msg.Data), buf.output.Len())
+				}
 
 			case MsgTypeCommand:
 				// Process command for LLM detection
+				log.Printf("[AsyncPipeline] Tab %s: Processing COMMAND: %s", msg.TabID, string(msg.Data))
 				p.processCommand(amSystem, msg.TabID, string(msg.Data))
 
 			case MsgTypeEndConversation:
 				// Flush and end conversation
+				log.Printf("[AsyncPipeline] Tab %s: Ending conversation", msg.TabID)
 				p.flushTabBuffer(amSystem, msg.TabID, buf)
 				if logger := amSystem.GetLLMLogger(msg.TabID); logger != nil {
 					logger.EndConversation()
@@ -308,6 +319,8 @@ func (p *AsyncPipeline) ProcessLoop(amSystem *System) {
 
 			// Check if buffer exceeds max size
 			if buf.output.Len() > p.config.MaxBufferSize {
+				log.Printf("[AsyncPipeline] Tab %s: Buffer full (%d bytes), flushing", 
+					msg.TabID, buf.output.Len())
 				p.flushTabBuffer(amSystem, msg.TabID, buf)
 			}
 
@@ -386,6 +399,10 @@ func (p *AsyncPipeline) flushTabBuffer(amSystem *System, tabID string, buf *tabB
 	
 	logger := amSystem.GetLLMLogger(tabID)
 	if logger == nil {
+		if buf.input.Len() > 0 || buf.output.Len() > 0 {
+			log.Printf("[AsyncPipeline] Tab %s: No logger, discarding %d input + %d output bytes",
+				tabID, buf.input.Len(), buf.output.Len())
+		}
 		return
 	}
 	
@@ -413,11 +430,19 @@ func (p *AsyncPipeline) flushTabBuffer(amSystem *System, tabID string, buf *tabB
 	}
 	
 	// Only flush to logger if there's an active conversation
-	if logger.GetActiveConversationID() == "" {
+	activeConvID := logger.GetActiveConversationID()
+	if activeConvID == "" {
+		if buf.input.Len() > 0 || buf.output.Len() > 0 {
+			log.Printf("[AsyncPipeline] Tab %s: No active conversation, discarding %d input + %d output bytes",
+				tabID, buf.input.Len(), buf.output.Len())
+		}
 		buf.input.Reset()
 		buf.output.Reset()
 		return
 	}
+	
+	log.Printf("[AsyncPipeline] Tab %s: Flushing to conversation %s (input: %d bytes, output: %d bytes)",
+		tabID, activeConvID, buf.input.Len(), buf.output.Len())
 	
 	// Check for image context to inject ("whisper")
 	analyzer := GetImageAnalyzer()
@@ -433,6 +458,7 @@ func (p *AsyncPipeline) flushTabBuffer(amSystem *System, tabID string, buf *tabB
 	// Flush input with optional image context
 	if buf.input.Len() > 0 {
 		inputContent := buf.input.String()
+		log.Printf("[AsyncPipeline] Tab %s: Adding USER INPUT (%d bytes)", tabID, len(inputContent))
 		if imageContext != "" {
 			// Prepend image context as a "whisper"
 			logger.AddUserInputWithContext(inputContent, imageContext)
@@ -444,6 +470,7 @@ func (p *AsyncPipeline) flushTabBuffer(amSystem *System, tabID string, buf *tabB
 	
 	// Flush output (using optimized ANSI stripping)
 	if buf.output.Len() > 0 {
+		log.Printf("[AsyncPipeline] Tab %s: Adding ASSISTANT OUTPUT (%d bytes)", tabID, buf.output.Len())
 		logger.AddOutput(buf.output.String())
 		buf.output.Reset()
 	}
