@@ -115,7 +115,7 @@ const TOUR_STEPS = [
     fallbackSelector: '.sidebar-view-tabs',
     title: 'Lens File Picker 🔍',
     content: 'Click "Files" to open the Lens File Picker - an intelligent context builder with four views: 🔥 Heatmap (recent activity), 🎯 Features (AI-powered code analysis - NEW v3.9.2!), 📊 Graph (dependencies), and 🔎 Search (fuzzy find).',
-    placement: 'right',
+    placement: 'left',
     spotlight: true,
     action: 'showFilesTab', // Switch to Files tab
   },
@@ -154,7 +154,7 @@ const TOUR_STEPS = [
     id: 'am-logging',
     selector: '.tab-bar .tab',
     fallbackSelector: '.terminal-pane',
-    title: 'Artificial Memory (AM) 🧠',
+    title: 'Artificial Memory (AM)',
     content: 'AM logs all terminal activity for crash recovery and analysis. Right-click any tab to toggle AM logging. Enable Dev Mode in Settings for advanced AM features.',
     placement: 'bottom',
     spotlight: true,
