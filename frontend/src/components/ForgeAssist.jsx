@@ -440,7 +440,11 @@ export default function ForgeAssist({
       setIsSavingInstructions(true);
       const filename = 'copilot-instructions.md';
       
-      const response = await fetch(`/api/files/read?path=${filename}`);
+      const response = await fetch('/api/files/read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filename })
+      });
       if (response.ok) {
         const data = await response.json();
         setInstructionContent(data.content || '');
@@ -599,46 +603,55 @@ export default function ForgeAssist({
             ))}
           </div>
           
-          {/* Instruction Mode Toggle */}
+          {/* Instruction Mode Toggle - More Visible */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button 
               className={`forge-assist-instruction-toggle ${isInstructionMode ? 'active' : ''}`}
               onClick={toggleInstructionMode}
-              title="Toggle Instruction Mode (append copilot-instructions.md)"
+              title={isInstructionMode 
+                ? "Instruction Mode ON - Custom instructions will be appended to commands" 
+                : "Instruction Mode OFF - Click to enable custom instructions"}
               style={{ 
-                background: isInstructionMode ? 'var(--accent-color, #8b5cf6)' : 'transparent',
-                border: `1px solid ${isInstructionMode ? 'var(--accent-color, #8b5cf6)' : '#444'}`,
-                color: isInstructionMode ? '#fff' : '#aaa',
-                padding: '6px 12px',
+                background: isInstructionMode ? 'var(--accent-color, #8b5cf6)' : '#333',
+                border: `2px solid ${isInstructionMode ? 'var(--accent-color, #8b5cf6)' : '#555'}`,
+                color: isInstructionMode ? '#fff' : '#888',
+                padding: '8px 14px',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '12px',
-                fontWeight: 500,
+                fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
+                transition: 'all 0.2s ease'
               }}
             >
               <FileText size={16} />
-              {isInstructionMode && <span>ON</span>}
+              <span>Instructions</span>
+              {isInstructionMode && <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 700}}>ON</span>}
             </button>
             {isInstructionMode && (
               <button 
                 className="forge-assist-edit-instructions"
                 onClick={openInstructionEditor}
-                title="Edit Instructions"
+                title="Edit your custom instructions (copilot-instructions.md)"
                 style={{
-                  background: 'transparent',
-                  border: '1px solid #444',
+                  background: '#333',
+                  border: '2px solid #555',
                   color: '#aaa',
-                  padding: '6px 10px',
+                  padding: '8px 12px',
                   borderRadius: '6px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
+                  fontSize: '12px',
+                  fontWeight: 500
                 }}
               >
-                <Edit size={14} />
+                <Edit size={16} />
+                <span>Edit</span>
               </button>
             )}
           </div>
@@ -747,9 +760,22 @@ export default function ForgeAssist({
 
         {/* Footer */}
         <div className="forge-assist-footer">
-          <span className="forge-assist-hint">
-            Press <kbd>Esc</kbd> to close • Click to run • <Copy size={12} /> to copy
-          </span>
+          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
+            <span className="forge-assist-hint">
+              Press <kbd>Esc</kbd> to close • Click to run • <Copy size={12} /> to copy
+            </span>
+            <span style={{fontSize: '11px', color: '#666', display: 'flex', alignItems: 'center', gap: '6px'}}>
+              {!isInstructionMode ? (
+                <>
+                  <FileText size={12} /> Tip: Enable Instructions mode to append custom guidelines to commands
+                </>
+              ) : (
+                <>
+                  <span style={{color: 'var(--accent-color, #8b5cf6)', fontWeight: 600}}>✓ Instruction Mode Active</span> - Your custom instructions will be appended
+                </>
+              )}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -761,7 +787,7 @@ export default function ForgeAssist({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.7)',
+          background: 'rgba(0,0,0,0.8)',
           zIndex: 3000,
           display: 'flex',
           alignItems: 'center',
@@ -776,28 +802,33 @@ export default function ForgeAssist({
             borderRadius: '12px',
             display: 'flex',
             flexDirection: 'column',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-            border: '1px solid var(--border-color, #333)'
+            boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+            border: '2px solid var(--accent-color, #8b5cf6)'
           }}>
             <div style={{
-              padding: '16px 20px',
+              padding: '20px',
               borderBottom: '1px solid var(--border-color, #333)',
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center'
+              alignItems: 'flex-start'
             }}>
-              <h3 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#fff'}}>
-                <FileText size={20} style={{color: 'var(--accent-color, #8b5cf6)'}} />
-                Edit Instructions (copilot-instructions.md)
-              </h3>
+              <div>
+                <h3 style={{margin: 0, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontSize: '18px'}}>
+                  <FileText size={24} style={{color: 'var(--accent-color, #8b5cf6)'}} />
+                  Custom Instructions
+                </h3>
+                <p style={{margin: 0, fontSize: '13px', color: '#888'}}>
+                  Edit copilot-instructions.md - These instructions will be appended to every command when Instruction Mode is enabled
+                </p>
+              </div>
               <button 
                 onClick={() => setShowInstructionEditor(false)}
-                style={{background: 'none', border: 'none', color: '#aaa', cursor: 'pointer'}}
+                style={{background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px'}}
               >
                 <X size={24} />
               </button>
             </div>
-            <div style={{flex: 1, padding: '20px', display: 'flex', flexDirection: 'column'}}>
+            <div style={{flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden'}}>
               <textarea
                 value={instructionContent}
                 onChange={(e) => setInstructionContent(e.target.value)}
@@ -810,10 +841,21 @@ export default function ForgeAssist({
                   color: '#fff',
                   fontFamily: 'monospace',
                   fontSize: '14px',
+                  lineHeight: '1.6',
                   resize: 'none',
                   outline: 'none'
                 }}
-                placeholder="# Copilot Instructions\n\nAdd your custom instructions here...\nThese will be appended to every command when Instruction Mode is enabled."
+                placeholder="# Custom Instructions for Copilot
+
+Write your instructions here. They will be appended to every Forge Power Feature command when Instruction Mode is enabled.
+
+Examples:
+- Code style preferences
+- Project-specific conventions
+- Architectural guidelines
+- Testing requirements
+
+These instructions are saved to copilot-instructions.md in your project."
               />
             </div>
             <div style={{
@@ -826,13 +868,17 @@ export default function ForgeAssist({
               <button 
                 onClick={() => setShowInstructionEditor(false)}
                 style={{
-                  padding: '8px 16px',
+                  padding: '10px 20px',
                   borderRadius: '6px',
                   border: '1px solid var(--border-color, #333)',
                   background: 'transparent',
                   color: '#aaa',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.2s ease'
                 }}
+                onMouseOver={(e) => e.target.style.background = '#222'}
+                onMouseOut={(e) => e.target.style.background = 'transparent'}
               >
                 Cancel
               </button>
@@ -840,20 +886,22 @@ export default function ForgeAssist({
                 onClick={saveInstructions}
                 disabled={isSavingInstructions}
                 style={{
-                  padding: '8px 16px',
+                  padding: '10px 24px',
                   borderRadius: '6px',
                   border: 'none',
                   background: 'var(--accent-color, #8b5cf6)',
                   color: 'white',
-                  cursor: 'pointer',
+                  cursor: isSavingInstructions ? 'not-allowed' : 'pointer',
+                  fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  opacity: isSavingInstructions ? 0.7 : 1
+                  opacity: isSavingInstructions ? 0.7 : 1,
+                  transition: 'all 0.2s ease'
                 }}
               >
                 {isSavingInstructions ? <Loader2 size={16} style={{animation: 'spin 1s linear infinite'}} /> : <Save size={16} />}
-                Save Changes
+                {isSavingInstructions ? 'Saving...' : 'Save Instructions'}
               </button>
             </div>
           </div>

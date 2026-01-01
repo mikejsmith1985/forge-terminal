@@ -149,16 +149,8 @@ func main() {
 		log.Printf("[SLM] Engine initialized: provider=%s, model=%s", status.ActiveProvider, status.ModelID)
 	}
 
-	// v3.5.1: Initialize Chat Store (SQLite-backed persistent chat)
-	// forgeDir already declared at top of main() for lockfile
-	if err := initChatStore(forgeDir); err != nil {
-		log.Printf("[Chat] Warning: failed to initialize chat store: %v", err)
-	} else {
-		log.Printf("[Chat] Store initialized at %s/chat/chat.db", forgeDir)
-	}
-
-	// v3.5.1: Initialize Chat Bridge (syncs AM events to Chat)
-	initChatBridge()
+	// v3.9.6: ChatView and Chat Store removed - functionality moved to Forge Assist
+	// Chat bridge initialization removed
 
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
