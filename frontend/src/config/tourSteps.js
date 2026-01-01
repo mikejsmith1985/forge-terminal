@@ -132,7 +132,7 @@ const TOUR_STEPS = [
     selector: '.sidebar-view-tab:nth-child(2)',
     fallbackSelector: '.sidebar-view-tabs',
     title: 'Lens File Picker 🔍',
-    content: 'Click "Files" to open the Lens File Picker - an intelligent context builder with four views: 🔥 Heatmap (recent activity), 📐 Features (grouped by functionality), 📊 Graph (dependencies), and 🔎 Search (fuzzy find).',
+    content: 'Click "Files" to open the Lens File Picker - an intelligent context builder with four views: 🔥 Heatmap (recent activity), 🎯 Features (AI-powered code analysis - NEW v3.9.2!), 📊 Graph (dependencies), and 🔎 Search (fuzzy find).',
     placement: 'right',
     spotlight: true,
     action: 'showFilesTab', // Switch to Files tab
@@ -142,7 +142,7 @@ const TOUR_STEPS = [
     selector: '.lens-file-picker, .lens-context-cart',
     fallbackSelector: '.sidebar-content',
     title: 'Features View & Context Cart 🛒',
-    content: 'The Features view automatically groups files by functionality (Auth, Terminal, etc.) - perfect for understanding feature scope! Select files to add to your Context Cart with real-time token counting (128k budget).',
+    content: 'The Features view uses AI-powered code analysis to automatically group files by functionality. Forge scans your codebase and discovers features with their capabilities and API endpoints - perfect for understanding ANY project! Select files to add to your Context Cart with real-time token counting (128k budget).',
     placement: 'left',
     spotlight: true,
   },
@@ -208,7 +208,7 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '3.9.0'; // v3.9.0: Workflows removed, Forge Assist + Task Mode + SLM
+const TOUR_VERSION = '3.9.2'; // v3.9.2: Dynamic feature mapping with AI-powered code analysis
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
 
