@@ -13,7 +13,6 @@
  * - File Explorer (Lens)
  * - AM (Artificial Memory)
  * - Smart Model Selection with SLM
- * - Forge Assist with Task Mode (NEW v3.9.0)
  * - CLI Configuration (Copilot/Claude)
  * - Budget & Intelligence
  * 
@@ -40,15 +39,7 @@ const TOUR_STEPS = [
     placement: 'left',
     spotlight: true,
   },
-  {
-    id: 'smart-routing',
-    selector: '.terminal-container',
-    fallbackSelector: '.terminal-outer-container',
-    title: 'Smart Model Selection 🎯',
-    content: 'Type "?" before any prompt to use Smart Routing. Forge analyzes your task intent (debug, refactor, generate, etc.) and complexity to automatically select the best model: Haiku for simple tasks, Sonnet for medium, Opus for complex architecture.',
-    placement: 'left',
-    spotlight: true,
-  },
+
   {
     id: 'tabs',
     selector: '.tab-bar',
@@ -89,17 +80,7 @@ const TOUR_STEPS = [
     action: 'switchToTaskMode', // Switches Forge Assist to Task mode
     requiresOpen: 'forgeAssist',
   },
-  {
-    id: 'forge-assist-slm',
-    selector: '.forge-assist-slm-badge',
-    fallbackSelector: '.forge-assist-modal',
-    title: 'SLM-Powered Suggestions 🧠',
-    content: 'When you see the "🧠 SLM" badge, your local AI is active! It analyzes prompts to provide intelligent suggestions. If you see "Enable SLM", go to Settings → Intelligence to install the free local AI (~150MB).',
-    placement: 'bottom',
-    spotlight: true,
-    requiresOpen: 'forgeAssist',
-    action: 'closeForgeAssist', // Close after this step
-  },
+
   {
     id: 'command-cards',
     selector: '.command-cards-container, .commands-panel, .sidebar-content',
@@ -156,16 +137,7 @@ const TOUR_STEPS = [
     spotlight: true,
     action: 'openSettings', // Opens Settings modal
   },
-  {
-    id: 'settings-intelligence',
-    selector: '.settings-modal, .modal-content',
-    fallbackSelector: '.modal-overlay',
-    title: 'Intelligence & SLM Setup 🧠',
-    content: 'The Intelligence tab shows Smart Routing status. If not installed, click "Install Smart Routing" to download the free local AI (~150MB). Or install Ollama for faster analysis. This powers Forge Assist suggestions!',
-    placement: 'right',
-    spotlight: true,
-    requiresOpen: 'settings',
-  },
+
   {
     id: 'settings-cli',
     selector: '.settings-modal, .modal-content',
@@ -200,7 +172,7 @@ const TOUR_STEPS = [
     selector: null,
     fallbackPosition: 'center',
     title: 'You\'re Ready! 🚀',
-    content: 'Try these features: Ctrl+/ for Forge Assist (Tab for Task Mode!), "? your task" for Smart Routing, or browse files in the Files tab. Replay this tour anytime from Settings → Shell.',
+    content: 'Try these features: Ctrl+/ for Forge Assist (Tab for Task Mode!), browse files in the Files tab with the new Features view, or right-click tabs for AM logging. Replay this tour anytime from Settings → Shell.',
     placement: 'center',
     spotlight: false,
     isFinal: true,
