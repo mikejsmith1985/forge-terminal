@@ -79,6 +79,7 @@ const TOUR_STEPS = [
     spotlight: true,
     action: 'switchToTaskMode', // Switches Forge Assist to Task mode
     requiresOpen: 'forgeAssist',
+    action: 'closeForgeAssist', // Close Forge Assist after showing Task mode
   },
 
   {
