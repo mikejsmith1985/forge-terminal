@@ -62,9 +62,6 @@ func SecureHeaders(next http.HandlerFunc) http.HandlerFunc {
 		// Content Security Policy - allow external resources but prevent inline scripts
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss:;")
 
-		// Prevent MIME type sniffing
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
 		next(w, r)
 	}
 }
