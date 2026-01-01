@@ -115,6 +115,45 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     if (hasConversations) return `${conversations.length} log${conversations.length !== 1 ? 's' : ''}`;
     return 'AM Ready';
   };
+  
+  // Build detailed tooltip
+  const getDetailedTooltip = () => {
+    if (!status) return statusText;
+    
+    let tooltip = `${status.statusText}\n\n`;
+    
+    // Add detailed reason if available
+    if (status.detailedReason) {
+      tooltip += `Status: ${status.detailedReason}\n\n`;
+    }
+    
+    // Add redundancy system status
+    if (status.redundancy) {
+      tooltip += `Redundancy Systems:\n`;
+      tooltip += `  Primary Layer: ${status.redundancy.primaryLayerOk ? '✓ OK' : '✗ Down'}\n`;
+      tooltip += `  Native Recovery: ${status.redundancy.nativeSessionOk ? '✓ OK' : '✗ Down'}\n`;
+      tooltip += `  Periodic Capture: ${status.redundancy.periodicCaptureOk ? '✓ OK' : '✗ Down'}\n`;
+      tooltip += `  Health Monitor: ${status.redundancy.healthMonitorOk ? '✓ OK' : '✗ Down'}\n\n`;
+    }
+    
+    // Add native session info
+    if (status.nativeRecoveryOk) {
+      tooltip += `Native Sessions: ${status.nativeSessionCount} detected\n`;
+    } else {
+      tooltip += `Native Sessions: Recovery system offline\n`;
+    }
+    
+    // Add capture metrics
+    if (status.turnsCaptured > 0) {
+      tooltip += `\nCapture Stats:\n`;
+      tooltip += `  Turns: ${status.turnsCaptured}\n`;
+      if (status.secondsSinceCapture !== undefined) {
+        tooltip += `  Last: ${status.secondsSinceCapture}s ago\n`;
+      }
+    }
+    
+    return tooltip;
+  };
 
   const handleClick = () => {
     if (hasConversations) {
@@ -126,7 +165,7 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     <>
       <div 
         className={`am-monitor ${statusClass} ${hasConversations ? 'clickable' : ''}`} 
-        title={statusText}
+        title={getDetailedTooltip()}
         onClick={hasConversations ? handleClick : undefined}
         style={{ cursor: hasConversations ? 'pointer' : 'default' }}
       >

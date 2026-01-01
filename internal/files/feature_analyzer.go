@@ -230,29 +230,104 @@ func groupIntoFeatures(files map[string]FileInfo) []FeatureDefinition {
 
 // inferFeatureName guesses feature name from file path and exports
 func inferFeatureName(path string, info FileInfo) string {
-	// Try to get from directory name
-	parts := strings.Split(filepath.ToSlash(path), "/")
+	normalized := strings.ToLower(filepath.ToSlash(path))
+	base := filepath.Base(path)
+	nameWithoutExt := strings.TrimSuffix(base, filepath.Ext(base))
 	
-	for i := len(parts) - 1; i >= 0; i-- {
+	// First, try specific filename patterns that indicate distinct features
+	// CLI-related files
+	if strings.Contains(nameWithoutExt, "cli") && !strings.Contains(nameWithoutExt, "config") {
+		return "CLI"
+	}
+	
+	// Playwright testing
+	if strings.Contains(nameWithoutExt, "playwright") {
+		return "Playwright Testing"
+	}
+	
+	// System Cards
+	if strings.Contains(strings.ToUpper(nameWithoutExt), "SYSTEM_CARDS") {
+		return "System Cards"
+	}
+	
+	// Settings View/Panel components (distinct from general config)
+	if strings.Contains(nameWithoutExt, "Settings") && 
+	   (strings.Contains(nameWithoutExt, "View") || strings.Contains(nameWithoutExt, "Panel") || strings.Contains(nameWithoutExt, "Component")) {
+		return "Settings UI"
+	}
+	
+	// Router handlers
+	if strings.Contains(nameWithoutExt, "router") {
+		return "Routing"
+	}
+	
+	// Handler files by type
+	if strings.HasPrefix(nameWithoutExt, "handler") || strings.HasPrefix(nameWithoutExt, "handlers_") {
+		// Extract the handler type: handlers_cli_config -> CLI Config
+		parts := strings.Split(nameWithoutExt, "_")
+		if len(parts) >= 2 {
+			// Skip "handler" or "handlers" prefix
+			typeParts := parts[1:]
+			for i, p := range typeParts {
+				typeParts[i] = strings.Title(p)
+			}
+			return strings.Join(typeParts, " ")
+		}
+	}
+	
+	// Directory-based detection (with more specific paths)
+	parts := strings.Split(normalized, "/")
+	
+	// Look for meaningful directory segments (from most specific to least)
+	meaningfulDirs := []string{}
+	for i := len(parts) - 2; i >= 0; i-- { // -2 to skip filename
 		dir := parts[i]
-		if dir == "internal" || dir == "cmd" || dir == "src" || dir == "components" {
+		// Skip generic container directories
+		if dir == "internal" || dir == "cmd" || dir == "src" || 
+		   dir == "components" || dir == "pkg" || dir == "lib" ||
+		   dir == "." || dir == "" {
 			continue
 		}
-		if strings.Contains(dir, "_") {
-			// snake_case to Title Case
-			words := strings.Split(dir, "_")
-			for j, w := range words {
-				words[j] = strings.Title(w)
-			}
-			return strings.Join(words, " ")
+		meaningfulDirs = append(meaningfulDirs, dir)
+		if len(meaningfulDirs) >= 2 {
+			break // Take up to 2 levels
 		}
-		return strings.Title(dir)
+	}
+	
+	// Build feature name from meaningful directories
+	if len(meaningfulDirs) > 0 {
+		// Reverse to get parent -> child order
+		for i, j := 0, len(meaningfulDirs)-1; i < j; i, j = i+1, j-1 {
+			meaningfulDirs[i], meaningfulDirs[j] = meaningfulDirs[j], meaningfulDirs[i]
+		}
+		
+		// Convert to title case
+		for i, d := range meaningfulDirs {
+			if strings.Contains(d, "_") {
+				words := strings.Split(d, "_")
+				for j, w := range words {
+					words[j] = strings.Title(w)
+				}
+				meaningfulDirs[i] = strings.Join(words, " ")
+			} else {
+				meaningfulDirs[i] = strings.Title(d)
+			}
+		}
+		
+		return strings.Join(meaningfulDirs, " / ")
 	}
 
-	// Fallback: use base filename
-	base := filepath.Base(path)
-	name := strings.TrimSuffix(base, filepath.Ext(base))
-	return strings.Title(strings.ReplaceAll(name, "_", " "))
+	// Fallback: use base filename with smart formatting
+	if strings.Contains(nameWithoutExt, "_") {
+		words := strings.Split(nameWithoutExt, "_")
+		for i, w := range words {
+			words[i] = strings.Title(w)
+		}
+		return strings.Join(words, " ")
+	}
+	
+	// Final fallback
+	return strings.Title(nameWithoutExt)
 }
 
 // inferCapability derives capability description from export name

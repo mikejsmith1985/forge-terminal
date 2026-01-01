@@ -38,30 +38,52 @@ type Handler struct {
 // connWriter wraps a websocket.Conn with a mutex for thread-safe writes.
 // gorilla/websocket requires that only one goroutine calls write methods at a time.
 type connWriter struct {
-	conn *websocket.Conn
-	mu   sync.Mutex
+	conn   *websocket.Conn
+	mu     sync.Mutex
+	closed atomic.Bool
 }
 
 func (cw *connWriter) WriteMessage(messageType int, data []byte) error {
+	if cw.closed.Load() {
+		return fmt.Errorf("connection closed")
+	}
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
-	// Set write deadline to prevent indefinite blocking
-	_ = cw.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	return cw.conn.WriteMessage(messageType, data)
+	// Increase deadline to 30s to handle slow clients without crashing
+	_ = cw.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+	err := cw.conn.WriteMessage(messageType, data)
+	if err != nil {
+		cw.closed.Store(true) // Mark as closed on any error
+	}
+	return err
 }
 
 func (cw *connWriter) WriteJSON(v interface{}) error {
+	if cw.closed.Load() {
+		return fmt.Errorf("connection closed")
+	}
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
-	// Set write deadline to prevent indefinite blocking
-	_ = cw.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	return cw.conn.WriteJSON(v)
+	// Increase deadline to 30s to handle slow clients without crashing
+	_ = cw.conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+	err := cw.conn.WriteJSON(v)
+	if err != nil {
+		cw.closed.Store(true) // Mark as closed on any error
+	}
+	return err
 }
 
 func (cw *connWriter) WriteControl(messageType int, data []byte, deadline time.Time) error {
+	if cw.closed.Load() {
+		return fmt.Errorf("connection closed")
+	}
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
 	return cw.conn.WriteControl(messageType, data, deadline)
+}
+
+func (cw *connWriter) markClosed() {
+	cw.closed.Store(true)
 }
 
 // ResizeMessage represents a terminal resize request from the client.
@@ -188,6 +210,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Wrap connection for thread-safe writes
 	// gorilla/websocket is NOT thread-safe for concurrent writes
 	conn := &connWriter{conn: rawConn}
+	defer conn.markClosed() // Ensure closed flag is set on exit
 
 	// Parse shell config from query params
 	query := r.URL.Query()
@@ -454,12 +477,14 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		// Send to WebSocket
 		// Note: conn.WriteJSON is thread-safe via mutex
-		conn.WriteJSON(map[string]interface{}{
+		if err := conn.WriteJSON(map[string]interface{}{
 			"type":      event.Type,
 			"timestamp": event.Timestamp,
 			"metadata":  event.Metadata,
 			"tabId":     event.TabID,
-		})
+		}); err != nil {
+			log.Printf("[Terminal] Failed to send AM event: %v", err)
+		}
 	})
 	defer unsubscribe()
 
@@ -562,7 +587,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 							OverlayType: match.Type,
 							Payload:     match.Payload,
 						}
-						conn.WriteJSON(overlayMsg) // Best effort, ignore errors
+						// Best effort write - log error but don't crash
+						if err := conn.WriteJSON(overlayMsg); err != nil {
+							log.Printf("[Terminal] Vision overlay write failed: %v", err)
+						}
 					}
 				}
 

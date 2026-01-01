@@ -980,7 +980,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           } catch (itemsErr) {
             console.error('[Terminal] Clipboard read failed:', itemsErr);
             if (xtermRef.current) {
-              xtermRef.current.write(`\x1b[31m[Paste failed: ${itemsErr.message}]\x1b[0m\r\n`);
+              // Check if it's a permission error
+              if (itemsErr.name === 'NotAllowedError' || itemsErr.message.includes('permission')) {
+                xtermRef.current.write(`\x1b[31m[Paste failed: Browser clipboard permission denied. Try right-click paste or focus this tab first.]\x1b[0m\r\n`);
+              } else {
+                xtermRef.current.write(`\x1b[31m[Paste failed: ${itemsErr.message}]\x1b[0m\r\n`);
+              }
             }
           }
         })();

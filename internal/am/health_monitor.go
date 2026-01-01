@@ -3,6 +3,7 @@ package am
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -43,6 +44,15 @@ type NativeSessionHealth struct {
 	RecoverableSessions int       `json:"recoverableSessions"`
 	MostRecentSession   *NativeSession `json:"mostRecentSession,omitempty"`
 	LastScanTime        time.Time `json:"lastScanTime"`
+}
+
+// RedundancySystemStatus represents the status of redundant capture systems
+type RedundancySystemStatus struct {
+	PrimaryLayerOk      bool      `json:"primaryLayerOk"`      // LLM Logger active
+	NativeSessionOk     bool      `json:"nativeSessionOk"`     // Native Copilot/Claude session files
+	PeriodicCaptureOk   bool      `json:"periodicCaptureOk"`   // Periodic PTY snapshots
+	LastPeriodicCapture time.Time `json:"lastPeriodicCapture,omitempty"`
+	HealthMonitorOk     bool      `json:"healthMonitorOk"`     // This health system itself
 }
 
 // HealthMonitor tracks the health of the AM capture pipeline.
@@ -321,14 +331,20 @@ func (hm *HealthMonitor) RecordPTYHeartbeat() {
 // TabCaptureStatus represents the capture status for a specific tab.
 // v3.9.1: Used by frontend to show accurate 3-state AM indicator.
 type TabCaptureStatus struct {
-	TabID              string    `json:"tabId"`
-	Status             string    `json:"status"` // "active", "disabled", "broken"
-	StatusText         string    `json:"statusText"`
-	IsCapturing        bool      `json:"isCapturing"`
-	HasActiveConv      bool      `json:"hasActiveConversation"`
-	LastCaptureTime    time.Time `json:"lastCaptureTime,omitempty"`
-	SecondsSinceCapture int64    `json:"secondsSinceCapture,omitempty"`
-	TurnsCaptured      int       `json:"turnsCaptured"`
+	TabID               string                  `json:"tabId"`
+	Status              string                  `json:"status"` // "active", "disabled", "broken"
+	StatusText          string                  `json:"statusText"`
+	DetailedReason      string                  `json:"detailedReason,omitempty"` // Specific error/status reason
+	IsCapturing         bool                    `json:"isCapturing"`
+	HasActiveConv       bool                    `json:"hasActiveConversation"`
+	LastCaptureTime     time.Time               `json:"lastCaptureTime,omitempty"`
+	SecondsSinceCapture int64                   `json:"secondsSinceCapture,omitempty"`
+	TurnsCaptured       int                     `json:"turnsCaptured"`
+	
+	// Redundancy & Recovery Systems
+	RedundancyStatus    *RedundancySystemStatus `json:"redundancy,omitempty"`
+	NativeRecoveryOk    bool                    `json:"nativeRecoveryOk"`
+	NativeSessionCount  int                     `json:"nativeSessionCount"`
 }
 
 // GetTabCaptureStatus returns capture status for a specific tab.
@@ -344,15 +360,26 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 	if !amEnabled {
 		status.Status = "disabled"
 		status.StatusText = "AM Logging is Disabled for this tab"
+		status.DetailedReason = "User toggled AM off for this tab"
 		return status
 	}
+	
+	// Check redundancy systems
+	redundancy := hm.getRedundancyStatus()
+	status.RedundancyStatus = redundancy
+	
+	// Check native session recovery
+	nativeSessions, err := hm.nativeMonitor.GetRecentSessions(5)
+	status.NativeRecoveryOk = err == nil
+	status.NativeSessionCount = len(nativeSessions)
 
 	// Check if there's an active conversation for this tab
 	logger := GetLLMLoggerIfExists(tabID)
 	if logger == nil {
 		// No logger yet - that's OK, waiting for LLM activity
 		status.Status = "active"
-		status.StatusText = "AM Logging is Active in this tab"
+		status.StatusText = "AM Ready (waiting for LLM activity)"
+		status.DetailedReason = "No LLM conversation detected yet. Primary layer idle, native recovery monitoring active."
 		status.IsCapturing = false
 		return status
 	}
@@ -361,7 +388,8 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 	if conv == nil {
 		// Logger exists but no active conversation - idle but ready
 		status.Status = "active"
-		status.StatusText = "AM Logging is Active in this tab"
+		status.StatusText = "AM Ready (no active conversation)"
+		status.DetailedReason = "Logger initialized. Waiting for LLM command (gh copilot, claude, etc)."
 		status.IsCapturing = false
 		return status
 	}
@@ -397,7 +425,8 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 	// If we have at least 1 user turn, we're successfully capturing
 	if userTurns > 0 {
 		status.Status = "active"
-		status.StatusText = "AM Logging is Active in this tab"
+		status.StatusText = "AM Logging Active & Capturing"
+		status.DetailedReason = fmt.Sprintf("Successfully captured %d user turns, %d assistant turns. All systems operational.", userTurns, assistantTurns)
 		status.IsCapturing = status.SecondsSinceCapture < 30 // Recent activity within 30s
 		return status
 	}
@@ -407,7 +436,8 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 	conversationAge := time.Since(conv.StartTime).Seconds()
 	if conversationAge < 60 && totalTurns > 0 {
 		status.Status = "active"
-		status.StatusText = "AM Logging is Active in this tab"
+		status.StatusText = "AM Logging Starting..."
+		status.DetailedReason = fmt.Sprintf("Conversation detected %.0fs ago. Waiting for turn parsing. %d raw turns seen.", conversationAge, totalTurns)
 		status.IsCapturing = true
 		return status
 	}
@@ -415,7 +445,8 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 	// Only mark as broken if conversation is old (> 60s) with no user/assistant turns
 	if conversationAge > 60 && userTurns == 0 && assistantTurns == 0 {
 		status.Status = "broken"
-		status.StatusText = "AM Logging is enabled but not capturing data"
+		status.StatusText = "AM Not Capturing Turns"
+		status.DetailedReason = fmt.Sprintf("ISSUE: Conversation active for %.0fs but captured 0 user/assistant turns. Native recovery: %v. Check LLM parser or native session detection.", conversationAge, status.NativeRecoveryOk)
 		status.IsCapturing = false
 		log.Printf("[Health] Tab %s BROKEN: %d turns but no user/assistant turns after %.0fs",
 			tabID, totalTurns, conversationAge)
@@ -424,8 +455,38 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 
 	// Default to active - optimistic approach
 	status.Status = "active"
-	status.StatusText = "AM Logging is Active in this tab"
+	status.StatusText = "AM Logging Active"
+	status.DetailedReason = fmt.Sprintf("%d user turns, %d assistant turns captured. System healthy.", userTurns, assistantTurns)
 	status.IsCapturing = status.SecondsSinceCapture < 30
+	
+	return status
+}
+
+// getRedundancyStatus checks all redundant capture systems
+func (hm *HealthMonitor) getRedundancyStatus() *RedundancySystemStatus {
+	hm.mutex.RLock()
+	defer hm.mutex.RUnlock()
+	
+	status := &RedundancySystemStatus{
+		HealthMonitorOk: true, // If this code is running, health monitor is OK
+	}
+	
+	// Check primary layer (LLM Logger)
+	// Consider it OK if we've captured anything OR system is new (< 5 min)
+	status.PrimaryLayerOk = hm.metrics.ConversationsComplete > 0 || 
+		hm.metrics.ConversationsActive > 0 ||
+		time.Since(hm.startTime) < 5*time.Minute
+	
+	// Check native session recovery
+	nativeSessions, err := hm.nativeMonitor.GetRecentSessions(1)
+	status.NativeSessionOk = err == nil && len(nativeSessions) > 0
+	
+	// Check periodic capture - look for recent snapshots
+	// This is based on whether we've captured any snapshots
+	status.PeriodicCaptureOk = hm.metrics.SnapshotsCaptured > 0
+	if !hm.metrics.LastCaptureTime.IsZero() {
+		status.LastPeriodicCapture = hm.metrics.LastCaptureTime
+	}
 	
 	return status
 }
