@@ -120,8 +120,9 @@ const AUTO_RESPOND_EXCLUSION_PATTERNS = [
   /Select an option/i,
   /Choose an option/i,
   /Pick.*:/i,
-  // Multiple numbered options that aren't yes/no
-  /\d+\.\s*[a-z].*\n.*\d+\.\s*[a-z]/i, // Multiple numbered text options
+  // Multiple numbered options with 3+ items (not just Yes/No which has 2)
+  // This detects lists like "1. Option A\n2. Option B\n3. Option C"
+  /\d+\.\s*\S+.*\n.*\d+\.\s*\S+.*\n.*\d+\.\s*\S+/i,
 ];
 
 // Y/N style prompts: These expect typing 'y' or 'n' then Enter
@@ -1078,24 +1079,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         
         // Try to read from clipboard directly
         (async () => {
-          try {
-            // First try to read text (most common, fastest)
-            const text = await navigator.clipboard.readText();
-            if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              console.log('[Terminal] Pasting text from clipboard:', text.length, 'chars');
-              wsRef.current.send(text);
-              if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
-              return;
-            }
-          } catch (textErr) {
-            console.log('[Terminal] Text read failed, trying clipboard items:', textErr.message);
-          }
-          
-          // Try to read items (for images and videos)
+          // PRIORITY: Check for images/videos FIRST (they're the special case)
           try {
             const items = await navigator.clipboard.read();
             for (const item of items) {
-              // Check for images or videos
+              // Check for images or videos FIRST - these need special upload handling
               const imageType = item.types.find(t => t.startsWith('image/'));
               const videoType = item.types.find(t => t.startsWith('video/'));
               const mediaType = imageType || videoType;
@@ -1216,6 +1204,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           } catch (itemsErr) {
             console.error('[Terminal] Clipboard read failed:', itemsErr);
+            
+            // Fallback: Try to read text using readText() API
+            try {
+              const text = await navigator.clipboard.readText();
+              if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                console.log('[Terminal] Pasting text via fallback readText():', text.length, 'chars');
+                wsRef.current.send(text);
+                if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
+                return;
+              }
+            } catch (fallbackErr) {
+              console.error('[Terminal] Fallback text read also failed:', fallbackErr);
+            }
+            
             if (xtermRef.current) {
               // Check if it's a permission error
               if (itemsErr.name === 'NotAllowedError' || itemsErr.message.includes('permission')) {

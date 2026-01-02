@@ -1,12 +1,70 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>WebSocket Fix v3.9.8</title>
-<style>*{margin:0;padding:0}body{background:#0d1117;color:#c9d1d9;font-family:system-ui;padding:20px}h1{color:#58a6ff;font-size:2em}h2{color:#f0883e;margin:20px 0 10px}.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin:16px 0}.critical{border:2px solid #ef4444}.success{border:2px solid #238636}.code{background:#0d1117;padding:12px;border-radius:6px;font-family:monospace}.add{color:#7ee787}.del{color:#f85149}ul{padding-left:20px}.badge{background:#238636;color:#fff;padding:3px 10px;border-radius:12px;font-size:0.9em;margin-left:10px}</style>
+<html><head><meta charset="UTF-8"><title>UI Bug Fixes</title>
+<style>*{margin:0;padding:0}body{background:#0d1117;color:#c9d1d9;font-family:system-ui;padding:20px}h1{color:#58a6ff;font-size:2em}h2{color:#f0883e;margin:20px 0 10px}.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin:16px 0}.critical{border:2px solid #ef4444}.success{border:2px solid #238636}.code{background:#0d1117;padding:12px;border-radius:6px;font-family:monospace;white-space:pre;font-size:12px}.add{color:#7ee787}.del{color:#f85149}ul{padding-left:20px;list-style:none}.badge{background:#238636;color:#fff;padding:3px 10px;border-radius:12px;font-size:0.9em;margin-left:10px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:768px){.grid{grid-template-columns:1fr}}</style>
 </head><body>
-<h1>🔧 WebSocket Stability<span class="badge">FIXED</span></h1>
-<div class="card critical"><h2>Root Cause</h2><div class="code"><span class="del">PTY read: 9m42s blocking
-WebSocket timeout</span></div></div>
-<div class="card success"><h2>Solution</h2><div class="code"><span class="add">30s watchdog timer
-Force close on hang</span></div></div>
-<div class="card success"><h2>v3.9.8 Complete</h2><ul><li>Quick Instructions</li><li>Auto-respond fix</li><li>Paste fallback</li><li>AM Monitor</li><li>PTY watchdog</li></ul></div>
-<div class="card"><h2>Status</h2><ul><li>✓ Builds pass</li><li>✓ 50+ sessions cleaned</li><li>✓ Watchdog active</li></ul></div>
+<h1>🔧 UI Bug Fixes<span class="badge">APPLIED</span></h1>
+
+<div class="card critical"><h2>🐛 Issues Reported</h2>
+<ul>
+<li>❌ Quick Instructions modal closes on input click</li>
+<li>❌ Feedback submission says PAT is invalid</li>
+<li>❌ Ctrl+V paste for images/videos broken</li>
+</ul></div>
+
+<div class="grid">
+<div class="card success"><h2>✅ Quick Instructions Fix</h2>
+<div class="code"><span class="del">// Old: Rendered inside ForgeAssist
+{showQuickInstructionsPanel && (
+  &lt;div ...&gt;</span>
+<span class="add">// New: Use React Portal
+import { createPortal } from 'react-dom';
+{showQuickInstructionsPanel && createPortal(
+  &lt;div ...&gt;,
+  document.body
+)}</span></div>
+<p style="margin-top:10px;font-size:12px">Portal renders OUTSIDE ForgeAssist DOM tree, preventing click bubbling</p>
+</div>
+
+<div class="card success"><h2>✅ GitHub PAT Fix</h2>
+<div class="code"><span class="del">// Old: Classic token format only
+'Authorization': `token ${githubToken}`</span>
+<span class="add">// New: Support fine-grained PATs
+const authHeader = githubToken.startsWith('github_pat_') 
+  ? `Bearer ${githubToken}` 
+  : `token ${githubToken}`;
+headers: {
+  'Authorization': authHeader,
+  'X-GitHub-Api-Version': '2022-11-28',
+}</span></div>
+</div>
+
+<div class="card success"><h2>✅ Clipboard Paste Fix</h2>
+<div class="code"><span class="del">// Old: Text checked first (breaks image paste)
+1. readText() → success → return
+2. read() → images (never reached)</span>
+<span class="add">// New: Check media FIRST
+1. read() → check image/video types FIRST
+2. If media found → upload → return
+3. Else check text types
+4. Fallback to readText()</span></div>
+</div>
+
+<div class="card success"><h2>✅ Instruction Manager Fix</h2>
+<p style="margin:10px 0">Same Portal fix applied to prevent click bubbling</p>
+</div>
+</div>
+
+<div class="card"><h2>📁 Files Changed</h2>
+<ul>
+<li>✓ frontend/src/components/ForgeAssist.jsx - Portal for modals</li>
+<li>✓ frontend/src/components/FeedbackModal.jsx - GitHub auth headers</li>
+<li>✓ frontend/src/components/ForgeTerminal.jsx - Clipboard paste order</li>
+</ul></div>
+
+<div class="card"><h2>📋 Next Steps</h2>
+<ol style="padding-left:20px">
+<li>Test Quick Instructions modal - click inputs, verify stays open</li>
+<li>Test Feedback with fine-grained PAT (github_pat_...)</li>
+<li>Test Ctrl+V paste of screenshot/image</li>
+</ol></div>
 </body></html>

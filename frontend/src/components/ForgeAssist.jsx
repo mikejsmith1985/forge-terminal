@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Search, X, Copy, Play, ChevronRight, ChevronDown,
   Zap, Settings, GitBranch, FileCode, Brain, Bot, Terminal,
@@ -933,8 +934,12 @@ export default function ForgeAssist({
       </div>
 
       {/* Instruction Manager Modal */}
-      {showInstructionManager && (
-        <div style={{
+      {/* Instruction Manager Modal - Using Portal to prevent click bubbling */}
+      {showInstructionManager && createPortal(
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1183,12 +1188,17 @@ export default function ForgeAssist({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Quick Instructions Panel - Toggle-able text snippets that always append */}
-      {showQuickInstructionsPanel && (
-        <div style={{
+      {/* Using Portal to render OUTSIDE ForgeAssist DOM tree to prevent click bubbling */}
+      {showQuickInstructionsPanel && createPortal(
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1395,7 +1405,8 @@ export default function ForgeAssist({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

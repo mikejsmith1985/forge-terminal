@@ -200,11 +200,15 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         const filename = `feedback-${timestamp}.png`;
         const content = base64Image.split(',')[1];
 
+        // Try Bearer first (for fine-grained PATs), then fall back to token (for classic PATs)
+        const authHeader = githubToken.startsWith('github_pat_') ? `Bearer ${githubToken}` : `token ${githubToken}`;
+        
         const res = await fetch(`https://api.github.com/repos/mikejsmith1985/forge-terminal-2/contents/feedback-screenshots/${filename}`, {
             method: 'PUT',
             headers: {
-                'Authorization': `token ${githubToken}`,
+                'Authorization': authHeader,
                 'Content-Type': 'application/json',
+                'X-GitHub-Api-Version': '2022-11-28',
             },
             body: JSON.stringify({
                 message: 'upload feedback screenshot',
@@ -213,6 +217,9 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         });
 
         if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            console.error('[Feedback] GitHub upload failed:', res.status, errorData);
+            if (res.status === 401) throw new Error('INVALID_TOKEN');
             if (res.status === 403 || res.status === 404) throw new Error('PERMISSION_DENIED');
             throw new Error('GITHUB_UPLOAD_FAILED');
         }
@@ -225,6 +232,9 @@ const FeedbackModal = ({ isOpen, onClose }) => {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `feedback-video-${timestamp}.webm`;
         
+        // Try Bearer first (for fine-grained PATs), then fall back to token (for classic PATs)
+        const authHeader = githubToken.startsWith('github_pat_') ? `Bearer ${githubToken}` : `token ${githubToken}`;
+        
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = async () => {
@@ -233,8 +243,9 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                     const res = await fetch(`https://api.github.com/repos/mikejsmith1985/forge-terminal-2/contents/feedback-screenshots/${filename}`, {
                         method: 'PUT',
                         headers: {
-                            'Authorization': `token ${githubToken}`,
+                            'Authorization': authHeader,
                             'Content-Type': 'application/json',
+                            'X-GitHub-Api-Version': '2022-11-28',
                         },
                         body: JSON.stringify({
                             message: 'upload feedback video',
@@ -242,7 +253,11 @@ const FeedbackModal = ({ isOpen, onClose }) => {
                         })
                     });
                     
-                    if (!res.ok) throw new Error('GITHUB_UPLOAD_FAILED');
+                    if (!res.ok) {
+                        const errorData = await res.json().catch(() => ({}));
+                        console.error('[Feedback] Video upload failed:', res.status, errorData);
+                        throw new Error('GITHUB_UPLOAD_FAILED');
+                    }
                     const data = await res.json();
                     resolve(data.content.download_url);
                 } catch (e) {
@@ -278,16 +293,25 @@ const FeedbackModal = ({ isOpen, onClose }) => {
             body += `<details>\n<summary>Application Logs (Last 3 Minutes)</summary>\n\n\`\`\`\n${recentLogs}\n\`\`\`\n</details>`;
         }
 
+        // Try Bearer first (for fine-grained PATs), then fall back to token (for classic PATs)
+        const authHeader = githubToken.startsWith('github_pat_') ? `Bearer ${githubToken}` : `token ${githubToken}`;
+        
         const res = await fetch(`https://api.github.com/repos/mikejsmith1985/forge-terminal-2/issues`, {
             method: 'POST',
             headers: {
-                'Authorization': `token ${githubToken}`,
+                'Authorization': authHeader,
                 'Content-Type': 'application/json',
+                'X-GitHub-Api-Version': '2022-11-28',
             },
             body: JSON.stringify({ title, body })
         });
 
-        if (!res.ok) throw new Error('ISSUE_FAILED');
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            console.error('[Feedback] Issue creation failed:', res.status, errorData);
+            if (res.status === 401) throw new Error('INVALID_TOKEN');
+            throw new Error('ISSUE_FAILED');
+        }
         return await res.json();
     };
 

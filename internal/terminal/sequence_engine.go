@@ -51,6 +51,22 @@ type SequenceEngine struct {
 	shouldContinue func() bool        // Callback to check if execution should continue
 }
 
+// ExclusionPatterns - menus where we should NOT auto-respond
+// These are user choice menus where the user needs to pick, not just confirm
+var ExclusionPatterns = []*regexp.Regexp{
+	// Model selection menus (Copilot /model command)
+	regexp.MustCompile(`(?i)Select a model`),
+	regexp.MustCompile(`(?i)Choose.*model`),
+	// Model names in selection context
+	regexp.MustCompile(`(?i)(gpt-4|gpt-3\.5|claude|o1-|o3-|gemini).*\n.*(gpt-4|gpt-3\.5|claude|o1-|o3-|gemini)`),
+	// Generic selection menus (not confirmation)
+	regexp.MustCompile(`(?i)Select an option`),
+	regexp.MustCompile(`(?i)Choose an option`),
+	regexp.MustCompile(`(?i)Pick.*:`),
+	// Multiple numbered options with 3+ items (not just Yes/No)
+	regexp.MustCompile(`(?s)\d+\.\s*\S+.*\n.*\d+\.\s*\S+.*\n.*\d+\.\s*\S+`),
+}
+
 // DefaultSequences contains pre-configured patterns for common CLI tools.
 // NOTE: More specific patterns should come BEFORE generic ones!
 var DefaultSequences = []*Sequence{
@@ -237,6 +253,19 @@ func (se *SequenceEngine) ProcessOutput(data []byte) {
 		se.settleBuffer = se.settleBuffer[len(se.settleBuffer)-se.maxBufferSize:]
 	}
 
+	// FIRST: Check exclusion patterns - if any match, do NOT auto-respond
+	for _, excl := range ExclusionPatterns {
+		if excl.MatchString(se.settleBuffer) {
+			// Reset any pending pattern and don't match anything
+			if se.settledPattern != nil {
+				log.Printf("[AutoRespond] EXCLUDED - matches exclusion pattern, was settling '%s'",
+					se.settledPattern.Name)
+				se.settledPattern = nil
+			}
+			return
+		}
+	}
+
 	// Check if any sequence pattern matches
 	for _, seq := range se.sequences {
 		if seq.Pattern.MatchString(se.settleBuffer) {
@@ -275,6 +304,16 @@ func (se *SequenceEngine) CheckSettle() {
 
 	if !se.enabled || se.executing || se.settledPattern == nil {
 		return
+	}
+
+	// Double-check exclusions before firing (buffer may have changed)
+	for _, excl := range ExclusionPatterns {
+		if excl.MatchString(se.settleBuffer) {
+			log.Printf("[AutoRespond] Settle check: EXCLUDED - pattern '%s' aborted",
+				se.settledPattern.Name)
+			se.settledPattern = nil
+			return
+		}
 	}
 
 	if time.Since(se.settleTime) >= se.settledPattern.SettleTime {

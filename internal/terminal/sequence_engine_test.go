@@ -357,3 +357,114 @@ if !bytes.Contains(receivedData, []byte{'\r'}) {
 t.Errorf("Expected Enter key, got: %q", data)
 }
 }
+
+// Test exclusion patterns prevent auto-respond on model selection
+func TestSequenceEngine_ExclusionModelSelection(t *testing.T) {
+	var executed atomic.Bool
+
+	se := NewSequenceEngine(func(data []byte) error {
+		executed.Store(true)
+		return nil
+	})
+	se.SetEnabled(true)
+	se.sequences = DefaultSequences
+
+	// Model selection menu - should be EXCLUDED
+	modelMenu := `
+Select a model
+
+❯ gpt-4o
+  gpt-3.5-turbo
+  claude-sonnet
+  o1-mini
+
+Use ↑/↓ arrows and Enter to confirm
+`
+
+	se.ProcessOutput([]byte(modelMenu))
+
+	// Wait for settle time plus buffer
+	time.Sleep(500 * time.Millisecond)
+	se.CheckSettle()
+
+	// Wait for any potential execution
+	time.Sleep(200 * time.Millisecond)
+
+	// Should NOT have executed due to exclusion
+	if executed.Load() {
+		t.Error("Should NOT auto-respond to model selection menu - should be excluded")
+	}
+}
+
+// Test exclusion patterns don't block legitimate confirmations
+func TestSequenceEngine_ExclusionDoesNotBlockYesNo(t *testing.T) {
+	var executed atomic.Bool
+
+	se := NewSequenceEngine(func(data []byte) error {
+		executed.Store(true)
+		return nil
+	})
+	se.SetEnabled(true)
+	se.sequences = DefaultSequences
+
+	// Simple Yes/No confirmation - should NOT be excluded
+	confirmation := `Do you want to run this command?
+
+> 1. Yes
+  2. No
+
+Confirm with Enter
+`
+
+	se.ProcessOutput([]byte(confirmation))
+
+	// Wait for settle time plus buffer
+	time.Sleep(500 * time.Millisecond)
+	se.CheckSettle()
+
+	// Wait for execution
+	time.Sleep(200 * time.Millisecond)
+
+	// SHOULD have executed - this is a genuine confirmation
+	if !executed.Load() {
+		t.Error("Should auto-respond to genuine Yes/No confirmation")
+	}
+}
+
+// Test exclusion for "Choose an option" menus
+func TestSequenceEngine_ExclusionChooseOption(t *testing.T) {
+	var executed atomic.Bool
+
+	se := NewSequenceEngine(func(data []byte) error {
+		executed.Store(true)
+		return nil
+	})
+	se.SetEnabled(true)
+	se.sequences = DefaultSequences
+
+	// Generic selection menu - should be EXCLUDED
+	selectMenu := `
+Choose an option:
+
+❯ 1. Generate code
+  2. Review changes
+  3. Run tests
+  4. Cancel
+
+Use ↑/↓ and Enter
+`
+
+	se.ProcessOutput([]byte(selectMenu))
+
+	// Wait for settle time plus buffer
+	time.Sleep(500 * time.Millisecond)
+	se.CheckSettle()
+
+	// Wait for any potential execution
+	time.Sleep(200 * time.Millisecond)
+
+	// Should NOT have executed due to exclusion
+	if executed.Load() {
+		t.Error("Should NOT auto-respond to 'Choose an option' menu - should be excluded")
+	}
+}
