@@ -343,6 +343,15 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 		})
 		log.Printf("[LLM Logger] Initial turn added, total turns: %d", len(conv.Turns))
 
+		// v3.9.8: Notify health monitor of user input capture
+		EventBus.Publish(&LayerEvent{
+			Type:      "USER_INPUT",
+			Layer:     2,
+			TabID:     l.tabID,
+			ConvID:    convID,
+			Timestamp: time.Now(),
+		})
+
 		// v3.5.0: Run SLM analysis on initial prompt
 		go l.runSLMAnalysis(conv, detected.Prompt)
 	} else {
@@ -926,6 +935,15 @@ func (l *LLMLogger) parseLatestSnapshotToTurns(conv *LLMConversation, snapshot S
 			Provider:        conv.Provider,
 			CaptureMethod:   "tui_snapshot",
 			ParseConfidence: 0.75,
+		})
+
+		// v3.9.8: Notify health monitor of assistant output capture
+		EventBus.Publish(&LayerEvent{
+			Type:      "ASSISTANT_OUTPUT",
+			Layer:     2,
+			TabID:     l.tabID,
+			ConvID:    conv.ConversationID,
+			Timestamp: time.Now(),
 		})
 
 		log.Printf("[LLM Logger] ✨ Extracted assistant response from snapshot #%d (%d chars)",

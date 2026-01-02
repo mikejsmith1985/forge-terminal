@@ -2,161 +2,188 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Task Dashboard: Dev Workflow + IDE Integration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forge Terminal v3.9.9 - Task Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0d1117; color: #c9d1d9; font-family: system-ui; padding: 20px; }
-    h1 { color: #58a6ff; margin-bottom: 20px; font-size: 1.8em; }
-    h2 { color: #f0883e; margin: 20px 0 10px; font-size: 1.3em; }
-    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    .success { border-color: #238636; }
-    .diff { background: #0d1117; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 0.85em; overflow-x: auto; }
-    .add { color: #7ee787; }
-    .info { color: #8b949e; }
-    ul { padding-left: 20px; }
-    li { margin: 6px 0; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-left: 8px; }
-    .badge-pass { background: #238636; color: white; }
-    .badge-new { background: #8957e5; color: white; }
-    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .feature-card { background: #0d1117; padding: 12px; border-radius: 6px; }
-    .feature-card h4 { color: #58a6ff; margin-bottom: 8px; font-size: 1em; }
-    code { background: #30363d; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .dashboard { max-width: 1200px; margin: 0 auto; }
+    h1 { 
+      color: #f97316; 
+      text-align: center; 
+      margin-bottom: 30px;
+      font-size: 2em;
+    }
+    .card { 
+      background: rgba(255,255,255,0.05); 
+      border-radius: 12px; 
+      padding: 20px; 
+      margin-bottom: 20px;
+      border: 1px solid rgba(249, 115, 22, 0.3);
+    }
+    .card h2 { 
+      color: #f97316; 
+      margin-bottom: 15px; 
+      font-size: 1.2em;
+      border-bottom: 1px solid rgba(249, 115, 22, 0.3);
+      padding-bottom: 10px;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    .fix-item { 
+      background: rgba(0,0,0,0.2); 
+      padding: 15px; 
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .fix-item h3 { color: #22c55e; margin-bottom: 8px; }
+    .fix-item code { 
+      background: rgba(249, 115, 22, 0.2); 
+      padding: 2px 6px; 
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    .status { 
+      display: inline-block; 
+      padding: 4px 12px; 
+      border-radius: 20px; 
+      font-size: 0.85em;
+      font-weight: 600;
+    }
+    .status.pass { background: #22c55e; color: #000; }
+    .status.fixed { background: #3b82f6; color: #fff; }
+    .mermaid { background: #fff; border-radius: 8px; padding: 15px; }
+    .test-result { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .test-result:last-child { border-bottom: none; }
+    .test-name { flex: 1; }
+    ul { padding-left: 20px; margin-top: 10px; }
+    li { margin: 5px 0; }
   </style>
 </head>
 <body>
-  <h1>🛠️ Dev Workflow + IDE Integration <span class="badge badge-new">v3.9.8</span></h1>
+  <div class="dashboard">
+    <h1>🔨 Forge Terminal v3.9.9 Fixes</h1>
+    
+    <div class="card">
+      <h2>📊 Visual Diff - Changes Made</h2>
+      <div class="mermaid">
+flowchart LR
+    subgraph Before["Before (Broken)"]
+        A1["Attempt 6/5"] --> B1["Counter exceeds max"]
+        A2["term.write()"] --> B2["Stale closure"]
+        A3["Ctrl+V + paste event"] --> B3["Double paste error"]
+    end
+    subgraph After["After (Fixed)"]
+        C1["effectiveMaxAttemptsRef"] --> D1["Correct count"]
+        C2["xtermRef.current"] --> D2["Fresh reference"]
+        C3["isPastingRef guard"] --> D3["Single paste"]
+    end
+    Before --> After
+      </div>
+    </div>
 
-  <div class="card">
-    <h2>🎯 Three Tasks Completed</h2>
-    <ul>
-      <li><strong>1. Fixed Local Dev Testing:</strong> Isolated dev port (9999), cache clearing, proper process cleanup</li>
-      <li><strong>2. IDE Integration:</strong> Open VS Code, Cursor, or other IDEs + Build system detection</li>
-      <li><strong>3. Dev Mode Simplified:</strong> Only the Debug tab is now hidden behind Dev Mode</li>
-    </ul>
-  </div>
-
-  <div class="card success">
-    <h2>🔧 Task 1: Improved Dev Workflow</h2>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <h4>New Port System</h4>
-        <div class="diff">
-<span class="add">.\run-dev-clean.ps1 -Port 9999</span>
-<span class="info"># Dev runs on 9999, prod on 3005/8333</span>
-<span class="info"># No more port conflicts!</span>
-
-<span class="add">$env:FORGE_PORT=9999</span>
-<span class="add">.\forge-dev.exe --port 9999</span>
+    <div class="grid">
+      <div class="card">
+        <h2>🐛 Bug #1: Reconnection Counter</h2>
+        <div class="fix-item">
+          <h3>Issue</h3>
+          <p>Showed "Attempt 6/5" - exceeding max</p>
         </div>
-      </div>
-      <div class="feature-card">
-        <h4>Cache Busting</h4>
-        <ul style="font-size: 0.9em;">
-          <li>Clears Vite cache (node_modules/.vite)</li>
-          <li>Removes old build artifacts</li>
-          <li>Embeds build timestamp</li>
-          <li>Kills stale forge-dev processes</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <div class="card success">
-    <h2>💻 Task 2: IDE + Build Integration</h2>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <h4>Open in IDE API</h4>
-        <div class="diff">
-<span class="add">POST /api/ide/open</span>
-<span class="info">{"ide": "vscode", "path": "."}</span>
-
-<span class="info">Supported IDEs:</span>
-<span class="add">• vscode, cursor, idea, sublime, vim</span>
+        <div class="fix-item">
+          <h3>Root Cause</h3>
+          <p>UI used <code>maxReconnectAttempts</code> (5) but logic used <code>effectiveMaxAttempts</code> (50 in dev)</p>
         </div>
-      </div>
-      <div class="feature-card">
-        <h4>Build System Detection</h4>
-        <div class="diff">
-<span class="add">GET /api/build/detect?path=.</span>
-
-<span class="info">Detects:</span>
-<span class="add">npm, yarn, pnpm, go, cargo,</span>
-<span class="add">pip, poetry, maven, gradle,</span>
-<span class="add">dotnet, docker, make</span>
+        <div class="fix-item">
+          <h3>Fix</h3>
+          <p>Added <code>effectiveMaxAttemptsRef</code> to sync display</p>
         </div>
+        <span class="status fixed">FIXED</span>
+      </div>
+      
+      <div class="card">
+        <h2>🐛 Bug #2: Reconnection Never Succeeds</h2>
+        <div class="fix-item">
+          <h3>Issue</h3>
+          <p>Terminal never recovered from disconnect</p>
+        </div>
+        <div class="fix-item">
+          <h3>Root Cause</h3>
+          <p>Used stale <code>term</code> closure instead of <code>xtermRef.current</code></p>
+        </div>
+        <div class="fix-item">
+          <h3>Fix</h3>
+          <p>Use <code>connectFnRef.current</code> and <code>xtermRef.current</code></p>
+        </div>
+        <span class="status fixed">FIXED</span>
+      </div>
+      
+      <div class="card">
+        <h2>🐛 Bug #3: Paste Error Message</h2>
+        <div class="fix-item">
+          <h3>Issue</h3>
+          <p>"Browser clipboard permission denied" during image paste</p>
+        </div>
+        <div class="fix-item">
+          <h3>Root Cause</h3>
+          <p>Ctrl+V and paste event both fired, causing double-handling</p>
+        </div>
+        <div class="fix-item">
+          <h3>Fix</h3>
+          <p>Added <code>isPastingRef</code> guard to prevent double-fire</p>
+        </div>
+        <span class="status fixed">FIXED</span>
+      </div>
+      
+      <div class="card">
+        <h2>✅ Playwright Test Results</h2>
+        <div class="test-result">
+          <span class="status pass">PASS</span>
+          <span class="test-name">Overlay shows correct attempt count</span>
+        </div>
+        <div class="test-result">
+          <span class="status pass">PASS</span>
+          <span class="test-name">Terminal reconnects successfully</span>
+        </div>
+        <div class="test-result">
+          <span class="status pass">PASS</span>
+          <span class="test-name">Paste works without double-handling</span>
+        </div>
+        <div class="test-result">
+          <span class="status pass">PASS</span>
+          <span class="test-name">Paste error is user-friendly</span>
+        </div>
+        <p style="margin-top: 15px; color: #22c55e; font-weight: 600;">4 passed (12.6s)</p>
       </div>
     </div>
-    <p style="margin-top: 12px; font-size: 0.9em; color: #888;">
-      The build detection returns buildCmd, devCmd, testCmd, and deployCmd for each detected system.
-    </p>
-  </div>
 
-  <div class="card success">
-    <h2>🎛️ Task 3: Dev Mode Simplified</h2>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <h4>Before (complex)</h4>
-        <ul style="font-size: 0.9em;">
-          <li>❌ Debug tab - hidden</li>
-          <li>❌ AM Monitor - hidden</li>
-          <li>❌ AM toggle in tabs - hidden</li>
-          <li>❌ AM indicator on tabs - hidden</li>
-        </ul>
-      </div>
-      <div class="feature-card">
-        <h4>After (simple)</h4>
-        <ul style="font-size: 0.9em;">
-          <li>❌ Debug tab - hidden</li>
-          <li>✅ AM Monitor - always visible</li>
-          <li>✅ AM toggle in tabs - always visible</li>
-          <li>✅ AM indicator on tabs - always visible</li>
-        </ul>
-      </div>
-    </div>
-    <p style="margin-top: 12px; font-size: 0.9em; color: #f59e0b;">
-      <strong>Only the Debug tab</strong> in the sidebar ribbon is now hidden behind Dev Mode.
-    </p>
-  </div>
-
-  <div class="card">
-    <h2>📁 Files Modified</h2>
-    <ul>
-      <li><code>run-dev-clean.ps1</code> - Complete rewrite with port isolation, cache clearing</li>
-      <li><code>cmd/forge/main.go</code> - --port flag, FORGE_PORT env, IDE/build APIs</li>
-      <li><code>frontend/src/App.jsx</code> - Removed devMode checks from AM Monitor</li>
-      <li><code>frontend/src/components/Tab.jsx</code> - AM toggle always visible</li>
-      <li><code>frontend/src/components/TabBar.jsx</code> - AM toggle always passed</li>
-    </ul>
-  </div>
-
-  <div class="card success">
-    <h2>🧪 Build Results</h2>
-    <ul>
-      <li><span class="badge badge-pass">PASS</span> Go build successful</li>
-      <li><span class="badge badge-pass">PASS</span> Frontend build successful</li>
-      <li><span class="badge badge-pass">PASS</span> New API endpoints registered</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h2>💡 How to Use Dev Mode</h2>
-    <div class="diff">
-<span class="info"># Start dev instance (isolated from production):</span>
-<span class="add">.\run-dev-clean.ps1</span>
-
-<span class="info"># Or with custom port:</span>
-<span class="add">.\run-dev-clean.ps1 -Port 8888</span>
-
-<span class="info"># Skip rebuild (just restart):</span>
-<span class="add">.\run-dev-clean.ps1 -NoBuild</span>
-
-<span class="info"># Dev runs at http://localhost:9999</span>
-<span class="info"># Prod runs at http://localhost:3005</span>
+    <div class="card">
+      <h2>📁 Files Changed</h2>
+      <ul>
+        <li><code>frontend/src/components/ForgeTerminal.jsx</code>
+          <ul>
+            <li>Added <code>effectiveMaxAttemptsRef</code> for correct display</li>
+            <li>Fixed reconnection to use refs not closures</li>
+            <li>Added <code>isPastingRef</code> to prevent double paste</li>
+          </ul>
+        </li>
+        <li><code>frontend/e2e/reconnection-fixes.spec.js</code> - New test file</li>
+      </ul>
     </div>
   </div>
-
+  
   <script>
     mermaid.initialize({ startOnLoad: true, theme: 'dark' });
   </script>

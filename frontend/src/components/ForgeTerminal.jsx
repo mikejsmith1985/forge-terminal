@@ -109,6 +109,21 @@ const MENU_CONTEXT_PATTERNS = [
   /Do you want to add these directories/i,
 ];
 
+// EXCLUSION patterns - menus where we should NOT auto-respond
+// These are user choice menus where the user needs to pick an option, not confirm
+const AUTO_RESPOND_EXCLUSION_PATTERNS = [
+  // Model selection menus (Copilot /model command)
+  /Select a model/i,
+  /Choose.*model/i,
+  /gpt-4|gpt-3\.5|claude|o1-|o3-|gemini/i, // Model names in selection context
+  // Generic selection menus (not confirmation)
+  /Select an option/i,
+  /Choose an option/i,
+  /Pick.*:/i,
+  // Multiple numbered options that aren't yes/no
+  /\d+\.\s*[a-z].*\n.*\d+\.\s*[a-z]/i, // Multiple numbered text options
+];
+
 // Y/N style prompts: These expect typing 'y' or 'n' then Enter
 const YN_PROMPT_PATTERNS = [
   // Standard y/n patterns at end of line
@@ -212,14 +227,23 @@ function detectYnPrompt(cleanText, debugLog = false) {
 }
 
 /**
+ * Check if the buffer matches exclusion patterns (user selection menus where we shouldn't auto-respond)
+ * @param {string} cleanText - ANSI-stripped text buffer
+ * @returns {boolean} - true if we should NOT auto-respond
+ */
+function shouldExcludeFromAutoRespond(cleanText) {
+  return AUTO_RESPOND_EXCLUSION_PATTERNS.some(p => p.test(cleanText));
+}
+
+/**
  * Main detection function - determines if CLI is waiting for user input
  * @param {string} text - Raw terminal output buffer
  * @param {boolean} debugLog - Enable debug logging
- * @returns {{ waiting: boolean, responseType: 'enter'|'y-enter'|null, confidence: string }}
+ * @returns {{ waiting: boolean, responseType: 'enter'|'y-enter'|null, confidence: string, excluded: boolean }}
  */
 function detectCliPrompt(text, debugLog = false) {
   if (!text || text.length < 10) {
-    return { waiting: false, responseType: null, confidence: 'none' };
+    return { waiting: false, responseType: null, confidence: 'none', excluded: false };
   }
   
   // Strip ANSI escape codes
@@ -228,13 +252,23 @@ function detectCliPrompt(text, debugLog = false) {
   // Use smaller buffer for performance (reduced from 2000)
   const bufferToCheck = cleanText.slice(-800);
   
+  // FIRST: Check exclusion patterns - these are user choice menus where we should NOT auto-respond
+  // This prevents auto-respond from firing during /model selection and similar menus
+  if (shouldExcludeFromAutoRespond(bufferToCheck)) {
+    if (debugLog) {
+      console.log('[AutoRespond] EXCLUDED - matches exclusion pattern (model selection, etc.)');
+    }
+    return { waiting: false, responseType: null, confidence: 'none', excluded: true };
+  }
+  
   // Priority 1: Check for menu-style prompts (Copilot, Claude, etc.)
   const menuResult = detectMenuPrompt(bufferToCheck, debugLog);
   if (menuResult.detected && menuResult.confidence !== 'low') {
     return { 
       waiting: true, 
       responseType: 'enter', 
-      confidence: menuResult.confidence 
+      confidence: menuResult.confidence,
+      excluded: false
     };
   }
   
@@ -244,7 +278,8 @@ function detectCliPrompt(text, debugLog = false) {
     return { 
       waiting: true, 
       responseType: 'y-enter', 
-      confidence: 'high' 
+      confidence: 'high',
+      excluded: false
     };
   }
   
@@ -253,11 +288,12 @@ function detectCliPrompt(text, debugLog = false) {
     return { 
       waiting: true, 
       responseType: 'enter', 
-      confidence: 'low' 
+      confidence: 'low',
+      excluded: false
     };
   }
   
-  return { waiting: false, responseType: null, confidence: 'none' };
+  return { waiting: false, responseType: null, confidence: 'none', excluded: false };
 }
 
 
@@ -404,7 +440,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 5;
+  // Track effective max for display (higher in dev mode)
+  const effectiveMaxAttemptsRef = useRef(maxReconnectAttempts);
   const isCopyingRef = useRef(false); // Prevent clipboard spam
+  const isPastingRef = useRef(false); // Prevent double paste handling
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -768,7 +807,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // We use the container and capture phase to ensure we get the event before xterm swallows it
     // v3.8.2: Now handles BOTH images AND text for faster paste (no async clipboard API)
     // v3.9.8: Enhanced with video support and better agent visibility metadata
+    // v3.9.8: Added fallback for clipboard permission issues
+    // v3.9.9: Fixed double-paste issue with isPastingRef guard
     const handlePaste = async (e) => {
+      // Prevent double-handling if Ctrl+V handler already processed this
+      if (isPastingRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      
       // v3.8.2 FIX: Handle TEXT paste synchronously using clipboardData
       // This is MUCH faster than navigator.clipboard.readText() which requires permission checks
       if (e.clipboardData) {
@@ -921,6 +969,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 if (xtermRef.current) {
                   xtermRef.current.write(`\r\x1b[K\x1b[31m[${mediaType} upload failed: ${err.message}]\x1b[0m\r\n`);
                 }
+                // Still return - we handled the paste, just failed to upload
+                return;
               }
               break; // Only handle one media item
             }
@@ -928,6 +978,30 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           
           if (mediaFound) return;
         }
+      }
+      
+      // v3.9.8 FALLBACK: If clipboardData was empty or we couldn't get text,
+      // try the async clipboard API as a last resort
+      // This handles edge cases where the paste event fires but clipboardData is empty
+      // BUT only if we haven't already processed media above
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const fallbackText = await navigator.clipboard.readText();
+          if (fallbackText && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[Terminal] Paste fallback - async clipboard API:', fallbackText.length, 'chars');
+            wsRef.current.send(fallbackText);
+            if (onPasteRef.current) onPasteRef.current('text', { chars: fallbackText.length });
+            return;
+          }
+        }
+      } catch (clipboardErr) {
+        // Clipboard permission denied - only show error if we have no other content
+        // This avoids showing paste error when image upload is in progress
+        console.warn('[Terminal] Clipboard API permission denied:', clipboardErr.message);
+        // Don't show error toast - the paste event handler in the native event
+        // may still work, or the user can right-click paste
       }
     };
 
@@ -994,8 +1068,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // Previously we returned true hoping xterm would trigger paste, but it doesn't
       // because clipboardMode: 'off' disables that behavior
       // v3.9.8: Enhanced with video support and better metadata
+      // v3.9.9: Set isPastingRef to prevent double-handling from paste event
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
         console.log('[Terminal] Ctrl+V pressed - manually reading clipboard');
+        
+        // Set flag to prevent handlePaste from also processing
+        isPastingRef.current = true;
+        setTimeout(() => { isPastingRef.current = false; }, 500); // Reset after 500ms
         
         // Try to read from clipboard directly
         (async () => {
@@ -1140,7 +1219,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             if (xtermRef.current) {
               // Check if it's a permission error
               if (itemsErr.name === 'NotAllowedError' || itemsErr.message.includes('permission')) {
-                xtermRef.current.write(`\x1b[31m[Paste failed: Browser clipboard permission denied. Try right-click paste or focus this tab first.]\x1b[0m\r\n`);
+                xtermRef.current.write(`\x1b[33m[Paste tip: Click in terminal first, or use Ctrl+Shift+V in some browsers]\x1b[0m\r\n`);
+                // Provide error callback for toast
+                if (onPasteRef.current) {
+                  onPasteRef.current('error', { 
+                    message: 'Click terminal to focus, then try paste again'
+                  });
+                }
               } else {
                 xtermRef.current.write(`\x1b[31m[Paste failed: ${itemsErr.message}]\x1b[0m\r\n`);
               }
@@ -1372,7 +1457,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           lastOutputRef.current = buf.data;
 
           // Now do the expensive regex work
-          const { waiting, responseType, confidence } = detectCliPrompt(buf.data, false);
+          const { waiting, responseType, confidence, excluded } = detectCliPrompt(buf.data, false);
           
           // DEBUG: Log auto-respond check (uncomment for debugging)
           if (autoRespondRef.current) {
@@ -1380,6 +1465,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               waiting, 
               responseType, 
               confidence,
+              excluded,
               autoRespondEnabled: autoRespondRef.current,
               wsReady: ws.readyState === WebSocket.OPEN,
               bufferLen: buf.data.length
@@ -1403,8 +1489,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Auto-respond logic - CRITICAL: Match v1.23.8 exactly
+          // Auto-respond logic - CRITICAL: Skip if excluded (model selection, etc.)
           const shouldAutoRespond = waiting && 
+            !excluded &&
             autoRespondRef.current && 
             ws.readyState === WebSocket.OPEN;
             
@@ -1500,12 +1587,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         
         // Attempt reconnection with exponential backoff
         if (shouldReconnect) {
-          // Reset attempts if we had a successful connection for a while
-          // (This logic is missing, but we can just increase the max attempts or make it infinite for dev)
-          
-          // If we are in dev mode (localhost), retry indefinitely or more times
+          // If we are in dev mode (localhost), retry more times
           const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
           const effectiveMaxAttempts = isDev ? 50 : maxReconnectAttempts;
+          // Store for display in overlay
+          effectiveMaxAttemptsRef.current = effectiveMaxAttempts;
 
           if (reconnectAttemptsRef.current < effectiveMaxAttempts) {
             const delay = Math.min(1000 * Math.pow(1.5, reconnectAttemptsRef.current), 10000); // Cap at 10s, slower backoff
@@ -1515,22 +1601,32 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             logger.terminal('Scheduling reconnection', { 
               tabId, 
               attempt: reconnectAttemptsRef.current, 
+              maxAttempts: effectiveMaxAttempts,
               delay 
             });
             
+            // Clear any existing reconnect timer to prevent duplicates
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+            
             reconnectTimeoutRef.current = setTimeout(() => {
-              // Only reconnect if this is still the active WS ref (avoid race conditions)
-              // AND if the component is still mounted (xtermRef.current exists)
-              if (xtermRef.current) {
+              // Only reconnect if the component is still mounted
+              if (xtermRef.current && connectFnRef.current) {
                 logger.terminal('Attempting reconnection...', { tabId, attempt: reconnectAttemptsRef.current });
-                term.write(`\x1b[1;33m[Reconnecting...]\x1b[0m Attempt ${reconnectAttemptsRef.current}/${effectiveMaxAttempts}\r\n`);
-                connectWebSocket();
+                // Write to terminal via ref (not stale closure)
+                if (xtermRef.current) {
+                  xtermRef.current.write(`\x1b[1;33m[Reconnecting...]\x1b[0m Attempt ${reconnectAttemptsRef.current}/${effectiveMaxAttempts}\r\n`);
+                }
+                // CRITICAL FIX: Use the stored connect function ref instead of closure
+                // This ensures we get the latest connectWebSocket with fresh closures
+                connectFnRef.current();
               }
             }, delay);
           } else {
             setReconnecting(false);
             if (xtermRef.current) {
-              term.write(`\r\n\x1b[1;31m[Error]\x1b[0m Failed to reconnect after ${effectiveMaxAttempts} attempts. Please refresh the page.\r\n`);
+              xtermRef.current.write(`\r\n\x1b[1;31m[Error]\x1b[0m Failed to reconnect after ${effectiveMaxAttempts} attempts. Please refresh the page.\r\n`);
             }
           }
         }
@@ -1715,7 +1811,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             {reconnecting ? (
               <>
                 <div className="spinner"></div>
-                <span>Reconnecting... (Attempt {reconnectAttemptsRef.current}/{maxReconnectAttempts})</span>
+                <span>Reconnecting... (Attempt {reconnectAttemptsRef.current}/{effectiveMaxAttemptsRef.current})</span>
               </>
             ) : (
               <>

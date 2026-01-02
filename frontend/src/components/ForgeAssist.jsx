@@ -431,6 +431,64 @@ export default function ForgeAssist({
     return localStorage.getItem('forgeAssist_activeInstructionFile') || null;
   });
 
+  // Quick Instructions state - toggle-able text snippets that append to prompts
+  // This is what the user asked for: "always append" instructions independent of command cards
+  const [quickInstructions, setQuickInstructions] = useState(() => {
+    const saved = localStorage.getItem('forgeAssist_quickInstructions');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+  const [showQuickInstructionsPanel, setShowQuickInstructionsPanel] = useState(false);
+  const [newInstructionText, setNewInstructionText] = useState('');
+  const [newInstructionLabel, setNewInstructionLabel] = useState('');
+
+  // Save quick instructions to localStorage
+  const saveQuickInstructions = useCallback((instructions) => {
+    localStorage.setItem('forgeAssist_quickInstructions', JSON.stringify(instructions));
+    setQuickInstructions(instructions);
+  }, []);
+
+  // Add a new quick instruction
+  const addQuickInstruction = useCallback(() => {
+    if (!newInstructionText.trim()) return;
+    const newInstruction = {
+      id: Date.now().toString(),
+      label: newInstructionLabel.trim() || `Instruction ${quickInstructions.length + 1}`,
+      text: newInstructionText.trim(),
+      enabled: true,
+    };
+    const updated = [...quickInstructions, newInstruction];
+    saveQuickInstructions(updated);
+    setNewInstructionText('');
+    setNewInstructionLabel('');
+    if (onToast) onToast(`Added: ${newInstruction.label}`, 'success', 1500);
+  }, [newInstructionText, newInstructionLabel, quickInstructions, saveQuickInstructions, onToast]);
+
+  // Toggle a quick instruction on/off
+  const toggleQuickInstruction = useCallback((id) => {
+    const updated = quickInstructions.map(inst => 
+      inst.id === id ? { ...inst, enabled: !inst.enabled } : inst
+    );
+    saveQuickInstructions(updated);
+  }, [quickInstructions, saveQuickInstructions]);
+
+  // Delete a quick instruction
+  const deleteQuickInstruction = useCallback((id) => {
+    const updated = quickInstructions.filter(inst => inst.id !== id);
+    saveQuickInstructions(updated);
+  }, [quickInstructions, saveQuickInstructions]);
+
+  // Get enabled quick instructions for appending
+  const getEnabledQuickInstructions = useCallback(() => {
+    return quickInstructions.filter(inst => inst.enabled).map(inst => inst.text);
+  }, [quickInstructions]);
+
   // Toggle instruction mode and persist
   const toggleInstructionMode = useCallback(() => {
     setIsInstructionMode(prev => {
@@ -612,7 +670,13 @@ export default function ForgeAssist({
     
     let finalCmd = feature.cmd;
     
-    // Append instruction reminder if instruction mode is active
+    // Append enabled quick instructions (user's custom "always append" snippets)
+    const enabledInstructions = getEnabledQuickInstructions();
+    if (enabledInstructions.length > 0) {
+      finalCmd += `\n\n${enabledInstructions.join('\n')}`;
+    }
+    
+    // Also append instruction file reference if instruction mode is active
     if (isInstructionMode && instructionContent.trim()) {
       finalCmd += `\n\n# Please follow and reference the instructions in copilot-instructions.md`;
     }
@@ -668,8 +732,35 @@ export default function ForgeAssist({
             ))}
           </div>
           
-          {/* Instruction Mode Toggle - More Visible */}
+          {/* Quick Instructions & Instruction Mode Controls */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {/* Quick Instructions Button - NEW: Always append custom snippets */}
+            <button 
+              onClick={() => setShowQuickInstructionsPanel(true)}
+              title="Quick Instructions - Add custom text that always appends to prompts"
+              style={{
+                background: quickInstructions.some(i => i.enabled) ? '#238636' : '#333',
+                border: `2px solid ${quickInstructions.some(i => i.enabled) ? '#2ea043' : '#555'}`,
+                color: quickInstructions.some(i => i.enabled) ? '#fff' : '#888',
+                padding: '8px 14px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Sparkles size={16} />
+              <span>Quick</span>
+              {quickInstructions.filter(i => i.enabled).length > 0 && (
+                <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 700}}>
+                  {quickInstructions.filter(i => i.enabled).length}
+                </span>
+              )}
+            </button>
             <button 
               className={`forge-assist-instruction-toggle ${isInstructionMode ? 'active' : ''}`}
               onClick={toggleInstructionMode}
@@ -692,7 +783,7 @@ export default function ForgeAssist({
               }}
             >
               <FileText size={16} />
-              <span>Instructions</span>
+              <span>Files</span>
               {isInstructionMode && <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 700}}>ON</span>}
             </button>
             <button 
@@ -715,7 +806,6 @@ export default function ForgeAssist({
               }}
             >
               <Settings size={16} />
-              <span>Manage</span>
             </button>
           </div>
           
@@ -1091,6 +1181,218 @@ export default function ForgeAssist({
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Instructions Panel - Toggle-able text snippets that always append */}
+      {showQuickInstructionsPanel && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.85)',
+          zIndex: 3000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--bg-secondary, #1a1a1a)',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '80%',
+            borderRadius: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+            border: '2px solid #238636'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid var(--border-color, #333)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start'
+            }}>
+              <div>
+                <h3 style={{margin: 0, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontSize: '18px'}}>
+                  <Sparkles size={24} style={{color: '#238636'}} />
+                  Quick Instructions
+                </h3>
+                <p style={{margin: 0, fontSize: '13px', color: '#888'}}>
+                  Add custom text snippets that automatically append to your prompts when enabled
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowQuickInstructionsPanel(false)}
+                style={{background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px'}}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            {/* Add New Instruction */}
+            <div style={{padding: '16px 20px', borderBottom: '1px solid var(--border-color, #333)'}}>
+              <div style={{display: 'flex', gap: '8px', marginBottom: '8px'}}>
+                <input
+                  type="text"
+                  placeholder="Label (e.g., 'Follow Standards')"
+                  value={newInstructionLabel}
+                  onChange={(e) => setNewInstructionLabel(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    background: '#0d1117',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <textarea
+                  placeholder="Enter instruction text (e.g., 'ensure you follow copilot-instructions.md')"
+                  value={newInstructionText}
+                  onChange={(e) => setNewInstructionText(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    background: '#0d1117',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    minHeight: '60px',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+                <button
+                  onClick={addQuickInstruction}
+                  disabled={!newInstructionText.trim()}
+                  style={{
+                    padding: '10px 16px',
+                    background: newInstructionText.trim() ? '#238636' : '#333',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: newInstructionText.trim() ? '#fff' : '#666',
+                    cursor: newInstructionText.trim() ? 'pointer' : 'not-allowed',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    alignSelf: 'flex-end'
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+            
+            {/* Instruction List */}
+            <div style={{flex: 1, overflowY: 'auto', padding: '12px 20px'}}>
+              {quickInstructions.length === 0 ? (
+                <div style={{textAlign: 'center', padding: '40px 20px', color: '#666'}}>
+                  <Sparkles size={32} style={{marginBottom: '12px', opacity: 0.5}} />
+                  <p style={{margin: 0, fontSize: '14px'}}>No quick instructions yet</p>
+                  <p style={{margin: '8px 0 0', fontSize: '12px'}}>Add one above to always append it to your prompts</p>
+                </div>
+              ) : (
+                quickInstructions.map((inst) => (
+                  <div 
+                    key={inst.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      padding: '12px',
+                      background: inst.enabled ? 'rgba(35,134,54,0.15)' : '#0d1117',
+                      border: `1px solid ${inst.enabled ? '#238636' : '#333'}`,
+                      borderRadius: '8px',
+                      marginBottom: '8px'
+                    }}
+                  >
+                    <button
+                      onClick={() => toggleQuickInstruction(inst.id)}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '4px',
+                        border: `2px solid ${inst.enabled ? '#238636' : '#555'}`,
+                        background: inst.enabled ? '#238636' : 'transparent',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '14px',
+                        flexShrink: 0,
+                        marginTop: '2px'
+                      }}
+                    >
+                      {inst.enabled ? '✓' : ''}
+                    </button>
+                    <div style={{flex: 1, minWidth: 0}}>
+                      <div style={{fontWeight: 600, fontSize: '13px', color: inst.enabled ? '#2ea043' : '#888', marginBottom: '4px'}}>
+                        {inst.label}
+                      </div>
+                      <div style={{fontSize: '12px', color: '#aaa', whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
+                        {inst.text}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => deleteQuickInstruction(inst.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        flexShrink: 0
+                      }}
+                      title="Delete"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div style={{
+              padding: '16px 20px',
+              borderTop: '1px solid var(--border-color, #333)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{fontSize: '12px', color: '#666'}}>
+                {quickInstructions.filter(i => i.enabled).length > 0 ? (
+                  <span style={{color: '#2ea043'}}>✓ {quickInstructions.filter(i => i.enabled).length} instruction(s) will append to prompts</span>
+                ) : (
+                  'No instructions enabled'
+                )}
+              </div>
+              <button 
+                onClick={() => setShowQuickInstructionsPanel(false)}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#238636',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>
