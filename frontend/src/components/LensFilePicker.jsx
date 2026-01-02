@@ -11,7 +11,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Flame, Network, Search, ShoppingCart, X, Check, ChevronRight,
-  FileCode, Trash2, RefreshCw, Package, Layers
+  FileCode, Trash2, RefreshCw, Package
 } from 'lucide-react';
 import './LensFilePicker.css';
 
@@ -20,7 +20,6 @@ const LENS_TYPES = {
   HEATMAP: 'heatmap',
   GRAPH: 'graph',
   SEARCH: 'search',
-  FEATURES: 'features', // NEW: Group files by feature/functionality
 };
 
 // Token budget (128k default)
@@ -217,323 +216,6 @@ const SearchLens = ({ files, selectedPaths, onToggle, onOpen }) => {
 
 // Feature detection - extracts feature names from file paths
 // v3.9.1: Enhanced to match both file names and directory patterns
-const detectFeature = (filePath) => {
-  // Normalize: lowercase and convert backslashes to forward slashes
-  const normalized = filePath.toLowerCase().replace(/\\/g, '/');
-  const fileName = normalized.split('/').pop() || '';
-  
-  // AM / Artificial Memory - match directory OR filename patterns
-  if (normalized.includes('/am/') || fileName.startsWith('am_') || 
-      fileName.includes('llm_logger') || fileName.includes('health_monitor') ||
-      fileName.includes('snapshot') || fileName.includes('artificial_memory')) {
-    return 'Artificial Memory';
-  }
-  
-  // Auto Response / Prompt Detection
-  if (fileName.includes('prompt_detect') || fileName.includes('auto_respond') ||
-      fileName.includes('autorespond') || fileName.includes('executive_trigger') ||
-      normalized.includes('/autoresponse/')) {
-    return 'Auto Response';
-  }
-  
-  // Terminal / PTY
-  if (normalized.includes('/terminal/') || fileName.includes('terminal') ||
-      fileName.includes('pty_') || fileName.includes('_pty')) {
-    return 'Terminal';
-  }
-  
-  // SLM / Smart Routing
-  if (normalized.includes('/slm/') || fileName.includes('slm') ||
-      fileName.includes('routing') || fileName.includes('classifier')) {
-    return 'Smart Routing';
-  }
-  
-  // LLM Integration
-  if (normalized.includes('/llm/') || fileName.includes('llm') ||
-      fileName.includes('model_tier') || fileName.includes('provider')) {
-    return 'LLM Integration';
-  }
-  
-  // Authentication
-  if (normalized.includes('/auth/') || fileName.includes('auth')) {
-    return 'Authentication';
-  }
-  
-  // Chat / UI
-  if (normalized.includes('/chat/') || fileName.includes('chat')) {
-    return 'Chat';
-  }
-  
-  // Workflows
-  if (normalized.includes('/workflow/') || fileName.includes('workflow')) {
-    return 'Workflows';
-  }
-  
-  // Command Cards
-  if (normalized.includes('/command') || fileName.includes('command_card') ||
-      fileName.includes('commandcard')) {
-    return 'Command Cards';
-  }
-  
-  // File System
-  if (normalized.includes('/files/') || fileName.includes('file_') ||
-      fileName.includes('_file') || fileName.includes('handler_file')) {
-    return 'File System';
-  }
-  
-  // Settings
-  if (normalized.includes('/settings/') || fileName.includes('settings') ||
-      fileName.includes('config')) {
-    return 'Settings';
-  }
-  
-  // Themes
-  if (normalized.includes('/theme') || fileName.includes('theme')) {
-    return 'Themes';
-  }
-  
-  // Vision
-  if (normalized.includes('/vision/') || fileName.includes('vision') ||
-      fileName.includes('image')) {
-    return 'Vision';
-  }
-  
-  // Forge Assist
-  if (normalized.includes('/assist') || fileName.includes('assist') ||
-      fileName.includes('forgeassist')) {
-    return 'Forge Assist';
-  }
-  
-  // Editor
-  if (normalized.includes('/editor') || fileName.includes('editor') ||
-      fileName.includes('codemirror')) {
-    return 'Editor';
-  }
-  
-  // Modals
-  if (fileName.includes('modal')) {
-    return 'Modals';
-  }
-  
-  // Search
-  if (fileName.includes('search') || fileName.includes('grep') ||
-      fileName.includes('find')) {
-    return 'Search';
-  }
-  
-  // API / Handlers
-  if (normalized.includes('/api/') || fileName.startsWith('handler')) {
-    return 'API';
-  }
-  
-  // Tests
-  if (fileName.includes('_test.') || fileName.includes('.test.') ||
-      fileName.includes('spec.') || normalized.includes('/tests/')) {
-    return 'Tests';
-  }
-  
-  // Styles
-  if (fileName.endsWith('.css') || normalized.includes('/styles/')) {
-    return 'Styles';
-  }
-  
-  // Documentation
-  if (fileName.includes('readme') || fileName.includes('.md') ||
-      normalized.includes('/docs/')) {
-    return 'Documentation';
-  }
-  
-  // Components (React)
-  if (normalized.includes('/components/')) {
-    return 'Components';
-  }
-  
-  // Hooks
-  if (normalized.includes('/hooks/') || fileName.startsWith('use')) {
-    return 'Hooks';
-  }
-  
-  // Utilities
-  if (normalized.includes('/utils/') || fileName.includes('util') ||
-      fileName.includes('helper')) {
-    return 'Utilities';
-  }
-  
-  // Configuration
-  if (normalized.includes('/config/') || fileName.includes('.json') ||
-      fileName.includes('.toml') || fileName.includes('.yaml')) {
-    return 'Configuration';
-  }
-  
-  // Fallback: use first directory segment
-  const parts = normalized.split('/').filter(p => p && p !== '.');
-  if (parts.length > 1) {
-    // Capitalize first letter
-    const dir = parts[0];
-    return dir.charAt(0).toUpperCase() + dir.slice(1);
-  }
-  
-  return 'Other';
-};
-
-// Features Lens - group files by feature/functionality
-const FeaturesLens = ({ files, selectedPaths, onToggle, onOpen }) => {
-  const [featureMap, setFeatureMap] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const currentPath = files.length > 0 ? files[0].path.split('/').slice(0, -1).join('/') : '.';
-
-  useEffect(() => {
-    const fetchFeatures = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/files/analyze?path=${encodeURIComponent(currentPath || '.')}`);
-        if (!res.ok) throw new Error('Feature analysis failed');
-        const data = await res.json();
-        setFeatureMap(data);
-      } catch (err) {
-        console.error('[FeaturesLens] Failed to analyze:', err);
-        setError(err.message);
-        // Fallback to static grouping
-        const fallbackGroups = {};
-        files.forEach(file => {
-          const feature = detectFeature(file.path);
-          if (!fallbackGroups[feature]) fallbackGroups[feature] = [];
-          fallbackGroups[feature].push(file);
-        });
-        setFeatureMap({
-          features: Object.entries(fallbackGroups).map(([name, fileList]) => ({
-            name,
-            files: fileList.map(f => f.path),
-            capabilities: [],
-            apiEndpoints: [],
-            category: name
-          }))
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchFeatures();
-  }, [currentPath, files]);
-
-  if (loading) {
-    return (
-      <div className="lens-content">
-        <div className="lens-loading">
-          <RefreshCw className="spinning" size={24} />
-          <span>Analyzing codebase features...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !featureMap) {
-    return (
-      <div className="lens-content">
-        <div className="lens-error">
-          <span>Analysis failed: {error}</span>
-          <button onClick={() => window.location.reload()}>Retry</button>
-        </div>
-      </div>
-    );
-  }
-
-  const features = featureMap?.features || [];
-
-  return (
-    <div className="lens-content">
-      <div className="lens-subtitle">
-        Features discovered by code analysis
-        {error && <span style={{color: 'var(--lens-warm)', fontSize: '0.85em', marginLeft: '8px'}}>
-          (Using fallback grouping)
-        </span>}
-      </div>
-      <div className="lens-features-groups">
-        {features.map((feature) => {
-          // Map file paths to file objects
-          const featureFiles = feature.files
-            .map(path => files.find(f => f.path === path || f.path.endsWith(path)))
-            .filter(Boolean);
-          
-          if (featureFiles.length === 0) return null;
-
-          const totalTokens = featureFiles.reduce((sum, f) => 
-            sum + (f.tokenCount || estimateTokens(f.size || 0)), 0
-          );
-          const selectedCount = featureFiles.filter(f => selectedPaths.has(f.path)).length;
-          
-          return (
-            <div key={feature.name} className="lens-feature-group">
-              <div className="lens-feature-header">
-                <div className="lens-feature-title">
-                  <ChevronRight size={14} />
-                  <span className="lens-feature-name">{feature.name}</span>
-                  <span className="lens-feature-badge">
-                    {featureFiles.length} file{featureFiles.length !== 1 ? 's' : ''}
-                  </span>
-                  {feature.category && (
-                    <span className="lens-feature-category">{feature.category}</span>
-                  )}
-                  {selectedCount > 0 && (
-                    <span className="lens-feature-selected">
-                      {selectedCount} selected
-                    </span>
-                  )}
-                </div>
-                <div className="lens-feature-tokens">
-                  {totalTokens.toLocaleString()} tokens
-                </div>
-              </div>
-              
-              {feature.description && (
-                <div className="lens-feature-description">
-                  {feature.description}
-                </div>
-              )}
-              
-              {feature.capabilities && feature.capabilities.length > 0 && (
-                <div className="lens-feature-capabilities">
-                  <strong>Capabilities:</strong> {feature.capabilities.join(', ')}
-                </div>
-              )}
-              
-              {feature.apiEndpoints && feature.apiEndpoints.length > 0 && (
-                <div className="lens-feature-endpoints">
-                  <strong>API:</strong> {feature.apiEndpoints.map(ep => (
-                    <code key={ep} className="lens-endpoint">{ep}</code>
-                  ))}
-                </div>
-              )}
-              
-              <div className="lens-feature-files">
-                {featureFiles.map(file => (
-                  <FileItem
-                    key={file.path}
-                    file={file}
-                    isSelected={selectedPaths.has(file.path)}
-                    onToggle={onToggle}
-                    onOpen={onOpen}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-        
-        {features.length === 0 && (
-          <div className="lens-empty">
-            <Layers size={32} />
-            <span>No features discovered</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // Context Cart component
 const ContextCart = ({ items, budget, onRemove, onClear }) => {
   const totalTokens = useMemo(() => {
@@ -726,7 +408,6 @@ export default function LensFilePicker({
   // Lens tabs
   const lenses = [
     { type: LENS_TYPES.HEATMAP, icon: Flame, label: 'Heatmap' },
-    { type: LENS_TYPES.FEATURES, icon: Layers, label: 'Features' },
     { type: LENS_TYPES.GRAPH, icon: Network, label: 'Graph' },
     { type: LENS_TYPES.SEARCH, icon: Search, label: 'Search' },
   ];
@@ -735,8 +416,6 @@ export default function LensFilePicker({
   const renderLens = () => {
     const props = { files, selectedPaths, onToggle: toggleFile, onOpen: handleFileOpen };
     switch (activeLens) {
-      case LENS_TYPES.FEATURES:
-        return <FeaturesLens {...props} />;
       case LENS_TYPES.GRAPH:
         return <GraphLens {...props} />;
       case LENS_TYPES.SEARCH:

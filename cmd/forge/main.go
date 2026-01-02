@@ -378,7 +378,6 @@ func main() {
 	// File management API
 	http.HandleFunc("/api/files/list", WrapWithMiddleware(handleListFiles)) // v3.3.7 Active Engineer
 	http.HandleFunc("/api/files/flat", WrapWithMiddleware(files.HandleFlatList)) // v3.3.6 @ mentions
-	http.HandleFunc("/api/files/analyze", WrapWithMiddleware(files.HandleAnalyzeCodebase)) // v3.9.2 Feature mapping
 	http.HandleFunc("/api/files/stats", WrapWithMiddleware(files.HandleStats))
 	http.HandleFunc("/api/files/read", WrapWithMiddleware(files.HandleRead))
 	http.HandleFunc("/api/files/write", WrapWithMiddleware(files.HandleWrite))
