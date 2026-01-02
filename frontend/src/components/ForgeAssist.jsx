@@ -421,9 +421,15 @@ export default function ForgeAssist({
   const [isInstructionMode, setIsInstructionMode] = useState(() => {
     return localStorage.getItem('forgeAssist_instructionMode') === 'true';
   });
-  const [showInstructionEditor, setShowInstructionEditor] = useState(false);
+  const [showInstructionManager, setShowInstructionManager] = useState(false);
+  const [instructionFiles, setInstructionFiles] = useState([]);
+  const [selectedInstructionFile, setSelectedInstructionFile] = useState(null);
   const [instructionContent, setInstructionContent] = useState('');
   const [isSavingInstructions, setIsSavingInstructions] = useState(false);
+  const [isLoadingInstructions, setIsLoadingInstructions] = useState(false);
+  const [activeInstructionFile, setActiveInstructionFile] = useState(() => {
+    return localStorage.getItem('forgeAssist_activeInstructionFile') || null;
+  });
 
   // Toggle instruction mode and persist
   const toggleInstructionMode = useCallback(() => {
@@ -434,56 +440,115 @@ export default function ForgeAssist({
     });
   }, []);
 
-  // Load instructions file
-  const openInstructionEditor = useCallback(async () => {
+  // Load instruction files from project
+  const loadInstructionFiles = useCallback(async () => {
     try {
-      setIsSavingInstructions(true);
-      const filename = 'copilot-instructions.md';
-      
-      const response = await fetch('/api/files/read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filename })
-      });
+      setIsLoadingInstructions(true);
+      const response = await fetch('/api/files/instructions');
       if (response.ok) {
         const data = await response.json();
-        setInstructionContent(data.content || '');
-      } else {
-        setInstructionContent('');
+        setInstructionFiles(data.files || []);
       }
-      setShowInstructionEditor(true);
     } catch (err) {
-      console.error('[ForgeAssist] Failed to load instructions:', err);
-      setInstructionContent('');
-      setShowInstructionEditor(true);
+      console.error('[ForgeAssist] Failed to load instruction files:', err);
     } finally {
-      setIsSavingInstructions(false);
+      setIsLoadingInstructions(false);
     }
   }, []);
 
+  // Load content of a specific instruction file
+  const loadInstructionContent = useCallback(async (filePath) => {
+    try {
+      setIsLoadingInstructions(true);
+      const response = await fetch(`/api/files/instructions/content?path=${encodeURIComponent(filePath)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setInstructionContent(data.content || '');
+        setSelectedInstructionFile(filePath);
+      }
+    } catch (err) {
+      console.error('[ForgeAssist] Failed to load instruction content:', err);
+      setInstructionContent('');
+    } finally {
+      setIsLoadingInstructions(false);
+    }
+  }, []);
+
+  // Open instruction manager
+  const openInstructionManager = useCallback(async () => {
+    setShowInstructionManager(true);
+    await loadInstructionFiles();
+  }, [loadInstructionFiles]);
+
   // Save instructions file
   const saveInstructions = useCallback(async () => {
+    if (!selectedInstructionFile) return;
+    
     try {
       setIsSavingInstructions(true);
-      const filename = 'copilot-instructions.md';
       
-      await fetch('/api/files/write', {
+      const response = await fetch('/api/files/instructions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          path: filename,
+          filename: selectedInstructionFile,
           content: instructionContent
         })
       });
-      setShowInstructionEditor(false);
-      if (onToast) onToast('Instructions saved!', 'success', 2000);
+      
+      if (response.ok) {
+        // Set as active instruction file
+        setActiveInstructionFile(selectedInstructionFile);
+        localStorage.setItem('forgeAssist_activeInstructionFile', selectedInstructionFile);
+        
+        if (onToast) onToast(`Saved ${selectedInstructionFile}`, 'success', 2000);
+        await loadInstructionFiles(); // Refresh list
+      } else {
+        throw new Error('Failed to save');
+      }
     } catch (err) {
       console.error('[ForgeAssist] Failed to save instructions:', err);
       if (onToast) onToast('Failed to save instructions', 'error', 3000);
     } finally {
       setIsSavingInstructions(false);
     }
-  }, [instructionContent, onToast]);
+  }, [selectedInstructionFile, instructionContent, onToast, loadInstructionFiles]);
+
+  // Create a new instruction file
+  const createInstructionFile = useCallback(async (filename, template) => {
+    try {
+      setIsSavingInstructions(true);
+      
+      const response = await fetch('/api/files/instructions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename,
+          content: template
+        })
+      });
+      
+      if (response.ok) {
+        setActiveInstructionFile(filename);
+        localStorage.setItem('forgeAssist_activeInstructionFile', filename);
+        if (onToast) onToast(`Created ${filename}`, 'success', 2000);
+        await loadInstructionFiles();
+        await loadInstructionContent(filename);
+      }
+    } catch (err) {
+      console.error('[ForgeAssist] Failed to create instruction file:', err);
+      if (onToast) onToast('Failed to create file', 'error', 3000);
+    } finally {
+      setIsSavingInstructions(false);
+    }
+  }, [onToast, loadInstructionFiles, loadInstructionContent]);
+
+  // Set a file as active (used for appending to prompts)
+  const setFileAsActive = useCallback((filePath) => {
+    setActiveInstructionFile(filePath);
+    localStorage.setItem('forgeAssist_activeInstructionFile', filePath);
+    if (onToast) onToast(`${filePath} set as active instruction file`, 'success', 2000);
+  }, [onToast]);
 
   // Focus search on open
   useEffect(() => {
@@ -609,8 +674,8 @@ export default function ForgeAssist({
               className={`forge-assist-instruction-toggle ${isInstructionMode ? 'active' : ''}`}
               onClick={toggleInstructionMode}
               title={isInstructionMode 
-                ? "Instruction Mode ON - Custom instructions will be appended to commands" 
-                : "Instruction Mode OFF - Click to enable custom instructions"}
+                ? "Instruction Mode ON - Instructions appended to prompts" 
+                : "Instruction Mode OFF - Click to enable"}
               style={{ 
                 background: isInstructionMode ? 'var(--accent-color, #8b5cf6)' : '#333',
                 border: `2px solid ${isInstructionMode ? 'var(--accent-color, #8b5cf6)' : '#555'}`,
@@ -630,30 +695,28 @@ export default function ForgeAssist({
               <span>Instructions</span>
               {isInstructionMode && <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 700}}>ON</span>}
             </button>
-            {isInstructionMode && (
-              <button 
-                className="forge-assist-edit-instructions"
-                onClick={openInstructionEditor}
-                title="Edit your custom instructions (copilot-instructions.md)"
-                style={{
-                  background: '#333',
-                  border: '2px solid #555',
-                  color: '#aaa',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s ease',
-                  fontSize: '12px',
-                  fontWeight: 500
-                }}
-              >
-                <Edit size={16} />
-                <span>Edit</span>
-              </button>
-            )}
+            <button 
+              className="forge-assist-manage-instructions"
+              onClick={openInstructionManager}
+              title="Manage instruction files (CLAUDE.md, copilot-instructions.md, etc.)"
+              style={{
+                background: '#333',
+                border: '2px solid #555',
+                color: '#aaa',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease',
+                fontSize: '12px',
+                fontWeight: 500
+              }}
+            >
+              <Settings size={16} />
+              <span>Manage</span>
+            </button>
           </div>
           
           <button className="forge-assist-close" onClick={onClose}>
@@ -779,15 +842,15 @@ export default function ForgeAssist({
         </div>
       </div>
 
-      {/* Instruction Editor Modal */}
-      {showInstructionEditor && (
+      {/* Instruction Manager Modal */}
+      {showInstructionManager && (
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.8)',
+          background: 'rgba(0,0,0,0.85)',
           zIndex: 3000,
           display: 'flex',
           alignItems: 'center',
@@ -797,14 +860,15 @@ export default function ForgeAssist({
           <div style={{
             background: 'var(--bg-secondary, #1a1a1a)',
             width: '100%',
-            maxWidth: '800px',
-            height: '80%',
+            maxWidth: '1000px',
+            height: '85%',
             borderRadius: '12px',
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
             border: '2px solid var(--accent-color, #8b5cf6)'
           }}>
+            {/* Header */}
             <div style={{
               padding: '20px',
               borderBottom: '1px solid var(--border-color, #333)',
@@ -815,94 +879,218 @@ export default function ForgeAssist({
               <div>
                 <h3 style={{margin: 0, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontSize: '18px'}}>
                   <FileText size={24} style={{color: 'var(--accent-color, #8b5cf6)'}} />
-                  Custom Instructions
+                  AI Instruction Files
                 </h3>
                 <p style={{margin: 0, fontSize: '13px', color: '#888'}}>
-                  Edit copilot-instructions.md - These instructions will be appended to every command when Instruction Mode is enabled
+                  Create and manage instruction files for Claude, Copilot, and other AI tools
                 </p>
               </div>
               <button 
-                onClick={() => setShowInstructionEditor(false)}
+                onClick={() => setShowInstructionManager(false)}
                 style={{background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px'}}
               >
                 <X size={24} />
               </button>
             </div>
-            <div style={{flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden'}}>
-              <textarea
-                value={instructionContent}
-                onChange={(e) => setInstructionContent(e.target.value)}
-                style={{
-                  flex: 1,
-                  background: 'var(--bg-tertiary, #0a0a0a)',
-                  border: '1px solid var(--border-color, #333)',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  color: '#fff',
-                  fontFamily: 'monospace',
-                  fontSize: '14px',
-                  lineHeight: '1.6',
-                  resize: 'none',
-                  outline: 'none'
-                }}
-                placeholder="# Custom Instructions for Copilot
-
-Write your instructions here. They will be appended to every Forge Power Feature command when Instruction Mode is enabled.
-
-Examples:
-- Code style preferences
-- Project-specific conventions
-- Architectural guidelines
-- Testing requirements
-
-These instructions are saved to copilot-instructions.md in your project."
-              />
+            
+            {/* Main Content - Split View */}
+            <div style={{flex: 1, display: 'flex', overflow: 'hidden'}}>
+              {/* File List Sidebar */}
+              <div style={{
+                width: '280px',
+                borderRight: '1px solid var(--border-color, #333)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{padding: '12px', borderBottom: '1px solid var(--border-color, #333)', fontSize: '12px', fontWeight: 600, color: '#888', textTransform: 'uppercase'}}>
+                  Detected Files
+                </div>
+                <div style={{flex: 1, overflowY: 'auto', padding: '8px'}}>
+                  {isLoadingInstructions ? (
+                    <div style={{padding: '20px', textAlign: 'center', color: '#666'}}>
+                      <Loader2 size={20} style={{animation: 'spin 1s linear infinite'}} />
+                    </div>
+                  ) : (
+                    <>
+                      {instructionFiles.map((file, idx) => (
+                        <div 
+                          key={idx}
+                          onClick={() => file.exists && loadInstructionContent(file.path)}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            marginBottom: '4px',
+                            background: selectedInstructionFile === file.path ? 'var(--accent-color, #8b5cf6)' : file.exists ? '#252525' : '#1a1a1a',
+                            border: `1px solid ${file.path === activeInstructionFile ? '#8b5cf6' : file.exists ? '#333' : '#2a2a2a'}`,
+                            cursor: file.exists ? 'pointer' : 'default',
+                            opacity: file.exists ? 1 : 0.5,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}}>
+                            <span style={{fontSize: '14px'}}>{file.cliType === 'claude' ? '🧠' : file.cliType === 'copilot' ? '🤖' : '📄'}</span>
+                            <span style={{fontSize: '13px', fontWeight: 500, color: selectedInstructionFile === file.path ? '#fff' : file.exists ? '#ccc' : '#666'}}>
+                              {file.name}
+                            </span>
+                            {file.path === activeInstructionFile && (
+                              <span style={{marginLeft: 'auto', fontSize: '10px', background: '#238636', color: '#fff', padding: '2px 6px', borderRadius: '3px'}}>ACTIVE</span>
+                            )}
+                          </div>
+                          <div style={{fontSize: '11px', color: selectedInstructionFile === file.path ? 'rgba(255,255,255,0.7)' : '#666', marginLeft: '26px'}}>
+                            {file.path}
+                          </div>
+                          {file.exists && file.size > 0 && (
+                            <div style={{fontSize: '10px', color: '#555', marginLeft: '26px', marginTop: '2px'}}>
+                              {Math.round(file.size / 1024)}KB • Modified {new Date(file.modTime * 1000).toLocaleDateString()}
+                            </div>
+                          )}
+                          {!file.exists && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const templates = {
+                                  'CLAUDE.md': `# Project Instructions for Claude\n\n## Overview\nDescribe your project here.\n\n## Coding Standards\n- Follow existing patterns\n- Write tests for new features\n- Use TypeScript strict mode\n\n## Architecture\nDescribe key architectural decisions.\n`,
+                                  '.github/copilot-instructions.md': `# Copilot Instructions\n\n## Project Context\nThis project uses...\n\n## Coding Guidelines\n- Use functional components with hooks\n- Prefer composition over inheritance\n- Write descriptive variable names\n\n## Testing\n- Use Playwright for E2E tests\n- Jest for unit tests\n`,
+                                  'copilot-instructions.md': `# Copilot Instructions\n\nAdd your instructions here.\n`,
+                                };
+                                createInstructionFile(file.path, templates[file.path] || `# ${file.name}\n\nAdd your instructions here.\n`);
+                              }}
+                              style={{
+                                marginTop: '8px',
+                                marginLeft: '26px',
+                                padding: '4px 10px',
+                                fontSize: '11px',
+                                background: '#333',
+                                border: '1px solid #444',
+                                borderRadius: '4px',
+                                color: '#aaa',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              + Create
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Editor Area */}
+              <div style={{flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden'}}>
+                {selectedInstructionFile ? (
+                  <>
+                    <div style={{padding: '12px 16px', borderBottom: '1px solid var(--border-color, #333)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                      <div style={{fontSize: '14px', fontWeight: 500, color: '#ccc'}}>
+                        Editing: <code style={{background: '#252525', padding: '2px 8px', borderRadius: '4px', fontSize: '13px'}}>{selectedInstructionFile}</code>
+                      </div>
+                      {selectedInstructionFile !== activeInstructionFile && (
+                        <button
+                          onClick={() => setFileAsActive(selectedInstructionFile)}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            background: '#333',
+                            border: '1px solid #444',
+                            borderRadius: '4px',
+                            color: '#aaa',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          Set as Active
+                        </button>
+                      )}
+                    </div>
+                    <div style={{flex: 1, padding: '16px', overflow: 'hidden'}}>
+                      <textarea
+                        value={instructionContent}
+                        onChange={(e) => setInstructionContent(e.target.value)}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          background: 'var(--bg-tertiary, #0a0a0a)',
+                          border: '1px solid var(--border-color, #333)',
+                          borderRadius: '8px',
+                          padding: '16px',
+                          color: '#fff',
+                          fontFamily: 'monospace',
+                          fontSize: '14px',
+                          lineHeight: '1.6',
+                          resize: 'none',
+                          outline: 'none'
+                        }}
+                        placeholder="Enter your instructions here..."
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#666', gap: '16px'}}>
+                    <FileText size={48} />
+                    <p style={{margin: 0, fontSize: '14px'}}>Select a file to edit or create a new one</p>
+                    <p style={{margin: 0, fontSize: '12px', color: '#555'}}>Instruction files tell AI tools how to work with your project</p>
+                  </div>
+                )}
+              </div>
             </div>
+            
+            {/* Footer */}
             <div style={{
               padding: '16px 20px',
               borderTop: '1px solid var(--border-color, #333)',
               display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '12px'
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              <button 
-                onClick={() => setShowInstructionEditor(false)}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-color, #333)',
-                  background: 'transparent',
-                  color: '#aaa',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => e.target.style.background = '#222'}
-                onMouseOut={(e) => e.target.style.background = 'transparent'}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={saveInstructions}
-                disabled={isSavingInstructions}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: 'var(--accent-color, #8b5cf6)',
-                  color: 'white',
-                  cursor: isSavingInstructions ? 'not-allowed' : 'pointer',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  opacity: isSavingInstructions ? 0.7 : 1,
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {isSavingInstructions ? <Loader2 size={16} style={{animation: 'spin 1s linear infinite'}} /> : <Save size={16} />}
-                {isSavingInstructions ? 'Saving...' : 'Save Instructions'}
-              </button>
+              <div style={{fontSize: '12px', color: '#666'}}>
+                {activeInstructionFile ? (
+                  <>Active file: <code style={{color: '#8b5cf6'}}>{activeInstructionFile}</code> {isInstructionMode ? '✓ Will be referenced' : '(Enable Instruction Mode to use)'}</>
+                ) : (
+                  'No active instruction file selected'
+                )}
+              </div>
+              <div style={{display: 'flex', gap: '12px'}}>
+                <button 
+                  onClick={() => setShowInstructionManager(false)}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color, #333)',
+                    background: 'transparent',
+                    color: '#aaa',
+                    cursor: 'pointer',
+                    fontWeight: 500
+                  }}
+                >
+                  Close
+                </button>
+                {selectedInstructionFile && (
+                  <button 
+                    onClick={saveInstructions}
+                    disabled={isSavingInstructions}
+                    style={{
+                      padding: '10px 24px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'var(--accent-color, #8b5cf6)',
+                      color: 'white',
+                      cursor: isSavingInstructions ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      opacity: isSavingInstructions ? 0.7 : 1
+                    }}
+                  >
+                    {isSavingInstructions ? <Loader2 size={16} style={{animation: 'spin 1s linear infinite'}} /> : <Save size={16} />}
+                    {isSavingInstructions ? 'Saving...' : 'Save'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

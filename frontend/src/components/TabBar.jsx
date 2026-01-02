@@ -74,7 +74,7 @@ function TabBar({
             onClose={() => handleTabClose(tab.id)}
             onRename={(newTitle) => handleTabRename(tab.id, newTitle)}
             onToggleAutoRespond={() => handleToggleAutoRespond(tab.id)}
-            onToggleAM={devMode ? () => handleToggleAM(tab.id) : null}
+            onToggleAM={() => handleToggleAM(tab.id)}
             onToggleMode={() => handleToggleMode(tab.id)}
             onToggleViewMode={() => handleToggleViewMode(tab.id)}
             devMode={devMode}

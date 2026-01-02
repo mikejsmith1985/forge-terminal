@@ -16,6 +16,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         pasteOnly: false,
         favorite: false,
         triggerAM: false,
+        alwaysAppend: false,
         llmProvider: '',
         llmType: 'chat',
         icon: null,
@@ -35,6 +36,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     pasteOnly: initialData.pasteOnly || false,
                     favorite: initialData.favorite || false,
                     triggerAM: initialData.triggerAM || false,
+                    alwaysAppend: initialData.alwaysAppend || false,
                     llmProvider: initialData.llmProvider || '',
                     llmType: initialData.llmType || 'chat',
                     icon: initialData.icon || null,
@@ -49,6 +51,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     pasteOnly: false,
                     favorite: false,
                     triggerAM: false,
+                    alwaysAppend: false,
                     llmProvider: '',
                     llmType: 'chat',
                     icon: null,
@@ -229,6 +232,28 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                             />
                             Favorite (show at top)
                         </label>
+
+                        <label className="checkbox-label">
+                            <input
+                                type="checkbox"
+                                name="alwaysAppend"
+                                checked={formData.alwaysAppend}
+                                onChange={handleChange}
+                            />
+                            📌 Always Append (add to every prompt)
+                        </label>
+
+                        {formData.alwaysAppend && (
+                            <div style={{ marginLeft: '24px', marginTop: '8px', padding: '12px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '4px', borderLeft: '3px solid #f59e0b' }}>
+                                <p style={{ fontSize: '13px', margin: 0, color: '#f59e0b' }}>
+                                    <strong>⚡ Always Append Mode</strong>
+                                </p>
+                                <p style={{ fontSize: '12px', marginTop: '8px', opacity: 0.8 }}>
+                                    This card's text will be automatically appended to every prompt you send to AI agents. 
+                                    Use this for persistent instructions like coding standards, project context, or response formatting.
+                                </p>
+                            </div>
+                        )}
 
                         <label className="checkbox-label">
                             <input

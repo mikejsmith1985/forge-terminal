@@ -10,17 +10,18 @@ import (
 
 // Command represents a command card
 type Command struct {
-	ID          int    `json:"id"`
-	Description string `json:"description"`
-	Command     string `json:"command"`
-	KeyBinding  string `json:"keyBinding"`
-	PasteOnly   bool   `json:"pasteOnly"`
-	Favorite    bool   `json:"favorite"`
-	TriggerAM   bool   `json:"triggerAM,omitempty"`
-	LLMProvider string `json:"llmProvider,omitempty"` // "copilot", "claude", "aider"
-	LLMType     string `json:"llmType,omitempty"`     // "chat", "suggest", "explain", "code"
-	Icon        string `json:"icon,omitempty"`
-	Delay       int    `json:"delay,omitempty"`
+	ID           int    `json:"id"`
+	Description  string `json:"description"`
+	Command      string `json:"command"`
+	KeyBinding   string `json:"keyBinding"`
+	PasteOnly    bool   `json:"pasteOnly"`
+	Favorite     bool   `json:"favorite"`
+	TriggerAM    bool   `json:"triggerAM,omitempty"`
+	LLMProvider  string `json:"llmProvider,omitempty"` // "copilot", "claude", "aider"
+	LLMType      string `json:"llmType,omitempty"`     // "chat", "suggest", "explain", "code"
+	Icon         string `json:"icon,omitempty"`
+	Delay        int    `json:"delay,omitempty"`
+	AlwaysAppend bool   `json:"alwaysAppend,omitempty"` // When true, this command's text is appended to every user prompt
 }
 
 // Default commands created on first run

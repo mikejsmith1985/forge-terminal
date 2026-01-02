@@ -415,10 +415,21 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Vision state
   const visionEnabledRef = useRef(visionEnabled);
 
-  // Keep autoRespond ref updated
+  // Keep autoRespond ref updated and sync with backend SequenceEngine
   useEffect(() => {
     autoRespondRef.current = autoRespond;
-  }, [autoRespond]);
+    
+    // CRITICAL FIX: Send AUTO_RESPOND_TOGGLE to backend to enable SequenceEngine
+    // Without this, the backend's advanced pattern detection never runs
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const msg = {
+        type: 'AUTO_RESPOND_TOGGLE',
+        enabled: autoRespond
+      };
+      wsRef.current.send(JSON.stringify(msg));
+      logger.terminal(`Auto-respond backend sync: ${autoRespond ? 'enabled' : 'disabled'}`, { tabId });
+    }
+  }, [autoRespond, tabId]);
 
   // Keep amEnabled ref updated
   useEffect(() => {
@@ -756,13 +767,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // This works even when navigator.clipboard.read() is blocked or fails
     // We use the container and capture phase to ensure we get the event before xterm swallows it
     // v3.8.2: Now handles BOTH images AND text for faster paste (no async clipboard API)
+    // v3.9.8: Enhanced with video support and better agent visibility metadata
     const handlePaste = async (e) => {
       // v3.8.2 FIX: Handle TEXT paste synchronously using clipboardData
       // This is MUCH faster than navigator.clipboard.readText() which requires permission checks
       if (e.clipboardData) {
         // Check for text first (most common case) - handle it directly for zero latency
         const text = e.clipboardData.getData('text/plain');
-        if (text && !Array.from(e.clipboardData.items || []).some(item => item.type.startsWith('image/'))) {
+        const hasMedia = Array.from(e.clipboardData.items || []).some(item => 
+          item.type.startsWith('image/') || item.type.startsWith('video/')
+        );
+        
+        if (text && !hasMedia) {
           // Text-only paste: Send directly to PTY
           e.preventDefault();
           e.stopPropagation();
@@ -770,35 +786,60 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             console.log('[Terminal] Paste event - sending text directly:', text.length, 'chars');
             wsRef.current.send(text);
-            if (onPasteRef.current) onPasteRef.current();
+            // Enhanced toast with character count
+            if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
           } else {
             console.warn('[Terminal] WebSocket not ready for paste');
           }
           return;
         }
         
-        // Check for images in the paste event
+        // Check for images or videos in the paste event
         if (e.clipboardData.items) {
-          let imageFound = false;
+          let mediaFound = false;
           for (const item of e.clipboardData.items) {
-            if (item.type.startsWith('image/')) {
-              imageFound = true;
+            const isImage = item.type.startsWith('image/');
+            const isVideo = item.type.startsWith('video/');
+            
+            if (isImage || isVideo) {
+              mediaFound = true;
               e.preventDefault(); // Stop xterm from handling it
               e.stopPropagation(); // Stop bubbling
               
-              console.log('[Terminal] Image detected in paste event:', item.type);
+              const mediaType = isImage ? 'image' : 'video';
+              const mimeType = item.type;
+              console.log(`[Terminal] ${mediaType} detected in paste event:`, mimeType);
               
               try {
                 const blob = item.getAsFile();
                 if (!blob) continue;
                 
+                // Get file size for metadata
+                const fileSizeKB = Math.round(blob.size / 1024);
+                const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+                
+                // Determine extension from MIME type
+                const extMap = {
+                  'image/png': '.png',
+                  'image/jpeg': '.jpg',
+                  'image/gif': '.gif',
+                  'image/webp': '.webp',
+                  'image/bmp': '.bmp',
+                  'video/mp4': '.mp4',
+                  'video/webm': '.webm',
+                  'video/quicktime': '.mov',
+                  'video/x-msvideo': '.avi',
+                };
+                const ext = extMap[mimeType] || (isImage ? '.png' : '.mp4');
+                
                 const formData = new FormData();
-                const filename = `clipboard-${Date.now()}.png`;
+                const filename = `clipboard-${Date.now()}${ext}`;
                 formData.append('file', blob, filename);
                 
-                // Show uploading indicator
+                // Show uploading indicator with media type
                 if (xtermRef.current) {
-                  xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
+                  const sizeStr = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
+                  xtermRef.current.write(`\x1b[33m[Uploading ${mediaType} (${sizeStr})...]\x1b[0m`);
                 }
                 
                 const response = await fetch('/api/files/upload', {
@@ -816,25 +857,76 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   xtermRef.current.write('\r\x1b[K');
                 }
                 
-                // Send file path to terminal
+                // Handle video frame extraction results
+                let framePaths = [];
+                let ffmpegAvailable = false;
+                if (data.isVideo) {
+                  ffmpegAvailable = data.ffmpegAvailable;
+                  framePaths = data.framePaths || [];
+                  
+                  if (!ffmpegAvailable) {
+                    // ffmpeg not installed - warn user
+                    if (xtermRef.current) {
+                      xtermRef.current.write(`\x1b[33m[Note: Install ffmpeg to enable video frame extraction for AI agents]\x1b[0m\r\n`);
+                    }
+                  } else if (framePaths.length > 0) {
+                    // Show frame extraction success
+                    if (xtermRef.current) {
+                      xtermRef.current.write(`\x1b[32m[Extracted ${framePaths.length} frames for AI visibility]\x1b[0m\r\n`);
+                    }
+                  }
+                }
+                
+                // Send file path(s) to terminal with enhanced format for agent visibility
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
-                  const textToSend = `see file at ${pathStr}`;
-                  wsRef.current.send(textToSend);
-                  console.log('[Terminal] Sent image path to backend:', textToSend);
-                  if (onPasteRef.current) onPasteRef.current('image');
+                  // For videos with extracted frames, send frame paths instead
+                  // AI agents can understand images, not video files
+                  if (isVideo && framePaths.length > 0) {
+                    // Send each frame path for the agent to see
+                    for (let i = 0; i < framePaths.length; i++) {
+                      const framePath = framePaths[i];
+                      const pathStr = framePath.includes(' ') ? `"${framePath}"` : framePath;
+                      const textToSend = `see file at ${pathStr}`;
+                      wsRef.current.send(textToSend);
+                      // Small delay between frames to avoid overwhelming
+                      if (i < framePaths.length - 1) {
+                        await new Promise(r => setTimeout(r, 100));
+                      }
+                    }
+                    console.log(`[Terminal] Sent ${framePaths.length} video frames to backend`);
+                  } else {
+                    // For images (or videos without frame extraction), send the file path
+                    const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
+                    const textToSend = `see file at ${pathStr}`;
+                    wsRef.current.send(textToSend);
+                    console.log(`[Terminal] Sent ${mediaType} path to backend:`, textToSend);
+                  }
+                  
+                  // Enhanced callback with metadata for better toast
+                  if (onPasteRef.current) {
+                    onPasteRef.current(mediaType, {
+                      filename,
+                      path: filePath,
+                      size: blob.size,
+                      sizeKB: fileSizeKB,
+                      mimeType,
+                      framePaths: framePaths,
+                      frameCount: framePaths.length,
+                      ffmpegAvailable,
+                    });
+                  }
                 }
               } catch (err) {
-                console.error('[Terminal] Image upload failed:', err);
+                console.error(`[Terminal] ${mediaType} upload failed:`, err);
                 if (xtermRef.current) {
-                  xtermRef.current.write(`\r\x1b[K\x1b[31m[Image upload failed: ${err.message}]\x1b[0m\r\n`);
+                  xtermRef.current.write(`\r\x1b[K\x1b[31m[${mediaType} upload failed: ${err.message}]\x1b[0m\r\n`);
                 }
               }
-              break; // Only handle one image
+              break; // Only handle one media item
             }
           }
           
-          if (imageFound) return;
+          if (mediaFound) return;
         }
       }
     };
@@ -901,6 +993,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // v3.9.1 FIX: Handle Ctrl+V ourselves since clipboardMode is 'off'
       // Previously we returned true hoping xterm would trigger paste, but it doesn't
       // because clipboardMode: 'off' disables that behavior
+      // v3.9.8: Enhanced with video support and better metadata
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
         console.log('[Terminal] Ctrl+V pressed - manually reading clipboard');
         
@@ -912,30 +1005,51 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
               console.log('[Terminal] Pasting text from clipboard:', text.length, 'chars');
               wsRef.current.send(text);
-              if (onPasteRef.current) onPasteRef.current();
+              if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
               return;
             }
           } catch (textErr) {
             console.log('[Terminal] Text read failed, trying clipboard items:', textErr.message);
           }
           
-          // Try to read items (for images)
+          // Try to read items (for images and videos)
           try {
             const items = await navigator.clipboard.read();
             for (const item of items) {
-              // Check for images
+              // Check for images or videos
               const imageType = item.types.find(t => t.startsWith('image/'));
-              if (imageType) {
-                console.log('[Terminal] Found image in clipboard:', imageType);
-                const blob = await item.getType(imageType);
+              const videoType = item.types.find(t => t.startsWith('video/'));
+              const mediaType = imageType || videoType;
+              
+              if (mediaType) {
+                const isImage = !!imageType;
+                const mediaKind = isImage ? 'image' : 'video';
+                console.log(`[Terminal] Found ${mediaKind} in clipboard:`, mediaType);
+                const blob = await item.getType(mediaType);
+                
+                // Get file size for metadata
+                const fileSizeKB = Math.round(blob.size / 1024);
+                const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+                const sizeStr = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
+                
+                // Determine extension from MIME type
+                const extMap = {
+                  'image/png': '.png',
+                  'image/jpeg': '.jpg',
+                  'image/gif': '.gif',
+                  'image/webp': '.webp',
+                  'video/mp4': '.mp4',
+                  'video/webm': '.webm',
+                };
+                const ext = extMap[mediaType] || (isImage ? '.png' : '.mp4');
                 
                 // Show uploading indicator
                 if (xtermRef.current) {
-                  xtermRef.current.write('\x1b[33m[Uploading image...]\x1b[0m');
+                  xtermRef.current.write(`\x1b[33m[Uploading ${mediaKind} (${sizeStr})...]\x1b[0m`);
                 }
                 
                 const formData = new FormData();
-                const filename = `clipboard-${Date.now()}.png`;
+                const filename = `clipboard-${Date.now()}${ext}`;
                 formData.append('file', blob, filename);
                 
                 const response = await fetch('/api/files/upload', {
@@ -953,13 +1067,57 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   xtermRef.current.write('\r\x1b[K');
                 }
                 
-                // Send file path to terminal
+                // Handle video frame extraction results
+                let framePaths = [];
+                let ffmpegAvailable = false;
+                const isVideo = !isImage;
+                if (data.isVideo) {
+                  ffmpegAvailable = data.ffmpegAvailable;
+                  framePaths = data.framePaths || [];
+                  
+                  if (!ffmpegAvailable) {
+                    if (xtermRef.current) {
+                      xtermRef.current.write(`\x1b[33m[Note: Install ffmpeg to enable video frame extraction for AI agents]\x1b[0m\r\n`);
+                    }
+                  } else if (framePaths.length > 0) {
+                    if (xtermRef.current) {
+                      xtermRef.current.write(`\x1b[32m[Extracted ${framePaths.length} frames for AI visibility]\x1b[0m\r\n`);
+                    }
+                  }
+                }
+                
+                // Send file path(s) to terminal
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
-                  const textToSend = `see file at ${pathStr}`;
-                  wsRef.current.send(textToSend);
-                  console.log('[Terminal] Sent image path to PTY:', textToSend);
-                  if (onPasteRef.current) onPasteRef.current('image');
+                  if (isVideo && framePaths.length > 0) {
+                    // Send each frame path for the agent to see
+                    for (let i = 0; i < framePaths.length; i++) {
+                      const framePath = framePaths[i];
+                      const pathStr = framePath.includes(' ') ? `"${framePath}"` : framePath;
+                      wsRef.current.send(`see file at ${pathStr}`);
+                      if (i < framePaths.length - 1) {
+                        await new Promise(r => setTimeout(r, 100));
+                      }
+                    }
+                    console.log(`[Terminal] Sent ${framePaths.length} video frames to PTY`);
+                  } else {
+                    const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
+                    const textToSend = `see file at ${pathStr}`;
+                    wsRef.current.send(textToSend);
+                    console.log(`[Terminal] Sent ${mediaKind} path to PTY:`, textToSend);
+                  }
+                  
+                  if (onPasteRef.current) {
+                    onPasteRef.current(mediaKind, {
+                      filename,
+                      path: filePath,
+                      size: blob.size,
+                      sizeKB: fileSizeKB,
+                      mimeType: mediaType,
+                      framePaths,
+                      frameCount: framePaths.length,
+                      ffmpegAvailable,
+                    });
+                  }
                 }
                 return;
               }
@@ -972,7 +1130,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                   console.log('[Terminal] Pasting text from clipboard items:', text.length, 'chars');
                   wsRef.current.send(text);
-                  if (onPasteRef.current) onPasteRef.current();
+                  if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
                   return;
                 }
               }
@@ -1098,6 +1256,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               logger.terminal('Directory restore command sent', { tabId, command: cdCommand.trim() });
             }
           }, 100);
+        }
+
+        // CRITICAL FIX: Sync auto-respond state to backend SequenceEngine on connect
+        // This enables the backend's advanced pattern detection when restoring a session
+        if (autoRespondRef.current) {
+          ws.send(JSON.stringify({
+            type: 'AUTO_RESPOND_TOGGLE',
+            enabled: true
+          }));
+          logger.terminal('Auto-respond backend sync on connect: enabled', { tabId });
         }
 
         if (onConnectionChange) onConnectionChange(true);

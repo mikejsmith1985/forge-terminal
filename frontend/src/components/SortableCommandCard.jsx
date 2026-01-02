@@ -29,17 +29,25 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
         <div
             ref={setNodeRef}
             style={style}
-            className={`card ${isDragging ? 'dragging' : ''} ${command.favorite ? 'favorite' : ''}`}
+            className={`card ${isDragging ? 'dragging' : ''} ${command.favorite ? 'favorite' : ''} ${command.alwaysAppend ? 'always-append' : ''}`}
         >
             <div className="card-header">
                 <div className="card-title-row">
                     {command.keyBinding && (
                         <span className="keybinding-badge">{command.keyBinding}</span>
                     )}
+                    {command.alwaysAppend && (
+                        <span className="always-append-badge" title="This text is appended to every prompt">📌</span>
+                    )}
                     <span className="card-title">{command.name}</span>
                 </div>
 
                 <div className="card-actions-top">
+                    {command.alwaysAppend && (
+                        <div className="action-icon always-append-indicator" title="Always Append - Appended to every prompt" style={{ color: '#f59e0b' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700 }}>A+</span>
+                        </div>
+                    )}
                     {command.triggerAM && (
                         <div className="action-icon am-trigger" title="Triggers AM on execute" style={{ color: '#8b5cf6' }}>
                             <Brain size={16} />

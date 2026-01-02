@@ -300,16 +300,17 @@ type FileDeleteRequest struct {
 	RootPath string `json:"rootPath"`
 }
 
-// HandleUpload saves an uploaded file
+// HandleUpload saves an uploaded file (images, videos, etc.)
+// v3.9.8: Increased limit to 50MB for video support
 func HandleUpload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Parse multipart form
-	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB max
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+	// Parse multipart form - 50MB max for video support
+	if err := r.ParseMultipartForm(50 << 20); err != nil {
+		http.Error(w, "Failed to parse form (max 50MB)", http.StatusBadRequest)
 		return
 	}
 
@@ -320,12 +321,32 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Save to temp directory
+	// Save to temp directory with original extension
 	tempDir := os.TempDir()
-	filename := fmt.Sprintf("clipboard-%d%s", time.Now().UnixNano(), filepath.Ext(handler.Filename))
-	if filepath.Ext(handler.Filename) == "" {
-		filename += ".png" // Default to png
+	ext := filepath.Ext(handler.Filename)
+	if ext == "" {
+		// Detect extension from content type if not provided
+		contentType := handler.Header.Get("Content-Type")
+		switch contentType {
+		case "image/png":
+			ext = ".png"
+		case "image/jpeg":
+			ext = ".jpg"
+		case "image/gif":
+			ext = ".gif"
+		case "image/webp":
+			ext = ".webp"
+		case "video/mp4":
+			ext = ".mp4"
+		case "video/webm":
+			ext = ".webm"
+		case "video/quicktime":
+			ext = ".mov"
+		default:
+			ext = ".png" // Default to png for images
+		}
 	}
+	filename := fmt.Sprintf("clipboard-%d%s", time.Now().UnixNano(), ext)
 	filePath := filepath.Join(tempDir, filename)
 
 	dst, err := os.Create(filePath)
@@ -340,10 +361,75 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if this is a video file - if so, extract frames for AI visibility
+	isVideo := ext == ".mp4" || ext == ".webm" || ext == ".mov" || ext == ".avi"
+	var framePaths []string
+	var ffmpegAvailable bool
+	
+	if isVideo {
+		framePaths, ffmpegAvailable = extractVideoFrames(filePath, tempDir)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"path": filePath,
-	})
+	response := map[string]interface{}{
+		"path":     filePath,
+		"isVideo":  isVideo,
+	}
+	
+	if isVideo {
+		response["ffmpegAvailable"] = ffmpegAvailable
+		response["framePaths"] = framePaths
+		response["frameCount"] = len(framePaths)
+	}
+	
+	json.NewEncoder(w).Encode(response)
+}
+
+// extractVideoFrames uses ffmpeg to extract key frames from a video
+// Returns the paths to extracted frames and whether ffmpeg was available
+func extractVideoFrames(videoPath, tempDir string) ([]string, bool) {
+	// Check if ffmpeg is available
+	ffmpegPath, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		log.Printf("[Files] ffmpeg not found in PATH, cannot extract video frames")
+		return nil, false
+	}
+	log.Printf("[Files] Found ffmpeg at: %s", ffmpegPath)
+
+	// Create output pattern for frames
+	baseName := strings.TrimSuffix(filepath.Base(videoPath), filepath.Ext(videoPath))
+	framePattern := filepath.Join(tempDir, baseName+"-frame-%02d.png")
+
+	// Extract 5 frames evenly distributed through the video
+	// Using fps filter to get approximately 5 frames
+	// -vf "select='not(mod(n\,30))'" - select every 30th frame
+	// Or simpler: use fps=1/2 to get 1 frame every 2 seconds, limit to 5
+	cmd := exec.Command(ffmpegPath,
+		"-i", videoPath,
+		"-vf", "fps=1,scale=1280:-1", // 1 frame per second, max width 1280
+		"-vframes", "5",              // Maximum 5 frames
+		"-q:v", "2",                  // High quality JPEG
+		framePattern,
+		"-y", // Overwrite existing
+	)
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("[Files] ffmpeg frame extraction failed: %v, output: %s", err, string(output))
+		return nil, true // ffmpeg exists but failed
+	}
+
+	// Find extracted frames
+	var framePaths []string
+	for i := 1; i <= 5; i++ {
+		framePath := filepath.Join(tempDir, fmt.Sprintf("%s-frame-%02d.png", baseName, i))
+		if _, err := os.Stat(framePath); err == nil {
+			framePaths = append(framePaths, framePath)
+		}
+	}
+
+	log.Printf("[Files] Extracted %d frames from video: %s", len(framePaths), videoPath)
+	return framePaths, true
 }
 
 // HandleList returns directory tree structure
@@ -1002,5 +1088,221 @@ json.NewEncoder(w).Encode(map[string]bool{"success": true})
 default:
 http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
+}
+
+// InstructionFile represents an AI instruction file
+type InstructionFile struct {
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	Exists   bool   `json:"exists"`
+	Size     int64  `json:"size,omitempty"`
+	ModTime  int64  `json:"modTime,omitempty"`
+	CLIType  string `json:"cliType"`  // "copilot", "claude", "generic"
+	Priority int    `json:"priority"` // Higher = more important
+}
+
+// HandleInstructionFiles detects, reads, and manages AI instruction files
+// GET: Detect and list instruction files in the project
+// POST: Create or update an instruction file
+func HandleInstructionFiles(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get project root from query param or use cwd
+	projectRoot := r.URL.Query().Get("root")
+	if projectRoot == "" {
+		var err error
+		projectRoot, err = os.Getwd()
+		if err != nil {
+			http.Error(w, "Failed to get working directory", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		// Detect all instruction files in the project
+		files := detectInstructionFiles(projectRoot)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"projectRoot": projectRoot,
+			"files":       files,
+		})
+
+	case http.MethodPost:
+		// Create or update an instruction file
+		var req struct {
+			Filename string `json:"filename"` // e.g., "CLAUDE.md", ".github/copilot-instructions.md"
+			Content  string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if req.Filename == "" {
+			http.Error(w, "filename is required", http.StatusBadRequest)
+			return
+		}
+
+		// Ensure path is within project root
+		fullPath := filepath.Join(projectRoot, req.Filename)
+		absPath, err := filepath.Abs(fullPath)
+		if err != nil {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
+
+		// Security check
+		absRoot, _ := filepath.Abs(projectRoot)
+		if !strings.HasPrefix(absPath, absRoot) {
+			http.Error(w, "Path must be within project root", http.StatusForbidden)
+			return
+		}
+
+		// Create parent directory if needed
+		parentDir := filepath.Dir(absPath)
+		if err := os.MkdirAll(parentDir, 0755); err != nil {
+			http.Error(w, "Failed to create directory: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Write file
+		if err := os.WriteFile(absPath, []byte(req.Content), 0644); err != nil {
+			http.Error(w, "Failed to write file: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("[Files] Created/updated instruction file: %s", absPath)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"path":    absPath,
+		})
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// detectInstructionFiles scans for common AI instruction file patterns
+func detectInstructionFiles(projectRoot string) []InstructionFile {
+	// Define instruction file patterns with priority and CLI type
+	patterns := []struct {
+		path     string
+		cliType  string
+		priority int
+	}{
+		// Claude-specific
+		{"CLAUDE.md", "claude", 10},
+		{".claude/settings.json", "claude", 8},
+		{".claude/agents", "claude", 7},
+
+		// GitHub Copilot-specific
+		{".github/copilot-instructions.md", "copilot", 10},
+		{"copilot-instructions.md", "copilot", 9},
+
+		// Generic/shared instruction files
+		{".cursorrules", "generic", 6},
+		{".aider/instructions.md", "aider", 7},
+		{"INSTRUCTIONS.md", "generic", 5},
+		{"AI_INSTRUCTIONS.md", "generic", 5},
+		{".ai/instructions.md", "generic", 5},
+	}
+
+	var files []InstructionFile
+	for _, pattern := range patterns {
+		fullPath := filepath.Join(projectRoot, pattern.path)
+		absPath, _ := filepath.Abs(fullPath)
+
+		file := InstructionFile{
+			Name:     filepath.Base(pattern.path),
+			Path:     pattern.path,
+			CLIType:  pattern.cliType,
+			Priority: pattern.priority,
+		}
+
+		info, err := os.Stat(absPath)
+		if err == nil {
+			file.Exists = true
+			file.Size = info.Size()
+			file.ModTime = info.ModTime().Unix()
+		} else {
+			file.Exists = false
+		}
+
+		files = append(files, file)
+	}
+
+	// Sort by priority (highest first), then by exists (existing files first)
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].Exists != files[j].Exists {
+			return files[i].Exists
+		}
+		return files[i].Priority > files[j].Priority
+	})
+
+	return files
+}
+
+// HandleInstructionFileContent reads the content of a specific instruction file
+func HandleInstructionFileContent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get file path from query
+	filePath := r.URL.Query().Get("path")
+	projectRoot := r.URL.Query().Get("root")
+
+	if filePath == "" {
+		http.Error(w, "path parameter required", http.StatusBadRequest)
+		return
+	}
+
+	if projectRoot == "" {
+		var err error
+		projectRoot, err = os.Getwd()
+		if err != nil {
+			http.Error(w, "Failed to get working directory", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Resolve full path
+	fullPath := filepath.Join(projectRoot, filePath)
+	absPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Security check
+	absRoot, _ := filepath.Abs(projectRoot)
+	if !strings.HasPrefix(absPath, absRoot) {
+		http.Error(w, "Path must be within project root", http.StatusForbidden)
+		return
+	}
+
+	// Read file
+	content, err := os.ReadFile(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"exists":  false,
+				"content": "",
+				"path":    filePath,
+			})
+			return
+		}
+		http.Error(w, "Failed to read file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"exists":  true,
+		"content": string(content),
+		"path":    filePath,
+	})
 }
 

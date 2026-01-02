@@ -1485,13 +1485,11 @@ function App() {
           <>
             <h3>⚡ Commands</h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {devMode && (
-                <AMMonitor 
-                  tabId={activeTab?.id || 'no-tab'} 
-                  amEnabled={activeTab?.amEnabled || false}
-                  devMode={devMode}
-                />
-              )}
+              <AMMonitor 
+                tabId={activeTab?.id || 'no-tab'} 
+                amEnabled={activeTab?.amEnabled || false}
+                devMode={true}
+              />
               <button className="btn btn-primary" onClick={handleAdd}>
                 <Plus size={16} /> Add
               </button>
@@ -1501,13 +1499,11 @@ function App() {
           <>
             <h3>📁 Files</h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {devMode && (
-                <AMMonitor 
-                  tabId={activeTab?.id || 'no-tab'} 
-                  amEnabled={activeTab?.amEnabled || false}
-                  devMode={devMode}
-                />
-              )}
+              <AMMonitor 
+                tabId={activeTab?.id || 'no-tab'} 
+                amEnabled={activeTab?.amEnabled || false}
+                devMode={true}
+              />
               <span className="sidebar-path-hint">{activeTab?.currentDirectory ? getFolderNameFromPath(activeTab.currentDirectory) : 'Root'}</span>
             </div>
           </>
@@ -1515,21 +1511,17 @@ function App() {
           <>
             <h3>🐛 Debug</h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {devMode && (
-                <>
-                  <AMMonitor 
-                    tabId={activeTab?.id || 'no-tab'} 
-                    amEnabled={activeTab?.amEnabled || false}
-                    devMode={devMode}
-                  />
-                  <button 
-                    className="btn btn-primary"
-                    onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
-                  >
-                    {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
-                  </button>
-                </>
-              )}
+              <AMMonitor 
+                tabId={activeTab?.id || 'no-tab'} 
+                amEnabled={activeTab?.amEnabled || false}
+                devMode={true}
+              />
+              <button 
+                className="btn btn-primary"
+                onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
+              >
+                {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
+              </button>
             </div>
           </>
         ) : null}
@@ -1798,12 +1790,29 @@ function App() {
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                     onInteractiveTUI={(tuiType) => handleInteractiveTUI(tab.id, tuiType)}
-                    onCopy={() => addToast('Text copied to clipboard', 'success', 1500)}
-                    onPaste={(type) => {
+                    onCopy={() => addToast('✓ Copied to clipboard', 'success', 1500)}
+                    onPaste={(type, metadata) => {
+                      // v3.9.8: Enhanced toast with metadata for better visibility
                       if (type === 'image') {
-                        addToast('Image pasted', 'success', 1500);
+                        const sizeStr = metadata?.sizeKB > 1024 
+                          ? `${(metadata.sizeKB / 1024).toFixed(1)}MB` 
+                          : `${metadata?.sizeKB || '?'}KB`;
+                        addToast(`📷 Image pasted (${sizeStr}) - Agent can see it`, 'success', 2500);
+                      } else if (type === 'video') {
+                        const sizeStr = metadata?.sizeKB > 1024 
+                          ? `${(metadata.sizeKB / 1024).toFixed(1)}MB` 
+                          : `${metadata?.sizeKB || '?'}KB`;
+                        // Show different message based on frame extraction
+                        if (metadata?.frameCount > 0) {
+                          addToast(`🎬 Video pasted (${sizeStr}) - ${metadata.frameCount} frames extracted for AI`, 'success', 3000);
+                        } else if (metadata?.ffmpegAvailable === false) {
+                          addToast(`🎬 Video saved (${sizeStr}) - Install ffmpeg for AI visibility`, 'warning', 4000);
+                        } else {
+                          addToast(`🎬 Video pasted (${sizeStr})`, 'success', 2500);
+                        }
                       } else {
-                        addToast('Text pasted from clipboard', 'success', 1500);
+                        const charInfo = metadata?.chars ? ` (${metadata.chars} chars)` : '';
+                        addToast(`📋 Text pasted${charInfo}`, 'success', 1500);
                       }
                     }}
                     onFeedbackClick={() => setIsFeedbackModalOpen(true)}

@@ -419,6 +419,16 @@ body {
   cursor: grabbing;
 }
 
+.card.always-append {
+  border-left: 3px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), transparent);
+}
+
+.always-append-badge {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -1904,6 +1914,17 @@ body {
   margin: 10px;
   margin-top: 0;
 }
+
+/* AM Details Panel Animations */
+.am-details-panel .spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ========================================
    WORKFLOW SYSTEM STYLES
    ======================================== */

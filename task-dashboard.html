@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Task Dashboard: Dev Workflow + IDE Integration</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0d1117; color: #c9d1d9; font-family: system-ui; padding: 20px; }
+    h1 { color: #58a6ff; margin-bottom: 20px; font-size: 1.8em; }
+    h2 { color: #f0883e; margin: 20px 0 10px; font-size: 1.3em; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .success { border-color: #238636; }
+    .diff { background: #0d1117; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 0.85em; overflow-x: auto; }
+    .add { color: #7ee787; }
+    .info { color: #8b949e; }
+    ul { padding-left: 20px; }
+    li { margin: 6px 0; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-left: 8px; }
+    .badge-pass { background: #238636; color: white; }
+    .badge-new { background: #8957e5; color: white; }
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .feature-card { background: #0d1117; padding: 12px; border-radius: 6px; }
+    .feature-card h4 { color: #58a6ff; margin-bottom: 8px; font-size: 1em; }
+    code { background: #30363d; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h1>🛠️ Dev Workflow + IDE Integration <span class="badge badge-new">v3.9.8</span></h1>
+
+  <div class="card">
+    <h2>🎯 Three Tasks Completed</h2>
+    <ul>
+      <li><strong>1. Fixed Local Dev Testing:</strong> Isolated dev port (9999), cache clearing, proper process cleanup</li>
+      <li><strong>2. IDE Integration:</strong> Open VS Code, Cursor, or other IDEs + Build system detection</li>
+      <li><strong>3. Dev Mode Simplified:</strong> Only the Debug tab is now hidden behind Dev Mode</li>
+    </ul>
+  </div>
+
+  <div class="card success">
+    <h2>🔧 Task 1: Improved Dev Workflow</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h4>New Port System</h4>
+        <div class="diff">
+<span class="add">.\run-dev-clean.ps1 -Port 9999</span>
+<span class="info"># Dev runs on 9999, prod on 3005/8333</span>
+<span class="info"># No more port conflicts!</span>
+
+<span class="add">$env:FORGE_PORT=9999</span>
+<span class="add">.\forge-dev.exe --port 9999</span>
+        </div>
+      </div>
+      <div class="feature-card">
+        <h4>Cache Busting</h4>
+        <ul style="font-size: 0.9em;">
+          <li>Clears Vite cache (node_modules/.vite)</li>
+          <li>Removes old build artifacts</li>
+          <li>Embeds build timestamp</li>
+          <li>Kills stale forge-dev processes</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card success">
+    <h2>💻 Task 2: IDE + Build Integration</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h4>Open in IDE API</h4>
+        <div class="diff">
+<span class="add">POST /api/ide/open</span>
+<span class="info">{"ide": "vscode", "path": "."}</span>
+
+<span class="info">Supported IDEs:</span>
+<span class="add">• vscode, cursor, idea, sublime, vim</span>
+        </div>
+      </div>
+      <div class="feature-card">
+        <h4>Build System Detection</h4>
+        <div class="diff">
+<span class="add">GET /api/build/detect?path=.</span>
+
+<span class="info">Detects:</span>
+<span class="add">npm, yarn, pnpm, go, cargo,</span>
+<span class="add">pip, poetry, maven, gradle,</span>
+<span class="add">dotnet, docker, make</span>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top: 12px; font-size: 0.9em; color: #888;">
+      The build detection returns buildCmd, devCmd, testCmd, and deployCmd for each detected system.
+    </p>
+  </div>
+
+  <div class="card success">
+    <h2>🎛️ Task 3: Dev Mode Simplified</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h4>Before (complex)</h4>
+        <ul style="font-size: 0.9em;">
+          <li>❌ Debug tab - hidden</li>
+          <li>❌ AM Monitor - hidden</li>
+          <li>❌ AM toggle in tabs - hidden</li>
+          <li>❌ AM indicator on tabs - hidden</li>
+        </ul>
+      </div>
+      <div class="feature-card">
+        <h4>After (simple)</h4>
+        <ul style="font-size: 0.9em;">
+          <li>❌ Debug tab - hidden</li>
+          <li>✅ AM Monitor - always visible</li>
+          <li>✅ AM toggle in tabs - always visible</li>
+          <li>✅ AM indicator on tabs - always visible</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top: 12px; font-size: 0.9em; color: #f59e0b;">
+      <strong>Only the Debug tab</strong> in the sidebar ribbon is now hidden behind Dev Mode.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>📁 Files Modified</h2>
+    <ul>
+      <li><code>run-dev-clean.ps1</code> - Complete rewrite with port isolation, cache clearing</li>
+      <li><code>cmd/forge/main.go</code> - --port flag, FORGE_PORT env, IDE/build APIs</li>
+      <li><code>frontend/src/App.jsx</code> - Removed devMode checks from AM Monitor</li>
+      <li><code>frontend/src/components/Tab.jsx</code> - AM toggle always visible</li>
+      <li><code>frontend/src/components/TabBar.jsx</code> - AM toggle always passed</li>
+    </ul>
+  </div>
+
+  <div class="card success">
+    <h2>🧪 Build Results</h2>
+    <ul>
+      <li><span class="badge badge-pass">PASS</span> Go build successful</li>
+      <li><span class="badge badge-pass">PASS</span> Frontend build successful</li>
+      <li><span class="badge badge-pass">PASS</span> New API endpoints registered</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>💡 How to Use Dev Mode</h2>
+    <div class="diff">
+<span class="info"># Start dev instance (isolated from production):</span>
+<span class="add">.\run-dev-clean.ps1</span>
+
+<span class="info"># Or with custom port:</span>
+<span class="add">.\run-dev-clean.ps1 -Port 8888</span>
+
+<span class="info"># Skip rebuild (just restart):</span>
+<span class="add">.\run-dev-clean.ps1 -NoBuild</span>
+
+<span class="info"># Dev runs at http://localhost:9999</span>
+<span class="info"># Prod runs at http://localhost:3005</span>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</body>
+</html>

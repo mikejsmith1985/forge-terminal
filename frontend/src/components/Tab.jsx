@@ -150,7 +150,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   let titleText = tab.title;
   const indicators = [];
   if (tab.autoRespond) indicators.push('Auto-respond');
-  if (devMode && tab.amEnabled) indicators.push('AM Logging');
+  if (tab.amEnabled) indicators.push('AM Logging');
   if (tabMode === 'light') indicators.push('Light');
   if (indicators.length > 0) {
     titleText = `${tab.title} (${indicators.join(', ')})`;
@@ -159,7 +159,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   return (
     <>
       <div
-        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''} ${devMode && tab.amEnabled ? 'am-enabled' : ''}`}
+        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''} ${tab.amEnabled ? 'am-enabled' : ''}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
@@ -174,7 +174,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
         <span className="tab-icon" data-shell={shellType}>
           {getShellIcon(shellType)}
         </span>
-        {devMode && tab.amEnabled && (
+        {tab.amEnabled && (
           <span className="am-indicator" title="AM Logging enabled">
             <BookOpen size={10} />
           </span>
@@ -229,7 +229,8 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             {tabMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
           {/* v3.8.2: View Mode toggle REMOVED - Terminal is the only view */}
-          {devMode && onToggleAM && (
+          {/* v3.9.8: AM toggle now always visible (not gated by devMode) */}
+          {onToggleAM && (
             <button 
               onClick={() => { 
                 setShowContextMenu(false); 

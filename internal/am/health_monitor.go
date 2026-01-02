@@ -419,8 +419,9 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 		status.SecondsSinceCapture = int64(time.Since(lastCapture).Seconds())
 	}
 
-	// FIXED v3.9.3: Relaxed timing to avoid false "broken" states during active chats
-	// Only mark as broken if we have real evidence of capture failure
+	// FIXED v3.9.7: Further relaxed to avoid false "broken" states
+	// AM is now designed as a REDUNDANCY system, not primary capture
+	// The native CLI tools (Copilot, Claude) have their own recovery mechanisms
 	
 	// If we have at least 1 user turn, we're successfully capturing
 	if userTurns > 0 {
@@ -431,29 +432,38 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 		return status
 	}
 	
-	// If conversation is very new (< 60s) and has ANY turns, consider it active
+	// If conversation is new (< 120s) and has ANY turns OR native recovery is working, consider it active
 	// This allows time for native session to detect and start capturing
 	conversationAge := time.Since(conv.StartTime).Seconds()
-	if conversationAge < 60 && totalTurns > 0 {
+	if conversationAge < 120 && (totalTurns > 0 || status.NativeRecoveryOk) {
 		status.Status = "active"
 		status.StatusText = "AM Logging Starting..."
-		status.DetailedReason = fmt.Sprintf("Conversation detected %.0fs ago. Waiting for turn parsing. %d raw turns seen.", conversationAge, totalTurns)
+		status.DetailedReason = fmt.Sprintf("Conversation detected %.0fs ago. %d raw turns, native recovery: %v.", conversationAge, totalTurns, status.NativeRecoveryOk)
 		status.IsCapturing = true
 		return status
 	}
 	
-	// Only mark as broken if conversation is old (> 60s) with no user/assistant turns
-	if conversationAge > 60 && userTurns == 0 && assistantTurns == 0 {
+	// If native recovery is working, don't mark as broken - native CLI tools handle recovery
+	if status.NativeRecoveryOk && status.NativeSessionCount > 0 {
+		status.Status = "active"
+		status.StatusText = "AM Active (Native Recovery)"
+		status.DetailedReason = fmt.Sprintf("Primary capture idle but native CLI recovery available. %d native sessions detected.", status.NativeSessionCount)
+		status.IsCapturing = false
+		return status
+	}
+	
+	// Only mark as broken if conversation is very old (> 120s) with no turns AND no native recovery
+	if conversationAge > 120 && userTurns == 0 && assistantTurns == 0 && !status.NativeRecoveryOk {
 		status.Status = "broken"
-		status.StatusText = "AM Not Capturing Turns"
-		status.DetailedReason = fmt.Sprintf("ISSUE: Conversation active for %.0fs but captured 0 user/assistant turns. Native recovery: %v. Check LLM parser or native session detection.", conversationAge, status.NativeRecoveryOk)
+		status.StatusText = "AM Not Capturing"
+		status.DetailedReason = fmt.Sprintf("ISSUE: Conversation active for %.0fs but no turns captured and native recovery offline.", conversationAge)
 		status.IsCapturing = false
 		log.Printf("[Health] Tab %s BROKEN: %d turns but no user/assistant turns after %.0fs",
 			tabID, totalTurns, conversationAge)
 		return status
 	}
 
-	// Default to active - optimistic approach
+	// Default to active - optimistic approach since native recovery is our fallback
 	status.Status = "active"
 	status.StatusText = "AM Logging Active"
 	status.DetailedReason = fmt.Sprintf("%d user turns, %d assistant turns captured. System healthy.", userTurns, assistantTurns)

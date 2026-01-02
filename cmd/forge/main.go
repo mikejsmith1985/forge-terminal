@@ -84,6 +84,26 @@ func main() {
 	
 	log.Printf("[Forge] Instance lock acquired (PID: %d)", os.Getpid())
 	
+	// Parse port from command line or environment
+	var overridePort int
+	for i := 1; i < len(os.Args); i++ {
+		if os.Args[i] == "-port" || os.Args[i] == "--port" {
+			if i+1 < len(os.Args) {
+				if p, err := strconv.Atoi(os.Args[i+1]); err == nil {
+					overridePort = p
+				}
+			}
+		}
+	}
+	// Also check environment variable
+	if overridePort == 0 {
+		if envPort := os.Getenv("FORGE_PORT"); envPort != "" {
+			if p, err := strconv.Atoi(envPort); err == nil {
+				overridePort = p
+			}
+		}
+	}
+	
 	// v3.7.1: Handle subcommands before starting web server
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -102,9 +122,14 @@ func main() {
 			fmt.Println("Forge Terminal - Agentic Coding Workspace")
 			fmt.Println("")
 			fmt.Println("Usage:")
-			fmt.Println("  forge              Start the web UI server")
-			fmt.Println("  forge lens [path]  Open the Context Builder file picker")
-			fmt.Println("  forge -port PORT   Start server on specific port")
+			fmt.Println("  forge                  Start the web UI server")
+			fmt.Println("  forge lens [path]      Open the Context Builder file picker")
+			fmt.Println("  forge -port PORT       Start server on specific port")
+			fmt.Println("  forge --port PORT      Start server on specific port")
+			fmt.Println("")
+			fmt.Println("Environment:")
+			fmt.Println("  FORGE_PORT=9999        Override default port")
+			fmt.Println("  FORGE_DEV_MODE=true    Enable dev mode logging")
 			fmt.Println("")
 			return
 		}
@@ -224,6 +249,10 @@ func main() {
 
 	// Shutdown API - allows graceful shutdown from browser
 	http.HandleFunc("/api/shutdown", WrapWithMiddleware(handleShutdown))
+	
+	// IDE Integration API - open current workspace in external IDE
+	http.HandleFunc("/api/ide/open", WrapWithMiddleware(handleOpenIDE))
+	http.HandleFunc("/api/build/detect", WrapWithMiddleware(handleDetectBuildSystem))
 
 	// Update API - check for updates and apply them
 	http.HandleFunc("/api/version", WrapWithMiddleware(handleVersion))
@@ -357,6 +386,10 @@ func main() {
 	http.HandleFunc("/api/files/delete", WrapWithMiddleware(files.HandleDelete))
 	http.HandleFunc("/api/files/stream", WrapWithMiddleware(files.HandleReadStream))
 	http.HandleFunc("/api/files/access-mode", WrapWithMiddleware(files.HandleFileAccessMode))
+	
+	// AI Instruction Files API - manage CLAUDE.md, copilot-instructions.md, etc.
+	http.HandleFunc("/api/files/instructions", WrapWithMiddleware(files.HandleInstructionFiles))
+	http.HandleFunc("/api/files/instructions/content", WrapWithMiddleware(files.HandleInstructionFileContent))
 
 	// Error logging API - client-side error reporting
 	http.HandleFunc("/api/log-error", WrapWithMiddleware(handleLogError))
@@ -369,8 +402,8 @@ func main() {
 		log.Printf("[ERROR] Failed to initialize session temp dir: %v", err)
 	}
 
-	// Find an available port
-	addr, listener, err := findAvailablePort()
+	// Find an available port (use override if specified)
+	addr, listener, err := findAvailablePort(overridePort)
 	if err != nil {
 		log.Fatalf("Failed to find available port: %v", err)
 	}
@@ -634,7 +667,20 @@ func handleWSLDetect(w http.ResponseWriter, r *http.Request) {
 }
 
 // findAvailablePort tries preferred ports in order and returns the first available one
-func findAvailablePort() (string, net.Listener, error) {
+// If overridePort is specified (> 0), it will try that port first
+func findAvailablePort(overridePort int) (string, net.Listener, error) {
+	// If override port specified, try it first
+	if overridePort > 0 {
+		addr := fmt.Sprintf("localhost:%d", overridePort)
+		listener, err := net.Listen("tcp", addr)
+		if err == nil {
+			log.Printf("[Dev] Using override port: %d", overridePort)
+			return addr, listener, nil
+		}
+		log.Printf("[Dev] Override port %d unavailable: %v", overridePort, err)
+		// Fall through to try preferred ports
+	}
+	
 	for _, port := range preferredPorts {
 		// Use localhost to allow OS to choose IPv4/IPv6 as needed
 		addr := fmt.Sprintf("localhost:%d", port)
@@ -653,6 +699,153 @@ func findAvailablePort() (string, net.Listener, error) {
 	addr := listener.Addr().String()
 	log.Printf("Using OS-assigned port: %s", addr)
 	return addr, listener, nil
+}
+
+// handleOpenIDE opens the current workspace in an external IDE (VS Code, Cursor, etc.)
+func handleOpenIDE(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	
+	var req struct {
+		IDE  string `json:"ide"`  // "vscode", "cursor", "idea", "sublime"
+		Path string `json:"path"` // Workspace path to open
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	
+	if req.Path == "" {
+		// Use current working directory
+		var err error
+		req.Path, err = os.Getwd()
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Failed to get cwd"})
+			return
+		}
+	}
+	
+	// Map IDE names to commands
+	ideCommands := map[string][]string{
+		"vscode":  {"code", req.Path},
+		"cursor":  {"cursor", req.Path},
+		"idea":    {"idea", req.Path},
+		"sublime": {"subl", req.Path},
+		"vim":     {"vim", req.Path},
+	}
+	
+	ide := req.IDE
+	if ide == "" {
+		ide = "vscode" // Default
+	}
+	
+	cmdArgs, ok := ideCommands[ide]
+	if !ok {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false, 
+			"error": fmt.Sprintf("Unknown IDE: %s. Supported: vscode, cursor, idea, sublime", ide),
+		})
+		return
+	}
+	
+	// Run the command
+	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+	if err := cmd.Start(); err != nil {
+		log.Printf("[IDE] Failed to open %s: %v", ide, err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false, 
+			"error": fmt.Sprintf("Failed to open %s: %v (is it installed?)", ide, err),
+		})
+		return
+	}
+	
+	log.Printf("[IDE] Opened %s for: %s", ide, req.Path)
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "ide": ide, "path": req.Path})
+}
+
+// handleDetectBuildSystem detects the build system for the current project
+func handleDetectBuildSystem(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		var err error
+		path, err = os.Getwd()
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{"error": "Failed to get cwd"})
+			return
+		}
+	}
+	
+	// Detect build systems by checking for config files
+	type BuildSystem struct {
+		Name        string `json:"name"`
+		File        string `json:"file"`
+		BuildCmd    string `json:"buildCmd"`
+		DevCmd      string `json:"devCmd"`
+		DeployCmd   string `json:"deployCmd,omitempty"`
+		TestCmd     string `json:"testCmd,omitempty"`
+		Detected    bool   `json:"detected"`
+	}
+	
+	systems := []BuildSystem{
+		// JavaScript/Node
+		{Name: "npm", File: "package.json", BuildCmd: "npm run build", DevCmd: "npm run dev", TestCmd: "npm test"},
+		{Name: "yarn", File: "yarn.lock", BuildCmd: "yarn build", DevCmd: "yarn dev", TestCmd: "yarn test"},
+		{Name: "pnpm", File: "pnpm-lock.yaml", BuildCmd: "pnpm build", DevCmd: "pnpm dev", TestCmd: "pnpm test"},
+		
+		// Go
+		{Name: "go", File: "go.mod", BuildCmd: "go build ./...", DevCmd: "go run .", TestCmd: "go test ./..."},
+		
+		// Python
+		{Name: "pip", File: "requirements.txt", BuildCmd: "pip install -r requirements.txt", DevCmd: "python main.py", TestCmd: "pytest"},
+		{Name: "poetry", File: "pyproject.toml", BuildCmd: "poetry install", DevCmd: "poetry run python main.py", TestCmd: "poetry run pytest"},
+		
+		// Rust
+		{Name: "cargo", File: "Cargo.toml", BuildCmd: "cargo build --release", DevCmd: "cargo run", TestCmd: "cargo test"},
+		
+		// Java/JVM
+		{Name: "maven", File: "pom.xml", BuildCmd: "mvn package", DevCmd: "mvn spring-boot:run", TestCmd: "mvn test"},
+		{Name: "gradle", File: "build.gradle", BuildCmd: "gradle build", DevCmd: "gradle bootRun", TestCmd: "gradle test"},
+		
+		// .NET
+		{Name: "dotnet", File: "*.csproj", BuildCmd: "dotnet build", DevCmd: "dotnet run", TestCmd: "dotnet test"},
+		
+		// Docker
+		{Name: "docker", File: "Dockerfile", BuildCmd: "docker build -t app .", DevCmd: "docker-compose up", DeployCmd: "docker push app"},
+		{Name: "docker-compose", File: "docker-compose.yml", BuildCmd: "docker-compose build", DevCmd: "docker-compose up -d"},
+		
+		// Make
+		{Name: "make", File: "Makefile", BuildCmd: "make build", DevCmd: "make run", TestCmd: "make test"},
+	}
+	
+	var detected []BuildSystem
+	for _, sys := range systems {
+		// Check if the config file exists
+		checkPath := filepath.Join(path, sys.File)
+		
+		// Handle wildcard patterns like *.csproj
+		if strings.Contains(sys.File, "*") {
+			matches, _ := filepath.Glob(checkPath)
+			if len(matches) > 0 {
+				sys.Detected = true
+				detected = append(detected, sys)
+			}
+		} else if _, err := os.Stat(checkPath); err == nil {
+			sys.Detected = true
+			detected = append(detected, sys)
+		}
+	}
+	
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"path":     path,
+		"systems":  detected,
+		"hasBuilds": len(detected) > 0,
+	})
 }
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
