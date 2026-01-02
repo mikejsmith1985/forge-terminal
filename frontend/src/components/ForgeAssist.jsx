@@ -734,10 +734,10 @@ export default function ForgeAssist({
           </div>
           
           {/* Quick Instructions & Instruction Mode Controls */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
             {/* Quick Instructions Button - NEW: Always append custom snippets */}
             <button 
-              onClick={() => setShowQuickInstructionsPanel(true)}
+              onClick={() => setShowQuickInstructionsPanel(!showQuickInstructionsPanel)}
               title="Quick Instructions - Add custom text that always appends to prompts"
               style={{
                 background: quickInstructions.some(i => i.enabled) ? '#238636' : '#333',
@@ -751,7 +751,8 @@ export default function ForgeAssist({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                flexShrink: 0
               }}
             >
               <Sparkles size={16} />
@@ -780,7 +781,8 @@ export default function ForgeAssist({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                flexShrink: 0
               }}
             >
               <FileText size={16} />
@@ -803,7 +805,8 @@ export default function ForgeAssist({
                 gap: '6px',
                 transition: 'all 0.2s ease',
                 fontSize: '12px',
-                fontWeight: 500
+                fontWeight: 500,
+                flexShrink: 0
               }}
             >
               <Settings size={16} />
