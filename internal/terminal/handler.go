@@ -514,15 +514,45 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		var totalWriteTime time.Duration
 		var maxWriteTime time.Duration
 		lastStatsReport := time.Now()
+		lastReadTime := time.Now()
+		const readTimeout = 30 * time.Second // Timeout for detecting hung PTY
+		
+		// Watchdog goroutine to detect hung PTY reads
+		go func() {
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					timeSinceRead := time.Since(lastReadTime)
+					if timeSinceRead > readTimeout {
+						log.Printf("[Terminal] CRITICAL: PTY read hung for %v - forcing close", timeSinceRead)
+						select {
+						case closeChan <- closeReason{CloseCodePTYError, "PTY read timeout"}:
+						default:
+						}
+						return
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
 		
 		for {
 			// FREEZE INSTRUMENTATION: Time PTY reads
 			readStart := time.Now()
 			n, err := session.Read(buf)
 			readDuration := time.Since(readStart)
+			lastReadTime = time.Now() // Update watchdog
+			
 			// v3.9.1: Increase threshold to 500ms to reduce log noise
 			if readDuration > 500*time.Millisecond {
 				log.Printf("[FREEZE-DEBUG] Slow PTY read: %v for %d bytes", readDuration, n)
+			}
+			// v3.9.8: Detect critically slow reads that indicate problems
+			if readDuration > 5*time.Second {
+				log.Printf("[FREEZE-CRITICAL] PTY read blocked for %v - possible hang", readDuration)
 			}
 			
 			if err != nil {
