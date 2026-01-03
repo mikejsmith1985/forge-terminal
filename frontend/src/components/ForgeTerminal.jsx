@@ -809,14 +809,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // v3.8.2: Now handles BOTH images AND text for faster paste (no async clipboard API)
     // v3.9.8: Enhanced with video support and better agent visibility metadata
     // v3.9.8: Added fallback for clipboard permission issues
-    // v3.9.9: Fixed double-paste issue with isPastingRef guard
+    // v3.11.1: Fixed paste reliability - this is now the PRIMARY handler
+    // The Ctrl+V handler just lets the event through, and uses clipboard API as fallback
     const handlePaste = async (e) => {
-      // Prevent double-handling if Ctrl+V handler already processed this
-      if (isPastingRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
+      // v3.11.1: Mark that paste event fired and is handling it
+      // This tells the Ctrl+V fallback not to run
+      isPastingRef.current = true;
+      setTimeout(() => { isPastingRef.current = false; }, 500);
       
       // v3.8.2 FIX: Handle TEXT paste synchronously using clipboardData
       // This is MUCH faster than navigator.clipboard.readText() which requires permission checks
@@ -1065,20 +1064,32 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // v3.9.1 FIX: Handle Ctrl+V ourselves since clipboardMode is 'off'
-      // Previously we returned true hoping xterm would trigger paste, but it doesn't
-      // because clipboardMode: 'off' disables that behavior
-      // v3.9.8: Enhanced with video support and better metadata
-      // v3.9.9: Set isPastingRef to prevent double-handling from paste event
+      // v3.11.1 FIX: Ctrl+V paste reliability fix
+      // PROBLEM: Previous approach blocked native paste event, then tried async clipboard API
+      // which fails 80% of the time due to focus/permission issues.
+      // SOLUTION: Let the native paste event fire first (it's synchronous and reliable).
+      // Only use clipboard API as a FALLBACK if the paste event didn't trigger.
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        console.log('[Terminal] Ctrl+V pressed - manually reading clipboard');
+        console.log('[Terminal] Ctrl+V pressed - allowing native paste event');
         
-        // Set flag to prevent handlePaste from also processing
-        isPastingRef.current = true;
-        setTimeout(() => { isPastingRef.current = false; }, 500); // Reset after 500ms
+        // DON'T set isPastingRef here - let the paste event handler work
+        // Instead, set a short timer to use clipboard API as fallback if paste event doesn't fire
+        const pasteStartTime = Date.now();
         
-        // Try to read from clipboard directly
-        (async () => {
+        // Wait a brief moment to see if paste event fires (it should be synchronous)
+        setTimeout(async () => {
+          // If isPastingRef was set, paste event already handled it
+          if (isPastingRef.current) {
+            console.log('[Terminal] Paste was handled by paste event');
+            return;
+          }
+          
+          // Paste event didn't fire - try clipboard API as fallback
+          console.log('[Terminal] Paste event did not fire, trying clipboard API fallback');
+          isPastingRef.current = true;
+          setTimeout(() => { isPastingRef.current = false; }, 500);
+          
+          (async () => {
           // PRIORITY: Check for images/videos FIRST (they're the special case)
           try {
             const items = await navigator.clipboard.read();
@@ -1234,8 +1245,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
         })();
+        }, 50); // Wait 50ms to see if paste event fires first
         
-        return false; // We handled it, don't let xterm process
+        // v3.11.1: Return TRUE to let xterm trigger the native paste event
+        // The paste event handler (handlePaste) will set isPastingRef if it handles the paste
+        return true;
       }
 
       return true; // Let all other keys pass through standard xterm processing
