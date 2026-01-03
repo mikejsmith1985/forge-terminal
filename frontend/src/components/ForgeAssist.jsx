@@ -737,7 +737,11 @@ export default function ForgeAssist({
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
             {/* Quick Instructions Button - NEW: Always append custom snippets */}
             <button 
-              onClick={() => setShowQuickInstructionsPanel(!showQuickInstructionsPanel)}
+              data-testid="quick-instructions-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowQuickInstructionsPanel(!showQuickInstructionsPanel);
+              }}
               title="Quick Instructions - Add custom text that always appends to prompts"
               style={{
                 background: quickInstructions.some(i => i.enabled) ? '#238636' : '#333',
@@ -949,7 +953,7 @@ export default function ForgeAssist({
           right: 0,
           bottom: 0,
           background: 'rgba(0,0,0,0.85)',
-          zIndex: 3000,
+          zIndex: 10001, // Must be above ForgeAssist overlay (z-index: 10000)
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1208,7 +1212,7 @@ export default function ForgeAssist({
           right: 0,
           bottom: 0,
           background: 'rgba(0,0,0,0.85)',
-          zIndex: 3000,
+          zIndex: 10001, // Must be above ForgeAssist overlay (z-index: 10000)
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

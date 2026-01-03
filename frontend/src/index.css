@@ -1188,6 +1188,30 @@ body {
   cursor: not-allowed;
 }
 
+/* Dashboard Button */
+.dashboard-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--subtext);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.dashboard-btn:hover {
+  background: rgba(249, 115, 22, 0.15);
+  color: var(--accent);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
 /* Terminal Container for multiple terminals */
 .terminal-container {
   flex: 1;

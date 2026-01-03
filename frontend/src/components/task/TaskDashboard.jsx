@@ -22,6 +22,7 @@ import {
   ChevronDown, ChevronRight, Plus, X, Play, Pause,
   Clock, Check, Circle, ArrowRight, Edit2, Save
 } from 'lucide-react';
+import SmartRoutingPanel from '../SmartRoutingPanel';
 import './TaskDashboard.css';
 
 // Stage definitions
@@ -84,6 +85,11 @@ export default function TaskDashboard({
     validate: false,
     deliver: false,
   });
+
+  // Smart routing state
+  const [implementPrompt, setImplementPrompt] = useState('');
+  const [showRoutingPanel, setShowRoutingPanel] = useState(false);
+  const [currentModel, setCurrentModel] = useState('claude-sonnet-4.5');
 
   // Compute context summary
   const contextSummary = useMemo(() => {
@@ -342,6 +348,44 @@ export default function TaskDashboard({
 
             {stageKey === 'implement' && (
               <div className="stage-implement">
+                {/* Smart Routing Panel */}
+                {showRoutingPanel && implementPrompt && (
+                  <SmartRoutingPanel
+                    prompt={implementPrompt}
+                    mentionedFiles={contextFiles.map(f => f.path || f.name)}
+                    currentModel={currentModel}
+                    onAccept={(recommendedModel) => {
+                      setCurrentModel(recommendedModel);
+                      setShowRoutingPanel(false);
+                      onToast?.(`Switched to ${recommendedModel}`, 'success', 2000);
+                      // TODO: Actually switch model via API
+                    }}
+                    onReject={() => {
+                      setShowRoutingPanel(false);
+                    }}
+                  />
+                )}
+
+                {/* Task Prompt Input */}
+                <div className="implement-prompt-section">
+                  <label htmlFor="task-prompt">What do you want to implement?</label>
+                  <textarea
+                    id="task-prompt"
+                    data-testid="ht-task-input"
+                    className="task-prompt-input"
+                    placeholder="Describe the implementation task... (e.g., 'Refactor routing logic across 7 files')"
+                    value={implementPrompt}
+                    onChange={(e) => {
+                      setImplementPrompt(e.target.value);
+                      // Show routing panel when user types a substantial prompt
+                      if (e.target.value.trim().length > 20) {
+                        setShowRoutingPanel(true);
+                      }
+                    }}
+                    rows={3}
+                  />
+                </div>
+
                 <div className="implement-hint">
                   <Terminal size={16} />
                   <span>Work in the terminal below. Your changes are tracked automatically via AM.</span>
@@ -350,6 +394,9 @@ export default function TaskDashboard({
                   <div className="stat">
                     <Clock size={14} />
                     <span>Session active</span>
+                  </div>
+                  <div className="stat">
+                    <span>Current model: {currentModel.split('-').pop()}</span>
                   </div>
                 </div>
                 <button 

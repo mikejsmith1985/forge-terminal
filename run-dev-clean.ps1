@@ -78,7 +78,7 @@ if (-not $NoBuild) {
     Write-Host "  ✓ forge-dev.exe built (timestamp: $buildTime)" -ForegroundColor Green
     Write-Host ""
 } else {
-    Write-Host "[2-4/6] Skipping build (--NoBuild specified)" -ForegroundColor Gray
+    Write-Host "[2-4/6] Skipping build (-NoBuild specified)" -ForegroundColor Gray
     Write-Host ""
 }
 

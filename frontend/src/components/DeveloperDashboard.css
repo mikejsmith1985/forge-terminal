@@ -1,0 +1,329 @@
+.dev-dashboard-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dev-dashboard {
+  background: var(--card-bg, #1e293b);
+  border: 1px solid var(--card-border, #334155);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0);
+  }
+}
+
+.dd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--card-border, #334155);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.dd-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dd-icon {
+  color: var(--accent, #f97316);
+}
+
+.dd-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text, #f1f5f9);
+  margin: 0;
+}
+
+.dd-dev-badge {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dd-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dd-refresh-btn,
+.dd-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--subtext, #94a3b8);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dd-refresh-btn:hover,
+.dd-close-btn:hover {
+  background: var(--overlay, rgba(255, 255, 255, 0.1));
+  color: var(--text, #f1f5f9);
+}
+
+.dd-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Loading State */
+.dd-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px;
+  color: var(--subtext, #94a3b8);
+}
+
+/* Content */
+.dd-content {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Stats Grid */
+.dd-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.dd-stat-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--card-border, #334155);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.dd-stat-card:hover {
+  border-color: var(--accent, #f97316);
+  transform: translateY(-2px);
+}
+
+.dd-stat-card.primary {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.1) 100%);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.dd-stat-card.primary svg {
+  color: var(--accent, #f97316);
+}
+
+.dd-stat-card svg {
+  color: var(--subtext, #94a3b8);
+}
+
+.dd-stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text, #f1f5f9);
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.dd-stat-label {
+  font-size: 0.75rem;
+  color: var(--subtext, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Sections */
+.dd-section {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--card-border, #334155);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dd-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text, #f1f5f9);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.dd-section-header:hover {
+  background: var(--overlay, rgba(255, 255, 255, 0.05));
+}
+
+.dd-section-header svg:first-child {
+  color: var(--accent, #f97316);
+}
+
+.dd-section-header svg:last-child {
+  margin-left: auto;
+  color: var(--subtext, #94a3b8);
+}
+
+/* Chart */
+.dd-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 100px;
+  padding: 16px 14px;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--card-border, #334155);
+}
+
+.dd-chart-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+}
+
+.dd-chart-bar {
+  width: 100%;
+  max-width: 28px;
+  min-height: 4px;
+  background: linear-gradient(180deg, var(--accent, #f97316) 0%, #ea580c 100%);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+  margin-top: auto;
+}
+
+.dd-chart-label {
+  font-size: 0.65rem;
+  color: var(--subtext, #94a3b8);
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+
+/* List */
+.dd-list {
+  padding: 8px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--card-border, #334155);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.dd-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.dd-provider-name,
+.dd-dir-name {
+  font-size: 0.85rem;
+  color: var(--text, #f1f5f9);
+  font-weight: 500;
+}
+
+.dd-provider-count,
+.dd-dir-count {
+  font-size: 0.75rem;
+  color: var(--subtext, #94a3b8);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* Footer */
+.dd-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border, #334155);
+  font-size: 0.75rem;
+  color: var(--subtext, #94a3b8);
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .dev-dashboard {
+    width: 95%;
+    max-height: 90vh;
+    border-radius: 12px;
+  }
+
+  .dd-stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .dd-stat-card {
+    padding: 12px 10px;
+  }
+
+  .dd-stat-value {
+    font-size: 1.4rem;
+  }
+}

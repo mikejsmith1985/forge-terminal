@@ -339,6 +339,12 @@ func main() {
 	http.HandleFunc("/api/slm/install/status", WrapWithMiddleware(handleSLMInstallStatus)) // Installation status
 	http.HandleFunc("/api/ollama/status", WrapWithMiddleware(handleOllamaStatus))
 
+	// Smart Routing API - v3.10.6 (Effectiveness-based model selection)
+	http.HandleFunc("/api/routing/classify", WrapWithMiddleware(handleRoutingClassify))
+	http.HandleFunc("/api/routing/recommend", WrapWithMiddleware(handleRoutingRecommend))
+	http.HandleFunc("/api/routing/log", WrapWithMiddleware(handleRoutingLog))
+	http.HandleFunc("/api/routing/effectiveness-log", WrapWithMiddleware(handleRoutingEffectivenessLog))
+
 	// CLI Configuration API - v3.5.3 (Copilot/Claude config management)
 	http.HandleFunc("/api/cli/config", WrapWithMiddleware(handleCLIConfig))
 	http.HandleFunc("/api/cli/copilot/config", WrapWithMiddleware(handleCLICopilotConfig))

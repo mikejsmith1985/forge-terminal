@@ -1,9 +1,9 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, BarChart3 } from 'lucide-react';
 import Tab from './Tab';
 
 /**
- * TabBar component - contains tabs and new tab button
+ * TabBar component - contains tabs, dashboard button, and new tab button
  */
 function TabBar({
   tabs,
@@ -17,6 +17,7 @@ function TabBar({
   onToggleAM = null, // Callback to toggle AM logging for a tab
   onToggleMode = null, // Callback to toggle light/dark mode for a tab
   onToggleViewMode = null, // Callback to toggle view mode (chat/terminal/notebook) for a tab
+  onOpenDashboard = null, // Callback to open Developer Dashboard
   disableNewTab = false,
   waitingTabs = {}, // Map of tabId -> isWaiting
   mode = 'dark', // 'dark' or 'light' for theme mode
@@ -81,6 +82,18 @@ function TabBar({
           />
         ))}
       </div>
+      {/* Dashboard Button */}
+      {onOpenDashboard && (
+        <button
+          className="dashboard-btn"
+          onClick={onOpenDashboard}
+          aria-label="Developer Dashboard"
+          title="Developer Dashboard"
+          data-testid="dashboard-btn"
+        >
+          <BarChart3 size={16} />
+        </button>
+      )}
       <button
         className="new-tab-btn"
         onClick={onNewTab}

@@ -10,6 +10,7 @@ import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import UpdateModal from './components/UpdateModal'
+import DeveloperDashboard from './components/DeveloperDashboard'
 // WelcomeModal REMOVED - replaced by guided tour (user request: 20+ times)
 // Workflows REMOVED - v3.9.0: Consolidating to SLM-enhanced Forge Assist
 import FileAccessPrompt from './components/FileAccessPrompt'
@@ -164,6 +165,9 @@ function App() {
   // v3.8.2: Task Dashboard state
   const [isTaskDashboardOpen, setIsTaskDashboardOpen] = useState(false)
   const [contextFiles, setContextFiles] = useState([])
+  
+  // v3.10.6: Developer Dashboard state
+  const [isDeveloperDashboardOpen, setIsDeveloperDashboardOpen] = useState(false)
   
   // Model Router state
   const [currentModelTier, setCurrentModelTier] = useState(null)
@@ -1715,6 +1719,7 @@ function App() {
           onToggleAM={handleToggleAM}
           onToggleMode={toggleTabMode}
           onToggleViewMode={toggleTabViewMode}
+          onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}
           mode={theme}
@@ -1888,6 +1893,12 @@ function App() {
       <FeedbackModal
         isOpen={isFeedbackModalOpen}
         onClose={() => setIsFeedbackModalOpen(false)}
+      />
+
+      <DeveloperDashboard
+        isOpen={isDeveloperDashboardOpen}
+        onClose={() => setIsDeveloperDashboardOpen(false)}
+        devMode={devMode}
       />
 
       <SettingsModal

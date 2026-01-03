@@ -485,3 +485,47 @@
 .task-stages::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary, #666);
 }
+/* Smart Routing Integration - Task Prompt Input */
+.implement-prompt-section {
+  margin-bottom: 16px;
+}
+
+.implement-prompt-section label {
+  display: block;
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.task-prompt-input {
+  width: 100%;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #e5e7eb;
+  font-family: "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.task-prompt-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.task-prompt-input::placeholder {
+  color: #6b7280;
+}
+
+.implement-stats .stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+}

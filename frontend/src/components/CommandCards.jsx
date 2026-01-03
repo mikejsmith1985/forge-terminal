@@ -2,11 +2,18 @@ import React from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableCommandCard } from './SortableCommandCard';
 import { RefreshCw } from 'lucide-react';
+import OwnerReleaseCard from './OwnerReleaseCard';
 
 const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType }) => {
   if (loading) {
     return (
       <div className="command-cards-container">
+        {/* Owner Release Card always renders */}
+        <OwnerReleaseCard 
+          onExecuteCommand={onExecute}
+          onToast={onToast}
+          shellType={shellType}
+        />
         <div className="command-cards-loading">
           <div className="spinner"></div>
           <p>Loading command cards...</p>
@@ -18,6 +25,12 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
   if (error) {
     return (
       <div className="command-cards-container">
+        {/* Owner Release Card always renders */}
+        <OwnerReleaseCard 
+          onExecuteCommand={onExecute}
+          onToast={onToast}
+          shellType={shellType}
+        />
         <div className="command-cards-error">
           <p className="error-message">⚠️ Failed to load command cards</p>
           <p className="error-details">{error}</p>
@@ -37,6 +50,13 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
 
   return (
     <div className="command-cards-container">
+      {/* Owner Release Card (only visible to repo owner) */}
+      <OwnerReleaseCard 
+        onExecuteCommand={onExecute}
+        onToast={onToast}
+        shellType={shellType}
+      />
+      
       {/* User Cards Section */}
       {userCards.length > 0 ? (
         <SortableContext

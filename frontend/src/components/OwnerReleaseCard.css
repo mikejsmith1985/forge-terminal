@@ -1,0 +1,463 @@
+.owner-release-card {
+  background: var(--card-bg);
+  background-image: linear-gradient(135deg, rgba(249, 115, 22, 0.05) 0%, transparent 50%);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  transition: all 0.2s ease;
+}
+
+.owner-release-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow), var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.owner-release-card.loading-auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--subtext);
+  font-size: 0.9rem;
+}
+
+.owner-release-card.unauthorized {
+  opacity: 0.7;
+}
+
+.orc-unauthorized-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 12px;
+}
+
+.orc-shield-icon {
+  color: var(--subtext);
+}
+
+.orc-unauthorized-msg {
+  font-size: 0.85rem;
+  color: var(--subtext);
+  margin: 0;
+  max-width: 300px;
+}
+
+.orc-header {
+  margin-bottom: 16px;
+}
+
+.orc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.orc-icon {
+  color: var(--accent);
+}
+
+.orc-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.orc-owner-badge {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.orc-description {
+  font-size: 0.85rem;
+  color: var(--subtext);
+  margin: 0;
+}
+
+.orc-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Version Display */
+.orc-version-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+}
+
+.orc-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--subtext);
+  font-size: 0.9rem;
+}
+
+.orc-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(249, 115, 22, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.orc-version-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.orc-version-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.orc-current-version {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.orc-arrow {
+  color: var(--accent);
+  font-weight: bold;
+  font-size: 1.4rem;
+}
+
+.orc-next-version {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-weight: 600;
+  color: white;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+/* Release Type Badge */
+.orc-release-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  align-self: flex-start;
+}
+
+.orc-release-type.red {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.orc-release-type.blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.orc-release-type.green {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Increment Buttons */
+.orc-buttons-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.orc-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+}
+
+.orc-button:hover {
+  background: var(--overlay);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.orc-button.selected {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+.orc-button-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.orc-button-preview {
+  font-size: 0.7rem;
+  color: var(--subtext);
+  font-family: 'Monaco', 'Consolas', monospace;
+  opacity: 0.8;
+}
+
+.orc-button.selected .orc-button-preview {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Commit Section */
+.orc-commit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.orc-commit-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.orc-commit-input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.orc-commit-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+}
+
+.orc-commit-input::placeholder {
+  color: var(--subtext);
+  opacity: 0.6;
+}
+
+/* Workflow Steps */
+.orc-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+}
+
+.orc-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+  padding: 4px 0;
+}
+
+.orc-step svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.orc-step-arrow {
+  color: var(--subtext);
+  font-size: 0.7rem;
+  text-align: center;
+  opacity: 0.6;
+}
+
+/* Command Section */
+.orc-command-section {
+  margin-top: 4px;
+}
+
+.orc-command-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--subtext);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.orc-command-toggle:hover {
+  background: var(--overlay);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.orc-command-display {
+  background: #0f172a;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.orc-command-text {
+  display: block;
+  color: #10b981;
+  font-size: 0.8rem;
+  font-family: 'Monaco', 'Consolas', monospace;
+  line-height: 1.5;
+  word-break: break-all;
+  white-space: pre-wrap;
+  margin: 0 0 10px 0;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.orc-command-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.orc-action-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.orc-action-button:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+/* Execute Button */
+.orc-execute-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+  width: 100%;
+}
+
+.orc-execute-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
+}
+
+.orc-execute-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Error */
+.orc-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #ef4444;
+  font-size: 0.85rem;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .owner-release-card {
+    padding: 16px;
+  }
+
+  .orc-buttons-group {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .orc-button {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 14px;
+  }
+
+  .orc-version-display {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
