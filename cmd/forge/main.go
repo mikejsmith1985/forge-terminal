@@ -378,6 +378,19 @@ func main() {
 	// Start freeze detector on startup
 	_ = diagnostic.GetFreezeDetector() // Auto-starts on first access
 
+	// Debug Session API - Follow-Me Debugger (v3.12.0)
+	http.HandleFunc("/api/debug-sessions", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handleListDebugSessions(w, r)
+		case http.MethodPost:
+			handleSaveDebugSession(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+	http.HandleFunc("/api/debug-sessions/", WrapWithMiddleware(handleGetDebugSession))
+
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
 

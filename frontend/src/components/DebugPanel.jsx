@@ -8,6 +8,7 @@ import {
   GripVertical
 } from 'lucide-react';
 import { getRecentLogs } from '../utils/logger';
+import FollowMeDebugger from './FollowMeDebugger';
 
 /**
  * Collapsible Debug Card Component
@@ -436,6 +437,9 @@ const DebugPanel = ({ terminalRef, tabId }) => {
       fontSize: '13px',
       overflowY: 'auto',
     }}>
+      {/* Follow-Me Debugger - Top of Debug Panel */}
+      <FollowMeDebugger />
+      
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
