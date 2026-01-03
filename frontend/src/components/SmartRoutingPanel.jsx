@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './SmartRoutingPanel.css';
 
 const SmartRoutingPanel = ({ 
@@ -12,6 +12,8 @@ const SmartRoutingPanel = ({
   const [recommendation, setRecommendation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const debounceRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     if (!prompt || prompt.trim().length === 0) {
@@ -19,7 +21,21 @@ const SmartRoutingPanel = ({
       return;
     }
 
-    const fetchRecommendation = async () => {
+    // Clear any pending debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    // Abort any in-flight requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Debounce API calls by 500ms to prevent rapid-fire requests
+    debounceRef.current = setTimeout(async () => {
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       try {
         setLoading(true);
         setError(null);
@@ -31,7 +47,8 @@ const SmartRoutingPanel = ({
           body: JSON.stringify({ 
             prompt, 
             mentionedFiles 
-          })
+          }),
+          signal
         });
 
         if (!classifyRes.ok) {
@@ -48,7 +65,8 @@ const SmartRoutingPanel = ({
           body: JSON.stringify({
             pattern: classifyData.pattern,
             current_model: currentModel
-          })
+          }),
+          signal
         });
 
         if (!recommendRes.ok) {
@@ -59,14 +77,26 @@ const SmartRoutingPanel = ({
         setRecommendation(recommendData);
 
       } catch (err) {
+        if (err.name === 'AbortError') {
+          // Request was cancelled, ignore
+          return;
+        }
         console.error('[SmartRouting] Error:', err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
-    };
+    }, 500); // 500ms debounce
 
-    fetchRecommendation();
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [prompt, mentionedFiles, currentModel]);
 
   if (loading) {
