@@ -162,12 +162,26 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     }
   };
 
-  // Display text
+  // Display text - show meaningful status instead of useless log count
   const getDisplayText = () => {
     if (statusType === 'disabled') return 'AM Off';
     if (statusType === 'broken') return 'AM Error';
     if (status?.isCapturing) return '● Recording';
-    if (hasConversations) return `${conversations.length} log${conversations.length !== 1 ? 's' : ''}`;
+    
+    // Show time since last capture if available
+    if (status?.secondsSinceCapture !== undefined) {
+      const seconds = status.secondsSinceCapture;
+      if (seconds < 60) return `Active ${seconds}s ago`;
+      if (seconds < 3600) return `Active ${Math.floor(seconds / 60)}m ago`;
+      if (seconds < 86400) return `Active ${Math.floor(seconds / 3600)}h ago`;
+      return `Idle ${Math.floor(seconds / 86400)}d`;
+    }
+    
+    // Show turns captured if meaningful
+    if (status?.turnsCaptured > 0) {
+      return `${status.turnsCaptured} turns`;
+    }
+    
     return 'AM Ready';
   };
   
