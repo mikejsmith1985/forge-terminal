@@ -1,4 +1,4 @@
-# Forge Terminal - PROPER Dev Workflow
+﻿# Forge Terminal - PROPER Dev Workflow
 # Rebuilds frontend AND Go binary, kills old processes, starts fresh on DEV PORTS
 # NO CACHE ISSUES!
 
