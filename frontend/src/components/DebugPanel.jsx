@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { 
   Bug, RefreshCw, MessageSquare, Activity, ChevronDown, ChevronRight, 
   Cpu, Wifi, Eye, Keyboard, Terminal as TerminalIcon, Gauge, AlertTriangle,
@@ -9,106 +8,20 @@ import {
 } from 'lucide-react';
 import { getRecentLogs } from '../utils/logger';
 import FollowMeDebugger from './FollowMeDebugger';
-
-/**
- * Collapsible Debug Card Component
- */
-const DebugCard = ({ id, title, icon: Icon, children, defaultCollapsed = false, isActive = false }) => {
-  const [collapsed, setCollapsed] = useState(() => {
-    const saved = localStorage.getItem(`debug-card-${id}-collapsed`);
-    return saved !== null ? saved === 'true' : defaultCollapsed;
-  });
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  useEffect(() => {
-    localStorage.setItem(`debug-card-${id}-collapsed`, collapsed.toString());
-  }, [collapsed, id]);
-
-  return (
-    <div 
-      ref={setNodeRef} 
-      style={style}
-      className="debug-card"
-    >
-      <div 
-        className="debug-card-header"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 12px',
-          background: 'rgba(255, 255, 255, 0.03)',
-          borderRadius: '8px 8px 0 0',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
-          borderBottom: collapsed ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-          cursor: 'pointer',
-          userSelect: 'none',
-        }}
-        onClick={() => setCollapsed(!collapsed)}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            {...attributes}
-            {...listeners}
-            style={{ cursor: 'grab', display: 'flex', alignItems: 'center', padding: '4px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVertical size={14} color="#666" />
-          </div>
-          <Icon size={14} color={isActive ? '#00ff00' : '#888'} />
-          <h4 style={{ margin: 0, color: '#fff', fontSize: '12px', fontWeight: 600 }}>
-            {title}
-          </h4>
-          {isActive && (
-            <div style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: '#00ff00',
-              animation: 'pulse 2s infinite',
-            }} />
-          )}
-        </div>
-        {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-      </div>
-      {!collapsed && (
-        <div 
-          className="debug-card-body"
-          style={{
-            padding: '12px',
-            background: 'rgba(255, 255, 255, 0.03)',
-            borderRadius: '0 0 8px 8px',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            borderTop: 'none',
-            fontSize: '11px',
-            color: '#ccc',
-          }}
-        >
-          {children}
-        </div>
-      )}
-    </div>
-  );
-};
+import DebugCard from './DebugCard';
 
 /**
  * Enhanced DebugPanel - Live monitoring with collapsible cards
  */
 const DebugPanel = ({ terminalRef, tabId }) => {
+  // Helper function - defined first to avoid TDZ issues with minifier
+  // This is a pure function that only reads localStorage, no React deps
+  const isCardExpanded = (cardId) => {
+    const saved = localStorage.getItem(`debug-card-${cardId}-collapsed`);
+    const defaultCollapsed = cardId === 'freeze-monitor' || cardId === 'auto-respond';
+    return saved !== null ? saved === 'false' : !defaultCollapsed;
+  };
+
   // Card order management
   const [cardOrder, setCardOrder] = useState(() => {
     const saved = localStorage.getItem('debug-card-order');
@@ -163,13 +76,6 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     }
   };
 
-  // Check which cards are collapsed
-  const isCardExpanded = useCallback((cardId) => {
-    const saved = localStorage.getItem(`debug-card-${cardId}-collapsed`);
-    const defaultCollapsed = cardId === 'freeze-monitor' || cardId === 'auto-respond';
-    return saved !== null ? saved === 'false' : !defaultCollapsed;
-  }, []);
-
   // Fetch freeze metrics
   const fetchFreezeMetrics = useCallback(async () => {
     if (!isCardExpanded('freeze-monitor')) return;
@@ -192,7 +98,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     } catch (e) {
       console.error('[DebugPanel] Failed to fetch freeze metrics', e);
     }
-  }, [isCardExpanded]);
+  }, []); // isCardExpanded is stable (useCallback with [])
 
   // Capture diagnostics snapshot
   const captureDiagnostics = useCallback(() => {
@@ -230,7 +136,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
       }
       return next;
     });
-  }, [tabId, terminalRef?.wsRef, terminalRef?.terminal, isCardExpanded]);
+  }, [tabId, terminalRef?.wsRef, terminalRef?.terminal]); // isCardExpanded is stable
 
   const getWebSocketState = (state) => {
     switch (state) {
@@ -258,7 +164,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     if (isCardExpanded('performance')) {
       animationFrameRef.current = requestAnimationFrame(measureFPS);
     }
-  }, [isCardExpanded]);
+  }, []); // isCardExpanded is stable
 
   // Memory monitoring
   const measureMemory = useCallback(() => {
@@ -275,7 +181,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
         }
       }));
     }
-  }, [isCardExpanded]);
+  }, []); // isCardExpanded is stable
 
   // WebSocket message rate tracking
   // FIXED: Don't override ws.onmessage - use addEventListener instead
@@ -304,7 +210,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
       clearInterval(interval);
       ws.removeEventListener('message', handleMessage);
     };
-  }, [terminalRef?.wsRef, isCardExpanded]);
+  }, [terminalRef?.wsRef]); // isCardExpanded is stable
 
   // Keyboard event tracking
   useEffect(() => {
@@ -345,7 +251,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
       window.removeEventListener('keydown', handleKeyEvent);
       window.removeEventListener('keyup', handleKeyEvent);
     };
-  }, [isCardExpanded]);
+  }, []); // isCardExpanded is stable
 
   // Console log tracking
   useEffect(() => {
@@ -363,7 +269,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     const interval = setInterval(updateConsoleLogs, 1000);
 
     return () => clearInterval(interval);
-  }, [isCardExpanded]);
+  }, []); // isCardExpanded is stable
 
   // Auto-Respond log interception
   // FIXED: Don't override console.log - use logger API instead
@@ -412,7 +318,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     return () => {
       clearInterval(interval);
     };
-  }, [isCardExpanded]);
+  }, []); // isCardExpanded is stable
 
   // Main update loop
   useEffect(() => {
@@ -439,7 +345,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [captureDiagnostics, fetchFreezeMetrics, measureMemory, measureFPS, isCardExpanded]);
+  }, [captureDiagnostics, fetchFreezeMetrics, measureMemory, measureFPS]); // isCardExpanded is stable
 
   return (
     <div style={{

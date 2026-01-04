@@ -721,9 +721,10 @@ function App() {
       const res = await fetch('/api/welcome');
       const data = await res.json();
       
-      // Show welcome if not already shown for this version
+      // WelcomeModal was removed in favor of guided tour
+      // Just log the status, don't try to open a modal that doesn't exist
       if (!data.shown) {
-        setIsWelcomeModalOpen(true);
+        console.log('[App] Welcome not yet shown - guided tour will handle this');
       }
     } catch (err) {
       console.error('Failed to check welcome status:', err);
