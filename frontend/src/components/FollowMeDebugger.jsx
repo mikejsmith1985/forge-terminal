@@ -20,6 +20,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [hasInterruptedSession, setHasInterruptedSession] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
@@ -32,16 +33,84 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
   const originalFetchRef = useRef(null);
   const lastMouseMoveRef = useRef(0);
   const lastScrollRef = useRef(0);
+  const sessionIdRef = useRef(null);
+  const streamEndedByUserRef = useRef(false);
+
+  // Check for interrupted session on mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem('follow-me-active-session');
+    if (savedSession) {
+      try {
+        const session = JSON.parse(savedSession);
+        if (session.interrupted) {
+          setHasInterruptedSession(true);
+          // Restore session data
+          eventsRef.current = session.events || [];
+          consoleLogsRef.current = session.consoleLogs || [];
+          networkRequestsRef.current = session.networkRequests || [];
+          startTimeRef.current = session.startTime;
+          sessionIdRef.current = session.id;
+          const elapsed = Math.floor((Date.now() - session.startTime) / 1000);
+          setRecordingDuration(elapsed);
+          
+          // v3.11.3: Auto-restore if session was active (not explicitly interrupted by user)
+          if (session.isRecording) {
+            console.log('[FollowMe] Restoring active recording session');
+            setIsRecording(true);
+            
+            // Restart duration counter
+            durationIntervalRef.current = setInterval(() => {
+              setRecordingDuration(prev => prev + 1);
+              // Auto-save periodically
+              if (prev % 5 === 0) {
+                const currentSession = {
+                  id: sessionIdRef.current,
+                  startTime: startTimeRef.current,
+                  events: eventsRef.current,
+                  consoleLogs: consoleLogsRef.current,
+                  networkRequests: networkRequestsRef.current,
+                  interrupted: true,
+                  isRecording: true,
+                };
+                localStorage.setItem('follow-me-active-session', JSON.stringify(currentSession));
+              }
+            }, 1000);
+            
+            // Re-attach event listeners
+            window.addEventListener('keydown', captureKeystroke, true);
+            window.addEventListener('click', captureClick, true);
+            window.addEventListener('mousemove', captureMouseMove, true);
+            window.addEventListener('scroll', captureScroll, true);
+            interceptConsole();
+            interceptFetch();
+          }
+        }
+      } catch (err) {
+        console.error('[FollowMe] Failed to restore session:', err);
+        localStorage.removeItem('follow-me-active-session');
+      }
+    }
+  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
 
   useEffect(() => {
+    // v3.11.3 FIX: Don't cleanup on unmount if recording is active
+    // This allows Follow Me to survive tab switches
     return () => {
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
+      // Only cleanup if NOT recording
+      // If recording, the session persists and will resume when user returns to Debug tab
+      if (!isRecording) {
+        if (durationIntervalRef.current) {
+          clearInterval(durationIntervalRef.current);
+        }
+        restoreConsole();
+        restoreFetch();
+      } else {
+        console.log('[FollowMe] Component unmounting but recording active - preserving state');
+        // Save to localStorage so it can be restored
+        saveSessionToLocalStorage();
       }
-      restoreConsole();
-      restoreFetch();
     };
-  }, []);
+  }, [isRecording, saveSessionToLocalStorage]);
 
   const captureKeystroke = useCallback((e) => {
     eventsRef.current.push({
@@ -170,16 +239,32 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     }
   }, []);
 
+  const saveSessionToLocalStorage = useCallback(() => {
+    const session = {
+      id: sessionIdRef.current,
+      startTime: startTimeRef.current,
+      events: eventsRef.current,
+      consoleLogs: consoleLogsRef.current,
+      networkRequests: networkRequestsRef.current,
+      interrupted: true,
+      isRecording: true, // Mark that recording is active
+    };
+    localStorage.setItem('follow-me-active-session', JSON.stringify(session));
+  }, []);
+
   const startRecording = useCallback(async () => {
     try {
       setError(null);
       setSessionComplete(false);
       setSessionData(null);
+      setHasInterruptedSession(false);
       eventsRef.current = [];
       consoleLogsRef.current = [];
       networkRequestsRef.current = [];
       recordedChunksRef.current = [];
       startTimeRef.current = Date.now();
+      sessionIdRef.current = 'debug-' + Date.now();
+      streamEndedByUserRef.current = false;
 
       // Try screen recording (skip in headless/test environments)
       const isHeadless = navigator.webdriver || window.navigator.userAgent.includes('HeadlessChrome');
@@ -189,6 +274,34 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
             video: { cursor: 'always', displaySurface: 'browser' },
             audio: false,
           });
+          
+          // Detect when user stops sharing via browser controls
+          stream.getVideoTracks()[0].onended = () => {
+            if (!streamEndedByUserRef.current) {
+              console.warn('[FollowMe] Screen share ended - checking if user explicitly stopped...');
+              
+              // Check if this was triggered by another displayMedia request (screenshot tool)
+              // vs user clicking "Stop Sharing" button
+              // If events are still being captured, it's likely a tool conflict, not user stop
+              const recentEvents = eventsRef.current.filter(e => 
+                e.timestamp > Date.now() - startTimeRef.current - 2000
+              );
+              
+              if (recentEvents.length > 0) {
+                console.log('[FollowMe] Detected screen capture tool conflict - continuing session without video');
+                // Don't persist or show recovery - just continue capturing events
+                // Video recording lost, but events/logs still captured
+                return;
+              }
+              
+              console.warn('[FollowMe] User stopped sharing - persisting session');
+              // Save session to localStorage for recovery
+              saveSessionToLocalStorage();
+              // Keep UI in recording state so user can click "I'm Done"
+              // Don't call stopRecording() automatically
+            }
+          };
+          
           const mediaRecorder = new MediaRecorder(stream, {
             mimeType: 'video/webm;codecs=vp9',
           });
@@ -214,6 +327,10 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       setRecordingDuration(0);
       durationIntervalRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
+        // Persist session every 5 seconds during recording
+        if (prev % 5 === 0) {
+          saveSessionToLocalStorage();
+        }
       }, 1000);
 
       setIsRecording(true);
@@ -237,6 +354,8 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
   const stopRecording = useCallback(async () => {
     try {
       setSaving(true);
+      streamEndedByUserRef.current = true; // Mark that user explicitly stopped
+      
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
@@ -304,6 +423,10 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       setSessionData(session);
       setSessionComplete(true);
       setSaving(false);
+      
+      // Clear localStorage since session is now complete
+      localStorage.removeItem('follow-me-active-session');
+      setHasInterruptedSession(false);
 
       if (onSessionComplete) onSessionComplete(session);
     } catch (err) {
@@ -445,6 +568,34 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     setError(null);
   }, []);
 
+  const resumeSession = useCallback(() => {
+    setHasInterruptedSession(false);
+    setIsRecording(true);
+    // Resume duration counter
+    durationIntervalRef.current = setInterval(() => {
+      setRecordingDuration(prev => prev + 1);
+      if (prev % 5 === 0) {
+        saveSessionToLocalStorage();
+      }
+    }, 1000);
+    // Re-attach event listeners
+    window.addEventListener('keydown', captureKeystroke, true);
+    window.addEventListener('click', captureClick, true);
+    window.addEventListener('mousemove', captureMouseMove, true);
+    window.addEventListener('scroll', captureScroll, true);
+    interceptConsole();
+    interceptFetch();
+  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch, saveSessionToLocalStorage]);
+
+  const discardSession = useCallback(() => {
+    localStorage.removeItem('follow-me-active-session');
+    setHasInterruptedSession(false);
+    eventsRef.current = [];
+    consoleLogsRef.current = [];
+    networkRequestsRef.current = [];
+    setRecordingDuration(0);
+  }, []);
+
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -460,7 +611,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
         </div>
       )}
 
-      {!isRecording && !sessionComplete && (
+      {!isRecording && !sessionComplete && !hasInterruptedSession && (
         <button
           className="follow-me-button"
           onClick={startRecording}
@@ -469,6 +620,33 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
           <Video size={16} />
           <span>Follow Me</span>
         </button>
+      )}
+
+      {hasInterruptedSession && !isRecording && !sessionComplete && (
+        <div className="follow-me-recovery" data-testid="follow-me-recovery">
+          <div className="recovery-message">
+            <AlertCircle size={16} color="#ff9800" />
+            <span>Previous session interrupted ({formatDuration(recordingDuration)})</span>
+          </div>
+          <div className="recovery-actions">
+            <button
+              className="resume-session-button"
+              onClick={resumeSession}
+              data-testid="resume-session-button"
+            >
+              <Video size={14} />
+              <span>Resume</span>
+            </button>
+            <button
+              className="discard-session-button"
+              onClick={discardSession}
+              data-testid="discard-session-button"
+            >
+              <Square size={14} />
+              <span>Discard</span>
+            </button>
+          </div>
+        </div>
       )}
 
       {isRecording && (

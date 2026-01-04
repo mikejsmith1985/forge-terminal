@@ -8,6 +8,37 @@ import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import { diagnosticCore } from '../utils/diagnosticCore';
 
+// Paste error logger
+const logPasteError = (error, context = {}) => {
+  const errorLog = {
+    timestamp: new Date().toISOString(),
+    type: 'clipboard',
+    error: error.message || String(error),
+    errorName: error.name || 'Unknown',
+    context,
+    userAgent: navigator.userAgent,
+  };
+  
+  // Log to console
+  console.error('[Paste Error]', errorLog);
+  
+  // Persist to sessionStorage
+  try {
+    const existingLogs = JSON.parse(sessionStorage.getItem('paste-error-log') || '[]');
+    existingLogs.push(errorLog);
+    // Keep only last 50 errors
+    if (existingLogs.length > 50) {
+      existingLogs.shift();
+    }
+    sessionStorage.setItem('paste-error-log', JSON.stringify(existingLogs));
+  } catch (storageErr) {
+    console.warn('[Paste Error] Failed to persist to sessionStorage:', storageErr);
+  }
+  
+  // If Follow Me is recording, it will capture the console.error automatically
+  return errorLog;
+};
+
 // Debounce helper for resize events
 function debounce(fn, ms) {
   let timeoutId;
@@ -817,16 +848,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       isPastingRef.current = true;
       setTimeout(() => { isPastingRef.current = false; }, 500);
       
-      // v3.8.2 FIX: Handle TEXT paste synchronously using clipboardData
-      // This is MUCH faster than navigator.clipboard.readText() which requires permission checks
+      // v3.11.3 FIX: Check for images/videos FIRST before text
+      // Some screenshot tools put file path as text AND image in clipboard
+      // We want the image, not the path!
       if (e.clipboardData) {
-        // Check for text first (most common case) - handle it directly for zero latency
         const text = e.clipboardData.getData('text/plain');
         const hasMedia = Array.from(e.clipboardData.items || []).some(item => 
           item.type.startsWith('image/') || item.type.startsWith('video/')
         );
         
-        if (text && !hasMedia) {
+        // If there's BOTH text and media, prioritize media (don't send text path)
+        if (hasMedia) {
+          console.log('[Terminal] Media detected in clipboard, ignoring text path');
+          // Fall through to media handling below
+        } else if (text) {
           // Text-only paste: Send directly to PTY
           e.preventDefault();
           e.stopPropagation();
@@ -965,6 +1000,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   }
                 }
               } catch (err) {
+                logPasteError(err, { 
+                  location: 'handlePaste-imageUpload',
+                  mimeType,
+                  blobSize: blob?.size 
+                });
                 console.error(`[Terminal] ${mediaType} upload failed:`, err);
                 if (xtermRef.current) {
                   xtermRef.current.write(`\r\x1b[K\x1b[31m[${mediaType} upload failed: ${err.message}]\x1b[0m\r\n`);
@@ -1214,6 +1254,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               }
             }
           } catch (itemsErr) {
+            logPasteError(itemsErr, {
+              location: 'Ctrl+V-fallback-clipboardRead',
+              hasPermission: itemsErr.name !== 'NotAllowedError'
+            });
             console.error('[Terminal] Clipboard read failed:', itemsErr);
             
             // Fallback: Try to read text using readText() API
@@ -1226,13 +1270,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 return;
               }
             } catch (fallbackErr) {
+              logPasteError(fallbackErr, {
+                location: 'Ctrl+V-fallback-readText',
+                originalError: itemsErr.name
+              });
               console.error('[Terminal] Fallback text read also failed:', fallbackErr);
             }
             
             if (xtermRef.current) {
               // Check if it's a permission error
               if (itemsErr.name === 'NotAllowedError' || itemsErr.message.includes('permission')) {
-                xtermRef.current.write(`\x1b[33m[Paste tip: Click in terminal first, or use Ctrl+Shift+V in some browsers]\x1b[0m\r\n`);
+                xtermRef.current.write(`\x1b[33m[Paste tip: Click in terminal first, then Ctrl+V. Some browsers require focus.]\x1b[0m\r\n`);
                 // Provide error callback for toast
                 if (onPasteRef.current) {
                   onPasteRef.current('error', { 

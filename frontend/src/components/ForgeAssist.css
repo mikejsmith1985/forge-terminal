@@ -49,8 +49,8 @@
   border-bottom: 1px solid #333;
   background: #0a0a0a;
   gap: 12px;
-  flex-wrap: nowrap;
-  overflow: hidden;
+  flex-wrap: wrap; /* Allow wrapping if needed */
+  min-height: 48px; /* Ensure minimum height */
 }
 
 .forge-assist-title {
@@ -69,12 +69,8 @@
   gap: 8px;
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.forge-assist-cli-tabs::-webkit-scrollbar {
-  display: none;
+  overflow-x: visible; /* Allow visibility */
+  flex-wrap: nowrap;
 }
 
 .forge-assist-cli-tab {
@@ -89,6 +85,8 @@
   cursor: pointer;
   font-size: 0.85rem;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 .forge-assist-cli-tab:hover {

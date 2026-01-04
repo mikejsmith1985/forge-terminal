@@ -414,7 +414,10 @@ export default function ForgeAssist({
   onToast,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCLI, setSelectedCLI] = useState('claude'); // Manual selection
+  const [selectedCLI, setSelectedCLI] = useState(() => {
+    // v3.11.3: Remember last selected CLI tool
+    return localStorage.getItem('forgeAssist_lastCLI') || 'claude';
+  });
   const [expandedCategories, setExpandedCategories] = useState(new Set(['Subagents', 'Session Management']));
   const inputRef = useRef(null);
   
@@ -724,7 +727,11 @@ export default function ForgeAssist({
               <button
                 key={key}
                 className={`forge-assist-cli-tab ${selectedCLI === key ? 'active' : ''}`}
-                onClick={() => setSelectedCLI(key)}
+                onClick={() => {
+                  setSelectedCLI(key);
+                  // v3.11.3: Save last selected CLI
+                  localStorage.setItem('forgeAssist_lastCLI', key);
+                }}
                 style={{ '--cli-color': color }}
               >
                 <span className="cli-icon">{icon}</span>

@@ -50,6 +50,68 @@
   transform: translateY(0);
 }
 
+/* Recovery UI */
+.follow-me-recovery {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 8px;
+}
+
+.recovery-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffb74d;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.recovery-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.resume-session-button,
+.discard-session-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.resume-session-button {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.resume-session-button:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  transform: translateY(-1px);
+}
+
+.discard-session-button {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.discard-session-button:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 /* Recording State */
 .follow-me-recording {
   display: flex;
