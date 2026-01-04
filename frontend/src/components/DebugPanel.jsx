@@ -230,7 +230,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
       }
       return next;
     });
-  }, [tabId, terminalRef, isCardExpanded]);
+  }, [tabId, terminalRef?.wsRef, terminalRef?.terminal, isCardExpanded]);
 
   const getWebSocketState = (state) => {
     switch (state) {
@@ -278,23 +278,23 @@ const DebugPanel = ({ terminalRef, tabId }) => {
   }, [isCardExpanded]);
 
   // WebSocket message rate tracking
+  // FIXED: Don't override ws.onmessage - use addEventListener instead
   useEffect(() => {
     if (!isCardExpanded('websocket') || !terminalRef?.wsRef?.current) return;
 
     const ws = terminalRef.wsRef.current;
-    const originalOnMessage = ws.onmessage;
     
-    ws.onmessage = (event) => {
+    const handleMessage = () => {
       wsMessageCountRef.current++;
-      if (originalOnMessage) {
-        originalOnMessage.call(ws, event);
-      }
     };
+    
+    // Use addEventListener so we don't break the terminal's message handler
+    ws.addEventListener('message', handleMessage);
 
     const interval = setInterval(() => {
       const now = Date.now();
       const elapsed = (now - lastWsCheckRef.current) / 1000;
-      const rate = Math.round(wsMessageCountRef.current / elapsed);
+      const rate = elapsed > 0 ? Math.round(wsMessageCountRef.current / elapsed) : 0;
       setPerformance(prev => ({ ...prev, wsMessageRate: rate }));
       wsMessageCountRef.current = 0;
       lastWsCheckRef.current = now;
@@ -302,11 +302,9 @@ const DebugPanel = ({ terminalRef, tabId }) => {
 
     return () => {
       clearInterval(interval);
-      if (ws.onmessage === originalOnMessage) {
-        ws.onmessage = originalOnMessage;
-      }
+      ws.removeEventListener('message', handleMessage);
     };
-  }, [terminalRef, isCardExpanded]);
+  }, [terminalRef?.wsRef, isCardExpanded]);
 
   // Keyboard event tracking
   useEffect(() => {
@@ -368,35 +366,51 @@ const DebugPanel = ({ terminalRef, tabId }) => {
   }, [isCardExpanded]);
 
   // Auto-Respond log interception
+  // FIXED: Don't override console.log - use logger API instead
   useEffect(() => {
     if (!isCardExpanded('auto-respond')) return;
 
-    const originalLog = console.log;
-    console.log = function(...args) {
-      originalLog.apply(console, args);
-      
-      if (args[0] && typeof args[0] === 'string' && args[0].includes('[Auto-Respond]')) {
-        const timestamp = new Date().toISOString();
-        const data = args[1] || {};
-        
-        setAutoRespondLogs(prev => {
-          const last3Mins = Date.now() - (3 * 60 * 1000);
-          const filtered = prev.filter(log => 
-            new Date(log.timestamp).getTime() > last3Mins
-          );
-          return [...filtered, {
-            timestamp,
-            message: args[0],
-            data: JSON.parse(JSON.stringify(data))
-          }].slice(-20);
-        });
+    // Instead of overriding console.log, poll the logger for auto-respond entries
+    const checkAutoRespondLogs = () => {
+      try {
+        const logs = getRecentLogs(1); // Get last minute of logs
+        if (logs) {
+          const lines = logs.split('\n').filter(line => line.includes('[Auto-Respond]'));
+          
+          lines.forEach(line => {
+            if (line) {
+              const timestamp = new Date().toISOString();
+              setAutoRespondLogs(prev => {
+                // Check if this log already exists
+                if (prev.some(log => log.message === line)) {
+                  return prev;
+                }
+                
+                const last3Mins = Date.now() - (3 * 60 * 1000);
+                const filtered = prev.filter(log => 
+                  new Date(log.timestamp).getTime() > last3Mins
+                );
+                return [...filtered, {
+                  timestamp,
+                  message: line,
+                  data: {}
+                }].slice(-20);
+              });
 
-        setActiveCards(prev => new Set(prev).add('auto-respond'));
+              setActiveCards(prev => new Set(prev).add('auto-respond'));
+            }
+          });
+        }
+      } catch (e) {
+        // Ignore errors
       }
     };
 
+    checkAutoRespondLogs();
+    const interval = setInterval(checkAutoRespondLogs, 1000);
+
     return () => {
-      console.log = originalLog;
+      clearInterval(interval);
     };
   }, [isCardExpanded]);
 

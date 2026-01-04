@@ -406,12 +406,21 @@ function App() {
         
         if (currentVersion !== lastKnownVersion && lastKnownVersion) {
           // Version changed - server was updated, refresh to load new assets and reconnect terminal
-          console.log('[Update] Version changed from', lastKnownVersion, 'to', currentVersion, '- refreshing NOW');
-          localStorage.setItem('lastKnownVersion', currentVersion);
-          // DON'T set versionReady - we're about to refresh
-          // Refresh immediately - no delay, don't let stale JS initialize terminal
-          window.location.reload();
-          return; // Never reached, but explicit
+          console.log('[Update] Version changed from', lastKnownVersion, 'to', currentVersion);
+          
+          // SAFETY CHECK: Only reload if versions are actually different and valid
+          if (currentVersion && lastKnownVersion && currentVersion.trim() !== lastKnownVersion.trim()) {
+            console.log('[Update] Confirmed version mismatch - refreshing page');
+            localStorage.setItem('lastKnownVersion', currentVersion);
+            // DON'T set versionReady - we're about to refresh
+            // Refresh immediately - no delay, don't let stale JS initialize terminal
+            window.location.reload();
+            return; // Never reached, but explicit
+          } else {
+            console.warn('[Update] Version strings differ but are invalid or whitespace - NOT reloading');
+            localStorage.setItem('lastKnownVersion', currentVersion);
+            setVersionReady(true);
+          }
         } else {
           localStorage.setItem('lastKnownVersion', currentVersion);
           // Version verified - safe to render terminals
@@ -1195,32 +1204,45 @@ function App() {
     setCommandsError(null);
     
     // Set a timeout to detect hanging requests
-    const timeoutId = setTimeout(() => {
+    let timeoutId = setTimeout(() => {
       setCommandsError('Request timeout - server may be unresponsive');
       setCommandsLoading(false);
       addToast('Failed to load command cards - timeout', 'error', 5000);
+      timeoutId = null; // Mark as fired
     }, 10000); // 10 second timeout
     
     fetch('/api/commands')
       .then(r => {
-        clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         if (!r.ok) {
           throw new Error(`HTTP ${r.status}: ${r.statusText}`);
         }
         return r.json();
       })
       .then(data => {
-        // Ensure data is an array
-        const cards = Array.isArray(data) ? data : [];
-        setCommands(cards);
-        setCommandsLoading(false);
+        // Only update if timeout hasn't fired
+        if (timeoutId !== null || commandsLoading) {
+          // Ensure data is an array
+          const cards = Array.isArray(data) ? data : [];
+          setCommands(cards);
+          setCommandsLoading(false);
+        }
       })
       .catch(err => {
-        clearTimeout(timeoutId);
-        console.error('Failed to load commands:', err);
-        setCommandsError(err.message);
-        setCommandsLoading(false);
-        addToast(`Failed to load command cards: ${err.message}`, 'error', 5000);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        // Only show error if not already timed out
+        if (commandsLoading) {
+          console.error('Failed to load commands:', err);
+          setCommandsError(err.message);
+          setCommandsLoading(false);
+          addToast(`Failed to load command cards: ${err.message}`, 'error', 5000);
+        }
       })
   }
 

@@ -118,6 +118,10 @@ const MENU_SELECTION_PATTERNS = [
   /[›❯>]\s*Run\s+this\s+command/i,
   // Selected option with checkmark or bullet
   /[●◉✓✔]\s*Yes\b/i,
+  // NEW: Tool permission - "❯ Allow" or "❯ 1. Allow"
+  /[›❯>]\s*(?:\d+\.\s*)?Allow\b/i,
+  /[›❯>]\s*Allow\s+tool:/i,
+  /[●◉✓✔]\s*Allow\b/i,
 ];
 
 // Context patterns that indicate a CLI is showing a confirmation menu
@@ -138,6 +142,14 @@ const MENU_CONTEXT_PATTERNS = [
   /Allow directory access/i,
   /allowed directory list/i,
   /Do you want to add these directories/i,
+  // NEW: Tool permission prompts (Copilot without --allow-all-tools)
+  /Allow\s+tool:/i,
+  /Allow\s+this\s+tool\?/i,
+  /tool.*permission/i,
+  /tool.*authorization/i,
+  /Grant.*permission/i,
+  /requires.*permission/i,
+  /allow.*to\s+(execute|run|access)/i,
 ];
 
 // EXCLUSION patterns - menus where we should NOT auto-respond
@@ -176,6 +188,9 @@ const YN_PROMPT_PATTERNS = [
   /\(default is "Y"\)\s*:?\s*$/i,
   // Generic confirmation ending with colon after Yes/No options
   /\[Y\].*\[N\].*:\s*$/i,
+  // NEW: Tool permission Y/N prompts
+  /Allow\s+this\s+tool\?\s*\(y\/n\)/i,
+  /Grant\s+permission\?\s*\(y\/n\)/i,
 ];
 
 // Question patterns that indicate waiting for input (used with context)
@@ -1104,32 +1119,26 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // v3.11.1 FIX: Ctrl+V paste reliability fix
-      // PROBLEM: Previous approach blocked native paste event, then tried async clipboard API
-      // which fails 80% of the time due to focus/permission issues.
-      // SOLUTION: Let the native paste event fire first (it's synchronous and reliable).
-      // Only use clipboard API as a FALLBACK if the paste event didn't trigger.
+      // v3.11.5 FIX: Ctrl+V paste reliability fix for 98% failure rate
+      // ROOT CAUSE: setTimeout delays clipboard API call by 50ms, by which time
+      // browser focus is lost and clipboard.readText() fails with permission error
+      // SOLUTION: Try clipboard API IMMEDIATELY while focus is active
+      // The paste event handler will still fire and set isPastingRef, preventing duplicate handling
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        console.log('[Terminal] Ctrl+V pressed - allowing native paste event');
+        console.log('[Terminal] Ctrl+V pressed - trying immediate clipboard API');
         
-        // DON'T set isPastingRef here - let the paste event handler work
-        // Instead, set a short timer to use clipboard API as fallback if paste event doesn't fire
-        const pasteStartTime = Date.now();
+        // Check if paste event already handled it (race condition safety)
+        if (isPastingRef.current) {
+          console.log('[Terminal] Paste already handled by paste event');
+          return true; // Allow the event to propagate
+        }
         
-        // Wait a brief moment to see if paste event fires (it should be synchronous)
-        setTimeout(async () => {
-          // If isPastingRef was set, paste event already handled it
-          if (isPastingRef.current) {
-            console.log('[Terminal] Paste was handled by paste event');
-            return;
-          }
-          
-          // Paste event didn't fire - try clipboard API as fallback
-          console.log('[Terminal] Paste event did not fire, trying clipboard API fallback');
-          isPastingRef.current = true;
-          setTimeout(() => { isPastingRef.current = false; }, 500);
-          
-          (async () => {
+        // Mark as handling to prevent duplicate paste event handling
+        isPastingRef.current = true;
+        setTimeout(() => { isPastingRef.current = false; }, 500);
+        
+        // Call clipboard API IMMEDIATELY while focus is active (no setTimeout!)
+        (async () => {
           // PRIORITY: Check for images/videos FIRST (they're the special case)
           try {
             const items = await navigator.clipboard.read();
@@ -1293,10 +1302,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
         })();
-        }, 50); // Wait 50ms to see if paste event fires first
         
-        // v3.11.1: Return TRUE to let xterm trigger the native paste event
-        // The paste event handler (handlePaste) will set isPastingRef if it handles the paste
+        // v3.11.5: Return TRUE to let xterm trigger the native paste event
+        // If paste event handler runs first (it should), it will set isPastingRef
+        // and this async code path will do nothing (see isPastingRef check above)
         return true;
       }
 
@@ -1650,7 +1659,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
         
         // Attempt reconnection with exponential backoff
-        if (shouldReconnect) {
+        // SAFETY: Only reconnect if we should AND we're not already trying
+        if (shouldReconnect && !reconnectTimeoutRef.current) {
           // If we are in dev mode (localhost), retry more times
           const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
           const effectiveMaxAttempts = isDev ? 50 : maxReconnectAttempts;
@@ -1669,12 +1679,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               delay 
             });
             
-            // Clear any existing reconnect timer to prevent duplicates
-            if (reconnectTimeoutRef.current) {
-              clearTimeout(reconnectTimeoutRef.current);
-            }
-            
             reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectTimeoutRef.current = null; // Clear ref before reconnecting
               // Only reconnect if the component is still mounted
               if (xtermRef.current && connectFnRef.current) {
                 logger.terminal('Attempting reconnection...', { tabId, attempt: reconnectAttemptsRef.current });

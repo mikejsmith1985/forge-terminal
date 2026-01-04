@@ -402,15 +402,32 @@ func (hm *HealthMonitor) GetTabCaptureStatus(tabID string, amEnabled bool) *TabC
 	// Count actual conversation turns (exclude system turns)
 	userTurns := 0
 	assistantTurns := 0
-	var lastCapture time.Time
-	for _, turn := range conv.Turns {
-		if turn.Role == "user" {
-			userTurns++
-		} else if turn.Role == "assistant" {
-			assistantTurns++
+	
+	// v3.11.5: Use LastSaveTime instead of turn timestamps for accurate "Active Xh ago" display
+	// Turn timestamps reflect when turns were created, not when conversation was last saved
+	// During long sessions, old turns in memory cause "Active 16h ago" even when session is live
+	lastCapture := conv.LastSaveTime
+	
+	// Fallback to turn timestamps if LastSaveTime not set (older saved conversations)
+	if lastCapture.IsZero() {
+		for _, turn := range conv.Turns {
+			if turn.Role == "user" {
+				userTurns++
+			} else if turn.Role == "assistant" {
+				assistantTurns++
+			}
+			if turn.Timestamp.After(lastCapture) {
+				lastCapture = turn.Timestamp
+			}
 		}
-		if turn.Timestamp.After(lastCapture) {
-			lastCapture = turn.Timestamp
+	} else {
+		// Just count turns, don't need to scan for timestamps
+		for _, turn := range conv.Turns {
+			if turn.Role == "user" {
+				userTurns++
+			} else if turn.Role == "assistant" {
+				assistantTurns++
+			}
 		}
 	}
 	

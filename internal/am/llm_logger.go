@@ -68,6 +68,7 @@ type LLMConversation struct {
 	CommandType     string                `json:"commandType"`
 	StartTime       time.Time             `json:"startTime"`
 	EndTime         time.Time             `json:"endTime,omitempty"`
+	LastSaveTime    time.Time             `json:"lastSaveTime,omitempty"` // v3.11.5: For accurate "Active Xh ago" in AM Monitor
 	Turns           []ConversationTurn    `json:"turns"`
 	Complete        bool                  `json:"complete"`
 	AutoRespond     bool                  `json:"autoRespond"`
@@ -1618,6 +1619,9 @@ func (l *LLMLogger) saveConversationAsync(conv *LLMConversation) {
 		return
 	}
 
+	// v3.11.5: Update LastSaveTime for accurate AM Monitor display
+	conv.LastSaveTime = time.Now()
+
 	filename := l.generateConversationFilename(conv)
 	filePath := filepath.Join(l.amDir, filename)
 
@@ -1647,6 +1651,9 @@ func (l *LLMLogger) saveConversation(conv *LLMConversation) {
 		log.Printf("[LLM Logger] ❌ Failed to create AM dir %s: %v", l.amDir, err)
 		return
 	}
+
+	// v3.11.5: Update LastSaveTime for accurate AM Monitor display
+	conv.LastSaveTime = time.Now()
 
 	filename := l.generateConversationFilename(conv)
 	filePath := filepath.Join(l.amDir, filename)
