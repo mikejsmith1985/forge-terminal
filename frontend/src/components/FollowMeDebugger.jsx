@@ -393,10 +393,15 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       setIsRecording(false);
 
       const summary = generateSummary();
+      
+      // FIX v3.11.7: Calculate actual duration from start time, not from state
+      // recordingDuration may be stale or not updated if interval missed ticks
+      const actualDuration = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      
       const session = {
         id: 'debug-' + Date.now(),
         timestamp: new Date().toISOString(),
-        duration: recordingDuration,
+        duration: actualDuration,  // Use calculated duration, not state
         events: eventsRef.current,
         consoleLogs: consoleLogsRef.current,
         networkRequests: networkRequestsRef.current,

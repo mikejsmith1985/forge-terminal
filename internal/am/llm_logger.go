@@ -148,7 +148,17 @@ func GetLLMLogger(tabID string, amDir string) *LLMLogger {
 	llmLoggersMu.RLock()
 	if logger, exists := llmLoggers[tabID]; exists {
 		llmLoggersMu.RUnlock()
-		log.Printf("[LLM Logger] ✓ Found existing logger for tab %s", tabID)
+		
+		// v3.11.7 FIX: If existing logger has empty amDir, update it
+		// This fixes bug where old loggers couldn't save (amDir was empty)
+		logger.mu.Lock()
+		if logger.amDir == "" && amDir != "" {
+			log.Printf("[LLM Logger] ⚠️ Updating empty amDir for tab %s to: %s", tabID, amDir)
+			logger.amDir = amDir
+		}
+		logger.mu.Unlock()
+		
+		log.Printf("[LLM Logger] ✓ Found existing logger for tab %s (amDir: %s)", tabID, logger.amDir)
 		return logger
 	}
 	llmLoggersMu.RUnlock()
