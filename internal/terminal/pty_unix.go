@@ -14,6 +14,11 @@ import (
 
 // startPTY starts a PTY session on Unix systems (Linux, macOS).
 func startPTY(cmd *exec.Cmd) (io.ReadWriteCloser, error) {
+	// Ensure environment variables are set (redundant but safe)
+	cmd.Env = append(cmd.Env,
+		fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
+		fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
+	)
 	return pty.Start(cmd)
 }
 
@@ -23,6 +28,8 @@ func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadW
 	cmd.Env = append(os.Environ(),
 		"TERM=xterm-256color",
 		"COLORTERM=truecolor",
+		fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
+		fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
 	)
 	if workingDir != "" {
 		cmd.Dir = workingDir

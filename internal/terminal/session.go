@@ -13,6 +13,18 @@ import (
 	"time"
 )
 
+// Global forge port variable (set by main)
+var forgePort int
+
+// SetForgePort stores the port for environment variable injection
+func SetForgePort(port int) {
+	forgePort = port
+}
+
+func getForgePort() int {
+	return forgePort
+}
+
 // ShellConfig contains shell configuration options
 type ShellConfig struct {
 	ShellType      string // "cmd", "powershell", or "wsl"
@@ -131,6 +143,8 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 		cmd.Env = append(os.Environ(),
 			"TERM=xterm-256color",
 			"COLORTERM=truecolor",
+			fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
+			fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
 		)
 		// Set working directory if specified
 		if workingDir != "" {

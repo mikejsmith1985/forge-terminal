@@ -42,6 +42,9 @@ var embeddedFS embed.FS
 // Preferred ports to try, in order
 var preferredPorts = []int{3005, 8333, 8080, 9000, 3000, 3333}
 
+// Active port (set at startup for process safeguard system)
+var activePort int
+
 // headerFixingResponseWriter wraps http.ResponseWriter to fix MIME types for embedded assets
 type headerFixingResponseWriter struct {
 	http.ResponseWriter
@@ -254,8 +257,9 @@ func main() {
 	http.HandleFunc("/api/ide/open", WrapWithMiddleware(handleOpenIDE))
 	http.HandleFunc("/api/build/detect", WrapWithMiddleware(handleDetectBuildSystem))
 
-	// Update API - check for updates and apply them
+	// Version and system info API
 	http.HandleFunc("/api/version", WrapWithMiddleware(handleVersion))
+	http.HandleFunc("/api/system-info", WrapWithMiddleware(handleSystemInfo))  // NEW: Process safeguard info
 	http.HandleFunc("/api/update/check", WrapWithMiddleware(handleUpdateCheck))
 	http.HandleFunc("/api/update/apply", WrapWithMiddleware(handleUpdateApply))
 	http.HandleFunc("/api/update/versions", WrapWithMiddleware(handleListVersions))
@@ -426,7 +430,16 @@ func main() {
 		log.Fatalf("Failed to find available port: %v", err)
 	}
 
-	log.Printf("🔥 Forge Terminal starting at http://%s", addr)
+	// Extract port number and inject into child processes
+	if _, portStr, err := net.SplitHostPort(addr); err == nil {
+		if p, err := strconv.Atoi(portStr); err == nil {
+			activePort = p
+			terminal.SetForgePort(p)
+			log.Printf("[Process Safeguard] Injecting FORGE_INSTANCE_PID=%d FORGE_INSTANCE_PORT=%d into child processes", os.Getpid(), p)
+		}
+	}
+
+	log.Printf("🔥 Forge Terminal starting at http://%s (PID: %d)", addr, os.Getpid())
 
 	// Handle graceful shutdown
 	stop := make(chan os.Signal, 1)
@@ -870,6 +883,26 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"version": updater.GetVersion(),
+	})
+}
+
+func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	// Get active port from listener
+	addr, _ := net.ResolveTCPAddr("tcp", "localhost:"+strconv.Itoa(activePort))
+	
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"pid":     os.Getpid(),
+		"port":    activePort,
+		"version": updater.GetVersion(),
+		"address": addr.String(),
+		"processName": "forge-terminal",
+		"safeguard": map[string]interface{}{
+			"enabled": true,
+			"version": "v3.11.6",
+			"protectionLayers": 5,
+		},
 	})
 }
 

@@ -43,24 +43,49 @@ func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadW
 		return nil, fmt.Errorf("conpty start failed for %s: %w", commandLine, err)
 	}
 	
-	// For Windows shells, send a CD command to set working directory
-	// This is done after a brief delay to ensure the shell is ready
-	if workingDir != "" && (shell == "cmd.exe" || shell == "powershell.exe") {
-		// Wait for shell to initialize before sending cd command
-		go func() {
-			// Brief delay to let the shell start and be ready for input
-			// 100ms is enough for cmd.exe/powershell.exe to initialize
-			time.Sleep(100 * time.Millisecond)
+	// Inject critical environment variables for process safeguard system
+	forgePID := os.Getpid()
+	forgePortNum := getForgePort()
+	
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		
+		// Set environment variables based on shell type
+		if strings.Contains(strings.ToLower(shell), "powershell") || strings.Contains(strings.ToLower(shell), "pwsh") {
+			// PowerShell: use $env:VAR syntax
+			cpty.Write([]byte(fmt.Sprintf("$env:FORGE_INSTANCE_PID=%d\r", forgePID)))
+			cpty.Write([]byte(fmt.Sprintf("$env:FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
 			
-			if shell == "cmd.exe" {
-				// CMD: use "cd /d" to change directory across drives
-				cpty.Write([]byte("cd /d \"" + workingDir + "\"\r"))
-			} else if shell == "powershell.exe" {
-				// PowerShell: use Set-Location
+			if workingDir != "" {
 				cpty.Write([]byte("Set-Location \"" + workingDir + "\"\r"))
 			}
-		}()
-	}
+		} else if strings.Contains(strings.ToLower(shell), "bash") || strings.Contains(strings.ToLower(shell), "zsh") || strings.Contains(strings.ToLower(shell), "sh") {
+			// Unix shells: use export
+			cpty.Write([]byte(fmt.Sprintf("export FORGE_INSTANCE_PID=%d\r", forgePID)))
+			cpty.Write([]byte(fmt.Sprintf("export FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
+			
+			if workingDir != "" {
+				cpty.Write([]byte("cd \"" + workingDir + "\"\r"))
+			}
+		} else {
+			// CMD.exe: use SET
+			cpty.Write([]byte(fmt.Sprintf("SET FORGE_INSTANCE_PID=%d\r", forgePID)))
+			cpty.Write([]byte(fmt.Sprintf("SET FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
+			
+			if workingDir != "" {
+				cpty.Write([]byte("cd /d \"" + workingDir + "\"\r"))
+			}
+		}
+		
+		// Send clear command to hide the environment setup
+		if strings.Contains(strings.ToLower(shell), "powershell") || strings.Contains(strings.ToLower(shell), "pwsh") {
+			cpty.Write([]byte("Clear-Host\r"))
+		} else if strings.Contains(strings.ToLower(shell), "bash") || strings.Contains(strings.ToLower(shell), "zsh") {
+			cpty.Write([]byte("clear\r"))
+		} else {
+			cpty.Write([]byte("cls\r"))
+		}
+	}()
 	
 	return cpty, nil
 }
