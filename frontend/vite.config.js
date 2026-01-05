@@ -7,6 +7,7 @@ export default defineConfig({
   build: {
     outDir: '../cmd/forge/web',
     emptyOutDir: true,
+    // minify: false, // TEMP: Disable minification to debug TDZ error - FIXED NOW, re-enabled
     rollupOptions: {
       output: {
         // Ensure assets go to lowercase 'assets/' directory for Go embed case-sensitivity

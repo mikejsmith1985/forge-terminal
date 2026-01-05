@@ -36,82 +36,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
   const sessionIdRef = useRef(null);
   const streamEndedByUserRef = useRef(false);
 
-  // Check for interrupted session on mount
-  useEffect(() => {
-    const savedSession = localStorage.getItem('follow-me-active-session');
-    if (savedSession) {
-      try {
-        const session = JSON.parse(savedSession);
-        if (session.interrupted) {
-          setHasInterruptedSession(true);
-          // Restore session data
-          eventsRef.current = session.events || [];
-          consoleLogsRef.current = session.consoleLogs || [];
-          networkRequestsRef.current = session.networkRequests || [];
-          startTimeRef.current = session.startTime;
-          sessionIdRef.current = session.id;
-          const elapsed = Math.floor((Date.now() - session.startTime) / 1000);
-          setRecordingDuration(elapsed);
-          
-          // v3.11.3: Auto-restore if session was active (not explicitly interrupted by user)
-          if (session.isRecording) {
-            console.log('[FollowMe] Restoring active recording session');
-            setIsRecording(true);
-            
-            // Restart duration counter
-            durationIntervalRef.current = setInterval(() => {
-              setRecordingDuration(prev => prev + 1);
-              // Auto-save periodically
-              if (prev % 5 === 0) {
-                const currentSession = {
-                  id: sessionIdRef.current,
-                  startTime: startTimeRef.current,
-                  events: eventsRef.current,
-                  consoleLogs: consoleLogsRef.current,
-                  networkRequests: networkRequestsRef.current,
-                  interrupted: true,
-                  isRecording: true,
-                };
-                localStorage.setItem('follow-me-active-session', JSON.stringify(currentSession));
-              }
-            }, 1000);
-            
-            // Re-attach event listeners
-            window.addEventListener('keydown', captureKeystroke, true);
-            window.addEventListener('click', captureClick, true);
-            window.addEventListener('mousemove', captureMouseMove, true);
-            window.addEventListener('scroll', captureScroll, true);
-            interceptConsole();
-            interceptFetch();
-          }
-        }
-      } catch (err) {
-        console.error('[FollowMe] Failed to restore session:', err);
-        localStorage.removeItem('follow-me-active-session');
-      }
-    }
-  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
-
-  useEffect(() => {
-    // v3.11.3 FIX: Don't cleanup on unmount if recording is active
-    // This allows Follow Me to survive tab switches
-    return () => {
-      // Only cleanup if NOT recording
-      // If recording, the session persists and will resume when user returns to Debug tab
-      if (!isRecording) {
-        if (durationIntervalRef.current) {
-          clearInterval(durationIntervalRef.current);
-        }
-        restoreConsole();
-        restoreFetch();
-      } else {
-        console.log('[FollowMe] Component unmounting but recording active - preserving state');
-        // Save to localStorage so it can be restored
-        saveSessionToLocalStorage();
-      }
-    };
-  }, [isRecording, saveSessionToLocalStorage]);
-
+  // DEFINE CALLBACKS FIRST - before useEffect that references them (TDZ fix)
   const captureKeystroke = useCallback((e) => {
     eventsRef.current.push({
       type: 'keystroke',
@@ -252,6 +177,85 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     localStorage.setItem('follow-me-active-session', JSON.stringify(session));
   }, []);
 
+  // NOW the useEffect that references these callbacks
+  // Check for interrupted session on mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem('follow-me-active-session');
+    if (savedSession) {
+      try {
+        const session = JSON.parse(savedSession);
+        if (session.interrupted) {
+          setHasInterruptedSession(true);
+          // Restore session data
+          eventsRef.current = session.events || [];
+          consoleLogsRef.current = session.consoleLogs || [];
+          networkRequestsRef.current = session.networkRequests || [];
+          startTimeRef.current = session.startTime;
+          sessionIdRef.current = session.id;
+          const elapsed = Math.floor((Date.now() - session.startTime) / 1000);
+          setRecordingDuration(elapsed);
+          
+          // v3.11.3: Auto-restore if session was active (not explicitly interrupted by user)
+          if (session.isRecording) {
+            console.log('[FollowMe] Restoring active recording session');
+            setIsRecording(true);
+            
+            // Restart duration counter
+            durationIntervalRef.current = setInterval(() => {
+              setRecordingDuration(prev => prev + 1);
+              // Auto-save periodically
+              if (prev % 5 === 0) {
+                const currentSession = {
+                  id: sessionIdRef.current,
+                  startTime: startTimeRef.current,
+                  events: eventsRef.current,
+                  consoleLogs: consoleLogsRef.current,
+                  networkRequests: networkRequestsRef.current,
+                  interrupted: true,
+                  isRecording: true,
+                };
+                localStorage.setItem('follow-me-active-session', JSON.stringify(currentSession));
+              }
+            }, 1000);
+            
+            // Re-attach event listeners
+            window.addEventListener('keydown', captureKeystroke, true);
+            window.addEventListener('click', captureClick, true);
+            window.addEventListener('mousemove', captureMouseMove, true);
+            window.addEventListener('scroll', captureScroll, true);
+            interceptConsole();
+            interceptFetch();
+          }
+        }
+      } catch (err) {
+        console.error('[FollowMe] Failed to restore session:', err);
+        localStorage.removeItem('follow-me-active-session');
+      }
+    }
+  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
+
+  useEffect(() => {
+    // v3.11.3 FIX: Don't cleanup on unmount if recording is active
+    // This allows Follow Me to survive tab switches
+    return () => {
+      // Only cleanup if NOT recording
+      // If recording, the session persists and will resume when user returns to Debug tab
+      if (!isRecording) {
+        if (durationIntervalRef.current) {
+          clearInterval(durationIntervalRef.current);
+        }
+        restoreConsole();
+        restoreFetch();
+      } else {
+        console.log('[FollowMe] Component unmounting but recording active - preserving state');
+        // Save to localStorage so it can be restored
+        saveSessionToLocalStorage();
+      }
+    };
+  }, [isRecording, saveSessionToLocalStorage]);
+
+  // TDZ FIX: All callbacks moved above - removed duplicates
+  
   const startRecording = useCallback(async () => {
     try {
       setError(null);

@@ -4,9 +4,9 @@ import { ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 
 /**
  * Collapsible Debug Card Component
- * Extracted to separate file to avoid minifier TDZ issues
+ * Extracted to separate file and memoized to avoid minifier TDZ issues
  */
-const DebugCard = ({ id, title, icon: Icon, children, defaultCollapsed = false, isActive = false }) => {
+const DebugCard = React.memo(({ id, title, icon: Icon, children, defaultCollapsed = false, isActive = false }) => {
   const [collapsed, setCollapsed] = useState(() => {
     const saved = localStorage.getItem(`debug-card-${id}-collapsed`);
     return saved !== null ? saved === 'true' : defaultCollapsed;
@@ -96,6 +96,9 @@ const DebugCard = ({ id, title, icon: Icon, children, defaultCollapsed = false, 
       )}
     </div>
   );
-};
+});
+
+// Add display name for debugging
+DebugCard.displayName = 'DebugCard';
 
 export default DebugCard;

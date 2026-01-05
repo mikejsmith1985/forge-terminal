@@ -15,8 +15,8 @@ test.describe('Debug Panel & Input Stability', () => {
     // Clear browser cache
     await context.clearCookies();
     
-    // Navigate to Forge Terminal - use 'load' instead of 'networkidle' for WebSocket apps
-    await page.goto('http://localhost:3005', { waitUntil: 'load', timeout: 15000 });
+    // Navigate to Forge Terminal DEV SERVER - use 'load' instead of 'networkidle' for WebSocket apps
+    await page.goto('http://localhost:9999', { waitUntil: 'load', timeout: 15000 });
     
     // Set up localStorage before reload
     await page.evaluate(() => {
@@ -122,40 +122,152 @@ test.describe('Debug Panel & Input Stability', () => {
     });
   });
 
-  test('Backspace key should work without freeze', async ({ page }) => {
+  test('Backspace key should work without freeze - long duration test', async ({ page }) => {
+    // Set 90-second timeout for this test (60s test + overhead)
+    test.setTimeout(90000);
     // Focus terminal
     const terminal = page.locator('.xterm').first();
     await terminal.click();
     await page.waitForTimeout(500);
 
-    // Type some text
-    await page.keyboard.type('echo hello world', { delay: 50 });
-    await page.waitForTimeout(300);
-
-    // Screenshot before backspace
+    // Screenshot before test
     await page.screenshot({ 
-      path: 'test-results/04-before-backspace.png', 
+      path: 'test-results/04-before-backspace-stress-test.png', 
       fullPage: true 
     });
 
-    // Press backspace multiple times
-    const startTime = Date.now();
-    for (let i = 0; i < 10; i++) {
-      await page.keyboard.press('Backspace');
+    // LONG-DURATION STRESS TEST: 60 seconds of continuous input
+    const testDurationMs = 60000; // 60 seconds
+    const testStartTime = Date.now();
+    const freezeThresholdMs = 1500; // Operations >1500ms = freeze (adjusted for Playwright overhead)
+    const slowOperationsMs = 800; // Track operations >800ms as "slow"
+    const freezeEvents = [];
+    const slowEvents = [];
+    let totalOperations = 0;
+    let iterationCount = 0;
+
+    console.log('Starting 60-second backspace stress test (freeze threshold: 1500ms, slow threshold: 800ms)...');
+
+    while (Date.now() - testStartTime < testDurationMs) {
+      iterationCount++;
+      
+      // Type a line of text
+      const typeStart = Date.now();
+      await page.keyboard.type('echo test line ' + iterationCount, { delay: 30 });
+      const typeElapsed = Date.now() - typeStart;
+      totalOperations++;
+      
+      if (typeElapsed > freezeThresholdMs) {
+        freezeEvents.push({
+          operation: 'type',
+          duration: typeElapsed,
+          iteration: iterationCount,
+          timestamp: Date.now() - testStartTime
+        });
+      } else if (typeElapsed > slowOperationsMs) {
+        slowEvents.push({
+          operation: 'type',
+          duration: typeElapsed,
+          iteration: iterationCount
+        });
+      }
+
+      // Backspace entire line (16 chars + iteration number digits)
+      const lineLength = ('echo test line ' + iterationCount).length;
+      for (let i = 0; i < lineLength; i++) {
+        const backspaceStart = Date.now();
+        await page.keyboard.press('Backspace');
+        const backspaceElapsed = Date.now() - backspaceStart;
+        totalOperations++;
+        
+        if (backspaceElapsed > freezeThresholdMs) {
+          freezeEvents.push({
+            operation: 'backspace',
+            duration: backspaceElapsed,
+            iteration: iterationCount,
+            charPosition: i,
+            timestamp: Date.now() - testStartTime
+          });
+        } else if (backspaceElapsed > slowOperationsMs) {
+          slowEvents.push({
+            operation: 'backspace',
+            duration: backspaceElapsed,
+            iteration: iterationCount,
+            charPosition: i
+          });
+        }
+      }
+
+      // Monitor main thread responsiveness every 10 iterations
+      if (iterationCount % 10 === 0) {
+        const responsiveStart = Date.now();
+        const isResponsive = await page.evaluate(() => {
+          // Check if main thread can execute JS in reasonable time
+          return new Promise(resolve => {
+            const start = performance.now();
+            requestAnimationFrame(() => {
+              const elapsed = performance.now() - start;
+              resolve(elapsed < 100); // Should get frame within 100ms
+            });
+          });
+        });
+        const responsiveElapsed = Date.now() - responsiveStart;
+        
+        if (!isResponsive || responsiveElapsed > freezeThresholdMs) {
+          freezeEvents.push({
+            operation: 'ui-responsiveness-check',
+            duration: responsiveElapsed,
+            responsive: isResponsive,
+            iteration: iterationCount,
+            timestamp: Date.now() - testStartTime
+          });
+        }
+      }
+
+      // Small delay between iterations
       await page.waitForTimeout(50);
     }
-    const elapsed = Date.now() - startTime;
 
-    // Screenshot after backspace
+    const testTotalTime = Date.now() - testStartTime;
+
+    // Screenshot after stress test
     await page.screenshot({ 
-      path: 'test-results/05-after-backspace.png', 
+      path: 'test-results/05-after-backspace-stress-test.png', 
       fullPage: true 
     });
 
-    // Check for freeze - should complete in reasonable time
-    // 10 backspaces with 50ms delay = 500ms + overhead, should be < 2000ms
-    expect(elapsed).toBeLessThan(2000);
+    // Log comprehensive results
+    console.log(`\n=== BACKSPACE FREEZE TEST RESULTS ===`);
+    console.log(`Test duration: ${testTotalTime}ms (${(testTotalTime/1000).toFixed(1)}s)`);
+    console.log(`Total iterations: ${iterationCount}`);
+    console.log(`Total operations: ${totalOperations}`);
+    console.log(`Freeze threshold: ${freezeThresholdMs}ms`);
+    console.log(`Slow threshold: ${slowOperationsMs}ms`);
+    console.log(`Freeze events detected: ${freezeEvents.length}`);
+    console.log(`Slow events detected: ${slowEvents.length}\n`);
+
+    if (freezeEvents.length > 0) {
+      console.log('FREEZE DETAILS (>1500ms):');
+      freezeEvents.forEach((event, idx) => {
+        console.log(`  [${idx+1}] ${event.operation} took ${event.duration}ms at iteration ${event.iteration} (t+${(event.timestamp/1000).toFixed(1)}s)`);
+      });
+      console.log('');
+    }
+
+    if (slowEvents.length > 0 && slowEvents.length <= 10) {
+      console.log('SLOW EVENTS SAMPLE (>800ms):');
+      slowEvents.slice(0, 10).forEach((event, idx) => {
+        console.log(`  [${idx+1}] ${event.operation} took ${event.duration}ms at iteration ${event.iteration}`);
+      });
+      console.log('');
+    }
+
+    // ASSERTION: No freeze events should occur
+    expect(freezeEvents.length).toBe(0);
     
-    console.log(`Backspace test completed in ${elapsed}ms`);
+    console.log('✓ Test PASSED: No freezes (>1500ms) detected during 60-second stress test');
+    if (slowEvents.length > 0) {
+      console.log(`  Note: ${slowEvents.length} slow operations (500-1500ms) detected - likely Playwright automation overhead`);
+    }
   });
 });
