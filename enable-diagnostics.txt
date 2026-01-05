@@ -1,0 +1,11 @@
+Open your browser console (F12) and run:
+
+// Enable diagnostic logging
+window.diagnosticCore = window.diagnosticCore || {};
+if (window.diagnosticCore.enable) {
+  window.diagnosticCore.enable();
+  console.log('Diagnostics enabled! Type and use backspace, then run:');
+  console.log('window.diagnosticCore.exportSession()');
+}
+
+// Or if using React DevTools, find ForgeTerminal and check diagnosticCore

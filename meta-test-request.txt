@@ -1,0 +1,46 @@
+# COPILOT META-TEST REQUEST
+
+You are reviewing a CRITICAL process safeguard implementation that prevents accidental killing of the active Forge session (has cost \+ from lost context).
+
+## What Was Implemented:
+
+1. **Backend Environment Injection** (cmd/forge/main.go, internal/terminal/*.go):
+   - Injects FORGE_INSTANCE_PID and FORGE_INSTANCE_PORT into ALL child shells
+   - Works cross-platform (Windows, Linux, macOS)
+   - Works cross-shell (PowerShell, bash, zsh, cmd)
+
+2. **/api/system-info Endpoint** (cmd/forge/main.go):
+   - Returns: pid, port, safeguard metadata
+   - Used by frontend for "Running in Forge PID: XXX" banner
+
+3. **PowerShell Safeguard Script** (scripts/forge-safeguard.ps1):
+   - 5-layer verification: env vars, port ownership, parent chain, process name, user confirmation
+   - Requires EXACT phrase: "I UNDERSTAND THIS WILL KILL MY SESSION"
+   - Function: Stop-ProcessSafe (replaces Stop-Process)
+
+4. **Bash Safeguard Script** (scripts/forge-safeguard.sh):
+   - Same 5-layer verification for Unix shells
+   - Function: safe_kill (replaces kill)
+
+5. **Playwright E2E Tests** (tests/playwright/process-safeguard.spec.js):
+   - ✅ 4/4 tests passing
+   - Validates API, environment injection, 5-layer protection, manual verification
+
+## Your Review Tasks:
+
+1. Check if environment variables are ACTUALLY injected (not just logged)
+2. Verify cross-platform compatibility (Windows ConPTY vs Unix PTY)
+3. Identify any race conditions in environment setup
+4. Check if safeguard scripts handle edge cases (process already dead, no ports, etc.)
+5. Verify that EXACT phrase matching is case-sensitive
+6. Check for any scenarios where safeguard could be bypassed
+
+## Files to Review:
+- cmd/forge/main.go (lines 430-442, 880-900)
+- internal/terminal/session.go (lines 1-25, 127-139)
+- internal/terminal/pty_windows.go (lines 33-72)
+- internal/terminal/pty_unix.go (entire file)
+- scripts/forge-safeguard.ps1 (entire file)
+- scripts/forge-safeguard.sh (entire file)
+
+**Question: Are there any bugs, race conditions, or bypass scenarios in this implementation?**
