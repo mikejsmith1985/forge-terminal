@@ -1600,37 +1600,21 @@ function App() {
         />
         <div className="font-size-controls">
           <button 
-            className={`btn btn-ghost btn-icon btn-sm ${fontTarget === 'terminal' ? 'active' : ''}`} 
-            onClick={() => setFontTarget('terminal')} 
-            title="Set target: Terminal"
-            aria-pressed={fontTarget === 'terminal'}
-          >
-            <span role="img" aria-label="terminal">⌨️</span>
-          </button>
-          <button 
-            className="btn btn-ghost btn-icon btn-sm" 
+            className="btn btn-ghost btn-icon" 
             onClick={() => handleFontSizeChange(-1)} 
             title="Decrease Font Size"
             disabled={(fontTarget === 'terminal' ? fontSize : chatFontSize) <= MIN_FONT_SIZE}
           >
-            <Minus size={14} />
+            <Minus size={18} />
           </button>
           <span className="font-size-display" title="Font Size">{fontTarget === 'terminal' ? `${fontSize}px` : `${chatFontSize}px`}</span>
           <button 
-            className="btn btn-ghost btn-icon btn-sm" 
+            className="btn btn-ghost btn-icon" 
             onClick={() => handleFontSizeChange(1)} 
             title="Increase Font Size"
             disabled={(fontTarget === 'terminal' ? fontSize : chatFontSize) >= MAX_FONT_SIZE}
           >
-            <Plus size={14} />
-          </button>
-          <button 
-            className={`btn btn-ghost btn-icon btn-sm ${fontTarget === 'chat' ? 'active' : ''}`} 
-            onClick={() => setFontTarget('chat')} 
-            title="Set target: Assistant"
-            aria-pressed={fontTarget === 'chat'}
-          >
-            <span role="img" aria-label="assistant">🤖</span>
+            <Plus size={18} />
           </button>
         </div>
         {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}

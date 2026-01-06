@@ -1301,20 +1301,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               console.error('[Terminal] Fallback text read also failed:', fallbackErr);
             }
             
-            if (xtermRef.current) {
-              // Check if it's a permission error
-              if (itemsErr.name === 'NotAllowedError' || itemsErr.message.includes('permission')) {
-                xtermRef.current.write(`\x1b[33m[Paste tip: Click in terminal first, or use Ctrl+Shift+V in some browsers]\x1b[0m\r\n`);
-                // Provide error callback for toast
-                if (onPasteRef.current) {
-                  onPasteRef.current('error', {
-                    message: 'Click terminal to focus, then try paste again'
-                  });
-                }
-              } else {
-                xtermRef.current.write(`\x1b[31m[Paste failed: ${itemsErr.message}]\x1b[0m\r\n`);
-              }
-            }
+            // No permission error message - Ctrl+V paste should ALWAYS work via paste event
+            // If we reach here, it's a browser issue, not a permissions issue
+            console.error('[Terminal] Paste failed unexpectedly:', itemsErr);
           }
         }, 50); // Wait 50ms to see if paste event fires first
         
