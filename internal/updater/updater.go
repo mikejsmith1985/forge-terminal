@@ -1,6 +1,7 @@
 package updater
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,11 +11,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Version is set at build time via ldflags
-var Version = "3.12.0"
+var Version = "3.12.1"
 
 // GitHub repo info
 const (
@@ -159,7 +161,9 @@ func DownloadUpdate(info *UpdateInfo) (string, error) {
 		Timeout:   0, // No overall timeout - let the body download take as long as needed
 	}
 
-	req, err := http.NewRequest("GET", info.DownloadURL, nil)
+	// Create request with context for cancellation
+	ctx := context.Background()
+	req, err := http.NewRequestWithContext(ctx, "GET", info.DownloadURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -182,11 +186,22 @@ func DownloadUpdate(info *UpdateInfo) (string, error) {
 	}
 	defer out.Close()
 
-	// Copy with progress tracking for large files
-	written, err := io.Copy(out, resp.Body)
+	// Wrap response body with timeout reader - timeout after 60 seconds of no data
+	// This prevents hanging if the connection stalls during download
+	timeoutReader, downloadCtx := newTimeoutReader(ctx, resp.Body, 60*time.Second)
+	defer timeoutReader.Close()
+
+	// Copy with stall detection
+	written, err := io.Copy(out, timeoutReader)
 	if err != nil {
 		os.Remove(tmpFile)
 		return "", fmt.Errorf("download interrupted after %d bytes: %w", written, err)
+	}
+
+	// Check if context was cancelled due to stall
+	if downloadCtx.Err() != nil {
+		os.Remove(tmpFile)
+		return "", fmt.Errorf("download stalled after %d bytes (no data for 60 seconds)", written)
 	}
 
 	// Verify download size if known
@@ -394,4 +409,64 @@ func copyFile(src, dst string) error {
 
 	_, err = io.Copy(out, in)
 	return err
+}
+
+// timeoutReader wraps an io.Reader and cancels if no data is received within the timeout
+type timeoutReader struct {
+	reader      io.Reader
+	timeout     time.Duration
+	cancel      context.CancelFunc
+	mu          sync.Mutex
+	lastRead    time.Time
+	totalBytes  int64
+	checkTicker *time.Ticker
+	done        chan struct{}
+}
+
+func newTimeoutReader(ctx context.Context, r io.Reader, timeout time.Duration) (*timeoutReader, context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	tr := &timeoutReader{
+		reader:      r,
+		timeout:     timeout,
+		cancel:      cancel,
+		lastRead:    time.Now(),
+		checkTicker: time.NewTicker(timeout / 2),
+		done:        make(chan struct{}),
+	}
+	
+	// Background goroutine to check for stalled reads
+	go func() {
+		defer tr.checkTicker.Stop()
+		for {
+			select {
+			case <-tr.done:
+				return
+			case <-tr.checkTicker.C:
+				tr.mu.Lock()
+				elapsed := time.Since(tr.lastRead)
+				tr.mu.Unlock()
+				if elapsed > tr.timeout {
+					tr.cancel()
+					return
+				}
+			}
+		}
+	}()
+	
+	return tr, ctx
+}
+
+func (tr *timeoutReader) Read(p []byte) (int, error) {
+	n, err := tr.reader.Read(p)
+	if n > 0 {
+		tr.mu.Lock()
+		tr.lastRead = time.Now()
+		tr.totalBytes += int64(n)
+		tr.mu.Unlock()
+	}
+	return n, err
+}
+
+func (tr *timeoutReader) Close() {
+	close(tr.done)
 }
