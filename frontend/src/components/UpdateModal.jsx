@@ -259,7 +259,17 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
     setErrorMessage('');
 
     try {
-      const res = await fetch('/api/update/apply', { method: 'POST' });
+      // Use AbortController with a 5 minute timeout for the download
+      // The server downloads ~18MB binary which can take time on slow connections
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minutes
+      
+      const res = await fetch('/api/update/apply', { 
+        method: 'POST',
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      
       const data = await res.json();
       
       if (data.success) {
@@ -273,7 +283,11 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       }
     } catch (err) {
       setUpdateStatus('error');
-      setErrorMessage(err.message || 'Failed to connect to server');
+      if (err.name === 'AbortError') {
+        setErrorMessage('Update timed out after 5 minutes. Please check your network connection and try again.');
+      } else {
+        setErrorMessage(err.message || 'Failed to connect to server');
+      }
       setIsUpdating(false);
     }
   };

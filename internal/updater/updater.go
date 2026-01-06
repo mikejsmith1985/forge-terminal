@@ -136,10 +136,30 @@ func DownloadUpdate(info *UpdateInfo) (string, error) {
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, "forge-update"+getExeSuffix())
 
-	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Get(info.DownloadURL)
+	// Use a transport with proper timeouts instead of client-level timeout
+	// This allows the download to take as long as needed while still detecting stalls
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ResponseHeaderTimeout: 30 * time.Second, // Timeout for response headers only
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   0, // No overall timeout - let the body download take as long as needed
+	}
+
+	req, err := http.NewRequest("GET", info.DownloadURL, nil)
 	if err != nil {
 		return "", err
+	}
+	req.Header.Set("User-Agent", "Forge-Terminal-Updater/"+Version)
+	req.Header.Set("Accept", "application/octet-stream")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("download request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -153,10 +173,17 @@ func DownloadUpdate(info *UpdateInfo) (string, error) {
 	}
 	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
+	// Copy with progress tracking for large files
+	written, err := io.Copy(out, resp.Body)
 	if err != nil {
 		os.Remove(tmpFile)
-		return "", err
+		return "", fmt.Errorf("download interrupted after %d bytes: %w", written, err)
+	}
+
+	// Verify download size if known
+	if info.AssetSize > 0 && written != info.AssetSize {
+		os.Remove(tmpFile)
+		return "", fmt.Errorf("download incomplete: got %d bytes, expected %d", written, info.AssetSize)
 	}
 
 	// Make executable on Unix
