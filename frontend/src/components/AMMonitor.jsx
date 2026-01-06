@@ -43,6 +43,8 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
     }
 
     let isMounted = true;
+    let consecutiveFailures = 0;
+    const MAX_CONSECUTIVE_FAILURES = 3;
 
     const checkStatus = async () => {
       try {
@@ -57,17 +59,42 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
         // Process status response
         if (statusRes && statusRes.ok) {
           const statusData = await statusRes.json();
+          consecutiveFailures = 0; // Reset on success
           if (isMounted) {
-            setStatus(statusData);
+            // v3.12.2: Validate the response has required fields
+            if (statusData && typeof statusData.status === 'string') {
+              setStatus(statusData);
+            } else {
+              // Backend returned invalid data - mark as broken
+              console.warn('[AMMonitor] Invalid status response:', statusData);
+              setStatus({
+                tabId,
+                status: 'broken',
+                statusText: 'AM returned invalid data',
+                detailedReason: 'Backend /api/am/tab-status returned malformed response'
+              });
+            }
           }
         } else if (statusRes && !statusRes.ok) {
+          consecutiveFailures++;
           console.warn('[AMMonitor] Status endpoint returned', statusRes.status);
           if (isMounted) {
-            setStatus({
-              tabId,
-              status: amEnabled ? 'active' : 'disabled',
-              statusText: amEnabled ? 'AM Active' : 'AM Disabled'
-            });
+            // v3.12.2: Don't lie about status - show error state if backend fails
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+              setStatus({
+                tabId,
+                status: 'broken',
+                statusText: 'AM Backend Error',
+                detailedReason: `Backend returned HTTP ${statusRes.status} (${consecutiveFailures} failures)`
+              });
+            } else {
+              // Brief failures: keep last known status or show unknown
+              setStatus(prev => prev || {
+                tabId,
+                status: 'disabled',
+                statusText: 'Checking AM status...'
+              });
+            }
           }
         }
 
@@ -89,18 +116,27 @@ const AMMonitor = ({ tabId, amEnabled, devMode = false }) => {
         }
       } catch (err) {
         if (!isMounted) return;
+        consecutiveFailures++;
+        
         // Silent fail for connection errors during server restarts
         const isConnectionError = err.message?.includes('Failed to fetch');
         if (!isConnectionError) {
           console.error('[AMMonitor] Status check failed:', err);
         }
-        // Set default status on error
+        
+        // v3.12.2: Show accurate error state after repeated failures
         if (isMounted) {
-          setStatus({
-            tabId,
-            status: amEnabled ? 'active' : 'disabled',
-            statusText: amEnabled ? 'AM Active' : 'AM Disabled'
-          });
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            setStatus({
+              tabId,
+              status: 'broken',
+              statusText: 'AM Connection Failed',
+              detailedReason: isConnectionError 
+                ? 'Cannot reach backend (server may be restarting)' 
+                : err.message
+            });
+          }
+          // On first failure, keep existing status
         }
       } finally {
         if (isMounted) setLoading(false);

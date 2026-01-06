@@ -16,7 +16,7 @@ import (
 )
 
 // Version is set at build time via ldflags
-var Version = "3.12.1"
+var Version = "3.12.2"
 
 // GitHub repo info
 const (
@@ -129,18 +129,51 @@ func CheckForUpdate() (*UpdateInfo, error) {
 	}, nil
 }
 
-// DownloadUpdate downloads the new binary to a temp location
+// DownloadUpdate downloads the new binary to a temp location with retry logic
 func DownloadUpdate(info *UpdateInfo) (string, error) {
+	return DownloadUpdateWithRetries(info, 3) // Default to 3 retries
+}
+
+// DownloadUpdateWithRetries downloads the new binary with configurable retry count
+func DownloadUpdateWithRetries(info *UpdateInfo, maxRetries int) (string, error) {
 	if !info.Available || info.DownloadURL == "" {
 		return "", fmt.Errorf("no update available")
 	}
 
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 1s, 2s, 4s
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			if backoff > 10*time.Second {
+				backoff = 10 * time.Second
+			}
+			time.Sleep(backoff)
+		}
+		
+		tmpFile, err := downloadUpdateAttempt(info, attempt)
+		if err == nil {
+			return tmpFile, nil
+		}
+		lastErr = err
+		
+		// Log retry attempt
+		if attempt < maxRetries {
+			fmt.Printf("[Updater] Download attempt %d failed: %v, retrying...\n", attempt+1, err)
+		}
+	}
+	
+	return "", fmt.Errorf("download failed after %d attempts: %w", maxRetries+1, lastErr)
+}
+
+// downloadUpdateAttempt performs a single download attempt
+func downloadUpdateAttempt(info *UpdateInfo, attempt int) (string, error) {
 	// Create temp file
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, "forge-update"+getExeSuffix())
 
 	// Use a transport based on DefaultTransport with adjusted timeouts
-	// This ensures proper connection handling while allowing long downloads
+	// v3.12.2: Separate transport per attempt to avoid connection reuse issues
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:          (&net.Dialer{
@@ -156,13 +189,25 @@ func DownloadUpdate(info *UpdateInfo) (string, error) {
 		ResponseHeaderTimeout: 60 * time.Second, // Allow time for GitHub redirect
 		DisableKeepAlives:     false,            // Enable keep-alives for better performance
 	}
+	
+	// v3.12.2: Custom redirect handling to apply timeouts to redirects too
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   0, // No overall timeout - let the body download take as long as needed
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			// Copy headers to redirect request
+			req.Header.Set("User-Agent", "Forge-Terminal-Updater/"+Version)
+			return nil
+		},
 	}
 
 	// Create request with context for cancellation
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	
 	req, err := http.NewRequestWithContext(ctx, "GET", info.DownloadURL, nil)
 	if err != nil {
 		return "", err
@@ -176,7 +221,18 @@ func DownloadUpdate(info *UpdateInfo) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	// v3.12.2: Handle various HTTP status codes
+	switch {
+	case resp.StatusCode == 200:
+		// Success, continue
+	case resp.StatusCode == 302 || resp.StatusCode == 301:
+		// Should have been followed automatically, but handle just in case
+		return "", fmt.Errorf("unexpected redirect (status %d)", resp.StatusCode)
+	case resp.StatusCode == 404:
+		return "", fmt.Errorf("release asset not found (404) - release may not be ready yet")
+	case resp.StatusCode >= 500:
+		return "", fmt.Errorf("GitHub server error (status %d) - try again later", resp.StatusCode)
+	default:
 		return "", fmt.Errorf("download failed with status %d", resp.StatusCode)
 	}
 
