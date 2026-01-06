@@ -102,6 +102,12 @@ func getDesktopPath() (string, error) {
 }
 
 func createShortcutViaPS(shortcutPath, execPath string) error {
+	// Convert Windows backslashes to forward slashes for PowerShell compatibility
+	// PowerShell handles forward slashes as path separators on Windows
+	shortcutPathPS := strings.ReplaceAll(shortcutPath, "\\", "/")
+	execPathPS := strings.ReplaceAll(execPath, "\\", "/")
+	workingDirPS := strings.ReplaceAll(filepath.Dir(execPath), "\\", "/")
+
 	psScript := fmt.Sprintf(`
 $ErrorActionPreference = 'Stop'
 try {
@@ -117,7 +123,7 @@ try {
     Write-Error $_.Exception.Message
     exit 1
 }
-`, shortcutPath, execPath, filepath.Dir(execPath), execPath)
+`, shortcutPathPS, execPathPS, workingDirPS, execPathPS)
 
 	cmd := exec.Command("powershell", "-NoProfile", "-Command", psScript)
 	hideWindow(cmd)
