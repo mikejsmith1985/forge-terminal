@@ -1139,49 +1139,39 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // v3.12.2 FIX: Restore v3.11.1 paste handling with fallback timer
-      // PROBLEM: v3.11.7 removed the fallback, and native paste events don't reliably fire in xterm
-      // SOLUTION: Let the native paste event fire first (it's synchronous and reliable).
-      // Only use clipboard API as a FALLBACK if the paste event didn't trigger.
+      // v3.12.8 FIX: Revert to v3.8.1 SIMPLE approach - directly read clipboard on Ctrl+V
+      // PROBLEM: The complex approach (return true, wait for paste event, fallback timer) is UNRELIABLE
+      // because xterm has clipboardMode: 'off' and native paste events don't fire consistently.
+      // SOLUTION: Directly read clipboard using navigator.clipboard.read() API, handle all media types,
+      // then return false to prevent xterm from doing anything. Simple and reliable.
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        console.log('[Terminal] Ctrl+V pressed - allowing native paste event');
-        
-        // DON'T set isPastingRef here - let the paste event handler work
-        // Instead, set a short timer to use clipboard API as fallback if paste event doesn't fire
-        
-        // Wait a brief moment to see if paste event fires (it should be synchronous)
-        setTimeout(async () => {
-          // If isPastingRef was set, paste event already handled it
-          if (isPastingRef.current) {
-            console.log('[Terminal] Paste was handled by paste event');
-            return;
-          }
-          
-          // Paste event didn't fire - try clipboard API as fallback
-          console.log('[Terminal] Paste event did not fire, trying clipboard API fallback');
-          isPastingRef.current = true;
-          setTimeout(() => { isPastingRef.current = false; }, 500);
-          
-          // PRIORITY: Check for images/videos FIRST (they're the special case)
+        console.log('[Terminal] Ctrl+V pressed - reading clipboard directly (v3.12.8 simple approach)');
+        isPastingRef.current = true;
+        setTimeout(() => { isPastingRef.current = false; }, 500);
+
+        // Immediately read clipboard and handle all content types
+        (async () => {
           try {
+            // Try navigator.clipboard.read() first - this supports images AND text
             const items = await navigator.clipboard.read();
+
             for (const item of items) {
               // Check for images or videos FIRST - these need special upload handling
               const imageType = item.types.find(t => t.startsWith('image/'));
               const videoType = item.types.find(t => t.startsWith('video/'));
               const mediaType = imageType || videoType;
-              
+
               if (mediaType) {
                 const isImage = !!imageType;
                 const mediaKind = isImage ? 'image' : 'video';
                 console.log(`[Terminal] Found ${mediaKind} in clipboard:`, mediaType);
                 const blob = await item.getType(mediaType);
-                
+
                 // Get file size for metadata
                 const fileSizeKB = Math.round(blob.size / 1024);
                 const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
                 const sizeStr = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
-                
+
                 // Determine extension from MIME type
                 const extMap = {
                   'image/png': '.png',
@@ -1190,33 +1180,34 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   'image/webp': '.webp',
                   'video/mp4': '.mp4',
                   'video/webm': '.webm',
+                  'video/quicktime': '.mov',
                 };
                 const ext = extMap[mediaType] || (isImage ? '.png' : '.mp4');
-                
+
                 // Show uploading indicator
                 if (xtermRef.current) {
                   xtermRef.current.write(`\x1b[33m[Uploading ${mediaKind} (${sizeStr})...]\x1b[0m`);
                 }
-                
+
                 const formData = new FormData();
                 const filename = `clipboard-${Date.now()}${ext}`;
                 formData.append('file', blob, filename);
-                
+
                 const response = await fetch('/api/files/upload', {
                   method: 'POST',
                   body: formData
                 });
-                
+
                 if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
-                
+
                 const data = await response.json();
                 const filePath = data.path;
-                
+
                 // Clear uploading indicator
                 if (xtermRef.current) {
                   xtermRef.current.write('\r\x1b[K');
                 }
-                
+
                 // Handle video frame extraction results
                 let framePaths = [];
                 let ffmpegAvailable = false;
@@ -1224,7 +1215,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 if (data.isVideo) {
                   ffmpegAvailable = data.ffmpegAvailable;
                   framePaths = data.framePaths || [];
-                  
+
                   if (!ffmpegAvailable) {
                     if (xtermRef.current) {
                       xtermRef.current.write(`\x1b[33m[Note: Install ffmpeg to enable video frame extraction for AI agents]\x1b[0m\r\n`);
@@ -1235,7 +1226,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                     }
                   }
                 }
-                
+
                 // Send file path(s) to terminal
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                   if (isVideo && framePaths.length > 0) {
@@ -1255,7 +1246,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                     wsRef.current.send(textToSend);
                     console.log(`[Terminal] Sent ${mediaKind} path to PTY:`, textToSend);
                   }
-                  
+
                   if (onPasteRef.current) {
                     onPasteRef.current(mediaKind, {
                       filename,
@@ -1269,47 +1260,44 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                     });
                   }
                 }
-                return;
+                return; // Done - we found and handled media
               }
-              
-              // Check for text in items
+
+              // Check for text in items (after checking for media)
               const textType = item.types.find(t => t === 'text/plain');
               if (textType) {
                 const textBlob = await item.getType(textType);
                 const text = await textBlob.text();
                 if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  console.log('[Terminal] Pasting text from clipboard items:', text.length, 'chars');
+                  console.log('[Terminal] Pasting text from clipboard:', text.length, 'chars');
                   wsRef.current.send(text);
                   if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
-                  return;
+                  return; // Done - we found and handled text
                 }
               }
             }
-          } catch (itemsErr) {
-            console.error('[Terminal] Clipboard read failed:', itemsErr);
-            
-            // Fallback: Try to read text using readText() API
+          } catch (readErr) {
+            // navigator.clipboard.read() failed - try readText() as fallback (text-only)
+            console.warn('[Terminal] clipboard.read() failed, trying readText():', readErr.message);
+
             try {
               const text = await navigator.clipboard.readText();
               if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                console.log('[Terminal] Pasting text via fallback readText():', text.length, 'chars');
+                console.log('[Terminal] Pasting text via readText() fallback:', text.length, 'chars');
                 wsRef.current.send(text);
                 if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
                 return;
               }
-            } catch (fallbackErr) {
-              console.error('[Terminal] Fallback text read also failed:', fallbackErr);
+            } catch (textErr) {
+              console.error('[Terminal] All clipboard read methods failed:', textErr.message);
+              logPasteError(textErr, { location: 'ctrlV-allFallbacksFailed' });
             }
-            
-            // No permission error message - Ctrl+V paste should ALWAYS work via paste event
-            // If we reach here, it's a browser issue, not a permissions issue
-            console.error('[Terminal] Paste failed unexpectedly:', itemsErr);
           }
-        }, 50); // Wait 50ms to see if paste event fires first
-        
-        // Return TRUE to let xterm trigger the native paste event
-        // The paste event handler (handlePaste) will set isPastingRef if it handles the paste
-        return true;
+        })();
+
+        // Return FALSE to prevent xterm from handling (we handle everything above)
+        // This is the key difference from the broken v3.12.2-v3.12.7 approach
+        return false;
       }
 
       return true; // Let all other keys pass through standard xterm processing
