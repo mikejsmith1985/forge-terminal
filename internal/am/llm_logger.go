@@ -2,7 +2,6 @@
 package am
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,7 +12,7 @@ import (
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
-	"github.com/mikejsmith1985/forge-terminal/internal/slm"
+	// SLM import removed in v3.12.3 - local LLM context window too small to be useful
 )
 
 // Memory limits to prevent unbounded growth
@@ -364,7 +363,7 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 		})
 
 		// v3.5.0: Run SLM analysis on initial prompt
-		go l.runSLMAnalysis(conv, detected.Prompt)
+		// v3.12.3: SLM removed - this was a no-op anyway
 	} else {
 		log.Printf("[LLM Logger] No initial prompt provided")
 	}
@@ -400,191 +399,6 @@ func (l *LLMLogger) StartConversation(detected *llm.DetectedCommand) string {
 	log.Printf("[LLM Logger] Final state: activeConvID='%s', mapSize=%d", l.activeConvID, len(l.conversations))
 	log.Printf("[LLM Logger] ═══ END START CONVERSATION ═══")
 	return convID
-}
-
-// runSLMAnalysis performs SLM analysis on a prompt and sets up tracking.
-// Called asynchronously to not block conversation start.
-func (l *LLMLogger) runSLMAnalysis(conv *LLMConversation, prompt string) {
-	if conv == nil || prompt == "" {
-		return
-	}
-
-	engine := slm.GetEngine()
-	if engine == nil {
-		log.Printf("[LLM Logger] SLM engine not available")
-		return
-	}
-
-	// Build context for analysis
-	input := slm.PromptContext{
-		Prompt:          prompt,
-		EstimatedTokens: len(prompt) / 4,
-	}
-
-	// Run analysis with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	result, err := engine.Analyze(ctx, input)
-	if err != nil {
-		log.Printf("[LLM Logger] SLM analysis failed: %v", err)
-		return
-	}
-	
-	// Issue #52 fix: result can be nil when no SLM provider is available
-	if result == nil {
-		log.Printf("[LLM Logger] No analysis result (SLM not available)")
-		return
-	}
-
-	// Update conversation with tracking data
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	// Make sure conversation still exists
-	if conv.ConversationID != l.activeConvID {
-		log.Printf("[LLM Logger] Conversation changed during SLM analysis, skipping")
-		return
-	}
-
-	// Initialize tracking
-	conv.SLMTracking = &SLMTrackingData{
-		PromptHash:          hashForTracking(prompt),
-		InitialPrompt:       truncateForTracking(prompt, 200),
-		PredictedComplexity: result.Complexity,
-		AnalysisProvider:    result.Provider,
-		UserIterations:      1, // Initial prompt counts as first iteration
-	}
-
-	// Find best predicted model from iterations
-	if result.Iterations != nil {
-		for _, model := range []string{"sonnet", "haiku", "gemini-3", "gpt-4o"} {
-			if iters, ok := result.Iterations[model]; ok {
-				conv.SLMTracking.PredictedModel = model
-				conv.SLMTracking.PredictedIterations = iters
-				break
-			}
-		}
-	}
-
-	log.Printf("[SLM] Analysis complete for %s: complexity=%d, task=%s, predicted=%s/%d",
-		conv.ConversationID, result.Complexity, result.TaskType,
-		conv.SLMTracking.PredictedModel, conv.SLMTracking.PredictedIterations)
-}
-
-// runSLMAnalysisForInput runs SLM analysis for user input during conversation.
-// This is called when the first user prompt is detected in a TUI-mode conversation.
-func (l *LLMLogger) runSLMAnalysisForInput(conv *LLMConversation, prompt string) {
-	if conv == nil || prompt == "" {
-		return
-	}
-
-	engine := slm.GetEngine()
-	if engine == nil {
-		log.Printf("[SLM] Engine not available")
-		return
-	}
-
-	// Build context
-	input := slm.PromptContext{
-		Prompt:          prompt,
-		EstimatedTokens: len(prompt) / 4,
-	}
-
-	// Run analysis
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	result, err := engine.Analyze(ctx, input)
-	if err != nil {
-		log.Printf("[SLM] Analysis failed: %v", err)
-		return
-	}
-	
-	// Issue #52 fix: result can be nil when no SLM provider is available
-	if result == nil {
-		log.Printf("[SLM] No analysis result (SLM not available)")
-		return
-	}
-
-	// Update tracking (need lock)
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	// Verify conversation still active
-	if conv.ConversationID != l.activeConvID {
-		return
-	}
-
-	if conv.SLMTracking == nil {
-		conv.SLMTracking = &SLMTrackingData{}
-	}
-
-	// Update with analysis results
-	conv.SLMTracking.PromptHash = hashForTracking(prompt)
-	conv.SLMTracking.InitialPrompt = truncateForTracking(prompt, 200)
-	conv.SLMTracking.PredictedComplexity = result.Complexity
-	conv.SLMTracking.AnalysisProvider = result.Provider
-
-	// Find predicted iterations
-	if result.Iterations != nil {
-		for _, model := range []string{"sonnet", "haiku", "gemini-3", "gpt-4o"} {
-			if iters, ok := result.Iterations[model]; ok {
-				conv.SLMTracking.PredictedModel = model
-				conv.SLMTracking.PredictedIterations = iters
-				break
-			}
-		}
-	}
-
-	log.Printf("[SLM] ✅ Analysis for %s: complexity=%d, task=%s, model=%s, iterations=%d",
-		conv.ConversationID, result.Complexity, result.TaskType,
-		conv.SLMTracking.PredictedModel, conv.SLMTracking.PredictedIterations)
-}
-
-// InitializeSLMTracking sets up SLM analysis for the active conversation.
-// Should be called after StartConversation when SLM analysis is available.
-func (l *LLMLogger) InitializeSLMTracking(analysis interface{}, initialPrompt string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.activeConvID == "" {
-		return
-	}
-
-	conv, exists := l.conversations[l.activeConvID]
-	if !exists {
-		return
-	}
-
-	// Import the analysis from SLM package
-	// We use interface{} to avoid circular imports, then type assert
-	if slmResult, ok := analysis.(interface {
-		GetComplexity() int
-		GetProvider() string
-		GetIterations() map[string]int
-	}); ok {
-		tracking := &SLMTrackingData{
-			PromptHash:          hashForTracking(initialPrompt),
-			InitialPrompt:       truncateForTracking(initialPrompt, 200),
-			PredictedComplexity: slmResult.GetComplexity(),
-			AnalysisProvider:    slmResult.GetProvider(),
-		}
-
-		// Find best predicted model
-		iters := slmResult.GetIterations()
-		for _, model := range []string{"haiku", "sonnet", "gemini-3", "gpt-4o"} {
-			if count, ok := iters[model]; ok {
-				tracking.PredictedModel = model
-				tracking.PredictedIterations = count
-				break
-			}
-		}
-
-		conv.SLMTracking = tracking
-		log.Printf("[LLM Logger] SLM tracking initialized: complexity=%d, model=%s, iters=%d",
-			tracking.PredictedComplexity, tracking.PredictedModel, tracking.PredictedIterations)
-	}
 }
 
 // hashForTracking creates a short hash for prompt identification.
@@ -1168,6 +982,13 @@ func (l *LLMLogger) flushUserInputLocked() {
 	
 	conv.Turns = append(conv.Turns, turn)
 
+	// Update SLMTracking stats
+	if conv.SLMTracking != nil {
+		conv.SLMTracking.UserIterations++
+		// Estimate tokens: ~4 chars per token
+		conv.SLMTracking.TotalTokensIn += len(cleaned) / 4
+	}
+
 	// v3.5.1: Publish LLM_TURN event for Chat bridge
 	EventBus.Publish(&LayerEvent{
 		Type:      "LLM_TURN",
@@ -1181,21 +1002,6 @@ func (l *LLMLogger) flushUserInputLocked() {
 			"content": cleaned,
 		},
 	})
-
-	// v3.5.0: Track user iteration for SLM feedback
-	if conv.SLMTracking != nil {
-		// Run SLM analysis on first real user prompt (not system turn)
-		if conv.SLMTracking.PromptHash == "" && cleaned != "" {
-			// This is the first user prompt - run SLM analysis
-			log.Printf("[SLM] First user prompt detected, running analysis...")
-			go l.runSLMAnalysisForInput(conv, cleaned)
-		}
-		
-		recorder := GetFeedbackRecorder()
-		if recorder != nil {
-			recorder.RecordUserTurn(conv, cleaned)
-		}
-	}
 
 	// Update recovery info
 	if conv.Recovery == nil {
@@ -1276,6 +1082,12 @@ func (l *LLMLogger) FlushOutput() {
 		CaptureMethod:   "pty_output",
 		ParseConfidence: confidence,
 	})
+
+	// Update SLMTracking stats
+	if conv.SLMTracking != nil {
+		// Estimate tokens: ~4 chars per token
+		conv.SLMTracking.TotalTokensOut += len(cleanedOutput) / 4
+	}
 
 	l.outputBuffer = ""
 	activeConvID := l.activeConvID
@@ -1364,16 +1176,6 @@ func (l *LLMLogger) EndConversation() {
 	conv.Complete = true
 	conv.EndTime = time.Now()
 	l.saveConversation(conv)
-
-	// v3.5.0: Record SLM feedback for learning
-	if conv.SLMTracking != nil {
-		recorder := GetFeedbackRecorder()
-		if recorder != nil {
-			if err := recorder.FinalizeAndRecord(conv); err != nil {
-				log.Printf("[LLM Logger] Warning: failed to record SLM feedback: %v", err)
-			}
-		}
-	}
 
 	EventBus.Publish(&LayerEvent{
 		Type:      "LLM_END",

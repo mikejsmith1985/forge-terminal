@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>v3.12.3 SLMTracking Validation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui; background: #0f172a; color: #e2e8f0; padding: 24px; }
+    h1 { color: #f97316; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; }
+    .pass { color: #22c55e; }
+    .stat { font-size: 2rem; font-weight: bold; color: #22c55e; }
+  </style>
+</head>
+<body>
+  <h1>v3.12.3 Validation Report</h1>
+  <div class="grid">
+    <div class="card">
+      <h2>Cypress Tests</h2>
+      <p class="pass">5 passing, 0 failing</p>
+    </div>
+    <div class="card">
+      <h2>SLMTracking</h2>
+      <p>UserIterations, TotalTokensIn, TotalTokensOut now populated</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart3, GitCommit, FileCode, MessageSquare, Clock, 
-  Zap, ChevronDown, ChevronUp, RefreshCw, X, TrendingUp 
+  Zap, ChevronDown, ChevronUp, RefreshCw, X, TrendingUp, Hash, ArrowLeftRight
 } from 'lucide-react';
 import './DeveloperDashboard.css';
 
@@ -26,6 +26,11 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
     testsRun: 0,
     lastActivity: null,
     sessionDuration: 0,
+    // v3.12.3: Real stats from SLMTracking
+    totalTokensIn: 0,
+    totalTokensOut: 0,
+    modelSwitches: 0,
+    modelsUsed: {},
   });
   const [dailyStats, setDailyStats] = useState([]);
   const [expandedSection, setExpandedSection] = useState(null);
@@ -88,7 +93,12 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
         });
       }
 
-      // Process conversations for prompt counts
+      // Process conversations for prompt counts and SLMTracking data
+      let totalTokensIn = 0;
+      let totalTokensOut = 0;
+      let modelSwitches = 0;
+      let modelsUsed = {};
+      
       if (convRes && convRes.ok) {
         const convData = await convRes.json();
         const conversations = Array.isArray(convData) 
@@ -104,6 +114,19 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
           if (conv.metadata?.provider) {
             const provider = conv.metadata.provider;
             providersUsed[provider] = (providersUsed[provider] || 0) + 1;
+          }
+          
+          // v3.12.3: Extract SLMTracking data for real stats
+          if (conv.slmTracking) {
+            const tracking = conv.slmTracking;
+            totalTokensIn += tracking.totalTokensIn || 0;
+            totalTokensOut += tracking.totalTokensOut || 0;
+            if (tracking.modelSwitched) {
+              modelSwitches++;
+            }
+            if (tracking.actualModel) {
+              modelsUsed[tracking.actualModel] = (modelsUsed[tracking.actualModel] || 0) + 1;
+            }
           }
         });
       }
@@ -172,6 +195,11 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
         testsRun,
         lastActivity,
         sessionDuration: Math.round(sessionDuration),
+        // v3.12.3: Real stats from SLMTracking
+        totalTokensIn,
+        totalTokensOut,
+        modelSwitches,
+        modelsUsed,
       });
 
       // Build daily stats array for chart
@@ -315,6 +343,29 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
               </div>
             </div>
 
+            {/* Token Usage Stats - v3.12.3 */}
+            {(stats.totalTokensIn > 0 || stats.totalTokensOut > 0) && (
+              <div className="dd-token-stats">
+                <div className="dd-token-stat">
+                  <Hash size={14} />
+                  <span className="dd-token-label">Tokens In:</span>
+                  <span className="dd-token-value">{stats.totalTokensIn.toLocaleString()}</span>
+                </div>
+                <div className="dd-token-stat">
+                  <Hash size={14} />
+                  <span className="dd-token-label">Tokens Out:</span>
+                  <span className="dd-token-value">{stats.totalTokensOut.toLocaleString()}</span>
+                </div>
+                {stats.modelSwitches > 0 && (
+                  <div className="dd-token-stat">
+                    <ArrowLeftRight size={14} />
+                    <span className="dd-token-label">Model Switches:</span>
+                    <span className="dd-token-value">{stats.modelSwitches}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Activity Chart */}
             <div className="dd-section">
               <div className="dd-section-header" onClick={() => toggleSection('chart')}>
@@ -354,6 +405,27 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
                       <div key={provider} className="dd-list-item">
                         <span className="dd-provider-name">{provider}</span>
                         <span className="dd-provider-count">{count} sessions</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Models Used - v3.12.3 */}
+            {Object.keys(stats.modelsUsed).length > 0 && (
+              <div className="dd-section">
+                <div className="dd-section-header" onClick={() => toggleSection('models')}>
+                  <Hash size={16} />
+                  <span>Models Used</span>
+                  {expandedSection === 'models' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </div>
+                {expandedSection === 'models' && (
+                  <div className="dd-list">
+                    {Object.entries(stats.modelsUsed).map(([model, count]) => (
+                      <div key={model} className="dd-list-item">
+                        <span className="dd-provider-name">{model}</span>
+                        <span className="dd-provider-count">{count} conversations</span>
                       </div>
                     ))}
                   </div>

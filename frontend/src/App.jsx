@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen, Target } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
@@ -21,11 +21,11 @@ import FileExplorer from './components/FileExplorer'
 import LensFilePicker from './components/LensFilePicker'
 import MonacoEditor from './components/MonacoEditor'
 import AgenticEditor from './components/AgenticEditor'
-import AMMonitor from './components/AMMonitor'
+// AMMonitor removed in v3.12.3 - native recovery works, redundancy monitoring didn't provide value
 import DebugPanel from './components/DebugPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
-import { TaskDashboard } from './components/task'
+// TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -158,13 +158,13 @@ function App() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
   // Workflow UI state - REMOVED v3.9.0: Workflows deleted, using Task Dashboard instead
+  // Task Dashboard state - REMOVED v3.12.3: Was unimplemented scaffolding
+  
+  // Context files for ForgeAssist (kept from Task Dashboard removal)
+  const [contextFiles, setContextFiles] = useState([])
   
   // Time-Travel UI state
   const [isHistorySliderOpen, setIsHistorySliderOpen] = useState(false)
-  
-  // v3.8.2: Task Dashboard state
-  const [isTaskDashboardOpen, setIsTaskDashboardOpen] = useState(false)
-  const [contextFiles, setContextFiles] = useState([])
   
   // v3.10.6: Developer Dashboard state
   const [isDeveloperDashboardOpen, setIsDeveloperDashboardOpen] = useState(false)
@@ -1512,11 +1512,6 @@ function App() {
           <>
             <h3>⚡ Commands</h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <AMMonitor 
-                tabId={activeTab?.id || 'no-tab'} 
-                amEnabled={activeTab?.amEnabled || false}
-                devMode={true}
-              />
               <button className="btn btn-primary" onClick={handleAdd}>
                 <Plus size={16} /> Add
               </button>
@@ -1526,11 +1521,6 @@ function App() {
           <>
             <h3>📁 Files</h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <AMMonitor 
-                tabId={activeTab?.id || 'no-tab'} 
-                amEnabled={activeTab?.amEnabled || false}
-                devMode={true}
-              />
               <span className="sidebar-path-hint">{activeTab?.currentDirectory ? getFolderNameFromPath(activeTab.currentDirectory) : 'Root'}</span>
             </div>
           </>
@@ -1538,11 +1528,6 @@ function App() {
           <>
             <h3>🐛 Debug</h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <AMMonitor 
-                tabId={activeTab?.id || 'no-tab'} 
-                amEnabled={activeTab?.amEnabled || false}
-                devMode={true}
-              />
               <button 
                 className="btn btn-primary"
                 onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
@@ -1648,15 +1633,7 @@ function App() {
             <span role="img" aria-label="assistant">🤖</span>
           </button>
         </div>
-        {/* v3.8.2: Task Dashboard toggle */}
-        <button 
-          className={`btn btn-ghost btn-icon ${isTaskDashboardOpen ? 'active' : ''}`}
-          onClick={() => setIsTaskDashboardOpen(prev => !prev)} 
-          title="Toggle Task Dashboard"
-          style={{ color: isTaskDashboardOpen ? 'var(--accent-color)' : undefined }}
-        >
-          <Target size={18} />
-        </button>
+        {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}
         <button 
           className="btn btn-ghost btn-icon" 
           onClick={() => setIsSettingsModalOpen(true)} 
@@ -1774,29 +1751,9 @@ function App() {
             ) : tabs.map((tab) => (
               <div
                 key={tab.id}
-                className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''} ${isTaskDashboardOpen ? 'with-dashboard' : ''}`}
+                className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
               >
-                {/* v3.8.2: Task Dashboard - Workflow Stage Orchestration */}
-                {isTaskDashboardOpen && tab.id === activeTabId && (
-                  <div className="task-dashboard-panel">
-                    <TaskDashboard
-                      tabId={tab.id}
-                      contextFiles={contextFiles}
-                      commandCards={commands}
-                      terminalRef={terminalRefs.current[tab.id]}
-                      onStageChange={(stage) => logger.info('Stage changed:', stage)}
-                      onTaskComplete={() => addToast('🎉 Task complete!', 'success', 3000)}
-                      onOpenContextCart={() => setSidebarView('files')}
-                      onRunCommand={(cmd) => {
-                        const termRef = terminalRefs.current[tab.id];
-                        if (termRef?.sendCommand) {
-                          termRef.sendCommand(cmd);
-                        }
-                      }}
-                      onToast={addToast}
-                    />
-                  </div>
-                )}
+                {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}
                 {/* v3.8.2: Terminal is the only view - ChatView and NotebookLayout removed */}
                 <div className="view-layer terminal-layer active">
                   <ForgeTerminal

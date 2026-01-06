@@ -1069,9 +1069,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
     };
 
-    // Attach to container with capture=true to intercept before xterm
+    // v3.12.3 FIX: Attach paste listener to BOTH the container AND the xterm textarea
+    // The xterm textarea is where paste events actually fire when clipboardMode is 'off'
     if (terminalRef.current) {
+      // Container listener (capture phase) - catches paste from anywhere in the terminal area
       terminalRef.current.addEventListener('paste', handlePaste, true);
+      
+      // Also attach to the xterm textarea directly - this is where keyboard paste events fire
+      const xtermTextarea = terminalRef.current.querySelector('.xterm-helper-textarea');
+      if (xtermTextarea) {
+        xtermTextarea.addEventListener('paste', handlePaste, true);
+        console.log('[Terminal] Paste listener attached to xterm textarea');
+      } else {
+        console.warn('[Terminal] xterm textarea not found - paste may not work reliably');
+      }
     }
 
     // VS Code proven solution: Use xterm's attachCustomKeyEventHandler
@@ -1809,7 +1820,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     resizeObserver.observe(terminalRef.current);
 
     return () => {
-      // No cleanup needed for attachCustomKeyEventHandler - xterm handles it
+      // v3.12.3: Clean up paste event listeners
+      if (terminalRef.current) {
+        terminalRef.current.removeEventListener('paste', handlePaste, true);
+        const xtermTextarea = terminalRef.current.querySelector('.xterm-helper-textarea');
+        if (xtermTextarea) {
+          xtermTextarea.removeEventListener('paste', handlePaste, true);
+        }
+      }
 
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();

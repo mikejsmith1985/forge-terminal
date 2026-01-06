@@ -2,7 +2,6 @@
 package terminal
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
-	"github.com/mikejsmith1985/forge-terminal/internal/slm"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
 
@@ -46,14 +44,13 @@ func stripANSILocal(input string) string {
 // ExecutiveTriggerHandler handles "?" command routing.
 type ExecutiveTriggerHandler struct {
 	mu            sync.Mutex
-	classifier    *llm.TaskClassifier // Fallback heuristic classifier
+	classifier    *llm.TaskClassifier // Heuristic classifier for task analysis
 	configLoader  *llm.ConfigLoader
 	visionParser  *vision.Parser
 	lastRouting   time.Time
 	cooldown      time.Duration       // Prevent rapid-fire triggers
 	activeProcess *ActiveProcessInfo  // Tracks what LLM is currently running
 	llmDetector   *llm.Detector       // Detects LLM commands
-	slmProvider   slm.Provider        // v3.5.3: Real SLM analysis (replaces heuristics)
 }
 
 // NewExecutiveTriggerHandler creates a new executive trigger handler.
@@ -70,29 +67,10 @@ func NewExecutiveTriggerHandler(vp *vision.Parser) *ExecutiveTriggerHandler {
 		llmDetector:  llm.NewDetector(),
 	}
 	
-	// v3.5.3: Initialize SLM provider for real task analysis
-	handler.initSLMProvider()
+	// v3.12.3: SLM removed - context windows too small for complex tasks
+	// Uses heuristic classifier only now
 	
 	return handler
-}
-
-// initSLMProvider initializes the SLM provider (Ollama only as of v3.9.1).
-func (eth *ExecutiveTriggerHandler) initSLMProvider() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	
-	// v3.9.1: Ollama only - embedded SLM removed
-	ollamaProvider := slm.NewOllamaProvider()
-	if ollamaProvider.IsAvailable() {
-		if err := ollamaProvider.Initialize(ctx); err == nil {
-			eth.slmProvider = ollamaProvider
-			log.Printf("[Executive] SLM initialized with Ollama provider")
-			return
-		}
-	}
-	
-	// No SLM available - will fall back to heuristic classifier
-	log.Printf("[Executive] No SLM provider available (install Ollama for smart routing)")
 }
 
 // SetActiveProcess updates the currently active LLM process.
@@ -257,11 +235,8 @@ type RoutingResult struct {
 	TierMismatch    bool               // True if routed tier != active process tier
 	MismatchAction  TierMismatchAction // What action was taken
 	ActuallyRunning string             // What is ACTUALLY running (for badge sync)
-	// v3.5.3: SLM analysis data (replaces heuristics)
+	// v3.12.3: Heuristic analysis data (SLM removed)
 	TaskType        string  // debug, explain, refactor, generate, simple
-	Complexity      int     // 1-10 complexity score
-	Confidence      float64 // SLM confidence in analysis
-	UsedSLM         bool    // True if SLM was used, false if heuristic fallback
 }
 
 // IsExecutiveTrigger checks if the input line is an executive trigger.
@@ -284,7 +259,7 @@ func ExtractPrompt(line string) string {
 
 // Route classifies the prompt and builds the routed command.
 // Task 1 & 2: Now includes active process detection and tier mismatch handling.
-// v3.5.3: Uses real SLM analysis instead of heuristic pattern matching.
+// v3.12.3: Uses heuristic pattern matching (SLM removed).
 func (eth *ExecutiveTriggerHandler) Route(prompt string) *RoutingResult {
 	eth.mu.Lock()
 	defer eth.mu.Unlock()
@@ -299,43 +274,10 @@ func (eth *ExecutiveTriggerHandler) Route(prompt string) *RoutingResult {
 	// Clean the prompt
 	cleanPrompt := stripANSILocal(prompt)
 
-	// v3.5.3: Use SLM for real task analysis if available
-	var tier llm.ModelTier
-	var taskType string
-	var complexity int
-	var confidence float64
-	var usedSLM bool
-
-	if eth.slmProvider != nil && eth.slmProvider.IsAvailable() {
-		// Use real SLM analysis
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		slmInput := slm.PromptContext{
-			Prompt: cleanPrompt,
-		}
-
-		if result, err := eth.slmProvider.Analyze(ctx, slmInput); err == nil && result != nil {
-			taskType = string(result.TaskType)
-			complexity = result.Complexity
-			confidence = result.Confidence
-			usedSLM = true
-
-			// Map SLM task type + complexity to model tier
-			tier = eth.mapSLMToTier(result)
-			log.Printf("[Executive] SLM analysis: task=%s, complexity=%d, confidence=%.2f -> tier=%s",
-				taskType, complexity, confidence, tier)
-		} else {
-			log.Printf("[Executive] SLM analysis failed: %v, falling back to heuristics", err)
-			tier = eth.classifier.ClassifyTask(cleanPrompt)
-			taskType = eth.inferTaskTypeFromTier(tier)
-		}
-	} else {
-		// Fallback to heuristic classifier
-		tier = eth.classifier.ClassifyTask(cleanPrompt)
-		taskType = eth.inferTaskTypeFromTier(tier)
-		log.Printf("[Executive] Using heuristic fallback: tier=%s, taskType=%s", tier, taskType)
-	}
+	// v3.12.3: Use heuristic classifier (SLM removed - context windows too small)
+	tier := eth.classifier.ClassifyTask(cleanPrompt)
+	taskType := eth.inferTaskTypeFromTier(tier)
+	log.Printf("[Executive] Heuristic classification: tier=%s, taskType=%s", tier, taskType)
 
 	// 2. Build execution context
 	execCtx := &llm.ExecutionContext{
@@ -346,12 +288,9 @@ func (eth *ExecutiveTriggerHandler) Route(prompt string) *RoutingResult {
 
 	// 3. Add Vision context if available
 	result := &RoutingResult{
-		Tier:       tier,
-		Prompt:     cleanPrompt,
-		TaskType:   taskType,
-		Complexity: complexity,
-		Confidence: confidence,
-		UsedSLM:    usedSLM,
+		Tier:     tier,
+		Prompt:   cleanPrompt,
+		TaskType: taskType,
 	}
 
 	config := eth.configLoader.GetConfig()
@@ -395,59 +334,13 @@ func (eth *ExecutiveTriggerHandler) Route(prompt string) *RoutingResult {
 	// 6. Task 4: Set what will actually be running
 	result.ActuallyRunning = tierConfig.Name
 
-	log.Printf("[Executive] Routed to %s: %s (task=%s, complexity=%d)",
-		tierConfig.Name, truncate(command, 80), taskType, complexity)
+	log.Printf("[Executive] Routed to %s: %s (task=%s)",
+		tierConfig.Name, truncate(command, 80), taskType)
 
 	return result
 }
 
-// mapSLMToTier converts SLM analysis to a model tier.
-// This uses the task type and complexity to determine the best tier.
-func (eth *ExecutiveTriggerHandler) mapSLMToTier(result *slm.AnalysisResult) llm.ModelTier {
-	// High complexity (7+) or architecture tasks -> Opus
-	if result.Complexity >= 7 {
-		return llm.TierOpus
-	}
-
-	// Task-type based routing
-	switch result.TaskType {
-	case slm.TaskDebug:
-		if result.Complexity >= 5 {
-			return llm.TierSonnet // Complex debugging
-		}
-		return llm.TierHaiku // Simple debugging
-
-	case slm.TaskRefactor:
-		if result.Complexity >= 6 {
-			return llm.TierOpus // Large refactoring
-		}
-		return llm.TierSonnet // Standard refactoring
-
-	case slm.TaskGenerate:
-		if result.Complexity >= 6 {
-			return llm.TierOpus // Complex generation
-		}
-		return llm.TierSonnet // Standard generation
-
-	case slm.TaskExplain:
-		if result.Complexity >= 5 {
-			return llm.TierSonnet // Deep explanation
-		}
-		return llm.TierHaiku // Simple explanation
-
-	case slm.TaskSimple:
-		return llm.TierHaiku // Quick tasks
-
-	default:
-		// Unknown task type - use complexity
-		if result.Complexity >= 5 {
-			return llm.TierSonnet
-		}
-		return llm.TierHaiku
-	}
-}
-
-// inferTaskTypeFromTier provides a best-guess task type when SLM is unavailable.
+// inferTaskTypeFromTier provides a best-guess task type for heuristic classification.
 func (eth *ExecutiveTriggerHandler) inferTaskTypeFromTier(tier llm.ModelTier) string {
 	switch tier {
 	case llm.TierOpus:
@@ -463,18 +356,15 @@ func (eth *ExecutiveTriggerHandler) inferTaskTypeFromTier(tier llm.ModelTier) st
 
 // RoutingNotification contains all info for the frontend notification.
 type RoutingNotification struct {
-	Tier            string  `json:"tier"`
-	ToolName        string  `json:"toolName"`
-	Prompt          string  `json:"prompt"`
-	TierMismatch    bool    `json:"tierMismatch"`
-	ActuallyRunning string  `json:"actuallyRunning"`
-	PreviousTier    string  `json:"previousTier,omitempty"`
-	Action          string  `json:"action"` // "launch", "warn", "skip"
-	// v3.5.3: SLM analysis data
-	TaskType        string  `json:"taskType,omitempty"`   // debug, explain, refactor, generate, simple
-	Complexity      int     `json:"complexity,omitempty"` // 1-10 complexity score
-	Confidence      float64 `json:"confidence,omitempty"` // SLM confidence
-	UsedSLM         bool    `json:"usedSLM"`              // True if real SLM, false if heuristic
+	Tier            string `json:"tier"`
+	ToolName        string `json:"toolName"`
+	Prompt          string `json:"prompt"`
+	TierMismatch    bool   `json:"tierMismatch"`
+	ActuallyRunning string `json:"actuallyRunning"`
+	PreviousTier    string `json:"previousTier,omitempty"`
+	Action          string `json:"action"` // "launch", "warn", "skip"
+	// v3.12.3: Heuristic analysis data (SLM removed)
+	TaskType string `json:"taskType,omitempty"` // debug, explain, refactor, generate, simple
 }
 
 // Handle executes the routing for a prompt, writing the command to the PTY.
@@ -504,7 +394,7 @@ func (eth *ExecutiveTriggerHandler) HandleWithExtendedNotify(
 		return fmt.Errorf("routing failed or cooldown active")
 	}
 
-	// Build extended notification with SLM data
+	// Build extended notification
 	notification := &RoutingNotification{
 		Tier:            string(result.Tier),
 		ToolName:        result.ToolName,
@@ -512,11 +402,7 @@ func (eth *ExecutiveTriggerHandler) HandleWithExtendedNotify(
 		TierMismatch:    result.TierMismatch,
 		ActuallyRunning: result.ActuallyRunning,
 		Action:          string(result.MismatchAction),
-		// v3.5.3: Include SLM analysis data
 		TaskType:        result.TaskType,
-		Complexity:      result.Complexity,
-		Confidence:      result.Confidence,
-		UsedSLM:         result.UsedSLM,
 	}
 
 	// If there was a previous process, include its tier

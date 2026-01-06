@@ -19,7 +19,6 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm/cfo"
-	"github.com/mikejsmith1985/forge-terminal/internal/slm"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
 
@@ -88,57 +87,9 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[Chat API] Full prompt length: %d chars", len(fullPrompt))
 
-	// v3.5.3: Use SLM engine for intelligent model selection based on complexity
-	slmEngine := slm.GetEngine()
-	slmCtx := context.Background()
-	
-	// Build prompt context for SLM analysis
-	promptContext := slm.PromptContext{
-		Prompt:          cleanMessage,
-		FileCount:       len(allContextFiles),
-		EstimatedTokens: len(fullPrompt) / 4, // ~4 chars per token
-		HasErrorOutput:  strings.Contains(strings.ToLower(cleanMessage), "error"),
-		HasStackTrace:   strings.Contains(cleanMessage, "at ") && strings.Contains(cleanMessage, "("),
-	}
-	
-	// Analyze prompt complexity
-	slmAnalysis, slmErr := slmEngine.Analyze(slmCtx, promptContext)
-	
-	var tier llm.ModelTier
-	var complexity int
-	var taskType string
-	
-	if slmErr == nil && slmAnalysis != nil {
-		complexity = slmAnalysis.Complexity
-		taskType = string(slmAnalysis.TaskType)
-		
-		// Map SLM complexity (1-10) to model tier
-		// 1-3: Haiku (fast, cheap)
-		// 4-6: Sonnet (balanced)
-		// 7-10: Opus (powerful, expensive)
-		switch {
-		case complexity <= 3:
-			tier = llm.TierHaiku
-		case complexity <= 6:
-			tier = llm.TierSonnet
-		default:
-			tier = llm.TierOpus
-		}
-		
-		log.Printf("[Chat API] SLM Analysis: complexity=%d, taskType=%s, tier=%s, confidence=%.2f, provider=%s",
-			complexity, taskType, tier, slmAnalysis.Confidence, slmAnalysis.Provider)
-		
-		// Add SLM headers for frontend visibility
-		w.Header().Set("X-Forge-Complexity", fmt.Sprintf("%d", complexity))
-		w.Header().Set("X-Forge-Task-Type", taskType)
-		w.Header().Set("X-Forge-SLM-Provider", slmAnalysis.Provider)
-	} else {
-		// Fallback to old regex-based classifier
-		tier = llm.ClassifyTask(cleanMessage)
-		complexity = 5 // Default mid-range
-		taskType = "unknown"
-		log.Printf("[Chat API] SLM failed (%v), fallback to regex classifier: tier=%s", slmErr, tier)
-	}
+	// v3.12.3: Simple model selection - use Sonnet tier (balanced) for all chat requests
+	tier := llm.ClassifyTask(cleanMessage)
+	log.Printf("[Chat API] Model tier: %s", tier)
 
 	// Get model from router config based on tier
 	modelName := getModelForTier(tier)

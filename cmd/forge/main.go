@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -29,7 +28,6 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm/ledger"
 	"github.com/mikejsmith1985/forge-terminal/internal/lockfile"
-	"github.com/mikejsmith1985/forge-terminal/internal/slm"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
@@ -168,14 +166,8 @@ func main() {
 		log.Printf("[CFO] Ledger initialized at %s", ledger.DefaultFilePath())
 	}
 
-	// v3.5.0: Initialize SLM engine (Dev Mode feature, smart routing)
-	slmEngine := slm.GetEngine()
-	if err := slmEngine.Initialize(context.Background()); err != nil {
-		log.Printf("[SLM] Warning: failed to initialize SLM engine: %v", err)
-	} else {
-		status := slmEngine.Status()
-		log.Printf("[SLM] Engine initialized: provider=%s, model=%s", status.ActiveProvider, status.ModelID)
-	}
+	// v3.12.3: SLM engine removed - context windows too small for complex tasks
+	// Archived: internal/slm.removed/
 
 	// v3.9.6: ChatView and Chat Store removed - functionality moved to Forge Assist
 	// Chat bridge initialization removed
@@ -330,24 +322,8 @@ func main() {
 	http.HandleFunc("/api/llm/pricing", WrapWithMiddleware(handleModelPricing))
 	http.HandleFunc("/api/llm/route/preview", WrapWithMiddleware(handleRoutePreview))
 
-	// SLM (Smart Language Model) routing API - v3.5.0
-	http.HandleFunc("/api/slm/status", WrapWithMiddleware(handleSLMStatus))
-	http.HandleFunc("/api/slm/analyze", WrapWithMiddleware(handleSLMAnalyze))
-	http.HandleFunc("/api/slm/learning", WrapWithMiddleware(handleSLMLearningStats))
-	http.HandleFunc("/api/slm/learning/clear", WrapWithMiddleware(handleSLMLearningClear))
-	http.HandleFunc("/api/slm/preferences", WrapWithMiddleware(handleSLMPreferences))
-	http.HandleFunc("/api/slm/model", WrapWithMiddleware(handleSLMModelStatus))           // Issue #52: SLM model status
-	http.HandleFunc("/api/slm/model/download", WrapWithMiddleware(handleSLMModelDownload)) // Issue #52: SLM model download
-	http.HandleFunc("/api/slm/binary/download", WrapWithMiddleware(handleSLMBinaryDownload)) // SLM binary download
-	http.HandleFunc("/api/slm/install", WrapWithMiddleware(handleSLMInstall))             // Full SLM installation
-	http.HandleFunc("/api/slm/install/status", WrapWithMiddleware(handleSLMInstallStatus)) // Installation status
-	http.HandleFunc("/api/ollama/status", WrapWithMiddleware(handleOllamaStatus))
-
-	// Smart Routing API - v3.10.6 (Effectiveness-based model selection)
-	http.HandleFunc("/api/routing/classify", WrapWithMiddleware(handleRoutingClassify))
-	http.HandleFunc("/api/routing/recommend", WrapWithMiddleware(handleRoutingRecommend))
-	http.HandleFunc("/api/routing/log", WrapWithMiddleware(handleRoutingLog))
-	http.HandleFunc("/api/routing/effectiveness-log", WrapWithMiddleware(handleRoutingEffectivenessLog))
+	// SLM and Routing APIs removed in v3.12.3 - local LLM context window too small to be useful
+	// Archived: internal/slm.removed/, internal/routing.removed/
 
 	// CLI Configuration API - v3.5.3 (Copilot/Claude config management)
 	http.HandleFunc("/api/cli/config", WrapWithMiddleware(handleCLIConfig))

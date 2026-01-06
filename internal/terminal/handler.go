@@ -835,11 +835,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 									"actuallyRunning": n.ActuallyRunning,
 									"previousTier":    n.PreviousTier,
 									"action":          n.Action,
-									// v3.5.3: SLM analysis data
+									// v3.12.3: Heuristic analysis data (SLM removed)
 									"taskType":        n.TaskType,
-									"complexity":      n.Complexity,
-									"confidence":      n.Confidence,
-									"usedSLM":         n.UsedSLM,
 								})
 							})
 							if err != nil {
