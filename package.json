@@ -1,10 +1,9 @@
 {
-  "devDependencies": {
-    "@percy/cli": "^1.31.5",
-    "@percy/playwright": "^1.0.10",
-    "@playwright/test": "^1.57.0"
-  },
   "dependencies": {
     "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "cypress": "^15.8.1",
+    "cypress-real-events": "^1.15.0"
   }
 }

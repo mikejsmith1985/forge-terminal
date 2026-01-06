@@ -843,6 +843,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     xtermRef.current = term;
     diagnosticCore.recordInitEvent('xterm_created', { tabId });
     
+    // CYPRESS TESTING: Expose terminal instance for E2E tests
+    // This allows cy.getTerminalOutput() to read the actual buffer
+    if (window.Cypress) {
+      window.term = term;
+    }
+    
     // Critical fix: Force focus immediately after terminal.open()
     // This ensures the terminal textarea receives focus before React re-renders
     queueMicrotask(() => {

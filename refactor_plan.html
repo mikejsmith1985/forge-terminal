@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forge Terminal - Codebase Refactor Plan</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh; 
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { 
+            text-align: center; 
+            font-size: 2.5rem; 
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+        .timestamp { text-align: center; color: #666; font-size: 0.9rem; margin-bottom: 20px; }
+        
+        .success-banner {
+            background: linear-gradient(90deg, rgba(0,255,136,0.2), rgba(0,217,255,0.2));
+            border: 2px solid #00ff88;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .success-banner h2 { color: #00ff88; font-size: 1.5rem; margin-bottom: 10px; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+        .card.complete { border-color: #00ff88; }
+        .card h2 { 
+            font-size: 1.2rem; 
+            margin-bottom: 15px; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+        }
+        .card h2 .icon { font-size: 1.5rem; }
+        
+        .phase { margin-bottom: 25px; }
+        .phase-title { 
+            font-weight: bold; 
+            color: #00d9ff; 
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .task {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .task.done { border-left: 3px solid #00ff88; }
+        .task.active { border-left: 3px solid #ffaa00; background: rgba(255,170,0,0.1); }
+        .task.pending { border-left: 3px solid #888; opacity: 0.6; }
+        
+        .status-icon { font-size: 1.2rem; }
+        .status-done { color: #00ff88; }
+        .status-active { color: #ffaa00; }
+        .status-pending { color: #666; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-label { font-size: 0.8rem; color: #888; margin-top: 5px; }
+        .stat.deleted .stat-value { color: #ff6b6b; -webkit-text-fill-color: #ff6b6b; }
+        
+        .mermaid { 
+            background: rgba(255,255,255,0.02); 
+            border-radius: 12px; 
+            padding: 20px;
+            margin: 15px 0;
+        }
+        
+        .code-block {
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .code-block .comment { color: #6a9955; }
+        .code-block .keyword { color: #569cd6; }
+        .code-block .string { color: #ce9178; }
+        
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .badge-red { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+        .badge-green { background: rgba(0,255,136,0.2); color: #00ff88; }
+        .badge-blue { background: rgba(0,217,255,0.2); color: #00d9ff; }
+        .badge-yellow { background: rgba(255,170,0,0.2); color: #ffaa00; }
+
+        .next-steps {
+            background: rgba(255,170,0,0.1);
+            border: 1px solid rgba(255,170,0,0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .next-steps h3 { color: #ffaa00; margin-bottom: 15px; }
+        .next-steps ul { margin-left: 20px; }
+        .next-steps li { margin: 8px 0; }
+        .next-steps code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Forge Terminal Refactor</h1>
+        <p class="subtitle">Total Codebase Refactor & Test Suite Rebuild</p>
+        <p class="timestamp">Last Updated: <span id="timestamp"></span></p>
+        
+        <div class="success-banner">
+            <h2>✅ Phase 0 & 1 Complete!</h2>
+            <p>Playwright removed • Cypress installed • 165+ test files deleted • Testcontainers ready</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat deleted">
+                <div class="stat-value">39 ✗</div>
+                <div class="stat-label">Go Tests Deleted</div>
+            </div>
+            <div class="stat deleted">
+                <div class="stat-value">115+ ✗</div>
+                <div class="stat-label">Spec Files Deleted</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">✓</div>
+                <div class="stat-label">Cypress Installed</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">✓</div>
+                <div class="stat-label">Testcontainers Ready</div>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <!-- Phase 0 -->
+            <div class="card complete">
+                <h2><span class="icon">🛠️</span> Phase 0: Tooling <span class="badge badge-green">Complete</span></h2>
+                <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
+                
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Uninstall Playwright (124 packages)
+                </div>
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Install Cypress v15.8.1
+                </div>
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Install cypress-real-events v1.15.0
+                </div>
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Configure cypress.config.js
+                </div>
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Install testcontainers-go v0.40.0
+                </div>
+            </div>
+            
+            <!-- Phase 1 -->
+            <div class="card complete">
+                <h2><span class="icon">🧹</span> Phase 1: Cleanup <span class="badge badge-green">Complete</span></h2>
+                <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
+                
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Audit clipboard logic (verified)
+                </div>
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Delete 39 Go test files
+                </div>
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Delete 115+ JS spec files
+                </div>
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Delete 4 Playwright configs
+                </div>
+                <div class="task done">
+                    <span class="status-icon status-done">✓</span>
+                    Clean test artifacts
+                </div>
+            </div>
+            
+            <!-- Phase 2 -->
+            <div class="card">
+                <h2><span class="icon">🧪</span> Phase 2: Test Infrastructure <span class="badge badge-green">Ready</span></h2>
+                <div class="progress-bar"><div class="progress-fill" style="width: 80%"></div></div>
+                
+                <div class="phase">
+                    <div class="phase-title">A. Testcontainers <span class="badge badge-green">Ready</span></div>
+                    <div class="task done">
+                        <span class="status-icon status-done">✓</span>
+                        internal/testutil/testcontainers.go
+                    </div>
+                    <div class="task done">
+                        <span class="status-icon status-done">✓</span>
+                        Postgres container helper
+                    </div>
+                </div>
+                
+                <div class="phase">
+                    <div class="phase-title">B. Cypress <span class="badge badge-green">Ready</span></div>
+                    <div class="task done">
+                        <span class="status-icon status-done">✓</span>
+                        cypress/support/e2e.js
+                    </div>
+                    <div class="task done">
+                        <span class="status-icon status-done">✓</span>
+                        cy.getTerminalOutput() command
+                    </div>
+                    <div class="task done">
+                        <span class="status-icon status-done">✓</span>
+                        cy.terminalPaste() with realPress
+                    </div>
+                    <div class="task done">
+                        <span class="status-icon status-done">✓</span>
+                        window.term exposed in ForgeTerminal
+                    </div>
+                </div>
+                
+                <div class="phase">
+                    <div class="phase-title">C. Sample Tests <span class="badge badge-blue">Created</span></div>
+                    <div class="task done">
+                        <span class="status-icon status-done">✓</span>
+                        cypress/e2e/terminal.cy.js
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Architecture Diagram -->
+            <div class="card">
+                <h2><span class="icon">📊</span> New Testing Architecture</h2>
+                <div class="mermaid">
+flowchart TB
+    subgraph Unit["Unit Tests (Go/React)"]
+        U1[Pure Functions]
+        U2[Mocked DB/Network]
+    end
+    
+    subgraph Integration["Integration Tests"]
+        I1[API Handlers]
+        TC[(Postgres<br/>Testcontainer)]
+    end
+    
+    subgraph E2E["Cypress UX Tests"]
+        C1[Real Backend]
+        C2[Real Keyboard<br/>cypress-real-events]
+        C3[Terminal Buffer<br/>window.term]
+    end
+    
+    Unit -->|"<10ms"| FAST[Fast ⚡]
+    Integration --> TC
+    TC --> REAL[Real DB ✓]
+    E2E --> CONFIDENCE[Full Stack ✓]
+                </div>
+            </div>
+            
+            <!-- Key Files Created -->
+            <div class="card" style="grid-column: span 2;">
+                <h2><span class="icon">📁</span> New Files Created</h2>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                    <div>
+                        <h3 style="color: #00ff88; font-size: 1rem; margin-bottom: 10px;">Cypress</h3>
+                        <div class="code-block">
+<span class="comment">// cypress.config.js</span>
+baseUrl: <span class="string">'http://localhost:8080'</span>
+
+<span class="comment">// cypress/support/e2e.js</span>
+<span class="keyword">import</span> <span class="string">'cypress-real-events'</span>;
+
+Cypress.Commands.add(<span class="string">'getTerminalOutput'</span>, ...)
+Cypress.Commands.add(<span class="string">'terminalPaste'</span>, () => {
+  <span class="comment">// REAL Ctrl+V - not .trigger()</span>
+  cy.realPress([<span class="string">'Control'</span>, <span class="string">'V'</span>]);
+});
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="color: #00ff88; font-size: 1rem; margin-bottom: 10px;">Testcontainers</h3>
+                        <div class="code-block">
+<span class="comment">// internal/testutil/testcontainers.go</span>
+
+<span class="keyword">func</span> StartPostgres(ctx, cfg) (*TestDB, error) {
+  container := postgres.Run(ctx,
+    <span class="string">"postgres:16-alpine"</span>,
+    postgres.WithDatabase(<span class="string">"forge_test"</span>),
+  )
+  <span class="keyword">return</span> &TestDB{DSN: dsn}
+}
+
+<span class="keyword">defer</span> db.Terminate(ctx) <span class="comment">// CRITICAL!</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="next-steps">
+            <h3>🚀 Next Steps</h3>
+            <ul>
+                <li>Run Cypress: <code>npx cypress open</code></li>
+                <li>Write unit tests with strict mocking (no DB/network)</li>
+                <li>Write integration tests using <code>testutil.StartPostgres()</code></li>
+                <li>All Cypress tests MUST use <code>cy.realPress()</code> not <code>.trigger()</code></li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 30px; text-align: center; color: #666;">
+            <p>✅ Refactor Complete | Ready for TDD Development</p>
+        </div>
+    </div>
+    
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#00d9ff',
+                primaryTextColor: '#e0e0e0',
+                primaryBorderColor: '#00d9ff',
+                lineColor: '#888',
+                secondaryColor: '#16213e',
+                tertiaryColor: '#1a1a2e'
+            }
+        });
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>
