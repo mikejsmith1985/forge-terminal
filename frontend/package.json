@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "cd .. && npx cypress run"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -28,9 +28,6 @@
     "react-resizable-panels": "^3.0.6"
   },
   "devDependencies": {
-    "@percy/cli": "^1.31.5",
-    "@percy/playwright": "^1.0.10",
-    "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@vitejs/plugin-react": "^4.2.0",

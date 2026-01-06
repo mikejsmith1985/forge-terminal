@@ -28,10 +28,19 @@ Cypress.Commands.add('getTerminalOutput', (lineCount = 10) => {
 });
 
 // Custom command: Wait for terminal to be ready
-Cypress.Commands.add('waitForTerminal', (timeout = 10000) => {
+Cypress.Commands.add('waitForTerminal', (timeout = 30000) => {
+  // Wait for the xterm element to exist first
+  cy.get('.xterm', { timeout }).should('exist');
+  
+  // Then wait for window.term to be set
   return cy.window({ timeout }).should((win) => {
-    expect(win.term).to.exist;
-    expect(win.term.buffer).to.exist;
+    // The terminal might take a moment to be set on window
+    // We check both term and term.buffer
+    if (win.term && win.term.buffer && win.term.buffer.active) {
+      expect(win.term).to.exist;
+    } else {
+      throw new Error('Terminal not ready yet');
+    }
   });
 });
 
