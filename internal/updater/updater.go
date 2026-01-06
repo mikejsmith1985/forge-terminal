@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 )
 
 // Version is set at build time via ldflags
-var Version = "3.11.8"
+var Version = "3.12.0"
 
 // GitHub repo info
 const (
@@ -136,14 +137,22 @@ func DownloadUpdate(info *UpdateInfo) (string, error) {
 	tmpDir := os.TempDir()
 	tmpFile := filepath.Join(tmpDir, "forge-update"+getExeSuffix())
 
-	// Use a transport with proper timeouts instead of client-level timeout
-	// This allows the download to take as long as needed while still detecting stalls
+	// Use a transport based on DefaultTransport with adjusted timeouts
+	// This ensures proper connection handling while allowing long downloads
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
-		ResponseHeaderTimeout: 30 * time.Second, // Timeout for response headers only
+		DialContext:          (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          10,
+		MaxIdleConnsPerHost:   2,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second, // Allow time for GitHub redirect
+		DisableKeepAlives:     false,            // Enable keep-alives for better performance
 	}
 	client := &http.Client{
 		Transport: transport,
