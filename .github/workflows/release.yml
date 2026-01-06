@@ -130,6 +130,7 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           make_latest: true
+          draft: false
 
       - name: Upload macOS Assets
         if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'macos-latest'
@@ -139,3 +140,5 @@ jobs:
             bin/forge-darwin-amd64
             bin/forge-darwin-arm64
           fail_on_unmatched_files: true
+          generate_release_notes: false
+          draft: false
