@@ -13,8 +13,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/mikejsmith1985/forge-terminal/internal/am"
 )
 
 // AutoRespondState represents the current state of the conversation.
@@ -305,9 +303,9 @@ func (d *AutoRespondDetector) Check() bool {
 
 // detectPrompt checks if the output contains a prompt indicating waiting for input.
 func (d *AutoRespondDetector) detectPrompt(output string) bool {
-	// Use parser_core StripANSI for consistent ANSI removal
+	// Use local stripANSIToBuffer for consistent ANSI removal
 	var cleanBuf bytes.Buffer
-	am.StripANSIToBuffer([]byte(output), &cleanBuf)
+	stripANSIToBuffer([]byte(output), &cleanBuf)
 	cleaned := cleanBuf.String()
 
 	// Get last few lines (where prompt would appear)

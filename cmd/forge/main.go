@@ -20,8 +20,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
@@ -202,23 +200,6 @@ func main() {
 
 	// WebSocket terminal handler
 	// Run AM cleanup on startup and initialize AM system
-	go am.CleanupOldLogs()
-	amSystem := am.InitSystem(am.DefaultAMDir())
-
-	// Load config to check if AM should be enabled
-	config, err := commands.LoadConfig()
-	if err != nil {
-		log.Printf("[Config] Failed to load config: %v, using defaults", err)
-		config = &commands.DefaultConfig
-	}
-
-	if config.AMEnabled {
-		if err := amSystem.Start(); err != nil {
-			log.Printf("[AM] Failed to start AM system: %v", err)
-		}
-	} else {
-		log.Printf("[AM] System disabled by configuration")
-	}
 
 	// Initialize components needed by terminal handler
 	// Vision system for terminal overlays
@@ -228,8 +209,9 @@ func main() {
 	// LLM detector for AI CLI tool detection
 	llmDetector := llm.NewDetector()
 
-	// Create terminal handler with direct dependencies (no assistant.Core wrapper)
-	termHandler := terminal.NewHandlerDirect(amSystem, visionParser, llmDetector)
+	// Create terminal handler with direct dependencies
+	// v3.12.3: AM system removed - passing nil
+	termHandler := terminal.NewHandlerDirect(nil, visionParser, llmDetector)
 	http.HandleFunc("/ws", termHandler.HandleWebSocket)
 
 	// Commands API
@@ -264,35 +246,7 @@ func main() {
 	// Welcome screen API - track if welcome has been shown
 	http.HandleFunc("/api/welcome", WrapWithMiddleware(handleWelcome))
 
-	// AM (Artificial Memory) API - session logging and recovery
-	http.HandleFunc("/api/am/check", WrapWithMiddleware(handleAMCheck))
-	http.HandleFunc("/api/am/check/enhanced", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		handleAMCheckEnhanced(w, r)
-	}))
-	http.HandleFunc("/api/am/check/grouped", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		handleAMCheckGrouped(w, r)
-	}))
-	http.HandleFunc("/api/am/content/", WrapWithMiddleware(handleAMContent))
-	http.HandleFunc("/api/am/archive/", WrapWithMiddleware(handleAMArchive))
-	http.HandleFunc("/api/am/cleanup", WrapWithMiddleware(handleAMCleanup))
-	http.HandleFunc("/api/am/llm/conversations/", WrapWithMiddleware(handleAMLLMConversations))
-	http.HandleFunc("/api/am/llm/conversation/", WrapWithMiddleware(handleAMLLMConversationDetail))
-	http.HandleFunc("/api/am/health", WrapWithMiddleware(handleAMHealth))
-	http.HandleFunc("/api/am/tab-status/", WrapWithMiddleware(handleAMTabStatus)) // v3.9.1: Per-tab capture status
-	http.HandleFunc("/api/am/conversations", WrapWithMiddleware(handleAMActiveConversations))
-	http.HandleFunc("/api/am/master-control", WrapWithMiddleware(handleAMMasterControl))
-	http.HandleFunc("/api/am/restore/sessions", WrapWithMiddleware(handleAMRestoreSessions))
-	http.HandleFunc("/api/am/restore/context/", WrapWithMiddleware(handleAMRestoreContext))
-	http.HandleFunc("/api/am/log", WrapWithMiddleware(handleAMLog))
-
-	// Time-Travel Rewind API (Industrial Phase 2)
-	http.HandleFunc("/api/am/session/", WrapWithMiddleware(handleAMSessionRewind))
-
-	// New Session-based Recovery API (v2)
-	http.HandleFunc("/api/am/v2/sessions", WrapWithMiddleware(handleAMV2Sessions))
-	http.HandleFunc("/api/am/v2/sessions/active", WrapWithMiddleware(handleAMV2ActiveSessions))
-	http.HandleFunc("/api/am/v2/sessions/", WrapWithMiddleware(handleAMV2SessionDetail))
-	http.HandleFunc("/api/am/v2/projects", WrapWithMiddleware(handleAMV2Projects))
+	// v3.12.3: AM (Artificial Memory) API removed
 
 	// Vision Configuration & Insights API
 	http.HandleFunc("/api/vision/config", WrapWithMiddleware(handleVisionConfig))
@@ -344,7 +298,6 @@ func main() {
 	// Diagnostics API - keyboard lockout debugging
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
 	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))
-	http.HandleFunc("/api/diagnostics/am-status", WrapWithMiddleware(handleDiagnosticsAMStatus))
 	http.HandleFunc("/api/diagnostics/platform", WrapWithMiddleware(handleDiagnosticsPlatform))
 
 	// Freeze detection API - comprehensive runtime monitoring
@@ -1278,916 +1231,6 @@ func inferLLMType(explicit string) llm.CommandType {
 	return llm.CommandChat // Default to chat
 }
 
-func handleAMCheck(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	sessions, err := am.CheckForRecoverableSessions()
-	if err != nil {
-		json.NewEncoder(w).Encode(am.RecoveryInfo{
-			HasRecoverable: false,
-			Sessions:       []am.SessionInfo{},
-		})
-		return
-	}
-
-	json.NewEncoder(w).Encode(am.RecoveryInfo{
-		HasRecoverable: len(sessions) > 0,
-		Sessions:       sessions,
-	})
-}
-
-// handleAMCheckEnhancedCore contains the core logic for enhanced session recovery
-func handleAMCheckEnhancedCore(sessions []am.SessionInfo) am.RecoveryInfo {
-	return am.RecoveryInfo{
-		HasRecoverable: len(sessions) > 0,
-		Sessions:       sessions,
-	}
-}
-
-// handleAMCheckEnhanced returns session recovery info with enhanced context (workspace, commands, etc)
-func handleAMCheckEnhanced(w http.ResponseWriter, r *http.Request, sessions ...[]am.SessionInfo) am.RecoveryInfo {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return am.RecoveryInfo{}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var sessionsList []am.SessionInfo
-	if len(sessions) > 0 && sessions[0] != nil {
-		// For testing: allow passing mock sessions
-		sessionsList = sessions[0]
-	} else {
-		// Production: fetch from AM system
-		var err error
-		sessionsList, err = am.CheckForRecoverableSessions()
-		if err != nil {
-			sessionsList = []am.SessionInfo{}
-		}
-	}
-
-	// Response includes all enhanced fields from SessionInfo
-	result := handleAMCheckEnhancedCore(sessionsList)
-	json.NewEncoder(w).Encode(result)
-	return result
-}
-
-// handleAMCheckGroupedCore contains the core logic for grouped session recovery
-func handleAMCheckGroupedCore(sessions []am.SessionInfo) am.RecoveryInfoGrouped {
-	groups := am.GroupSessionsByWorkspace(sessions)
-	return am.RecoveryInfoGrouped{
-		HasRecoverable: len(sessions) > 0,
-		Groups:         groups,
-		TotalSessions:  len(sessions),
-	}
-}
-
-// handleAMCheckGrouped returns session recovery info grouped by workspace
-func handleAMCheckGrouped(w http.ResponseWriter, r *http.Request, sessions ...[]am.SessionInfo) am.RecoveryInfoGrouped {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return am.RecoveryInfoGrouped{}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var sessionsList []am.SessionInfo
-	if len(sessions) > 0 && sessions[0] != nil {
-		// For testing: allow passing mock sessions
-		sessionsList = sessions[0]
-	} else {
-		// Production: fetch from AM system
-		var err error
-		sessionsList, err = am.CheckForRecoverableSessions()
-		if err != nil {
-			sessionsList = []am.SessionInfo{}
-		}
-	}
-
-	// Group sessions by workspace
-	result := handleAMCheckGroupedCore(sessionsList)
-	json.NewEncoder(w).Encode(result)
-	return result
-}
-
-func handleAMContent(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract tabId from URL path
-	tabID := strings.TrimPrefix(r.URL.Path, "/api/am/content/")
-	if tabID == "" {
-		http.Error(w, "Tab ID required", http.StatusBadRequest)
-		return
-	}
-
-	content, err := am.GetLogContent(tabID)
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"content": content,
-	})
-}
-
-func handleAMArchive(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract tabId from URL path
-	tabID := strings.TrimPrefix(r.URL.Path, "/api/am/archive/")
-	if tabID == "" {
-		http.Error(w, "Tab ID required", http.StatusBadRequest)
-		return
-	}
-
-	if err := am.ArchiveLog(tabID); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	// No longer need to remove from registry (old Logger system removed)
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-	})
-}
-
-func handleAMCleanup(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	if err := am.CleanupOldLogs(); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-	})
-}
-
-// handleAMMasterControl handles global AM enable/disable.
-// FIXED: Now actually calls system.Start() and system.Stop()
-func handleAMMasterControl(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var req struct {
-		Enabled bool `json:"enabled"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "Invalid JSON",
-		})
-		return
-	}
-
-	system := am.GetSystem()
-	if system == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "AM system not initialized",
-		})
-		return
-	}
-
-	if req.Enabled {
-		if err := system.Start(); err != nil {
-			log.Printf("[AM Master] Failed to start: %v", err)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-			})
-			return
-		}
-		log.Printf("[AM Master] Enabled - AM system STARTED")
-	} else {
-		system.Stop()
-		log.Printf("[AM Master] Disabled - AM system STOPPED")
-	}
-
-	// Persist state to config
-	config, err := commands.LoadConfig()
-	if err == nil {
-		config.AMEnabled = req.Enabled
-		if err := commands.SaveConfig(config); err != nil {
-			log.Printf("[AM Master] Failed to save config: %v", err)
-		} else {
-			log.Printf("[AM Master] Config saved: AMEnabled=%v", req.Enabled)
-		}
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": fmt.Sprintf("AM system %s", map[bool]string{true: "started", false: "stopped"}[req.Enabled]),
-	})
-}
-
-func handleAMLLMConversations(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract tab ID from URL path
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 5 {
-		http.Error(w, "Tab ID required", http.StatusBadRequest)
-		return
-	}
-	tabID := pathParts[len(pathParts)-1]
-
-	log.Printf("[AM API] GET /api/am/llm/conversations/%s", tabID)
-
-	// Get LLM logger for this tab
-	llmLogger := am.GetLLMLogger(tabID, am.DefaultAMDir())
-	log.Printf("[AM API] Retrieved LLM logger for tab %s", tabID)
-
-	conversations := llmLogger.GetConversations()
-	count := len(conversations)
-
-	log.Printf("[AM API] GetConversations() returned %d conversations for tab %s", count, tabID)
-
-	if count == 0 {
-		log.Printf("[AM API] ⚠️ ZERO conversations found for tab %s", tabID)
-		log.Printf("[AM API] Active conversation ID: '%s'", llmLogger.GetActiveConversationID())
-	} else {
-		log.Printf("[AM API] ✓ Found %d conversations:", count)
-		for i, conv := range conversations {
-			log.Printf("[AM API]   [%d] ID=%s provider=%s type=%s complete=%v turns=%d",
-				i, conv.ConversationID, conv.Provider, conv.CommandType, conv.Complete, len(conv.Turns))
-		}
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":       true,
-		"conversations": conversations,
-		"count":         count,
-	})
-}
-
-func handleAMLLMConversationDetail(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract tab ID and conversation ID from URL path
-	// Format: /api/am/llm/conversation/{tabID}/{conversationID}
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 7 {
-		http.Error(w, "Tab ID and Conversation ID required", http.StatusBadRequest)
-		return
-	}
-	tabID := pathParts[5]
-	convID := pathParts[6]
-
-	log.Printf("[AM API] GET /api/am/llm/conversation/%s/%s", tabID, convID)
-
-	// Get LLM logger for this tab
-	llmLogger := am.GetLLMLogger(tabID, am.DefaultAMDir())
-
-	// Get specific conversation
-	conversation := llmLogger.GetConversation(convID)
-	if conversation == nil {
-		log.Printf("[AM API] ⚠️ Conversation %s not found for tab %s", convID, tabID)
-		http.Error(w, "Conversation not found", http.StatusNotFound)
-		return
-	}
-
-	log.Printf("[AM API] ✓ Found conversation: ID=%s provider=%s turns=%d snapshots=%d",
-		conversation.ConversationID, conversation.Provider,
-		len(conversation.Turns), len(conversation.ScreenSnapshots))
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":      true,
-		"conversation": conversation,
-	})
-}
-
-func handleAMHealth(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	system := am.GetSystem()
-	if system == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status": "NOT_INITIALIZED",
-		})
-		return
-	}
-
-	// v3.12.3 FIX: Add timeout to prevent hanging on slow disk I/O
-	type healthResult struct {
-		health *am.SystemHealth
-		err    error
-	}
-	resultChan := make(chan healthResult, 1)
-	
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[AM Health] Panic during health check: %v", r)
-				resultChan <- healthResult{nil, fmt.Errorf("health check panic")}
-			}
-		}()
-		h := system.GetHealth()
-		resultChan <- healthResult{h, nil}
-	}()
-
-	select {
-	case result := <-resultChan:
-		if result.err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"status": "DEGRADED",
-				"error":  result.err.Error(),
-			})
-			return
-		}
-		json.NewEncoder(w).Encode(result.health)
-	case <-time.After(5 * time.Second):
-		log.Printf("[AM Health] Health check timed out after 5s")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":  "DEGRADED",
-			"error":   "Health check timed out - disk I/O may be slow",
-			"metrics": nil,
-		})
-	}
-}
-
-// handleAMTabStatus returns capture status for a specific tab.
-// v3.9.1: Powers the 3-state AM indicator (active/disabled/broken).
-// Path: /api/am/tab-status/{tabId}?amEnabled=true|false
-func handleAMTabStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract tabId from path
-	tabID := strings.TrimPrefix(r.URL.Path, "/api/am/tab-status/")
-	if tabID == "" {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"error": "tabId required",
-		})
-		return
-	}
-
-	// Get amEnabled from query param
-	amEnabled := r.URL.Query().Get("amEnabled") == "true"
-
-	system := am.GetSystem()
-	if system == nil || system.HealthMonitor == nil {
-		json.NewEncoder(w).Encode(&am.TabCaptureStatus{
-			TabID:      tabID,
-			Status:     "disabled",
-			StatusText: "AM System not initialized",
-		})
-		return
-	}
-
-	// v3.12.3 FIX: Add timeout to prevent hanging on slow disk I/O
-	type statusResult struct {
-		status *am.TabCaptureStatus
-	}
-	resultChan := make(chan statusResult, 1)
-	
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[AM TabStatus] Panic during status check: %v", r)
-				resultChan <- statusResult{&am.TabCaptureStatus{
-					TabID:      tabID,
-					Status:     "disabled",
-					StatusText: "Status check failed",
-				}}
-			}
-		}()
-		s := system.HealthMonitor.GetTabCaptureStatus(tabID, amEnabled)
-		resultChan <- statusResult{s}
-	}()
-
-	select {
-	case result := <-resultChan:
-		json.NewEncoder(w).Encode(result.status)
-	case <-time.After(5 * time.Second):
-		log.Printf("[AM TabStatus] Status check timed out after 5s for tab %s", tabID)
-		json.NewEncoder(w).Encode(&am.TabCaptureStatus{
-			TabID:          tabID,
-			Status:         "disabled",
-			StatusText:     "Status check timed out",
-			DetailedReason: "Disk I/O may be slow",
-		})
-	}
-}
-
-func handleAMActiveConversations(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	system := am.GetSystem()
-	if system == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"active": map[string]interface{}{},
-			"count":  0,
-		})
-		return
-	}
-
-	convs := system.GetActiveConversations()
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"active": convs,
-		"count":  len(convs),
-	})
-}
-
-// handleAMRestoreSessions returns all recoverable sessions.
-func handleAMRestoreSessions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	amDir := am.DefaultAMDir()
-	cb := am.NewContextBuilder(amDir)
-
-	sessions, err := cb.GetRecoverableSessions()
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success":  false,
-			"error":    err.Error(),
-			"sessions": []interface{}{},
-		})
-		return
-	}
-
-	log.Printf("[AM Restore] Found %d recoverable sessions", len(sessions))
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"sessions": sessions,
-		"count":    len(sessions),
-	})
-}
-
-// handleAMRestoreContext returns restore context for a specific conversation.
-func handleAMRestoreContext(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract conversation ID from path: /api/am/restore/context/{conversationId}
-	convID := strings.TrimPrefix(r.URL.Path, "/api/am/restore/context/")
-	if convID == "" {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "conversation ID required",
-		})
-		return
-	}
-
-	amDir := am.DefaultAMDir()
-	cb := am.NewContextBuilder(amDir)
-
-	if r.Method == http.MethodPost {
-		// Mark as restored
-		err := cb.MarkAsRestored(convID)
-		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-			})
-			return
-		}
-		log.Printf("[AM Restore] Marked conversation %s as restored", convID)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"message": "conversation marked as restored",
-		})
-		return
-	}
-
-	// GET - return restore context
-	ctx, err := cb.GetRestoreContextByID(convID)
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	log.Printf("[AM Restore] Retrieved context for conversation %s", convID)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"context": ctx,
-	})
-}
-
-// =============================================================================
-// AM v2 Session Recovery API Handlers
-// =============================================================================
-
-// handleAMV2Sessions returns all recoverable sessions
-func handleAMV2Sessions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	amDir := am.DefaultAMDir()
-	recovery := am.NewRecoveryAPI(amDir)
-
-	sessions, err := recovery.GetRecoverableSessions()
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success":  false,
-			"error":    err.Error(),
-			"sessions": []interface{}{},
-		})
-		return
-	}
-
-	log.Printf("[AM v2] Found %d recoverable sessions", len(sessions))
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"sessions": sessions,
-		"count":    len(sessions),
-	})
-}
-
-// handleAMV2ActiveSessions returns currently active capture sessions
-func handleAMV2ActiveSessions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	activeSessions := am.GetAllActiveSessions()
-
-	sessions := make([]map[string]interface{}, 0, len(activeSessions))
-	for _, capture := range activeSessions {
-		session := capture.Session()
-		sessions = append(sessions, map[string]interface{}{
-			"id":        session.ID,
-			"tabId":     session.TabID,
-			"project":   session.Project.Name,
-			"provider":  session.Provider,
-			"startTime": session.StartTime,
-			"status":    session.Status,
-			"turnCount": len(session.Turns),
-		})
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"sessions": sessions,
-		"count":    len(sessions),
-	})
-}
-
-// handleAMV2SessionDetail handles individual session operations
-func handleAMV2SessionDetail(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract session ID from path: /api/am/v2/sessions/{sessionId}
-	sessionID := strings.TrimPrefix(r.URL.Path, "/api/am/v2/sessions/")
-	if sessionID == "" {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "session ID required",
-		})
-		return
-	}
-
-	amDir := am.DefaultAMDir()
-	recovery := am.NewRecoveryAPI(amDir)
-
-	switch r.Method {
-	case http.MethodGet:
-		// Get session summary
-		summary, err := recovery.GetSessionSummary(sessionID)
-		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-			})
-			return
-		}
-
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"session": summary,
-		})
-
-	case http.MethodPost:
-		// Mark session as restored
-		err := recovery.MarkSessionRestored(sessionID)
-		if err != nil {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-			})
-			return
-		}
-
-		log.Printf("[AM v2] Marked session %s as restored", sessionID)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success":   true,
-			"sessionId": sessionID,
-			"message":   "Session marked as restored",
-		})
-
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// handleAMV2Projects returns recovery info grouped by project
-func handleAMV2Projects(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	amDir := am.DefaultAMDir()
-	recovery := am.NewRecoveryAPI(amDir)
-
-	projects, err := recovery.GetProjectSummaries()
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success":  false,
-			"error":    err.Error(),
-			"projects": []interface{}{},
-		})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"projects": projects,
-		"count":    len(projects),
-	})
-}
-
-// handleAMLog handles command card and sendCommand AM log entries.
-// This starts/associates conversations when commands are triggered from the UI.
-func handleAMLog(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	var req struct {
-		TabID       string `json:"tabId"`
-		TabName     string `json:"tabName"`
-		Workspace   string `json:"workspace"`
-		EntryType   string `json:"entryType"`
-		CommandID   int    `json:"commandId,omitempty"`
-		Description string `json:"description,omitempty"`
-		Content     string `json:"content"`
-		TriggerAM   bool   `json:"triggerAM,omitempty"`
-		LLMProvider string `json:"llmProvider,omitempty"`
-		LLMType     string `json:"llmType,omitempty"`
-		Timestamp   string `json:"timestamp,omitempty"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "invalid request body",
-		})
-		return
-	}
-
-	log.Printf("[AM Log] Received: tabId=%s, entryType=%s, triggerAM=%v, provider=%s",
-		req.TabID, req.EntryType, req.TriggerAM, req.LLMProvider)
-
-	// Normalize provider names
-	provider := req.LLMProvider
-	switch strings.ToLower(provider) {
-	case "copilot", "gh-copilot":
-		provider = "github-copilot"
-	}
-
-	// If this is a command card with triggerAM, start a conversation
-	if req.TriggerAM && provider != "" {
-		amSystem := am.GetSystem()
-		if amSystem != nil {
-			logger := am.GetLLMLogger(req.TabID, amSystem.AMDir)
-			if logger != nil {
-				// Only start if no active conversation
-				if logger.GetActiveConversationID() == "" {
-					convID := logger.StartConversationFromProcess(
-						provider,
-						req.LLMType,
-						0,
-					)
-					log.Printf("[AM Log] Started conversation %s for tab %s (provider: %s)",
-						convID, req.TabID, provider)
-					json.NewEncoder(w).Encode(map[string]interface{}{
-						"success":        true,
-						"conversationId": convID,
-					})
-					return
-				} else {
-					log.Printf("[AM Log] Conversation already active for tab %s", req.TabID)
-				}
-			}
-		}
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-	})
-}
-
-// handleAMNativeSessions returns list of recoverable native AI sessions
-func handleAMNativeSessions(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodGet {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
-
-w.Header().Set("Content-Type", "application/json")
-
-system := am.GetSystem()
-if system == nil || system.GetRecoveryManager() == nil {
-json.NewEncoder(w).Encode(map[string]interface{}{
-"error": "AM system not initialized",
-})
-return
-}
-
-// Get query parameter for limit
-limitStr := r.URL.Query().Get("limit")
-limit := 20
-if limitStr != "" {
-if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
-limit = parsed
-}
-}
-
-sessions, err := system.GetRecoveryManager().ListRecoverableSessions(limit)
-if err != nil {
-json.NewEncoder(w).Encode(map[string]interface{}{
-"error": err.Error(),
-})
-return
-}
-
-json.NewEncoder(w).Encode(map[string]interface{}{
-"sessions": sessions,
-"count":    len(sessions),
-})
-}
-
-// handleAMNativeRecover gets recovery command for a session
-func handleAMNativeRecover(w http.ResponseWriter, r *http.Request) {
-if r.Method != http.MethodPost {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
-
-w.Header().Set("Content-Type", "application/json")
-
-system := am.GetSystem()
-if system == nil || system.GetRecoveryManager() == nil {
-json.NewEncoder(w).Encode(map[string]interface{}{
-"error": "AM system not initialized",
-})
-return
-}
-
-// Parse request body
-var req struct {
-SessionID string `json:"sessionId"`
-Provider  string `json:"provider"`
-}
-if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-json.NewEncoder(w).Encode(map[string]interface{}{
-"error": "Invalid request body",
-})
-return
-}
-
-// Convert provider string to Provider type
-var provider am.Provider
-switch req.Provider {
-case "copilot":
-provider = am.ProviderCopilot
-case "claude":
-provider = am.ProviderClaude
-default:
-json.NewEncoder(w).Encode(map[string]interface{}{
-"error": "Invalid provider: must be 'copilot' or 'claude'",
-})
-return
-}
-
-// Get recovery command
-cmd, err := system.GetRecoveryManager().GetRecoveryCommand(req.SessionID, provider)
-if err != nil {
-json.NewEncoder(w).Encode(map[string]interface{}{
-"error": err.Error(),
-})
-return
-}
-
-json.NewEncoder(w).Encode(map[string]interface{}{
-"command":   cmd,
-"sessionId": req.SessionID,
-"provider":  req.Provider,
-})
-}
-
-func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	err := createDesktopShortcut()
-	if err != nil {
-		log.Printf("[Desktop] Failed to create shortcut: %v", err)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-			"code":    "SHORTCUT_CREATE_FAILED",
-		})
-		return
-	}
-
-	log.Printf("[Desktop] Shortcut created successfully")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Desktop shortcut created successfully",
-		"code":    "SHORTCUT_CREATE_SUCCESS",
-	})
-}
 
 
 // handleLogError handles client-side error logging
@@ -2226,6 +1269,33 @@ func handleLogError(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Error logged successfully",
+	})
+}
+
+func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	err := createDesktopShortcut()
+	if err != nil {
+		log.Printf("[Desktop] Failed to create shortcut: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+			"code":    "SHORTCUT_CREATE_FAILED",
+		})
+		return
+	}
+
+	log.Printf("[Desktop] Shortcut created successfully")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Desktop shortcut created successfully",
+		"code":    "SHORTCUT_CREATE_SUCCESS",
 	})
 }
 
@@ -2329,18 +1399,15 @@ func handleVisionInsights(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[Vision API] GET /api/vision/insights/%s", tabID)
 
-	// Load insights from disk
-	amSystem := am.GetSystem()
-	if amSystem == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success":  false,
-			"error":    "AM system not initialized",
-			"insights": []interface{}{},
-		})
-		return
+	// v3.12.3: AM system removed - use default directory
+	forgeDir := os.Getenv("FORGE_DIR")
+	if forgeDir == "" {
+		homeDir, _ := os.UserHomeDir()
+		forgeDir = filepath.Join(homeDir, ".forge")
 	}
+	amDir := filepath.Join(forgeDir, "am")
 
-	insights, err := terminal.LoadVisionInsights(amSystem.AMDir, tabID)
+	insights, err := terminal.LoadVisionInsights(amDir, tabID)
 	if err != nil {
 		log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -2378,17 +1445,15 @@ func handleVisionInsightsSummary(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[Vision API] GET /api/vision/insights/summary/%s", tabID)
 
-	// Load insights from disk
-	amSystem := am.GetSystem()
-	if amSystem == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   "AM system not initialized",
-		})
-		return
+	// v3.12.3: AM system removed - use default directory
+	forgeDir := os.Getenv("FORGE_DIR")
+	if forgeDir == "" {
+		homeDir, _ := os.UserHomeDir()
+		forgeDir = filepath.Join(homeDir, ".forge")
 	}
+	amDir := filepath.Join(forgeDir, "am")
 
-	insights, err := terminal.LoadVisionInsights(amSystem.AMDir, tabID)
+	insights, err := terminal.LoadVisionInsights(amDir, tabID)
 	if err != nil {
 		log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -2571,3 +1636,4 @@ func serveIndexWithVersion(w http.ResponseWriter, r *http.Request, webFS fs.FS) 
 
 	w.Write(content)
 }
+

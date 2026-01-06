@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
@@ -30,7 +29,6 @@ const (
 type Handler struct {
 	upgrader     websocket.Upgrader
 	sessions     sync.Map // map[string]*TerminalSession
-	amSystem     *am.System
 	visionParser *vision.Parser
 	llmDetector  *llm.Detector
 }
@@ -147,8 +145,8 @@ type ChatOutputMessage struct {
 }
 
 // NewHandlerDirect creates a new terminal WebSocket handler with direct dependencies.
-// This is the new constructor that doesn't depend on assistant.Core wrapper.
-func NewHandlerDirect(amSys *am.System, visionP *vision.Parser, llmDet *llm.Detector) *Handler {
+// v3.12.3: AM system removed - amSys parameter kept for API compatibility but ignored
+func NewHandlerDirect(amSys interface{}, visionP *vision.Parser, llmDet *llm.Detector) *Handler {
 	return &Handler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -176,7 +174,6 @@ func NewHandlerDirect(amSys *am.System, visionP *vision.Parser, llmDet *llm.Dete
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		amSystem:     amSys,
 		visionParser: visionP,
 		llmDetector:  llmDet,
 	}
@@ -185,11 +182,6 @@ func NewHandlerDirect(amSys *am.System, visionP *vision.Parser, llmDet *llm.Dete
 // GetVisionParser returns the vision parser for terminal vision overlay features.
 func (h *Handler) GetVisionParser() *vision.Parser {
 	return h.visionParser
-}
-
-// GetAMSystem returns the AM (Artificial Memory) system for LLM logging.
-func (h *Handler) GetAMSystem() *am.System {
-	return h.amSystem
 }
 
 // GetLLMDetector returns the LLM detector for detecting AI CLI tools.
@@ -230,10 +222,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Terminal] Warning: No tabID provided, using session ID: %s", tabID)
 	}
 
-	// Get amEnabled status from query params
-	amEnabledStr := query.Get("amEnabled")
-	amEnabled := amEnabledStr == "true"
-	log.Printf("[Terminal] Tab %s AM enabled: %v", tabID, amEnabled)
+	// v3.12.3: AM system removed - amEnabled param ignored
 
 	// Create terminal session with config
 	sessionID := tabID // Use tabID as session ID for consistency
@@ -327,95 +316,28 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 
-	// PERFORMANCE FIX: Initialize AM/Vision/LLM systems asynchronously
-	// These don't need to block the terminal from becoming interactive
-	var llmLoggerAtomic atomic.Value // Stores *am.LLMLogger - lock-free concurrent access
+	// v3.12.3: AM system removed - simplified initialization
 	var insightsTracker *vision.InsightsTracker
-	amSystem := h.GetAMSystem()
 
-	// Launch async initialization - doesn't block terminal readiness
+	// Launch async initialization for vision insights only
 	go func() {
-		if amSystem != nil && amEnabled {
-			log.Printf("[Terminal] AM is ENABLED for tab %s - initializing LLM Logger", tabID)
-			llmLogger := am.GetLLMLogger(tabID, amSystem.AMDir)
-			llmLoggerAtomic.Store(llmLogger)
-			if llmLogger != nil {
-				activeConv := llmLogger.GetActiveConversationID()
-				log.Printf("[Terminal] Using LLM logger for tabID: %s, activeConv: %s", tabID, activeConv)
-			} else {
-				log.Printf("[Terminal] NO LLM logger available for tabID: %s", tabID)
-			}
-			// Record PTY heartbeat for Layer 1
-			if amSystem.HealthMonitor != nil {
-				amSystem.HealthMonitor.RecordPTYHeartbeat()
-			}
-
-			// Initialize Vision Insights tracker
-			cwd, _ := os.Getwd()
-			sessionInfo := vision.SessionInfo{
-				TabID:      tabID,
-				WorkingDir: cwd,
-				ShellType:  shellConfig.ShellType,
-				InAutoMode: false, // Will be updated when auto-respond starts
-			}
-			insightsTracker = vision.NewInsightsTracker(amSystem.AMDir, sessionInfo)
-			visionParser.SetInsightsTracker(insightsTracker)
-			log.Printf("[Terminal] Vision insights tracker initialized for session %s", sessionID)
-
-			// Set up low-confidence callback for AM v2.0
-			// When parsing confidence is low during auto-respond, notify user via Vision
-			if logger := llmLoggerAtomic.Load(); logger != nil {
-				llmLogger := logger.(*am.LLMLogger)
-				if llmLogger != nil {
-					llmLogger.SetLowConfidenceCallback(func(raw string) {
-						log.Printf("[AM] Low confidence parsing detected, sending Vision notification")
-						// Send a Vision overlay to notify the user
-						overlayMsg := VisionOverlayMessage{
-							Type:        "VISION_OVERLAY",
-							OverlayType: "AM_LOW_CONFIDENCE",
-							Payload: map[string]interface{}{
-								"message":     "AM detected low-confidence parsing. Raw data preserved for manual review.",
-								"severity":    "warning",
-								"autoRespond": true,
-								"rawLength":   len(raw),
-							},
-						}
-						if err := conn.WriteJSON(overlayMsg); err != nil {
-							log.Printf("[AM] Failed to send low-confidence notification: %v", err)
-						}
-					})
-				}
-			}
-			
-			// v3.5.3: Hook PromptDetector to end conversations when shell prompt returns
-			// This provides more accurate conversation boundaries than pattern matching
-			promptDetector.OnPromptDetected(func() {
-				llmLogger := llmLoggerAtomic.Load()
-				if llmLogger == nil {
-					return
-				}
-				if logger, ok := llmLogger.(*am.LLMLogger); ok && logger != nil {
-					activeConv := logger.GetActiveConversationID()
-					if activeConv != "" {
-						log.Printf("[PromptDetector→AM] Shell prompt detected, ending conversation %s", activeConv)
-						logger.EndConversation()
-					}
-				}
-			})
-			
-			log.Printf("[Terminal] Session %s: AM system initialized with tabID %s", sessionID, tabID)
-		} else if amSystem != nil && !amEnabled {
-			log.Printf("[Terminal] AM is DISABLED for tab %s - skipping LLM Logger initialization", tabID)
-		} else {
-			log.Printf("[Terminal] AM system is nil for tab %s", tabID)
+		// Initialize Vision Insights tracker (doesn't depend on AM)
+		cwd, _ := os.Getwd()
+		sessionInfo := vision.SessionInfo{
+			TabID:      tabID,
+			WorkingDir: cwd,
+			ShellType:  shellConfig.ShellType,
+			InAutoMode: false,
 		}
+		insightsTracker = vision.NewInsightsTracker("", sessionInfo)
+		visionParser.SetInsightsTracker(insightsTracker)
+		log.Printf("[Terminal] Vision insights tracker initialized for session %s", sessionID)
 	}()
 
 	// NOTE: detector is kept but LLM detection now happens in async pipeline
 	_ = h.GetLLMDetector() // Keep for backward compatibility
 	var inputBuffer strings.Builder
-	// Removed: amInputAccumulator, lastAMCheck, llmOutputBuffer, flushTimeout, lastFlushCheck, lastLLMFlush
-	// These are now handled by the async pipeline in internal/am/async_pipeline.go
+	// v3.12.3: AM removed - input/output logging disabled
 
 	// EXECUTIVE TRIGGER: Smart Model Routing via "?" prefix
 	executiveTrigger := NewExecutiveTriggerHandler(visionParser)
@@ -440,9 +362,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		for {
 			select {
 			case <-ticker.C:
-				if amSystem != nil && amSystem.HealthMonitor != nil {
-					amSystem.HealthMonitor.RecordPTYHeartbeat()
-				}
+				// v3.12.3: AM heartbeat removed
 			case <-done:
 				return
 			}
@@ -463,30 +383,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Subscribe to AM EventBus for Assistant events
-	unsubscribe := am.EventBus.Subscribe(func(event *am.LayerEvent) {
-		// Only forward events for this tab
-		if event.TabID != "" && event.TabID != tabID {
-			return
-		}
-
-		// Only forward assistant events (Layer 2)
-		if event.Layer != 2 {
-			return
-		}
-
-		// Send to WebSocket
-		// Note: conn.WriteJSON is thread-safe via mutex
-		if err := conn.WriteJSON(map[string]interface{}{
-			"type":      event.Type,
-			"timestamp": event.Timestamp,
-			"metadata":  event.Metadata,
-			"tabId":     event.TabID,
-		}); err != nil {
-			log.Printf("[Terminal] Failed to send AM event: %v", err)
-		}
-	})
-	defer unsubscribe()
+	// v3.12.3: AM EventBus subscription removed
 
 	// AUTO-RESPOND: Periodic check for state changes
 	go func() {
@@ -624,12 +521,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				// ═══ ASYNC PIPELINE: Non-blocking enqueue to AM system ═══
-				// This prevents LLM logger from blocking the PTY read loop
-				if amSystem != nil && amEnabled {
-					// Non-blocking send - drops data if pipeline full (UI > logging)
-					amSystem.EnqueueOutput(tabID, buf[:n])
-				}
+				// v3.12.3: AM pipeline removed
 			}
 		}
 	}()
@@ -683,14 +575,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// Check for AM control messages (auto-respond state sync)
+				// v3.12.3: AM removed - skip AM_AUTO_RESPOND messages
 				var amMsg AMControlMessage
 				if err := json.Unmarshal(data, &amMsg); err == nil && amMsg.Type == "AM_AUTO_RESPOND" {
-					if logger := llmLoggerAtomic.Load(); logger != nil {
-						if llmLogger := logger.(*am.LLMLogger); llmLogger != nil {
-							llmLogger.SetAutoRespond(amMsg.AutoRespond)
-							log.Printf("[AM] Auto-respond set to %v for session %s", amMsg.AutoRespond, sessionID)
-						}
-					}
+					log.Printf("[Terminal] v3.12.3: AM_AUTO_RESPOND message ignored (AM removed)")
 					continue
 				}
 
@@ -879,22 +767,15 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			inputBuffer.WriteString(dataStr)
 
-			// ═══ ASYNC PIPELINE: Non-blocking enqueue to AM system ═══
-			// This prevents AM operations from blocking keyboard input
-			if amSystem != nil && amEnabled {
-				// Non-blocking send - drops data if pipeline full (UI > logging)
-				amSystem.EnqueueInput(tabID, data)
-			}
+			// v3.12.3: AM pipeline removed
 
 			// Check for newline/enter (command submission)
 			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
 				commandLine := strings.TrimSpace(inputBuffer.String())
 				inputBuffer.Reset()
 
-				// ═══ ASYNC PIPELINE: Enqueue command for LLM detection ═══
-				if commandLine != "" && amSystem != nil && amEnabled {
-					amSystem.EnqueueCommand(tabID, commandLine)
-				}
+				// v3.12.3: AM command enqueue removed
+				_ = commandLine // Silence unused warning
 			}
 		}
 	}()
@@ -917,20 +798,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		finalReason = closeReason{CloseCodeTimeout, "Session timed out after 24 hours"}
 	}
 
-	// CRITICAL: Clean up LLM logger when session ends
-	if logger := llmLoggerAtomic.Load(); logger != nil {
-		llmLogger := logger.(*am.LLMLogger)
-		if llmLogger != nil {
-			// End any active conversation
-			if activeConv := llmLogger.GetActiveConversationID(); activeConv != "" {
-				log.Printf("[Terminal] Ending active conversation %s on session close", activeConv)
-				llmLogger.EndConversation()
-			}
-			// Remove the logger from global map to prevent memory leaks
-			am.RemoveLLMLogger(tabID)
-			log.Printf("[Terminal] LLM logger cleaned up for tab %s", tabID)
-		}
-	}
+	// v3.12.3: AM LLM logger cleanup removed
 
 	// Send close message with reason
 	closeMessage := websocket.FormatCloseMessage(finalReason.code, finalReason.reason)

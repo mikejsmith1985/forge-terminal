@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikejsmith1985/forge-terminal/internal/am"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm/cfo"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
@@ -224,50 +223,9 @@ func buildFileContext(filePaths []string) string {
 }
 
 func buildChatContext(tabID string) (string, error) {
-	var contextParts []string
-
-	stateStore := am.GetStateStore(tabID)
-	if stateStore != nil {
-		snapshots := stateStore.GetAllSnapshots()
-		recentContent := extractRecentLines(snapshots, 50)
-		if recentContent != "" {
-			contextParts = append(contextParts, "Recent Terminal Output:\n"+recentContent)
-		}
-	}
-
-	amDir := am.DefaultAMDir()
-	insights, err := vision.LoadInsights(amDir, tabID)
-	if err == nil && len(insights) > 0 {
-		latestInsight := insights[len(insights)-1]
-		if latestInsight != nil {
-			summary := formatInsightSummary(latestInsight)
-			if summary != "" {
-				contextParts = append(contextParts, "Recent Analysis:\n"+summary)
-			}
-		}
-	}
-
-	if len(contextParts) == 0 {
-		return "", nil
-	}
-
-	return strings.Join(contextParts, "\n\n---\n\n"), nil
-}
-
-func extractRecentLines(snapshots []am.StateSnapshot, lineCount int) string {
-	if len(snapshots) == 0 {
-		return ""
-	}
-
-	latest := snapshots[len(snapshots)-1]
-	lines := strings.Split(latest.CleanedContent, "\n")
-
-	if len(lines) <= lineCount {
-		return latest.CleanedContent
-	}
-
-	start := len(lines) - lineCount
-	return strings.Join(lines[start:], "\n")
+	// v3.12.3: AM system removed - context building simplified
+	// Chat now works without terminal snapshot context
+	return "", nil
 }
 
 func formatInsightSummary(insight *vision.Insight) string {

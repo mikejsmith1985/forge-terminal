@@ -53,7 +53,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     mode: assignedMode, // Per-tab light/dark mode
     viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
     autoRespond: false, // Auto-respond to CLI confirmation prompts
-    amEnabled: true, // AM (Artificial Memory) logging - DEFAULT ON for legal compliance
+    // v3.12.3: amEnabled removed - AM system no longer exists
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
     currentDirectory: currentDirectory || null, // Current working directory
     createdAt: Date.now(),
@@ -89,7 +89,7 @@ function tabsToSession(tabs, activeTabId) {
       mode: tab.mode || 'dark',
       viewMode: 'terminal', // v3.8.2: Terminal only (viewMode no longer needed)
       autoRespond: tab.autoRespond || false,
-      amEnabled: tab.amEnabled || false,
+      // v3.12.3: amEnabled removed
       visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
     })),
@@ -203,7 +203,7 @@ export function useTabManager(initialShellConfig) {
           mode: tabState.mode || 'dark',
           viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
           autoRespond: tabState.autoRespond || false,
-          amEnabled: tabState.amEnabled || false,
+          // v3.12.3: amEnabled removed
           visionEnabled: tabState.visionEnabled || false,
           currentDirectory: tabState.currentDirectory || null,
           createdAt: Date.now(),
@@ -497,34 +497,13 @@ export function useTabManager(initialShellConfig) {
   }, []);
 
   /**
-   * Toggle AM (Artificial Memory) logging for a tab
+   * v3.12.3: Toggle AM removed - AM system no longer exists
+   * Kept as no-op for API compatibility
    * @param {string} tabId - ID of tab to update
    */
   const toggleTabAM = useCallback((tabId) => {
-    logger.tabs('Toggling tab AM', { tabId });
-    
-    setState(prev => {
-      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
-      if (tabIndex === -1) {
-        logger.tabs('Tab not found for AM toggle', { tabId });
-        return prev;
-      }
-
-      const oldValue = prev.tabs[tabIndex].amEnabled;
-      const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], amEnabled: !oldValue };
-      
-      logger.tabs('Tab AM toggled', { 
-        tabId, 
-        oldValue, 
-        newValue: !oldValue 
-      });
-      
-      return {
-        ...prev,
-        tabs: newTabs,
-      };
-    });
+    logger.tabs('toggleTabAM called but AM system removed in v3.12.3', { tabId });
+    // No-op - AM system removed
   }, []);
 
   /**

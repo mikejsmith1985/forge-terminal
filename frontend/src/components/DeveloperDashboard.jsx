@@ -6,11 +6,11 @@ import {
 import './DeveloperDashboard.css';
 
 /**
- * DeveloperDashboard - Daily developer stats from AM logs and terminal activity
+ * DeveloperDashboard - Daily developer stats from terminal activity
  * 
+ * v3.12.3: AM system removed - now uses localStorage and GitHub API only
  * Data Sources:
- * - AM API (/api/am/llm/conversations) - prompts, turns, providers
- * - Terminal output parsing - git commits, test results
+ * - localStorage (forge_daily_stats) - local tracking
  * - GitHub API (if token available) - commit stats
  */
 const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
@@ -26,7 +26,6 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
     testsRun: 0,
     lastActivity: null,
     sessionDuration: 0,
-    // v3.12.3: Real stats from SLMTracking
     totalTokensIn: 0,
     totalTokensOut: 0,
     modelSwitches: 0,
@@ -41,95 +40,21 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
     
     setRefreshing(true);
     try {
-      // Fetch AM v2 sessions for comprehensive data
-      const [sessionsRes, convRes] = await Promise.all([
-        fetch('/api/am/v2/sessions'),
-        fetch('/api/am/llm/conversations/all').catch(() => null)
-      ]);
-
+      // v3.12.3: AM APIs removed - use localStorage only
       let totalPrompts = 0;
       let totalTurns = 0;
       let conversationsCount = 0;
       let providersUsed = {};
       let workingDirs = {};
+      let sessionDuration = 0;
       let gitCommits = 0;
       let filesModified = 0;
       let testsRun = 0;
       let lastActivity = null;
-      let sessionDuration = 0;
-
-      // Process v2 sessions
-      if (sessionsRes && sessionsRes.ok) {
-        const sessionsData = await sessionsRes.json();
-        const sessions = sessionsData.sessions || [];
-        
-        sessions.forEach(session => {
-          if (session.conversationCount) {
-            conversationsCount += session.conversationCount;
-          }
-          if (session.totalTurns) {
-            totalTurns += session.totalTurns;
-          }
-          if (session.provider) {
-            providersUsed[session.provider] = (providersUsed[session.provider] || 0) + 1;
-          }
-          if (session.projectContext?.name) {
-            const name = session.projectContext.name;
-            workingDirs[name] = (workingDirs[name] || 0) + 1;
-          }
-          // Calculate session duration
-          if (session.startTime && session.lastActivity) {
-            const start = new Date(session.startTime);
-            const end = new Date(session.lastActivity);
-            sessionDuration += (end - start) / 1000 / 60; // in minutes
-          }
-          // Track last activity
-          if (session.lastActivity) {
-            const actDate = new Date(session.lastActivity);
-            if (!lastActivity || actDate > lastActivity) {
-              lastActivity = actDate;
-            }
-          }
-        });
-      }
-
-      // Process conversations for prompt counts and SLMTracking data
       let totalTokensIn = 0;
       let totalTokensOut = 0;
       let modelSwitches = 0;
       let modelsUsed = {};
-      
-      if (convRes && convRes.ok) {
-        const convData = await convRes.json();
-        const conversations = Array.isArray(convData) 
-          ? convData 
-          : convData.conversations || [];
-        
-        conversations.forEach(conv => {
-          if (conv.turns) {
-            // Count user prompts specifically
-            const userTurns = conv.turns.filter(t => t.role === 'user' || t.role === 'human');
-            totalPrompts += userTurns.length;
-          }
-          if (conv.metadata?.provider) {
-            const provider = conv.metadata.provider;
-            providersUsed[provider] = (providersUsed[provider] || 0) + 1;
-          }
-          
-          // v3.12.3: Extract SLMTracking data for real stats
-          if (conv.slmTracking) {
-            const tracking = conv.slmTracking;
-            totalTokensIn += tracking.totalTokensIn || 0;
-            totalTokensOut += tracking.totalTokensOut || 0;
-            if (tracking.modelSwitched) {
-              modelSwitches++;
-            }
-            if (tracking.actualModel) {
-              modelsUsed[tracking.actualModel] = (modelsUsed[tracking.actualModel] || 0) + 1;
-            }
-          }
-        });
-      }
 
       // Try to get GitHub stats if token is available
       const githubToken = localStorage.getItem('forge_github_token');

@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"sync"
 	"time"
-
-	"github.com/mikejsmith1985/forge-terminal/internal/am"
 )
 
 // ActionType represents a single action type in a sequence.
@@ -240,7 +238,7 @@ func (se *SequenceEngine) ProcessOutput(data []byte) {
 
 	// Strip ANSI codes for pattern matching
 	var cleanBuf bytes.Buffer
-	am.StripANSIToBuffer(data, &cleanBuf)
+	stripANSIToBuffer(data, &cleanBuf)
 	clean := cleanBuf.String()
 
 	if len(clean) == 0 {
@@ -462,4 +460,13 @@ func keyName(b byte) string {
 		}
 		return "CTRL"
 	}
+}
+
+// ansiEscapeRegex matches ANSI escape sequences
+var ansiEscapeRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[PX^_][^\x1b]*\x1b\\|\x1b.`)
+
+// stripANSIToBuffer removes ANSI escape sequences from data and writes to buf
+func stripANSIToBuffer(data []byte, buf *bytes.Buffer) {
+	clean := ansiEscapeRegex.ReplaceAll(data, nil)
+	buf.Write(clean)
 }
