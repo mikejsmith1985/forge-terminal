@@ -498,6 +498,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   
+  // PERF FIX: Track isWaiting in ref to avoid stale closures in hot paths
+  const isWaitingRef = useRef(false);
+  
   // Vision state
   const visionEnabledRef = useRef(visionEnabled);
 
@@ -1366,6 +1369,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           reconnectAttempts: reconnectAttemptsRef.current
         });
         
+        // Capture reconnect state BEFORE resetting
+        const wasReconnection = reconnectAttemptsRef.current > 0;
+        
         // Reset reconnection state
         reconnectAttemptsRef.current = 0;
         setReconnecting(false);
@@ -1373,7 +1379,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         
         // Use orange for the welcome message to match theme
         const shellLabel = cfg?.shellType ? ` (${cfg.shellType.toUpperCase()})` : '';
-        const reconnectLabel = reconnectAttemptsRef.current > 0 ? ' [Reconnected]' : '';
+        const reconnectLabel = wasReconnection ? ' [Reconnected]' : '';
         term.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}${reconnectLabel}.\r\n\r\n`);
 
         // Send initial size
@@ -1545,7 +1551,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             });
           }
 
-          if (waiting !== isWaiting) {
+          if (waiting !== isWaitingRef.current) {
+            isWaitingRef.current = waiting;
             setIsWaiting(waiting);
             if (onWaitingChange) {
               onWaitingChange(waiting);
@@ -1581,6 +1588,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             // Clear buffer and state after auto-respond
             buf.data = '';
             lastOutputRef.current = '';
+            isWaitingRef.current = false;
             setIsWaiting(false);
             if (onWaitingChange) {
               onWaitingChange(false);
@@ -1633,17 +1641,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             shouldReconnect = true;
             break;
           case 4000:
-            // Custom: PTY process exited
-            disconnectMessage = 'Shell process exited.';
+            // Custom: PTY process exited - reconnect to get new shell
+            disconnectMessage = 'Shell process exited. Reconnecting...';
+            shouldReconnect = true;
             break;
           case 4001:
-            // Custom: Session timeout
-            disconnectMessage = 'Session timed out.';
+            // Custom: Session timeout - reconnect to restore
+            disconnectMessage = 'Session timed out. Reconnecting...';
+            shouldReconnect = true;
             break;
           case 4002:
-            // Custom: PTY read error
-            disconnectMessage = 'Terminal read error.';
+            // Custom: PTY read error - reconnect to recover
+            disconnectMessage = 'Terminal read error. Reconnecting...';
             messageColor = '1;31'; // Red
+            shouldReconnect = true;
             break;
           default:
             if (event.reason) {
@@ -1745,7 +1756,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }
           
           // Clear waiting state when user types (they're responding to the prompt)
-          if (isWaiting) {
+          // PERF FIX: Use ref instead of state to avoid stale closure
+          if (isWaitingRef.current) {
+            isWaitingRef.current = false;
             setIsWaiting(false);
             if (onWaitingChange) {
               onWaitingChange(false);

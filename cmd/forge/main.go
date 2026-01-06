@@ -1644,8 +1644,42 @@ func handleAMHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	health := system.GetHealth()
-	json.NewEncoder(w).Encode(health)
+	// v3.12.3 FIX: Add timeout to prevent hanging on slow disk I/O
+	type healthResult struct {
+		health *am.SystemHealth
+		err    error
+	}
+	resultChan := make(chan healthResult, 1)
+	
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[AM Health] Panic during health check: %v", r)
+				resultChan <- healthResult{nil, fmt.Errorf("health check panic")}
+			}
+		}()
+		h := system.GetHealth()
+		resultChan <- healthResult{h, nil}
+	}()
+
+	select {
+	case result := <-resultChan:
+		if result.err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status": "DEGRADED",
+				"error":  result.err.Error(),
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(result.health)
+	case <-time.After(5 * time.Second):
+		log.Printf("[AM Health] Health check timed out after 5s")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "DEGRADED",
+			"error":   "Health check timed out - disk I/O may be slow",
+			"metrics": nil,
+		})
+	}
 }
 
 // handleAMTabStatus returns capture status for a specific tab.
@@ -1681,8 +1715,39 @@ func handleAMTabStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status := system.HealthMonitor.GetTabCaptureStatus(tabID, amEnabled)
-	json.NewEncoder(w).Encode(status)
+	// v3.12.3 FIX: Add timeout to prevent hanging on slow disk I/O
+	type statusResult struct {
+		status *am.TabCaptureStatus
+	}
+	resultChan := make(chan statusResult, 1)
+	
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[AM TabStatus] Panic during status check: %v", r)
+				resultChan <- statusResult{&am.TabCaptureStatus{
+					TabID:      tabID,
+					Status:     "disabled",
+					StatusText: "Status check failed",
+				}}
+			}
+		}()
+		s := system.HealthMonitor.GetTabCaptureStatus(tabID, amEnabled)
+		resultChan <- statusResult{s}
+	}()
+
+	select {
+	case result := <-resultChan:
+		json.NewEncoder(w).Encode(result.status)
+	case <-time.After(5 * time.Second):
+		log.Printf("[AM TabStatus] Status check timed out after 5s for tab %s", tabID)
+		json.NewEncoder(w).Encode(&am.TabCaptureStatus{
+			TabID:          tabID,
+			Status:         "disabled",
+			StatusText:     "Status check timed out",
+			DetailedReason: "Disk I/O may be slow",
+		})
+	}
 }
 
 func handleAMActiveConversations(w http.ResponseWriter, r *http.Request) {

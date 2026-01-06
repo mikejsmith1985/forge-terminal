@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Recovery & Performance Fixes</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#c9d1d9; --green:#238636; --blue:#58a6ff; --red:#f85149; --yellow:#d29922; }
+        body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin:0; padding:20px; }
+        .header { text-align:center; margin-bottom:30px; }
+        .header h1 { color:#4ade80; margin:0; }
+        .header p { color:#8b949e; margin:10px 0; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(400px,1fr)); gap:20px; max-width:1400px; margin:0 auto; }
+        .card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px; }
+        .card h2 { margin:0 0 15px 0; font-size:1.2em; display:flex; align-items:center; gap:8px; }
+        .status-badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8em; font-weight:600; }
+        .status-fixed { background:var(--green); color:white; }
+        .status-pending { background:var(--yellow); color:black; }
+        .mermaid { text-align:center; background:#0d1117; padding:20px; border-radius:6px; }
+        .code-block { background:#0d1117; padding:15px; border-radius:6px; font-family:monospace; font-size:0.85em; overflow-x:auto; }
+        .fix-item { padding:12px; border-left:3px solid var(--green); margin:10px 0; background:rgba(35,134,54,0.1); }
+        .fix-title { font-weight:600; margin-bottom:5px; }
+        .fix-detail { font-size:0.9em; color:#8b949e; }
+        ul { margin:0; padding-left:20px; }
+        li { margin:8px 0; }
+        .before-after { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .before { border-left:3px solid var(--red); padding-left:10px; }
+        .after { border-left:3px solid var(--green); padding-left:10px; }
+        .test-result { color:var(--green); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 WebSocket Recovery & Performance Fixes</h1>
+        <p>Forge Terminal v3.12.3 | January 6, 2026</p>
+    </div>
+    
+    <div class="grid">
+        <div class="card">
+            <h2>🔌 Bug #1: WebSocket Recovery <span class="status-badge status-fixed">FIXED</span></h2>
+            <p><strong>Problem:</strong> WebSocket never reconnected after PTY errors</p>
+            
+            <div class="mermaid">
+flowchart LR
+    A[WebSocket Close] --> B{Close Code?}
+    B -->|1000| C[Normal ❌]
+    B -->|4000 PTY Exit| D[No Reconnect ❌]
+    B -->|4001 Timeout| E[No Reconnect ❌]
+    B -->|4002 PTY Error| F[No Reconnect ❌]
+    
+    style D fill:#f85149
+    style E fill:#f85149
+    style F fill:#f85149
+            </div>
+            
+            <div class="before-after">
+                <div class="before">
+                    <strong>Before:</strong>
+                    <pre>case 4000:
+  msg = 'Shell exited.';
+  break; // No reconnect!</pre>
+                </div>
+                <div class="after">
+                    <strong>After:</strong>
+                    <pre>case 4000:
+  msg = 'Shell exited. Reconnecting...';
+  shouldReconnect = true; ✅</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🏷️ Bug #2: Reconnected Label <span class="status-badge status-fixed">FIXED</span></h2>
+            <p><strong>Problem:</strong> "[Reconnected]" label never appeared after reconnection</p>
+            
+            <div class="before-after">
+                <div class="before">
+                    <strong>Before:</strong>
+                    <pre>// Reset THEN check
+reconnectAttempts = 0;
+label = attempts > 0 ? '[Reconnected]' : '';
+// Always empty!</pre>
+                </div>
+                <div class="after">
+                    <strong>After:</strong>
+                    <pre>// Check THEN reset
+const wasReconnection = attempts > 0;
+reconnectAttempts = 0;
+label = wasReconnection ? '[Reconnected]' : ''; ✅</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⚡ Bug #3: Stale Closure in onData <span class="status-badge status-fixed">FIXED</span></h2>
+            <p><strong>Problem:</strong> isWaiting state check in onData used stale closure</p>
+            
+            <div class="fix-item">
+                <div class="fix-title">Added isWaitingRef</div>
+                <div class="fix-detail">Ref stays current across re-renders, avoiding stale state in hot paths</div>
+            </div>
+            
+            <div class="code-block">
+// Added ref
+const isWaitingRef = useRef(false);
+
+// onData now uses ref (no stale closure)
+if (isWaitingRef.current) { // ✅ Always current
+  isWaitingRef.current = false;
+  setIsWaiting(false);
+}
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🔄 WebSocket Recovery Flow (Fixed)</h2>
+            
+            <div class="mermaid">
+sequenceDiagram
+    participant Client
+    participant Server
+    participant PTY
+    
+    Client->>Server: WebSocket Connect
+    Server->>PTY: Create PTY Session
+    PTY-->>Server: Session Ready
+    Server-->>Client: Connected ✓
+    
+    Note over PTY: Shell exits (exit command)
+    PTY->>Server: Process Exit
+    Server->>Client: Close (4000)
+    
+    Note over Client: shouldReconnect = true ✅
+    Client->>Client: Schedule Reconnect
+    Client->>Server: New WebSocket
+    Server->>PTY: New PTY Session
+    Server-->>Client: Connected [Reconnected] ✓
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Performance Investigation</h2>
+            
+            <p><strong>Observed:</strong> Intermittent backspace freezing</p>
+            
+            <div class="fix-item" style="border-color:var(--yellow)">
+                <div class="fix-title">Log Evidence: Slow PTY Read</div>
+                <div class="fix-detail">[FREEZE-DEBUG] Slow PTY read: 514ms for 34 bytes</div>
+            </div>
+            
+            <p><strong>Potential Causes:</strong></p>
+            <ul>
+                <li>Windows ConPTY latency spikes (OS-level)</li>
+                <li>React state updates in hot paths (fixed)</li>
+                <li>Focus management issues with xterm.js</li>
+            </ul>
+            
+            <p><strong>Tests Passed:</strong></p>
+            <ul>
+                <li class="test-result">✓ Mutex contention tests (Go)</li>
+                <li class="test-result">✓ Backspace simulation: &lt;1ms per key</li>
+                <li class="test-result">✓ EnqueueInput: ~0µs (no-op)</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>📁 Files Modified</h2>
+            <ul>
+                <li><code>frontend/src/components/ForgeTerminal.jsx</code>
+                    <ul>
+                        <li>WebSocket close code handling (lines 1635-1653)</li>
+                        <li>Reconnection label fix (line 1374)</li>
+                        <li>Added isWaitingRef for performance</li>
+                    </ul>
+                </li>
+                <li><code>cypress/e2e/websocket-recovery.cy.js</code> - New test file</li>
+                <li><code>internal/am/contention_test.go</code> - Mutex contention tests</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>✅ Verification</h2>
+            
+            <div class="code-block" style="color:var(--green)">
+$ go test -run "Contention|Backspace|Mutex" ./internal/am/...
+--- PASS: TestLLMLoggerMutexContention (0.10s)
+--- PASS: TestLLMLoggerAddUserInputLatency (0.01s)
+--- PASS: TestBackspaceSimulation (0.01s)
+    50 backspace inputs in 0s (0.00ms per key)
+--- PASS: TestMutexHoldTime (0.01s)
+    Keystroke sequence: 0s
+PASS
+            </div>
+            
+            <p style="margin-top:15px"><strong>Next Steps:</strong></p>
+            <ol>
+                <li>Rebuild and deploy: <code>go build -o forge.exe ./cmd/forge</code></li>
+                <li>Test WebSocket recovery: Type <code>exit</code> in terminal</li>
+                <li>Monitor for slow PTY reads in logs</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+    </script>
+</body>
+</html>
