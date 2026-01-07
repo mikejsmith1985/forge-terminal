@@ -200,11 +200,16 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
             console.log('[FollowMe] Restoring active recording session');
             setIsRecording(true);
             
-            // Restart duration counter
+            // Calculate actual elapsed time from start
+            const actualElapsed = Math.floor((Date.now() - session.startTime) / 1000);
+            setRecordingDuration(actualElapsed);
+            console.log('[FollowMe] Restored timer - actual elapsed:', actualElapsed, 'seconds');
+            
+            // Restart duration counter from actual elapsed time
             durationIntervalRef.current = setInterval(() => {
               setRecordingDuration(prev => prev + 1);
               // Auto-save periodically
-              if (prev % 5 === 0) {
+              if ((prev + 1) % 5 === 0) {
                 const currentSession = {
                   id: sessionIdRef.current,
                   startTime: startTimeRef.current,
@@ -243,16 +248,23 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       if (!isRecording) {
         if (durationIntervalRef.current) {
           clearInterval(durationIntervalRef.current);
+          durationIntervalRef.current = null;
         }
         restoreConsole();
         restoreFetch();
       } else {
         console.log('[FollowMe] Component unmounting but recording active - preserving state');
+        // CRITICAL FIX: Must clear interval even when recording
+        // Otherwise timer continues in background but UI is unmounted
+        if (durationIntervalRef.current) {
+          clearInterval(durationIntervalRef.current);
+          durationIntervalRef.current = null;
+        }
         // Save to localStorage so it can be restored
         saveSessionToLocalStorage();
       }
     };
-  }, [isRecording, saveSessionToLocalStorage]);
+  }, [isRecording, saveSessionToLocalStorage, restoreConsole, restoreFetch]);
 
   // TDZ FIX: All callbacks moved above - removed duplicates
   

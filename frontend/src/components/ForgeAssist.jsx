@@ -741,7 +741,7 @@ export default function ForgeAssist({
           </div>
           
           {/* Quick Instructions & Instruction Mode Controls */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
             {/* Quick Instructions Button - NEW: Always append custom snippets */}
             <button 
               data-testid="quick-instructions-btn"
@@ -754,22 +754,22 @@ export default function ForgeAssist({
                 background: quickInstructions.some(i => i.enabled) ? '#238636' : '#333',
                 border: `2px solid ${quickInstructions.some(i => i.enabled) ? '#2ea043' : '#555'}`,
                 color: quickInstructions.some(i => i.enabled) ? '#fff' : '#888',
-                padding: '8px 14px',
+                padding: '6px 10px',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '4px',
                 transition: 'all 0.2s ease',
                 flexShrink: 0
               }}
             >
-              <Sparkles size={16} />
+              <Sparkles size={14} />
               <span>Quick</span>
               {quickInstructions.filter(i => i.enabled).length > 0 && (
-                <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 700}}>
+                <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 700}}>
                   {quickInstructions.filter(i => i.enabled).length}
                 </span>
               )}
@@ -784,21 +784,21 @@ export default function ForgeAssist({
                 background: isInstructionMode ? 'var(--accent-color, #8b5cf6)' : '#333',
                 border: `2px solid ${isInstructionMode ? 'var(--accent-color, #8b5cf6)' : '#555'}`,
                 color: isInstructionMode ? '#fff' : '#888',
-                padding: '8px 14px',
+                padding: '6px 10px',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '4px',
                 transition: 'all 0.2s ease',
                 flexShrink: 0
               }}
             >
-              <FileText size={16} />
+              <FileText size={14} />
               <span>Files</span>
-              {isInstructionMode && <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 700}}>ON</span>}
+              {isInstructionMode && <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 700}}>ON</span>}
             </button>
             <button 
               className="forge-assist-manage-instructions"
@@ -808,19 +808,19 @@ export default function ForgeAssist({
                 background: '#333',
                 border: '2px solid #555',
                 color: '#aaa',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '4px',
                 transition: 'all 0.2s ease',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 500,
                 flexShrink: 0
               }}
             >
-              <Settings size={16} />
+              <Settings size={14} />
             </button>
           </div>
           
