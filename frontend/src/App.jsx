@@ -23,6 +23,7 @@ import MonacoEditor from './components/MonacoEditor'
 import AgenticEditor from './components/AgenticEditor'
 // AMMonitor removed in v3.12.3 - native recovery works, redundancy monitoring didn't provide value
 import DebugPanel from './components/DebugPanel'
+import WebAppDebuggerCard from './components/WebAppDebuggerCard'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
@@ -74,6 +75,9 @@ function App() {
   const [theme, setTheme] = useState('dark')
   const [colorTheme, setColorTheme] = useState(() => {
     return localStorage.getItem('colorTheme') || 'molten';
+  })
+  const [defaultTabTheme, setDefaultTabTheme] = useState(() => {
+    return localStorage.getItem('defaultTabTheme') || 'auto-cycle';
   })
   const [sidebarPosition, setSidebarPosition] = useState(() => {
     return localStorage.getItem('sidebarPosition') || 'right';
@@ -191,7 +195,7 @@ function App() {
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
-  } = useTabManager(shellConfig);
+  } = useTabManager(shellConfig, defaultTabTheme);
   
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
@@ -199,25 +203,47 @@ function App() {
   // Workflow management - REMOVED v3.9.0: Consolidating to SLM-enhanced Forge Assist
 
   // Tour action handlers for interactive steps
-  // v3.9.0: Added ForgeAssist and Settings modal actions
+  // v3.12.4: Complete interactive tour with all UI actions
   const tourActionHandlers = useMemo(() => ({
-    openRouterConfig: () => setIsRouterConfigOpen(true),
-    closeRouterConfig: () => setIsRouterConfigOpen(false),
-    showFilesTab: () => {
-      // Switch sidebar to Files tab
-      setSidebarView('files');
+    // Tab management
+    createNewTab: () => {
+      if (tabs.length < MAX_TABS) {
+        createTab();
+      }
     },
-    // v3.9.0: Forge Assist actions
+    closeExtraTab: () => {
+      // Close the last tab if we have more than one
+      if (tabs.length > 1) {
+        const lastTab = tabs[tabs.length - 1];
+        closeTab(lastTab.id);
+      }
+    },
+
+    // Forge Assist actions
     openForgeAssist: () => setIsForgeAssistOpen(true),
     closeForgeAssist: () => setIsForgeAssistOpen(false),
     switchToTaskMode: () => {
       // ForgeAssist handles its own mode state, we just ensure it's open
       setIsForgeAssistOpen(true);
     },
-    // v3.9.0: Settings modal actions
+
+    // Sidebar tab switching
+    showCardsTab: () => setSidebarView('cards'),
+    showFilesTab: () => setSidebarView('files'),
+    showWebToolsTab: () => setSidebarView('debug'),
+
+    // History Slider (Time Travel)
+    openHistorySlider: () => setIsHistorySliderOpen(true),
+    closeHistorySlider: () => setIsHistorySliderOpen(false),
+
+    // Settings modal
     openSettings: () => setIsSettingsModalOpen(true),
     closeSettings: () => setIsSettingsModalOpen(false),
-  }), []);
+
+    // Legacy router config (kept for compatibility)
+    openRouterConfig: () => setIsRouterConfigOpen(true),
+    closeRouterConfig: () => setIsRouterConfigOpen(false),
+  }), [tabs, createTab, closeTab]);
 
   // Guided Tour for first-run experience
   const {
@@ -1495,15 +1521,14 @@ function App() {
           <Folder size={16} />
           Files
         </button>
-        {devMode && (
-          <button 
-            className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
-            onClick={() => setSidebarView('debug')}
-          >
-            <Bug size={16} />
-            Debug
-          </button>
-        )}
+        <button
+          className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
+          onClick={() => setSidebarView('debug')}
+          title="Debug web applications with session recording"
+        >
+          <Bug size={16} />
+          Web Tools
+        </button>
       </div>
 
       {/* Row 2: Header - context-aware based on view */}
@@ -1526,14 +1551,17 @@ function App() {
           </>
         ) : sidebarView === 'debug' ? (
           <>
-            <h3>🐛 Debug</h3>
+            <h3>🌐 Web Tools</h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button 
-                className="btn btn-primary"
-                onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
-              >
-                {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
-              </button>
+              {devMode && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
+                  style={{ fontSize: '11px', padding: '4px 8px' }}
+                >
+                  {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
+                </button>
+              )}
             </div>
           </>
         ) : null}
@@ -1656,10 +1684,16 @@ function App() {
             terminalRef={getActiveTerminalRef()}
           />
         ) : sidebarView === 'debug' ? (
-          <DebugPanel
-            terminalRef={getActiveTerminalRef()}
-            tabId={activeTabId}
-          />
+          devMode ? (
+            <DebugPanel
+              terminalRef={getActiveTerminalRef()}
+              tabId={activeTabId}
+            />
+          ) : (
+            <div style={{ padding: '12px', overflowY: 'auto', height: '100%' }}>
+              <WebAppDebuggerCard />
+            </div>
+          )
         ) : null}
       </div>
     </div>
@@ -1881,6 +1915,11 @@ function App() {
         onAMMasterChange={handleAMMasterToggle}
         amDefaultEnabled={amDefaultEnabled}
         onAMDefaultChange={handleAMDefaultChange}
+        defaultTabTheme={defaultTabTheme}
+        onDefaultTabThemeChange={(newTheme) => {
+          setDefaultTabTheme(newTheme);
+          localStorage.setItem('defaultTabTheme', newTheme);
+        }}
         onRestartTour={() => {
           setIsSettingsModalOpen(false);
           restartTour();

@@ -37,13 +37,37 @@ function generateId() {
  * @param {string} colorTheme - Optional color theme override
  * @param {string} mode - Optional mode override ('dark' or 'light')
  * @param {string} currentDirectory - Optional current directory path
+ * @param {string} defaultThemePreference - Default theme preference: 'auto-cycle', 'auto-cycle-dark', 'auto-cycle-light', or specific theme name
  */
-function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, currentDirectory = null) {
-  // Auto-assign next theme in cycle if not specified
-  const assignedTheme = colorTheme || themeOrder[themeIndex % themeOrder.length];
-  // Alternate mode for visual variety: even tabs dark, odd tabs light (if not specified)
-  const assignedMode = mode || (themeIndex % 2 === 0 ? 'dark' : 'light');
-  themeIndex++;
+function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, currentDirectory = null, defaultThemePreference = 'auto-cycle') {
+  // Auto-assign theme based on preference
+  let assignedTheme;
+  let assignedMode;
+  
+  if (colorTheme) {
+    // Explicit override - use it
+    assignedTheme = colorTheme;
+    assignedMode = mode || 'dark'; // Default to dark if not specified
+  } else if (defaultThemePreference === 'auto-cycle') {
+    // Auto-cycle through themes with alternating dark/light
+    assignedTheme = themeOrder[themeIndex % themeOrder.length];
+    assignedMode = themeIndex % 2 === 0 ? 'dark' : 'light';
+    themeIndex++;
+  } else if (defaultThemePreference === 'auto-cycle-dark') {
+    // Auto-cycle through themes in dark mode only
+    assignedTheme = themeOrder[themeIndex % themeOrder.length];
+    assignedMode = 'dark';
+    themeIndex++;
+  } else if (defaultThemePreference === 'auto-cycle-light') {
+    // Auto-cycle through themes in light mode only
+    assignedTheme = themeOrder[themeIndex % themeOrder.length];
+    assignedMode = 'light';
+    themeIndex++;
+  } else {
+    // Use specific theme preference in dark mode by default
+    assignedTheme = defaultThemePreference;
+    assignedMode = mode || 'dark';
+  }
   
   const newTab = {
     id: generateId(),
@@ -151,18 +175,23 @@ async function loadSession() {
 /**
  * Hook for managing terminal tabs
  * @param {Object} initialShellConfig - Default shell configuration
+ * @param {string} defaultThemePreference - Default theme preference: 'auto-cycle' or specific theme name
  * @returns {Object} Tab state and actions
  */
-export function useTabManager(initialShellConfig) {
+export function useTabManager(initialShellConfig, defaultThemePreference = 'auto-cycle') {
   // Track if session has been loaded
   const sessionLoadedRef = useRef(false);
-  
+
   // Store current state in a ref for synchronous access
   const stateRef = useRef(null);
-  
+
+  // Store defaultThemePreference in ref for callbacks
+  const themePreferenceRef = useRef(defaultThemePreference);
+  themePreferenceRef.current = defaultThemePreference;
+
   // Initialize with one default tab
   const [state, setState] = useState(() => {
-    const initialTab = createTab(initialShellConfig, 1);
+    const initialTab = createTab(initialShellConfig, 1, null, null, null, defaultThemePreference);
     return {
       tabs: [initialTab],
       activeTabId: initialTab.id,
@@ -268,7 +297,7 @@ export function useTabManager(initialShellConfig) {
     setState(prev => {
       const config = shellConfig || configRef.current;
       const newTabNumber = prev.tabs.length + 1;
-      const newTab = createTab(config, newTabNumber);
+      const newTab = createTab(config, newTabNumber, null, null, null, themePreferenceRef.current);
       createdTab = newTab;
       
       logger.tabs('Tab created successfully', { 

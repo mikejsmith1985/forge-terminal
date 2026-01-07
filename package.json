@@ -1,9 +1,12 @@
 {
   "dependencies": {
+    "sharp": "^0.34.5",
     "ws": "^8.18.3"
   },
   "devDependencies": {
     "cypress": "^15.8.1",
-    "cypress-real-events": "^1.15.0"
+    "cypress-real-events": "^1.15.0",
+    "png-to-ico": "^3.0.1",
+    "to-ico": "^1.1.5"
   }
 }

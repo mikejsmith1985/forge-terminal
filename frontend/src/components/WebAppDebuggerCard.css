@@ -1,0 +1,174 @@
+.web-app-debugger-card {
+  background: var(--card-bg, rgba(30, 30, 30, 0.95));
+  border: 1px solid var(--border-color, rgba(100, 100, 100, 0.3));
+  border-radius: 8px;
+  padding: 20px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.web-app-debugger-card:hover {
+  border-color: rgba(100, 150, 255, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.debugger-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(100, 100, 100, 0.2);
+}
+
+.debugger-icon-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.debugger-icon-group .icon-globe {
+  color: #3b82f6;
+}
+
+.debugger-icon-group .icon-bug {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  color: #10b981;
+  background: var(--card-bg, rgba(30, 30, 30, 0.95));
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.debugger-title-group {
+  flex: 1;
+}
+
+.debugger-title-group h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-color, #e5e5e5);
+  background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.debugger-subtitle {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: var(--text-secondary, #999);
+  font-weight: normal;
+}
+
+.debugger-description {
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 3px solid #3b82f6;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.debugger-description p {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-color, #ccc);
+}
+
+.debugger-description p:last-child {
+  margin-bottom: 0;
+}
+
+.debugger-description strong {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.debugger-description em {
+  color: #10b981;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.debugger-description u {
+  text-decoration: none;
+  border-bottom: 2px dotted #3b82f6;
+}
+
+.debugger-note {
+  background: rgba(251, 191, 36, 0.1);
+  border-left: 3px solid #fbbf24;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.debugger-action-area {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.debugger-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(100, 100, 100, 0.2);
+}
+
+.use-case-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.use-case-item {
+  font-size: 12px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  border-left: 2px solid;
+  color: var(--text-secondary, #aaa);
+}
+
+.use-case-item:nth-child(1),
+.use-case-item:nth-child(2),
+.use-case-item:nth-child(3) {
+  border-left-color: #10b981;
+  color: #10b981;
+}
+
+.use-case-item:nth-child(4),
+.use-case-item:nth-child(5),
+.use-case-item:nth-child(6) {
+  border-left-color: #ef4444;
+  color: #ef4444;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .use-case-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .debugger-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .debugger-icon-group {
+    width: 40px;
+    height: 40px;
+  }
+}

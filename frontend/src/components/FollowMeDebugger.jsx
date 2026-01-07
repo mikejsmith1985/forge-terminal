@@ -572,7 +572,8 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
 
   const resetSession = useCallback(() => {
     setSessionComplete(false);
-    setSessionData(null);
+    // KEEP sessionData so user can still access it if needed
+    // setSessionData(null);  // Don't clear - session is still saved to disk
     setRecordingDuration(0);
     setError(null);
   }, []);
@@ -610,6 +611,15 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     const secs = seconds % 60;
     return mins + ':' + secs.toString().padStart(2, '0');
   };
+
+  // Expose session data to window for easy debugging access
+  useEffect(() => {
+    if (sessionData) {
+      window.followMeSession = sessionData;
+      console.log('[FollowMe] Session data available at window.followMeSession');
+      console.log('[FollowMe] Session saved to:', sessionData.savedPath);
+    }
+  }, [sessionData]);
 
   return (
     <div className="follow-me-debugger" data-testid="follow-me-debugger">
@@ -679,7 +689,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
             ) : (
               <>
                 <Square size={16} />
-                <span>I'm Done</span>
+                <span>Complete & Save Session</span>
               </>
             )}
           </button>
@@ -690,7 +700,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
         <div className="debug-session-summary" data-testid="session-summary">
           <div className="session-header">
             <h4>Debug Session Complete</h4>
-            <button className="reset-button" onClick={resetSession}>New Session</button>
+            <button className="reset-button" onClick={resetSession}>Start New Session</button>
           </div>
 
           <div className="session-stats">

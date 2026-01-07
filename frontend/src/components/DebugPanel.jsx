@@ -7,7 +7,6 @@ import {
   GripVertical
 } from 'lucide-react';
 import { getRecentLogs } from '../utils/logger';
-import FollowMeDebugger from './FollowMeDebugger';
 import DebugCard from './DebugCard';
 
 /**
@@ -357,9 +356,9 @@ const DebugPanel = ({ terminalRef, tabId }) => {
       fontSize: '13px',
       overflowY: 'auto',
     }}>
-      {/* Follow-Me Debugger - Top of Debug Panel */}
-      <FollowMeDebugger />
-      
+      {/* Follow-Me Debugger moved to WebAppDebuggerCard for all users */}
+      {/* Advanced users in DevMode see full debug panel here */}
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

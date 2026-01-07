@@ -1099,6 +1099,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
       
+      // FIX: Explicitly handle Backspace to ensure correct escape sequence
+      // Different CLIs expect different codes: \x7f (DEL) vs \x08 (BS)
+      // We'll send \x7f which is the standard for most Unix terminals and modern CLIs
+      if (arg.code === 'Backspace' && arg.type === 'keydown') {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          // Send DEL character (\x7f) directly to ensure it reaches the CLI
+          wsRef.current.send('\x7f');
+          console.log('[Terminal] Backspace intercepted - sending \\x7f (DEL)');
+          return false; // Prevent xterm from also handling it
+        }
+        return true; // Let xterm handle if websocket not ready
+      }
+      
       // Handle Ctrl+C (Copy vs Interrupt)
       if (arg.ctrlKey && arg.code === 'KeyC' && arg.type === 'keydown') {
         // Prevent spamming copy operations which can crash the renderer

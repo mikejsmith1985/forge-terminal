@@ -24,7 +24,6 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
-	"github.com/mikejsmith1985/forge-terminal/internal/llm/ledger"
 	"github.com/mikejsmith1985/forge-terminal/internal/lockfile"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
@@ -160,13 +159,6 @@ func main() {
 	}
 	log.Printf("[Forge] Storage structure: %s", storage.GetCurrentStructure())
 
-	// v3.4.1: Initialize CFO ledger on startup (creates file if missing)
-	if _, err := ledger.GetLedger(); err != nil {
-		log.Printf("[CFO] Warning: failed to initialize ledger: %v", err)
-	} else {
-		log.Printf("[CFO] Ledger initialized at %s", ledger.DefaultFilePath())
-	}
-
 	// v3.12.3: SLM engine removed - context windows too small for complex tasks
 	// Archived: internal/slm.removed/
 
@@ -271,13 +263,8 @@ func main() {
 	http.HandleFunc("/api/llm/providers", WrapWithMiddleware(handleListProviders))
 	http.HandleFunc("/api/llm/providers/", WrapWithMiddleware(handleProviderModels))
 
-	// Budget & CFO Router API (v3.4.0 - Smart Marketplace)
-	http.HandleFunc("/api/llm/budget", WrapWithMiddleware(handleBudgetStatus))
-	http.HandleFunc("/api/llm/budget/config", WrapWithMiddleware(handleBudgetConfig))
-	http.HandleFunc("/api/llm/budget/history", WrapWithMiddleware(handleBudgetHistory))
-	http.HandleFunc("/api/llm/budget/reset", WrapWithMiddleware(handleBudgetReset))
-	http.HandleFunc("/api/llm/pricing", WrapWithMiddleware(handleModelPricing))
-	http.HandleFunc("/api/llm/route/preview", WrapWithMiddleware(handleRoutePreview))
+	// Budget & CFO Router API removed in v3.12.11 - Intelligence tab deprecated
+	// Archived: cmd/forge/handlers_budget.go.removed
 
 	// SLM and Routing APIs removed in v3.12.3 - local LLM context window too small to be useful
 	// Archived: internal/slm.removed/, internal/routing.removed/

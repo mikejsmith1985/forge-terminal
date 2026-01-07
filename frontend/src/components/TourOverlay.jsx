@@ -1,13 +1,11 @@
 /**
- * TourOverlay.jsx - Visual Tour Overlay for Forge Terminal v3.3.6
+ * TourOverlay.jsx - Interactive Tour Overlay for Forge Terminal v3.12.4
  *
- * Renders a spotlight effect highlighting the target element with a tooltip.
- * Features:
- * - Full-screen mask with spotlight cutout
- * - iOS-style blurred backdrop
- * - Animated tooltip with high-contrast text
- * - Responsive positioning based on target element
- * - Smart viewport boundary detection to prevent cutoff
+ * Complete redesign with:
+ * - Center-positioned cards with arrows pointing to UI elements
+ * - Pulsing border/glow effect instead of spotlight cutout
+ * - Markdown support for content
+ * - Interactive element highlighting
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -15,11 +13,8 @@ import { ChevronRight, X, Sparkles } from 'lucide-react';
 import { getRect } from '../hooks/useGuidedTour';
 import './TourOverlay.css';
 
-const PADDING = 8; // Padding around spotlight
-const TOOLTIP_OFFSET = 16; // Distance from spotlight to tooltip
-const VIEWPORT_MARGIN = 20; // Minimum distance from viewport edge
-const TOOLTIP_WIDTH = 380; // Max tooltip width from CSS
-const TOOLTIP_HEIGHT = 200; // Estimated tooltip height
+const PADDING = 12; // Padding around highlighted element
+const ARROW_SIZE = 40; // Size of arrow element
 
 const TourOverlay = ({ step, currentStep, totalSteps, onNext, onSkip }) => {
   const [targetRect, setTargetRect] = useState(null);
@@ -60,163 +55,163 @@ const TourOverlay = ({ step, currentStep, totalSteps, onNext, onSkip }) => {
     };
   }, [step]);
 
-  // Calculate tooltip position based on target and placement with viewport bounds checking
-  const tooltipStyle = useMemo(() => {
-    if (!targetRect || !step?.spotlight) {
-      // Center the tooltip
-      return {
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-      };
+  // Calculate arrow position and rotation
+  const arrowStyle = useMemo(() => {
+    if (!targetRect || !step?.spotlight || !step?.arrow) {
+      return null;
     }
-
-    const placement = step.placement || 'bottom';
-    const style = { position: 'fixed' };
-
-    const spotlightRect = {
-      top: targetRect.top - PADDING,
-      left: targetRect.left - PADDING,
-      width: targetRect.width + PADDING * 2,
-      height: targetRect.height + PADDING * 2,
-      bottom: targetRect.bottom + PADDING,
-      right: targetRect.right + PADDING,
-    };
 
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const centerX = viewportWidth / 2;
+    const centerY = viewportHeight / 2;
 
-    // Helper to check if placement would cause cutoff
-    const wouldCutOff = (pos) => {
-      switch (pos) {
-        case 'top':
-          return spotlightRect.top - TOOLTIP_OFFSET - TOOLTIP_HEIGHT < VIEWPORT_MARGIN;
-        case 'bottom':
-          return spotlightRect.bottom + TOOLTIP_OFFSET + TOOLTIP_HEIGHT > viewportHeight - VIEWPORT_MARGIN;
-        case 'left':
-          return spotlightRect.left - TOOLTIP_OFFSET - TOOLTIP_WIDTH < VIEWPORT_MARGIN;
-        case 'right':
-          return spotlightRect.right + TOOLTIP_OFFSET + TOOLTIP_WIDTH > viewportWidth - VIEWPORT_MARGIN;
-        default:
-          return false;
-      }
+    const targetCenterX = targetRect.left + targetRect.width / 2;
+    const targetCenterY = targetRect.top + targetRect.height / 2;
+
+    let style = {
+      position: 'fixed',
+      width: `${ARROW_SIZE}px`,
+      height: `${ARROW_SIZE}px`,
+      pointerEvents: 'none',
+      zIndex: 10002,
     };
 
-    // Determine best placement (fallback if original would cause cutoff)
-    let actualPlacement = placement;
-    if (wouldCutOff(placement)) {
-      // Try opposite placement first
-      const opposites = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
-      const opposite = opposites[placement];
-      if (opposite && !wouldCutOff(opposite)) {
-        actualPlacement = opposite;
-      } else {
-        // Fall back to center
-        actualPlacement = 'center';
-      }
-    }
-
-    switch (actualPlacement) {
-      case 'top':
-        style.bottom = viewportHeight - spotlightRect.top + TOOLTIP_OFFSET;
-        style.left = Math.max(VIEWPORT_MARGIN, Math.min(
-          spotlightRect.left + spotlightRect.width / 2,
-          viewportWidth - TOOLTIP_WIDTH / 2 - VIEWPORT_MARGIN
-        ));
-        style.transform = 'translateX(-50%)';
+    // Position arrow based on direction
+    switch (step.arrow) {
+      case 'up':
+        style.left = `${centerX}px`;
+        style.top = `${centerY - 180}px`; // Above center card
+        style.transform = 'translateX(-50%) rotate(0deg)';
         break;
-      case 'bottom':
-        style.top = Math.min(spotlightRect.bottom + TOOLTIP_OFFSET, viewportHeight - TOOLTIP_HEIGHT - VIEWPORT_MARGIN);
-        style.left = Math.max(VIEWPORT_MARGIN, Math.min(
-          spotlightRect.left + spotlightRect.width / 2,
-          viewportWidth - TOOLTIP_WIDTH / 2 - VIEWPORT_MARGIN
-        ));
-        style.transform = 'translateX(-50%)';
+      case 'down':
+        style.left = `${centerX}px`;
+        style.top = `${centerY + 180}px`; // Below center card
+        style.transform = 'translateX(-50%) rotate(180deg)';
         break;
       case 'left':
-        style.right = viewportWidth - spotlightRect.left + TOOLTIP_OFFSET;
-        style.top = Math.max(VIEWPORT_MARGIN, Math.min(
-          spotlightRect.top + spotlightRect.height / 2,
-          viewportHeight - TOOLTIP_HEIGHT / 2 - VIEWPORT_MARGIN
-        ));
-        style.transform = 'translateY(-50%)';
+        style.left = `${centerX - 240}px`; // Left of center card
+        style.top = `${centerY}px`;
+        style.transform = 'translateY(-50%) rotate(-90deg)';
         break;
       case 'right':
-        style.left = Math.min(spotlightRect.right + TOOLTIP_OFFSET, viewportWidth - TOOLTIP_WIDTH - VIEWPORT_MARGIN);
-        style.top = Math.max(VIEWPORT_MARGIN, Math.min(
-          spotlightRect.top + spotlightRect.height / 2,
-          viewportHeight - TOOLTIP_HEIGHT / 2 - VIEWPORT_MARGIN
-        ));
-        style.transform = 'translateY(-50%)';
+        style.left = `${centerX + 240}px`; // Right of center card
+        style.top = `${centerY}px`;
+        style.transform = 'translateY(-50%) rotate(90deg)';
         break;
-      case 'center':
+      case 'up-left':
+        style.left = `${centerX - 170}px`;
+        style.top = `${centerY - 140}px`;
+        style.transform = 'rotate(-45deg)';
+        break;
+      case 'up-right':
+        style.left = `${centerX + 170}px`;
+        style.top = `${centerY - 140}px`;
+        style.transform = 'rotate(45deg)';
+        break;
+      case 'down-left':
+        style.left = `${centerX - 170}px`;
+        style.top = `${centerY + 140}px`;
+        style.transform = 'rotate(-135deg)';
+        break;
+      case 'down-right':
+        style.left = `${centerX + 170}px`;
+        style.top = `${centerY + 140}px`;
+        style.transform = 'rotate(135deg)';
+        break;
       default:
-        style.top = '50%';
-        style.left = '50%';
-        style.transform = 'translate(-50%, -50%)';
-        break;
+        return null;
     }
 
     return style;
   }, [targetRect, step]);
 
-  // Calculate spotlight mask using clip-path
-  const maskStyle = useMemo(() => {
-    if (!targetRect || !step?.spotlight) {
-      return {};
+  // Format content with markdown-like support
+  const formattedContent = useMemo(() => {
+    if (!step?.content) return '';
+
+    let content = step.content;
+
+    // Replace **bold** with <strong>
+    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // Replace bullet points
+    content = content.replace(/^•\s+/gm, '<li>');
+
+    // Wrap list items
+    if (content.includes('<li>')) {
+      content = content.replace(/<li>/g, '<ul><li>');
+      content = content.replace(/<\/li>\n<li>/g, '</li><li>');
+      content = content.replace(/<li>(.*?)(?=\n|$)/g, '<li>$1</li></ul>');
+      // Clean up nested ul tags
+      content = content.replace(/<\/ul>\n<ul>/g, '');
     }
 
-    const top = Math.max(0, targetRect.top - PADDING);
-    const left = Math.max(0, targetRect.left - PADDING);
-    const width = targetRect.width + PADDING * 2;
-    const height = targetRect.height + PADDING * 2;
-    const right = left + width;
-    const bottom = top + height;
+    // Convert \n\n to <br><br> for paragraphs
+    content = content.replace(/\n\n/g, '<br><br>');
 
-    // Create a polygon that covers everything except the spotlight area
-    // Using inset with border-radius for rounded spotlight
-    return {
-      clipPath: `polygon(
-        0% 0%,
-        0% 100%,
-        ${left}px 100%,
-        ${left}px ${top}px,
-        ${right}px ${top}px,
-        ${right}px ${bottom}px,
-        ${left}px ${bottom}px,
-        ${left}px 100%,
-        100% 100%,
-        100% 0%
-      )`,
-    };
-  }, [targetRect, step]);
+    return content;
+  }, [step]);
 
   if (!step) return null;
 
   const isLastStep = step.isFinal || currentStep === totalSteps - 1;
-  const showSpotlight = step.spotlight && targetRect;
+  const showHighlight = step.spotlight && targetRect;
+  const showArrow = showHighlight && step.arrow && arrowStyle;
 
   return (
     <div className={`tour-overlay ${isAnimating ? 'tour-overlay-entering' : ''}`}>
-      {/* Backdrop with spotlight cutout */}
-      <div className="tour-backdrop" style={maskStyle} onClick={onSkip} />
+      {/* Semi-transparent backdrop */}
+      <div className="tour-backdrop" onClick={onSkip} />
 
-      {/* Spotlight glow effect */}
-      {showSpotlight && (
+      {/* Pulsing border/glow around target element (Option B) */}
+      {showHighlight && (
         <div
-          className="tour-spotlight-glow"
+          className="tour-highlight-pulse"
           style={{
+            position: 'fixed',
             top: targetRect.top - PADDING,
             left: targetRect.left - PADDING,
             width: targetRect.width + PADDING * 2,
             height: targetRect.height + PADDING * 2,
+            border: '3px solid rgba(147, 51, 234, 0.8)', // Purple border
+            borderRadius: '8px',
+            boxShadow: `
+              0 0 0 2px rgba(147, 51, 234, 0.4),
+              0 0 20px rgba(147, 51, 234, 0.6),
+              0 0 40px rgba(147, 51, 234, 0.3)
+            `,
+            animation: 'tour-pulse 2s ease-in-out infinite',
+            pointerEvents: 'none',
+            zIndex: 10001,
           }}
         />
       )}
 
-      {/* Tooltip */}
-      <div className="tour-tooltip" style={tooltipStyle}>
+      {/* Arrow pointing from center card to target */}
+      {showArrow && (
+        <div className="tour-arrow" style={arrowStyle}>
+          <svg width={ARROW_SIZE} height={ARROW_SIZE} viewBox="0 0 40 40">
+            <path
+              d="M20 5 L35 20 L20 35 L20 25 L5 25 L5 15 L20 15 Z"
+              fill="rgba(147, 51, 234, 0.9)"
+              stroke="rgba(255, 255, 255, 0.5)"
+              strokeWidth="1"
+            />
+          </svg>
+        </div>
+      )}
+
+      {/* Center-positioned tooltip card */}
+      <div
+        className="tour-tooltip"
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      >
         <div className="tour-tooltip-header">
           <div className="tour-tooltip-icon">
             <Sparkles size={18} />
@@ -227,24 +222,28 @@ const TourOverlay = ({ step, currentStep, totalSteps, onNext, onSkip }) => {
           </button>
         </div>
 
-        <p className="tour-tooltip-content">{step.content}</p>
+        <div
+          className="tour-tooltip-content"
+          dangerouslySetInnerHTML={{ __html: formattedContent }}
+        />
 
         <div className="tour-tooltip-footer">
           <div className="tour-tooltip-progress">
-            {Array.from({ length: totalSteps }).map((_, i) => (
-              <span
-                key={i}
-                className={`tour-progress-dot ${i === currentStep ? 'active' : ''} ${i < currentStep ? 'completed' : ''}`}
+            Step {currentStep + 1} of {totalSteps}
+            <div className="tour-progress-bar">
+              <div
+                className="tour-progress-fill"
+                style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
               />
-            ))}
+            </div>
           </div>
 
           <div className="tour-tooltip-actions">
             <button className="tour-btn tour-btn-skip" onClick={onSkip}>
-              {isLastStep ? 'Close' : 'Skip'}
+              {isLastStep ? 'Close' : 'Skip Tour'}
             </button>
             <button className="tour-btn tour-btn-next" onClick={onNext}>
-              {isLastStep ? 'Get Started' : 'Next'}
+              {isLastStep ? 'Get Started 🚀' : 'Next'}
               {!isLastStep && <ChevronRight size={16} />}
             </button>
           </div>

@@ -288,7 +288,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
           <button
             className="settings-btn"
             onClick={onOpenSettings}
-            title="Intelligence & Budget Settings"
+            title="Settings"
           >
             <Settings size={16} />
           </button>

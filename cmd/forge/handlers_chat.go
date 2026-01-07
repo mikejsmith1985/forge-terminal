@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
-	"github.com/mikejsmith1985/forge-terminal/internal/llm/cfo"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 )
 
@@ -93,40 +92,9 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	// Get model from router config based on tier
 	modelName := getModelForTier(tier)
 
-	// v3.4.0: Apply CFO budget-aware routing
-	cfoRouter, cfoErr := cfo.GetRouter()
-	var cfoDecision *cfo.RouteDecision
-	if cfoErr == nil {
-		// Get available models (simplified for now)
-		availableModels := []string{
-			"gpt-4o-mini", "gpt-4o", "claude-3.5-haiku", "claude-3.5-sonnet",
-			"claude-sonnet-4", "claude-opus-4", "llama3.2",
-		}
-		
-		// Use requested model from tier or explicit request
-		requestedModel := modelName
-		if req.Model != "" {
-			requestedModel = req.Model
-		}
-		
-		decision := cfoRouter.ResolveModel(cleanMessage, requestedModel, availableModels)
-		cfoDecision = &decision
-		
-		// Update model name if CFO made a decision
-		if decision.SelectedModel != "" {
-			modelName = decision.SelectedModel
-		}
-		
-		// Log CFO decision
-		log.Printf("[Chat API] CFO Decision: requested=%s, selected=%s, downgraded=%v, risk=%s",
-			decision.RequestedModel, decision.SelectedModel, decision.WasDowngraded, decision.RiskLevel)
-		
-		// Add CFO headers
-		if decision.WasDowngraded {
-			w.Header().Set("X-Forge-Budget-Warning", decision.Warning)
-		}
-		w.Header().Set("X-Forge-Budget-Risk", string(decision.RiskLevel))
-		w.Header().Set("X-Forge-Budget-Remaining", fmt.Sprintf("%.2f", decision.RemainingBudget))
+	// Use explicit model request if provided
+	if req.Model != "" {
+		modelName = req.Model
 	}
 
 	// Set the routing header so frontend can display which model was used
@@ -140,20 +108,6 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 
 	if err := streamChatResponse(w, fullPrompt, provider, tabID, modelName); err != nil {
 		log.Printf("[Chat API] Stream error: %v", err)
-	}
-
-	// v3.4.0: Record usage in ledger after successful response
-	if cfoRouter != nil && cfoDecision != nil {
-		// Estimate tokens for ledger (rough approximation)
-		inputTokens := len(fullPrompt) / 4
-		outputTokens := inputTokens // Assume similar output
-		
-		cost, err := cfoRouter.RecordUsage(modelName, provider, inputTokens, outputTokens)
-		if err != nil {
-			log.Printf("[Chat API] Failed to record usage: %v", err)
-		} else {
-			log.Printf("[Chat API] Recorded usage: model=%s, cost=%.4f", modelName, cost)
-		}
 	}
 }
 
