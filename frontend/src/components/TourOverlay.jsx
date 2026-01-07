@@ -188,19 +188,7 @@ const TourOverlay = ({ step, currentStep, totalSteps, onNext, onSkip }) => {
         />
       )}
 
-      {/* Arrow pointing from center card to target */}
-      {showArrow && (
-        <div className="tour-arrow" style={arrowStyle}>
-          <svg width={ARROW_SIZE} height={ARROW_SIZE} viewBox="0 0 40 40">
-            <path
-              d="M20 5 L35 20 L20 35 L20 25 L5 25 L5 15 L20 15 Z"
-              fill="rgba(147, 51, 234, 0.9)"
-              stroke="rgba(255, 255, 255, 0.5)"
-              strokeWidth="1"
-            />
-          </svg>
-        </div>
-      )}
+      {/* Arrow removed - was distracting and unnecessary */}
 
       {/* Center-positioned tooltip card */}
       <div

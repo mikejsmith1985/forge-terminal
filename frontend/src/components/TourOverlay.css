@@ -34,16 +34,16 @@
   }
 }
 
-/* Backdrop with blur - darkens everything except spotlight */
+/* Backdrop - darkens everything except spotlight (NO BLUR - user wants to see UI) */
 .tour-backdrop {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5); /* Reduced from 0.75 to 0.5 - less darkness */
+  /* backdrop-filter: blur(4px); REMOVED - blurring hides the UI elements */
+  /* -webkit-backdrop-filter: blur(4px); REMOVED */
   cursor: pointer;
   transition: clip-path 0.3s ease-out;
 }

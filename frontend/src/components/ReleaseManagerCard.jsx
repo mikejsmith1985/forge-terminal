@@ -60,13 +60,14 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
     // Generate command based on shell type
     // The workflow is triggered by pushing a tag, not by gh release create
     // Uses --no-edit for merge to avoid quote escaping issues in commit messages
+    // Deletes remote tag first (if exists) to ensure fresh push triggers workflow
     if (shellType === 'powershell') {
       // PowerShell 5.1 compatible syntax (no &&)
       // Uses backticks for strings that might contain special chars
-      return `$b = git branch --show-current; git add -A; if ($?) { git commit -m 'Release ${next}' --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host 'Tag ${next} pushed! GitHub Actions will build.' -ForegroundColor Green } } } } } } } } }`;
+      return `$b = git branch --show-current; git add -A; if ($?) { git commit -m 'Release ${next}' --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host 'Tag ${next} pushed! GitHub Actions will build.' -ForegroundColor Green } } } } } } } } }`;
     } else {
       // Bash, CMD, and PowerShell 7+ support &&
-      return `b=$(git branch --show-current) && git add -A && git commit -m 'Release ${next}' --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git tag ${next} && git push origin ${next} && git checkout $b && echo "Tag ${next} pushed! GitHub Actions will build."`;
+      return `b=$(git branch --show-current) && git add -A && git commit -m 'Release ${next}' --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "Tag ${next} pushed! GitHub Actions will build."`;
     }
   }, [next, shellType]);
 

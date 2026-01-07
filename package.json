@@ -6,6 +6,7 @@
   "devDependencies": {
     "cypress": "^15.8.1",
     "cypress-real-events": "^1.15.0",
+    "js-yaml": "^4.1.1",
     "png-to-ico": "^3.0.1",
     "to-ico": "^1.1.5"
   }

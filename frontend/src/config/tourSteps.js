@@ -428,6 +428,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '3.12.4'; // v3.12.4: Complete redesign - interactive tour with center positioning
+const TOUR_VERSION = '3.12.10'; // v3.12.10: Tour UX improvements, backspace fix, theme dark/light modes
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };

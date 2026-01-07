@@ -247,30 +247,54 @@ fi
 echo ""
 echo -e "${YELLOW}🚀 Creating release...${NC}"
 
+# Update version in files
+echo -e "${CYAN}[1/6]${NC} Updating version numbers..."
+
+# Update Go version constant
+if [ -f "internal/updater/updater.go" ]; then
+    sed -i.bak "s/var Version = \"[^\"]*\"/var Version = \"${NEW_VERSION}\"/" internal/updater/updater.go
+    rm -f internal/updater/updater.go.bak
+    echo -e "${GREEN}  ✓ Updated internal/updater/updater.go${NC}"
+fi
+
+# Update frontend package.json
+if [ -f "frontend/package.json" ]; then
+    sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"${NEW_VERSION}\"/" frontend/package.json
+    rm -f frontend/package.json.bak
+    echo -e "${GREEN}  ✓ Updated frontend/package.json${NC}"
+fi
+
+# Update tour version
+if [ -f "frontend/src/config/tourSteps.js" ]; then
+    sed -i.bak "s/const TOUR_VERSION = '[^']*'/const TOUR_VERSION = '${NEW_VERSION}'/" frontend/src/config/tourSteps.js
+    rm -f frontend/src/config/tourSteps.js.bak
+    echo -e "${GREEN}  ✓ Updated TOUR_VERSION in tourSteps.js${NC}"
+fi
+
 # Add files
-echo -e "${CYAN}[1/5]${NC} Staging changes..."
+echo -e "${CYAN}[2/6]${NC} Staging changes..."
 git add -A
 
 # Commit
-echo -e "${CYAN}[2/5]${NC} Committing..."
+echo -e "${CYAN}[3/6]${NC} Committing..."
 FULL_COMMIT_MSG="$COMMIT_TITLE
 
 $COMMIT_BODY"
 git commit -m "$FULL_COMMIT_MSG"
 
 # Push commit
-echo -e "${CYAN}[3/5]${NC} Pushing commit..."
+echo -e "${CYAN}[4/6]${NC} Pushing commit..."
 git push origin main
 
 # Create tag
-echo -e "${CYAN}[4/5]${NC} Creating tag v${NEW_VERSION}..."
+echo -e "${CYAN}[5/6]${NC} Creating tag v${NEW_VERSION}..."
 TAG_FULL_MSG="v${NEW_VERSION}
 
 $TAG_MESSAGE"
 git tag -a "v${NEW_VERSION}" -m "$TAG_FULL_MSG"
 
 # Push tag
-echo -e "${CYAN}[5/5]${NC} Pushing tag..."
+echo -e "${CYAN}[6/6]${NC} Pushing tag..."
 git push origin "v${NEW_VERSION}"
 
 echo ""
