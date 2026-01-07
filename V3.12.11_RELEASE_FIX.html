@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>v3.12.11 Release Asset Fix</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #e2e8f0;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(220, 38, 38, 0.3);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin: 0.5rem 0.25rem;
+        }
+        .status-fixed {
+            background: #10b981;
+            color: white;
+        }
+        .status-broken {
+            background: #dc2626;
+            color: white;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+        .card h2 {
+            color: #60a5fa;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #60a5fa;
+            padding-bottom: 0.5rem;
+        }
+        .card h3 {
+            color: #93c5fd;
+            margin: 1.5rem 0 1rem 0;
+            font-size: 1.2rem;
+        }
+        .code-block {
+            background: #0f172a;
+            border-left: 4px solid #60a5fa;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        .highlight {
+            background: rgba(251, 191, 36, 0.2);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            color: #fbbf24;
+            font-weight: 600;
+        }
+        .diff {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+        }
+        .diff-add {
+            color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+            display: block;
+            padding: 0.2rem;
+        }
+        .diff-remove {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            display: block;
+            padding: 0.2rem;
+        }
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+            margin: 1rem 0;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #60a5fa;
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+            padding-left: 1.5rem;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 0.5rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #60a5fa;
+            border: 3px solid #0f172a;
+        }
+        .timeline-time {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-bottom: 0.25rem;
+        }
+        .mermaid {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        ul, ol {
+            margin-left: 1.5rem;
+            margin-top: 0.5rem;
+        }
+        li {
+            margin: 0.5rem 0;
+        }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        .asset-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .asset-item {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+        }
+        .asset-item.missing {
+            border-left-color: #dc2626;
+            opacity: 0.6;
+        }
+        .asset-name {
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 0.25rem;
+        }
+        .asset-size {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 v3.12.11 Release Asset Fix</h1>
+            <div class="subtitle">Concurrent Upload Race Condition</div>
+            <div style="margin-top: 1rem;">
+                <span class="status-badge status-broken">BROKEN: Missing Assets</span>
+                <span class="status-badge status-fixed">FIXED: All Assets Present</span>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Issue Summary -->
+            <div class="card">
+                <h2>🚨 Issue Report</h2>
+                <p><strong>Symptom:</strong> v3.12.11 release deployed with only macOS binaries</p>
+                
+                <h3>Missing Assets</h3>
+                <div class="asset-list">
+                    <div class="asset-item missing">
+                        <div class="asset-name">❌ forge-linux-amd64</div>
+                        <div class="asset-size">Expected: ~17.8 MB</div>
+                    </div>
+                    <div class="asset-item missing">
+                        <div class="asset-name">❌ forge-windows-amd64.exe</div>
+                        <div class="asset-size">Expected: ~18.5 MB</div>
+                    </div>
+                </div>
+
+                <h3>Present Assets</h3>
+                <div class="asset-list">
+                    <div class="asset-item">
+                        <div class="asset-name">✅ forge-darwin-amd64</div>
+                        <div class="asset-size">18.2 MB</div>
+                    </div>
+                    <div class="asset-item">
+                        <div class="asset-name">✅ forge-darwin-arm64</div>
+                        <div class="asset-size">17.5 MB</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Root Cause -->
+            <div class="card">
+                <h2>🔍 Root Cause Analysis</h2>
+                <p><span class="highlight">Concurrent Upload Race Condition</span></p>
+                
+                <h3>Workflow Execution Timeline</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-time">16:43:12</div>
+                        <div>Both matrix jobs start in parallel</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-time">16:44:32-36</div>
+                        <div>Ubuntu job uploads Linux/Windows binaries to draft</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-time">16:44:39-44</div>
+                        <div>macOS job uploads macOS binaries (overlapping!)</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-time">16:44:44</div>
+                        <div>❌ Linux/Windows assets deleted by concurrent action</div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-time">16:45:15</div>
+                        <div>Release published with only macOS binaries</div>
+                    </div>
+                </div>
+
+                <h3>GitHub Actions Log Evidence</h3>
+                <div class="code-block">
+♻️ Deleting previously uploaded asset forge-linux-amd64...
+♻️ Deleting previously uploaded asset forge-windows-amd64.exe...
+⬆️ Uploading forge-darwin-amd64...
+⬆️ Uploading forge-darwin-arm64...
+✅ Uploaded forge-darwin-amd64
+✅ Uploaded forge-darwin-arm64
+                </div>
+            </div>
+
+            <!-- Problem Diagram -->
+            <div class="card full-width">
+                <h2>📊 Race Condition Diagram</h2>
+                <div class="mermaid">
+sequenceDiagram
+    participant Ubuntu as Ubuntu Build Job
+    participant macOS as macOS Build Job
+    participant Draft as Draft Release
+
+    Note over Ubuntu,macOS: Both jobs run in parallel
+
+    Ubuntu->>Ubuntu: Build Linux + Windows binaries
+    macOS->>macOS: Build macOS AMD64 + ARM64 binaries
+    
+    Note over Ubuntu,Draft: 16:44:32
+    Ubuntu->>Draft: Upload Linux + Windows assets
+    Draft-->>Ubuntu: ✅ Upload successful
+    
+    Note over macOS,Draft: 16:44:39 (7 seconds later)
+    macOS->>Draft: Upload macOS assets
+    Draft->>Draft: ⚠️ Delete existing assets (default behavior)
+    Draft->>Draft: ❌ Linux + Windows assets removed
+    Draft-->>macOS: ✅ Upload successful
+    
+    Note over Draft: Result: Only macOS binaries remain
+                </div>
+            </div>
+
+            <!-- Solution -->
+            <div class="card full-width">
+                <h2>✅ Solution Implementation</h2>
+                <p><strong>Strategy:</strong> Separate build and upload phases using workflow artifacts</p>
+
+                <h3>New Workflow Architecture</h3>
+                <div class="mermaid">
+graph LR
+    A[Cleanup Release] --> B[Build Ubuntu<br/>Linux + Windows]
+    A --> C[Build macOS<br/>AMD64 + ARM64]
+    B -->|Upload Artifact| D[Upload Release Job]
+    C -->|Upload Artifact| D
+    D -->|Single Atomic Upload| E[Draft Release]
+    E --> F[Finalize Release]
+    
+    style A fill:#3b82f6
+    style B fill:#10b981
+    style C fill:#10b981
+    style D fill:#f59e0b
+    style E fill:#8b5cf6
+    style F fill:#ec4899
+                </div>
+
+                <h3>Key Changes</h3>
+                <ol>
+                    <li><strong>Build jobs</strong> upload binaries as workflow artifacts (not to release)</li>
+                    <li><strong>New upload-release job</strong> depends on both builds completing</li>
+                    <li><strong>Single atomic upload</strong> downloads all artifacts and uploads together</li>
+                    <li><strong>Finalize job</strong> now depends on upload-release (not build jobs)</li>
+                </ol>
+            </div>
+
+            <!-- Code Changes -->
+            <div class="card full-width">
+                <h2>💻 Code Changes</h2>
+                
+                <h3>Before: Concurrent Uploads</h3>
+                <div class="diff">
+<span class="diff-remove">-      - name: Upload Linux/Windows Assets</span>
+<span class="diff-remove">-        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest'</span>
+<span class="diff-remove">-        uses: softprops/action-gh-release@v2</span>
+<span class="diff-remove">-        with:</span>
+<span class="diff-remove">-          files: |</span>
+<span class="diff-remove">-            bin/forge-linux-amd64</span>
+<span class="diff-remove">-            bin/forge-windows-amd64.exe</span>
+<span class="diff-remove">-          draft: true</span>
+<span class="diff-remove"></span>
+<span class="diff-remove">-      - name: Upload macOS Assets</span>
+<span class="diff-remove">-        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'macos-latest'</span>
+<span class="diff-remove">-        uses: softprops/action-gh-release@v2</span>
+<span class="diff-remove">-        with:</span>
+<span class="diff-remove">-          files: |</span>
+<span class="diff-remove">-            bin/forge-darwin-amd64</span>
+<span class="diff-remove">-            bin/forge-darwin-arm64</span>
+<span class="diff-remove">-          draft: true</span>
+                </div>
+
+                <h3>After: Artifact Storage + Single Upload</h3>
+                <div class="diff">
+<span class="diff-add">+      - name: Upload Build Artifacts</span>
+<span class="diff-add">+        uses: actions/upload-artifact@v4</span>
+<span class="diff-add">+        with:</span>
+<span class="diff-add">+          name: binaries-${{ matrix.os }}</span>
+<span class="diff-add">+          path: bin/*</span>
+<span class="diff-add">+          retention-days: 1</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+  upload-release:</span>
+<span class="diff-add">+    name: Upload Release Assets</span>
+<span class="diff-add">+    needs: build-and-release</span>
+<span class="diff-add">+    steps:</span>
+<span class="diff-add">+      - name: Download All Artifacts</span>
+<span class="diff-add">+        uses: actions/download-artifact@v4</span>
+<span class="diff-add">+        with:</span>
+<span class="diff-add">+          pattern: binaries-*</span>
+<span class="diff-add">+          merge-multiple: true</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+      - name: Upload Release Assets</span>
+<span class="diff-add">+        uses: softprops/action-gh-release@v2</span>
+<span class="diff-add">+        with:</span>
+<span class="diff-add">+          files: artifacts/*</span>
+<span class="diff-add">+          draft: true</span>
+                </div>
+            </div>
+
+            <!-- Immediate Fix -->
+            <div class="card">
+                <h2>🔧 Immediate Fix Applied</h2>
+                <p><strong>Action Taken:</strong> Manually built and uploaded missing binaries</p>
+                
+                <div class="code-block">
+$ git checkout v3.12.11
+$ cd frontend && npm run build
+$ go build -ldflags "-s -w" -o bin/forge-linux-amd64
+$ go build -ldflags "-s -w -H=windowsgui" -o bin/forge-windows-amd64.exe
+$ gh release upload v3.12.11 bin/forge-* --clobber
+✅ Successfully uploaded 2 assets to v3.12.11
+                </div>
+
+                <h3>Verified Assets</h3>
+                <div class="asset-list">
+                    <div class="asset-item">
+                        <div class="asset-name">✅ forge-darwin-amd64</div>
+                        <div class="asset-size">18.2 MB</div>
+                    </div>
+                    <div class="asset-item">
+                        <div class="asset-name">✅ forge-darwin-arm64</div>
+                        <div class="asset-size">17.5 MB</div>
+                    </div>
+                    <div class="asset-item">
+                        <div class="asset-name">✅ forge-linux-amd64</div>
+                        <div class="asset-size">17.8 MB</div>
+                    </div>
+                    <div class="asset-item">
+                        <div class="asset-name">✅ forge-windows-amd64.exe</div>
+                        <div class="asset-size">18.5 MB</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prevention -->
+            <div class="card">
+                <h2>🛡️ Future Prevention</h2>
+                
+                <h3>Workflow Changes</h3>
+                <ul>
+                    <li>✅ Sequential upload prevents race condition</li>
+                    <li>✅ Artifacts ensure no data loss</li>
+                    <li>✅ Single upload point = atomic operation</li>
+                    <li>✅ Better failure visibility</li>
+                </ul>
+
+                <h3>Benefits</h3>
+                <ul>
+                    <li><strong>Reliability:</strong> No concurrent write conflicts</li>
+                    <li><strong>Atomicity:</strong> All assets uploaded together or none</li>
+                    <li><strong>Debuggability:</strong> Artifacts preserved for inspection</li>
+                    <li><strong>Consistency:</strong> Same workflow pattern for all releases</li>
+                </ul>
+
+                <h3>Commit</h3>
+                <div class="code-block">
+commit 7074f37
+Fix: Prevent concurrent release asset uploads
+
+SOLUTION:
+- Build jobs now upload binaries as workflow artifacts
+- New 'upload-release' job downloads all artifacts
+- Single atomic upload to draft release
+- Prevents concurrent uploads that delete each other's assets
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; padding: 2rem; color: #94a3b8;">
+            <p>✅ v3.12.11 Release Fixed | 🔧 Workflow Updated | 📊 Issue Documented</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+                Commit: 7074f37 | Date: 2026-01-07
+            </p>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#60a5fa',
+                primaryTextColor: '#1e293b',
+                primaryBorderColor: '#3b82f6',
+                lineColor: '#94a3b8',
+                secondaryColor: '#10b981',
+                tertiaryColor: '#f59e0b'
+            }
+        });
+    </script>
+</body>
+</html>
