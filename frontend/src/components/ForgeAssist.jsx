@@ -1285,6 +1285,15 @@ export default function ForgeAssist({
                   placeholder="Enter instruction text (e.g., 'ensure you follow copilot-instructions.md')"
                   value={newInstructionText}
                   onChange={(e) => setNewInstructionText(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter (without Shift) adds the instruction
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (newInstructionText.trim()) {
+                        addQuickInstruction();
+                      }
+                    }
+                  }}
                   style={{
                     flex: 1,
                     padding: '10px 12px',

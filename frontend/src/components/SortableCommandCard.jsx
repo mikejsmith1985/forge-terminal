@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Play, Clipboard, Edit2, Trash2, GripVertical, Brain } from 'lucide-react';
+import { Play, Clipboard, Edit2, Trash2, GripVertical } from 'lucide-react';
 import { iconMap, emojiMap } from './IconPicker';
 
 export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDelete }) {
@@ -46,11 +46,6 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
                     {command.alwaysAppend && (
                         <div className="action-icon always-append-indicator" title="Always Append - Appended to every prompt" style={{ color: '#f59e0b' }}>
                             <span style={{ fontSize: '12px', fontWeight: 700 }}>A+</span>
-                        </div>
-                    )}
-                    {command.triggerAM && (
-                        <div className="action-icon am-trigger" title="Triggers AM on execute" style={{ color: '#8b5cf6' }}>
-                            <Brain size={16} />
                         </div>
                     )}
                     <div {...attributes} {...listeners} className="action-icon" style={{ cursor: 'grab' }} title="Drag to reorder">

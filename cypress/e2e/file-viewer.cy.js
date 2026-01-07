@@ -41,10 +41,18 @@ describe('File Viewer with LensFilePicker', () => {
     // Step 4: Verify editor panel opens with file content
     cy.get('.editor-panel', { timeout: 5000 }).should('be.visible');
 
-    // Step 5: Verify file content is displayed (this proves the file opened successfully)
-    cy.get('.editor-panel', { timeout: 5000 }).should('contain', 'NEVER FUCKING KILL');
+    // Step 5: Wait for Monaco to load (not just loading spinner)
+    cy.get('.monaco-loading', { timeout: 3000 }).should('not.exist');
+    
+    // Step 6: Verify Monaco editor wrapper is visible with content
+    cy.get('.monaco-editor-wrapper', { timeout: 5000 }).should('be.visible');
+    
+    // Step 7: Verify file content loaded (Monaco renders in .view-lines)
+    cy.get('.monaco-editor-wrapper').within(() => {
+      cy.get('.view-lines, [data-uri]', { timeout: 5000 }).should('exist');
+    });
 
-    // Step 7: Verify Save button exists
+    // Step 8: Verify Save button exists
     cy.get('.editor-panel').should('contain', 'Save');
   });
 

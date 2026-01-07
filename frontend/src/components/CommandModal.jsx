@@ -15,10 +15,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         keyBinding: '',
         pasteOnly: false,
         favorite: false,
-        triggerAM: false,
         alwaysAppend: false,
-        llmProvider: '',
-        llmType: 'chat',
         icon: null,
         delay: 0
     });
@@ -35,10 +32,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     keyBinding: initialData.keyBinding || '',
                     pasteOnly: initialData.pasteOnly || false,
                     favorite: initialData.favorite || false,
-                    triggerAM: initialData.triggerAM || false,
                     alwaysAppend: initialData.alwaysAppend || false,
-                    llmProvider: initialData.llmProvider || '',
-                    llmType: initialData.llmType || 'chat',
                     icon: initialData.icon || null,
                     delay: initialData.delay || 0,
                     id: initialData.id, // Preserve ID for editing
@@ -50,10 +44,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     keyBinding: '',
                     pasteOnly: false,
                     favorite: false,
-                    triggerAM: false,
                     alwaysAppend: false,
-                    llmProvider: '',
-                    llmType: 'chat',
                     icon: null,
                     delay: 0
                 });
@@ -251,52 +242,6 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                                 <p style={{ fontSize: '12px', marginTop: '8px', opacity: 0.8 }}>
                                     This card's text will be automatically appended to every prompt you send to AI agents. 
                                     Use this for persistent instructions like coding standards, project context, or response formatting.
-                                </p>
-                            </div>
-                        )}
-
-                        <label className="checkbox-label">
-                            <input
-                                type="checkbox"
-                                name="triggerAM"
-                                checked={formData.triggerAM}
-                                onChange={handleChange}
-                            />
-                            Trigger AM (start AM when executed)
-                        </label>
-
-                        {formData.triggerAM && (
-                            <div style={{ marginLeft: '24px', marginTop: '8px', padding: '12px', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '4px' }}>
-                                <label style={{ display: 'block', marginBottom: '8px' }}>
-                                    <strong>LLM Provider (optional):</strong>
-                                    <select 
-                                        name="llmProvider" 
-                                        value={formData.llmProvider} 
-                                        onChange={handleChange}
-                                        style={{ width: '100%', marginTop: '4px', padding: '6px' }}
-                                    >
-                                        <option value="">Auto-detect from command</option>
-                                        <option value="copilot">GitHub Copilot</option>
-                                        <option value="claude">Claude</option>
-                                        <option value="aider">Aider</option>
-                                    </select>
-                                </label>
-                                <label style={{ display: 'block', marginTop: '8px' }}>
-                                    <strong>Command Type:</strong>
-                                    <select 
-                                        name="llmType" 
-                                        value={formData.llmType} 
-                                        onChange={handleChange}
-                                        style={{ width: '100%', marginTop: '4px', padding: '6px' }}
-                                    >
-                                        <option value="chat">Chat/Conversation</option>
-                                        <option value="suggest">Suggest Command</option>
-                                        <option value="explain">Explain Code</option>
-                                        <option value="code">Code Generation</option>
-                                    </select>
-                                </label>
-                                <p style={{ fontSize: '12px', marginTop: '8px', opacity: 0.7 }}>
-                                    💡 Specifying the provider helps AM track conversations more reliably
                                 </p>
                             </div>
                         )}

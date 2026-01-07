@@ -530,8 +530,19 @@ func HandleRead(w http.ResponseWriter, r *http.Request) {
 		// It's a UNC path, use as-is
 		absPath = req.Path
 	} else {
-		// Regular path, use absolute path
-		absPath, err = filepath.Abs(req.Path)
+		// If path is relative, resolve it against rootPath, not server cwd
+		var pathToResolve string
+		if !filepath.IsAbs(req.Path) {
+			// Relative path - join with rootPath first
+			pathToResolve = filepath.Join(rootPath, req.Path)
+			log.Printf("[Files] Relative path detected: joined %s + %s = %s", rootPath, req.Path, pathToResolve)
+		} else {
+			// Already absolute
+			pathToResolve = req.Path
+		}
+		
+		// Now make it absolute (handles . and ..)
+		absPath, err = filepath.Abs(pathToResolve)
 		if err != nil {
 			log.Printf("[Files] Invalid path: %v", err)
 			http.Error(w, "Invalid path", http.StatusBadRequest)
@@ -608,8 +619,19 @@ func HandleWrite(w http.ResponseWriter, r *http.Request) {
 		// It's a UNC path, use as-is
 		absPath = req.Path
 	} else {
-		// Regular path, use absolute path
-		absPath, err = filepath.Abs(req.Path)
+		// If path is relative, resolve it against rootPath, not server cwd
+		var pathToResolve string
+		if !filepath.IsAbs(req.Path) {
+			// Relative path - join with rootPath first
+			pathToResolve = filepath.Join(rootPath, req.Path)
+			log.Printf("[Files] Write: Relative path detected: joined %s + %s = %s", rootPath, req.Path, pathToResolve)
+		} else {
+			// Already absolute
+			pathToResolve = req.Path
+		}
+		
+		// Now make it absolute (handles . and ..)
+		absPath, err = filepath.Abs(pathToResolve)
 		if err != nil {
 			http.Error(w, "Invalid path", http.StatusBadRequest)
 			return

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, BookOpen, Sun, Moon } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Zap, Sun, Moon } from 'lucide-react';
 import { themes } from '../themes';
 
 /**
@@ -32,7 +32,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleAM, onToggleMode, onToggleViewMode, isWaiting = false, mode = 'dark', devMode = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleMode, onToggleViewMode, isWaiting = false, mode = 'dark', devMode = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -45,11 +45,10 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
     if (showContextMenu) {
       console.log('[Tab] Context menu opened:', { 
         devMode, 
-        hasOnToggleAM: !!onToggleAM,
         tabId: tab.id
       });
     }
-  }, [showContextMenu, devMode, onToggleAM, tab.id]);
+  }, [showContextMenu, devMode, tab.id]);
 
   const handleClick = (e) => {
     // Don't trigger onClick if clicking close button or in edit mode
@@ -150,7 +149,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   let titleText = tab.title;
   const indicators = [];
   if (tab.autoRespond) indicators.push('Auto-respond');
-  if (tab.amEnabled) indicators.push('AM Logging');
+  // v3.12.12: AM feature removed
   if (tabMode === 'light') indicators.push('Light');
   if (indicators.length > 0) {
     titleText = `${tab.title} (${indicators.join(', ')})`;
@@ -159,7 +158,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   return (
     <>
       <div
-        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''} ${tab.amEnabled ? 'am-enabled' : ''}`}
+        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
@@ -174,11 +173,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
         <span className="tab-icon" data-shell={shellType}>
           {getShellIcon(shellType)}
         </span>
-        {tab.amEnabled && (
-          <span className="am-indicator" title="AM Logging enabled">
-            <BookOpen size={10} />
-          </span>
-        )}
+        {/* v3.12.12: AM indicator removed */}
         {tab.autoRespond && (
           <span className="auto-respond-indicator" title="Auto-respond enabled">
             <Zap size={10} />
@@ -229,19 +224,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             {tabMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
           {/* v3.8.2: View Mode toggle REMOVED - Terminal is the only view */}
-          {/* v3.9.8: AM toggle now always visible (not gated by devMode) */}
-          {onToggleAM && (
-            <button 
-              onClick={() => { 
-                setShowContextMenu(false); 
-                if (onToggleAM) onToggleAM(); 
-              }}
-              className={tab.amEnabled ? 'active' : ''}
-            >
-              <BookOpen size={14} />
-              AM Logging {tab.amEnabled ? '✓' : ''}
-            </button>
-          )}
+          {/* v3.12.12: AM toggle REMOVED - AM feature deprecated */}
           <button 
             onClick={() => { 
               setShowContextMenu(false); 

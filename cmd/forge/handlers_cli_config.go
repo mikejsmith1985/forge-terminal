@@ -186,6 +186,7 @@ func getCopilotModels() []string {
 	}
 	
 	cmd := exec.Command("copilot", "--help")
+	hideWindow(cmd) // v3.12.12: Prevent visible console window on Windows
 	output, err := cmd.Output()
 	if err != nil {
 		return nil

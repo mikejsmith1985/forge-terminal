@@ -449,10 +449,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onPaste = null, // Callback when text is pasted (for toast notification)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
-  tabName = null, // Tab display name (for AM logging)
+  tabName = null, // Tab display name
   isVisible = true, // Whether this terminal is currently visible
   autoRespond = false, // Auto-respond "yes" to CLI confirmation prompts
-  amEnabled = false, // AM (Artificial Memory) logging enabled
+  // amEnabled = false, // v3.12.12: AM feature removed
   currentDirectory = null, // Current working directory to restore on connect
   visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
   assistantEnabled = false, // Forge Assistant panel enabled (Dev Mode)
@@ -473,17 +473,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const lastOutputRef = useRef(''); // Keep for compatibility but update less often
   const waitingCheckIdleRef = useRef(null); // Changed from timeout to idle callback
   const autoRespondRef = useRef(autoRespond);
-  const amEnabledRef = useRef(amEnabled);
+  // const amEnabledRef = useRef(amEnabled); // v3.12.12: AM feature removed
   const tabNameRef = useRef(tabName);
   const lastDirectoryRef = useRef(null);
   const onDirectoryChangeRef = useRef(onDirectoryChange);
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
-  // PERF FIX: Batch AM logs instead of per-message
-  const amLogQueueRef = useRef([]);
-  const amLogFlushIdleRef = useRef(null);
-  const amInputBufferRef = useRef('');
-  const amInputTimeoutRef = useRef(null);
+  // v3.12.12: AM logging refs removed - AM feature deprecated
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 5;
@@ -520,10 +516,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     }
   }, [autoRespond, tabId]);
 
-  // Keep amEnabled ref updated
-  useEffect(() => {
-    amEnabledRef.current = amEnabled;
-  }, [amEnabled]);
+  // v3.12.12: AM feature removed - amEnabled effect deleted
 
   // Keep tabName ref updated
   useEffect(() => {
@@ -1491,36 +1484,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         const buf = outputBufferRef.current;
         buf.data = (buf.data + textData).slice(-800);
 
-        // PERF FIX: Batch AM logging - just queue, flush in idle time
-        if (amEnabledRef.current && textData) {
-          amLogQueueRef.current.push(textData);
-
-          // Schedule flush during idle time (not on every message)
-          if (!amLogFlushIdleRef.current) {
-            amLogFlushIdleRef.current = scheduleIdleWork(() => {
-              amLogFlushIdleRef.current = null;
-              const queue = amLogQueueRef.current;
-              if (queue.length > 0) {
-                const combined = queue.join('');
-                amLogQueueRef.current = [];
-                const cleanContent = stripAnsi(combined);
-                if (cleanContent.trim()) {
-                  fetch('/api/am/log', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      tabId: tabId,
-                      tabName: tabNameRef.current || 'Terminal',
-                      workspace: window.location.pathname,
-                      entryType: 'AGENT_OUTPUT',
-                      content: cleanContent.slice(-1500),
-                    }),
-                  }).catch(() => {});
-                }
-              }
-            });
-          }
-        }
+        // v3.12.12: AM logging removed
 
         // Simple debounce pattern matching v1.23.8 proven behavior
         // 1. Cancel any pending check (new data arrived)
@@ -1730,37 +1694,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
           
-          // AM logging: Optimized input capture - only when AM enabled
-          if (amEnabledRef.current) {
-            amInputBufferRef.current += data;
-            
-            if (amInputTimeoutRef.current) {
-              clearTimeout(amInputTimeoutRef.current);
-            }
-            amInputTimeoutRef.current = setTimeout(() => {
-              if (amInputBufferRef.current) {
-                // Clean the input - strip control chars but keep meaningful content
-                const cleanInput = amInputBufferRef.current
-                  .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // Strip ANSI
-                  .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ''); // Strip control chars except \r\n\t
-                
-                if (cleanInput.trim() || cleanInput.includes('\r') || cleanInput.includes('\n')) {
-                  fetch('/api/am/log', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      tabId: tabId,
-                      tabName: tabNameRef.current || 'Terminal',
-                      workspace: window.location.pathname,
-                      entryType: 'USER_INPUT',
-                      content: cleanInput.slice(-500), // Limit size
-                    }),
-                  }).catch(() => {}); // Silent fail for performance
-                }
-                amInputBufferRef.current = '';
-              }
-            }, 2000); // Increased from 1s to 2s for better batching
-          }
+          // v3.12.12: AM logging removed
           
           // Clear waiting state when user types (they're responding to the prompt)
           // PERF FIX: Use ref instead of state to avoid stale closure
@@ -1833,48 +1767,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         cancelIdleWork(waitingCheckIdleRef.current);
         waitingCheckIdleRef.current = null;
       }
-      if (amLogFlushIdleRef.current) {
-        cancelIdleWork(amLogFlushIdleRef.current);
-        amLogFlushIdleRef.current = null;
-      }
-      if (amInputTimeoutRef.current) {
-        clearTimeout(amInputTimeoutRef.current);
-      }
 
-      // Flush any pending AM logs before closing
-      const amQueue = amLogQueueRef.current;
-      if (amQueue.length > 0 || amInputBufferRef.current) {
-        const flushData = [];
-        if (amQueue.length > 0) {
-          const combined = amQueue.join('');
-          const cleanContent = stripAnsi(combined);
-          if (cleanContent.trim()) {
-            flushData.push({ entryType: 'AGENT_OUTPUT', content: cleanContent.slice(-2000) });
-          }
-          amLogQueueRef.current = [];
-        }
-        if (amInputBufferRef.current) {
-          const cleanInput = amInputBufferRef.current
-            .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
-            .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
-          if (cleanInput.trim() || cleanInput.includes('\r')) {
-            flushData.push({ entryType: 'USER_INPUT', content: cleanInput.slice(-500) });
-          }
-        }
-        // Fire-and-forget flush
-        flushData.forEach(data => {
-          fetch('/api/am/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tabId: tabId,
-              tabName: tabNameRef.current || 'Terminal',
-              workspace: window.location.pathname,
-              ...data,
-            }),
-          }).catch(() => {}); // Ignore errors on cleanup
-        });
-      }
+      // v3.12.12: AM logging cleanup removed - AM feature deprecated
 
       // Clear buffer
       outputBufferRef.current = { data: '', writePos: 0 };

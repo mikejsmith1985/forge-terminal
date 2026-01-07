@@ -14,7 +14,7 @@ function TabBar({
   onNewTab,
   onReorder,
   onToggleAutoRespond = null, // Callback to toggle auto-respond for a tab
-  onToggleAM = null, // Callback to toggle AM logging for a tab
+  // onToggleAM = null, // v3.12.12: AM feature removed
   onToggleMode = null, // Callback to toggle light/dark mode for a tab
   onToggleViewMode = null, // Callback to toggle view mode (chat/terminal/notebook) for a tab
   onOpenDashboard = null, // Callback to open Developer Dashboard
@@ -43,11 +43,7 @@ function TabBar({
     }
   };
 
-  const handleToggleAM = (tabId) => {
-    if (onToggleAM) {
-      onToggleAM(tabId);
-    }
-  };
+  // v3.12.12: handleToggleAM removed - AM feature deprecated
 
   const handleToggleMode = (tabId) => {
     if (onToggleMode) {
@@ -75,7 +71,6 @@ function TabBar({
             onClose={() => handleTabClose(tab.id)}
             onRename={(newTitle) => handleTabRename(tab.id, newTitle)}
             onToggleAutoRespond={() => handleToggleAutoRespond(tab.id)}
-            onToggleAM={() => handleToggleAM(tab.id)}
             onToggleMode={() => handleToggleMode(tab.id)}
             onToggleViewMode={() => handleToggleViewMode(tab.id)}
             devMode={devMode}

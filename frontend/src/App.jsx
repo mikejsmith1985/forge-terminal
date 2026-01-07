@@ -190,7 +190,7 @@ function App() {
     updateTabShellConfig,
     updateTabColorTheme,
     toggleTabAutoRespond,
-    toggleTabAM,
+    // toggleTabAM, // v3.12.12: AM feature removed
     toggleTabMode,
     toggleTabViewMode,
     updateTabDirectory,
@@ -288,17 +288,7 @@ function App() {
     setCurrentModelTier(info.actuallyRunning || info.toolName || info.tier);
   }, []);
   
-  // AM Master Control state (global kill switch for ALL tabs)
-  const [amMasterEnabled, setAMMasterEnabled] = useState(() => {
-    const saved = localStorage.getItem('amMasterEnabled');
-    return saved !== null ? saved === 'true' : true; // Default to ON
-  });
-  
-  // AM Default state (global override for new tabs)
-  const [amDefaultEnabled, setAMDefaultEnabled] = useState(() => {
-    const saved = localStorage.getItem('amDefaultEnabled');
-    return saved !== null ? saved === 'true' : true; // Default to ON for legal compliance
-  });
+  // v3.12.12: AM feature completely removed
   
   // Store refs for each terminal by tab ID
   const terminalRefs = useRef({});
@@ -989,14 +979,11 @@ function App() {
       return;
     }
     
-    // Override AM setting based on global default
-    if (!amDefaultEnabled && result.tab) {
-      toggleTabAM(result.tabId); // Toggle it off if global default is off
-    }
+    // v3.12.12: AM feature completely removed
     
-    logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme, amEnabled: amDefaultEnabled, type: options.type });
+    logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme, type: options.type });
     // Theme will be applied by the activeTab useEffect below
-  }, [createTab, shellConfig, addToast, amDefaultEnabled, toggleTabAM]);
+  }, [createTab, shellConfig, addToast]);
 
   // Handle tab switch - focus terminal after switching and apply tab's theme
   const handleTabSwitch = useCallback((tabId) => {
@@ -1142,87 +1129,7 @@ function App() {
     addToast(`Saved: ${file.name}`, 'success', 2000);
   }, [addToast]);
 
-  // Handle AM toggle - toggle in state (no backend API needed)
-  const handleToggleAM = useCallback((tabId) => {
-    const tab = tabs.find(t => t.id === tabId);
-    if (!tab) return;
-
-    const newEnabled = !tab.amEnabled;
-    toggleTabAM(tabId);
-    addToast(newEnabled ? 'AM Logging enabled' : 'AM Logging disabled', 'info', 2000);
-    logger.tabs('AM toggled', { tabId, enabled: newEnabled });
-  }, [tabs, toggleTabAM, addToast]);
-
-  // Handle global AM default change
-  const handleAMDefaultChange = useCallback((enabled) => {
-    setAMDefaultEnabled(enabled);
-    localStorage.setItem('amDefaultEnabled', enabled.toString());
-    addToast(
-      enabled 
-        ? 'New tabs will have AM enabled by default' 
-        : '⚠️ New tabs will have AM disabled by default',
-      enabled ? 'success' : 'warning',
-      3000
-    );
-    logger.settings('AM default changed', { enabled });
-  }, [addToast]);
-
-  // Handle AM Master Control toggle
-  const handleAMMasterToggle = useCallback(async (enabled) => {
-    if (!enabled) {
-      // Show confirmation dialog
-      const confirmed = window.confirm(
-        'Disable AM System?\n\n' +
-        'This will:\n' +
-        '• Stop all AM logging across all tabs\n' +
-        '• Remove shell hooks from ~/.bashrc, ~/.zshrc, etc.\n\n' +
-        'Hooks will need to be re-configured when AM is re-enabled.\n\n' +
-        'Continue?'
-      );
-      
-      if (!confirmed) return;
-      
-      try {
-        const res = await fetch('/api/am/master-control', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enabled: false })
-        });
-        
-        const data = await res.json();
-        
-        if (data.success) {
-          setAMMasterEnabled(false);
-          localStorage.setItem('amMasterEnabled', 'false');
-          
-          // Show success message
-          const removedFiles = data.removed || [];
-          if (removedFiles.length > 0) {
-            addToast(
-              `AM disabled. Hooks removed from:\n${removedFiles.map(r => r.filePath).join('\n')}`,
-              'success',
-              5000
-            );
-          } else {
-            addToast('AM disabled. No hooks found to remove.', 'success', 3000);
-          }
-          
-          logger.settings('AM Master disabled', { removed: removedFiles });
-        } else {
-          addToast('Failed to disable AM: ' + data.error, 'error', 3000);
-        }
-      } catch (err) {
-        console.error('Failed to disable AM:', err);
-        addToast('Failed to disable AM system', 'error', 3000);
-      }
-    } else {
-      // Enable: Simple toggle
-      setAMMasterEnabled(true);
-      localStorage.setItem('amMasterEnabled', 'true');
-      addToast('AM enabled. You will need to configure shell hooks in Settings → Shell Hooks.', 'info', 4000);
-      logger.settings('AM Master enabled', {});
-    }
-  }, [addToast]);
+  // v3.12.12: AM feature completely removed - all AM handlers deleted
   
   // Workflow handlers - REMOVED v3.9.0: Workflows deleted
 
@@ -1315,8 +1222,6 @@ function App() {
       // Command cards should ALWAYS execute directly in terminal, regardless of viewMode
       // Chat routing is only for user input from ChatView UI, not command cards
       
-      // If command is empty but triggerAM is true, we still want to trigger AM
-      // but we shouldn't send an empty command to the terminal as it might just print a newline
       if (cmd.command && cmd.command.trim().length > 0) {
         // Execute command directly in terminal
         termRef.sendCommand(cmd.command, cmd.delay);
@@ -1324,44 +1229,6 @@ function App() {
       } else {
         // Focus terminal even if command is empty
         termRef.focus();
-      }
-
-      // If this command card is configured to trigger AM, send an AM log entry
-      // so the backend can start/associate a conversation without relying on text detection.
-      try {
-        if (cmd.triggerAM && activeTab?.amEnabled) {
-          fetch('/api/am/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tabId: activeTabId,
-              tabName: activeTab?.title || 'Terminal',
-              workspace: window.location.pathname,
-              entryType: 'COMMAND_CARD_EXECUTED',
-              commandId: cmd.id,
-              description: cmd.description,
-              content: cmd.command,
-              triggerAM: true,
-              llmProvider: cmd.llmProvider || '',
-              llmType: cmd.llmType || 'chat',
-              timestamp: new Date().toISOString()
-            }),
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success && data.conversationId) {
-              addToast(`🧠 AM tracking started: ${cmd.description}`, 'success', 2000);
-              logger.am('LLM conversation started from command card', { 
-                conversationId: data.conversationId, 
-                provider: cmd.llmProvider || 'auto-detected',
-                commandId: cmd.id 
-              });
-            }
-          })
-          .catch(err => console.warn('[AM] Failed to send command-card AM event:', err));
-        }
-      } catch (err) {
-        console.warn('[AM] Error while triggering AM for command card:', err);
       }
     }
   }
@@ -1735,7 +1602,6 @@ function App() {
           onNewTab={handleNewTab}
           onReorder={reorderTabs}
           onToggleAutoRespond={toggleTabAutoRespond}
-          onToggleAM={handleToggleAM}
           onToggleMode={toggleTabMode}
           onToggleViewMode={toggleTabViewMode}
           onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
@@ -1788,7 +1654,6 @@ function App() {
                     fontSize={fontSize}
                     shellConfig={tab.shellConfig}
                     autoRespond={tab.autoRespond || false}
-                    amEnabled={tab.amEnabled || false}
                     tabName={tab.title}
                     currentDirectory={tab.currentDirectory || null}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
@@ -1912,10 +1777,6 @@ function App() {
         onToast={addToast}
         devMode={devMode}
         onDevModeChange={setDevMode}
-        amMasterEnabled={amMasterEnabled}
-        onAMMasterChange={handleAMMasterToggle}
-        amDefaultEnabled={amDefaultEnabled}
-        onAMDefaultChange={handleAMDefaultChange}
         defaultTabTheme={defaultTabTheme}
         onDefaultTabThemeChange={(newTheme) => {
           setDefaultTabTheme(newTheme);

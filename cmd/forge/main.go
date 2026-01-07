@@ -506,6 +506,7 @@ func openBrowser(url string) {
 	case "windows":
 		// Use system default browser on Windows (do not force Chrome)
 		cmd = exec.Command("cmd", "/c", "start", url)
+		hideWindow(cmd) // Prevent console window flash
 	}
 	if cmd != nil {
 		_ = cmd.Start()
@@ -707,6 +708,7 @@ func handleOpenIDE(w http.ResponseWriter, r *http.Request) {
 	
 	// Run the command
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+	hideWindow(cmd) // Prevent console window flash on Windows
 	if err := cmd.Start(); err != nil {
 		log.Printf("[IDE] Failed to open %s: %v", ide, err)
 		json.NewEncoder(w).Encode(map[string]interface{}{

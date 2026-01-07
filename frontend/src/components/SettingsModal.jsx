@@ -4,7 +4,7 @@ import CLISettingsPanel from './CLISettingsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 import { themes, themeOrder } from '../themes';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, amMasterEnabled = true, onAMMasterChange, amDefaultEnabled = true, onAMDefaultChange, initialTab = 'shell', onRestartTour, defaultTabTheme = 'auto-cycle', onDefaultTabThemeChange }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, initialTab = 'shell', onRestartTour, defaultTabTheme = 'auto-cycle', onDefaultTabThemeChange }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -590,56 +590,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             </label>
           </div>
 
-          {/* AM Master Control - Global Kill Switch */}
-          <div className="form-group" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #333' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '10px' }}>
-              <input
-                type="checkbox"
-                name="amMasterEnabled"
-                checked={amMasterEnabled}
-                onChange={(e) => {
-                  if (onAMMasterChange) {
-                    onAMMasterChange(e.target.checked);
-                  }
-                }}
-                style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-              />
-              <span style={{ fontWeight: 600, userSelect: 'none' }}>
-                Master AM Control
-              </span>
-              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '4px' }}>
-                (Enable/disable AM system globally)
-              </span>
-            </label>
-
-            {amMasterEnabled && (
-              <div style={{
-                background: '#1a2e1a',
-                border: '1px solid #22c55e',
-                borderRadius: '8px',
-                padding: '10px 12px',
-                marginTop: '8px',
-                fontSize: '0.85em',
-                color: '#86efac'
-              }}>
-                ✓ AM System Active - Logging enabled across all tabs
-              </div>
-            )}
-
-            {!amMasterEnabled && (
-              <div style={{
-                background: '#422006',
-                border: '1px solid #f97316',
-                borderRadius: '8px',
-                padding: '10px 12px',
-                marginTop: '8px',
-                fontSize: '0.85em',
-                color: '#fed7aa'
-              }}>
-                ⚠️ AM System Disabled - No logging on any tab
-              </div>
-            )}
-          </div>
+          {/* v3.12.12: AM Master Control section removed - AM feature deprecated */}
 
           {/* File Access Security - Now inside modal-body for proper scrolling */}
           <div className="form-group" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '2px solid #333' }}>

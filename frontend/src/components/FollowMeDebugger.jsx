@@ -38,6 +38,19 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
 
   // DEFINE CALLBACKS FIRST - before useEffect that references them (TDZ fix)
   const captureKeystroke = useCallback((e) => {
+    // v3.12.12 FIX: Handle SVGAnimatedString for className
+    let className = '';
+    try {
+      const cn = e.target.className;
+      if (typeof cn === 'string') {
+        className = cn.substring(0, 100);
+      } else if (cn && cn.baseVal) {
+        className = cn.baseVal.substring(0, 100);
+      }
+    } catch (err) {
+      // Ignore - className will be empty
+    }
+    
     eventsRef.current.push({
       type: 'keystroke',
       timestamp: Date.now() - startTimeRef.current,
@@ -49,13 +62,27 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       metaKey: e.metaKey,
       target: {
         tagName: e.target.tagName,
-        className: (e.target.className || '').substring(0, 100),
+        className: className,
         id: e.target.id || '',
       },
     });
   }, []);
 
   const captureClick = useCallback((e) => {
+    // v3.12.12 FIX: Handle SVGAnimatedString for className
+    // SVG elements have className as SVGAnimatedString object, not string
+    let className = '';
+    try {
+      const cn = e.target.className;
+      if (typeof cn === 'string') {
+        className = cn.substring(0, 100);
+      } else if (cn && cn.baseVal) {
+        className = cn.baseVal.substring(0, 100);
+      }
+    } catch (err) {
+      // Ignore - className will be empty
+    }
+    
     eventsRef.current.push({
       type: 'click',
       timestamp: Date.now() - startTimeRef.current,
@@ -64,7 +91,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       button: e.button,
       target: {
         tagName: e.target.tagName,
-        className: (e.target.className || '').substring(0, 100),
+        className: className,
         id: e.target.id || '',
         textContent: (e.target.textContent || '').substring(0, 50),
       },
