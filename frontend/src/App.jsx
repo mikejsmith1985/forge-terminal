@@ -120,7 +120,7 @@ function App() {
   const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', or 'debug' (workflows removed v3.9.0)
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
-  const [editorMode, setEditorMode] = useState('agentic') // 'agentic' or 'classic' (Monaco)
+  const [editorMode, setEditorMode] = useState('classic') // 'agentic' or 'classic' (Monaco)
   const [editorProposedChanges, setEditorProposedChanges] = useState([]) // Agent diff proposals
   const [editorAnchors, setEditorAnchors] = useState([]) // Conversational anchors
   
