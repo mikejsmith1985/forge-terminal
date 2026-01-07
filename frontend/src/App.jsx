@@ -1684,16 +1684,17 @@ function App() {
             terminalRef={getActiveTerminalRef()}
           />
         ) : sidebarView === 'debug' ? (
-          devMode ? (
-            <DebugPanel
-              terminalRef={getActiveTerminalRef()}
-              tabId={activeTabId}
-            />
-          ) : (
-            <div style={{ padding: '12px', overflowY: 'auto', height: '100%' }}>
+          <div style={{ overflowY: 'auto', height: '100%' }}>
+            {devMode && (
+              <DebugPanel
+                terminalRef={getActiveTerminalRef()}
+                tabId={activeTabId}
+              />
+            )}
+            <div style={{ padding: '12px' }}>
               <WebAppDebuggerCard />
             </div>
-          )
+          </div>
         ) : null}
       </div>
     </div>
