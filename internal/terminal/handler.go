@@ -20,17 +20,19 @@ import (
 
 // Custom WebSocket close codes (4000-4999 range is for application use)
 const (
-	CloseCodePTYExited = 4000 // Shell process exited normally
-	CloseCodeTimeout   = 4001 // Session timed out
-	CloseCodePTYError  = 4002 // PTY read/write error
+	CloseCodePTYExited       = 4000 // Shell process exited normally
+	CloseCodeTimeout         = 4001 // Session timed out
+	CloseCodePTYError        = 4002 // PTY read/write error
+	CloseCodeSessionRestart  = 4003 // All sessions restarted (server still running)
 )
 
 // Handler manages WebSocket terminal connections.
 type Handler struct {
-	upgrader     websocket.Upgrader
-	sessions     sync.Map // map[string]*TerminalSession
-	visionParser *vision.Parser
-	llmDetector  *llm.Detector
+	upgrader        websocket.Upgrader
+	sessions        sync.Map // map[string]*TerminalSession
+	visionParser    *vision.Parser
+	llmDetector     *llm.Detector
+	restartRequested atomic.Bool // Flag to indicate session restart is in progress
 }
 
 // connWriter wraps a websocket.Conn with a mutex for thread-safe writes.
@@ -187,6 +189,30 @@ func (h *Handler) GetVisionParser() *vision.Parser {
 // GetLLMDetector returns the LLM detector for detecting AI CLI tools.
 func (h *Handler) GetLLMDetector() *llm.Detector {
 	return h.llmDetector
+}
+
+// CloseAllSessions closes all active terminal sessions and returns the count.
+// This is used for session restart without shutting down the server.
+func (h *Handler) CloseAllSessions() int {
+	// Set restart flag so HandleWebSocket knows to send CloseCodeSessionRestart
+	h.restartRequested.Store(true)
+	defer func() {
+		// Clear flag after a short delay to ensure all close messages are sent
+		time.Sleep(100 * time.Millisecond)
+		h.restartRequested.Store(false)
+	}()
+
+	count := 0
+	h.sessions.Range(func(key, value interface{}) bool {
+		if session, ok := value.(*TerminalSession); ok {
+			log.Printf("[Terminal] Closing session %s for restart", key)
+			session.Close()
+			count++
+		}
+		return true // continue iteration
+	})
+	log.Printf("[Terminal] Closed %d sessions for restart", count)
+	return count
 }
 
 // HandleWebSocket upgrades the HTTP connection to WebSocket and manages PTY I/O.
@@ -791,8 +817,14 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			finalReason = closeReason{websocket.CloseNormalClosure, "Connection closed"}
 		}
 	case <-session.Done():
-		log.Printf("[Terminal] Session %s: Process exited", sessionID)
-		finalReason = closeReason{CloseCodePTYExited, "Shell process exited"}
+		// Check if this is a restart or normal exit
+		if h.restartRequested.Load() {
+			log.Printf("[Terminal] Session %s: Restarting (server still running)", sessionID)
+			finalReason = closeReason{CloseCodeSessionRestart, "Session restarted"}
+		} else {
+			log.Printf("[Terminal] Session %s: Process exited", sessionID)
+			finalReason = closeReason{CloseCodePTYExited, "Shell process exited"}
+		}
 	case <-time.After(24 * time.Hour):
 		log.Printf("[Terminal] Session %s: Timeout (24h)", sessionID)
 		finalReason = closeReason{CloseCodeTimeout, "Session timed out after 24 hours"}

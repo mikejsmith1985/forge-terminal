@@ -583,25 +583,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
             </>
           ) : (
             <>
-              {/* Development Mode Message */}
-              {isDevMode && (
-                <div style={{ 
-                  textAlign: 'center', 
-                  padding: '20px',
-                  color: '#888',
-                  background: '#1a1a1a',
-                  borderRadius: '8px',
-                  marginBottom: '15px'
-                }}>
-                  <p style={{ margin: 0, marginBottom: '8px' }}>
-                    Running in development mode
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.85em', color: '#666' }}>
-                    Update checks are disabled. Use the "Check Now" button to check GitHub manually.
-                  </p>
-                </div>
-              )}
-              <div style={{ 
+              <div style={{
                 textAlign: 'center', 
                 padding: '30px',
                 color: '#888'

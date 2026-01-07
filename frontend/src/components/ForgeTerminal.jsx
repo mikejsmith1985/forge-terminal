@@ -1644,6 +1644,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             messageColor = '1;31'; // Red
             shouldReconnect = true;
             break;
+          case 4003:
+            // Custom: Session restart requested - reconnect immediately (5 attempts default)
+            disconnectMessage = 'Session restarted. Reconnecting...';
+            messageColor = '1;33'; // Yellow
+            shouldReconnect = true;
+            break;
           default:
             if (event.reason) {
               disconnectMessage = event.reason;

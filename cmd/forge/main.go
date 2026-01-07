@@ -41,6 +41,9 @@ var preferredPorts = []int{3005, 8333, 8080, 9000, 3000, 3333}
 // Active port (set at startup for process safeguard system)
 var activePort int
 
+// Terminal handler (set at startup for session management)
+var termHandler *terminal.Handler
+
 // headerFixingResponseWriter wraps http.ResponseWriter to fix MIME types for embedded assets
 type headerFixingResponseWriter struct {
 	http.ResponseWriter
@@ -211,7 +214,7 @@ func main() {
 
 	// Create terminal handler with direct dependencies
 	// v3.12.3: AM system removed - passing nil
-	termHandler := terminal.NewHandlerDirect(nil, visionParser, llmDetector)
+	termHandler = terminal.NewHandlerDirect(nil, visionParser, llmDetector)
 	http.HandleFunc("/ws", termHandler.HandleWebSocket)
 
 	// Commands API
@@ -528,13 +531,16 @@ func handleShutdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status":"shutting down"}`))
-	log.Println("👋 Shutdown requested from browser")
-	// Give the response time to send before exiting
-	go func() {
-		<-time.After(500 * time.Millisecond)
-		os.Exit(0)
-	}()
+
+	// Close all terminal sessions but keep server running for automatic reconnection
+	count := 0
+	if termHandler != nil {
+		count = termHandler.CloseAllSessions()
+	}
+
+	response := fmt.Sprintf(`{"status":"sessions_restarted","count":%d}`, count)
+	w.Write([]byte(response))
+	log.Printf("🔄 Restarted %d terminal sessions (server still running for reconnection)", count)
 }
 
 func handleConfig(w http.ResponseWriter, r *http.Request) {
