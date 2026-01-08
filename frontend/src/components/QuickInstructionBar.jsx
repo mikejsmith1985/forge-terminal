@@ -12,21 +12,25 @@ import './QuickInstructionBar.css';
  * 3. Send combined text to terminal (like Command Cards)
  */
 function QuickInstructionBar({ 
-  isEnabled, 
+  isEnabled,
+  isExpanded: externalIsExpanded,
   quickInstruction, 
   forgeAssistBtnPos, 
-  onSend, 
+  onSend,
+  onOpen,
   onClose 
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [userPrompt, setUserPrompt] = useState('');
   const promptInputRef = useRef(null);
+
+  // Use internal state for expansion, but can be controlled externally
+  const isExpanded = externalIsExpanded;
 
   // Close on Escape
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isExpanded) {
-        setIsExpanded(false);
+        onClose();
       }
       // Ctrl+Enter to send (when focused in component)
       if (e.ctrlKey && e.key === 'Enter' && isExpanded && userPrompt.trim()) {
@@ -55,12 +59,12 @@ function QuickInstructionBar({
     
     // Clear input and collapse
     setUserPrompt('');
-    setIsExpanded(false);
+    onClose();
   };
 
   const handleCancel = () => {
     setUserPrompt('');
-    setIsExpanded(false);
+    onClose();
   };
 
   if (!isEnabled) return null;
@@ -80,7 +84,10 @@ function QuickInstructionBar({
             bottom: `${barBottom}px`,
             zIndex: 999
           }}
-          onClick={() => setIsExpanded(true)}
+          onClick={(e) => {
+            e.preventDefault();
+            onOpen();
+          }}
         >
           <Zap size={16} />
           <span>Quick Instruction</span>

@@ -26,6 +26,136 @@ const (
 	CloseCodeSessionRestart  = 4003 // All sessions restarted (server still running)
 )
 
+// PTYLogEntry represents a single PTY I/O operation for debugging
+type PTYLogEntry struct {
+	Timestamp   int64  `json:"timestamp"`   // Unix timestamp in milliseconds
+	Direction   string `json:"direction"`   // "to_pty" or "from_pty"
+	Data        string `json:"data"`        // Hex-encoded bytes for safe JSON storage
+	Size        int    `json:"size"`        // Number of bytes
+	Text        string `json:"text"`        // Human-readable text (printable ASCII only)
+	SessionID   string `json:"sessionId"`   // Terminal session ID
+}
+
+// PTYLogger manages PTY logging for Follow Me debugger integration
+type PTYLogger struct {
+	mu          sync.RWMutex
+	enabled     map[string]bool      // map[sessionID]enabled
+	logs        map[string][]PTYLogEntry // map[sessionID][]logs
+	maxLogsPerSession int            // Prevent OOM
+}
+
+var globalPTYLogger = &PTYLogger{
+	enabled: make(map[string]bool),
+	logs:    make(map[string][]PTYLogEntry),
+	maxLogsPerSession: 10000, // 10k entries max per session
+}
+
+// EnablePTYLogging enables PTY byte logging for a session (for Follow Me debugger)
+func (l *PTYLogger) EnablePTYLogging(sessionID string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.enabled[sessionID] = true
+	l.logs[sessionID] = make([]PTYLogEntry, 0, 100)
+	log.Printf("[PTYLogger] Enabled for session %s", sessionID)
+}
+
+// DisablePTYLogging disables PTY logging and clears logs for a session
+func (l *PTYLogger) DisablePTYLogging(sessionID string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.enabled, sessionID)
+	delete(l.logs, sessionID)
+	log.Printf("[PTYLogger] Disabled for session %s", sessionID)
+}
+
+// IsEnabled checks if PTY logging is enabled for a session
+func (l *PTYLogger) IsEnabled(sessionID string) bool {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.enabled[sessionID]
+}
+
+// LogPTY logs a PTY I/O operation if logging is enabled for the session
+func (l *PTYLogger) LogPTY(sessionID, direction string, data []byte) {
+	if !l.IsEnabled(sessionID) {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Check if logs exist for session
+	sessionLogs, exists := l.logs[sessionID]
+	if !exists {
+		return
+	}
+
+	// Prevent OOM: limit log entries per session
+	if len(sessionLogs) >= l.maxLogsPerSession {
+		log.Printf("[PTYLogger] Session %s reached max log entries (%d), dropping oldest", sessionID, l.maxLogsPerSession)
+		// Drop oldest 10% of logs
+		dropCount := l.maxLogsPerSession / 10
+		sessionLogs = sessionLogs[dropCount:]
+	}
+
+	// Create log entry
+	entry := PTYLogEntry{
+		Timestamp: time.Now().UnixMilli(),
+		Direction: direction,
+		Data:      fmt.Sprintf("%x", data), // Hex encoding for safe JSON storage
+		Size:      len(data),
+		Text:      getPrintableText(data),
+		SessionID: sessionID,
+	}
+
+	l.logs[sessionID] = append(sessionLogs, entry)
+}
+
+// GetLogs retrieves all PTY logs for a session
+func (l *PTYLogger) GetLogs(sessionID string) []PTYLogEntry {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	
+	logs, exists := l.logs[sessionID]
+	if !exists {
+		return nil
+	}
+	
+	// Return a copy to avoid race conditions
+	result := make([]PTYLogEntry, len(logs))
+	copy(result, logs)
+	return result
+}
+
+// getPrintableText converts bytes to printable ASCII text for readability
+// Non-printable characters are shown as escape sequences (e.g., \r, \n, \x08 for backspace)
+func getPrintableText(data []byte) string {
+	var sb strings.Builder
+	for _, b := range data {
+		switch b {
+		case '\r':
+			sb.WriteString("\\r")
+		case '\n':
+			sb.WriteString("\\n")
+		case '\t':
+			sb.WriteString("\\t")
+		case 0x08: // Backspace
+			sb.WriteString("\\b")
+		case 0x7F: // DEL (also used as backspace in some terminals)
+			sb.WriteString("\\x7F")
+		case 0x1B: // ESC
+			sb.WriteString("\\e")
+		default:
+			if b >= 32 && b < 127 { // Printable ASCII
+				sb.WriteByte(b)
+			} else {
+				sb.WriteString(fmt.Sprintf("\\x%02x", b))
+			}
+		}
+	}
+	return sb.String()
+}
+
 // Handler manages WebSocket terminal connections.
 type Handler struct {
 	upgrader        websocket.Upgrader
@@ -144,6 +274,17 @@ type ChatOutputMessage struct {
 	Content   string `json:"content"`   // The output text
 	IsPrompt  bool   `json:"isPrompt"`  // True if this looks like an interactive prompt
 	Timestamp int64  `json:"timestamp"` // Unix timestamp
+}
+
+// PTYLogControlMessage represents PTY logging control commands from client.
+type PTYLogControlMessage struct {
+	Type    string `json:"type"`    // "PTY_LOG_ENABLE", "PTY_LOG_DISABLE", "PTY_LOG_GET"
+	Enabled bool   `json:"enabled"` // For ENABLE/DISABLE
+}
+
+// GetPTYLogsForSession retrieves PTY logs for a session (for debug session export)
+func GetPTYLogsForSession(sessionID string) []PTYLogEntry {
+	return globalPTYLogger.GetLogs(sessionID)
 }
 
 // NewHandlerDirect creates a new terminal WebSocket handler with direct dependencies.
@@ -488,6 +629,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			if n > 0 {
 				messageCount++
+				
+				// PTY LOGGING: Log bytes read from PTY (for Follow Me debugger)
+				globalPTYLogger.LogPTY(sessionID, "from_pty", buf[:n])
+				
 				// ═══ CRITICAL PERFORMANCE: Send to browser FIRST ═══
 				// This ensures terminal output is immediately visible
 				
@@ -639,6 +784,43 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
+				// Check for PTY logging control messages (Follow Me debugger integration)
+				var ptyLogMsg PTYLogControlMessage
+				if err := json.Unmarshal(data, &ptyLogMsg); err == nil {
+					switch ptyLogMsg.Type {
+					case "PTY_LOG_ENABLE":
+						globalPTYLogger.EnablePTYLogging(sessionID)
+						_ = conn.WriteJSON(map[string]interface{}{
+							"type":    "PTY_LOG_ENABLED",
+							"enabled": true,
+						})
+						continue
+					case "PTY_LOG_DISABLE":
+						globalPTYLogger.DisablePTYLogging(sessionID)
+						_ = conn.WriteJSON(map[string]interface{}{
+							"type":    "PTY_LOG_DISABLED",
+							"enabled": false,
+						})
+						continue
+					case "PTY_LOG_GET":
+						logs := globalPTYLogger.GetLogs(sessionID)
+						logsJSON, err := json.Marshal(logs)
+						if err != nil {
+							log.Printf("[PTYLogger] Failed to marshal logs: %v", err)
+							_ = conn.WriteJSON(map[string]interface{}{
+								"type":  "PTY_LOG_ERROR",
+								"error": err.Error(),
+							})
+						} else {
+							_ = conn.WriteJSON(map[string]interface{}{
+								"type": "PTY_LOG_DATA",
+								"logs": json.RawMessage(logsJSON),
+							})
+						}
+						continue
+					}
+				}
+
 				// v3.5.3: Check for Chat command messages (Chat→PTY bridge)
 				var chatMsg ChatCommandMessage
 				if err := json.Unmarshal(data, &chatMsg); err != nil {
@@ -780,6 +962,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
+
+			// PTY LOGGING: Log bytes sent to PTY (for Follow Me debugger)
+			globalPTYLogger.LogPTY(sessionID, "to_pty", data)
 
 			// AUTO-RESPOND: Process input for state detection
 			autoRespondDetector.ProcessInput(data)

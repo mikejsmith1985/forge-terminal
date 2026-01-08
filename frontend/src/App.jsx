@@ -1960,10 +1960,12 @@ function App() {
 
       {/* v3.12.15: Quick Instruction Bar - Floating prompt input */}
       <QuickInstructionBar
-        isEnabled={quickInstructionEnabled && showQuickInstruction}
+        isEnabled={quickInstructionEnabled}
+        isExpanded={showQuickInstruction}
         quickInstruction={quickInstructionText}
         forgeAssistBtnPos={forgeAssistBtnPos}
         onSend={sendToTerminal}
+        onOpen={() => setShowQuickInstruction(true)}
         onClose={() => setShowQuickInstruction(false)}
       />
 

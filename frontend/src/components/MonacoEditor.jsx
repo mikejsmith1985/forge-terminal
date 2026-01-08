@@ -36,7 +36,9 @@ export default function MonacoEditor({
     console.log('[MonacoEditor] Platform:', navigator.platform);
     
     try {
-      const requestBody = { path, rootPath };
+      // Normalize path separators to forward slashes
+      const normalizedPath = path.replace(/\\/g, '/');
+      const requestBody = { path: normalizedPath, rootPath };
       console.log('[MonacoEditor] Sending request:', JSON.stringify(requestBody, null, 2));
       
       const response = await fetch('/api/files/read', {

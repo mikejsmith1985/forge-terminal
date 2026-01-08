@@ -511,6 +511,9 @@ func HandleRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize path separators to forward slashes for consistency
+	req.Path = strings.ReplaceAll(req.Path, "\\", "/")
+
 	log.Printf("[Files] Read request: path=%s, rootPath=%s, runtime=%s, accessMode=%v",
 		req.Path, req.RootPath, runtime.GOOS, getFileAccessMode())
 

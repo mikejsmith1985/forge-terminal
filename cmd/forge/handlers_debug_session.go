@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+	
+	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 )
 
 // DebugSession represents a captured debug session
@@ -21,6 +23,7 @@ type DebugSession struct {
 	Events          json.RawMessage `json:"events"`
 	ConsoleLogs     json.RawMessage `json:"consoleLogs"`
 	NetworkRequests json.RawMessage `json:"networkRequests"`
+	PTYLogs         json.RawMessage `json:"ptyLogs,omitempty"` // PTY byte-level I/O logs
 	HasVideo        bool            `json:"hasVideo"`
 	Summary         SessionSummary  `json:"summary"`
 	VideoPath       string          `json:"videoPath,omitempty"`
@@ -37,6 +40,8 @@ type SessionSummary struct {
 	Warnings         int `json:"warnings"`
 	NetworkRequests  int `json:"networkRequests"`
 	FailedRequests   int `json:"failedRequests"`
+	PTYBytesSent     int `json:"ptyBytesSent,omitempty"`     // Total bytes sent to PTY
+	PTYBytesReceived int `json:"ptyBytesReceived,omitempty"` // Total bytes received from PTY
 }
 
 // handleSaveDebugSession saves a debug session to disk
@@ -250,4 +255,31 @@ func generateAnalysisPromptFromSession(session *DebugSession) string {
 	sb.WriteString("4. Propose a specific fix\n")
 
 	return sb.String()
+}
+
+// handleGetPTYLogs retrieves PTY logs for a session (Follow Me debugger integration)
+// GET /api/debug/pty-logs?sessionId=<id>
+func handleGetPTYLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sessionID := r.URL.Query().Get("sessionId")
+	if sessionID == "" {
+		http.Error(w, "Missing sessionId parameter", http.StatusBadRequest)
+		return
+	}
+
+	logs := terminal.GetPTYLogsForSession(sessionID)
+	if logs == nil {
+		logs = []terminal.PTYLogEntry{} // Return empty array instead of null
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"sessionId": sessionID,
+		"logs":      logs,
+		"count":     len(logs),
+	})
 }

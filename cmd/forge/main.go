@@ -337,6 +337,9 @@ func main() {
 		}
 	}))
 	http.HandleFunc("/api/debug-sessions/", WrapWithMiddleware(handleGetDebugSession))
+	
+	// PTY Logs API - Get PTY logs for Follow Me integration
+	http.HandleFunc("/api/debug/pty-logs", WrapWithMiddleware(handleGetPTYLogs))
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
