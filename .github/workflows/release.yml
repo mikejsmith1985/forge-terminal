@@ -114,10 +114,8 @@ jobs:
           # Linux AMD64
           GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-linux-amd64 ./cmd/forge
           # Windows AMD64 (GUI mode - no console window)
-          # Build BOTH names for transition period (v3.12.15+)
+          # Named 'fterm.exe' to prevent accidental process killing via 'forge-*' patterns
           GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS -H=windowsgui" -o bin/fterm.exe ./cmd/forge
-          # Duplicate as old name for backward compatibility
-          cp bin/fterm.exe bin/forge-windows-amd64.exe
 
       - name: Build macOS Binaries
         if: matrix.os == 'macos-latest'
