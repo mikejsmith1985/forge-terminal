@@ -65,7 +65,7 @@ Go to the [Releases page](https://github.com/mikejsmith1985/forge-terminal/relea
 
 | Your Computer | Download This File |
 |---------------|-------------------|
-| **Windows** | `forge-windows-amd64.exe` |
+| **Windows** | `fterm.exe` |
 | **Mac (Intel)** | `forge-darwin-amd64` |
 | **Mac (Apple Silicon/M1/M2/M3)** | `forge-darwin-arm64` |
 | **Linux** | `forge-linux-amd64` |
@@ -73,7 +73,7 @@ Go to the [Releases page](https://github.com/mikejsmith1985/forge-terminal/relea
 ### Step 2: Run It
 
 **On Windows:**
-1. Double-click `forge-windows-amd64.exe`
+1. Double-click `fterm.exe`
 2. If you see "Windows protected your PC", click "More info" → "Run anyway"
 
 **On Mac or Linux:**

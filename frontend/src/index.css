@@ -1171,6 +1171,78 @@ body {
   color: var(--subtext);
 }
 
+.tab-context-menu .submenu-trigger {
+  position: relative;
+}
+
+.tab-context-menu .submenu-arrow {
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+/* Theme submenu */
+.theme-submenu {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--overlay);
+  border-radius: 6px;
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  z-index: 1001;
+  min-width: 240px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.theme-option {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--overlay);
+}
+
+.theme-option:last-child {
+  border-bottom: none;
+}
+
+.theme-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.theme-modes {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-modes button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--overlay);
+  border-radius: 4px;
+  color: var(--subtext);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-modes button:hover {
+  background: var(--overlay);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.theme-modes button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .new-tab-btn {
   display: flex;
   align-items: center;

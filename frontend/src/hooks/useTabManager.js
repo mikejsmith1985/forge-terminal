@@ -601,6 +601,53 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
+   * Change theme and mode for a tab
+   * @param {string} tabId - ID of tab to update
+   * @param {string} themeName - New theme name
+   * @param {string} themeMode - New mode ('dark' or 'light')
+   */
+  const changeTabTheme = useCallback((tabId, themeName, themeMode) => {
+    console.log('[useTabManager] changeTabTheme called:', { tabId, themeName, themeMode });
+    logger.tabs('Changing tab theme', { tabId, themeName, themeMode });
+    
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        logger.tabs('Tab not found for theme change', { tabId });
+        console.warn('[useTabManager] Tab not found:', tabId);
+        return prev;
+      }
+
+      const newTabs = [...prev.tabs];
+      const oldTab = newTabs[tabIndex];
+      newTabs[tabIndex] = { 
+        ...newTabs[tabIndex], 
+        colorTheme: themeName,
+        mode: themeMode 
+      };
+      
+      console.log('[useTabManager] Tab theme updated:', {
+        tabId,
+        oldTheme: oldTab.colorTheme,
+        oldMode: oldTab.mode,
+        newTheme: themeName,
+        newMode: themeMode
+      });
+      
+      logger.tabs('Tab theme changed', { 
+        tabId, 
+        newTheme: themeName,
+        newMode: themeMode 
+      });
+      
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
+  /**
    * Update a tab's current directory
    * @param {string} tabId - ID of tab to update
    * @param {string} currentDirectory - Current working directory path
@@ -648,6 +695,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     toggleTabAM,
     toggleTabVision,
     toggleTabMode,
+    changeTabTheme,
     toggleTabViewMode, // v3.3.0: Toggle between chat and terminal view
     updateTabDirectory,
     reorderTabs,

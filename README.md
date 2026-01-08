@@ -246,7 +246,7 @@ Or try the wizard: `node setup-wizard.js`
 - **Troubleshooting:** [Common issues & fixes](docs/user/github-pages-deployment.md#troubleshooting)
 
 ### Windows
-Download `forge-windows-amd64.exe` and double-click it.
+Download `fterm.exe` and double-click it.
 
 > **⚠️ Windows Troubleshooting**
 > 

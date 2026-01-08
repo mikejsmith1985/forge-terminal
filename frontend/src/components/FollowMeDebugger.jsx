@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { Video, Square, Copy, Check, AlertCircle, Loader } from 'lucide-react';
 import './FollowMeDebugger.css';
 
@@ -21,6 +22,10 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasInterruptedSession, setHasInterruptedSession] = useState(false);
+  
+  // v3.12.14: Force re-render counter
+  const [, forceUpdate] = useState(0);
+  const durationRef = useRef(0); // Store actual duration in ref
 
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
@@ -35,8 +40,9 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
   const lastScrollRef = useRef(0);
   const sessionIdRef = useRef(null);
   const streamEndedByUserRef = useRef(false);
+  const isRecordingRef = useRef(false); // v3.12.13: Track recording state in ref for cleanup
 
-  // DEFINE CALLBACKS FIRST - before useEffect that references them (TDZ fix)
+  // DEFINE CALLBACKS FIRST- before useEffect that references them (TDZ fix)
   const captureKeystroke = useCallback((e) => {
     // v3.12.12 FIX: Handle SVGAnimatedString for className
     let className = '';
@@ -225,30 +231,15 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
           // v3.11.3: Auto-restore if session was active (not explicitly interrupted by user)
           if (session.isRecording) {
             console.log('[FollowMe] Restoring active recording session');
-            setIsRecording(true);
             
             // Calculate actual elapsed time from start
             const actualElapsed = Math.floor((Date.now() - session.startTime) / 1000);
             setRecordingDuration(actualElapsed);
             console.log('[FollowMe] Restored timer - actual elapsed:', actualElapsed, 'seconds');
             
-            // Restart duration counter from actual elapsed time
-            durationIntervalRef.current = setInterval(() => {
-              setRecordingDuration(prev => prev + 1);
-              // Auto-save periodically
-              if ((prev + 1) % 5 === 0) {
-                const currentSession = {
-                  id: sessionIdRef.current,
-                  startTime: startTimeRef.current,
-                  events: eventsRef.current,
-                  consoleLogs: consoleLogsRef.current,
-                  networkRequests: networkRequestsRef.current,
-                  interrupted: true,
-                  isRecording: true,
-                };
-                localStorage.setItem('follow-me-active-session', JSON.stringify(currentSession));
-              }
-            }, 1000);
+            // v3.12.14: Timer managed by useEffect, just set state
+            isRecordingRef.current = true;
+            setIsRecording(true);
             
             // Re-attach event listeners
             window.addEventListener('keydown', captureKeystroke, true);
@@ -266,32 +257,69 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     }
   }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
 
+  // v3.12.13: Keep isRecordingRef in sync with state
   useEffect(() => {
-    // v3.11.3 FIX: Don't cleanup on unmount if recording is active
-    // This allows Follow Me to survive tab switches
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  // v3.12.14: Dedicated timer effect using ref + forceUpdate pattern
+  // This avoids any potential React state batching issues
+  useEffect(() => {
+    if (!isRecording) {
+      durationRef.current = 0;
+      window.__followMeTimerActive = false;
+      return; // Not recording, no timer needed
+    }
+    
+    console.log('[FollowMe] Timer effect: starting interval, isRecording:', isRecording);
+    durationRef.current = 0;
+    window.__followMeTimerActive = true;
+    window.__followMeTimerValue = 0;
+    
+    const intervalId = setInterval(() => {
+      try {
+        durationRef.current += 1;
+        window.__followMeTimerValue = durationRef.current;
+        console.log('[FollowMe] Timer tick:', durationRef.current);
+        // Use actual state update instead of forceUpdate
+        setRecordingDuration(durationRef.current);
+      } catch (err) {
+        console.error('[FollowMe] Timer tick error:', err);
+      }
+    }, 1000);
+    
+    // Store in ref for other code that might need to access it
+    durationIntervalRef.current = intervalId;
+    window.__followMeIntervalId = intervalId;
+    console.log('[FollowMe] Interval ID stored:', intervalId);
+    
     return () => {
-      // Only cleanup if NOT recording
-      // If recording, the session persists and will resume when user returns to Debug tab
-      if (!isRecording) {
-        if (durationIntervalRef.current) {
-          clearInterval(durationIntervalRef.current);
-          durationIntervalRef.current = null;
-        }
-        restoreConsole();
-        restoreFetch();
-      } else {
-        console.log('[FollowMe] Component unmounting but recording active - preserving state');
-        // CRITICAL FIX: Must clear interval even when recording
-        // Otherwise timer continues in background but UI is unmounted
-        if (durationIntervalRef.current) {
-          clearInterval(durationIntervalRef.current);
-          durationIntervalRef.current = null;
-        }
-        // Save to localStorage so it can be restored
+      console.log('[FollowMe] Timer effect: clearing interval', intervalId);
+      clearInterval(intervalId);
+      durationIntervalRef.current = null;
+      window.__followMeTimerActive = false;
+    };
+  }, [isRecording]);
+
+  // Cleanup effect - only runs on unmount
+  useEffect(() => {
+    return () => {
+      console.log('[FollowMe] Component unmounting');
+      // Always clear interval on unmount to prevent memory leaks
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      // Restore console/fetch hooks
+      restoreConsole();
+      restoreFetch();
+      // If recording was active, save to localStorage for recovery
+      if (isRecordingRef.current) {
         saveSessionToLocalStorage();
       }
     };
-  }, [isRecording, saveSessionToLocalStorage, restoreConsole, restoreFetch]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run on unmount
 
   // TDZ FIX: All callbacks moved above - removed duplicates
   
@@ -367,16 +395,17 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       interceptConsole();
       interceptFetch();
 
+      // v3.12.14: Timer is now managed by useEffect that watches isRecording
+      // Just reset duration and set recording state
       setRecordingDuration(0);
-      durationIntervalRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-        // Persist session every 5 seconds during recording
-        if (prev % 5 === 0) {
-          saveSessionToLocalStorage();
-        }
-      }, 1000);
-
+      
+      // v3.12.13 FIX: Update ref BEFORE state to ensure useEffect sees correct value
+      isRecordingRef.current = true;
+      window.__followMeStartRecordingCalled = true;
+      window.__followMeIsRecordingBeforeSet = false;
       setIsRecording(true);
+      window.__followMeIsRecordingAfterSet = true;
+      console.log('[FollowMe] Recording started, setIsRecording(true) called');
 
       eventsRef.current.push({
         type: 'session_start',
@@ -390,6 +419,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       });
     } catch (err) {
       console.error('[FollowMe] Failed to start:', err);
+      window.__followMeStartError = err.message;
       setError('Failed to start: ' + err.message);
     }
   }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
@@ -399,10 +429,10 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       setSaving(true);
       streamEndedByUserRef.current = true; // Mark that user explicitly stopped
       
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-        durationIntervalRef.current = null;
-      }
+      // v3.12.14: Timer is cleared by useEffect when isRecording becomes false
+      // Just set the state, the effect will handle cleanup
+      isRecordingRef.current = false;
+      setIsRecording(false);
 
       eventsRef.current.push({
         type: 'session_end',
@@ -429,6 +459,8 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
         }
       }
 
+      // v3.12.13: Update ref BEFORE state for consistency
+      isRecordingRef.current = false;
       setIsRecording(false);
 
       const summary = generateSummary();
@@ -481,6 +513,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       console.error('[FollowMe] Failed to stop:', err);
       setError('Failed to stop: ' + err.message);
       setSaving(false);
+      isRecordingRef.current = false; // v3.12.13: Keep ref in sync
       setIsRecording(false);
     }
   }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, restoreConsole, restoreFetch, recordingDuration, onSessionComplete]);
@@ -619,14 +652,9 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
 
   const resumeSession = useCallback(() => {
     setHasInterruptedSession(false);
+    // v3.12.14: Timer is managed by useEffect, just set state
+    isRecordingRef.current = true;
     setIsRecording(true);
-    // Resume duration counter
-    durationIntervalRef.current = setInterval(() => {
-      setRecordingDuration(prev => prev + 1);
-      if (prev % 5 === 0) {
-        saveSessionToLocalStorage();
-      }
-    }, 1000);
     // Re-attach event listeners
     window.addEventListener('keydown', captureKeystroke, true);
     window.addEventListener('click', captureClick, true);
@@ -634,7 +662,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     window.addEventListener('scroll', captureScroll, true);
     interceptConsole();
     interceptFetch();
-  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch, saveSessionToLocalStorage]);
+  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
 
   const discardSession = useCallback(() => {
     localStorage.removeItem('follow-me-active-session');
@@ -659,6 +687,9 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       console.log('[FollowMe] Session saved to:', sessionData.savedPath);
     }
   }, [sessionData]);
+
+  // Debug: Log on every render
+  console.log('[FollowMe] Render - isRecording:', isRecording, 'recordingDuration:', recordingDuration);
 
   return (
     <div className="follow-me-debugger" data-testid="follow-me-debugger">

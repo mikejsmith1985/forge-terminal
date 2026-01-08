@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tab Theme Controls - Implementation Status</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: #2d3748;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            margin-bottom: 40px;
+            padding: 30px;
+            background: #f7fafc;
+            border-radius: 12px;
+            border-left: 5px solid #667eea;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .status-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #48bb78;
+        }
+        .status-card.pending {
+            border-left-color: #ed8936;
+        }
+        .status-card.failed {
+            border-left-color: #f56565;
+        }
+        .status-card h3 {
+            margin-bottom: 10px;
+            color: #2d3748;
+            font-size: 1.1em;
+        }
+        .status-card p {
+            color: #718096;
+            line-height: 1.6;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .badge.complete { background: #c6f6d5; color: #22543d; }
+        .badge.pending { background: #fed7d7; color: #742a2a; }
+        .badge.testing { background: #feebc8; color: #7c2d12; }
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        .command {
+            color: #68d391;
+            font-weight: bold;
+        }
+        .warning-box {
+            background: #fff5f5;
+            border: 2px solid #fc8181;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .warning-box h3 {
+            color: #c53030;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        .warning-box p {
+            color: #742a2a;
+            line-height: 1.6;
+        }
+        .screenshot {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin: 15px 0;
+        }
+        .file-list {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .file-list li {
+            padding: 8px;
+            margin: 5px 0;
+            background: #f7fafc;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .emoji {
+            font-size: 1.5em;
+        }
+        .next-steps {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-top: 30px;
+        }
+        .next-steps h2 {
+            color: white;
+            margin-bottom: 20px;
+        }
+        .next-steps ol {
+            margin-left: 20px;
+            line-height: 2;
+        }
+        .next-steps li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Tab Theme Controls</h1>
+            <p>Per-Tab Theme Configuration Implementation</p>
+        </div>
+
+        <div class="content">
+            <!-- Current Status -->
+            <div class="section">
+                <h2><span class="emoji">📊</span> Implementation Status</h2>
+                <div class="status-grid">
+                    <div class="status-card">
+                        <span class="badge complete">✓ COMPLETE</span>
+                        <h3>Backend API</h3>
+                        <p>Created <code>handlers_tab_defaults.go</code> with GET/POST endpoints for tab configuration storage.</p>
+                    </div>
+                    <div class="status-card">
+                        <span class="badge complete">✓ COMPLETE</span>
+                        <h3>Frontend UI Components</h3>
+                        <p>Built TabControlsPanel with global presets, per-tab defaults (1-20), and split theme support.</p>
+                    </div>
+                    <div class="status-card">
+                        <span class="badge complete">✓ COMPLETE</span>
+                        <h3>Context Menu Integration</h3>
+                        <p>Added theme selector to tab right-click menu with all 10 themes and dark/light modes.</p>
+                    </div>
+                    <div class="status-card pending">
+                        <span class="badge pending">⚠ BLOCKED</span>
+                        <h3>Endpoint Registration</h3>
+                        <p><strong>Root Cause:</strong> <code>/api/tab-defaults</code> endpoint was never registered in main.go. Fixed but needs restart.</p>
+                    </div>
+                    <div class="status-card pending">
+                        <span class="badge testing">⏳ PENDING</span>
+                        <h3>E2E Testing</h3>
+                        <p>Cypress tests scaffolded (15 tests) but not yet executed. Ready to run after endpoint fix.</p>
+                    </div>
+                    <div class="status-card pending">
+                        <span class="badge testing">⏳ PENDING</span>
+                        <h3>Integration Logic</h3>
+                        <p>Per-tab defaults need to be applied in <code>createTab()</code> function in useTabManager.js.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- The Bug -->
+            <div class="section">
+                <h2><span class="emoji">🐛</span> Root Cause Analysis</h2>
+                <div class="warning-box">
+                    <h3>Missing Endpoint Registration</h3>
+                    <p><strong>Problem:</strong> The <code>/api/tab-defaults</code> endpoint was implemented in <code>handlers_tab_defaults.go</code> but never registered in <code>cmd/forge/main.go</code>.</p>
+                    <p style="margin-top: 10px;"><strong>Impact:</strong> Frontend calls to <code>fetch('/api/tab-defaults')</code> return 404, causing "Failed to load settings" error in Tab Controls panel.</p>
+                    <p style="margin-top: 10px;"><strong>Evidence:</strong> Manual curl test confirms 404 response from running instance.</p>
+                </div>
+
+                <div class="code-block">
+<span class="command">$ curl http://localhost:8333/api/tab-defaults</span>
+404 page not found
+
+<span style="color: #fbb6ce;">// Backend logs show NO log entry for this endpoint being called</span>
+<span style="color: #fbb6ce;">// This confirms the route handler is not registered</span>
+                </div>
+            </div>
+
+            <!-- The Fix -->
+            <div class="section">
+                <h2><span class="emoji">✅</span> Fix Applied</h2>
+                <p><strong>File Modified:</strong> <code>cmd/forge/main.go</code> (lines 293-309)</p>
+                
+                <div class="code-block">
+<span style="color: #9f7aea;">// Tab theme defaults API</span>
+http.HandleFunc("/api/tab-defaults", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+    switch r.Method {
+    case http.MethodGet:
+        <span class="command">handleGetTabDefaults</span>(w, r)
+    case http.MethodPost:
+        <span class="command">handleSaveTabDefaults</span>(w, r)
+    default:
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+    }
+}))
+                </div>
+
+                <p style="margin-top: 20px;"><strong>Build Status:</strong> ✓ Backend recompiled successfully into <code>forge-test.exe</code></p>
+                <p><strong>Needs:</strong> Forge restart to activate the new endpoint</p>
+            </div>
+
+            <!-- Files Changed -->
+            <div class="section">
+                <h2><span class="emoji">📝</span> Files Modified/Created</h2>
+                
+                <h3 style="margin: 20px 0 10px 0; color: #4a5568;">Backend (Go)</h3>
+                <ul class="file-list">
+                    <li>✨ <strong>cmd/forge/handlers_tab_defaults.go</strong> - NEW (166 lines)
+                        <br><span style="color: #718096; font-size: 0.85em;">Contains TabDefaults struct, loadTabDefaults(), handleGetTabDefaults(), handleSaveTabDefaults()</span>
+                    </li>
+                    <li>🔧 <strong>cmd/forge/main.go</strong> - MODIFIED (added lines 300-309)
+                        <br><span style="color: #718096; font-size: 0.85em;">Registered /api/tab-defaults endpoint with GET/POST routing</span>
+                    </li>
+                </ul>
+
+                <h3 style="margin: 20px 0 10px 0; color: #4a5568;">Frontend (React)</h3>
+                <ul class="file-list">
+                    <li>✨ <strong>frontend/src/components/TabControlsPanel.jsx</strong> - NEW (439 lines)
+                        <br><span style="color: #718096; font-size: 0.85em;">Complete Settings panel with global presets, per-tab grid, split themes</span>
+                    </li>
+                    <li>🔧 <strong>frontend/src/components/Tab.jsx</strong> - MODIFIED
+                        <br><span style="color: #718096; font-size: 0.85em;">Added theme submenu to context menu with Palette icon</span>
+                    </li>
+                    <li>🔧 <strong>frontend/src/components/TabBar.jsx</strong> - MODIFIED
+                        <br><span style="color: #718096; font-size: 0.85em;">Added onChangeTheme prop passthrough</span>
+                    </li>
+                    <li>🔧 <strong>frontend/src/components/SettingsModal.jsx</strong> - MODIFIED
+                        <br><span style="color: #718096; font-size: 0.85em;">Added "Tab Controls" tab with Palette icon</span>
+                    </li>
+                    <li>🔧 <strong>frontend/src/hooks/useTabManager.js</strong> - MODIFIED
+                        <br><span style="color: #718096; font-size: 0.85em;">Added changeTabTheme() function (lines 601-638)</span>
+                    </li>
+                    <li>🔧 <strong>frontend/src/App.jsx</strong> - MODIFIED
+                        <br><span style="color: #718096; font-size: 0.85em;">Wired changeTabTheme to TabBar component</span>
+                    </li>
+                    <li>🔧 <strong>frontend/src/index.css</strong> - MODIFIED
+                        <br><span style="color: #718096; font-size: 0.85em;">Added theme submenu styles (lines 1174-1232)</span>
+                    </li>
+                </ul>
+
+                <h3 style="margin: 20px 0 10px 0; color: #4a5568;">Testing (Cypress)</h3>
+                <ul class="file-list">
+                    <li>✨ <strong>cypress/e2e/tab-theme-controls.cy.js</strong> - NEW (282 lines, 15 tests)
+                        <br><span style="color: #718096; font-size: 0.85em;">Comprehensive E2E tests for all features</span>
+                    </li>
+                    <li>✨ <strong>cypress/e2e/tab-controls-validation.cy.js</strong> - NEW
+                        <br><span style="color: #718096; font-size: 0.85em;">Quick validation test for Settings panel load</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Evidence Screenshot -->
+            <div class="section">
+                <h2><span class="emoji">📸</span> Current State Evidence</h2>
+                <p><strong>Screenshot:</strong> Settings > Tab Controls panel showing "Failed to load settings" error</p>
+                <img src="file:///C:/ProjectsWin/Forge-Terminal/cypress/screenshots/tab-controls-validation.cy.js/tab-controls-full-panel.png" 
+                     alt="Tab Controls Panel Error" 
+                     class="screenshot">
+                <p style="margin-top: 15px; color: #718096;">
+                    The panel renders correctly but shows "Failed to load settings" because the <code>/api/tab-defaults</code> 
+                    endpoint returns 404. This is fixed in the compiled binary and just needs a restart.
+                </p>
+            </div>
+
+            <!-- Next Steps -->
+            <div class="next-steps">
+                <h2>🚀 Next Steps to Complete</h2>
+                <ol>
+                    <li><strong>Restart Forge</strong>
+                        <br><code>Stop current Forge instance → Start forge-test.exe → Navigate to http://localhost:XXXX</code>
+                    </li>
+                    <li><strong>Test Settings Panel</strong>
+                        <br>Open Settings > Tab Controls and verify it loads without errors
+                    </li>
+                    <li><strong>Manual Feature Testing</strong>
+                        <ul style="margin-left: 20px; margin-top: 5px;">
+                            <li>Right-click tab → Theme submenu → Select different theme/mode</li>
+                            <li>Settings > Tab Controls → Change global preset → Save</li>
+                            <li>Settings > Tab Controls → Set per-tab default → Save</li>
+                            <li>Verify settings persist across app restart</li>
+                        </ul>
+                    </li>
+                    <li><strong>Run E2E Tests</strong>
+                        <br><code>npx cypress run --spec "cypress/e2e/tab-theme-controls.cy.js"</code>
+                    </li>
+                    <li><strong>Integrate Per-Tab Defaults</strong>
+                        <br>Modify <code>createTab()</code> in useTabManager.js to apply saved defaults when creating new tabs
+                    </li>
+                    <li><strong>Apply Split Themes to UI</strong>
+                        <br>Use split theme config to apply different themes to terminal vs control ribbon/sidebar
+                    </li>
+                </ol>
+            </div>
+
+            <!-- Architecture Summary -->
+            <div class="section">
+                <h2><span class="emoji">🏗️</span> Architecture Overview</h2>
+                
+                <h3 style="margin: 20px 0 10px 0;">Data Flow</h3>
+                <div class="code-block">
+<span style="color: #9f7aea;">// 1. User opens Settings > Tab Controls</span>
+<span class="command">TabControlsPanel</span>.useEffect()
+  → fetch(<span style="color: #fbb6ce;">'/api/tab-defaults'</span>)
+  → <span class="command">handleGetTabDefaults</span>()
+  → <span class="command">loadTabDefaults</span>()
+  → Returns JSON config
+
+<span style="color: #9f7aea;">// 2. User modifies settings and clicks Save</span>
+<span class="command">handleSave</span>()
+  → fetch(<span style="color: #fbb6ce;">'/api/tab-defaults'</span>, { method: 'POST', body: JSON })
+  → <span class="command">handleSaveTabDefaults</span>()
+  → Saves to <span style="color: #68d391;">~/.forge/tab-defaults.json</span>
+
+<span style="color: #9f7aea;">// 3. User right-clicks tab and selects theme</span>
+<span class="command">Tab</span>.handleThemeChange(themeName, themeMode)
+  → <span class="command">TabBar</span>.onChangeTheme(tabId, themeName, themeMode)
+  → <span class="command">App</span>.changeTabTheme(tabId, themeName, themeMode)
+  → <span class="command">useTabManager</span>.changeTabTheme(tabId, themeName, themeMode)
+  → Updates tab.colorTheme and tab.mode in state
+                </div>
+
+                <h3 style="margin: 20px 0 10px 0;">Configuration Structure</h3>
+                <div class="code-block">
+{
+  "<span style="color: #f6ad55;">globalPreset</span>": "auto-cycle",        <span style="color: #9f7aea;">// or specific theme name, "auto-cycle-dark", "auto-cycle-light"</span>
+  "<span style="color: #f6ad55;">splitThemes</span>": false,
+  "<span style="color: #f6ad55;">terminalTheme</span>": { "theme": "molten", "mode": "dark" },
+  "<span style="color: #f6ad55;">controlRibbon</span>": { "theme": "ocean", "mode": "light" },
+  "<span style="color: #f6ad55;">perTab</span>": {
+    "1": { "theme": "molten", "mode": "dark" },
+    "2": { "theme": "ocean", "mode": "light" },
+    <span style="color: #9f7aea;">// ... up to tab 20</span>
+  }
+}
+                </div>
+
+                <h3 style="margin: 20px 0 10px 0;">Available Themes</h3>
+                <p style="margin: 10px 0;">10 color themes × 2 modes = 20 total combinations</p>
+                <ul style="margin-left: 20px; line-height: 1.8;">
+                    <li><strong>molten</strong> (red/orange) - dark/light</li>
+                    <li><strong>ocean</strong> (blue) - dark/light</li>
+                    <li><strong>forest</strong> (green) - dark/light</li>
+                    <li><strong>midnight</strong> (purple/blue) - dark/light</li>
+                    <li><strong>rose</strong> (pink) - dark/light</li>
+                    <li><strong>arctic</strong> (cyan/white) - dark/light</li>
+                    <li><strong>highContrastDark</strong> - dark only</li>
+                    <li><strong>highContrastLight</strong> - light only</li>
+                    <li><strong>highContrastBlue</strong> - light only</li>
+                    <li><strong>highContrastYellow</strong> - light only</li>
+                </ul>
+            </div>
+
+            <!-- Known Issues -->
+            <div class="section">
+                <h2><span class="emoji">⚠️</span> Known Limitations</h2>
+                <ul style="margin-left: 20px; line-height: 2;">
+                    <li><strong>Instance Lock:</strong> Cannot stop running Forge via PowerShell due to process protection. Must close via browser or remove <code>~/.forge/forge.lock</code></li>
+                    <li><strong>Per-Tab Defaults Not Applied:</strong> Saved per-tab defaults are not yet read when creating new tabs</li>
+                    <li><strong>Split Themes Not Applied:</strong> Terminal/ribbon split configuration is saved but not yet applied to UI CSS variables</li>
+                    <li><strong>Theme Cycling:</strong> Current themeIndex counter doesn't respect global presets or per-tab defaults</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

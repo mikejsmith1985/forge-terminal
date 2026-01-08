@@ -114,7 +114,7 @@ const tests = [
       );
       return step && 
         step.with.files.includes('forge-linux-amd64') && 
-        step.with.files.includes('forge-windows-amd64.exe');
+        step.with.files.includes('fterm.exe');
     },
   },
   {

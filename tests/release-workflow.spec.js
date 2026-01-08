@@ -175,7 +175,7 @@ test.describe('Release Workflow Asset Upload', () => {
     
     expect(ubuntuUpload).toBeDefined();
     expect(ubuntuUpload.with.files).toContain('bin/forge-linux-amd64');
-    expect(ubuntuUpload.with.files).toContain('bin/forge-windows-amd64.exe');
+    expect(ubuntuUpload.with.files).toContain('bin/fterm.exe');
   });
 
   test('macOS job uploads macOS binaries', () => {

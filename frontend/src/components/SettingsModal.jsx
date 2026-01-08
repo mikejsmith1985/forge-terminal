@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
+import TabControlsPanel from './TabControlsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 import { themes, themeOrder } from '../themes';
 
@@ -213,6 +214,23 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <Cpu size={16} />
             CLI
           </button>
+          <button
+            onClick={() => setActiveTab('tabs')}
+            style={{
+              padding: '12px 20px',
+              background: 'transparent',
+              border: 'none',
+              color: activeTab === 'tabs' ? '#fff' : '#888',
+              borderBottom: activeTab === 'tabs' ? '2px solid #8b5cf6' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Palette size={16} />
+            Tab Controls
+          </button>
         </div>
 
         <div className="modal-body">
@@ -220,6 +238,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <ClaudeCLICommandsTable />
           ) : activeTab === 'cli' ? (
             <CLISettingsPanel onToast={onToast} />
+          ) : activeTab === 'tabs' ? (
+            <TabControlsPanel onToast={onToast} />
           ) : (
             <>
               <div style={{

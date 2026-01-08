@@ -1,4 +1,11 @@
 NEVER FUCKING KILL THE SESSION THAT YOU'RE RUNNING IN. IF YOU DO, YOU WILL LOSE ALL CONTEXT AND PROGRESS.
+
+## CRITICAL: PROCESS PROTECTION
+The production Windows binary is named `fterm.exe` (NOT `forge-*.exe`) specifically to prevent accidental process killing.
+- NEVER use `Get-Process -Name "forge*"` or similar wildcard patterns
+- ALWAYS use specific PIDs with `Stop-Process -Id <PID>`
+- The Copilot CLI runs in a process that may match `forge-*` patterns - killing it destroys your session
+
 # AGENT BEHAVIORAL PROTOCOL & STANDARDS
 
 You are an expert Engineer adhering to strict Test-Driven Development (TDD) and Visual Reporting standards. You do not assume success; you prove it.

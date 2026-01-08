@@ -192,6 +192,7 @@ function App() {
     toggleTabAutoRespond,
     // toggleTabAM, // v3.12.12: AM feature removed
     toggleTabMode,
+    changeTabTheme,
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
@@ -582,6 +583,13 @@ function App() {
   useEffect(() => {
     if (activeTab?.colorTheme) {
       const tabMode = activeTab.mode || 'dark';
+      console.log('[App] Theme useEffect triggered:', {
+        tabId: activeTab.id,
+        colorTheme: activeTab.colorTheme,
+        mode: tabMode,
+        currentGlobalTheme: colorTheme,
+        currentGlobalMode: theme
+      });
       logger.theme('Applying theme for active tab', { 
         tabId: activeTab.id, 
         colorTheme: activeTab.colorTheme,
@@ -592,11 +600,13 @@ function App() {
       // CRITICAL FIX: Ensure global theme class matches tab mode
       // This ensures components using .light/.dark selectors (like SystemCommandCard) work correctly
       if (tabMode !== theme) {
+        console.log('[App] Updating global theme mode from', theme, 'to', tabMode);
         setTheme(tabMode);
         document.documentElement.className = tabMode;
         // Force re-apply theme variables immediately after class change
         applyTheme(activeTab.colorTheme, tabMode);
       } else {
+        console.log('[App] Applying theme without mode change');
         applyTheme(activeTab.colorTheme, tabMode);
       }
     }
@@ -1604,6 +1614,7 @@ function App() {
           onToggleAutoRespond={toggleTabAutoRespond}
           onToggleMode={toggleTabMode}
           onToggleViewMode={toggleTabViewMode}
+          onChangeTheme={changeTabTheme}
           onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
           disableNewTab={tabs.length >= MAX_TABS}
           waitingTabs={waitingTabs}

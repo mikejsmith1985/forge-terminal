@@ -1,0 +1,829 @@
+{
+  "logs": [
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Creating tab object",
+        {
+          "tabId": "tab-1-ojjykxrop",
+          "tabNumber": 1,
+          "colorTheme": "molten",
+          "mode": "dark",
+          "viewMode": "terminal",
+          "currentDirectory": null,
+          "themeIndex": 0
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Session] Loading session from backend",
+        {}
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[PerfInst] Long Task Observer started"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[PerfInst] Started - monitoring for freezes"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Theme useEffect triggered:",
+        {
+          "tabId": "tab-1-ojjykxrop",
+          "colorTheme": "molten",
+          "mode": "dark",
+          "currentGlobalTheme": "molten",
+          "currentGlobalMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Theme] Applying theme for active tab",
+        {
+          "tabId": "tab-1-ojjykxrop",
+          "colorTheme": "molten",
+          "mode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Applying theme without mode change"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[SSE] Connected to update events"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Session] Session loaded",
+        {
+          "tabCount": 3,
+          "activeTabId": "tab-7-gyi20l1br"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Update] Skipping GitHub update check in local development"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Welcome not yet shown - guided tour will handle this"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Update] Version verified:",
+        "3.12.10"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Paste listener attached to xterm textarea"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Paste listener attached to xterm textarea"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Paste listener attached to xterm textarea"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Theme useEffect triggered:",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "colorTheme": "ocean",
+          "mode": "light",
+          "currentGlobalTheme": "molten",
+          "currentGlobalMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Theme] Applying theme for active tab",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "colorTheme": "ocean",
+          "mode": "light"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Updating global theme mode from",
+        "dark",
+        "to",
+        "light"
+      ]
+    },
+    {
+      "type": "warn",
+      "args": [
+        "[PerfInst] Long task: 130ms",
+        {
+          "visibilityState": "visible",
+          "hasFocus": true
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] WebSocket connected",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "shellType": "powershell",
+          "wsUrl": "ws://[host]/ws?tabId=tab-7-gyi20l1br&shell=powershell",
+          "reconnectAttempts": 0
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Initial size sent",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "cols": 107,
+          "rows": 41
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Restoring directory",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "directory": "C:\\ProjectsWin\\Forge-Terminal"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Auto-respond backend sync on connect: enabled",
+        {
+          "tabId": "tab-7-gyi20l1br"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Directory restore command sent",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "command": "cd \"C:\\ProjectsWin\\Forge-Terminal\""
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] WebSocket connected",
+        {
+          "tabId": "tab-5-rd60757wx",
+          "shellType": "powershell",
+          "wsUrl": "ws://[host]/ws?tabId=tab-5-rd60757wx&shell=powershell",
+          "reconnectAttempts": 0
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Initial size sent",
+        {
+          "tabId": "tab-5-rd60757wx",
+          "cols": 107,
+          "rows": 41
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Restoring directory",
+        {
+          "tabId": "tab-5-rd60757wx",
+          "directory": "C:\\ProjectsWin\\Forge-Terminal"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Auto-respond backend sync on connect: enabled",
+        {
+          "tabId": "tab-5-rd60757wx"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] WebSocket connected",
+        {
+          "tabId": "tab-4-0v4b30awa",
+          "shellType": "powershell",
+          "wsUrl": "ws://[host]/ws?tabId=tab-4-0v4b30awa&shell=powershell",
+          "reconnectAttempts": 0
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Initial size sent",
+        {
+          "tabId": "tab-4-0v4b30awa",
+          "cols": 107,
+          "rows": 41
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Restoring directory",
+        {
+          "tabId": "tab-4-0v4b30awa",
+          "directory": "C:\\ProjectsWin\\Forge-Terminal"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Directory restore command sent",
+        {
+          "tabId": "tab-5-rd60757wx",
+          "command": "cd \"C:\\ProjectsWin\\Forge-Terminal\""
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Directory restore command sent",
+        {
+          "tabId": "tab-4-0v4b30awa",
+          "command": "cd \"C:\\ProjectsWin\\Forge-Terminal\""
+        }
+      ]
+    },
+    {
+      "type": "warn",
+      "args": [
+        "[PerfInst] Long task: 114ms",
+        {
+          "visibilityState": "visible",
+          "hasFocus": true
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Session] Saving session",
+        {
+          "tabCount": 3,
+          "activeTabId": "tab-7-gyi20l1br",
+          "tabIds": [
+            "tab-7-gyi20l1br",
+            "tab-5-rd60757wx",
+            "tab-4-0v4b30awa"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Session] Session saved successfully",
+        {}
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 385
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 800
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Auto-renaming tab to folder",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "folderName": "Forge-Terminal\"",
+          "fullPath": "C:\\ProjectsWin\\Forge-Terminal\""
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 419
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Auto-renaming tab to folder",
+        {
+          "tabId": "tab-5-rd60757wx",
+          "folderName": "forge-terminal",
+          "fullPath": "C:\\ProjectsWin\\forge-terminal"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 800
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Auto-renaming tab to folder",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "folderName": "Forge-Terminal",
+          "fullPath": "C:\\ProjectsWin\\Forge-Terminal"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Auto-renaming tab to folder",
+        {
+          "tabId": "tab-4-0v4b30awa",
+          "folderName": "forge-terminal",
+          "fullPath": "C:\\ProjectsWin\\forge-terminal"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 485
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 494
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 636
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 800
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 800
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Auto-renaming tab to folder",
+        {
+          "tabId": "tab-5-rd60757wx",
+          "folderName": "Forge-Terminal\"",
+          "fullPath": "C:\\ProjectsWin\\Forge-Terminal\""
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Auto-renaming tab to folder",
+        {
+          "tabId": "tab-4-0v4b30awa",
+          "folderName": "Forge-Terminal\"\b",
+          "fullPath": "C:\\ProjectsWin\\Forge-Terminal\"\b"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[AutoRespond] Check:",
+        {
+          "waiting": false,
+          "responseType": null,
+          "confidence": "none",
+          "excluded": false,
+          "autoRespondEnabled": true,
+          "wsReady": true,
+          "bufferLen": 800
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Auto-renaming tab to folder",
+        {
+          "tabId": "tab-5-rd60757wx",
+          "folderName": "Forge-Terminal",
+          "fullPath": "C:\\ProjectsWin\\Forge-Terminal"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Auto-renaming tab to folder",
+        {
+          "tabId": "tab-4-0v4b30awa",
+          "folderName": "Forge-Terminal",
+          "fullPath": "C:\\ProjectsWin\\Forge-Terminal"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Session] Saving session",
+        {
+          "tabCount": 3,
+          "activeTabId": "tab-7-gyi20l1br",
+          "tabIds": [
+            "tab-7-gyi20l1br",
+            "tab-5-rd60757wx",
+            "tab-4-0v4b30awa"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Session] Session saved successfully",
+        {}
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Tab switch initiated",
+        {
+          "fromTabId": "tab-7-gyi20l1br",
+          "toTabId": "tab-7-gyi20l1br",
+          "targetTabTheme": "ocean",
+          "currentGlobalTheme": "ocean"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Switching tab",
+        {
+          "fromTabId": "tab-7-gyi20l1br",
+          "toTabId": "tab-7-gyi20l1br",
+          "targetColorTheme": "ocean"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tab] Context menu opened:",
+        {
+          "devMode": false,
+          "tabId": "tab-7-gyi20l1br"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tab] handleThemeChange called:",
+        {
+          "themeName": "molten",
+          "themeMode": "dark",
+          "tabId": "tab-7-gyi20l1br"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tab] Calling onChangeTheme callback"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[useTabManager] changeTabTheme called:",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "themeName": "molten",
+          "themeMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Changing tab theme",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "themeName": "molten",
+          "themeMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[useTabManager] Tab theme updated:",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "oldTheme": "ocean",
+          "oldMode": "light",
+          "newTheme": "molten",
+          "newMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tabs] Tab theme changed",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "newTheme": "molten",
+          "newMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Terminal] Theme updated",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "colorTheme": "molten",
+          "baseTheme": "dark",
+          "isVisible": true
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Theme useEffect triggered:",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "colorTheme": "molten",
+          "mode": "dark",
+          "currentGlobalTheme": "ocean",
+          "currentGlobalMode": "light"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Theme] Applying theme for active tab",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "colorTheme": "molten",
+          "mode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Updating global theme mode from",
+        "light",
+        "to",
+        "dark"
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Session] Saving session",
+        {
+          "tabCount": 3,
+          "activeTabId": "tab-7-gyi20l1br",
+          "tabIds": [
+            "tab-7-gyi20l1br",
+            "tab-5-rd60757wx",
+            "tab-4-0v4b30awa"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Session] Session saved successfully",
+        {}
+      ]
+    }
+  ],
+  "themeChangeLogs": [
+    {
+      "type": "log",
+      "args": [
+        "[App] Theme useEffect triggered:",
+        {
+          "tabId": "tab-1-ojjykxrop",
+          "colorTheme": "molten",
+          "mode": "dark",
+          "currentGlobalTheme": "molten",
+          "currentGlobalMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Theme useEffect triggered:",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "colorTheme": "ocean",
+          "mode": "light",
+          "currentGlobalTheme": "molten",
+          "currentGlobalMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[Tab] handleThemeChange called:",
+        {
+          "themeName": "molten",
+          "themeMode": "dark",
+          "tabId": "tab-7-gyi20l1br"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[useTabManager] changeTabTheme called:",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "themeName": "molten",
+          "themeMode": "dark"
+        }
+      ]
+    },
+    {
+      "type": "log",
+      "args": [
+        "[App] Theme useEffect triggered:",
+        {
+          "tabId": "tab-7-gyi20l1br",
+          "colorTheme": "molten",
+          "mode": "dark",
+          "currentGlobalTheme": "ocean",
+          "currentGlobalMode": "light"
+        }
+      ]
+    }
+  ]
+}

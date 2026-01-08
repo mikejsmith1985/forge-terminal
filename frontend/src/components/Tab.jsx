@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, Sun, Moon } from 'lucide-react';
-import { themes } from '../themes';
+import { X, Terminal, TerminalSquare, Edit2, Zap, Sun, Moon, Palette } from 'lucide-react';
+import { themes, themeOrder } from '../themes';
 
 /**
  * Get shell icon based on shell type
@@ -32,10 +32,11 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleMode, onToggleViewMode, isWaiting = false, mode = 'dark', devMode = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [showThemeSubmenu, setShowThemeSubmenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const inputRef = useRef(null);
   const contextMenuRef = useRef(null);
@@ -49,6 +50,18 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
       });
     }
   }, [showContextMenu, devMode, tab.id]);
+
+  const handleThemeChange = (themeName, themeMode) => {
+    console.log('[Tab] handleThemeChange called:', { themeName, themeMode, tabId: tab.id });
+    setShowContextMenu(false);
+    setShowThemeSubmenu(false);
+    if (onChangeTheme) {
+      console.log('[Tab] Calling onChangeTheme callback');
+      onChangeTheme(themeName, themeMode);
+    } else {
+      console.warn('[Tab] onChangeTheme callback is not defined!');
+    }
+  };
 
   const handleClick = (e) => {
     // Don't trigger onClick if clicking close button or in edit mode
@@ -223,6 +236,15 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             {tabMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             {tabMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
+          <button 
+            className="submenu-trigger"
+            onClick={() => setShowThemeSubmenu(!showThemeSubmenu)}
+            onMouseEnter={() => setShowThemeSubmenu(true)}
+          >
+            <Palette size={14} />
+            Theme
+            <span className="submenu-arrow">▶</span>
+          </button>
           {/* v3.8.2: View Mode toggle REMOVED - Terminal is the only view */}
           {/* v3.12.12: AM toggle REMOVED - AM feature deprecated */}
           <button 
@@ -239,6 +261,46 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
             <X size={14} />
             Close
           </button>
+        </div>
+      )}
+
+      {/* Theme Submenu */}
+      {showContextMenu && showThemeSubmenu && (
+        <div 
+          className="theme-submenu"
+          style={{ 
+            top: contextMenuPos.y, 
+            left: contextMenuPos.x + 200 
+          }}
+          onMouseLeave={() => setShowThemeSubmenu(false)}
+        >
+          {themeOrder.map(themeName => {
+            const themeData = themes[themeName];
+            const currentTheme = tab.colorTheme === themeName;
+            return (
+              <div key={themeName} className="theme-option">
+                <div className="theme-name">
+                  {themeData?.name || themeName} {currentTheme && '✓'}
+                </div>
+                <div className="theme-modes">
+                  <button 
+                    onClick={() => handleThemeChange(themeName, 'dark')}
+                    className={currentTheme && tabMode === 'dark' ? 'active' : ''}
+                  >
+                    <Moon size={12} />
+                    Dark
+                  </button>
+                  <button 
+                    onClick={() => handleThemeChange(themeName, 'light')}
+                    className={currentTheme && tabMode === 'light' ? 'active' : ''}
+                  >
+                    <Sun size={12} />
+                    Light
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </>

@@ -37,7 +37,7 @@ If macOS builds are failing:
 
 Each release includes:
 - `forge-linux-amd64` - Linux AMD64 binary
-- `forge-windows-amd64.exe` - Windows AMD64 binary  
+- `fterm.exe` - Windows AMD64 binary  
 - `forge-darwin-amd64` - macOS Intel binary
 - `forge-darwin-arm64` - macOS Apple Silicon binary
 

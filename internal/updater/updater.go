@@ -396,11 +396,12 @@ func getAssetName() string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
 
-	name := fmt.Sprintf("forge-%s-%s", goos, arch)
+	// Windows uses 'fterm.exe' to prevent accidental process killing via 'forge-*' patterns
 	if goos == "windows" {
-		name += ".exe"
+		return "fterm.exe"
 	}
-	return name
+
+	return fmt.Sprintf("forge-%s-%s", goos, arch)
 }
 
 func getExeSuffix() string {

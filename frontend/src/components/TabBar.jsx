@@ -17,6 +17,7 @@ function TabBar({
   // onToggleAM = null, // v3.12.12: AM feature removed
   onToggleMode = null, // Callback to toggle light/dark mode for a tab
   onToggleViewMode = null, // Callback to toggle view mode (chat/terminal/notebook) for a tab
+  onChangeTheme = null, // Callback to change theme+mode for a tab
   onOpenDashboard = null, // Callback to open Developer Dashboard
   disableNewTab = false,
   waitingTabs = {}, // Map of tabId -> isWaiting
@@ -57,6 +58,12 @@ function TabBar({
     }
   };
 
+  const handleChangeTheme = (tabId, themeName, themeMode) => {
+    if (onChangeTheme) {
+      onChangeTheme(tabId, themeName, themeMode);
+    }
+  };
+
   return (
     <div className="tab-bar" role="tablist">
       <div className="tab-bar-scroll">
@@ -73,6 +80,7 @@ function TabBar({
             onToggleAutoRespond={() => handleToggleAutoRespond(tab.id)}
             onToggleMode={() => handleToggleMode(tab.id)}
             onToggleViewMode={() => handleToggleViewMode(tab.id)}
+            onChangeTheme={(themeName, themeMode) => handleChangeTheme(tab.id, themeName, themeMode)}
             devMode={devMode}
           />
         ))}

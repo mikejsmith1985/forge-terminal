@@ -1092,17 +1092,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
       
-      // FIX: Explicitly handle Backspace to ensure correct escape sequence
-      // Different CLIs expect different codes: \x7f (DEL) vs \x08 (BS)
-      // We'll send \x7f which is the standard for most Unix terminals and modern CLIs
-      if (arg.code === 'Backspace' && arg.type === 'keydown') {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          // Send DEL character (\x7f) directly to ensure it reaches the CLI
-          wsRef.current.send('\x7f');
-          console.log('[Terminal] Backspace intercepted - sending \\x7f (DEL)');
-          return false; // Prevent xterm from also handling it
-        }
-        return true; // Let xterm handle if websocket not ready
+      // v3.12.13 FIX: Remove Backspace interception - let xterm handle it naturally
+      // The previous "fix" that sent \x7f directly caused freezing issues with Copilot CLI
+      // because xterm's internal state wasn't updated. By returning true, xterm will:
+      // 1. Process the backspace locally (update cursor position, etc.)
+      // 2. Call onData() with the correct character (\x7f or \x08)
+      // 3. We send that via websocket in the onData handler
+      // This is the standard flow and works with all CLIs.
+      if (arg.code === 'Backspace') {
+        return true; // Let xterm handle backspace naturally
       }
       
       // Handle Ctrl+C (Copy vs Interrupt)

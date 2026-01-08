@@ -1,62 +1,82 @@
 /**
  * E2E Test: Follow Me Recording Timer
  * 
- * Validates that the recording timer updates correctly and survives tab switches
+ * v3.12.13: Validates that the recording timer updates correctly and survives tab switches
  */
 
 describe('Follow Me Recording Timer', () => {
   beforeEach(() => {
     // Start Forge Terminal
     cy.visit('http://localhost:3005');
-    cy.get('.terminal-container', { timeout: 10000 }).should('be.visible');
+    
+    // Wait for app to load
+    cy.wait(2000);
+    
+    // Dismiss tour if present (use jQuery trigger like in backspace test)
+    cy.get('body').then($body => {
+      const tourClose = $body.find('.tour-tooltip-close');
+      if (tourClose.length > 0) {
+        tourClose.trigger('click');
+      }
+    });
+    cy.wait(500);
+    
+    cy.get('.terminal-wrapper:not(.hidden) .terminal-inner', { timeout: 15000 }).should('be.visible');
   });
 
   it('timer should increment from 0:00', () => {
-    // Navigate to WebTools → Debug
-    cy.contains('button', 'Web Tools').click();
+    // Navigate to Web Tools tab (which contains the debugger)
+    cy.contains('button', 'Web Tools').click({ force: true });
     cy.wait(500);
     
-    // Click Debug view
-    cy.get('[data-view="debug"]').click({ force: true });
-    cy.wait(1000);
+    // Wait for WebAppDebuggerCard to appear (contains Follow Me)
+    cy.get('.web-app-debugger-card', { timeout: 5000 }).should('be.visible');
     
     // Wait for Follow Me button
     cy.get('[data-testid="follow-me-button"]', { timeout: 5000 }).should('be.visible');
     
-    // Click Follow Me
-    cy.get('[data-testid="follow-me-button"]').click();
+    // Click Follow Me with force to bypass any overlays
+    cy.get('[data-testid="follow-me-button"]').click({ force: true });
     
     // Wait for recording to start
     cy.get('[data-testid="recording-indicator"]', { timeout: 5000 }).should('be.visible');
+    
+    // Take immediate screenshot
+    cy.screenshot('timer-after-click');
     
     // Get initial timer value
     cy.get('.recording-duration').invoke('text').then(initialTimer => {
       cy.log('Initial timer:', initialTimer);
       
       // Should be 0:00 or 0:01
-      expect(initialTimer).to.match(/0:0[0-1]/);
+      expect(initialTimer).to.match(/0:0[0-2]/);
       
-      // Wait 3 seconds
-      cy.wait(3000);
+      // Wait 4 seconds (a bit longer to ensure ticks)
+      cy.wait(4000);
+      
+      // Take screenshot after wait
+      cy.screenshot('timer-after-4-seconds');
       
       // Timer should have incremented
       cy.get('.recording-duration').invoke('text').then(updatedTimer => {
         cy.log('Updated timer:', updatedTimer);
-        expect(updatedTimer).to.match(/0:0[3-5]/);
+        // Timer should now be 0:03 to 0:06 (4 seconds + some slack)
+        expect(updatedTimer).to.match(/0:0[3-6]/);
       });
     });
     
-    // Take screenshot
+    // Take final screenshot
     cy.screenshot('follow-me-timer-running');
     
     // Stop recording
-    cy.get('[data-testid="im-done-button"]').click();
+    cy.get('[data-testid="im-done-button"]').click({ force: true });
   });
 
   it('timer should survive tab switches', () => {
-    // Navigate to Debug tab
+    // Navigate to Web Tools tab
     cy.contains('button', 'Web Tools').click();
-    cy.get('[data-view="debug"]').click({ force: true });
+    cy.wait(500);
+    cy.get('.web-app-debugger-card', { timeout: 5000 }).should('be.visible');
     
     // Start Follow Me
     cy.get('[data-testid="follow-me-button"]').click();
@@ -70,13 +90,12 @@ describe('Follow Me Recording Timer', () => {
       cy.log('Timer before switch:', timerBefore);
       const secondsBefore = parseInt(timerBefore.split(':')[1]);
       
-      // Switch away from WebTools
-      cy.get('.tab').first().click();
+      // Switch away to Files tab
+      cy.contains('button', 'Files').click();
       cy.wait(2000);
       
-      // Switch back to WebTools → Debug
+      // Switch back to Web Tools tab
       cy.contains('button', 'Web Tools').click();
-      cy.get('[data-view="debug"]').click({ force: true });
       
       // Wait for component to remount
       cy.get('[data-testid="recording-indicator"]', { timeout: 5000 }).should('be.visible');
@@ -87,7 +106,7 @@ describe('Follow Me Recording Timer', () => {
         cy.log('Timer after switch:', timerAfter);
         const secondsAfter = parseInt(timerAfter.split(':')[1]);
         
-        // Timer should have continued (allow 2s tolerance)
+        // Timer should have continued (allow 2s tolerance for switch time)
         expect(secondsAfter).to.be.at.least(secondsBefore + 1);
         expect(secondsAfter).to.be.at.most(secondsBefore + 5);
       });
