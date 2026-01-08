@@ -22,12 +22,14 @@ build-mac-arm: frontend-build
 
 build-windows: frontend-build
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS_WIN) -o bin/fterm.exe ./cmd/forge
+	cp bin/fterm.exe bin/forge-windows-amd64.exe
 
 build-all: frontend-build
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/forge-linux-amd64 ./cmd/forge
 	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o bin/forge-darwin-amd64 ./cmd/forge
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o bin/forge-darwin-arm64 ./cmd/forge
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS_WIN) -o bin/fterm.exe ./cmd/forge
+	cp bin/fterm.exe bin/forge-windows-amd64.exe
 
 # Frontend build
 frontend-build:

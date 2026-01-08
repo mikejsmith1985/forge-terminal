@@ -102,20 +102,28 @@ func CheckForUpdate() (*UpdateInfo, error) {
 	}
 
 	// Find the right asset for this platform
-	assetName := getAssetName()
+	// Try new name first, fallback to old name for transition period
+	assetNames := getAssetNames()
 	var downloadURL string
 	var assetSize int64
+	var assetName string
 
-	for _, asset := range release.Assets {
-		if asset.Name == assetName {
-			downloadURL = asset.BrowserDownloadURL
-			assetSize = asset.Size
+	for _, name := range assetNames {
+		for _, asset := range release.Assets {
+			if asset.Name == name {
+				downloadURL = asset.BrowserDownloadURL
+				assetSize = asset.Size
+				assetName = name
+				break
+			}
+		}
+		if downloadURL != "" {
 			break
 		}
 	}
 
 	if downloadURL == "" {
-		return nil, fmt.Errorf("no binary available for %s/%s", runtime.GOOS, runtime.GOARCH)
+		return nil, fmt.Errorf("no binary available for %s/%s (tried: %v)", runtime.GOOS, runtime.GOARCH, assetNames)
 	}
 
 	return &UpdateInfo{
@@ -392,16 +400,23 @@ func ListReleases(limit int) ([]ReleaseInfo, error) {
 
 // Helper functions
 
-func getAssetName() string {
+// getAssetNames returns a list of asset names to try, in priority order
+// Windows: Try new name (fterm.exe) first, fallback to old name for transition
+func getAssetNames() []string {
 	goos := runtime.GOOS
 	arch := runtime.GOARCH
 
-	// Windows uses 'fterm.exe' to prevent accidental process killing via 'forge-*' patterns
 	if goos == "windows" {
-		return "fterm.exe"
+		// Try new name first, fallback to old name for backward compatibility
+		return []string{"fterm.exe", "forge-windows-amd64.exe"}
 	}
 
-	return fmt.Sprintf("forge-%s-%s", goos, arch)
+	return []string{fmt.Sprintf("forge-%s-%s", goos, arch)}
+}
+
+func getAssetName() string {
+	// Keep for compatibility - returns first preference
+	return getAssetNames()[0]
 }
 
 func getExeSuffix() string {
