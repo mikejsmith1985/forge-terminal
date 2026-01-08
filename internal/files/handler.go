@@ -587,6 +587,8 @@ func HandleRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[Files] Read success: path=%s, size=%d bytes", req.Path, len(content))
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"path":    req.Path,

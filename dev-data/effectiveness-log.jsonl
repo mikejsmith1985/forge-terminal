@@ -13,3 +13,4 @@
 {"pattern":"bugfix","model":"claude-haiku-4.5","prompts":2,"success":true,"timestamp":"2026-01-03T07:53:53.6699284-05:00"}
 {"pattern":"feature","model":"claude-opus-4.5","prompts":2,"success":true,"timestamp":"2026-01-03T07:53:53.7066155-05:00"}
 {"pattern":"feature","model":"claude-sonnet-4.5","prompts":4,"success":true,"timestamp":"2026-01-03T07:53:53.7071776-05:00"}
+{"pattern":"bugfix","model":"copilot-cli","prompts":2,"success":true,"timestamp":"2026-01-08T19:10:00Z","files_changed":1}

@@ -136,6 +136,7 @@ body {
   width: 40%;
   min-width: 300px;
   max-width: 50%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);

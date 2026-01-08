@@ -1,7 +1,8 @@
 .monaco-editor-container {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr;
   height: 100%;
+  width: 100%;
   background: var(--bg-primary);
 }
 
@@ -61,8 +62,10 @@
 }
 
 .monaco-editor-wrapper {
-  flex: 1;
   overflow: hidden;
+  position: relative;
+  height: 100%;
+  width: 100%;
 }
 
 .monaco-loading {

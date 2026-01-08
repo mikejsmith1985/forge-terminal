@@ -838,6 +838,13 @@ function App() {
     localStorage.setItem('theme', newTheme);
     document.documentElement.className = newTheme;
     applyTheme(colorTheme, newTheme);
+
+    // Fix: Update active tab mode to match new global theme
+    // This ensures the terminal (which prioritizes tab.mode) updates correctly
+    if (activeTabId && activeTab) {
+      // Use changeTabTheme to update mode while preserving color theme
+      changeTabTheme(activeTabId, activeTab.colorTheme || colorTheme, newTheme);
+    }
   };
 
   // Keyboard shortcuts

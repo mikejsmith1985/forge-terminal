@@ -56,13 +56,17 @@ export default function MonacoEditor({
       }
       
       const data = await response.json();
-      console.log('[MonacoEditor] Response data:', {
-        hasContent: !!data.content,
-        contentLength: data.content?.length || 0,
-        contentPreview: data.content?.substring(0, 100) || ''
-      });
-      
-      setContent(data.content || '');
+      console.log('[MonacoEditor] Raw response data:', JSON.stringify(data, null, 2)); // CRITICAL DEBUG
+
+      if (data.content === undefined || data.content === null) {
+         console.error('[MonacoEditor] CRITICAL: Content is null/undefined in response!');
+         setContent('// ERROR: Server returned no content field');
+         return;
+      }
+
+      console.log('[MonacoEditor] Setting content length:', data.content.length);
+      console.log('[MonacoEditor] First 100 chars:', data.content.substring(0, 100));
+      setContent(data.content);
       setModified(false);
       console.log('[MonacoEditor] ===== FILE LOAD SUCCESS =====');
     } catch (err) {
@@ -172,7 +176,7 @@ export default function MonacoEditor({
   };
   
   return (
-    <div className="monaco-editor-container">
+    <div className="monaco-editor-container" style={{ display: 'grid', gridTemplateRows: 'auto 1fr', height: '100%', width: '100%', backgroundColor: 'var(--bg-primary)' }}>
       <div className="monaco-toolbar">
         <div className="monaco-toolbar-left">
           <span className="monaco-filename">{file?.name || 'Untitled'}</span>
@@ -211,7 +215,7 @@ export default function MonacoEditor({
         </div>
       </div>
       
-      <div className="monaco-editor-wrapper">
+      <div className="monaco-editor-wrapper" style={{ overflow: 'hidden', position: 'relative', height: '100%', width: '100%' }}>
         {loading ? (
           <div className="monaco-loading">Loading...</div>
         ) : (

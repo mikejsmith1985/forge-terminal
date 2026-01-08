@@ -114,9 +114,7 @@ jobs:
           # Linux AMD64
           GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-linux-amd64 ./cmd/forge
           # Windows AMD64 (GUI mode - no console window)
-          # v3.12.15 ONLY: Provide both names for transition (old updater needs old name to find update)
           GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS -H=windowsgui" -o bin/fterm.exe ./cmd/forge
-          cp bin/fterm.exe bin/forge-windows-amd64.exe
 
       - name: Build macOS Binaries
         if: matrix.os == 'macos-latest'

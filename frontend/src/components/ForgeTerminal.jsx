@@ -1384,8 +1384,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           const dir = currentDirectoryRef.current;
           logger.terminal('Restoring directory', { tabId, directory: dir });
           
-          // PERFORMANCE FIX: Reduce delay from 500ms to 100ms
-          // Modern shells are ready almost immediately after PTY connection
+          // PERFORMANCE FIX: Increased delay from 100ms to 800ms
+          // 100ms was too aggressive for some systems causing directory restore to fail
+          // when the shell wasn't fully ready to receive input
           setTimeout(() => {
             if (ws.readyState === WebSocket.OPEN) {
               // Different cd command syntax for different shells
@@ -1411,7 +1412,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               ws.send(cdCommand);
               logger.terminal('Directory restore command sent', { tabId, command: cdCommand.trim() });
             }
-          }, 100);
+          }, 800);
         }
 
         // CRITICAL FIX: Sync auto-respond state to backend SequenceEngine on connect
