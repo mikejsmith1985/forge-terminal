@@ -310,6 +310,18 @@ func main() {
 		}
 	}))
 
+	// v3.12.15: Quick instruction API for floating prompt bar
+	http.HandleFunc("/api/quick-instruction", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handleGetQuickInstruction(w, r)
+		case http.MethodPost:
+			handleSaveQuickInstruction(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
 	// Start freeze detector on startup
 	_ = diagnostic.GetFreezeDetector() // Auto-starts on first access
 

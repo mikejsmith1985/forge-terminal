@@ -42,7 +42,7 @@ go build -o bin/forge ./cmd/forge
 
 **Advantages**:
 - Full terminal access with PTY support
-- All features work (AM logging, commands, themes)
+- All features work (commands, themes, etc.)
 - Fast, no network latency
 - Perfect for development and testing
 

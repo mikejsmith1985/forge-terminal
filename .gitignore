@@ -73,6 +73,20 @@ VERIFICATION_*.md
 *_CHARTER.md
 Freeze-Fix-Data.md
 
+# Detailed changelogs (keep locally, not customer-facing)
+RELEASE_NOTES_*.md
+RELEASE_SUMMARY_*.md
+CHANGELOG_*.md
+V*.md
+v*.md
+*_RELEASE_*.md
+*_FIX_*.md
+*_COMPLETE.md
+*_VALIDATION*.md
+*_DASHBOARD*.html
+*-dashboard*.html
+*-validation*.html
+
 # Logs and monitoring
 logs/
 scripts/freeze-monitor/

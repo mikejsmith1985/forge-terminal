@@ -11,20 +11,18 @@
 3. [The Terminal](#-the-terminal)
 4. [Tabs - Run Multiple Terminals](#-tabs---run-multiple-terminals)
 5. [Command Cards](#-command-cards)
-6. [Keyboard Shortcuts](#-keyboard-shortcuts)
-7. [Themes & Customization](#-themes--customization)
-8. [Font Size Control](#-font-size-control)
-9. [Resizable Sidebar](#-resizable-sidebar)
-10. [Windows Features (CMD, PowerShell, WSL)](#-windows-features-cmd-powershell-wsl)
-11. [Search Your Terminal](#-search-your-terminal)
-12. [Auto-Respond (Prompt Watcher)](#-auto-respond-prompt-watcher)
-13. [AM (Artificial Memory) Logging](#-am-artificial-memory-logging)
-14. [Forge Assistant (Experimental)](#-forge-assistant-experimental)
-15. [Vision Detection (Experimental)](#-vision-detection-experimental)
-16. [Updates & Versions](#-updates--versions)
-17. [Where Settings Are Saved](#-where-settings-are-saved)
-18. [Technical Details](#-technical-details)
-19. [Troubleshooting](#-troubleshooting)
+6. [Quick Instructions (NEW!)](#-quick-instructions-new)
+7. [Keyboard Shortcuts](#-keyboard-shortcuts)
+8. [Themes & Customization](#-themes--customization)
+9. [Font Size Control](#-font-size-control)
+10. [Resizable Sidebar](#-resizable-sidebar)
+11. [Windows Features (CMD, PowerShell, WSL)](#-windows-features-cmd-powershell-wsl)
+12. [Search Your Terminal](#-search-your-terminal)
+13. [Auto-Respond (Prompt Watcher)](#-auto-respond-prompt-watcher)
+14. [Updates & Versions](#-updates--versions)
+15. [Where Settings Are Saved](#-where-settings-are-saved)
+16. [Technical Details](#-technical-details)
+17. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -41,15 +39,7 @@ Think of it like your computer's command prompt or terminal, but with superpower
 - **Multiple Tabs**: Open up to 20 different terminals at once with per-tab customization
 - **10 Beautiful Themes**: Choose from 10 color themes including high-contrast accessibility options
 - **Per-Tab Modes**: Each tab can be light or dark mode independently (20 unique visual combinations)
-- **AM Logging**: Optional session recording to never lose your work context
 - **Works Everywhere**: Runs on Windows, Mac, and Linux
-
-### New in v2.1.0: Agent Mode 🤖
-
-Forge Terminal now features **Agent Mode** - a full-screen chat interface that acts as your AI pair programmer.
-- **Smart Router**: Automatically switches between fast local models and powerful cloud models (Copilot) based on your request.
-- **Full Context**: The Agent understands your project and can execute commands for you.
-- **Dedicated Workspace**: Open Agent tabs (`Ctrl+Shift+T`) alongside your terminal tabs.
 
 ### The "One Binary, Double-Click, Works" Promise
 
@@ -182,7 +172,7 @@ Forge Terminal comes with 5 default commands designed for AI coding:
 | 📝 **Design Command** | Pastes a prompt asking AI to design before coding |
 | ⚡ **Execute Command** | Pastes a prompt to implement the design using TDD |
 | 🛑 **F*** THIS!** | A "reset" prompt when the AI gets stuck in a loop |
-| 📖 **Summarize Last Session** | AI prompt to read AM logs and summarize where you left off |
+| 📖 **Summarize Last Session** | AI prompt to summarize your recent terminal activity |
 
 ### Execute vs. Paste
 
@@ -240,6 +230,78 @@ Commands automatically get shortcuts assigned:
 
 ---
 
+## ⚡ Quick Instructions (NEW!)
+
+**Quick Instructions** is a floating input bar that lets you automatically append context to any CLI prompt - perfect for working with AI tools like GitHub Copilot CLI, Claude, or Aider.
+
+### What It Does
+
+Instead of typing the same context or instructions repeatedly, Quick Instructions lets you:
+- Save a custom instruction template in Settings
+- Press **Ctrl+I** to open a floating input bar
+- Type your prompt and see your instruction automatically appended
+- Click Send to deliver the complete prompt to your CLI tool
+
+### How to Use
+
+1. **Enable the Feature**
+   - Open Settings (⚙️ icon or Ctrl+,)
+   - Click the **"Quick Instructions"** tab (⚡ icon)
+   - Toggle **"Enable Quick Instruction Bar"**
+   - Enter your instruction template
+   - Click **Save Settings**
+
+2. **Configure Your Template**
+   ```
+   Example template:
+   "This is a test prompt to verify the quick instruction 
+   system is working correctly."
+   ```
+
+3. **Use It in Any CLI**
+   - Start a CLI tool (e.g., `gh copilot suggest`, `claude`, `aider`)
+   - Press **Ctrl+I** to open the Quick Instruction bar
+   - Type your prompt: "How do I list all files recursively?"
+   - Review the combined preview
+   - Click **Send** or press **Ctrl+Enter**
+
+### What Gets Sent
+
+```
+Your Prompt:
+How do I list all files recursively?
+
+Appended Context:
+This is a test prompt to verify the quick instruction 
+system is working correctly.
+```
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| **Ctrl+I** | Toggle Quick Instruction bar |
+| **Ctrl+Enter** | Send prompt (when bar is focused) |
+| **Escape** | Collapse bar |
+
+### Why It's Better Than Auto-Append
+
+The Quick Instruction bar is **explicit and reliable**:
+- ✅ You see exactly what will be sent
+- ✅ You can edit your prompt before sending
+- ✅ Works with ANY CLI tool (not just specific ones)
+- ✅ 100% reliable (no fragile terminal interception)
+- ✅ Can edit instruction on-the-fly per prompt
+
+### Tips
+
+- Use it for **testing prompts** ("This is a test to verify...")
+- Add **project context** ("You're working on a Node.js project...")
+- Include **response format preferences** ("Respond with code only...")
+- Set **tone or style** ("Use beginner-friendly explanations...")
+
+---
+
 ## ⌨️ Keyboard Shortcuts
 
 ### Tab Management
@@ -271,6 +333,21 @@ Commands automatically get shortcuts assigned:
 | `Ctrl+Shift+...` | Trigger Command #N |
 | `Ctrl+Shift+0` | Trigger Command #10 |
 | `Ctrl+Shift+A` through `Ctrl+Shift+Z` | Commands #11 and beyond |
+
+### Quick Instructions (NEW!)
+
+| Shortcut | What It Does |
+|----------|--------------|
+| `Ctrl+I` | Toggle Quick Instruction bar |
+| `Ctrl+Enter` | Send prompt (when bar is focused) |
+| `Escape` | Collapse Quick Instruction bar |
+
+### Other
+
+| Shortcut | What It Does |
+|----------|--------------|
+| `Ctrl+,` | Open Settings |
+| `Ctrl+/` | Open Forge Assist (command palette) |
 
 ---
 
@@ -457,172 +534,6 @@ The Prompt Watcher looks for common confirmation patterns:
 - Auto-respond is **per-tab** - enable it only where you want it
 - It only responds to **confirmation prompts**, not passwords or other input
 - Turn it off when you need manual control
-
----
-
-## 📖 AM (Artificial Memory) Logging
-
-**AM** stands for **Artificial Memory** - it's an optional feature that records everything that happens in your terminal session so you never lose your work context.
-
-### What Is It?
-
-When you enable AM logging for a tab, Forge Terminal creates a Markdown file that records:
-- Every command you type
-- All terminal output
-- Timestamps for when things happened
-- The working directory and tab name
-
-Think of it like a detailed lab notebook for your terminal sessions!
-
-### Why Use It?
-
-- **Crash Recovery**: If your terminal crashes or you accidentally close it, you have a complete record
-- **Session Resuming**: Use the "📖 Summarize Last Session" command card to get an AI-powered summary of where you left off
-- **Documentation**: Perfect audit trail for debugging or explaining what you did
-- **Team Collaboration**: Share logs with teammates to show exact steps you took
-
-### How to Enable
-
-1. **Right-click** on a tab
-2. Select **"AM Logging"** to enable it
-3. A green indicator appears on the tab when active
-
-### Where Are Logs Stored?
-
-AM logs are stored in your current working directory:
-- **Active logs**: `./am/session-{tabID}-{date}.md`
-- **Archived logs**: `./am_archive/` (automatically moved when sessions end)
-
-### Using the Summary Command
-
-The default command card "📖 Summarize Last Session" (Ctrl+Shift+5) is a special prompt designed to work with AM logs:
-
-1. **Paste the command** into your AI assistant (like Claude)
-2. The AI will **read the most recent AM log** from `./am/`
-3. You get a **200-word summary** covering:
-   - What you were working on
-   - The last significant action
-   - Any errors encountered
-   - What to do next
-
-### Tips
-
-- Enable AM logging when working on complex tasks
-- Logs are stored as Markdown files - you can read them directly!
-- Old logs (7+ days) are automatically cleaned up to save space
-- Disable AM logging when you don't need it (reduces disk writes)
-
-### View LLM Conversation Snapshots (Dev Mode)
-
-When using LLM tools like GitHub Copilot CLI, Forge Terminal automatically captures screen snapshots of your conversations:
-
-1. **Enable Dev Mode** in Settings → Toggle "Dev Mode"
-2. Look for the **"AM (3)"** indicator in the bottom-right status bar
-3. **Click on the AM indicator** to open the Conversation Viewer
-4. Navigate through captured snapshots:
-   - **← →** Arrow keys to move between snapshots
-   - **Esc** to close the viewer
-
-Each snapshot preserves the terminal state at that moment, giving you a complete history of your LLM interactions. Conversations persist across server restarts!
-
-### Performance Tuning
-
-If you experience keyboard latency, you can adjust how often AM polls for updates:
-
-```javascript
-// In browser console (F12):
-window.__forgeAMConfig?.setPollingInterval(60000)  // 60 seconds
-```
-
-**Common settings:**
-- `10000` - Very frequent monitoring (may impact performance)
-- `30000` - **Default** (balanced)
-- `60000` - Reduced monitoring (best if typing feels slow)
-
----
-
-## 🤖 Forge Assistant (Experimental)
-
-> **Status:** Experimental feature, available in Dev Mode  
-> **Enable:** Settings → Toggle "Dev Mode"
-
-The Forge Assistant is an AI-powered chat panel that understands your terminal context and can suggest commands, answer questions, and execute operations with your confirmation.
-
-### What It Does
-
-- **Context-Aware Chat**: Understands your working directory, recent commands, and terminal output
-- **Command Suggestions**: Proposes commands and explains what they do
-- **Local LLM**: Uses Ollama for completely local, private inference (no cloud)
-- **Model Selection**: Switch between different models (Llama, CodeLlama, Mistral, etc.)
-
-### Getting Started
-
-1. **Enable Dev Mode**:
-   - Click ⚙️ Settings
-   - Toggle **"Dev Mode"**
-   - Restart or refresh the page
-
-2. **Install Ollama**:
-   - Download from [ollama.ai](https://ollama.ai)
-   - Run `ollama serve` in a terminal
-   - Pull a model: `ollama pull mistral`
-
-3. **Open Assistant Panel**:
-   - Click the **"Assistant"** tab in the sidebar
-   - Select your model from the dropdown
-
-### Using the Assistant
-
-- **Ask Questions**: "How do I find large files?" → Assistant suggests `find . -size +100M`
-- **Get Help**: "How do I create a git branch?" → Explains the command
-- **Run Commands**: Click "Run" next to suggested commands (they execute in the active tab)
-
-### Limitations (Current)
-
-- Visual improvements coming soon
-- JSON detection from Vision system not yet displayed
-- Command execution confirmation required for safety
-- Dev Mode feature; may change in future versions
-
----
-
-## 👁️ Vision Detection (Experimental)
-
-> **Status:** Experimental feature, available in Dev Mode  
-> **Enable:** Settings → Toggle "Dev Mode" → Enable for specific tab
-
-Vision Detection automatically recognizes structured patterns in terminal output and makes them available for enhanced interaction.
-
-### What It Detects
-
-**Currently Deployed:**
-- **JSON Objects & Arrays**: Recognizes valid JSON structures in output
-
-**Coming Soon:**
-- File paths and clickable navigation
-- URLs for quick access
-- Error stack traces with line-number navigation
-- Git status and branch information
-
-### Current Behavior
-
-When JSON is detected:
-- Terminal detects and buffers the output
-- Information is passed to the Assistant (when enabled)
-- Visual formatting improvements coming in future versions
-
-### Enabling Vision per Tab
-
-1. **Right-click** on a tab
-2. Select **"Vision"** to toggle detection for that tab
-3. An eye icon (👁️) appears on the tab when enabled
-
-### Limitations (Current)
-
-- JSON detection works; visual improvements pending
-- No clickable links or formatting yet
-- Primarily supports Assistant integration
-- Experimental; behavior may change
 
 ---
 

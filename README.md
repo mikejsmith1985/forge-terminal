@@ -9,15 +9,26 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 > **🚀 NEW: GitHub Pages Deployment!**  
 > Run forge-terminal from your browser on ANY device (Mac, Linux, Windows). See [Installation](#installation) below or try the **[interactive setup wizard](#-interactive-setup-wizard-recommended)**.
 
+# Forge Terminal
+
+**"One binary, double-click, works."**
+
+Forge Terminal is a standalone, cross-platform terminal application designed for AI-assisted development. It combines a full-featured terminal with "command cards" - saved commands that can be executed or pasted with a single click or keyboard shortcut.
+
+![Forge Terminal Screenshot](https://via.placeholder.com/800x500?text=Forge+Terminal+Screenshot)
+
+> **🚀 NEW: GitHub Pages Deployment!**  
+> Run forge-terminal from your browser on ANY device (Mac, Linux, Windows). See [Installation](#installation) below or try the **[interactive setup wizard](#-interactive-setup-wizard-recommended)**.
+
 ## ✨ Features
 
 ### Core Terminal
 - **🚀 Single Binary**: No Docker, Node.js, or config files required. Just download and run.
 - **💻 Full PTY Terminal**: Real PTY support (xterm.js) for interactive apps like `vim`, `htop`, `claude`, and more.
-- **📑 Multi-Tab Support**: Open up to 20 terminal tabs with drag-and-drop reordering. Each tab has its own isolated terminal session and chat context.
+- **📑 Multi-Tab Support**: Open up to 20 terminal tabs with drag-and-drop reordering. Each tab has its own isolated terminal session.
 - **💾 Session Persistence**: Tabs, themes, and positions are restored automatically across restarts.
 - **🔍 Terminal Search**: Find text in terminal output with match highlighting.
-- **🔐 Tab Isolation (NEW v3.3.7)**: Each terminal tab has a completely isolated session with independent WebSocket connections and PTY processes. Chat messages persist per-tab when switching between chat and terminal views.
+- **🔐 Tab Isolation**: Each terminal tab has a completely isolated session with independent WebSocket connections and PTY processes.
 
 ### Command Cards
 - **⚡ Quick Commands**: Save frequently used commands with descriptions and icons.
@@ -27,30 +38,31 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **🔄 Drag & Drop**: Reorder command cards to your preference.
 - **⭐ Favorites**: Mark important commands as favorites.
 
-### AI Chat & Context Brain (NEW v3.3.0+)
-- **💬 Chat-Native Interface**: Full-featured chat interface with easy switching to terminal. New tabs start in chat mode by default.
-- **🧠 Context Brain**: Intelligent context system that automatically includes:
-  - Terminal output history (last 50 lines)
-  - Vision-detected patterns (errors, warnings, file paths)
-  - Multi-file context via `@filepath` syntax for deep project understanding
-- **🎯 Smart Routing with SLM (NEW v3.6.0)**: Executive trigger (prefix with `?`) for real smart model tier selection
-  - **Real Task Analysis**: Uses Small Language Model (SLM) to analyze prompt intent (debug, refactor, generate, explain, etc.)
-  - **Complexity Scoring**: Automatic 1-10 complexity assessment with color-coded confidence indicators
-  - **Optimal Model Selection**: Routes to Haiku, Sonnet, or Opus based on actual task requirements (not heuristics)
-  - **Fallback Safety**: Gracefully falls back to heuristic pattern matching if SLM unavailable
-  - **Live Feedback**: Badge shows real task type, complexity, and which model is running
-- **🌙 Dark Mode (v3.3.7)**: Chat sidebar and router configuration now support dark mode for comfortable extended use
-- **⚙️ Router Configuration**: Configure which AI models handle different task tiers (basic/intermediate/advanced)
-- **📊 Task Classification**: Automatic detection of task complexity for optimal model selection
+### AI Integration
+- **🤖 Forge Assist**: AI-powered assistance panel integrated into the sidebar for context-aware help.
+- **⚡ Quick Instructions (NEW v3.12.15)**: 
+  - Floating input bar for adding context to CLI prompts
+  - Toggle with `Ctrl+I` shortcut
+  - Automatically append instruction templates to your prompts
+  - Works with any CLI tool (gh copilot, claude, aider, etc.)
+  - Configure custom instruction templates in Settings
+  - Explicit and reliable - see exactly what gets sent
+- **💬 Chat Context**: Full-featured chat interface with terminal output integration.
+- **📂 File Context**: Reference project files for deep understanding.
 
 ### Theming & Customization
 - **🎨 10 Color Themes**: Molten Metal, Deep Ocean, Emerald Forest, Midnight Purple, Rose Gold, Arctic Frost, plus 4 high-contrast accessibility themes.
-- **🌗 Per-Tab Light/Dark Mode**: Each tab can independently toggle between light and dark modes (10 themes × 2 modes = 20 unique visuals).
+- **🌗 Per-Tab Theme Controls (NEW v3.12.15)**: 
+  - Right-click any tab → Theme submenu
+  - Choose from all 10 color themes
+  - Toggle between light and dark mode per theme
+  - Each tab can have its own unique theme
+  - Visual indicator shows current theme
+  - Settings panel for global presets and per-tab defaults
 - **♿ High-Contrast Themes**: Includes color-blind friendly themes for visual accessibility.
-- **📏 Dual Font Controls**: Adjust terminal (8-30px) and assistant chat (8-30px) font sizes independently with icon toggle.
+- **📏 Dual Font Controls**: Adjust terminal (8-30px) and assistant chat (8-30px) font sizes independently.
 - **📐 Flexible Layout**: Position the command sidebar on the left or right.
 - **↔️ Resizable Sidebar**: Drag the sidebar edge to adjust width (200-800px, persists across sessions).
-- **🎯 Per-Tab Themes**: Each tab can have its own color theme.
 
 ### Windows-Specific Features
 - **🐚 Shell Selection**: Switch between CMD, PowerShell, and WSL.
@@ -64,33 +76,17 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **🔓 Unrestricted Mode**: Optional full filesystem access for advanced users.
 
 ### Quality of Life
-- **🐛 Debug Panel**: Integrated debug panel in the ribbon with real-time system diagnostics, auto-refresh capability, and one-click feedback reporting. Includes Terminal Info, Focus State, WebSocket status, and viewport details. **Send Feedback** button opens GitHub issue creation with automatic screenshot capture. **NEW in v1.23.0**: Comprehensive **Diagnostic Overlay** for troubleshooting. Captures all keyboard, paste, websocket, and AM events in real-time. 4 intelligent problem detectors identify root causes: double-paste issues, spacebar blocking, stale AM output, and hydration delays. Session export to `~/.forge/diagnostics/` for offline analysis.
-- **📖 AM (Artificial Memory)**: Optional per-tab session logging for crash recovery and context restoration. Logs are stored in `./.forge/am/` directory with workspace-aware naming. **NEW in v1.21.0**: Full TUI screen capture for AI CLI tools (Copilot, Claude) with automatic session reconstruction and 70% parsing accuracy + 100% raw snapshot fallback.
-- **🎓 Interactive Guided Tour (NEW v3.3.5)**: First-run experience with interactive guide introducing Chat Evolution UI features. Highlights key components and explains the workflow for new users.
+- **🤖 Auto-Respond**: Automatically respond to CLI confirmation prompts (per-tab toggle).
+- **🎓 Interactive Guided Tour**: First-run experience with interactive guide introducing key features.
 - **🔄 Auto-Updates**: Automatic update checking with one-click installation.
 - **📜 Version History**: View and rollback to previous versions.
-- **🤖 Auto-Respond**: Auto-respond to CLI confirmation prompts (per-tab toggle).
 - **📍 Scroll to Bottom**: Quick button to jump to latest output.
 - **🔌 Disconnect Reasons**: Clear messages when terminal sessions end.
 - **🖥️ Desktop Shortcut**: Create a desktop shortcut from Settings for quick access.
-- **✨ Active Tab Indicator**: Rotating "bead of light" animation for visual clarity (v1.20.9+).
+- **✨ Active Tab Indicator**: Rotating "bead of light" animation for visual clarity.
 
-### Experimental Features (Dev Mode)
-> Enable Dev Mode in Settings to access experimental features.
-
-- **🤖 Forge Assistant** (Experimental): AI-powered chat panel integrated into the sidebar. Requires local Ollama for model inference. Context-aware suggestions based on terminal state.
-  - **📚 RAG Knowledge Base** (NEW in v1.22.0): Assistant now includes **comprehensive** Retrieval-Augmented Generation for accurate project-specific answers. Indexes not just documentation but **entire codebase** (Go source, JavaScript/React, configs, scripts) for deep technical understanding. Uses cosine similarity search for relevant context retrieval. Now includes ~280+ files and 1200+ document chunks for maximum accuracy. See `scripts/index-full-codebase.sh` to index your project.
-- **👁️ Vision Detection** (Experimental): Real-time pattern detection with interactive overlays and configurable detectors:
-  - **Git Status**: Detects `git status` output, shows staged/unstaged/untracked files with quick stage/unstage actions
-  - **JSON Blocks**: Identifies JSON in terminal output, pretty-prints with copy actions (configurable minimum size)
-  - **File Paths**: Detects file paths, validates existence, provides quick view/edit/list actions
-  - **Compiler Errors** (NEW): Detects errors from Go, Rust, TypeScript, Python, Java with context and quick actions
-  - **Stack Traces** (NEW): Detects panics and exceptions from Go, Python, Java, JavaScript with frame analysis
-  - **Configurable Detectors**: Enable/disable each detector type independently via Vision Settings
-  - **Vision-AM Integration** (NEW): All detected errors and warnings are persisted to AM logs. When auto-respond is enabled, Vision can optionally interrupt the workflow on critical errors or silently collect findings for post-session review. Configure in Settings: "Vision-AutoRespond Mode" (strict/lenient)
-
-### Terminal Improvements (v1.22.0)
-- **⌨️ Smart Keyboard Shortcuts**: Ctrl+C and Ctrl+V now work exactly like VS Code:
+### Terminal Improvements
+- **⌨️ Smart Keyboard Shortcuts**: Ctrl+C and Ctrl+V work exactly like VS Code:
   - **Ctrl+C with selection**: Copies text to clipboard (no SIGINT)
   - **Ctrl+C without selection**: Sends SIGINT to interrupt processes
   - **Ctrl+V**: Pastes from clipboard seamlessly
@@ -330,16 +326,11 @@ chmod +x forge-linux-amd64
 
 4. **Customize Appearance**:
    - Click the **palette icon** to cycle through 10 color themes.
-   - **Right-click a tab** and select "Light Mode" or "Dark Mode" for per-tab themes.
+   - **Right-click a tab** and select "Theme" to choose from 10 color themes and toggle light/dark mode.
    - Use **+/-** buttons to adjust font size.
    - Click the **panel icon** to move sidebar left/right.
 
-5. **Enable AM Logging** (Optional):
-   - Right-click a tab → "AM Logging" to enable session recording.
-   - Logs are saved to `./am/` directory.
-   - Use the "📖 Summarize Last Session" command card to review previous work.
-
-6. **Windows Shell Selection**:
+5. **Windows Shell Selection**:
    - Click the shell indicator (CMD/PS/WSL) to cycle through shells.
    - Use the **settings gear** for detailed WSL configuration.
 
@@ -429,117 +420,16 @@ Forge Terminal stores configuration in `~/.forge/`:
 | File | Purpose |
 |------|---------|
 | `commands.json` | Saved command cards |
-| `config.json` | Shell and app settings (including dark mode preferences for chat and router) |
-| `sessions.json` | Tab state for session restore (includes active view mode per tab) |
-| `router_config.json` | LLM router configuration with model mappings for different task tiers |
+| `config.json` | Shell and app settings |
+| `sessions.json` | Tab state for session restore |
+| `tab-defaults.json` | Per-tab theme preferences and global presets |
 | `welcome_shown` | Tracks if welcome screen was shown for current version |
 
-AM logs are stored in the working directory:
-- `./am/` - Active session logs (Markdown format)
-- `./am_archive/` - Archived logs from completed sessions
+## Version History
 
-### Dark Mode Settings (v3.3.7+)
-Individual dark mode preferences are now saved for:
-- **Chat Sidebar**: Toggle dark mode in Chat settings
-- **Router Configuration**: Toggle dark mode in Router Configuration panel
-- **Terminal Tabs**: Per-tab light/dark mode (existing feature)
+See [Release Notes](https://github.com/mikejsmith1985/forge-terminal/releases) for detailed changelogs and downloads.
 
-These settings persist across sessions in `config.json`.
-
-## Changelog
-
-### v3.3.7 (Current)
-- **Dark Mode for Chat & Config**: Chat sidebar and router configuration now support dark mode
-- **Terminal View Preservation**: Terminal view mode is now preserved when switching tabs
-- **Terminal Tab Isolation**: Fixed terminal session isolation to prevent cross-tab interference
-- **Chat Message Persistence**: Chat messages now persist per-tab when switching between chat and terminal views
-- **Improved Tab Cleanup**: Proper resource cleanup when closing tabs
-- **CSS z-index Fixes**: Improved z-index layering for terminal wrappers to prevent visual overlap
-
-### v3.3.6 (Active Engineer - Configuration Persistence & Deep Context)
-- **Active Engineer Integration**: New file listing API endpoint for workspace navigation
-- **Configuration Persistence**: Router configuration now persists across sessions
-- **Deep Context with @mentions**: Reference files with @filepath syntax for enhanced AI context
-- **Enhanced Chat Context**: Improved context building with terminal history and vision insights
-
-### v3.3.5 (Guided Tour - First Run Experience)
-- **Interactive Guided Tour**: First-run experience walking users through Chat Evolution UI
-- **Chat Evolution UI**: Full-tab chat interface replacing sidebar chat
-- **Smart Routing**: AI-powered model tier classification based on task complexity
-
-### v3.3.4 (Remediation)
-- **AM Tests**: Comprehensive test coverage for Artificial Memory system
-- **Router Config Enhancements**: Improved router configuration UI and functionality
-
-### v3.3.0 (Chat Evolution - Production-Ready)
-- **Context Brain**: Full-featured context system with terminal history and vision insights
-- **Smart Routing**: Executive trigger (?) for intelligent model routing
-- **Chat-Native Tabs**: Tabs start in chat mode with easy switching to terminal
-- **Active Model Orchestrator**: Dynamic model selection based on task analysis
-
-### v1.20.0
-- **Vision-AM Integration**: All Vision findings (errors, warnings, patterns) persisted to AM logs
-- **Configurable Vision-AutoRespond**: Choose between strict (interrupt) or lenient (collect) modes
-- **Insights API**: New endpoint for accessing Vision insights from sessions
-- **Post-Session Review**: Review all Vision findings after command execution completes
-- **Error Detection Enhancements**: Improved parsing of compiler errors and stack traces
-
-### v1.19.1
-- **Resizable Sidebar**: Drag sidebar edge horizontally to adjust width (persists)
-- **Dual Font Controls**: Independent font size adjustment for terminal and assistant chat (8-30px range)
-- **Experimental Assistant**: Dev Mode toggle for AI chat panel with Ollama integration
-- **Experimental Vision**: JSON detection in terminal output (visual improvements pending)
-
-### v1.16.1
-- **Update Modal Cleanup**: Removed dead hard-refresh code that never executed
-- **16 New Unit Tests**: Comprehensive test coverage for update flow
-- **Improved Documentation**: Clear README guide for updating and spacebar recovery
-- **Better UX Messages**: "Update applied. New version launching in new tab..." message
-
-### v1.9.0 (Latest)
-- **Per-Tab Light/Dark Mode**: Each tab can independently toggle between light and dark modes (20 unique visual combinations)
-- **Emoji Icons**: 40+ colorful emoji icons for command cards alongside existing Lucide icons
-- **High-Contrast Accessibility Themes**: 4 new themes including color-blind friendly options (10 total themes)
-- **Desktop Shortcut Creation**: Create desktop shortcuts from Settings > Installation
-- **Enhanced Welcome Screen**: Updated with AM, Auto-Respond, Self-Naming Tabs, and accessibility info
-
-### v1.8.0
-- **Desktop Shortcut**: Create shortcuts from Settings modal
-- **4 High-Contrast Themes**: Accessibility-focused themes for visual impairments
-- **Welcome Screen Enhancements**: Added feature descriptions for AM, Auto-Respond, and Self-Naming Tabs
-
-### v1.7.0
-- **AM (Artificial Memory)**: Per-tab session logging for crash recovery
-- **Self-Naming Tabs**: Tabs automatically rename to current working directory
-- **Auto-Respond**: Per-tab toggle for CLI confirmation prompt automation
-
-### v1.6.0
-- **Welcome Screen**: First-launch splash screen with feature overview
-- **Enhanced Documentation**: Comprehensive README with all features documented
-- **Prompt Watcher**: Auto-respond to CLI confirmation prompts (per-tab toggle)
-- **Disconnect Reasons**: Clear messages when terminal sessions end
-
-### v1.5.7
-- Bug fixes for tab creation and theme application
-- Improved prompt watcher reliability
-
-### v1.5.0
-- **Session Persistence**: Tabs are now restored automatically when you refresh or restart the app
-- **Terminal Search**: Find text in terminal output with `Ctrl+F` (prev/next navigation, highlights matches)
-
-### v1.4.2
-- Per-tab color theming
-- Bug fixes for max tabs warning
-
-### v1.4.0
-- Multi-tab terminal support (up to 20 tabs)
-- Tab keyboard shortcuts (`Ctrl+T`, `Ctrl+W`, `Ctrl+1-9`)
-
-### v1.3.9
-- 6 color themes
-- Sidebar positioning (left/right)
-- Font size controls
-- Auto-update system
+**Current Version**: v3.12.15
 
 ## License
 MIT

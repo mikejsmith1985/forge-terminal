@@ -97,6 +97,18 @@ const TOUR_STEPS = [
   },
 
   {
+    id: 'quick-instruction-intro',
+    selector: '.quick-instruction-collapsed',
+    fallbackSelector: '.forge-assist-floating-btn',
+    title: 'Quick Instructions (NEW!) ⚡',
+    content: 'Press Ctrl+I to open the Quick Instruction bar - a floating input that lets you add custom context to any CLI prompt. Works with gh copilot, claude, aider, and more! Configure your instruction template in Settings.',
+    placement: 'center',
+    spotlight: true,
+    arrow: 'down-right',
+    action: 'closeForgeAssist', // Make sure Forge Assist is closed
+  },
+
+  {
     id: 'forge-assist-commands',
     selector: '.forge-assist-modal .mode-tab:first-child',
     fallbackSelector: '.forge-assist-modal',
@@ -397,7 +409,7 @@ const TOUR_STEPS = [
     id: 'keyboard-shortcuts',
     selector: null,
     title: 'Keyboard Power User ⌨️',
-    content: '**Essential Shortcuts:**\n\n• Ctrl+T: New tab\n• Ctrl+W: Close tab\n• Ctrl+Tab: Cycle tabs\n• Ctrl+1-9: Jump to tab\n• Ctrl+F: Search terminal\n• Ctrl+/: Forge Assist\n• Ctrl+Shift+H: Time Travel\n• Ctrl+Shift+1-9: Run command cards\n• Ctrl+,: Settings',
+    content: '**Essential Shortcuts:**\n\n• Ctrl+T: New tab\n• Ctrl+W: Close tab\n• Ctrl+Tab: Cycle tabs\n• Ctrl+1-9: Jump to tab\n• Ctrl+F: Search terminal\n• Ctrl+/: Forge Assist\n• Ctrl+I: Quick Instructions\n• Ctrl+Shift+H: Time Travel\n• Ctrl+Shift+1-9: Run command cards\n• Ctrl+,: Settings',
     placement: 'center',
     spotlight: false,
   },
@@ -420,7 +432,7 @@ const TOUR_STEPS = [
     id: 'complete',
     selector: null,
     title: 'You\'re Ready to Go! 🚀',
-    content: '**Try these next:**\n\n• Press Ctrl+/ to open Forge Assist\n• Create a Command Card for your favorite command\n• Browse files and use @ mentions\n• Try Time Travel with Ctrl+Shift+H\n• Customize your theme\n\nReplay this tour anytime from Settings → Shell tab. Happy coding!',
+    content: '**Try these next:**\n\n• Press Ctrl+/ to open Forge Assist\n• Press Ctrl+I for Quick Instructions\n• Create a Command Card for your favorite command\n• Browse files and use @ mentions\n• Try Time Travel with Ctrl+Shift+H\n• Customize your theme\n\nReplay this tour anytime from Settings → Shell tab. Happy coding!',
     placement: 'center',
     spotlight: false,
     isFinal: true,

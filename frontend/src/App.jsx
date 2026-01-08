@@ -5,6 +5,7 @@ import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
+import QuickInstructionBar from './components/QuickInstructionBar'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
@@ -160,6 +161,11 @@ function App() {
   });
   const [isDraggingBtn, setIsDraggingBtn] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
+  // v3.12.15: Quick Instruction feature
+  const [quickInstructionEnabled, setQuickInstructionEnabled] = useState(false);
+  const [quickInstructionText, setQuickInstructionText] = useState('');
+  const [showQuickInstruction, setShowQuickInstruction] = useState(false);
   
   // Workflow UI state - REMOVED v3.9.0: Workflows deleted, using Task Dashboard instead
   // Task Dashboard state - REMOVED v3.12.3: Was unimplemented scaffolding
@@ -371,6 +377,7 @@ function App() {
     checkWSL()
     checkForUpdates()
     checkWelcome()
+    loadQuickInstructionConfig() // v3.12.15: Load quick instruction settings
     
     // Start performance instrumentation for freeze detection
     performanceInstrumentation.start((freezeCapture) => {
@@ -647,6 +654,21 @@ function App() {
     }
   }
 
+  // v3.12.15: Load quick instruction config
+  const loadQuickInstructionConfig = async () => {
+    try {
+      const response = await fetch('/api/quick-instruction');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[QuickInstruction] Loaded:', data);
+        setQuickInstructionEnabled(data.enabled || false);
+        setQuickInstructionText(data.template || '');
+      }
+    } catch (error) {
+      console.error('[QuickInstruction] Failed to load config:', error);
+    }
+  };
+
   const saveConfig = async (config) => {
     const oldShell = shellConfig.shellType;
     const newShell = config.shellType;
@@ -797,6 +819,19 @@ function App() {
     saveConfig({ ...shellConfig, shellType: nextShell });
   }
 
+  // v3.12.15: Send text to terminal (for Quick Instruction and Command Cards)
+  const sendToTerminal = (text) => {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (!tab || !tab.socket || tab.socket.readyState !== WebSocket.OPEN) {
+      addToast('No active terminal connection', 'error');
+      return;
+    }
+    
+    // Send text directly to PTY
+    tab.socket.send(text);
+    console.log('[QuickInstruction] Sent to terminal:', text);
+  };
+
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
@@ -893,6 +928,13 @@ function App() {
       if (e.ctrlKey && !e.shiftKey && e.key === '/') {
         e.preventDefault();
         setIsForgeAssistOpen(prev => !prev);
+        return;
+      }
+      
+      // Ctrl+I: Toggle Quick Instruction Bar
+      if (e.ctrlKey && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+        e.preventDefault();
+        setShowQuickInstruction(prev => !prev);
         return;
       }
       
@@ -1915,6 +1957,15 @@ function App() {
       >
         <Command size={24} />
       </button>
+
+      {/* v3.12.15: Quick Instruction Bar - Floating prompt input */}
+      <QuickInstructionBar
+        isEnabled={quickInstructionEnabled && showQuickInstruction}
+        quickInstruction={quickInstructionText}
+        forgeAssistBtnPos={forgeAssistBtnPos}
+        onSend={sendToTerminal}
+        onClose={() => setShowQuickInstruction(false)}
+      />
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (

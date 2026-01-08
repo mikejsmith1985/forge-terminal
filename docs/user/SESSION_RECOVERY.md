@@ -1,5 +1,10 @@
 # Session Recovery Guide
 
+> **⚠️ DEPRECATED - Feature Removed in v3.12.12**  
+> This document describes the Session Recovery feature which relied on "Artificial Memory" (AM) logging.  
+> Both features have been removed from Forge Terminal.  
+> This file is kept for historical reference only.
+
 Forge Terminal's Session Recovery lets you continue interrupted AI conversations across tabs, terminals, and even system restarts.
 
 ## How It Works

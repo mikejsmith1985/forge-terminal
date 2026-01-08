@@ -1,5 +1,7 @@
 # 🚀 LOCAL DEVELOPMENT - QUICK START
 
+> **⚠️ Note:** Some testing commands in this guide reference the deprecated "AM" (Artificial Memory) feature which was removed in v3.12.12.
+
 **You're ready to test locally! No more push-to-production cycle.**
 
 ---

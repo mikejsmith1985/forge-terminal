@@ -1,5 +1,9 @@
 # LLM Conversation Logging - User Guide
 
+> **⚠️ DEPRECATED - Feature Removed in v3.12.12**  
+> This document describes the "Artificial Memory" (AM) logging feature which has been removed from Forge Terminal.  
+> This file is kept for historical reference only.
+
 ## 🎯 **TL;DR**: It Just Works™
 
 **You don't need to do anything.** LLM conversation logging is **ALWAYS ON** automatically.
