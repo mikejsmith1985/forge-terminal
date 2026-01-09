@@ -808,28 +808,26 @@ function App() {
 
   // v3.12.15: Send text to terminal (for Quick Instruction and Command Cards)
   const sendToTerminal = (text) => {
-    const tab = tabs.find(t => t.id === activeTabId);
-    
-    if (!tab) {
-      addToast('No active tab found. Please create a tab first.', 'error');
+    const termRefObj = getActiveTerminalRef();
+
+    // The terminalRef is the single authoritative path for inserting text into the terminal.
+    // If it's not present, sending isn't supported in this context.
+    const writeFn = termRefObj?.write || termRefObj?.current?.write;
+    if (!writeFn) {
+      addToast('No active terminal available to receive input. Open a terminal tab and try again.', 'error');
+      console.warn('[QuickInstruction] No terminal ref available to write to');
       return;
     }
 
-    if (!tab.socket) {
-      addToast('Terminal socket not initialized.', 'error');
-      return;
+    const payload = text.endsWith('\r') || text.endsWith('\n') ? text : `${text}\r`;
+    try {
+      writeFn(payload);
+      addToast('Inserted into terminal.', 'success');
+      console.log('[QuickInstruction] Wrote to terminal ref:', payload);
+    } catch (err) {
+      console.error('[QuickInstruction] Write to terminal ref failed:', err);
+      addToast('Failed to write to terminal.', 'error');
     }
-
-    if (tab.socket.readyState !== WebSocket.OPEN) {
-      const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
-      const state = states[tab.socket.readyState] || 'UNKNOWN';
-      addToast(`Terminal connection is ${state}. Please wait...`, 'warning');
-      return;
-    }
-    
-    // Send text directly to PTY
-    tab.socket.send(text);
-    console.log('[QuickInstruction] Sent to terminal:', text);
   };
 
   const toggleTheme = () => {
@@ -1300,6 +1298,34 @@ function App() {
         // Execute command directly in terminal
         termRef.sendCommand(cmd.command, cmd.delay);
         termRef.focus();
+
+        // Zero-Click Workflow: If macro_payload exists, auto-inject after delay
+        console.log('[SmartCard] Checking macro for:', cmd.name, 'Payload:', cmd.macro_payload ? 'YES' : 'NO');
+        
+        if (cmd.macro_payload && cmd.macro_payload.trim().length > 0) {
+          const macroDelay = cmd.macro_delay || 1500; // Default 1500ms
+          console.log('[SmartCard] Scheduling macro in', macroDelay, 'ms');
+          
+          setTimeout(() => {
+            console.log('[SmartCard] Timer fired. Checking termRef...');
+            // Re-acquire ref to be safe? No, termRef should be stable for the specific tab.
+            // But let's check connection state explicitly.
+            if (termRef) {
+                const connected = termRef.isConnected ? termRef.isConnected() : 'unknown';
+                console.log('[SmartCard] TermRef exists. Connected:', connected);
+                
+                if (connected === true || connected === 'unknown') {
+                    console.log('[SmartCard] Sending payload...');
+                    termRef.sendCommand(cmd.macro_payload, 0);
+                    console.log('[SmartCard] SENT.');
+                } else {
+                    console.error('[SmartCard] Terminal not connected, skipped.');
+                }
+            } else {
+                console.error('[SmartCard] termRef is null inside timeout.');
+            }
+          }, macroDelay);
+        }
       } else {
         // Focus terminal even if command is empty
         termRef.focus();
@@ -1934,7 +1960,7 @@ function App() {
           if (termRef?.sendCommand) {
             termRef.sendCommand(cmd);
           } else if (termRef?.write) {
-            termRef.write(cmd);
+            termRef.write(ctx);
           }
         }}
         terminalBuffer={(() => {
@@ -1944,6 +1970,7 @@ function App() {
         })()}
         activeView="terminal"
         onToast={addToast}
+        activeTabId={activeTabId}
         contextFiles={contextFiles}
       />
 

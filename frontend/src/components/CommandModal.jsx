@@ -17,37 +17,39 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         favorite: false,
         alwaysAppend: false,
         icon: null,
-        delay: 0
+        delay: 0,
+        macro_payload: '',
+        macro_delay: 1500
     });
     const [showIconPicker, setShowIconPicker] = useState(false);
     const [keybindingError, setKeybindingError] = useState(null);
 
     useEffect(() => {
         if (isOpen) {
+            // Reset state
+            const defaults = {
+                description: '',
+                command: '',
+                keyBinding: '',
+                pasteOnly: false,
+                favorite: false,
+                alwaysAppend: false,
+                icon: null,
+                delay: 0,
+                macro_payload: '',
+                macro_delay: 1500
+            };
+
             if (initialData) {
-                // Safely merge initialData with defaults to prevent undefined values
                 setFormData({
-                    description: initialData.description || '',
-                    command: initialData.command || '',
-                    keyBinding: initialData.keyBinding || '',
-                    pasteOnly: initialData.pasteOnly || false,
-                    favorite: initialData.favorite || false,
-                    alwaysAppend: initialData.alwaysAppend || false,
-                    icon: initialData.icon || null,
-                    delay: initialData.delay || 0,
-                    id: initialData.id, // Preserve ID for editing
+                    ...defaults,
+                    ...initialData,
+                    // Ensure these are not undefined
+                    macro_payload: initialData.macro_payload || '',
+                    macro_delay: initialData.macro_delay || 1500
                 });
             } else {
-                setFormData({
-                    description: '',
-                    command: '',
-                    keyBinding: '',
-                    pasteOnly: false,
-                    favorite: false,
-                    alwaysAppend: false,
-                    icon: null,
-                    delay: 0
-                });
+                setFormData(defaults);
             }
             setShowIconPicker(false);
         }
@@ -201,6 +203,32 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                                 step="50"
                             />
                         </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label>Macro Payload (Zero-Click)</label>
+                        <textarea
+                            name="macro_payload"
+                            value={formData.macro_payload}
+                            onChange={handleChange}
+                            placeholder="# Text to auto-inject after command execution..."
+                            rows={3}
+                            style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                        />
+                        <small style={{ color: '#666' }}>Injects automatically after delay. Use for system prompts or setup.</small>
+                    </div>
+
+                    <div className="form-group" style={{ width: '150px' }}>
+                        <label>Macro Delay (ms)</label>
+                        <input
+                            type="number"
+                            name="macro_delay"
+                            value={formData.macro_delay || 1500}
+                            onChange={handleChange}
+                            placeholder="1500"
+                            min="0"
+                            step="100"
+                        />
                     </div>
 
                     <div className="form-row">

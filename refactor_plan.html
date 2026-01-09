@@ -2,51 +2,316 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quick Instruction Fix Analysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero-Click Workflow - Refactor Plan</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <style>
-        body { font-family: system-ui, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8em; }
-        .pending { background: #fff3e0; color: #e65100; }
-        .completed { background: #e8f5e9; color: #2e7d32; }
-        .mermaid { margin: 20px 0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e0e0e0;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            padding: 30px 40px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3);
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .subtitle {
+            font-size: 1.1em;
+            color: #e9d5ff;
+            font-weight: 400;
+        }
+        .phase {
+            background: rgba(255,255,255,0.05);
+            border-left: 4px solid #8b5cf6;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        .phase h2 {
+            color: #a78bfa;
+            font-size: 1.8em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-left: 10px;
+        }
+        .badge.pending { background: #ef4444; color: #fff; }
+        .badge.in-progress { background: #f59e0b; color: #fff; }
+        .badge.completed { background: #10b981; color: #fff; }
+        .task-list {
+            list-style: none;
+            margin-top: 15px;
+        }
+        .task-list li {
+            padding: 12px 15px;
+            background: rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #444;
+            transition: all 0.2s;
+        }
+        .task-list li:hover {
+            background: rgba(139, 92, 246, 0.1);
+            border-left-color: #8b5cf6;
+            transform: translateX(5px);
+        }
+        .task-list li.done {
+            opacity: 0.6;
+            text-decoration: line-through;
+            border-left-color: #10b981;
+        }
+        .mermaid-container {
+            background: rgba(255,255,255,0.05);
+            padding: 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+            overflow-x: auto;
+        }
+        code {
+            background: #1e1e1e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #a78bfa;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.95em;
+        }
+        .warning {
+            background: rgba(239, 68, 68, 0.1);
+            border: 2px solid #ef4444;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .warning-icon {
+            font-size: 1.5em;
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.1);
+            border: 2px solid #3b82f6;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .card-preview {
+            background: #1e1e1e;
+            border: 2px solid #8b5cf6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        .card-preview h4 {
+            color: #8b5cf6;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .card-preview pre {
+            color: #e0e0e0;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <script>mermaid.initialize({startOnLoad:true});</script>
 </head>
 <body>
-    <h1>Quick Instruction Fix Analysis</h1>
+    <div class="container">
+        <header>
+            <h1>⚡ Zero-Click Workflow Transformation</h1>
+            <div class="subtitle">From "UI-Assisted" to "Fire-and-Forget" Macros</div>
+        </header>
+
+        <div class="warning">
+            <span class="warning-icon">🔥</span>
+            <div>
+                <strong>SCORCHED EARTH REFACTOR:</strong> Removing all God Mode UI elements and implementing automated context injection via Command Card macros.
+            </div>
+        </div>
+
+        <div class="mermaid-container">
+            <pre class="mermaid">
+graph TB
+    subgraph "Old Workflow (DEPRECATED)"
+        A1["User clicks Command Card"] --> A2["Copilot launches"]
+        A2 --> A3["User opens ForgeAssist (Ctrl+/)"]
+        A3 --> A4["User clicks 'Inject Context'"]
+        A4 --> A5["Manual API call to /api/rpc/inject-context"]
+        A5 --> A6["Context appears in terminal"]
+    end
     
-    <h2>Status</h2>
-    <p>Task: <strong>Unified Quick Instructions Architecture</strong></p>
-    <p>Status: <span class="badge completed">[COMPLETED]</span></p>
+    subgraph "New Workflow (ZERO-CLICK)"
+        B1["User clicks Smart Card"] --> B2["Copilot launches"]
+        B2 --> B3["setTimeout(macro_delay)"]
+        B3 --> B4["Auto-inject macro_payload to PTY"]
+        B4 --> B5["Context appears automatically"]
+    end
+    
+    A1 -.->|"Replace"| B1
+    
+    style A1 fill:#ef4444,stroke:#dc2626,color:#fff
+    style A2 fill:#ef4444,stroke:#dc2626,color:#fff
+    style A3 fill:#ef4444,stroke:#dc2626,color:#fff
+    style A4 fill:#ef4444,stroke:#dc2626,color:#fff
+    style A5 fill:#ef4444,stroke:#dc2626,color:#fff
+    style A6 fill:#ef4444,stroke:#dc2626,color:#fff
+    
+    style B1 fill:#10b981,stroke:#059669,color:#fff
+    style B2 fill:#10b981,stroke:#059669,color:#fff
+    style B3 fill:#10b981,stroke:#059669,color:#fff
+    style B4 fill:#10b981,stroke:#059669,color:#fff
+    style B5 fill:#10b981,stroke:#059669,color:#fff
+            </pre>
+        </div>
 
-    <h2>Problem Diagnosis</h2>
-    <p>User identified redundant configuration in Settings vs Forge Assist and reported an unhandled error in the floating bar.</p>
+        <!-- PHASE 1: CLEANUP -->
+        <div class="phase">
+            <h2>🗑️ Phase 1: Scorched Earth Cleanup <span class="badge completed">COMPLETED</span></h2>
+            <p>Remove all "God Mode" context injection UI elements from ForgeAssist.</p>
+            <ul class="task-list">
+                <li class="done">Remove "God Mode Context Injection" panel from <code>ForgeAssist.jsx</code> (lines 949-1141)</li>
+                <li class="done">Remove <code>injectAwareness()</code> function (lines 737-777)</li>
+                <li class="done">Remove <code>customContext</code> state variable and localStorage persistence</li>
+                <li class="done">Remove <code>showContextComposer</code> state toggle</li>
+                <li class="done">Clean up unused imports (Shield icon if not used elsewhere)</li>
+            </ul>
+        </div>
 
-    <h2>Solution Architecture</h2>
-    <div class="mermaid">
-    graph TD
-        A["User (Ctrl+I)"] -->|Opens| B["QuickInstructionBar"]
-        B -->|Reads| C["localStorage (forgeAssist_quickInstructions)"]
-        B -->|Click Edit| D["Forge Assist (Ctrl+/)"]
-        D -->|Manages| C
-        B -->|Send| E["App.jsx:sendToTerminal"]
-        E -->|Validates| F{Socket Ready?}
-        F -->|Yes| G["Send to PTY"]
-        F -->|No| H["Toast Warning"]
+        <!-- PHASE 2: SMART CARD SCHEMA -->
+        <div class="phase">
+            <h2>🏗️ Phase 2: Smart Card Architecture <span class="badge completed">COMPLETED</span></h2>
+            <p>Extend Command Card schema to support automated macro injection.</p>
+            <ul class="task-list">
+                <li class="done">Add <code>macro_payload</code> (optional string) to Command Card interface</li>
+                <li class="done">Add <code>macro_delay</code> (optional integer, default 1500ms) to Command Card interface</li>
+                <li class="done">Update <code>SortableCommandCard.jsx</code> to pass macro data to execute handler</li>
+                <li class="done">Modify <code>onExecute</code> flow in <code>App.jsx</code> to detect macro fields</li>
+                <li class="done">Implement PTY write logic: <code>setTimeout(() => writeToPTY(macro_payload + '\n'), macro_delay)</code></li>
+            </ul>
+        </div>
+
+        <!-- PHASE 3: CARD CONFIGURATION -->
+        <div class="phase">
+            <h2>📝 Phase 3: Command Card Configuration <span class="badge completed">COMPLETED</span></h2>
+            <p>Create two pre-configured Command Cards for Copilot workflows.</p>
+            
+            <div class="card-preview">
+                <h4>Card A: Copilot (Fresh)</h4>
+                <pre>{
+  "id": "copilot-fresh",
+  "name": "🤖 Copilot (Fresh)",
+  "description": "Start new Copilot session with Forge awareness",
+  "command": "copilot --allow-all-tools",
+  "macro_delay": 1500,
+  "macro_payload": "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @copilot-instructions.md",
+  "category": "ai",
+  "icon": "emoji-robot"
+}</pre>
+            </div>
+
+            <div class="card-preview">
+                <h4>Card B: Copilot (Resume)</h4>
+                <pre>{
+  "id": "copilot-resume",
+  "name": "🔄 Copilot (Resume)",
+  "description": "Continue previous Copilot session with Forge awareness",
+  "command": "copilot --allow-all-tools --continue",
+  "macro_delay": 1500,
+  "macro_payload": "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @copilot-instructions.md",
+  "category": "ai",
+  "icon": "emoji-repeat"
+}</pre>
+            </div>
+            
+            <ul class="task-list">
+                <li class="done">Create <code>command-cards/copilot-fresh.json</code></li>
+                <li class="done">Create <code>command-cards/copilot-resume.json</code></li>
+                <li class="done">Verify cards load in UI and display correctly</li>
+            </ul>
+        </div>
+
+        <!-- PHASE 4: TESTING -->
+        <div class="phase">
+            <h2>🧪 Phase 4: User Verification <span class="badge pending">PENDING</span></h2>
+            <p>Cypress E2E test to verify Zero-Click workflow.</p>
+            <ul class="task-list">
+                <li>Write Cypress test: Click card → Wait for macro_delay → Verify PTY receives payload</li>
+                <li>Test macro execution timing (1500ms delay validation)</li>
+                <li>Verify newline character is appended to payload</li>
+                <li>Visual verification: User clicks once, text appears automatically</li>
+            </ul>
+            <div class="info">
+                <span>ℹ️</span>
+                <div>Use <code>cy.window().then(win => win.term.buffer.active)</code> to verify terminal output, NOT DOM inspection.</div>
+            </div>
+        </div>
+
+        <!-- PHASE 5: CLEANUP -->
+        <div class="phase">
+            <h2>🧹 Phase 5: Final Cleanup <span class="badge completed">COMPLETED</span></h2>
+            <ul class="task-list">
+                <li class="done">Remove deprecated <code>/api/rpc/inject-context</code> backend handler</li>
+                <li class="done">Delete <code>handlers_injection.go</code> file</li>
+                <li class="done">Update documentation to reflect Zero-Click workflow</li>
+                <li class="done">Verify no orphaned God Mode code remains</li>
+                <li class="done">Rebuild and smoke test in production mode</li>
+            </ul>
+        </div>
+
+        <div class="info">
+            <span>✅</span>
+            <div>
+                <strong>ZERO-CLICK MIGRATION COMPLETE!</strong><br>
+                All phases completed successfully. The "God Mode" UI has been removed and replaced with an elegant automated macro system. Users now click once, and context injection happens automatically after 1.5 seconds. See <code>ZERO_CLICK_MIGRATION.md</code> for full details.
+            </div>
+        </div>
     </div>
 
-    <h2>Changes Applied</h2>
-    <ul>
-        <li><strong>Consolidated Config:</strong> Removed <code>QuickInstructionsPanel</code> from Settings. Feature now relies 100% on Forge Assist's localStorage.</li>
-        <li><strong>Unified UI:</strong> <code>QuickInstructionBar</code> now syncs with Forge Assist via event listeners. "Edit" button opens Forge Assist.</li>
-        <li><strong>Robust Error Handling:</strong> <code>sendToTerminal</code> now explicitly checks socket state and provides helpful feedback (Connecting vs Closed).</li>
-        <li><strong>Deleted:</strong> <code>QuickInstructionsPanel.jsx</code> (dead code).</li>
-    </ul>
-
-    <h2>Hotfixes</h2>
-    <ul>
-        <li><span class="badge completed">[COMPLETED]</span> <strong>Build Error Support:</strong> Removed undefined call to <code>loadQuickInstructionConfig()</code> in <code>App.jsx</code> (residual from migration).</li>
-    </ul>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#8b5cf6',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#6d28d9',
+                lineColor: '#a78bfa',
+                secondaryColor: '#10b981',
+                tertiaryColor: '#ef4444',
+                background: '#1a1a1a',
+                mainBkg: '#1e1e1e',
+                textColor: '#e0e0e0'
+            }
+        });
+    </script>
 </body>
 </html>

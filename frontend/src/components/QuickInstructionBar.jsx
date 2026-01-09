@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, Edit3, Zap } from 'lucide-react';
+import { Send, X } from 'lucide-react';
 import './QuickInstructionBar.css';
 
 /**
@@ -46,7 +46,21 @@ function QuickInstructionBar({
   // Compute active instruction text
   const activeInstructions = quickInstructions.filter(i => i.enabled);
   const quickInstructionText = activeInstructions.map(i => i.text).join('\n\n');
-  const isEnabled = activeInstructions.length > 0;
+  // Global enable toggle for the quick-instruction bar (persisted in localStorage)
+  const [globalBarEnabled, setGlobalBarEnabled] = useState(() => {
+    const v = localStorage.getItem('forgeAssist_quickInstructionBarEnabled');
+    if (v === null) return true;
+    return v === 'true';
+  });
+  useEffect(() => {
+    const handler = () => {
+      const v = localStorage.getItem('forgeAssist_quickInstructionBarEnabled');
+      setGlobalBarEnabled(v === null ? true : v === 'true');
+    };
+    window.addEventListener('forge-quick-instruction-bar-enabled-changed', handler);
+    return () => window.removeEventListener('forge-quick-instruction-bar-enabled-changed', handler);
+  }, []);
+  const isEnabled = globalBarEnabled && activeInstructions.length > 0;
 
   // Use internal state for expansion, but can be controlled externally
   const isExpanded = externalIsExpanded;
@@ -94,140 +108,135 @@ function QuickInstructionBar({
 
   if (!isEnabled) return null;
 
-  // Calculate position relative to Forge Assist button
-  const barBottom = forgeAssistBtnPos.bottom + 70; // 70px above button
+  // Browser-style address bar positioning: extends leftward from Forge Assist button
+  // The Forge Assist button acts as the "home" button
+  const barRight = forgeAssistBtnPos.right;
+  const barBottom = forgeAssistBtnPos.bottom;
 
   return (
     <>
-      {/* Collapsed Bar - Always visible when enabled */}
-      {!isExpanded && (
-        <div
-          className="quick-instruction-collapsed"
-          style={{
-            position: 'fixed',
-            right: `${forgeAssistBtnPos.right - 10}px`,
-            bottom: `${barBottom}px`,
-            zIndex: 999
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            onOpen();
-          }}
-        >
-          <Zap size={16} />
-          <span>Quick Instruction</span>
-          <kbd>Ctrl+I</kbd>
-        </div>
-      )}
-
-      {/* Expanded Bar */}
+      {/* Browser-style Address Bar (expanded mode) */}
       {isExpanded && (
         <div
-          className="quick-instruction-bar"
           style={{
             position: 'fixed',
-            right: '20px',
+            right: `${barRight + 60}px`, // Start 60px left of Forge Assist button (button width)
             bottom: `${barBottom}px`,
-            zIndex: 999
+            zIndex: 998, // Below Forge Assist button (999)
+            display: 'flex',
+            alignItems: 'center',
+            background: 'linear-gradient(135deg, rgba(26,26,26,0.98) 0%, rgba(35,35,35,0.98) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: '2px solid rgba(139, 92, 246, 0.3)',
+            borderRadius: '12px',
+            padding: '8px 16px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
+            minWidth: '400px',
+            maxWidth: '600px',
+            gap: '12px',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
-          {/* Header */}
-          <div className="qib-header">
-            <Zap size={18} />
-            <span>Quick Instruction</span>
-            <button
-              className="qib-close-btn"
-              onClick={handleCancel}
-              title="Close (Esc)"
-            >
-              <X size={16} />
-            </button>
-          </div>
+          {/* Input field (browser URL bar style) */}
+          <input
+            ref={promptInputRef}
+            type="text"
+            value={userPrompt}
+            onChange={(e) => setUserPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+              if (e.key === 'Escape') {
+                onClose();
+              }
+            }}
+            placeholder="Type your prompt here..."
+            style={{
+              flex: 1,
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              color: '#fff',
+              fontSize: '14px',
+              outline: 'none',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.background = 'rgba(255,255,255,0.08)';
+              e.target.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+            }}
+            onBlur={(e) => {
+              e.target.style.background = 'rgba(255,255,255,0.05)';
+              e.target.style.borderColor = 'rgba(255,255,255,0.1)';
+            }}
+          />
 
-          {/* Content */}
-          <div className="qib-content">
-            {/* User Prompt Input */}
-            <div className="qib-section">
-              <label className="qib-label">
-                💬 Your Prompt
-              </label>
-              <textarea
-                ref={promptInputRef}
-                className="qib-textarea"
-                value={userPrompt}
-                onChange={(e) => setUserPrompt(e.target.value)}
-                placeholder="Type your question or prompt here..."
-                rows={3}
-                onKeyDown={(e) => {
-                  // Ctrl+Enter to send
-                  if (e.ctrlKey && e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
-            </div>
+          {/* Send button */}
+          <button
+            onClick={handleSend}
+            disabled={!userPrompt.trim()}
+            title="Send (Enter)"
+            style={{
+              background: userPrompt.trim() ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : 'rgba(100,100,100,0.3)',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              color: userPrompt.trim() ? '#fff' : '#666',
+              cursor: userPrompt.trim() ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '13px',
+              fontWeight: 600,
+              transition: 'all 0.2s ease',
+              boxShadow: userPrompt.trim() ? '0 2px 8px rgba(139, 92, 246, 0.3)' : 'none'
+            }}
+            onMouseEnter={(e) => {
+              if (userPrompt.trim()) {
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = userPrompt.trim() ? '0 2px 8px rgba(139, 92, 246, 0.3)' : 'none';
+            }}
+          >
+            <Send size={16} />
+            Send
+          </button>
 
-            {/* Quick Instruction Preview */}
-            <div className="qib-section">
-              <label className="qib-label">
-                📝 Appended Context
-                <a
-                  href="#"
-                  className="qib-edit-link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onClose(); // Close Quick Instruction bar
-                    if (onEdit) onEdit();
-                  }}
-                  title="Configure in Forge Assist"
-                >
-                  <Edit3 size={12} />
-                  Configure
-                </a>
-              </label>
-              <div className="qib-instruction-preview">
-                {quickInstructionText || '(No instructions enabled)'}
-              </div>
-            </div>
-
-            {/* Combined Preview */}
-            {userPrompt.trim() && (
-              <div className="qib-section">
-                <label className="qib-label">
-                  👁️ What Will Be Sent
-                </label>
-                <div className="qib-combined-preview">
-                  <div className="qib-preview-section">
-                    {userPrompt.trim()}
-                  </div>
-                  <div className="qib-preview-divider">• • •</div>
-                  <div className="qib-preview-section qib-preview-instruction">
-                    {quickInstructionText}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="qib-actions">
-              <button
-                className="qib-btn qib-btn-cancel"
-                onClick={handleCancel}
-              >
-                Cancel
-              </button>
-              <button
-                className="qib-btn qib-btn-send"
-                onClick={handleSend}
-                disabled={!userPrompt.trim()}
-              >
-                <Send size={16} />
-                Send
-                <kbd style={{ marginLeft: '8px' }}>Ctrl+↵</kbd>
-              </button>
-            </div>
-          </div>
+          {/* Close button */}
+          <button
+            onClick={handleCancel}
+            title="Close (Esc)"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#888',
+              cursor: 'pointer',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = '#888';
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
       )}
     </>

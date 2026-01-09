@@ -356,6 +356,18 @@ func (h *Handler) CloseAllSessions() int {
 	return count
 }
 
+// GetSession retrieves a terminal session by ID.
+// Returns the session and true if found, nil and false otherwise.
+// Used by injection handlers and other session management features.
+func (h *Handler) GetSession(sessionID string) (*TerminalSession, bool) {
+	value, ok := h.sessions.Load(sessionID)
+	if !ok {
+		return nil, false
+	}
+	session, ok := value.(*TerminalSession)
+	return session, ok
+}
+
 // HandleWebSocket upgrades the HTTP connection to WebSocket and manages PTY I/O.
 func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Upgrade to WebSocket

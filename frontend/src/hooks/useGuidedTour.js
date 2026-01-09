@@ -54,6 +54,13 @@ const useGuidedTour = (actionHandlers = {}) => {
 
   // Check if tour should start on mount
   useEffect(() => {
+    // BACKDOOR: Disable tour for testing if flag is set
+    if (localStorage.getItem('forge_tour_completed') === 'true' || 
+        localStorage.getItem('tour_disabled') === 'true') {
+      setIsReady(true);
+      return;
+    }
+
     const checkTourStatus = () => {
       // Check localStorage for tour completion
       const storedData = localStorage.getItem(TOUR_STORAGE_KEY);

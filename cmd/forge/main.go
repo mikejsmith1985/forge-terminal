@@ -338,6 +338,8 @@ func main() {
 	// PTY Logs API - Get PTY logs for Follow Me integration
 	http.HandleFunc("/api/debug/pty-logs", WrapWithMiddleware(handleGetPTYLogs))
 
+	// PTY Injection API - REMOVED in v3.12.17: Replaced by Zero-Click macro system in Command Cards
+
 	// External Logs API - Ingest logs from external apps (Follow Me integration)
 	http.HandleFunc("/api/debug-logs", WrapWithMiddleware(handleDebugLogsRouter))
 	http.HandleFunc("/api/debug-logs/", WrapWithMiddleware(handleDebugLogsRouter)) // For /{sessionId}
@@ -355,11 +357,6 @@ func main() {
 	http.HandleFunc("/api/files/delete", WrapWithMiddleware(files.HandleDelete))
 	http.HandleFunc("/api/files/stream", WrapWithMiddleware(files.HandleReadStream))
 	http.HandleFunc("/api/files/access-mode", WrapWithMiddleware(files.HandleFileAccessMode))
-	
-	// AI Instruction Files API - manage CLAUDE.md, copilot-instructions.md, etc.
-	http.HandleFunc("/api/files/instructions", WrapWithMiddleware(files.HandleInstructionFiles))
-	http.HandleFunc("/api/files/instructions/content", WrapWithMiddleware(files.HandleInstructionFileContent))
-
 	// Error logging API - client-side error reporting
 	http.HandleFunc("/api/log-error", WrapWithMiddleware(handleLogError))
 

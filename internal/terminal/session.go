@@ -249,6 +249,31 @@ func (s *TerminalSession) Write(p []byte) (int, error) {
 	return s.PTY.Write(p)
 }
 
+// WriteToPty safely writes data to the PTY with mutex protection.
+// This method is used by injection handlers to force text into the terminal.
+// Returns the number of bytes written and any error encountered.
+func (s *TerminalSession) WriteToPty(data []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return 0, fmt.Errorf("session is closed")
+	}
+
+	if s.PTY == nil {
+		return 0, fmt.Errorf("PTY is nil")
+	}
+
+	n, err := s.PTY.Write(data)
+	if err != nil {
+		log.Printf("[Terminal] WriteToPty error for session %s: %v", s.ID, err)
+		return n, err
+	}
+
+	log.Printf("[Terminal] WriteToPty: wrote %d bytes to session %s", n, s.ID)
+	return n, nil
+}
+
 // Resize changes the terminal size.
 func (s *TerminalSession) Resize(cols, rows uint16) error {
 	s.mu.Lock()

@@ -22,6 +22,8 @@ type Command struct {
 	Icon         string `json:"icon,omitempty"`
 	Delay        int    `json:"delay,omitempty"`
 	AlwaysAppend bool   `json:"alwaysAppend,omitempty"` // When true, this command's text is appended to every user prompt
+	MacroPayload string `json:"macro_payload,omitempty"` // Zero-Click: Text to auto-inject after command execution
+	MacroDelay   int    `json:"macro_delay,omitempty"`   // Zero-Click: Delay in ms before macro injection (default 1500)
 }
 
 // Default commands created on first run
@@ -66,6 +68,28 @@ var DefaultCommands = []Command{
 		PasteOnly:   false,
 		Favorite:    false,
 		Icon:        "emoji-eyes",
+	},
+	{
+		ID:           6,
+		Description:  "🤖 Copilot (Fresh)",
+		Command:      "copilot --allow-all-tools",
+		KeyBinding:   "",
+		PasteOnly:    false,
+		Favorite:     false,
+		Icon:         "emoji-robot",
+		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
+		MacroDelay:   1500,
+	},
+	{
+		ID:           7,
+		Description:  "🔄 Copilot (Resume)",
+		Command:      "copilot --allow-all-tools --continue",
+		KeyBinding:   "",
+		PasteOnly:    false,
+		Favorite:     false,
+		Icon:         "emoji-repeat",
+		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
+		MacroDelay:   1500,
 	},
 }
 
