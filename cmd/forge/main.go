@@ -107,6 +107,9 @@ func main() {
 
 	lock, err := lockfile.Acquire(forgeDir)
 	if err != nil {
+		msg := fmt.Sprintf("Failed to start Forge Terminal:\n%v\n\nIf you're sure no other instance is running, delete:\n%s", err, filepath.Join(forgeDir, "forge.lock"))
+		showErrorDialog("Forge Startup Error", msg)
+		
 		log.Printf("CRITICAL ERROR: Failed to acquire lock: %v", err)
 		log.Printf("If you're sure no other instance is running, remove: %s", filepath.Join(forgeDir, "forge.lock"))
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n\n", err)
@@ -1343,10 +1346,24 @@ func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleCommandBackups handles listing backups
+// handleCommandBackups handles listing backups or retrieving content of one
 func handleCommandBackups(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check for "file" query param to get details
+	fileParam := r.URL.Query().Get("file")
+	if fileParam != "" {
+		cmds, err := commands.GetBackupContent(fileParam)
+		if err != nil {
+			log.Printf("[Backups] Failed to get content for %s: %v", fileParam, err)
+			http.Error(w, "Failed to get backup content: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cmds)
 		return
 	}
 
@@ -1369,7 +1386,8 @@ func handleRestoreBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		BackupName string `json:"backupName"`
+		BackupName  string `json:"backupName"`
+		SelectedIDs []int  `json:"selectedIds"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1382,8 +1400,16 @@ func handleRestoreBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Backups] Restoring backup: %s", req.BackupName)
-	if err := commands.RestoreBackup(req.BackupName); err != nil {
+	var err error
+	if len(req.SelectedIDs) > 0 {
+		log.Printf("[Backups] Restoring %d commands from: %s", len(req.SelectedIDs), req.BackupName)
+		err = commands.ImportBackup(req.BackupName, req.SelectedIDs)
+	} else {
+		log.Printf("[Backups] Restoring full backup: %s", req.BackupName)
+		err = commands.RestoreBackup(req.BackupName)
+	}
+
+	if err != nil {
 		log.Printf("[Backups] Restore failed: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{

@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { RotateCcw, Database, AlertTriangle, FileClock } from 'lucide-react';
+import { RotateCcw, Database, AlertTriangle, FileClock, ChevronDown, ChevronRight, Check } from 'lucide-react';
 
 const BackupsPanel = ({ onToast }) => {
   const [backups, setBackups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(null);
+  
+  // New state for preview
+  const [expandedBackup, setExpandedBackup] = useState(null);
+  const [previewData, setPreviewData] = useState([]);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   useEffect(() => {
     fetchBackups();
@@ -24,17 +30,62 @@ const BackupsPanel = ({ onToast }) => {
     }
   };
 
-  const handleRestore = async (backupName) => {
-    if (!window.confirm(`Are you sure you want to restore "${backupName}"? This will overwrite your current commands.`)) {
+  const handleToggleExpand = async (backupName) => {
+      if (expandedBackup === backupName) {
+          setExpandedBackup(null);
+          setPreviewData([]);
+          setSelectedIds(new Set());
+          return;
+      }
+
+      setExpandedBackup(backupName);
+      setLoadingPreview(true);
+      setPreviewData([]);
+      setSelectedIds(new Set());
+
+      try {
+          const res = await fetch(`/api/commands/backups?file=${backupName}`);
+          const data = await res.json();
+          setPreviewData(data || []);
+      } catch (err) {
+          console.error('Failed to load backup details:', err);
+          if (onToast) onToast('Failed to load backup details', 'error');
+      } finally {
+          setLoadingPreview(false);
+      }
+  };
+
+  const toggleSelection = (id) => {
+      const newSet = new Set(selectedIds);
+      if (newSet.has(id)) {
+          newSet.delete(id);
+      } else {
+          newSet.add(id);
+      }
+      setSelectedIds(newSet);
+  };
+
+  const handleRestore = async (backupName, specificIds = null) => {
+    const isFullRestore = !specificIds;
+    const msg = isFullRestore 
+        ? `Are you sure you want to fully restore "${backupName}"? This will overwrite ALL your current commands.` 
+        : `Are you sure you want to restore ${specificIds.length} commands from "${backupName}"? This will overwrite matching commands.`;
+
+    if (!window.confirm(msg)) {
       return;
     }
 
     setRestoring(backupName);
     try {
+      const body = { backupName };
+      if (specificIds) {
+          body.selectedIds = specificIds;
+      }
+
       const res = await fetch('/api/commands/restore-backup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ backupName })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
 
@@ -74,7 +125,7 @@ const BackupsPanel = ({ onToast }) => {
           </h4>
           <p style={{ margin: 0, fontSize: '0.9em', color: '#ccc' }}>
               Forge automatically backs up your command cards every time you make a change. 
-              The last 20 versions are kept safe. Restore a previous version if you accidentally deleted something important.
+              Expand a backup to preview its contents and restore specific commands.
           </p>
       </div>
 
@@ -95,36 +146,102 @@ const BackupsPanel = ({ onToast }) => {
               background: '#1a1a1a',
               border: '1px solid #333',
               borderRadius: '8px',
-              padding: '12px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
+              padding: '12px',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <FileClock size={20} color="#888" />
-                <div>
-                  <div style={{ fontWeight: 500, color: '#e5e5e5' }}>{formatDate(backup.timestamp)}</div>
-                  <div style={{ fontSize: '0.8em', color: '#888' }}>
-                    {backup.count} command cards • {backup.name}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div 
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1 }}
+                    onClick={() => handleToggleExpand(backup.name)}
+                  >
+                    {expandedBackup === backup.name ? <ChevronDown size={20} color="#888" /> : <ChevronRight size={20} color="#888" />}
+                    <FileClock size={20} color="#888" />
+                    <div>
+                      <div style={{ fontWeight: 500, color: '#e5e5e5' }}>{formatDate(backup.timestamp)}</div>
+                      <div style={{ fontSize: '0.8em', color: '#888' }}>
+                        {backup.count} command cards • {backup.name}
+                      </div>
+                    </div>
                   </div>
-                </div>
+
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={(e) => { e.stopPropagation(); handleRestore(backup.name); }}
+                    disabled={restoring === backup.name}
+                    title="Restore everything (overwrite current)"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        fontSize: '0.85em',
+                        background: '#333'
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    {restoring === backup.name ? 'Restoring...' : 'Full Restore'}
+                  </button>
               </div>
 
-              <button
-                className="btn btn-sm btn-secondary"
-                onClick={() => handleRestore(backup.name)}
-                disabled={restoring === backup.name}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    fontSize: '0.85em'
-                }}
-              >
-                <RotateCcw size={14} />
-                {restoring === backup.name ? 'Restoring...' : 'Restore'}
-              </button>
+              {expandedBackup === backup.name && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #333', paddingLeft: '32px' }}>
+                      {loadingPreview ? (
+                          <div style={{color: '#888', fontStyle: 'italic'}}>Loading contents...</div>
+                      ) : (
+                          <div>
+                              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                                  <div style={{fontSize: '0.9em', color: '#aaa'}}>
+                                      Select cards to restore ({selectedIds.size} selected)
+                                  </div>
+                                  <button 
+                                      className="btn btn-sm btn-primary"
+                                      disabled={selectedIds.size === 0 || restoring === backup.name}
+                                      onClick={() => handleRestore(backup.name, Array.from(selectedIds))}
+                                      style={{
+                                          fontSize: '0.85em', 
+                                          padding: '4px 10px',
+                                          background: selectedIds.size > 0 ? '#2563eb' : '#444',
+                                          opacity: selectedIds.size > 0 ? 1 : 0.5
+                                      }}
+                                  >
+                                      Restore Selected
+                                  </button>
+                              </div>
+                              <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+                                  {previewData.map(cmd => (
+                                      <div 
+                                        key={cmd.id} 
+                                        onClick={() => toggleSelection(cmd.id)}
+                                        style={{
+                                            background: selectedIds.has(cmd.id) ? 'rgba(37, 99, 235, 0.2)' : '#222',
+                                            border: selectedIds.has(cmd.id) ? '1px solid #2563eb' : '1px solid #444',
+                                            borderRadius: '4px',
+                                            padding: '8px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9em'
+                                        }}
+                                      >
+                                          <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}}>
+                                              <div style={{
+                                                  width: '16px', height: '16px', 
+                                                  borderRadius: '4px', 
+                                                  border: '1px solid #666',
+                                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                  background: selectedIds.has(cmd.id) ? '#2563eb' : 'transparent'
+                                              }}>
+                                                  {selectedIds.has(cmd.id) && <Check size={12} color="white" />}
+                                              </div>
+                                              <span style={{fontWeight: 600, color: '#ddd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{cmd.description}</span>
+                                          </div>
+                                          <div style={{fontSize: '0.8em', color: '#888', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                                              {cmd.command}
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              )}
             </div>
           ))}
         </div>

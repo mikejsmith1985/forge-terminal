@@ -63,6 +63,7 @@ export const normalizeKeybinding = (keybinding) => {
   return keybinding
     .trim()
     .replace(/\s+/g, '')
+    .replace(/control/gi, 'Ctrl') // Handle 'Control' spelling
     .replace(/ctrl/gi, 'Ctrl')
     .replace(/shift/gi, 'Shift')
     .replace(/alt/gi, 'Alt');
@@ -82,7 +83,9 @@ export const getNextAvailableKeybinding = (commands, excludeId = null) => {
   
   const assigned = getAssignedKeybindings(activeCommands);
   
-  // Find first unassigned keybinding in pool
+  // Find first unassigned keybinding in pool (Lowest Open Keybinding)
+  // This satisfies the requirement: "Start with ctrl+shift+0 increment by 1... 
+  // check for the lowest open keybinding"
   for (const keybinding of KEYBINDING_POOL) {
     if (!assigned.has(keybinding)) {
       return keybinding;

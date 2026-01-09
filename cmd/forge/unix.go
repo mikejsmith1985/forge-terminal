@@ -16,6 +16,11 @@ func hideWindow(cmd *exec.Cmd) {
 	// Nothing to do on Unix-like systems
 }
 
+// showErrorDialog prints to stderr on non-Windows platforms
+func showErrorDialog(title, message string) {
+	fmt.Fprintf(os.Stderr, "%s: %s\n", title, message)
+}
+
 // createDesktopShortcut creates a desktop shortcut for Forge Terminal
 func createDesktopShortcut() error {
 	// Get the executable path

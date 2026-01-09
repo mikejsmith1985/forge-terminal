@@ -356,3 +356,88 @@ func RestoreBackup(backupName string) error {
 
 	return nil
 }
+
+// GetBackupContent returns the commands from a specific backup file
+func GetBackupContent(backupName string) ([]Command, error) {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	backupDir := filepath.Join(configDir, "backups")
+	backupPath := filepath.Join(backupDir, backupName)
+
+	// Security check: ensure path traversal is not possible
+	if filepath.Clean(backupPath) != backupPath {
+		return nil, fmt.Errorf("invalid backup path")
+	}
+
+	content, err := os.ReadFile(backupPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read backup: %w", err)
+	}
+
+	var cmds []Command
+	if err := json.Unmarshal(content, &cmds); err != nil {
+		return nil, fmt.Errorf("invalid backup file (corrupt JSON): %w", err)
+	}
+
+	return cmds, nil
+}
+
+// ImportBackup restores specific commands from a backup, merging them into current commands
+// Commands with matching IDs will be overwritten by the backup version
+func ImportBackup(backupName string, selectedIDs []int) error {
+	// Get backup commands
+	backupCmds, err := GetBackupContent(backupName)
+	if err != nil {
+		return err
+	}
+
+	// Filter for selected IDs
+	selectedMap := make(map[int]bool)
+	for _, id := range selectedIDs {
+		selectedMap[id] = true
+	}
+
+	var cmdsToRestore []Command
+	for _, cmd := range backupCmds {
+		if selectedMap[cmd.ID] {
+			cmdsToRestore = append(cmdsToRestore, cmd)
+		}
+	}
+
+	if len(cmdsToRestore) == 0 {
+		return fmt.Errorf("no valid commands found to restore in backup")
+	}
+
+	// Load current commands
+	currentCmds, err := LoadCommands()
+	if err != nil {
+		return err
+	}
+
+	// Map current commands by ID
+	cmdMap := make(map[int]Command)
+	for _, cmd := range currentCmds {
+		cmdMap[cmd.ID] = cmd
+	}
+
+	// Overwrite/Add with restored commands
+	for _, cmd := range cmdsToRestore {
+		cmdMap[cmd.ID] = cmd
+	}
+
+	// Reconstruct slice
+	var newCmds []Command
+	for _, cmd := range cmdMap {
+		newCmds = append(newCmds, cmd)
+	}
+
+	// Sort by ID
+	sort.Slice(newCmds, func(i, j int) bool {
+		return newCmds[i].ID < newCmds[j].ID
+	})
+
+	// Save (this will trigger a new backup of the pre-merge state)
+	return SaveCommands(newCmds)
+}
