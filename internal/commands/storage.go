@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 )
 
@@ -151,7 +156,7 @@ func LoadCommands() ([]Command, error) {
 	return deduplicated, nil
 }
 
-// SaveCommands saves commands to the JSON file
+// SaveCommands saves commands to the JSON file with automated backup
 func SaveCommands(commands []Command) error {
 	configDir, err := GetConfigDir()
 	if err != nil {
@@ -163,15 +168,191 @@ func SaveCommands(commands []Command) error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(commands, "", "  ")
-	if err != nil {
-		return err
-	}
-
+	// PATH HANDLING
 	path, err := GetCommandsPath()
 	if err != nil {
 		return err
 	}
 
+	// AUTOMATED BACKUP
+	// Only backup if the file exists and has content
+	if info, err := os.Stat(path); err == nil && info.Size() > 0 {
+		if err := performBackup(path, configDir); err != nil {
+			// Log error but continue with save - don't block user operation due to backup failure
+			fmt.Printf("Warning: Failed to create backup: %v\n", err)
+		}
+	}
+
+	data, err := json.MarshalIndent(commands, "", "  ")
+	if err != nil {
+		return err
+	}
+
 	return os.WriteFile(path, data, 0600)
+}
+
+// performBackup creates a timestamped backup and rotates old ones
+func performBackup(sourcePath string, configDir string) error {
+	// Create backups directory
+	backupDir := filepath.Join(configDir, "backups")
+	if err := os.MkdirAll(backupDir, 0700); err != nil {
+		return fmt.Errorf("failed to create backup dir: %w", err)
+	}
+
+	// Read source content
+	content, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to read source for backup: %w", err)
+	}
+
+	// Create timestamped backup
+	timestamp := time.Now().Format("20060102-150405")
+	backupName := fmt.Sprintf("commands-%s.json", timestamp)
+	backupPath := filepath.Join(backupDir, backupName)
+
+	if err := os.WriteFile(backupPath, content, 0600); err != nil {
+		return fmt.Errorf("failed to write backup file: %w", err)
+	}
+
+	// Prune old backups (keep last 20)
+	return pruneBackups(backupDir)
+}
+
+// pruneBackups keeps only the N most recent backups
+func pruneBackups(backupDir string) error {
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		return err
+	}
+
+	var backups []os.DirEntry
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "commands-") && strings.HasSuffix(entry.Name(), ".json") {
+			backups = append(backups, entry)
+		}
+	}
+
+	// If we have more than 20, delete the oldest
+	maxBackups := 20
+	if len(backups) <= maxBackups {
+		return nil
+	}
+
+	// Sort by name (timestamp ensures chronological order)
+	// command-20260101... comes before command-20260102...
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].Name() < backups[j].Name()
+	})
+
+	// Delete oldest (start of slice)
+	numToDelete := len(backups) - maxBackups
+	for i := 0; i < numToDelete; i++ {
+		path := filepath.Join(backupDir, backups[i].Name())
+		if err := os.Remove(path); err != nil {
+			// Log but continue
+			fmt.Printf("Warning: Failed to delete old backup %s: %v\n", path, err)
+		}
+	}
+
+	return nil
+}
+
+// Backup represents a command backup file
+type Backup struct {
+	Name      string    `json:"name"`
+	Timestamp time.Time `json:"timestamp"`
+	Count     int       `json:"count"`
+}
+
+// GetBackups returns a list of available backups
+func GetBackups() ([]Backup, error) {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return nil, err
+	}
+
+	backupDir := filepath.Join(configDir, "backups")
+	entries, err := os.ReadDir(backupDir)
+	if os.IsNotExist(err) {
+		return []Backup{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var backups []Backup
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "commands-") && strings.HasSuffix(entry.Name(), ".json") {
+			// Parse timestamp from filename: commands-20260109-141913.json
+			tsStr := strings.TrimPrefix(entry.Name(), "commands-")
+			tsStr = strings.TrimSuffix(tsStr, ".json")
+			
+			ts, err := time.Parse("20060102-150405", tsStr)
+			if err != nil {
+				continue
+			}
+
+			// Count items (rough check by reading file)
+			count := 0
+			if content, err := os.ReadFile(filepath.Join(backupDir, entry.Name())); err == nil {
+				var cmds []Command
+				if err := json.Unmarshal(content, &cmds); err == nil {
+					count = len(cmds)
+				}
+			}
+
+			backups = append(backups, Backup{
+				Name:      entry.Name(),
+				Timestamp: ts,
+				Count:     count,
+			})
+		}
+	}
+
+	// Sort descending (newest first)
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].Timestamp.After(backups[j].Timestamp)
+	})
+
+	return backups, nil
+}
+
+// RestoreBackup overwrites the current commands.json with the selected backup
+func RestoreBackup(backupName string) error {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return err
+	}
+
+	backupDir := filepath.Join(configDir, "backups")
+	backupPath := filepath.Join(backupDir, backupName)
+
+	// Security check: ensure path traversal is not possible
+	if filepath.Clean(backupPath) != backupPath {
+		return fmt.Errorf("invalid backup path")
+	}
+
+	content, err := os.ReadFile(backupPath)
+	if err != nil {
+		return fmt.Errorf("failed to read backup: %w", err)
+	}
+
+	// Validate JSON before restoring
+	var cmds []Command
+	if err := json.Unmarshal(content, &cmds); err != nil {
+		return fmt.Errorf("invalid backup file (corrupt JSON): %w", err)
+	}
+
+	// Create a backup of CURRENT state before overwriting (just in case)
+	currentPath, _ := GetCommandsPath()
+	if info, err := os.Stat(currentPath); err == nil && info.Size() > 0 {
+		performBackup(currentPath, configDir)
+	}
+
+	// Overwrite
+	if err := os.WriteFile(currentPath, content, 0600); err != nil {
+		return fmt.Errorf("failed to restore commands: %w", err)
+	}
+
+	return nil
 }

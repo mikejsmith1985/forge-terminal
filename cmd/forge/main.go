@@ -232,6 +232,8 @@ func main() {
 	// Commands API
 	http.HandleFunc("/api/commands", WrapWithMiddleware(handleCommands))
 	http.HandleFunc("/api/commands/restore-defaults", WrapWithMiddleware(handleRestoreDefaultCommands))
+	http.HandleFunc("/api/commands/backups", WrapWithMiddleware(handleCommandBackups))
+	http.HandleFunc("/api/commands/restore-backup", WrapWithMiddleware(handleRestoreBackup))
 
 	// Config API
 	http.HandleFunc("/api/config", WrapWithMiddleware(handleConfig))
@@ -1338,6 +1340,63 @@ func handleDesktopShortcut(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": "Desktop shortcut created successfully",
 		"code":    "SHORTCUT_CREATE_SUCCESS",
+	})
+}
+
+// handleCommandBackups handles listing backups
+func handleCommandBackups(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	backups, err := commands.GetBackups()
+	if err != nil {
+		log.Printf("[Backups] Failed to get backups: %v", err)
+		http.Error(w, "Failed to list backups", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(backups)
+}
+
+// handleRestoreBackup handles restoring a specific backup
+func handleRestoreBackup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		BackupName string `json:"backupName"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.BackupName == "" {
+		http.Error(w, "Backup name required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[Backups] Restoring backup: %s", req.BackupName)
+	if err := commands.RestoreBackup(req.BackupName); err != nil {
+		log.Printf("[Backups] Restore failed: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Backup restored successfully",
 	})
 }
 

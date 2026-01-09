@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap, RotateCcw, Database } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
 import TabControlsPanel from './TabControlsPanel';
+import BackupsPanel from './BackupsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 import { themes, themeOrder } from '../themes';
 
@@ -231,6 +232,23 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <Palette size={16} />
             Tab Controls
           </button>
+          <button
+            onClick={() => setActiveTab('backups')}
+            style={{
+              padding: '12px 20px',
+              background: 'transparent',
+              border: 'none',
+              color: activeTab === 'backups' ? '#fff' : '#888',
+              borderBottom: activeTab === 'backups' ? '2px solid #8b5cf6' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Database size={16} />
+            Data
+          </button>
         </div>
 
         <div className="modal-body">
@@ -240,6 +258,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <CLISettingsPanel onToast={onToast} />
           ) : activeTab === 'tabs' ? (
             <TabControlsPanel onToast={onToast} />
+          ) : activeTab === 'backups' ? (
+            <BackupsPanel onToast={onToast} />
           ) : (
             <>
               <div style={{
