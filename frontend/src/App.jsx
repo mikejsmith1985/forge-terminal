@@ -376,7 +376,6 @@ function App() {
     checkWSL()
     checkForUpdates()
     checkWelcome()
-    loadQuickInstructionConfig() // v3.12.15: Load quick instruction settings
     
     // Start performance instrumentation for freeze detection
     performanceInstrumentation.start((freezeCapture) => {
