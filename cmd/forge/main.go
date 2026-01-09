@@ -73,12 +73,45 @@ func (w *headerFixingResponseWriter) WriteHeader(statusCode int) {
 func main() {
 	// v3.7.2: Acquire instance lock to prevent multiple instances
 	// This prevents resource contention and keystroke latency issues
-	forgeDir := filepath.Join(os.Getenv("HOME"), ".forge")
+	
+	// Determine home directory reliably
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to Env if UserHomeDir fails (rare)
+		homeDir = os.Getenv("HOME")
+	}
+	if homeDir == "" {
+		homeDir = "." // Last resort fallback
+	}
+
+	forgeDir := filepath.Join(homeDir, ".forge")
+	
+	// Ensure directory exists for logging (created by lockfile usually, but we want to log earlier)
+	_ = os.MkdirAll(forgeDir, 0755)
+
+	// Set up file-based logging EARLY for production diagnostics
+	logPath := filepath.Join(forgeDir, "forge.log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		// Log to both file and stdout
+		log.SetOutput(os.Stdout) // Keep stdout for console
+		log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+		// Also write to file by wrapping
+		multiWriter := io.MultiWriter(os.Stdout, logFile)
+		log.SetOutput(multiWriter)
+		defer logFile.Close()
+	}
+
+	log.Printf("[Forge] Starting up... (Version: %s)", updater.GetVersion())
+	log.Printf("[Forge] Home directory: %s", homeDir)
+
 	lock, err := lockfile.Acquire(forgeDir)
 	if err != nil {
+		log.Printf("CRITICAL ERROR: Failed to acquire lock: %v", err)
+		log.Printf("If you're sure no other instance is running, remove: %s", filepath.Join(forgeDir, "forge.lock"))
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n\n", err)
-		fmt.Fprintf(os.Stderr, "If you're sure no other instance is running, remove:\n")
-		fmt.Fprintf(os.Stderr, "  %s\n", filepath.Join(forgeDir, "forge.lock"))
+		// Wait a moment purely to ensure log flush if async (it's not, but good hygiene)
+		time.Sleep(100 * time.Millisecond) 
 		os.Exit(1)
 	}
 	defer lock.Release()
@@ -136,19 +169,8 @@ func main() {
 		}
 	}
 
-	// Set up file-based logging for production diagnostics
-	logFile, err := os.OpenFile(filepath.Join(os.Getenv("HOME"), ".forge", "forge.log"),
-		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err == nil {
-		// Log to both file and stdout
-		log.SetOutput(os.Stdout) // Keep stdout for console
-		log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-		// Also write to file by wrapping
-		multiWriter := io.MultiWriter(os.Stdout, logFile)
-		log.SetOutput(multiWriter)
-		defer logFile.Close()
-	}
-
+	// Logging is already set up at the top of main()
+	
 	// Migrate storage structure if needed
 	log.Printf("[Forge] Checking storage structure...")
 	if err := storage.MigrateToV2(); err != nil {
