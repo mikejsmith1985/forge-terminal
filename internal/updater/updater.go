@@ -102,7 +102,6 @@ func CheckForUpdate() (*UpdateInfo, error) {
 	}
 
 	// Find the right asset for this platform
-	// Try new name first, fallback to old name for transition period
 	assetNames := getAssetNames()
 	var downloadURL string
 	var assetSize int64
@@ -110,7 +109,15 @@ func CheckForUpdate() (*UpdateInfo, error) {
 
 	for _, name := range assetNames {
 		for _, asset := range release.Assets {
-			if asset.Name == name {
+			// Case-insensitive match for Windows .exe extension
+			match := false
+			if runtime.GOOS == "windows" {
+				match = strings.EqualFold(asset.Name, name)
+			} else {
+				match = asset.Name == name
+			}
+
+			if match {
 				downloadURL = asset.BrowserDownloadURL
 				assetSize = asset.Size
 				assetName = name
