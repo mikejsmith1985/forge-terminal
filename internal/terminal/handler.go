@@ -533,15 +533,40 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	done := make(chan struct{})
 	var closeOnce sync.Once
 
-	// Layer 1: PTY Heartbeat - Send periodic heartbeats for health monitoring
+	// ═══ WEBSOCKET KEEPALIVE (CRITICAL FOR IDLE CONNECTIONS) ═══
+	// Configure ping/pong to prevent idle disconnects
+	// Browsers and proxies often close idle WebSockets after 60-120 seconds
+	const (
+		pingPeriod = 30 * time.Second  // Send ping every 30 seconds
+		pongWait   = 60 * time.Second  // Wait up to 60 seconds for pong response
+	)
+	
+	// Set up pong handler - client must respond to our pings
+	rawConn.SetReadDeadline(time.Now().Add(pongWait))
+	rawConn.SetPongHandler(func(string) error {
+		// Reset the read deadline on pong receipt - connection is alive
+		rawConn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+	
+	// Ping goroutine - sends periodic pings to keep connection alive
 	go func() {
-		ticker := time.NewTicker(15 * time.Second)
+		ticker := time.NewTicker(pingPeriod)
 		defer ticker.Stop()
-
+		
 		for {
 			select {
 			case <-ticker.C:
-				// v3.12.3: AM heartbeat removed
+				// Send ping with deadline
+				if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+					log.Printf("[Terminal] Ping failed for session %s: %v", sessionID, err)
+					// Connection is dead, trigger close
+					select {
+					case closeChan <- closeReason{1006, "Ping failed"}:
+					default:
+					}
+					return
+				}
 			case <-done:
 				return
 			}
