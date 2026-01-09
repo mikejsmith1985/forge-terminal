@@ -39,11 +39,11 @@ function generateId() {
  * @param {string} currentDirectory - Optional current directory path
  * @param {string} defaultThemePreference - Default theme preference: 'auto-cycle', 'auto-cycle-dark', 'auto-cycle-light', or specific theme name
  */
-function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, currentDirectory = null, defaultThemePreference = 'auto-cycle') {
+function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, currentDirectory = null, defaultThemePreference = 'auto-cycle', options = {}) {
   // Auto-assign theme based on preference
   let assignedTheme;
   let assignedMode;
-  
+
   if (colorTheme) {
     // Explicit override - use it
     assignedTheme = colorTheme;
@@ -68,10 +68,10 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     assignedTheme = defaultThemePreference;
     assignedMode = mode || 'dark';
   }
-  
+
   const newTab = {
     id: generateId(),
-    title: `Terminal ${tabNumber}`,
+    title: options.title || `Terminal ${tabNumber}`,
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
@@ -81,6 +81,9 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
     currentDirectory: currentDirectory || null, // Current working directory
     createdAt: Date.now(),
+    type: options.type || 'terminal',
+    file: options.file || null,
+    path: options.path || null,
   };
   
   logger.tabs('Creating tab object', { 
@@ -670,6 +673,33 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
+   * Update a tab's modified (dirty) state
+   * @param {string} tabId - ID of tab to update
+   * @param {boolean} modified - Whether the tab has unsaved changes
+   */
+  const updateTabModified = useCallback((tabId, modified) => {
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) {
+        return prev;
+      }
+
+      // Only update if changed
+      if (prev.tabs[tabIndex].modified === modified) {
+        return prev;
+      }
+
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], modified };
+
+      return {
+        ...prev,
+        tabs: newTabs,
+      };
+    });
+  }, []);
+
+  /**
    * Toggle view mode for a tab (chat -> terminal -> notebook -> chat)
    * @param {string} tabId - ID of tab to update
    * @param {string} targetMode - Optional: directly set to a specific mode
@@ -696,6 +726,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     toggleTabVision,
     toggleTabMode,
     changeTabTheme,
+    updateTabModified,
     toggleTabViewMode, // v3.3.0: Toggle between chat and terminal view
     updateTabDirectory,
     reorderTabs,

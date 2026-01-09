@@ -209,10 +209,20 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
         <button
           className="tab-close"
           onClick={handleCloseClick}
-          aria-label="Close tab"
+          aria-label={tab.modified ? "Unsaved changes" : "Close tab"}
           tabIndex={-1}
         >
-          <X size={14} />
+          {tab.modified ? (
+            <div className="tab-dirty-indicator" style={{ 
+              width: '8px', 
+              height: '8px', 
+              borderRadius: '50%', 
+              backgroundColor: 'var(--text-secondary)',
+              margin: '3px'
+            }} />
+          ) : (
+            <X size={14} />
+          )}
         </button>
       </div>
       

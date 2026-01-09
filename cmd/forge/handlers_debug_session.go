@@ -28,6 +28,7 @@ type DebugSession struct {
 	Summary         SessionSummary  `json:"summary"`
 	VideoPath       string          `json:"videoPath,omitempty"`
 	SessionPath     string          `json:"sessionPath,omitempty"`
+	TargetDirectory string          `json:"targetDirectory,omitempty"`
 }
 
 // SessionSummary contains aggregate stats from the session
@@ -239,15 +240,46 @@ func generateAnalysisPromptFromSession(session *DebugSession) string {
 	sb.WriteString("- **Session ID:** " + session.ID + "\n")
 	sb.WriteString("- **Timestamp:** " + session.Timestamp + "\n")
 	sb.WriteString("- **Duration:** " + (time.Duration(session.Duration) * time.Second).String() + "\n")
+	if session.TargetDirectory != "" {
+		sb.WriteString("- **Target Directory:** " + session.TargetDirectory + "\n")
+	}
 	sb.WriteString("\n## Summary\n")
 	sb.WriteString("- **Total Events:** " + fmt.Sprintf("%d", session.Summary.TotalEvents) + "\n")
 	sb.WriteString("- **Keystrokes:** " + fmt.Sprintf("%d", session.Summary.Keystrokes) + "\n")
 	sb.WriteString("- **Clicks:** " + fmt.Sprintf("%d", session.Summary.Clicks) + "\n")
 	sb.WriteString("- **Console Errors:** " + fmt.Sprintf("%d", session.Summary.Errors) + "\n")
 	sb.WriteString("- **Failed Network Requests:** " + fmt.Sprintf("%d", session.Summary.FailedRequests) + "\n")
+	
+	// v3.12.16: Check for external logs
+	externalLogs, _ := loadDebugLogs(session.ID)
+	if len(externalLogs) > 0 {
+		sb.WriteString("- **External Logs:** " + fmt.Sprintf("%d", len(externalLogs)) + "\n")
+	}
+
 	sb.WriteString("\n## Raw Data\n")
 	sb.WriteString("Session data is available at: " + session.SessionPath + "\n")
 	sb.WriteString("\n## Analysis Request\n")
+	if session.TargetDirectory != "" {
+		sb.WriteString("CONTEXT: The user is debugging an application located at: " + session.TargetDirectory + "\n")
+		sb.WriteString("IMPORTANT: Please perform all file searches and reads relative to this directory.\n\n")
+	}
+
+	// v3.12.16: Include external logs in the prompt
+	if len(externalLogs) > 0 {
+		sb.WriteString("## External Application Logs\n")
+		sb.WriteString("```json\n")
+		
+		// Limit to last 50 logs to avoid token limits
+		logsToInclude := externalLogs
+		if len(logsToInclude) > 50 {
+			logsToInclude = logsToInclude[len(logsToInclude)-50:]
+		}
+		
+		data, _ := json.MarshalIndent(logsToInclude, "", "  ")
+		sb.WriteString(string(data))
+		sb.WriteString("\n```\n\n")
+	}
+
 	sb.WriteString("Please analyze this debug session and:\n")
 	sb.WriteString("1. Identify any errors or issues\n")
 	sb.WriteString("2. Explain what the user was trying to do\n")
@@ -257,7 +289,30 @@ func generateAnalysisPromptFromSession(session *DebugSession) string {
 	return sb.String()
 }
 
-// handleGetPTYLogs retrieves PTY logs for a session (Follow Me debugger integration)
+// handleSetActiveDebugSession sets the global active debug session ID
+// POST /api/debug-sessions/active
+func handleSetActiveDebugSession(w http.ResponseWriter, r *http.Request) {
+if r.Method != http.MethodPost {
+http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+return
+}
+
+var req struct {
+SessionID string `json:"sessionId"`
+}
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+http.Error(w, "Invalid JSON", http.StatusBadRequest)
+return
+}
+
+terminal.SetActiveDebugSession(req.SessionID)
+
+w.Header().Set("Content-Type", "application/json")
+json.NewEncoder(w).Encode(map[string]interface{}{
+"success": true,
+"activeSessionId": req.SessionID,
+})
+}
 // GET /api/debug/pty-logs?sessionId=<id>
 func handleGetPTYLogs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

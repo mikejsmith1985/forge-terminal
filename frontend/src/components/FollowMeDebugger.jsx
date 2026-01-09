@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
-import { Video, Square, Copy, Check, AlertCircle, Loader } from 'lucide-react';
+import { Video, Square, Copy, Check, AlertCircle, Loader, Info } from 'lucide-react';
 import './FollowMeDebugger.css';
 
 /**
@@ -21,8 +21,11 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [targetDirectory, setTargetDirectory] = useState('');
   const [hasInterruptedSession, setHasInterruptedSession] = useState(false);
-  
+  // v3.12.16: Pre-generate session ID for external logs setup
+  const [nextSessionId, setNextSessionId] = useState('debug-' + Date.now());
+
   // v3.12.14: Force re-render counter
   const [, forceUpdate] = useState(0);
   const durationRef = useRef(0); // Store actual duration in ref
@@ -334,8 +337,20 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       networkRequestsRef.current = [];
       recordedChunksRef.current = [];
       startTimeRef.current = Date.now();
-      sessionIdRef.current = 'debug-' + Date.now();
+      sessionIdRef.current = nextSessionId; // Use pre-generated ID
       streamEndedByUserRef.current = false;
+
+      // v3.12.16: Notify backend of active session (for environment injection)
+      try {
+        await fetch('/api/debug-sessions/active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: nextSessionId })
+        });
+        console.log('[FollowMe] Active session set in backend:', nextSessionId);
+      } catch (err) {
+        console.warn('[FollowMe] Failed to set active session in backend:', err);
+      }
 
       // Try screen recording (skip in headless/test environments)
       const isHeadless = navigator.webdriver || window.navigator.userAgent.includes('HeadlessChrome');
@@ -470,9 +485,10 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       const actualDuration = Math.floor((Date.now() - startTimeRef.current) / 1000);
       
       const session = {
-        id: 'debug-' + Date.now(),
+        id: sessionIdRef.current || 'debug-' + Date.now(),
         timestamp: new Date().toISOString(),
         duration: actualDuration,  // Use calculated duration, not state
+        targetDirectory: targetDirectory,
         events: eventsRef.current,
         consoleLogs: consoleLogsRef.current,
         networkRequests: networkRequestsRef.current,
@@ -504,6 +520,9 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       setSessionComplete(true);
       setSaving(false);
       
+      // Generate new ID for next session
+      setNextSessionId('debug-' + Date.now());
+
       // Clear localStorage since session is now complete
       localStorage.removeItem('follow-me-active-session');
       setHasInterruptedSession(false);
@@ -547,6 +566,14 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
 
     lines.push('# Debug Session Analysis Request');
     lines.push('');
+
+    if (session.targetDirectory) {
+      lines.push('## Context');
+      lines.push('- **Target Application Directory:** ' + session.targetDirectory);
+      lines.push('IMPORTANT: The application source code is located at this path. Please use this path for all file operations.');
+      lines.push('');
+    }
+
     lines.push('## Session Overview');
     lines.push('- **Duration:** ' + duration + ' seconds');
     lines.push('- **Total Events:** ' + summary.totalEvents);
@@ -648,6 +675,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     // setSessionData(null);  // Don't clear - session is still saved to disk
     setRecordingDuration(0);
     setError(null);
+    setNextSessionId('debug-' + Date.now()); // New ID for next session
   }, []);
 
   const resumeSession = useCallback(() => {
@@ -701,14 +729,46 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       )}
 
       {!isRecording && !sessionComplete && !hasInterruptedSession && (
-        <button
-          className="follow-me-button"
-          onClick={startRecording}
-          data-testid="follow-me-button"
-        >
-          <Video size={16} />
-          <span>Follow Me</span>
-        </button>
+        <div className="follow-me-setup">
+          <input
+            type="text"
+            className="target-dir-input"
+            placeholder="Target App Path (optional)"
+            value={targetDirectory}
+            onChange={(e) => setTargetDirectory(e.target.value)}
+          />
+
+          <details className="external-logs-help">
+            <summary>
+              <Info size={14} />
+              <span>Connect External Logs (Setup)</span>
+            </summary>
+            <div className="help-content">
+              <p>Session ID: <code>{nextSessionId}</code></p>
+              <p>
+                <strong>Automatic:</strong> Start a new terminal during recording to get <code>FORGE_DEBUG_SESSION_ID</code> automatically injected.
+              </p>
+              <p><strong>Manual:</strong> POST to <code>/api/debug-logs</code>:</p>
+              <pre>
+{`{
+  "sessionId": process.env.FORGE_DEBUG_SESSION_ID || "${nextSessionId}",
+  "source": "app-name",
+  "level": "error",
+  ...
+}`}
+              </pre>
+            </div>
+          </details>
+
+          <button
+            className="follow-me-button"
+            onClick={startRecording}
+            data-testid="follow-me-button"
+          >
+            <Video size={16} />
+            <span>Follow Me</span>
+          </button>
+        </div>
       )}
 
       {hasInterruptedSession && !isRecording && !sessionComplete && (
@@ -745,6 +805,18 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
             <span>Recording</span>
             <span className="recording-duration">{formatDuration(recordingDuration)}</span>
           </div>
+          
+          <div className="active-session-info">
+             <div className="info-row">
+                <span className="label">Target:</span>
+                <span className="value">{targetDirectory || 'None'}</span>
+             </div>
+             <div className="info-row">
+                <span className="label">Session:</span>
+                <code className="value">{sessionIdRef.current}</code>
+             </div>
+          </div>
+
           <button
             className="im-done-button"
             onClick={stopRecording}

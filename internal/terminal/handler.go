@@ -631,7 +631,21 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				messageCount++
 				
 				// PTY LOGGING: Log bytes read from PTY (for Follow Me debugger)
-				globalPTYLogger.LogPTY(sessionID, "from_pty", buf[:n])
+				// Check for both session-specific and global active session logging
+				activeDebugSession := GetActiveDebugSession()
+				isFollowMeActive := globalPTYLogger.IsEnabled(sessionID) || 
+					(activeDebugSession != "" && globalPTYLogger.IsEnabled(activeDebugSession))
+
+				if isFollowMeActive {
+					// Log to the sessionID (tabID) stream
+					if globalPTYLogger.IsEnabled(sessionID) {
+						globalPTYLogger.LogPTY(sessionID, "from_pty", buf[:n])
+					}
+					// Also log to the global active session stream if different
+					if activeDebugSession != "" && activeDebugSession != sessionID && globalPTYLogger.IsEnabled(activeDebugSession) {
+						globalPTYLogger.LogPTY(activeDebugSession, "from_pty", buf[:n])
+					}
+				}
 				
 				// ═══ CRITICAL PERFORMANCE: Send to browser FIRST ═══
 				// This ensures terminal output is immediately visible

@@ -6,8 +6,8 @@ import (
 )
 
 // LoadVisionInsights loads insights from disk for a specific tab.
-func LoadVisionInsights(amDir string, tabID string) ([]*vision.Insight, error) {
-	return vision.LoadInsights(amDir, tabID)
+func LoadVisionInsights(storageDir string, tabID string) ([]*vision.Insight, error) {
+	return vision.LoadInsights(storageDir, tabID)
 }
 
 // GetVisionInsightSummary generates a summary report for insights.

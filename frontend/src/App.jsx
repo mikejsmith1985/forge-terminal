@@ -22,7 +22,6 @@ import FileExplorer from './components/FileExplorer'
 import LensFilePicker from './components/LensFilePicker'
 import MonacoEditor from './components/MonacoEditor'
 import AgenticEditor from './components/AgenticEditor'
-// AMMonitor removed in v3.12.3 - native recovery works, redundancy monitoring didn't provide value
 import DebugPanel from './components/DebugPanel'
 import WebAppDebuggerCard from './components/WebAppDebuggerCard'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
@@ -163,8 +162,7 @@ function App() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
   // v3.12.15: Quick Instruction feature
-  const [quickInstructionEnabled, setQuickInstructionEnabled] = useState(false);
-  const [quickInstructionText, setQuickInstructionText] = useState('');
+  // Redesigned to use Forge Assist localStorage config instead of API
   const [showQuickInstruction, setShowQuickInstruction] = useState(false);
   
   // Workflow UI state - REMOVED v3.9.0: Workflows deleted, using Task Dashboard instead
@@ -199,6 +197,7 @@ function App() {
     // toggleTabAM, // v3.12.12: AM feature removed
     toggleTabMode,
     changeTabTheme,
+    updateTabModified,
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
@@ -479,6 +478,7 @@ function App() {
     
     const startFallbackPolling = () => {
       // Fallback polling every 5 minutes if SSE fails
+      stopFallbackPolling();
       console.log('[SSE] Starting fallback polling every 5 minutes');
       fallbackPollTimer = setInterval(() => {
         checkForUpdates();
@@ -654,20 +654,8 @@ function App() {
     }
   }
 
-  // v3.12.15: Load quick instruction config
-  const loadQuickInstructionConfig = async () => {
-    try {
-      const response = await fetch('/api/quick-instruction');
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[QuickInstruction] Loaded:', data);
-        setQuickInstructionEnabled(data.enabled || false);
-        setQuickInstructionText(data.template || '');
-      }
-    } catch (error) {
-      console.error('[QuickInstruction] Failed to load config:', error);
-    }
-  };
+  // v3.12.15: Load quick instruction config - REMOVED (Migrated to ForgeAssist localStorage)
+  // const loadQuickInstructionConfig = async () => { ... }
 
   const saveConfig = async (config) => {
     const oldShell = shellConfig.shellType;
@@ -822,8 +810,21 @@ function App() {
   // v3.12.15: Send text to terminal (for Quick Instruction and Command Cards)
   const sendToTerminal = (text) => {
     const tab = tabs.find(t => t.id === activeTabId);
-    if (!tab || !tab.socket || tab.socket.readyState !== WebSocket.OPEN) {
-      addToast('No active terminal connection', 'error');
+    
+    if (!tab) {
+      addToast('No active tab found. Please create a tab first.', 'error');
+      return;
+    }
+
+    if (!tab.socket) {
+      addToast('Terminal socket not initialized.', 'error');
+      return;
+    }
+
+    if (tab.socket.readyState !== WebSocket.OPEN) {
+      const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+      const state = states[tab.socket.readyState] || 'UNKNOWN';
+      addToast(`Terminal connection is ${state}. Please wait...`, 'warning');
       return;
     }
     
@@ -1175,9 +1176,24 @@ function App() {
 
   // File explorer handlers
   const handleFileOpen = useCallback((file) => {
-    setEditorFile(file);
-    setShowEditor(true);
-  }, []);
+    // Check if file is already open in a tab
+    const existingTab = tabs.find(t => t.path === file.path && t.type === 'file');
+    if (existingTab) {
+      switchTab(existingTab.id);
+      return;
+    }
+
+    // Create new tab for file
+    createTab(shellConfig, {
+      type: 'file',
+      title: file.name,
+      file: file,
+      path: file.path
+    });
+    
+    // Ensure sidebar stays on files or whatever is appropriate
+    // setSidebarView('files'); // Optional, keep current view
+  }, [tabs, createTab, switchTab, shellConfig]);
 
   const handleEditorClose = useCallback(() => {
     setShowEditor(false);
@@ -1701,8 +1717,19 @@ function App() {
                 {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}
                 {/* v3.8.2: Terminal is the only view - ChatView and NotebookLayout removed */}
                 <div className="view-layer terminal-layer active">
-                  <ForgeTerminal
-                    ref={(el) => {
+                  {tab.type === 'file' ? (
+                    <MonacoEditor
+                      file={tab.file || { path: tab.path, name: tab.title }}
+                      onClose={() => closeTab(tab.id)}
+                      onSave={handleEditorSave}
+                      onModifiedChange={(modified) => updateTabModified(tab.id, modified)}
+                      theme={tab.mode || theme}
+                      rootPath={tab.currentDirectory || '.'}
+                      terminalRef={null}
+                    />
+                  ) : (
+                    <ForgeTerminal
+                      ref={(el) => {
                       if (el) {
                         terminalRefs.current[tab.id] = el;
                       }
@@ -1748,6 +1775,7 @@ function App() {
                     onTerminalCommand={queryModelTier}
                     onRoutingUpdate={handleRoutingUpdate}
                   />
+                  )}
                 </div>
                 {/* v3.8.2: NotebookLayout REMOVED - Terminal is the only view */}
               </div>
@@ -1967,13 +1995,12 @@ function App() {
 
       {/* v3.12.15: Quick Instruction Bar - Floating prompt input */}
       <QuickInstructionBar
-        isEnabled={quickInstructionEnabled}
         isExpanded={showQuickInstruction}
-        quickInstruction={quickInstructionText}
         forgeAssistBtnPos={forgeAssistBtnPos}
         onSend={sendToTerminal}
         onOpen={() => setShowQuickInstruction(true)}
         onClose={() => setShowQuickInstruction(false)}
+        onEdit={() => setIsForgeAssistOpen(true)}
       />
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}

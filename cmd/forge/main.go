@@ -194,7 +194,6 @@ func main() {
 	})
 
 	// WebSocket terminal handler
-	// Run AM cleanup on startup and initialize AM system
 
 	// Initialize components needed by terminal handler
 	// Vision system for terminal overlays
@@ -205,7 +204,6 @@ func main() {
 	llmDetector := llm.NewDetector()
 
 	// Create terminal handler with direct dependencies
-	// v3.12.3: AM system removed - passing nil
 	termHandler = terminal.NewHandlerDirect(nil, visionParser, llmDetector)
 	http.HandleFunc("/ws", termHandler.HandleWebSocket)
 
@@ -240,8 +238,6 @@ func main() {
 
 	// Welcome screen API - track if welcome has been shown
 	http.HandleFunc("/api/welcome", WrapWithMiddleware(handleWelcome))
-
-	// v3.12.3: AM (Artificial Memory) API removed
 
 	// Vision Configuration & Insights API
 	http.HandleFunc("/api/vision/config", WrapWithMiddleware(handleVisionConfig))
@@ -336,10 +332,15 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
+	http.HandleFunc("/api/debug-sessions/active", WrapWithMiddleware(handleSetActiveDebugSession)) // v3.12.16
 	http.HandleFunc("/api/debug-sessions/", WrapWithMiddleware(handleGetDebugSession))
 	
 	// PTY Logs API - Get PTY logs for Follow Me integration
 	http.HandleFunc("/api/debug/pty-logs", WrapWithMiddleware(handleGetPTYLogs))
+
+	// External Logs API - Ingest logs from external apps (Follow Me integration)
+	http.HandleFunc("/api/debug-logs", WrapWithMiddleware(handleDebugLogsRouter))
+	http.HandleFunc("/api/debug-logs/", WrapWithMiddleware(handleDebugLogsRouter)) // For /{sessionId}
 
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
@@ -1421,15 +1422,14 @@ func handleVisionInsights(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[Vision API] GET /api/vision/insights/%s", tabID)
 
-	// v3.12.3: AM system removed - use default directory
 	forgeDir := os.Getenv("FORGE_DIR")
 	if forgeDir == "" {
 		homeDir, _ := os.UserHomeDir()
 		forgeDir = filepath.Join(homeDir, ".forge")
 	}
-	amDir := filepath.Join(forgeDir, "am")
+	visionDir := filepath.Join(forgeDir, "vision")
 
-	insights, err := terminal.LoadVisionInsights(amDir, tabID)
+	insights, err := terminal.LoadVisionInsights(visionDir, tabID)
 	if err != nil {
 		log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1467,15 +1467,14 @@ func handleVisionInsightsSummary(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[Vision API] GET /api/vision/insights/summary/%s", tabID)
 
-	// v3.12.3: AM system removed - use default directory
 	forgeDir := os.Getenv("FORGE_DIR")
 	if forgeDir == "" {
 		homeDir, _ := os.UserHomeDir()
 		forgeDir = filepath.Join(homeDir, ".forge")
 	}
-	amDir := filepath.Join(forgeDir, "am")
+	visionDir := filepath.Join(forgeDir, "vision")
 
-	insights, err := terminal.LoadVisionInsights(amDir, tabID)
+	insights, err := terminal.LoadVisionInsights(visionDir, tabID)
 	if err != nil {
 		log.Printf("[Vision API] Failed to load insights for tab %s: %v", tabID, err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1590,31 +1589,14 @@ func handleDiagnosticsStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	
 	svc := diagnostic.GetService()
-	amStatus := svc.GetAMStatus()
 	platform := svc.GetPlatformInfo()
 	events := svc.GetEvents(50)
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":       "ok",
-		"amStatus":     amStatus,
 		"platform":     platform,
 		"recentEvents": len(events),
 	})
-}
-
-// handleDiagnosticsAMStatus returns detailed AM system status with file verification.
-func handleDiagnosticsAMStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	
-	svc := diagnostic.GetService()
-	status := svc.GetAMStatus()
-
-	json.NewEncoder(w).Encode(status)
 }
 
 // handleDiagnosticsPlatform returns platform detection information.

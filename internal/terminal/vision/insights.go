@@ -47,17 +47,17 @@ type InsightsTracker struct {
 	mu           sync.RWMutex
 	insights     []*Insight
 	sessionInfo  SessionInfo
-	amDir        string
+	storageDir   string
 	maxInsights  int  // Max insights to keep in memory
 	persistOnAdd bool // Whether to persist after each add
 }
 
 // NewInsightsTracker creates a new insights tracker.
-func NewInsightsTracker(amDir string, sessionInfo SessionInfo) *InsightsTracker {
+func NewInsightsTracker(storageDir string, sessionInfo SessionInfo) *InsightsTracker {
 	return &InsightsTracker{
 		insights:     make([]*Insight, 0),
 		sessionInfo:  sessionInfo,
-		amDir:        amDir,
+		storageDir:   storageDir,
 		maxInsights:  100, // Keep last 100 insights
 		persistOnAdd: true,
 	}
@@ -172,17 +172,17 @@ func (t *InsightsTracker) persist() {
 	tabID := t.sessionInfo.TabID
 	t.mu.RUnlock()
 
-	if t.amDir == "" || tabID == "" {
+	if t.storageDir == "" || tabID == "" {
 		return
 	}
 
-	// Ensure AM directory exists
-	if err := os.MkdirAll(t.amDir, 0755); err != nil {
+	// Ensure storage directory exists
+	if err := os.MkdirAll(t.storageDir, 0755); err != nil {
 		return
 	}
 
 	// Write to vision-insights-{tabID}.json
-	filename := filepath.Join(t.amDir, fmt.Sprintf("vision-insights-%s.json", tabID))
+	filename := filepath.Join(t.storageDir, fmt.Sprintf("vision-insights-%s.json", tabID))
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return
@@ -192,8 +192,8 @@ func (t *InsightsTracker) persist() {
 }
 
 // LoadInsights loads insights from disk for a specific tab.
-func LoadInsights(amDir string, tabID string) ([]*Insight, error) {
-	filename := filepath.Join(amDir, fmt.Sprintf("vision-insights-%s.json", tabID))
+func LoadInsights(storageDir string, tabID string) ([]*Insight, error) {
+	filename := filepath.Join(storageDir, fmt.Sprintf("vision-insights-%s.json", tabID))
 	
 	data, err := os.ReadFile(filename)
 	if err != nil {

@@ -36,7 +36,21 @@ export const useAPI = () => {
     }
   }, [])
 
-  return { apiCall, loading, error }
+  const readFile = useCallback(async (path) => {
+    return apiCall('/api/files/read', {
+      method: 'POST',
+      body: JSON.stringify({ path, rootPath: '.' })
+    })
+  }, [apiCall])
+
+  const writeFile = useCallback(async (path, content) => {
+    return apiCall('/api/files/write', {
+      method: 'POST',
+      body: JSON.stringify({ path, content, rootPath: '.' })
+    })
+  }, [apiCall])
+
+  return { apiCall, loading, error, readFile, writeFile }
 }
 
 // Hook for WebSocket connections

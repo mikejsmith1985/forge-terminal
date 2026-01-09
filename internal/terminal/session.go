@@ -16,6 +16,25 @@ import (
 // Global forge port variable (set by main)
 var forgePort int
 
+// Global active debug session ID (for injecting into new terminals)
+var activeDebugSessionID string
+var activeDebugSessionMu sync.RWMutex
+
+// SetActiveDebugSession sets the global debug session ID
+func SetActiveDebugSession(id string) {
+	activeDebugSessionMu.Lock()
+	defer activeDebugSessionMu.Unlock()
+	activeDebugSessionID = id
+	log.Printf("[Terminal] Active debug session set to: %s", id)
+}
+
+// GetActiveDebugSession gets the global debug session ID
+func GetActiveDebugSession() string {
+	activeDebugSessionMu.RLock()
+	defer activeDebugSessionMu.RUnlock()
+	return activeDebugSessionID
+}
+
 // SetForgePort stores the port for environment variable injection
 func SetForgePort(port int) {
 	forgePort = port
@@ -138,14 +157,24 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 
 	// Create command (only used on Unix)
 	var cmd *exec.Cmd
+	
+	// Prepare environment variables
+	env := os.Environ()
+	env = append(env,
+		"TERM=xterm-256color",
+		"COLORTERM=truecolor",
+		fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
+		fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
+	)
+
+	// Inject active debug session ID if present
+	if sessionID := GetActiveDebugSession(); sessionID != "" {
+		env = append(env, fmt.Sprintf("FORGE_DEBUG_SESSION_ID=%s", sessionID))
+	}
+
 	if runtime.GOOS != "windows" {
 		cmd = exec.Command(shell, shellArgs...)
-		cmd.Env = append(os.Environ(),
-			"TERM=xterm-256color",
-			"COLORTERM=truecolor",
-			fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
-			fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
-		)
+		cmd.Env = env
 		// Set working directory if specified
 		if workingDir != "" {
 			cmd.Dir = workingDir
@@ -156,6 +185,24 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	var ptmx io.ReadWriteCloser
 	var err error
 	if runtime.GOOS == "windows" {
+		// Windows: ConPTY needs env vars too?
+		// Note: pty_windows.go implementation of startPTYWithShell might need updating if it doesn't inherit or set env
+		// But usually it inherits parent env. We can set process env temporarily or rely on SetEnvironmentVariable
+		// For now, let's try setting the env var in the current process before spawning (if safe)
+		// Or better, let's update pty_windows.go signature in a future refactor.
+		// For now, on Windows, we'll set the env var on the command if we were using exec.Command, but startPTYWithShell uses syscalls.
+		
+		// v3.12.16: Inject env var for Windows ConPTY
+		if sessionID := GetActiveDebugSession(); sessionID != "" {
+			os.Setenv("FORGE_DEBUG_SESSION_ID", sessionID)
+			// Defer unset? No, concurrent spawns might need it. 
+			// But setting process-wide env is risky for concurrent differing sessions.
+			// However, ActiveDebugSessionID is global anyway, so it represents "current focus".
+			// Ideally we pass env to startPTYWithShell.
+		} else {
+			os.Unsetenv("FORGE_DEBUG_SESSION_ID")
+		}
+		
 		ptmx, err = startPTYWithShell(shell, shellArgs, workingDir)
 	} else {
 		ptmx, err = startPTY(cmd)

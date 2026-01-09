@@ -12,16 +12,41 @@ import './QuickInstructionBar.css';
  * 3. Send combined text to terminal (like Command Cards)
  */
 function QuickInstructionBar({ 
-  isEnabled,
   isExpanded: externalIsExpanded,
-  quickInstruction, 
   forgeAssistBtnPos, 
   onSend,
   onOpen,
-  onClose 
+  onClose,
+  onEdit
 }) {
   const [userPrompt, setUserPrompt] = useState('');
+  const [quickInstructions, setQuickInstructions] = useState([]);
   const promptInputRef = useRef(null);
+
+  // Load instructions from localStorage and listen for updates
+  useEffect(() => {
+    const loadInstructions = () => {
+      try {
+        const saved = localStorage.getItem('forgeAssist_quickInstructions');
+        if (saved) {
+          setQuickInstructions(JSON.parse(saved));
+        } else {
+          setQuickInstructions([]);
+        }
+      } catch (e) {
+        setQuickInstructions([]);
+      }
+    };
+
+    loadInstructions();
+    window.addEventListener('forge-quick-instructions-updated', loadInstructions);
+    return () => window.removeEventListener('forge-quick-instructions-updated', loadInstructions);
+  }, []);
+
+  // Compute active instruction text
+  const activeInstructions = quickInstructions.filter(i => i.enabled);
+  const quickInstructionText = activeInstructions.map(i => i.text).join('\n\n');
+  const isEnabled = activeInstructions.length > 0;
 
   // Use internal state for expansion, but can be controlled externally
   const isExpanded = externalIsExpanded;
@@ -53,7 +78,7 @@ function QuickInstructionBar({
     if (!userPrompt.trim()) return;
 
     // Combine user prompt with quick instruction
-    const fullPrompt = `${userPrompt.trim()}\n\n${quickInstruction}\n`;
+    const fullPrompt = `${userPrompt.trim()}\n\n${quickInstructionText}\n`;
     
     onSend(fullPrompt);
     
@@ -153,17 +178,16 @@ function QuickInstructionBar({
                   onClick={(e) => {
                     e.preventDefault();
                     onClose(); // Close Quick Instruction bar
-                    // Open Settings modal to Quick Instructions tab
-                    // This will be handled by parent component
+                    if (onEdit) onEdit();
                   }}
-                  title="Edit in Settings"
+                  title="Configure in Forge Assist"
                 >
                   <Edit3 size={12} />
-                  Edit
+                  Configure
                 </a>
               </label>
               <div className="qib-instruction-preview">
-                {quickInstruction || '(No instruction configured)'}
+                {quickInstructionText || '(No instructions enabled)'}
               </div>
             </div>
 
@@ -179,7 +203,7 @@ function QuickInstructionBar({
                   </div>
                   <div className="qib-preview-divider">• • •</div>
                   <div className="qib-preview-section qib-preview-instruction">
-                    {quickInstruction}
+                    {quickInstructionText}
                   </div>
                 </div>
               </div>

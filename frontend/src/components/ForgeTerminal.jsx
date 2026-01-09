@@ -697,10 +697,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         xtermRef.current.focus();
       }
     },
-    isConnected: () => {
-      return wsRef.current && wsRef.current.readyState === WebSocket.OPEN;
-    },
-    reconnect: () => {
+    isConnected: () => { return wsRef.current && wsRef.current.readyState === WebSocket.OPEN; }, getTerminal: () => xtermRef.current, getSocket: () => wsRef.current, wsRef: wsRef, terminal: xtermRef.current, reconnect: () => {
       // Clear any pending reconnection timeouts
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
@@ -749,8 +746,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
     },
     isWaitingForPrompt: () => isWaiting,
-  }));
-  
+  }), [isWaiting]); // Only update when state changes
+
   // Vision action handler
   const handleVisionAction = useCallback((action) => {
     if (action.type === 'INJECT_COMMAND' && action.command) {
@@ -1861,3 +1858,5 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 });
 
 export default ForgeTerminal;
+
+

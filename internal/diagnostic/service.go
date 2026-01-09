@@ -29,19 +29,6 @@ type DiagnosticEvent struct {
 	PlainText  string                 `json:"plainText"`
 }
 
-// AMStatus represents the current AM system status.
-type AMStatus struct {
-	IsHealthy           bool      `json:"isHealthy"`
-	LastFileWrite       time.Time `json:"lastFileWrite,omitempty"`
-	LastFileWritePath   string    `json:"lastFileWritePath,omitempty"`
-	ActiveConversations int       `json:"activeConversations"`
-	TotalFiles          int       `json:"totalFiles"`
-	FileWriteVerified   bool      `json:"fileWriteVerified"`
-	AMDirectory         string    `json:"amDirectory"`
-	DirectoryExists     bool      `json:"directoryExists"`
-	DirectoryWritable   bool      `json:"directoryWritable"`
-}
-
 // PlatformInfo represents platform detection information.
 type PlatformInfo struct {
 	OS           string `json:"os"`
@@ -57,7 +44,6 @@ type DiagnosticSession struct {
 	StartTime   time.Time         `json:"startTime"`
 	Platform    PlatformInfo      `json:"platform"`
 	Events      []DiagnosticEvent `json:"events"`
-	AMStatus    *AMStatus         `json:"amStatus,omitempty"`
 	TotalEvents int               `json:"totalEvents"`
 }
 
@@ -69,7 +55,6 @@ type Service struct {
 	events          []DiagnosticEvent
 	maxEvents       int
 	lastEventTime   time.Time
-	amDir           string
 	diagnosticsDir  string
 	subscribers     []chan DiagnosticEvent
 	subscriberMutex sync.RWMutex
@@ -86,7 +71,6 @@ func NewService() *Service {
 		events:         make([]DiagnosticEvent, 0, 500),
 		maxEvents:      500,
 		lastEventTime:  time.Now(),
-		amDir:          filepath.Join(forgeDir, "am"),
 		diagnosticsDir: filepath.Join(forgeDir, "diagnostics"),
 		subscribers:    make([]chan DiagnosticEvent, 0),
 	}
@@ -168,63 +152,6 @@ func (s *Service) Unsubscribe(ch chan DiagnosticEvent) {
 	}
 }
 
-// GetAMStatus returns the current AM system status with actual file verification.
-func (s *Service) GetAMStatus() *AMStatus {
-	status := &AMStatus{
-		AMDirectory: s.amDir,
-	}
-
-	// Check if directory exists
-	if info, err := os.Stat(s.amDir); err == nil && info.IsDir() {
-		status.DirectoryExists = true
-
-		// Check if directory is writable
-		testFile := filepath.Join(s.amDir, ".diagnostic-test")
-		if err := os.WriteFile(testFile, []byte("test"), 0644); err == nil {
-			os.Remove(testFile)
-			status.DirectoryWritable = true
-		}
-
-		// Find most recent file and count total
-		var mostRecentFile string
-		var mostRecentTime time.Time
-
-		entries, err := os.ReadDir(s.amDir)
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-					continue
-				}
-				status.TotalFiles++
-
-				info, err := entry.Info()
-				if err == nil && info.ModTime().After(mostRecentTime) {
-					mostRecentTime = info.ModTime()
-					mostRecentFile = entry.Name()
-				}
-			}
-		}
-
-		if mostRecentFile != "" {
-			status.LastFileWritePath = mostRecentFile
-			status.LastFileWrite = mostRecentTime
-
-			// Verify the file is actually readable
-			fullPath := filepath.Join(s.amDir, mostRecentFile)
-			if _, err := os.ReadFile(fullPath); err == nil {
-				status.FileWriteVerified = true
-			}
-		}
-	}
-
-	// Determine overall health
-	status.IsHealthy = status.DirectoryExists && 
-		status.DirectoryWritable && 
-		(status.TotalFiles > 0 || time.Since(s.startTime) < 5*time.Minute)
-
-	return status
-}
-
 // GetPlatformInfo returns platform detection information.
 func (s *Service) GetPlatformInfo() PlatformInfo {
 	homeDir, _ := os.UserHomeDir()
@@ -264,7 +191,6 @@ func (s *Service) ExportSession() (string, error) {
 		StartTime:   s.startTime,
 		Platform:    s.GetPlatformInfo(),
 		Events:      s.events,
-		AMStatus:    s.GetAMStatus(),
 		TotalEvents: len(s.events),
 	}
 

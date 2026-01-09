@@ -2,361 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forge Terminal - Refactor COMPLETE ✅</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <title>Quick Instruction Fix Analysis</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', system-ui, sans-serif; 
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh; 
-            color: #e0e0e0;
-            padding: 20px;
-        }
-        .container { max-width: 1400px; margin: 0 auto; }
-        h1 { 
-            text-align: center; 
-            font-size: 2.5rem; 
-            margin-bottom: 10px;
-            background: linear-gradient(90deg, #00ff88, #00d9ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
-        .timestamp { text-align: center; color: #666; font-size: 0.9rem; margin-bottom: 20px; }
-        
-        .success-banner {
-            background: linear-gradient(90deg, rgba(0,255,136,0.3), rgba(0,217,255,0.3));
-            border: 2px solid #00ff88;
-            border-radius: 12px;
-            padding: 25px;
-            text-align: center;
-            margin-bottom: 30px;
-            animation: pulse 2s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 20px rgba(0,255,136,0.3); }
-            50% { box-shadow: 0 0 40px rgba(0,255,136,0.5); }
-        }
-        .success-banner h2 { color: #00ff88; font-size: 2rem; margin-bottom: 10px; }
-        .success-banner p { font-size: 1.1rem; }
-        
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-        
-        .card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 16px;
-            padding: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-        }
-        .card.complete { border-color: #00ff88; }
-        .card h2 { 
-            font-size: 1.2rem; 
-            margin-bottom: 15px; 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-        }
-        .card h2 .icon { font-size: 1.5rem; }
-        
-        .task {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            margin: 5px 0;
-            background: rgba(0,0,0,0.2);
-            border-radius: 8px;
-            font-size: 0.9rem;
-        }
-        .task.done { border-left: 3px solid #00ff88; }
-        
-        .status-icon { font-size: 1.2rem; }
-        .status-done { color: #00ff88; }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .stat {
-            text-align: center;
-            padding: 20px 15px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 12px;
-            border: 1px solid rgba(0,255,136,0.3);
-        }
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #00ff88;
-        }
-        .stat-label { font-size: 0.85rem; color: #888; margin-top: 5px; }
-        
-        .proof-section {
-            background: rgba(0,255,136,0.1);
-            border: 2px solid rgba(0,255,136,0.5);
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .proof-section h3 { color: #00ff88; margin-bottom: 15px; font-size: 1.3rem; }
-        
-        .terminal-output {
-            font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
-            font-size: 0.85rem;
-            background: #0a0a0a;
-            padding: 15px;
-            border-radius: 8px;
-            overflow-x: auto;
-            white-space: pre;
-            color: #00ff88;
-            border: 1px solid #333;
-        }
-        .terminal-output .pass { color: #00ff88; }
-        .terminal-output .fail { color: #ff6b6b; }
-        .terminal-output .pending { color: #888; }
-        .terminal-output .header { color: #00d9ff; }
-        
-        .mermaid { 
-            background: rgba(255,255,255,0.02); 
-            border-radius: 12px; 
-            padding: 20px;
-            margin: 15px 0;
-        }
-        
-        .code-block {
-            font-family: 'Consolas', monospace;
-            font-size: 0.85rem;
-            background: rgba(0,0,0,0.4);
-            padding: 15px;
-            border-radius: 8px;
-            overflow-x: auto;
-        }
-        .code-block .comment { color: #6a9955; }
-        .code-block .keyword { color: #569cd6; }
-        .code-block .string { color: #ce9178; }
-        
-        .progress-bar {
-            height: 10px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 5px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00d9ff, #00ff88);
-            border-radius: 5px;
-        }
-        
-        .badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-        .badge-green { background: rgba(0,255,136,0.2); color: #00ff88; }
-        .badge-blue { background: rgba(0,217,255,0.2); color: #00d9ff; }
-
-        .footer {
-            margin-top: 40px;
-            text-align: center;
-            padding: 20px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        .footer p { color: #666; margin: 5px 0; }
+        body { font-family: system-ui, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8em; }
+        .pending { background: #fff3e0; color: #e65100; }
+        .completed { background: #e8f5e9; color: #2e7d32; }
+        .mermaid { margin: 20px 0; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true});</script>
 </head>
 <body>
-    <div class="container">
-        <h1>✅ REFACTOR COMPLETE</h1>
-        <p class="subtitle">Total Codebase Refactor & Test Suite Rebuild</p>
-        <p class="timestamp">Completed: <span id="timestamp"></span></p>
-        
-        <div class="success-banner">
-            <h2>🎉 ALL TESTS PASSING!</h2>
-            <p>5/5 Cypress Tests ✓ | 12/12 Go Unit Tests ✓ | 165+ Old Tests Deleted ✓</p>
-        </div>
-        
-        <div class="stats-grid">
-            <div class="stat">
-                <div class="stat-value">5</div>
-                <div class="stat-label">Cypress Tests Pass</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">12</div>
-                <div class="stat-label">Go Unit Tests Pass</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">165+</div>
-                <div class="stat-label">Old Tests Deleted</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">0</div>
-                <div class="stat-label">Playwright Deps</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">✓</div>
-                <div class="stat-label">Testcontainers Ready</div>
-            </div>
-        </div>
-        
-        <!-- PROOF: Cypress Test Results -->
-        <div class="proof-section">
-            <h3>📋 PROOF: Cypress Test Results</h3>
-            <div class="terminal-output"><span class="header">====================================================================================================
-
-  (Run Finished)
-
-       Spec                                              Tests  Passing  Failing  Pending  Skipped  
-  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-  │ <span class="pass">√  terminal.cy.js                           00:17        6        5        -        1        -</span> │
-  └────────────────────────────────────────────────────────────────────────────────────────────────┘
-    <span class="pass">√  All specs passed!</span>                        00:17        6        5        -        1        -</span>
-
-<span class="pass">  Terminal Connection
-    √ should load the terminal UI (3280ms)
-    √ should connect to WebSocket (3730ms)
-    √ should accept real keyboard input via cypress-real-events (3779ms)
-    √ should handle Ctrl+V paste using REAL events (3111ms)
-    √ should expose terminal instance when Cypress detected (3318ms)</span>
-
-  <span class="pending">Terminal Auto-Respond
-    - should detect CLI confirmation prompts (skipped - requires real CLI)</span></div>
-        </div>
-        
-        <!-- PROOF: Go Unit Test Results -->
-        <div class="proof-section">
-            <h3>📋 PROOF: Go Unit Test Results</h3>
-            <div class="terminal-output"><span class="pass">=== RUN   TestCleanANSI
-=== RUN   TestCleanANSI/empty_string
-=== RUN   TestCleanANSI/plain_text_unchanged
-=== RUN   TestCleanANSI/removes_color_codes
-=== RUN   TestCleanANSI/removes_bold_codes
-=== RUN   TestCleanANSI/removes_complex_SGR
-=== RUN   TestCleanANSI/removes_cursor_position_codes
-=== RUN   TestCleanANSI/removes_bracketed_paste_mode
-=== RUN   TestCleanANSI/preserves_newlines
-=== RUN   TestCleanANSI/removes_orphaned_CSI_sequences
---- PASS: TestCleanANSI (0.00s)</span>
-
-<span class="pass">=== RUN   TestParseCopilotOutput
-=== RUN   TestParseCopilotOutput/removes_TUI_frame_characters
-=== RUN   TestParseCopilotOutput/removes_Copilot_footer
-=== RUN   TestParseCopilotOutput/removes_menu_instructions
---- PASS: TestParseCopilotOutput (0.00s)
-
-PASS
-ok      github.com/mikejsmith1985/forge-terminal/internal/llm   0.906s</span></div>
-        </div>
-        
-        <div class="grid">
-            <!-- What Was Done -->
-            <div class="card complete">
-                <h2><span class="icon">✅</span> Phase 0: Tooling <span class="badge badge-green">Complete</span></h2>
-                <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Uninstalled Playwright (124 packages)</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Installed Cypress v15.8.1</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Installed cypress-real-events v1.15.0</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Configured cypress.config.js</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Installed testcontainers-go v0.40.0</div>
-            </div>
-            
-            <div class="card complete">
-                <h2><span class="icon">✅</span> Phase 1: Cleanup <span class="badge badge-green">Complete</span></h2>
-                <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Deleted 39 Go test files</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Deleted 115+ JS spec files</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Deleted 11 JS test files</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Deleted 4 Playwright configs</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Audited clipboard logic</div>
-            </div>
-            
-            <div class="card complete">
-                <h2><span class="icon">✅</span> Phase 2: Test Infrastructure <span class="badge badge-green">Complete</span></h2>
-                <div class="progress-bar"><div class="progress-fill" style="width: 100%"></div></div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Created testcontainers.go helper</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Created Cypress custom commands</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> cy.getTerminalOutput() reads xterm buffer</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> cy.realPress() for REAL keyboard events</div>
-                <div class="task done"><span class="status-icon status-done">✓</span> Exposed window.term for Cypress</div>
-            </div>
-            
-            <!-- Architecture -->
-            <div class="card">
-                <h2><span class="icon">📊</span> New Testing Architecture</h2>
-                <div class="mermaid">
-flowchart TB
-    subgraph Unit["Unit Tests"]
-        U1[Pure Functions]
-        U2[Strict Mocking]
-    end
+    <h1>Quick Instruction Fix Analysis</h1>
     
-    subgraph Integration["Integration"]
-        TC[(Postgres<br/>Testcontainer)]
-        I1[Real DB Queries]
-    end
-    
-    subgraph E2E["Cypress E2E"]
-        C1[Real Backend]
-        C2[realPress() Events]
-        C3[xterm Buffer Read]
-    end
-    
-    Unit -->|"<10ms"| FAST[Fast ⚡]
-    Integration --> TC
-    E2E --> REAL[Real Stack ✓]
-                </div>
-            </div>
-            
-            <!-- Key Constraints -->
-            <div class="card" style="grid-column: span 2;">
-                <h2><span class="icon">🔒</span> Enforced Constraints</h2>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 10px;">
-                    <div style="text-align: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
-                        <div style="font-size: 2rem; margin-bottom: 10px;">🚫</div>
-                        <div style="font-weight: bold; color: #ff6b6b;">FORBIDDEN</div>
-                        <div style="font-size: 0.85rem; color: #888; margin-top: 5px;">.trigger('paste')<br/>.trigger('keydown')</div>
-                    </div>
-                    <div style="text-align: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
-                        <div style="font-size: 2rem; margin-bottom: 10px;">✅</div>
-                        <div style="font-weight: bold; color: #00ff88;">REQUIRED</div>
-                        <div style="font-size: 0.85rem; color: #888; margin-top: 5px;">cy.realPress(['Control', 'V'])<br/>cypress-real-events</div>
-                    </div>
-                    <div style="text-align: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
-                        <div style="font-size: 2rem; margin-bottom: 10px;">🗄️</div>
-                        <div style="font-weight: bold; color: #00d9ff;">REAL DB</div>
-                        <div style="font-size: 0.85rem; color: #888; margin-top: 5px;">Testcontainers<br/>No DB Mocks</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p style="font-size: 1.2rem; color: #00ff88;">✅ REFACTOR 100% COMPLETE</p>
-            <p>All phases executed • All tests passing • Ready for TDD development</p>
-        </div>
+    <h2>Status</h2>
+    <p>Task: <strong>Unified Quick Instructions Architecture</strong></p>
+    <p>Status: <span class="badge completed">[COMPLETED]</span></p>
+
+    <h2>Problem Diagnosis</h2>
+    <p>User identified redundant configuration in Settings vs Forge Assist and reported an unhandled error in the floating bar.</p>
+
+    <h2>Solution Architecture</h2>
+    <div class="mermaid">
+    graph TD
+        A["User (Ctrl+I)"] -->|Opens| B["QuickInstructionBar"]
+        B -->|Reads| C["localStorage (forgeAssist_quickInstructions)"]
+        B -->|Click Edit| D["Forge Assist (Ctrl+/)"]
+        D -->|Manages| C
+        B -->|Send| E["App.jsx:sendToTerminal"]
+        E -->|Validates| F{Socket Ready?}
+        F -->|Yes| G["Send to PTY"]
+        F -->|No| H["Toast Warning"]
     </div>
-    
-    <script>
-        mermaid.initialize({ 
-            startOnLoad: true, 
-            theme: 'dark',
-            themeVariables: {
-                primaryColor: '#00d9ff',
-                primaryTextColor: '#e0e0e0',
-                primaryBorderColor: '#00d9ff',
-                lineColor: '#888',
-                secondaryColor: '#16213e',
-                tertiaryColor: '#1a1a2e'
-            }
-        });
-        document.getElementById('timestamp').textContent = new Date().toLocaleString();
-    </script>
+
+    <h2>Changes Applied</h2>
+    <ul>
+        <li><strong>Consolidated Config:</strong> Removed <code>QuickInstructionsPanel</code> from Settings. Feature now relies 100% on Forge Assist's localStorage.</li>
+        <li><strong>Unified UI:</strong> <code>QuickInstructionBar</code> now syncs with Forge Assist via event listeners. "Edit" button opens Forge Assist.</li>
+        <li><strong>Robust Error Handling:</strong> <code>sendToTerminal</code> now explicitly checks socket state and provides helpful feedback (Connecting vs Closed).</li>
+        <li><strong>Deleted:</strong> <code>QuickInstructionsPanel.jsx</code> (dead code).</li>
+    </ul>
 </body>
 </html>

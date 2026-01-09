@@ -456,6 +456,8 @@ export default function ForgeAssist({
   const saveQuickInstructions = useCallback((instructions) => {
     localStorage.setItem('forgeAssist_quickInstructions', JSON.stringify(instructions));
     setQuickInstructions(instructions);
+    // Dispatch event so other components (QuickInstructionBar) can sync
+    window.dispatchEvent(new Event('forge-quick-instructions-updated'));
   }, []);
 
   // Add a new quick instruction
