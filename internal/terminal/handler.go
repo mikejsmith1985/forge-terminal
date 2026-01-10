@@ -162,6 +162,7 @@ type Handler struct {
 	sessions        sync.Map // map[string]*TerminalSession
 	visionParser    *vision.Parser
 	llmDetector     *llm.Detector
+	contextManager  *ContextManager // Server-side context storage per session
 	restartRequested atomic.Bool // Flag to indicate session restart is in progress
 }
 
@@ -324,8 +325,9 @@ func NewHandlerDirect(amSys interface{}, visionP *vision.Parser, llmDet *llm.Det
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		visionParser: visionP,
-		llmDetector:  llmDet,
+		visionParser:   visionP,
+		llmDetector:    llmDet,
+		contextManager: NewContextManager(), // Initialize server-side context manager
 	}
 }
 
@@ -532,10 +534,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	lineBuffer := NewLineBuffer()
 	var smartRoutingEnabled atomic.Bool
 	smartRoutingEnabled.Store(true) // Enabled by default
-
-	// PERSISTENT PROMPT INJECTION STATE
-	var injectionEnabled bool
-	var persistentPrompt string
 
 	// Channel to coordinate shutdown with reason
 	type closeReason struct {
@@ -826,16 +824,21 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// Check for PROMPT INJECTION CONFIG
 				var promptMsg PromptInjectionControlMessage
 				if err := json.Unmarshal(data, &promptMsg); err == nil && promptMsg.Type == "PROMPT_INJECTION_CONFIG" {
-					injectionEnabled = promptMsg.Enabled
-					persistentPrompt = promptMsg.Instruction
-					log.Printf("[PromptInjection] Configured for session %s: Enabled=%v, Instruction length=%d",
-						sessionID, injectionEnabled, len(persistentPrompt))
+					// Store context in ContextManager (server-side storage, no PTY pollution)
+					ctx := &PersistentContext{
+						Enabled: promptMsg.Enabled,
+						Text:    promptMsg.Instruction,
+					}
+					h.contextManager.SetContext(sessionID, ctx)
+					
+					log.Printf("[ContextManager] Context configured for session %s: Enabled=%v, Instruction length=%d",
+						sessionID, ctx.Enabled, len(ctx.Text))
 
 					// Send confirmation back to client
 					_ = conn.WriteJSON(map[string]interface{}{
 						"type":        "PROMPT_INJECTION_CONFIRMED",
-						"enabled":     injectionEnabled,
-						"instruction": persistentPrompt,
+						"enabled":     ctx.Enabled,
+						"instruction": ctx.Text,
 					})
 					continue
 				}
@@ -1008,32 +1011,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// ═══ PERSISTENT PROMPT INJECTION ═══
-			// Automatically inject instructions on Enter, but ONLY if enabled and in main buffer
-			if injectionEnabled && persistentPrompt != "" {
-				dataStr := string(data)
-				// Check for Enter key (submission)
-				if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
-					// SAFETY: Only inject if we are in the main buffer (CLI mode)
-					// This prevents accidental injection into Vim/Nano/Htop (Alternate Buffer)
-					if !promptDetector.IsAlternateBuffer() {
-						log.Printf("[PromptInjection] Injecting persistent instruction (%d chars)", len(persistentPrompt))
-
-						// Append instruction before the newline so it becomes part of the command
-						if strings.Contains(dataStr, "\r") {
-							dataStr = strings.ReplaceAll(dataStr, "\r", " "+persistentPrompt+"\r")
-						} else {
-							dataStr = strings.ReplaceAll(dataStr, "\n", " "+persistentPrompt+"\n")
-						}
-						data = []byte(dataStr)
-					} else {
-						log.Printf("[PromptInjection] Skipped: Alternate buffer (TUI) detected")
-					}
-				}
-			}
-
 			// ═══ CRITICAL PERFORMANCE: Write to PTY FIRST, process later ═══
 			// This ensures keyboard input is immediately responsive
+			// NOTE: Context injection happens at LLM API level, NOT here
 			if _, err := session.Write(data); err != nil {
 				log.Printf("[Terminal] PTY write error: %v", err)
 				select {
@@ -1096,6 +1076,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// v3.12.3: AM LLM logger cleanup removed
+
+	// Clean up persistent context for this session
+	h.contextManager.ClearContext(sessionID)
+	log.Printf("[ContextManager] Cleared context for session %s", sessionID)
 
 	// Send close message with reason
 	closeMessage := websocket.FormatCloseMessage(finalReason.code, finalReason.reason)
