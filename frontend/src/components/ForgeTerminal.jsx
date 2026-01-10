@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import { diagnosticCore } from '../utils/diagnosticCore';
+import { isLLMCommand } from '../utils/llmDetection';
 
 // Paste error logger
 const logPasteError = (error, context = {}) => {
@@ -487,6 +488,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const effectiveMaxAttemptsRef = useRef(maxReconnectAttempts);
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
+  
+  // v3.14.4: Command buffer for persistent context injection
+  const commandBufferRef = useRef(''); // Tracks current command being typed
+  const persistentContextRef = useRef(null); // Cached context { enabled, text }
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -1317,6 +1322,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // Listener for persistent instruction changes
     const handlePersistentInstructionChange = (e) => {
       const { enabled, instruction } = e.detail;
+      
+      // Cache context locally for injection (client-side)
+      persistentContextRef.current = enabled ? { enabled: true, text: instruction } : null;
+      
+      // Also send to backend for storage (backwards compat)
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: 'PROMPT_INJECTION_CONFIG',
@@ -1441,6 +1451,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           const savedInstructions = JSON.parse(localStorage.getItem('forgeAssist_quickInstructions') || '[]');
           const activeInst = savedInstructions.find(i => i.enabled);
           if (activeInst) {
+            // Cache context locally for client-side injection
+            persistentContextRef.current = { enabled: true, text: activeInst.text };
+            
+            // Also send to backend for storage
             ws.send(JSON.stringify({
               type: 'PROMPT_INJECTION_CONFIG',
               enabled: true,
@@ -1719,7 +1733,47 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
 
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(data);
+          // v3.14.4: CLIENT-SIDE CONTEXT INJECTION
+          // Track command buffer and conditionally inject context for LLM commands
+          let dataToSend = data;
+          
+          // Update command buffer
+          if (data.includes('\r') || data.includes('\n')) {
+            // Command submission detected - check if we should inject context
+            const command = commandBufferRef.current.trim();
+            
+            // Only inject if:
+            // 1. Context is enabled
+            // 2. Command is detected as LLM command
+            // 3. Command buffer is not empty
+            if (persistentContextRef.current && 
+                persistentContextRef.current.enabled && 
+                command &&
+                isLLMCommand(command)) {
+              
+              const contextText = persistentContextRef.current.text;
+              // Inject context before the newline
+              dataToSend = data.replace(/\r|\n/, ` ${contextText}\r`);
+              
+              console.log('[ContextInjection] LLM command detected, context injected:', {
+                command: command.substring(0, 50),
+                contextLength: contextText.length
+              });
+            } else if (command) {
+              console.log('[ContextInjection] Shell command, no injection:', command.substring(0, 50));
+            }
+            
+            // Clear buffer after submission
+            commandBufferRef.current = '';
+          } else {
+            // Accumulate keystrokes (but limit buffer to prevent OOM)
+            commandBufferRef.current += data;
+            if (commandBufferRef.current.length > 2048) {
+              commandBufferRef.current = commandBufferRef.current.slice(-2048);
+            }
+          }
+          
+          ws.send(dataToSend);
           
           // v3.12.12: AM logging removed
           
