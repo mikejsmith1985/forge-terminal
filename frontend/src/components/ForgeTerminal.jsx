@@ -1448,7 +1448,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
         // SYNC: Send initial persistent instruction state if available
         try {
-          const savedInstructions = JSON.parse(localStorage.getItem('forgeAssist_quickInstructions') || '[]');
+          const savedInstructions = JSON.parse(localStorage.getItem('forgeAssist_persistentInstructions') || '[]');
           const activeInst = savedInstructions.find(i => i.enabled);
           if (activeInst) {
             // Cache context locally for client-side injection
