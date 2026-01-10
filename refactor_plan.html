@@ -1,96 +1,446 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forge Terminal: Refactor Plan & Status</title>
-    <style>
-        body { font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #d4d4d4; padding: 20px; line-height: 1.6; }
-        h1, h2, h3 { color: #569cd6; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .card { background-color: #252526; border: 1px solid #333; padding: 15px; margin-bottom: 20px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
-        .badge { padding: 3px 8px; border-radius: 3px; font-size: 0.8em; font-weight: bold; text-transform: uppercase; }
-        .badge-pending { background-color: #555; color: #fff; }
-        .badge-progress { background-color: #007acc; color: #fff; }
-        .badge-completed { background-color: #4ec9b0; color: #000; }
-        .code-block { background-color: #1e1e1e; padding: 10px; border: 1px solid #444; font-family: "Consolas", monospace; overflow-x: auto; }
-        .checklist { list-style-type: none; padding: 0; }
-        .checklist li { margin-bottom: 5px; }
-        .checklist li:before { content: "☐"; margin-right: 10px; color: #888; }
-        .checklist li.checked:before { content: "☑"; color: #4ec9b0; }
-        .mermaid-container { background: #fff; padding: 10px; border-radius: 4px; }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <script>mermaid.initialize({startOnLoad:true});</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server-Side Persistent Context - Architecture Plan</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      padding: 40px;
+      line-height: 1.6;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      color: #8b949e;
+      font-size: 1.1rem;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #30363d;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-right: 8px;
+      text-transform: uppercase;
+    }
+    .badge.pending { background: #6e40aa; color: #fff; }
+    .badge.in-progress { background: #f59e0b; color: #000; }
+    .badge.completed { background: #2ea043; color: #fff; }
+    .badge.critical { background: #da3633; color: #fff; }
+    
+    .section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .section h2 {
+      color: #58a6ff;
+      font-size: 1.5rem;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .section h3 {
+      color: #79c0ff;
+      font-size: 1.2rem;
+      margin: 20px 0 12px 0;
+    }
+    ul { margin-left: 20px; margin-top: 8px; }
+    li { margin-bottom: 8px; }
+    code {
+      background: #0d1117;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #ff7b72;
+      font-family: 'Consolas', monospace;
+      font-size: 0.9em;
+    }
+    pre {
+      background: #0d1117;
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      border: 1px solid #30363d;
+      margin: 12px 0;
+    }
+    .mermaid { background: #fff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    .warning {
+      background: #3d2506;
+      border-left: 4px solid #f59e0b;
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 4px;
+    }
+    .success {
+      background: #0f2820;
+      border-left: 4px solid #2ea043;
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 4px;
+    }
+    .error {
+      background: #3d1212;
+      border-left: 4px solid #da3633;
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #30363d;
+    }
+    th {
+      background: #0d1117;
+      color: #58a6ff;
+      font-weight: 600;
+    }
+    tr:hover { background: #0d1117; }
+  </style>
 </head>
 <body>
-
-    <h1>Forge Terminal: Refactor Plan</h1>
-    <p><strong>Mission:</strong> Persistent Prompt Injection & Dev Workflow Restoration</p>
-    <p><strong>Date:</strong> 2026-01-10</p>
-    
-    <div class="card">
-        <h2>Phase 1: Architecture Fix (Lock Separation)</h2>
-        <div class="mermaid-container">
-            <div class="mermaid">
-                graph TD
-                    P[Production App] -->|Locks| PLock[forge.lock]
-                    D[Dev Instance] -->|Locks| DLock[forge-dev.lock]
-                    
-                    W[WebSocket] -->|Config| H[Handler]
-                    H -->|Inject| PTY[Terminal]
-                    
-                    style P fill:#2d4f26,stroke:#4ec9b0,stroke-width:2px
-                    style D fill:#8a2be2,stroke:#d19fe8,stroke-width:2px
-            </div>
-        </div>
+  <div class="container">
+    <h1>🔧 Server-Side Persistent Context</h1>
+    <div class="subtitle">
+      Architecture Plan for Proper LLM Context Injection
+      <br><strong>Branch:</strong> feature/server-side-persistent-context
+      <br><strong>Date:</strong> 2026-01-10
     </div>
 
-    <div class="card">
-        <h2>Phase 2: The "Zero-Compromise" Audit [COMPLETED]</h2>
-        <ul class="checklist">
-            <li class="checked"><strong>Safety:</strong> Protecting `fterm.exe` (Production) while killing `forge-dev.exe` (Dev).</li>
-            <li class="checked"><strong>Isolation:</strong> Dev instances now use completely separate lock files (`forge-dev.lock`) and logs.</li>
-            <li class="checked"><strong>Injection Safety:</strong> Prompt injection strictly disabled in TUI/Alternate Buffers.</li>
+    <!-- Problem Statement -->
+    <div class="section">
+      <h2>🚨 Problem Statement</h2>
+      <div class="error">
+        <strong>CRITICAL BUG:</strong> Previous implementation used PTY injection (<code>termRef.write()</code>), causing:
+        <ul>
+          <li><strong>Command Cards Broken:</strong> Instructions appended to commands (e.g., <code>copilot\n\nContext: don't break stuff</code>)</li>
+          <li><strong>Enter Key Malfunction:</strong> Each press appended text again instead of executing once</li>
+          <li><strong>Architectural Flaw:</strong> Client-side PTY writes cannot distinguish between user input and LLM context</li>
         </ul>
+      </div>
     </div>
 
-    <div class="card">
-        <h2>Phase 3: Execution [COMPLETED]</h2>
-        
-        <h3>1. Lock File Separation</h3>
-        <p><span class="badge badge-completed">COMPLETED</span> Updated `cmd/forge/main.go` and `internal/lockfile/lockfile.go`</p>
-        
-        <h3>2. Persistent Prompt Injection</h3>
-        <p><span class="badge badge-completed">COMPLETED</span> Implemented in `internal/terminal/handler.go`</p>
-        <div class="code-block">
-            // Test Validation (internal/terminal/injection_test.go):
-            // --- PASS: TestInjectionLogic (0.00s)
-            //    --- PASS: TestInjectionLogic/Basic_Injection_on_Return
-            //    --- PASS: TestInjectionLogic/No_Injection_if_Disabled
-            //    --- PASS: TestInjectionLogic/No_Injection_in_Alt_Buffer
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>Phase 4: Verification [COMPLETED]</h2>
-        <ul class="checklist">
-            <li class="checked">Go Build: Success</li>
-            <li class="checked">Injection Logic: Verified via `TestInjectionLogic` (100% Pass)</li>
-            <li class="checked">Lock Logic: Production uses `forge.lock`, Dev uses `forge-dev.lock`</li>
-        </ul>
-    </div>
+    <!-- Architecture Overview -->
+    <div class="section">
+      <h2>🏗️ Target Architecture</h2>
+      <span class="badge in-progress">IN PROGRESS</span>
+      
+      <h3>Server-Side Context Injection Flow</h3>
+      <div class="mermaid">
+graph LR
+    UI["Frontend<br/>(ForgeAssist UI)"] -->|"1. Save Context"| LS["localStorage<br/>(persistentContext)"]
+    LS -->|"2. Send on Command"| WS["WebSocket Message<br/>(pty-input)"]
+    WS -->|"3. Parse & Extract"| BE["Backend<br/>(pty_manager.go)"]
+    BE -->|"4. Check Context"| CTX["Context Store<br/>(sessionContext map)"]
+    CTX -->|"5. Command Only"| PTY["PTY<br/>(shell execution)"]
+    CTX -->|"6. Command + Context"| LLM["LLM API<br/>(system prompt injection)"]
+    LLM -->|"7. Response"| PTY
     
-    <div class="card">
-        <h2>Configuration Guide</h2>
-        <p>To enable prompt injection, the frontend must send this WebSocket message:</p>
-        <div class="code-block">
+    style UI fill:#8b5cf6,color:#fff
+    style BE fill:#f59e0b,color:#000
+    style LLM fill:#2ea043,color:#fff
+    style PTY fill:#3b82f6,color:#fff
+    style CTX fill:#ec4899,color:#fff
+      </div>
+
+      <h3>Key Design Principles</h3>
+      <ul>
+        <li>✅ <strong>Zero PTY Pollution:</strong> Context NEVER reaches the shell input buffer</li>
+        <li>✅ <strong>Server-Side Logic:</strong> Backend decides when to inject context (only for LLM commands)</li>
+        <li>✅ <strong>Transparent to User:</strong> Terminal shows clean commands, context injected server-side</li>
+        <li>✅ <strong>Command Detection:</strong> Pattern matching to identify LLM-bound vs shell-bound commands</li>
+      </ul>
+    </div>
+
+    <!-- Implementation Phases -->
+    <div class="section">
+      <h2>📋 Implementation Phases</h2>
+      
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 40%">Phase</th>
+            <th style="width: 15%">Status</th>
+            <th>Tasks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Phase 1:</strong> Backend Context Manager</td>
+            <td><span class="badge pending">PENDING</span></td>
+            <td>
+              <ul>
+                <li>Create <code>internal/pty/context_manager.go</code></li>
+                <li>Add sessionContext map (tabID → context string)</li>
+                <li>Implement SetContext/GetContext/ClearContext methods</li>
+                <li>Unit tests with mocked dependencies</li>
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Phase 2:</strong> WebSocket Protocol Extension</td>
+            <td><span class="badge pending">PENDING</span></td>
+            <td>
+              <ul>
+                <li>Add <code>set-persistent-context</code> message type</li>
+                <li>Parse context from WebSocket messages</li>
+                <li>Store in context manager per tab</li>
+                <li>Integration tests with testcontainers</li>
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Phase 3:</strong> Command Detection Logic</td>
+            <td><span class="badge pending">PENDING</span></td>
+            <td>
+              <ul>
+                <li>Pattern matching: <code>copilot</code>, <code>claude</code>, <code>@</code> prefix</li>
+                <li>Inject context ONLY for LLM commands</li>
+                <li>Pass-through for shell commands (ls, cd, etc.)</li>
+                <li>Unit tests for pattern matching</li>
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Phase 4:</strong> Frontend Integration</td>
+            <td><span class="badge pending">PENDING</span></td>
+            <td>
+              <ul>
+                <li>Send context via WebSocket on enable/disable</li>
+                <li>Remove PTY write logic</li>
+                <li>Add visual indicator (context active badge)</li>
+                <li>Cypress E2E tests with <code>cypress-real-events</code></li>
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Phase 5:</strong> Visual Proof & Validation</td>
+            <td><span class="badge pending">PENDING</span></td>
+            <td>
+              <ul>
+                <li>Puppeteer screenshots: context enabled, command executed</li>
+                <li>Highlight terminal output (no context pollution)</li>
+                <li>Base64 embed in validation dashboard</li>
+                <li>Auto-launch proof HTML</li>
+              </ul>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Backend API Spec -->
+    <div class="section">
+      <h2>🔌 Backend API Specification</h2>
+      <span class="badge pending">PENDING</span>
+
+      <h3>WebSocket Message: <code>set-persistent-context</code></h3>
+      <pre>
 {
-  "type": "PROMPT_INJECTION_CONFIG",
-  "enabled": true,
-  "instruction": "Follow .github/copilot-instructions.md"
+  "type": "set-persistent-context",
+  "tabId": "tab-1234",
+  "context": {
+    "enabled": true,
+    "text": "Context: You are a senior engineer. Be concise."
+  }
 }
-        </div>
+      </pre>
+
+      <h3>Backend Response:</h3>
+      <pre>
+{
+  "type": "context-updated",
+  "tabId": "tab-1234",
+  "success": true
+}
+      </pre>
+
+      <h3>Go Implementation:</h3>
+      <pre>
+type PersistentContext struct {
+    Enabled bool   `json:"enabled"`
+    Text    string `json:"text"`
+}
+
+type ContextManager struct {
+    contexts map[string]*PersistentContext // tabID → context
+    mu       sync.RWMutex
+}
+
+func (cm *ContextManager) SetContext(tabID string, ctx *PersistentContext) {
+    cm.mu.Lock()
+    defer cm.mu.Unlock()
+    cm.contexts[tabID] = ctx
+}
+
+func (cm *ContextManager) GetContext(tabID string) *PersistentContext {
+    cm.mu.RLock()
+    defer cm.mu.RUnlock()
+    return cm.contexts[tabID]
+}
+      </pre>
     </div>
 
+    <!-- Command Detection -->
+    <div class="section">
+      <h2>🔍 Command Detection Logic</h2>
+      <span class="badge pending">PENDING</span>
+
+      <h3>LLM Commands (Inject Context):</h3>
+      <ul>
+        <li><code>copilot ...</code> - GitHub Copilot CLI</li>
+        <li><code>claude ...</code> - Claude CLI</li>
+        <li><code>@&lt;agent&gt; ...</code> - Subagent invocation</li>
+        <li><code>aider ...</code> - Aider AI assistant</li>
+      </ul>
+
+      <h3>Shell Commands (Pass-Through):</h3>
+      <ul>
+        <li><code>ls</code>, <code>cd</code>, <code>git</code>, <code>npm</code>, etc.</li>
+        <li>Command cards (already have explicit commands)</li>
+        <li>User terminal input</li>
+      </ul>
+
+      <h3>Implementation:</h3>
+      <pre>
+func isLLMCommand(cmd string) bool {
+    trimmed := strings.TrimSpace(cmd)
+    llmPrefixes := []string{"copilot", "claude", "@", "aider"}
+    
+    for _, prefix := range llmPrefixes {
+        if strings.HasPrefix(trimmed, prefix) {
+            return true
+        }
+    }
+    return false
+}
+      </pre>
+    </div>
+
+    <!-- Testing Strategy -->
+    <div class="section">
+      <h2>🧪 Testing Strategy</h2>
+      <span class="badge pending">PENDING</span>
+
+      <h3>Unit Tests (Mocked)</h3>
+      <ul>
+        <li><code>context_manager_test.go</code> - SetContext/GetContext/ClearContext</li>
+        <li><code>command_detection_test.go</code> - isLLMCommand() logic</li>
+        <li>Speed: &lt;10ms per test</li>
+      </ul>
+
+      <h3>Integration Tests (Testcontainers)</h3>
+      <ul>
+        <li>WebSocket message parsing</li>
+        <li>Context storage persistence across connections</li>
+        <li>Real Postgres/SQLite container</li>
+      </ul>
+
+      <h3>E2E Tests (Cypress + Real Backend)</h3>
+      <ul>
+        <li>Launch via <code>.\run-dev-clean.ps1 -Port 9999</code></li>
+        <li>Enable persistent context in ForgeAssist</li>
+        <li>Execute <code>copilot explain this code</code></li>
+        <li>Verify context injection (server logs, not terminal output)</li>
+        <li>Use <code>cy.realPress()</code> for physical input simulation</li>
+      </ul>
+    </div>
+
+    <!-- Proof Protocol -->
+    <div class="section">
+      <h2>📸 Visual Proof Protocol</h2>
+      <span class="badge pending">PENDING</span>
+
+      <h3>Required Screenshots:</h3>
+      <ol>
+        <li><strong>Before:</strong> ForgeAssist with context disabled</li>
+        <li><strong>Enable:</strong> Toggle persistent context ON</li>
+        <li><strong>Command:</strong> Type <code>copilot explain React hooks</code></li>
+        <li><strong>Terminal Output:</strong> Show CLEAN terminal (no context text visible)</li>
+        <li><strong>Server Logs:</strong> Highlight context injection in backend logs</li>
+      </ol>
+
+      <h3>Validation Dashboard:</h3>
+      <pre>
+validation.html (auto-generated)
+├── Screenshot 1: Context Toggle (highlighted in neon)
+├── Screenshot 2: Clean Terminal Output
+├── Screenshot 3: Backend Logs (context injection proof)
+└── Auto-launch: start validation.html (Windows)
+      </pre>
+    </div>
+
+    <!-- Success Criteria -->
+    <div class="section">
+      <h2>✅ Success Criteria</h2>
+      
+      <div class="success">
+        <h3>Feature Acceptance:</h3>
+        <ul>
+          <li>✅ Command Cards execute WITHOUT context appended</li>
+          <li>✅ Enter key sends command exactly ONCE</li>
+          <li>✅ Terminal shows clean commands (no context pollution)</li>
+          <li>✅ LLM commands receive context in system prompt</li>
+          <li>✅ Shell commands bypass context injection</li>
+          <li>✅ Zero PTY writes for context injection</li>
+          <li>✅ Visual proof generated with highlighted evidence</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Rollback Plan -->
+    <div class="section">
+      <h2>🔄 Rollback Plan</h2>
+      <div class="warning">
+        <strong>If Implementation Fails:</strong>
+        <ul>
+          <li>Delete feature branch: <code>git branch -D feature/server-side-persistent-context</code></li>
+          <li>Main branch remains clean (feature already removed)</li>
+          <li>Zero impact on production</li>
+          <li>Document learnings in <code>PERSISTENT_CONTEXT_POSTMORTEM.md</code></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    mermaid.initialize({ 
+      startOnLoad: true,
+      theme: 'default',
+      themeVariables: {
+        primaryColor: '#8b5cf6',
+        primaryTextColor: '#000',
+        primaryBorderColor: '#7c3aed',
+        lineColor: '#6366f1',
+        secondaryColor: '#ec4899',
+        tertiaryColor: '#f59e0b'
+      }
+    });
+  </script>
 </body>
 </html>
