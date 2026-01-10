@@ -5,7 +5,6 @@ import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
-import PersistentInstructionBar from './components/PersistentInstructionBar'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
@@ -161,12 +160,9 @@ function App() {
   const [isDraggingBtn, setIsDraggingBtn] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
-  // v3.12.15: Quick Instruction feature
-  // Redesigned to use Forge Assist localStorage config instead of API
-  const [showQuickInstruction, setShowQuickInstruction] = useState(false);
-  
   // Workflow UI state - REMOVED v3.9.0: Workflows deleted, using Task Dashboard instead
   // Task Dashboard state - REMOVED v3.12.3: Was unimplemented scaffolding
+  // Quick Instruction feature - REMOVED v3.14.4: Broke command execution via PTY injection
   
   // Context files for ForgeAssist (kept from Task Dashboard removal)
   const [contextFiles, setContextFiles] = useState([])
@@ -806,30 +802,6 @@ function App() {
     saveConfig({ ...shellConfig, shellType: nextShell });
   }
 
-  // v3.12.15: Send text to terminal (for Quick Instruction and Command Cards)
-  const sendToTerminal = (text) => {
-    const termRefObj = getActiveTerminalRef();
-
-    // The terminalRef is the single authoritative path for inserting text into the terminal.
-    // If it's not present, sending isn't supported in this context.
-    const writeFn = termRefObj?.write || termRefObj?.current?.write;
-    if (!writeFn) {
-      addToast('No active terminal available to receive input. Open a terminal tab and try again.', 'error');
-      console.warn('[QuickInstruction] No terminal ref available to write to');
-      return;
-    }
-
-    const payload = text.endsWith('\r') || text.endsWith('\n') ? text : `${text}\r`;
-    try {
-      writeFn(payload);
-      addToast('Inserted into terminal.', 'success');
-      console.log('[QuickInstruction] Wrote to terminal ref:', payload);
-    } catch (err) {
-      console.error('[QuickInstruction] Write to terminal ref failed:', err);
-      addToast('Failed to write to terminal.', 'error');
-    }
-  };
-
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
@@ -933,13 +905,6 @@ function App() {
       if (e.ctrlKey && !e.shiftKey && e.key === '/') {
         e.preventDefault();
         setIsForgeAssistOpen(prev => !prev);
-        return;
-      }
-      
-      // Ctrl+I: Toggle Quick Instruction Bar
-      if (e.ctrlKey && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
-        e.preventDefault();
-        setShowQuickInstruction(prev => !prev);
         return;
       }
       
@@ -2030,16 +1995,6 @@ function App() {
       >
         <Command size={24} />
       </button>
-
-      {/* v3.12.15: Persistent Instruction Bar - Floating prompt input */}
-      <PersistentInstructionBar
-        isExpanded={showQuickInstruction}
-        forgeAssistBtnPos={forgeAssistBtnPos}
-        onSend={sendToTerminal}
-        onOpen={() => setShowQuickInstruction(true)}
-        onClose={() => setShowQuickInstruction(false)}
-        onEdit={() => setIsForgeAssistOpen(true)}
-      />
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (
