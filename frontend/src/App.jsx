@@ -936,10 +936,10 @@ function App() {
         return;
       }
       
-      // Ctrl+I: Toggle Quick Instruction Bar
+      // Ctrl+I: Toggle Quick Instruction Bar - DISABLED (feature has critical bugs)
       if (e.ctrlKey && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
         e.preventDefault();
-        setShowQuickInstruction(prev => !prev);
+        addToast('Quick Instruction Bar disabled: breaks commands & Enter key', 'error', 3000);
         return;
       }
       
@@ -2031,15 +2031,22 @@ function App() {
         <Command size={24} />
       </button>
 
-      {/* v3.12.15: Persistent Instruction Bar - Floating prompt input */}
-      <PersistentInstructionBar
+      {/* v3.12.15: Persistent Instruction Bar - DISABLED 
+          CRITICAL BUG: sendToTerminal() writes raw text to PTY, breaking:
+          1. Command Cards (appends instructions to commands like "copilot")
+          2. Enter key (keeps appending instead of sending once)
+          
+          Proper fix requires server-side LLM prompt injection, not PTY writes.
+          TODO: Implement as LLM context modifier, not terminal input.
+      */}
+      {/* <PersistentInstructionBar
         isExpanded={showQuickInstruction}
         forgeAssistBtnPos={forgeAssistBtnPos}
         onSend={sendToTerminal}
         onOpen={() => setShowQuickInstruction(true)}
         onClose={() => setShowQuickInstruction(false)}
         onEdit={() => setIsForgeAssistOpen(true)}
-      />
+      /> */}
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (

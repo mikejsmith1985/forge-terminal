@@ -693,31 +693,36 @@ export default function ForgeAssist({
                 </span>
               )}
             </button>
-            {/* Bar Toggle - Controls Persistent Instruction Bar visibility */}
+            {/* Bar Toggle - DISABLED: Persistent Instruction Bar has critical bugs
+                - Breaks command cards by appending instructions to commands
+                - Enter key doesn't work (keeps appending instead of sending)
+                - Fix requires server-side LLM integration, not PTY writes
+            */}
             <button
               data-testid="persistent-instruction-bar-toggle"
               onClick={(e) => {
                 e.stopPropagation();
-                togglePersistentInstructionBar();
+                if (onToast) onToast('Feature Disabled: Breaks commands & Enter key. Fix in progress.', 'error', 3000);
               }}
-              title={persistentInstructionBarEnabled ? "Persistent Instruction Bar: ON (click to disable)" : "Persistent Instruction Bar: OFF (click to enable)"}
+              title="Feature temporarily disabled due to critical bugs (breaks command execution)"
               style={{
-                background: persistentInstructionBarEnabled ? '#2a2a2a' : '#222',
-                border: `1px solid ${persistentInstructionBarEnabled ? '#2ea043' : '#555'}`,
-                color: persistentInstructionBarEnabled ? '#fff' : '#888',
+                background: '#222',
+                border: '1px solid #555',
+                color: '#555',
                 padding: '6px 8px',
                 borderRadius: '6px',
-                cursor: 'pointer',
+                cursor: 'not-allowed',
                 fontSize: '11px',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
                 transition: 'all 0.15s ease',
-                flexShrink: 0
+                flexShrink: 0,
+                opacity: 0.5
               }}
             >
-              {persistentInstructionBarEnabled ? 'Bar: ON' : 'Bar: OFF'}
+              Bar: DISABLED
             </button>
           </div>
           
