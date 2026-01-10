@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, X } from 'lucide-react';
-import './QuickInstructionBar.css';
+import './PersistentInstructionBar.css';
 
 /**
- * QuickInstructionBar - Floating input bar for appending context to prompts
+ * PersistentInstructionBar - Floating input bar for appending context to prompts
  * v3.12.15: Explicit input mechanism (not PTY interception)
  * 
  * Positioned above Forge Assist button, allows user to:
  * 1. Type their prompt
- * 2. See quick instruction context
+ * 2. See persistent instruction context
  * 3. Send combined text to terminal (like Command Cards)
  */
-function QuickInstructionBar({ 
+function PersistentInstructionBar({ 
   isExpanded: externalIsExpanded,
   forgeAssistBtnPos, 
   onSend,
@@ -20,45 +20,45 @@ function QuickInstructionBar({
   onEdit
 }) {
   const [userPrompt, setUserPrompt] = useState('');
-  const [quickInstructions, setQuickInstructions] = useState([]);
+  const [persistentInstructions, setPersistentInstructions] = useState([]);
   const promptInputRef = useRef(null);
 
   // Load instructions from localStorage and listen for updates
   useEffect(() => {
     const loadInstructions = () => {
       try {
-        const saved = localStorage.getItem('forgeAssist_quickInstructions');
+        const saved = localStorage.getItem('forgeAssist_persistentInstructions');
         if (saved) {
-          setQuickInstructions(JSON.parse(saved));
+          setPersistentInstructions(JSON.parse(saved));
         } else {
-          setQuickInstructions([]);
+          setPersistentInstructions([]);
         }
       } catch (e) {
-        setQuickInstructions([]);
+        setPersistentInstructions([]);
       }
     };
 
     loadInstructions();
-    window.addEventListener('forge-quick-instructions-updated', loadInstructions);
-    return () => window.removeEventListener('forge-quick-instructions-updated', loadInstructions);
+    window.addEventListener('forge-persistent-instructions-updated', loadInstructions);
+    return () => window.removeEventListener('forge-persistent-instructions-updated', loadInstructions);
   }, []);
 
   // Compute active instruction text
-  const activeInstructions = quickInstructions.filter(i => i.enabled);
-  const quickInstructionText = activeInstructions.map(i => i.text).join('\n\n');
-  // Global enable toggle for the quick-instruction bar (persisted in localStorage)
+  const activeInstructions = persistentInstructions.filter(i => i.enabled);
+  const persistentInstructionText = activeInstructions.map(i => i.text).join('\n\n');
+  // Global enable toggle for the persistent-instruction bar (persisted in localStorage)
   const [globalBarEnabled, setGlobalBarEnabled] = useState(() => {
-    const v = localStorage.getItem('forgeAssist_quickInstructionBarEnabled');
+    const v = localStorage.getItem('forgeAssist_persistentInstructionBarEnabled');
     if (v === null) return true;
     return v === 'true';
   });
   useEffect(() => {
     const handler = () => {
-      const v = localStorage.getItem('forgeAssist_quickInstructionBarEnabled');
+      const v = localStorage.getItem('forgeAssist_persistentInstructionBarEnabled');
       setGlobalBarEnabled(v === null ? true : v === 'true');
     };
-    window.addEventListener('forge-quick-instruction-bar-enabled-changed', handler);
-    return () => window.removeEventListener('forge-quick-instruction-bar-enabled-changed', handler);
+    window.addEventListener('forge-persistent-instruction-bar-enabled-changed', handler);
+    return () => window.removeEventListener('forge-persistent-instruction-bar-enabled-changed', handler);
   }, []);
   const isEnabled = globalBarEnabled && activeInstructions.length > 0;
 
@@ -91,8 +91,8 @@ function QuickInstructionBar({
   const handleSend = () => {
     if (!userPrompt.trim()) return;
 
-    // Combine user prompt with quick instruction
-    const fullPrompt = `${userPrompt.trim()}\n\n${quickInstructionText}\n`;
+    // Combine user prompt with persistent instruction
+    const fullPrompt = `${userPrompt.trim()}\n\n${persistentInstructionText}\n`;
     
     onSend(fullPrompt);
     
@@ -243,4 +243,4 @@ function QuickInstructionBar({
   );
 }
 
-export default QuickInstructionBar;
+export default PersistentInstructionBar;

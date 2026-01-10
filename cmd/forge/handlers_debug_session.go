@@ -338,3 +338,48 @@ func handleGetPTYLogs(w http.ResponseWriter, r *http.Request) {
 		"count":     len(logs),
 	})
 }
+
+// CleanupOldDebugSessions removes debug sessions older than the specified duration
+func CleanupOldDebugSessions(maxAge time.Duration) {
+	cwd, _ := os.Getwd()
+	sessionsDir := filepath.Join(cwd, "dev-data", "debug-sessions")
+
+	// Check if directory exists
+	if _, err := os.Stat(sessionsDir); os.IsNotExist(err) {
+		return
+	}
+
+	entries, err := os.ReadDir(sessionsDir)
+	if err != nil {
+		log.Printf("[DebugSession] Cleanup failed - cannot read directory: %v", err)
+		return
+	}
+
+	cutoff := time.Now().Add(-maxAge)
+	deletedCount := 0
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		path := filepath.Join(sessionsDir, entry.Name())
+		info, err := os.Stat(path)
+		if err != nil {
+			continue
+		}
+
+		if info.ModTime().Before(cutoff) {
+			if err := os.RemoveAll(path); err != nil {
+				log.Printf("[DebugSession] Failed to delete old session %s: %v", entry.Name(), err)
+			} else {
+				log.Printf("[DebugSession] Deleted old session: %s (Age: %s)", entry.Name(), time.Since(info.ModTime()))
+				deletedCount++
+			}
+		}
+	}
+
+	if deletedCount > 0 {
+		log.Printf("[DebugSession] Cleanup complete. Removed %d old sessions.", deletedCount)
+	}
+}

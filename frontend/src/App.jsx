@@ -5,7 +5,7 @@ import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
-import QuickInstructionBar from './components/QuickInstructionBar'
+import PersistentInstructionBar from './components/PersistentInstructionBar'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
@@ -1090,6 +1090,8 @@ function App() {
   }, [tabs.length, closeTab]);
 
   // v3.8.2: Draggable Forge Assist button handlers
+  const dragStartPosRef = useRef({ x: 0, y: 0 }); // Track start position to distinguish click vs drag
+
   const handleBtnMouseDown = useCallback((e) => {
     if (e.button !== 0) return; // Only left click
     e.preventDefault();
@@ -1099,6 +1101,8 @@ function App() {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     });
+    // Record start position
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
   }, []);
 
   const handleBtnMouseMove = useCallback((e) => {
@@ -1112,10 +1116,21 @@ function App() {
     setForgeAssistBtnPos(constrainedPos);
   }, [isDraggingBtn, dragOffset]);
 
-  const handleBtnMouseUp = useCallback(() => {
+  const handleBtnMouseUp = useCallback((e) => {
     if (isDraggingBtn) {
       setIsDraggingBtn(false);
       localStorage.setItem('forge_assist_btn_pos', JSON.stringify(forgeAssistBtnPos));
+      
+      // Calculate distance moved
+      const dist = Math.sqrt(
+        Math.pow(e.clientX - dragStartPosRef.current.x, 2) + 
+        Math.pow(e.clientY - dragStartPosRef.current.y, 2)
+      );
+      
+      // If moved less than 5 pixels, treat as a click
+      if (dist < 5) {
+        setIsForgeAssistOpen(prev => !prev);
+      }
     }
   }, [isDraggingBtn, forgeAssistBtnPos]);
 
@@ -1316,7 +1331,9 @@ function App() {
                 
                 if (connected === true || connected === 'unknown') {
                     console.log('[SmartCard] Sending payload...');
-                    termRef.sendCommand(cmd.macro_payload, 0);
+                    // Normalize newlines to \r for PTY execution and allow small delay for TUI processing
+                    const payload = cmd.macro_payload.replace(/\n/g, '\r');
+                    termRef.sendCommand(payload, 50);
                     console.log('[SmartCard] SENT.');
                 } else {
                     console.error('[SmartCard] Terminal not connected, skipped.');
@@ -1997,11 +2014,6 @@ function App() {
           userSelect: 'none',
         }}
         onMouseDown={handleBtnMouseDown}
-        onClick={(e) => {
-          if (!isDraggingBtn) {
-            setIsForgeAssistOpen(prev => !prev);
-          }
-        }}
         onMouseEnter={(e) => {
           if (!isDraggingBtn) {
             e.currentTarget.style.transform = 'scale(1.1)';
@@ -2019,8 +2031,8 @@ function App() {
         <Command size={24} />
       </button>
 
-      {/* v3.12.15: Quick Instruction Bar - Floating prompt input */}
-      <QuickInstructionBar
+      {/* v3.12.15: Persistent Instruction Bar - Floating prompt input */}
+      <PersistentInstructionBar
         isExpanded={showQuickInstruction}
         forgeAssistBtnPos={forgeAssistBtnPos}
         onSend={sendToTerminal}

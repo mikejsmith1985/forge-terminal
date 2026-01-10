@@ -36,6 +36,23 @@ if ($existingProcesses) {
     Start-Sleep -Seconds 1
 }
 
+# Step 1.5: Remove stale lock file (CRITICAL for dev restarts)
+$homeDir = [Environment]::GetFolderPath("UserProfile")
+# v3.13.5: Dev mode now uses a separate lock file to avoid conflicts with production
+$lockFile = Join-Path $homeDir ".forge\forge-dev.lock"
+if (Test-Path $lockFile) {
+    Write-Host "  Removing stale lock file: $lockFile" -ForegroundColor Yellow
+    Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+
+    # Wait for file to be actually removed (Windows filesystem sync delay)
+    $retries = 0
+    while ((Test-Path $lockFile) -and ($retries -lt 10)) {
+        Start-Sleep -Milliseconds 200
+        Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+        $retries++
+    }
+}
+
 if (-not $NoBuild) {
     # Step 2: Clean old builds
     Write-Host "[2/6] Cleaning old build artifacts..." -ForegroundColor Yellow

@@ -40,6 +40,9 @@ var preferredPorts = []int{3005, 8333, 8080, 9000, 3000, 3333}
 // Active port (set at startup for process safeguard system)
 var activePort int
 
+// Dev mode flag (set via ldflags)
+var devMode string
+
 // Terminal handler (set at startup for session management)
 var termHandler *terminal.Handler
 
@@ -90,7 +93,11 @@ func main() {
 	_ = os.MkdirAll(forgeDir, 0755)
 
 	// Set up file-based logging EARLY for production diagnostics
-	logPath := filepath.Join(forgeDir, "forge.log")
+	logFilename := "forge.log"
+	if devMode == "true" {
+		logFilename = "forge-dev.log"
+	}
+	logPath := filepath.Join(forgeDir, logFilename)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
 		// Log to both file and stdout
@@ -105,13 +112,19 @@ func main() {
 	log.Printf("[Forge] Starting up... (Version: %s)", updater.GetVersion())
 	log.Printf("[Forge] Home directory: %s", homeDir)
 
-	lock, err := lockfile.Acquire(forgeDir)
+	lockFileName := "forge.lock"
+	if devMode == "true" {
+		lockFileName = "forge-dev.lock"
+		log.Printf("[Forge] Dev mode enabled - using lockfile: %s", lockFileName)
+	}
+
+	lock, err := lockfile.AcquireWithFileName(forgeDir, lockFileName)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to start Forge Terminal:\n%v\n\nIf you're sure no other instance is running, delete:\n%s", err, filepath.Join(forgeDir, "forge.lock"))
+		msg := fmt.Sprintf("Failed to start Forge Terminal:\n%v\n\nIf you're sure no other instance is running, delete:\n%s", err, filepath.Join(forgeDir, lockFileName))
 		showErrorDialog("Forge Startup Error", msg)
 		
 		log.Printf("CRITICAL ERROR: Failed to acquire lock: %v", err)
-		log.Printf("If you're sure no other instance is running, remove: %s", filepath.Join(forgeDir, "forge.lock"))
+		log.Printf("If you're sure no other instance is running, remove: %s", filepath.Join(forgeDir, lockFileName))
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n\n", err)
 		// Wait a moment purely to ensure log flush if async (it's not, but good hygiene)
 		time.Sleep(100 * time.Millisecond) 
@@ -120,6 +133,12 @@ func main() {
 	defer lock.Release()
 	
 	log.Printf("[Forge] Instance lock acquired (PID: %d)", os.Getpid())
+
+	// Run cleanup of old debug sessions (older than 7 days) in background
+	go func() {
+		log.Println("[Forge] Starting background cleanup of old debug sessions...")
+		CleanupOldDebugSessions(7 * 24 * time.Hour)
+	}()
 	
 	// Parse port from command line or environment
 	var overridePort int

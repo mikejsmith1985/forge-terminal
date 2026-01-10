@@ -18,12 +18,17 @@ type LockFile struct {
 // Acquire creates and locks a lockfile to prevent multiple instances
 // Returns error if another instance is already running
 func Acquire(lockDir string) (*LockFile, error) {
+	return AcquireWithFileName(lockDir, "forge.lock")
+}
+
+// AcquireWithFileName creates and locks a specific lockfile
+func AcquireWithFileName(lockDir, fileName string) (*LockFile, error) {
 	if err := os.MkdirAll(lockDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create lock directory: %w", err)
 	}
 
-	lockPath := filepath.Join(lockDir, "forge.lock")
-	
+	lockPath := filepath.Join(lockDir, fileName)
+
 	// Try to open/create the lockfile
 	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
@@ -39,7 +44,7 @@ func Acquire(lockDir string) (*LockFile, error) {
 		if isStale(lockPath) {
 			// Lockfile is stale, remove it and retry
 			os.Remove(lockPath)
-			return Acquire(lockDir)
+			return AcquireWithFileName(lockDir, fileName)
 		}
 		
 		return nil, fmt.Errorf("another instance of Forge Terminal is already running (PID in %s)", lockPath)

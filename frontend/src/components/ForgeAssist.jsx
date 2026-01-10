@@ -422,10 +422,10 @@ export default function ForgeAssist({
   const [expandedCategories, setExpandedCategories] = useState(new Set(['Subagents', 'Session Management']));
   const inputRef = useRef(null);
   
-  // Quick Instructions state - toggle-able text snippets that append to prompts
+  // Persistent Instructions state - toggle-able text snippets that append to prompts
   // This is what the user asked for: "always append" instructions independent of command cards
-  const [quickInstructions, setQuickInstructions] = useState(() => {
-    const saved = localStorage.getItem('forgeAssist_quickInstructions');
+  const [persistentInstructions, setPersistentInstructions] = useState(() => {
+    const saved = localStorage.getItem('forgeAssist_persistentInstructions');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -435,70 +435,104 @@ export default function ForgeAssist({
     }
     return [];
   });
-  const [showQuickInstructionsPanel, setShowQuickInstructionsPanel] = useState(false);
+  const [showPersistentInstructionsPanel, setShowPersistentInstructionsPanel] = useState(false);
   const [newInstructionText, setNewInstructionText] = useState('');
   const [newInstructionLabel, setNewInstructionLabel] = useState('');
 
-  // Global toggle for Quick Instruction Bar visibility (persisted)
-  const [quickInstructionBarEnabled, setQuickInstructionBarEnabled] = useState(() => {
-    const v = localStorage.getItem('forgeAssist_quickInstructionBarEnabled');
+  // Global toggle for Persistent Instruction Bar visibility (persisted)
+  const [persistentInstructionBarEnabled, setPersistentInstructionBarEnabled] = useState(() => {
+    const v = localStorage.getItem('forgeAssist_persistentInstructionBarEnabled');
     return v === null ? true : v === 'true';
   });
   
 
   
-  const toggleQuickInstructionBar = useCallback(() => {
-    setQuickInstructionBarEnabled((prev) => {
+  const togglePersistentInstructionBar = useCallback(() => {
+    setPersistentInstructionBarEnabled((prev) => {
       const next = !prev;
-      localStorage.setItem('forgeAssist_quickInstructionBarEnabled', next.toString());
-      window.dispatchEvent(new Event('forge-quick-instruction-bar-enabled-changed'));
-      if (onToast) onToast(`Quick Instruction Bar ${next ? 'Enabled' : 'Disabled'}`, 'info', 1500);
+      localStorage.setItem('forgeAssist_persistentInstructionBarEnabled', next.toString());
+      window.dispatchEvent(new Event('forge-persistent-instruction-bar-enabled-changed'));
+      if (onToast) onToast(`Persistent Instruction Bar ${next ? 'Enabled' : 'Disabled'}`, 'info', 1500);
       return next;
     });
   }, [onToast]);
 
-  // Save quick instructions to localStorage
-  const saveQuickInstructions = useCallback((instructions) => {
-    localStorage.setItem('forgeAssist_quickInstructions', JSON.stringify(instructions));
-    setQuickInstructions(instructions);
-    // Dispatch event so other components (QuickInstructionBar) can sync
-    window.dispatchEvent(new Event('forge-quick-instructions-updated'));
+  // Save persistent instructions to localStorage
+  const savePersistentInstructions = useCallback((instructions) => {
+    localStorage.setItem('forgeAssist_persistentInstructions', JSON.stringify(instructions));
+    setPersistentInstructions(instructions);
+    // Dispatch event so other components (PersistentInstructionBar) can sync
+    window.dispatchEvent(new Event('forge-persistent-instructions-updated'));
+    
+    // Also dispatch to terminal for backend sync
+    // Find if we have an enabled instruction
+    const active = instructions.find(i => i.enabled);
+    window.dispatchEvent(new CustomEvent('forge-persistent-instruction-change', { 
+      detail: { 
+        enabled: !!active, 
+        instruction: active ? active.text : '' 
+      } 
+    }));
   }, []);
 
-  // Add a new quick instruction
-  const addQuickInstruction = useCallback(() => {
+  // Add a new persistent instruction
+  const addPersistentInstruction = useCallback(() => {
     if (!newInstructionText.trim()) return;
     const newInstruction = {
       id: Date.now().toString(),
-      label: newInstructionLabel.trim() || `Instruction ${quickInstructions.length + 1}`,
+      label: newInstructionLabel.trim() || `Instruction ${persistentInstructions.length + 1}`,
       text: newInstructionText.trim(),
       enabled: true,
     };
-    const updated = [...quickInstructions, newInstruction];
-    saveQuickInstructions(updated);
+    const updated = [...persistentInstructions, newInstruction];
+    savePersistentInstructions(updated);
     setNewInstructionText('');
     setNewInstructionLabel('');
     if (onToast) onToast(`Added: ${newInstruction.label}`, 'success', 1500);
-  }, [newInstructionText, newInstructionLabel, quickInstructions, saveQuickInstructions, onToast]);
+  }, [newInstructionText, newInstructionLabel, persistentInstructions, savePersistentInstructions, onToast]);
 
-  // Toggle a quick instruction on/off
-  const toggleQuickInstruction = useCallback((id) => {
-    const updated = quickInstructions.map(inst => 
-      inst.id === id ? { ...inst, enabled: !inst.enabled } : inst
-    );
-    saveQuickInstructions(updated);
-  }, [quickInstructions, saveQuickInstructions]);
+  // Toggle instruction enabled state - enforce SINGLE selection (Persistent Mode)
+  const togglePersistentInstruction = useCallback((id) => {
+    // Find the instruction being toggled
+    const target = persistentInstructions.find(i => i.id === id);
+    if (!target) return;
+    
+    const newEnabledState = !target.enabled;
+    
+    // Update state: if enabling, disable all others (Single Mode)
+    const updated = persistentInstructions.map(inst => {
+      if (inst.id === id) {
+        return { ...inst, enabled: newEnabledState };
+      }
+      // If we are enabling one, disable all others
+      return newEnabledState ? { ...inst, enabled: false } : inst;
+    });
+    
+    savePersistentInstructions(updated);
+    
+    // Notify parent about the active persistent instruction via global event
+    // The ForgeTerminal component listens for this to configure the backend
+    const activeInstruction = newEnabledState ? target.text : null;
+    
+    window.dispatchEvent(new CustomEvent('forge-persistent-instruction-change', {
+      detail: { 
+        enabled: !!activeInstruction,
+        instruction: activeInstruction || ""
+      }
+    }));
+    
+  }, [persistentInstructions, savePersistentInstructions]);
 
-  // Delete a quick instruction
-  const deleteQuickInstruction = useCallback((id) => {
-    const updated = quickInstructions.filter(inst => inst.id !== id);
-    saveQuickInstructions(updated);
-  }, [quickInstructions, saveQuickInstructions]);
+  // Delete a persistent instruction
+  const deletePersistentInstruction = useCallback((id) => {
+    const updated = persistentInstructions.filter(inst => inst.id !== id);
+    savePersistentInstructions(updated);
+  }, [persistentInstructions, savePersistentInstructions]);
 
-  // Get enabled quick instructions for appending
-  const getEnabledQuickInstructions = useCallback(() => {
-    return quickInstructions.filter(inst => inst.enabled).map(inst => inst.text);
-  }, [quickInstructions]);
+  // Get enabled persistent instructions for appending
+  const getEnabledPersistentInstructions = useCallback(() => {
+    return persistentInstructions.filter(inst => inst.enabled).map(inst => inst.text);
+  }, [persistentInstructions]);
 
   // Focus search on open
   useEffect(() => {
@@ -562,8 +596,8 @@ export default function ForgeAssist({
     
     let finalCmd = feature.cmd;
     
-    // Append enabled quick instructions (user's custom "always append" snippets)
-    const enabledInstructions = getEnabledQuickInstructions();
+    // Append enabled persistent instructions (user's custom "always append" snippets)
+    const enabledInstructions = getEnabledPersistentInstructions();
     if (enabledInstructions.length > 0) {
       finalCmd += `\n\n${enabledInstructions.join('\n')}`;
     }
@@ -625,20 +659,20 @@ export default function ForgeAssist({
             ))}
           </div>
           
-          {/* Quick Instructions & Instruction Mode Controls */}
+          {/* Persistent Instruction Controls */}
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
-            {/* Quick Instructions Button - NEW: Always append custom snippets */}
+            {/* Persistent Instruction Button */}
             <button 
-              data-testid="quick-instructions-btn"
+              data-testid="persistent-instruction-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowQuickInstructionsPanel(!showQuickInstructionsPanel);
+                setShowPersistentInstructionsPanel(!showPersistentInstructionsPanel);
               }}
-              title="Quick Instructions - Add custom text that always appends to prompts"
+              title="Persistent Instruction - Set a single instruction that appends to every prompt"
               style={{
-                background: quickInstructions.some(i => i.enabled) ? '#238636' : '#333',
-                border: `2px solid ${quickInstructions.some(i => i.enabled) ? '#2ea043' : '#555'}`,
-                color: quickInstructions.some(i => i.enabled) ? '#fff' : '#888',
+                background: persistentInstructions.some(i => i.enabled) ? '#238636' : '#333',
+                border: `2px solid ${persistentInstructions.some(i => i.enabled) ? '#2ea043' : '#555'}`,
+                color: persistentInstructions.some(i => i.enabled) ? '#fff' : '#888',
                 padding: '6px 10px',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -652,25 +686,25 @@ export default function ForgeAssist({
               }}
             >
               <Sparkles size={14} />
-              <span>Quick</span>
-              {quickInstructions.filter(i => i.enabled).length > 0 && (
+              <span>Persistent Instruction</span>
+              {persistentInstructions.some(i => i.enabled) && (
                 <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 700}}>
-                  {quickInstructions.filter(i => i.enabled).length}
+                  ON
                 </span>
               )}
             </button>
-            {/* Bar Toggle - Controls Quick Instruction Bar visibility */}
+            {/* Bar Toggle - Controls Persistent Instruction Bar visibility */}
             <button
-              data-testid="quick-instruction-bar-toggle"
+              data-testid="persistent-instruction-bar-toggle"
               onClick={(e) => {
                 e.stopPropagation();
-                toggleQuickInstructionBar();
+                togglePersistentInstructionBar();
               }}
-              title={quickInstructionBarEnabled ? "Quick Instruction Bar: ON (click to disable)" : "Quick Instruction Bar: OFF (click to enable)"}
+              title={persistentInstructionBarEnabled ? "Persistent Instruction Bar: ON (click to disable)" : "Persistent Instruction Bar: OFF (click to enable)"}
               style={{
-                background: quickInstructionBarEnabled ? '#2a2a2a' : '#222',
-                border: `1px solid ${quickInstructionBarEnabled ? '#2ea043' : '#555'}`,
-                color: quickInstructionBarEnabled ? '#fff' : '#888',
+                background: persistentInstructionBarEnabled ? '#2a2a2a' : '#222',
+                border: `1px solid ${persistentInstructionBarEnabled ? '#2ea043' : '#555'}`,
+                color: persistentInstructionBarEnabled ? '#fff' : '#888',
                 padding: '6px 8px',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -683,7 +717,7 @@ export default function ForgeAssist({
                 flexShrink: 0
               }}
             >
-              {quickInstructionBarEnabled ? 'Bar: ON' : 'Bar: OFF'}
+              {persistentInstructionBarEnabled ? 'Bar: ON' : 'Bar: OFF'}
             </button>
           </div>
           
@@ -802,9 +836,9 @@ export default function ForgeAssist({
         </div>
       </div>
 
-      {/* Quick Instructions Panel - Toggle-able text snippets that always append */}
+      {/* Persistent Instructions Panel - Toggle-able text snippets that always append */}
       {/* Using Portal to render OUTSIDE ForgeAssist DOM tree to prevent click bubbling */}
-      {showQuickInstructionsPanel && createPortal(
+      {showPersistentInstructionsPanel && createPortal(
         <div 
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
@@ -843,14 +877,14 @@ export default function ForgeAssist({
               <div>
                 <h3 style={{margin: 0, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontSize: '18px'}}>
                   <Sparkles size={24} style={{color: '#238636'}} />
-                  Quick Instructions
+                  Persistent Instructions
                 </h3>
                 <p style={{margin: 0, fontSize: '13px', color: '#888'}}>
                   Add custom text snippets that automatically append to your prompts when enabled
                 </p>
               </div>
               <button 
-                onClick={() => setShowQuickInstructionsPanel(false)}
+                onClick={() => setShowPersistentInstructionsPanel(false)}
                 style={{background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px'}}
               >
                 <X size={24} />
@@ -886,7 +920,7 @@ export default function ForgeAssist({
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       if (newInstructionText.trim()) {
-                        addQuickInstruction();
+                        addPersistentInstruction();
                       }
                     }
                   }}
@@ -904,7 +938,7 @@ export default function ForgeAssist({
                   }}
                 />
                 <button
-                  onClick={addQuickInstruction}
+                  onClick={addPersistentInstruction}
                   disabled={!newInstructionText.trim()}
                   style={{
                     padding: '10px 16px',
@@ -925,14 +959,14 @@ export default function ForgeAssist({
             
             {/* Instruction List */}
             <div style={{flex: 1, overflowY: 'auto', padding: '12px 20px'}}>
-              {quickInstructions.length === 0 ? (
+              {persistentInstructions.length === 0 ? (
                 <div style={{textAlign: 'center', padding: '40px 20px', color: '#666'}}>
                   <Sparkles size={32} style={{marginBottom: '12px', opacity: 0.5}} />
-                  <p style={{margin: 0, fontSize: '14px'}}>No quick instructions yet</p>
+                  <p style={{margin: 0, fontSize: '14px'}}>No persistent instructions yet</p>
                   <p style={{margin: '8px 0 0', fontSize: '12px'}}>Add one above to always append it to your prompts</p>
                 </div>
               ) : (
-                quickInstructions.map((inst) => (
+                persistentInstructions.map((inst) => (
                   <div 
                     key={inst.id}
                     style={{
@@ -947,7 +981,7 @@ export default function ForgeAssist({
                     }}
                   >
                     <button
-                      onClick={() => toggleQuickInstruction(inst.id)}
+                      onClick={() => togglePersistentInstruction(inst.id)}
                       style={{
                         width: '24px',
                         height: '24px',
@@ -975,7 +1009,7 @@ export default function ForgeAssist({
                       </div>
                     </div>
                     <button
-                      onClick={() => deleteQuickInstruction(inst.id)}
+                      onClick={() => deletePersistentInstruction(inst.id)}
                       style={{
                         background: 'none',
                         border: 'none',
@@ -1002,14 +1036,14 @@ export default function ForgeAssist({
               alignItems: 'center'
             }}>
               <div style={{fontSize: '12px', color: '#666'}}>
-                {quickInstructions.filter(i => i.enabled).length > 0 ? (
-                  <span style={{color: '#2ea043'}}>✓ {quickInstructions.filter(i => i.enabled).length} instruction(s) will append to prompts</span>
+                {persistentInstructions.some(i => i.enabled) ? (
+                  <span style={{color: '#2ea043'}}>✓ Persistent instruction active</span>
                 ) : (
-                  'No instructions enabled'
+                  'No persistent instruction active'
                 )}
               </div>
               <button 
-                onClick={() => setShowQuickInstructionsPanel(false)}
+                onClick={() => setShowPersistentInstructionsPanel(false)}
                 style={{
                   padding: '10px 24px',
                   borderRadius: '6px',

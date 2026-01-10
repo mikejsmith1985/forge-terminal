@@ -1314,6 +1314,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // Record that handlers are now attached
     diagnosticCore.recordInitEvent('handlers_attached', { tabId });
 
+    // Listener for persistent instruction changes
+    const handlePersistentInstructionChange = (e) => {
+      const { enabled, instruction } = e.detail;
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'PROMPT_INJECTION_CONFIG',
+          enabled,
+          instruction
+        }));
+        console.log('[Terminal] Persistent instruction updated:', { enabled, len: instruction.length });
+      }
+    };
+    window.addEventListener('forge-persistent-instruction-change', handlePersistentInstructionChange);
+
     // Connect to WebSocket
     const connectWebSocket = () => {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1420,6 +1434,22 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             enabled: true
           }));
           logger.terminal('Auto-respond backend sync on connect: enabled', { tabId });
+        }
+
+        // SYNC: Send initial persistent instruction state if available
+        try {
+          const savedInstructions = JSON.parse(localStorage.getItem('forgeAssist_quickInstructions') || '[]');
+          const activeInst = savedInstructions.find(i => i.enabled);
+          if (activeInst) {
+            ws.send(JSON.stringify({
+              type: 'PROMPT_INJECTION_CONFIG',
+              enabled: true,
+              instruction: activeInst.text
+            }));
+            logger.terminal('Persistent instruction sync on connect', { tabId, len: activeInst.text.length });
+          }
+        } catch (e) {
+          console.warn('[Terminal] Failed to sync persistent instruction:', e);
         }
 
         if (onConnectionChange) onConnectionChange(true);
@@ -1640,8 +1670,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // SAFETY: Only reconnect if we should AND we're not already trying
         if (shouldReconnect && !reconnectTimeoutRef.current) {
           // If we are in dev mode (localhost), retry more times
+          // v3.14.3: User requested max 3 retries (50 was too many)
           const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-          const effectiveMaxAttempts = isDev ? 50 : maxReconnectAttempts;
+          const effectiveMaxAttempts = 3; 
           // Store for display in overlay
           effectiveMaxAttemptsRef.current = effectiveMaxAttempts;
 
@@ -1754,6 +1785,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           xtermTextarea.removeEventListener('paste', handlePaste, true);
         }
       }
+      
+      window.removeEventListener('forge-persistent-instruction-change', handlePersistentInstructionChange);
 
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();

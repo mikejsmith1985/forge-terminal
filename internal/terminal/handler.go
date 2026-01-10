@@ -282,6 +282,13 @@ type PTYLogControlMessage struct {
 	Enabled bool   `json:"enabled"` // For ENABLE/DISABLE
 }
 
+// PromptInjectionControlMessage configures persistent prompt injection.
+type PromptInjectionControlMessage struct {
+	Type        string `json:"type"`        // "PROMPT_INJECTION_CONFIG"
+	Enabled     bool   `json:"enabled"`     // Enable/Disable injection
+	Instruction string `json:"instruction"` // The instruction to append on every prompt
+}
+
 // GetPTYLogsForSession retrieves PTY logs for a session (for debug session export)
 func GetPTYLogsForSession(sessionID string) []PTYLogEntry {
 	return globalPTYLogger.GetLogs(sessionID)
@@ -411,13 +418,15 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
 		return
 	}
-	defer func() {
-		session.Close()
-		h.sessions.Delete(sessionID)
-	}()
-
 	h.sessions.Store(sessionID, session)
 	log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
+
+	defer func() {
+		session.Close()
+		// RACE CONDITION FIX: Only delete if the map still holds THIS session
+		// This prevents deleting a NEW session if a reconnection happened quickly
+		h.sessions.CompareAndDelete(sessionID, session)
+	}()
 
 	// Set initial terminal size (default 80x24)
 	_ = session.Resize(80, 24)
@@ -524,6 +533,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	var smartRoutingEnabled atomic.Bool
 	smartRoutingEnabled.Store(true) // Enabled by default
 
+	// PERSISTENT PROMPT INJECTION STATE
+	var injectionEnabled bool
+	var persistentPrompt string
+
 	// Channel to coordinate shutdown with reason
 	type closeReason struct {
 		code   int
@@ -615,37 +628,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		var totalWriteTime time.Duration
 		var maxWriteTime time.Duration
 		lastStatsReport := time.Now()
-		lastReadTime := time.Now()
-		const readTimeout = 30 * time.Second // Timeout for detecting hung PTY
-		
-		// Watchdog goroutine to detect hung PTY reads
-		go func() {
-			ticker := time.NewTicker(10 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-					timeSinceRead := time.Since(lastReadTime)
-					if timeSinceRead > readTimeout {
-						log.Printf("[Terminal] CRITICAL: PTY read hung for %v - forcing close", timeSinceRead)
-						select {
-						case closeChan <- closeReason{CloseCodePTYError, "PTY read timeout"}:
-						default:
-						}
-						return
-					}
-				case <-done:
-					return
-				}
-			}
-		}()
 		
 		for {
 			// FREEZE INSTRUMENTATION: Time PTY reads
 			readStart := time.Now()
 			n, err := session.Read(buf)
 			readDuration := time.Since(readStart)
-			lastReadTime = time.Now() // Update watchdog
 			
 			// v3.9.1: Increase threshold to 500ms to reduce log noise
 			if readDuration > 500*time.Millisecond {
@@ -835,6 +823,23 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
+				// Check for PROMPT INJECTION CONFIG
+				var promptMsg PromptInjectionControlMessage
+				if err := json.Unmarshal(data, &promptMsg); err == nil && promptMsg.Type == "PROMPT_INJECTION_CONFIG" {
+					injectionEnabled = promptMsg.Enabled
+					persistentPrompt = promptMsg.Instruction
+					log.Printf("[PromptInjection] Configured for session %s: Enabled=%v, Instruction length=%d",
+						sessionID, injectionEnabled, len(persistentPrompt))
+
+					// Send confirmation back to client
+					_ = conn.WriteJSON(map[string]interface{}{
+						"type":        "PROMPT_INJECTION_CONFIRMED",
+						"enabled":     injectionEnabled,
+						"instruction": persistentPrompt,
+					})
+					continue
+				}
+
 				// Check for PTY logging control messages (Follow Me debugger integration)
 				var ptyLogMsg PTYLogControlMessage
 				if err := json.Unmarshal(data, &ptyLogMsg); err == nil {
@@ -999,6 +1004,30 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 						// Don't write the "?" line to PTY - we'll inject the routed command instead
 						continue
+					}
+				}
+			}
+
+			// ═══ PERSISTENT PROMPT INJECTION ═══
+			// Automatically inject instructions on Enter, but ONLY if enabled and in main buffer
+			if injectionEnabled && persistentPrompt != "" {
+				dataStr := string(data)
+				// Check for Enter key (submission)
+				if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
+					// SAFETY: Only inject if we are in the main buffer (CLI mode)
+					// This prevents accidental injection into Vim/Nano/Htop (Alternate Buffer)
+					if !promptDetector.IsAlternateBuffer() {
+						log.Printf("[PromptInjection] Injecting persistent instruction (%d chars)", len(persistentPrompt))
+
+						// Append instruction before the newline so it becomes part of the command
+						if strings.Contains(dataStr, "\r") {
+							dataStr = strings.ReplaceAll(dataStr, "\r", " "+persistentPrompt+"\r")
+						} else {
+							dataStr = strings.ReplaceAll(dataStr, "\n", " "+persistentPrompt+"\n")
+						}
+						data = []byte(dataStr)
+					} else {
+						log.Printf("[PromptInjection] Skipped: Alternate buffer (TUI) detected")
 					}
 				}
 			}
