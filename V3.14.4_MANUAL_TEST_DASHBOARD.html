@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>v3.14.4 Persistent Context - Manual Test Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            border-bottom: 4px solid #667eea;
+            padding-bottom: 15px;
+            font-size: 2.5em;
+            margin-top: 0;
+        }
+        h2 {
+            color: #764ba2;
+            margin-top: 40px;
+            font-size: 1.8em;
+            border-left: 5px solid #764ba2;
+            padding-left: 15px;
+        }
+        h3 {
+            color: #667eea;
+            margin-top: 30px;
+            font-size: 1.4em;
+        }
+        .status-banner {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 30px 0;
+            font-size: 1.2em;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
+        }
+        .test-case {
+            background: #f8f9fa;
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-case h4 {
+            margin-top: 0;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+        .command {
+            background: #2d3748;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+            border: 2px solid #4a5568;
+        }
+        .expected {
+            background: #e6fffa;
+            border-left: 4px solid #38b2ac;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+        }
+        .expected strong {
+            color: #38b2ac;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .warning {
+            background: #fff5f5;
+            border-left: 4px solid #f56565;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+        }
+        .warning strong {
+            color: #f56565;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .success {
+            background: #f0fff4;
+            border-left: 4px solid #48bb78;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+        }
+        .success strong {
+            color: #48bb78;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .checklist {
+            background: #fff;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .checklist li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .checklist li:last-child {
+            border-bottom: none;
+        }
+        .code-inline {
+            background: #edf2f7;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #2d3748;
+            border: 1px solid #cbd5e0;
+        }
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+        }
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        tr:hover {
+            background: #f7fafc;
+        }
+        .critical {
+            background: #fed7d7;
+            border: 2px solid #fc8181;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .critical strong {
+            color: #c53030;
+            font-size: 1.2em;
+            display: block;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 v3.14.4 Persistent Context Injection - Manual Test Dashboard</h1>
+        
+        <div class="status-banner">
+            ✅ ALL UNIT TESTS PASSING (31 JS + 20 Go Tests) | localStorage Key Bug FIXED | Ready for Manual Verification
+        </div>
+
+        <div class="critical">
+            <strong>⚠️ CRITICAL FIX APPLIED</strong>
+            <p><strong>Bug:</strong> localStorage key mismatch prevented context from ever loading</p>
+            <p><strong>Root Cause:</strong> ForgeAssist saved to <code class="code-inline">forgeAssist_persistentInstructions</code> but ForgeTerminal read from <code class="code-inline">forgeAssist_quickInstructions</code></p>
+            <p><strong>Fix:</strong> Changed line 1451 in ForgeTerminal.jsx to use correct key</p>
+            <p><strong>Commit:</strong> <code class="code-inline">6c7f347</code></p>
+            <p><strong>Result:</strong> Context should now load correctly on connection sync</p>
+        </div>
+
+        <h2>📋 Pre-Test Setup Checklist</h2>
+        <div class="checklist">
+            <ol>
+                <li><span class="step-number">1</span> <strong>Build Latest Code:</strong> Run <code class="code-inline">npm run build</code> in frontend directory</li>
+                <li><span class="step-number">2</span> <strong>Restart Application:</strong> Kill and restart Forge Terminal to load new build</li>
+                <li><span class="step-number">3</span> <strong>Hard Refresh Browser:</strong> Press <code class="code-inline">Ctrl+Shift+R</code> to clear cache</li>
+                <li><span class="step-number">4</span> <strong>Open DevTools:</strong> Press <code class="code-inline">F12</code> and navigate to Console tab</li>
+                <li><span class="step-number">5</span> <strong>Clear localStorage (Optional):</strong> In Console, run: <code class="code-inline">localStorage.clear()</code></li>
+            </ol>
+        </div>
+
+        <h2>🎯 Test Suite Overview</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Test ID</th>
+                    <th>Scenario</th>
+                    <th>Expected Behavior</th>
+                    <th>Pass Criteria</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>T1</strong></td>
+                    <td>Enable persistent context</td>
+                    <td>Context saved to localStorage</td>
+                    <td>Console shows sync event</td>
+                </tr>
+                <tr>
+                    <td><strong>T2</strong></td>
+                    <td>LLM command: <code>copilot</code></td>
+                    <td>Context injected before Enter</td>
+                    <td>Console shows "LLM command detected"</td>
+                </tr>
+                <tr>
+                    <td><strong>T3</strong></td>
+                    <td>Shell command: <code>ls -la</code></td>
+                    <td>No injection occurs</td>
+                    <td>Console shows "Shell command, no injection"</td>
+                </tr>
+                <tr>
+                    <td><strong>T4</strong></td>
+                    <td>Copilot receives context</td>
+                    <td>Copilot confirms instructions</td>
+                    <td>Copilot responds "Yes, I received..."</td>
+                </tr>
+                <tr>
+                    <td><strong>T5</strong></td>
+                    <td>Command card execution</td>
+                    <td>Card executes directly</td>
+                    <td>No injection, command runs clean</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🧪 Test Case 1: Enable Persistent Context</h2>
+        <div class="test-case">
+            <h4>Objective: Verify context is saved and synced</h4>
+            
+            <p><strong>Steps:</strong></p>
+            <ol>
+                <li>Open Forge Assist panel (click lightbulb icon)</li>
+                <li>Navigate to "Persistent Instructions" tab</li>
+                <li>Create a new instruction: <code class="code-inline">"Context: Always be concise and direct"</code></li>
+                <li>Toggle the instruction to ENABLED (green checkmark)</li>
+                <li>Close Forge Assist panel</li>
+            </ol>
+
+            <div class="expected">
+                <strong>✅ Expected Console Output:</strong>
+                <pre>[Terminal] Persistent instruction updated {enabled: true, len: 38}</pre>
+            </div>
+
+            <div class="success">
+                <strong>Verification Command:</strong>
+                <div class="command">localStorage.getItem('forgeAssist_persistentInstructions')</div>
+                <p>Should return JSON array with your instruction object containing <code class="code-inline">enabled: true</code></p>
+            </div>
+        </div>
+
+        <h2>🧪 Test Case 2: LLM Command Detection (copilot)</h2>
+        <div class="test-case">
+            <h4>Objective: Verify context is injected for Copilot commands</h4>
+            
+            <p><strong>Steps:</strong></p>
+            <ol>
+                <li>With persistent context ENABLED from T1</li>
+                <li>Type in terminal: <code class="code-inline">copilot explain React hooks</code></li>
+                <li>Press Enter</li>
+                <li>Watch console IMMEDIATELY (before Copilot responds)</li>
+            </ol>
+
+            <div class="expected">
+                <strong>✅ Expected Console Output:</strong>
+                <pre>[ContextInjection] LLM command detected, context injected: {
+  command: "copilot explain React hooks",
+  contextLength: 38
+}</pre>
+            </div>
+
+            <div class="warning">
+                <strong>⚠️ Critical Check:</strong>
+                <p>After Copilot responds, ask: <code class="code-inline">"Did you receive any instructions with my question?"</code></p>
+                <p>Copilot should respond: <strong>"Yes, I received instructions to be concise and direct"</strong></p>
+                <p>If Copilot says "No", the injection failed to reach Copilot's STDIN (escalate bug)</p>
+            </div>
+        </div>
+
+        <h2>🧪 Test Case 3: Shell Command Bypass</h2>
+        <div class="test-case">
+            <h4>Objective: Verify shell commands do NOT get context injection</h4>
+            
+            <p><strong>Steps:</strong></p>
+            <ol>
+                <li>With persistent context ENABLED</li>
+                <li>Type in terminal: <code class="code-inline">ls -la</code></li>
+                <li>Press Enter</li>
+                <li>Check console output</li>
+            </ol>
+
+            <div class="expected">
+                <strong>✅ Expected Console Output:</strong>
+                <pre>[ContextInjection] Shell command, no injection: ls -la</pre>
+            </div>
+
+            <div class="success">
+                <strong>Success Criteria:</strong>
+                <ul>
+                    <li>Directory listing appears normally</li>
+                    <li>No extra text appended to command</li>
+                    <li>Console confirms "no injection"</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2>🧪 Test Case 4: gh copilot Command</h2>
+        <div class="test-case">
+            <h4>Objective: Verify "gh copilot" prefix detection</h4>
+            
+            <p><strong>Steps:</strong></p>
+            <ol>
+                <li>Type: <code class="code-inline">gh copilot suggest "list files recursively"</code></li>
+                <li>Press Enter</li>
+                <li>Check console for injection log</li>
+            </ol>
+
+            <div class="expected">
+                <strong>✅ Expected Console Output:</strong>
+                <pre>[ContextInjection] LLM command detected, context injected: {
+  command: "gh copilot suggest \"list files recursively\"",
+  contextLength: 38
+}</pre>
+            </div>
+        </div>
+
+        <h2>🧪 Test Case 5: Subagent Commands (@reviewer)</h2>
+        <div class="test-case">
+            <h4>Objective: Verify @ prefix subagent detection</h4>
+            
+            <p><strong>Steps:</strong></p>
+            <ol>
+                <li>Type: <code class="code-inline">@reviewer check this code</code></li>
+                <li>Press Enter</li>
+                <li>Check console for injection log</li>
+            </ol>
+
+            <div class="expected">
+                <strong>✅ Expected Console Output:</strong>
+                <pre>[ContextInjection] LLM command detected, context injected: {
+  command: "@reviewer check this code",
+  contextLength: 38
+}</pre>
+            </div>
+        </div>
+
+        <h2>🧪 Test Case 6: Command Card Execution</h2>
+        <div class="test-case">
+            <h4>Objective: Verify command cards bypass injection</h4>
+            
+            <p><strong>Steps:</strong></p>
+            <ol>
+                <li>Navigate to a command card directory (if available)</li>
+                <li>Click any command card to execute</li>
+                <li>Check that card executes without modification</li>
+            </ol>
+
+            <div class="expected">
+                <strong>✅ Expected Behavior:</strong>
+                <ul>
+                    <li>Command card executes successfully</li>
+                    <li>No context appended to the card's command</li>
+                    <li>Console may show "Shell command" or no injection log (depends on card command)</li>
+                </ul>
+            </div>
+
+            <div class="warning">
+                <strong>⚠️ If Command Cards Fail:</strong>
+                <p>This indicates client-side injection is interfering with card execution. Check if cards trigger Enter keypress differently.</p>
+            </div>
+        </div>
+
+        <h2>🧪 Test Case 7: Disable Context Mid-Session</h2>
+        <div class="test-case">
+            <h4>Objective: Verify context can be disabled dynamically</h4>
+            
+            <p><strong>Steps:</strong></p>
+            <ol>
+                <li>Open Forge Assist panel</li>
+                <li>Toggle persistent instruction to DISABLED</li>
+                <li>Type: <code class="code-inline">copilot list recent issues</code></li>
+                <li>Press Enter</li>
+            </ol>
+
+            <div class="expected">
+                <strong>✅ Expected Console Output:</strong>
+                <pre>[Terminal] Persistent instruction updated {enabled: false}
+[ContextInjection] LLM command detected, context injected: ... (should NOT appear)</pre>
+                <p>Or console shows "Shell command, no injection" if detection fails when disabled.</p>
+            </div>
+
+            <div class="success">
+                <strong>Verification:</strong>
+                <p>Ask Copilot: "Did you receive any instructions?"</p>
+                <p>Copilot should respond: <strong>"No, I didn't receive any special instructions"</strong></p>
+            </div>
+        </div>
+
+        <h2>📊 Debugging Guide</h2>
+        
+        <h3>If Context Injection Not Appearing in Console:</h3>
+        <div class="warning">
+            <strong>Debug Steps:</strong>
+            <ol>
+                <li>Check localStorage value:
+                    <div class="command">JSON.parse(localStorage.getItem('forgeAssist_persistentInstructions'))</div>
+                    Should show array with <code class="code-inline">enabled: true</code>
+                </li>
+                <li>Check if terminal tab is connected:
+                    <div class="command">Look for "[Terminal] Persistent instruction sync on connect" in console</div>
+                </li>
+                <li>Hard refresh browser (Ctrl+Shift+R) and retry</li>
+                <li>Check if correct build is loaded:
+                    <div class="command">Open ForgeTerminal.jsx in DevTools Sources tab, search for "ContextInjection"</div>
+                </li>
+            </ol>
+        </div>
+
+        <h3>If Copilot Says "No Instructions Received":</h3>
+        <div class="warning">
+            <strong>Possible Causes:</strong>
+            <ul>
+                <li><strong>Injection timing issue:</strong> Context appended AFTER newline instead of BEFORE</li>
+                <li><strong>Copilot CLI version:</strong> Older versions may not accept trailing arguments</li>
+                <li><strong>PTY buffering:</strong> WebSocket sends data but PTY strips it before child process</li>
+                <li><strong>Shell parsing:</strong> Space before context text breaks command parsing</li>
+            </ul>
+            
+            <p><strong>Next Steps:</strong></p>
+            <ol>
+                <li>Add backend PTY logging to see what ACTUALLY gets written to PTY</li>
+                <li>Test with raw <code class="code-inline">echo</code> command to verify injection format:
+                    <div class="command">echo test → should become → echo test Context: be concise</div>
+                </li>
+                <li>Check if context text contains special characters that break shell parsing</li>
+                <li>Consider alternative injection formats (environment variable, config file, stdin pipe)</li>
+            </ol>
+        </div>
+
+        <h3>If Shell Commands Get Injected (False Positive):</h3>
+        <div class="warning">
+            <strong>Bug in LLM Detection Logic:</strong>
+            <p>Check console to see which command triggered injection. Update <code class="code-inline">llmDetection.js</code> pattern matching.</p>
+            <p>Example false positives to avoid: <code class="code-inline">copilot-tool</code>, <code class="code-inline">my-copilot-wrapper</code></p>
+        </div>
+
+        <h2>🎉 Success Criteria Summary</h2>
+        <div class="success">
+            <strong>Feature is WORKING if ALL of the following are true:</strong>
+            <ol>
+                <li>✅ Console shows "[ContextInjection] LLM command detected" for <code class="code-inline">copilot</code> commands</li>
+                <li>✅ Console shows "[ContextInjection] Shell command, no injection" for <code class="code-inline">ls</code> commands</li>
+                <li>✅ Copilot CLI confirms it received instructions when asked</li>
+                <li>✅ Command cards execute without context injection</li>
+                <li>✅ Disabling context stops injection immediately</li>
+                <li>✅ No repeated Enter key bug (text not appended multiple times)</li>
+            </ol>
+        </div>
+
+        <div class="critical">
+            <strong>🚨 ESCALATION CRITERIA</strong>
+            <p>If Copilot says "No instructions received" despite console showing injection:</p>
+            <ul>
+                <li><strong>Root Cause:</strong> Client-side injection format is incompatible with Copilot CLI STDIN parsing</li>
+                <li><strong>Impact:</strong> Context never reaches the LLM (architecture failure)</li>
+                <li><strong>Action Required:</strong> Investigate alternative injection methods (environment variables, config file, .copilotrc)</li>
+                <li><strong>Alternative:</strong> Explore GitHub Copilot API for proper context injection mechanism</li>
+            </ul>
+        </div>
+
+        <h2>📝 Test Results Form</h2>
+        <div class="checklist">
+            <p><strong>Record your results below (copy to text file):</strong></p>
+            <pre style="background: #f7fafc; padding: 20px; border-radius: 8px; border: 2px dashed #cbd5e0;">
+TEST RESULTS - v3.14.4 Persistent Context Injection
+Date: ___________
+Tester: ___________
+
+[ ] T1: Context saved to localStorage
+[ ] T2: Console shows injection for "copilot" command
+[ ] T3: Console shows no injection for "ls" command
+[ ] T4: Copilot confirms receiving instructions (YES/NO): _____
+[ ] T5: "gh copilot" command detected as LLM
+[ ] T6: "@reviewer" command detected as LLM
+[ ] T7: Command cards execute without injection
+[ ] T8: Disabling context stops injection
+
+OVERALL RESULT: PASS / FAIL
+
+NOTES:
+____________________________________________
+____________________________________________
+____________________________________________
+            </pre>
+        </div>
+
+        <h2>📞 Next Steps Based on Results</h2>
+        
+        <h3>If ALL Tests Pass:</h3>
+        <div class="success">
+            <strong>🎉 Success! Proceed with:</strong>
+            <ol>
+                <li>Create visual proof dashboard with screenshots</li>
+                <li>Merge feature branch to main: <code class="code-inline">git checkout main && git merge feature/server-side-persistent-context</code></li>
+                <li>Update CHANGELOG with bug fixes</li>
+                <li>Create release notes for v3.14.4</li>
+                <li>Tag and release new version</li>
+            </ol>
+        </div>
+
+        <h3>If Copilot Doesn't Receive Instructions:</h3>
+        <div class="warning">
+            <strong>⚠️ Architecture Issue - Investigate:</strong>
+            <ol>
+                <li>Add PTY write logging in handler.go to see raw bytes sent</li>
+                <li>Test with <code class="code-inline">echo</code> command to verify injection format works</li>
+                <li>Research GitHub Copilot CLI input format (does it accept trailing args?)</li>
+                <li>Consider alternative: Copilot config file injection (.copilotrc)</li>
+                <li>Consider alternative: Environment variable COPILOT_INSTRUCTIONS</li>
+            </ol>
+        </div>
+
+        <h3>If Shell Commands Get Injected:</h3>
+        <div class="warning">
+            <strong>⚠️ Detection Logic Bug - Fix:</strong>
+            <ol>
+                <li>Review failing command in console log</li>
+                <li>Update pattern matching in <code class="code-inline">llmDetection.js</code></li>
+                <li>Add unit test for failing case</li>
+                <li>Re-run test suite</li>
+            </ol>
+        </div>
+
+        <div class="status-banner" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); margin-top: 40px;">
+            🚀 Ready to Test! Follow test cases in order. Report results immediately.
+        </div>
+    </div>
+</body>
+</html>
