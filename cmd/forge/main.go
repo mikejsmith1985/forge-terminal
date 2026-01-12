@@ -352,13 +352,13 @@ func main() {
 		}
 	}))
 
-	// v3.12.15: Quick instruction API for floating prompt bar
-	http.HandleFunc("/api/quick-instruction", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	// v3.14.4: Persistent instruction API
+	http.HandleFunc("/api/persistent-instruction", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			handleGetQuickInstruction(w, r)
+			handleGetPersistentInstruction(w, r)
 		case http.MethodPost:
-			handleSaveQuickInstruction(w, r)
+			handleSavePersistentInstruction(w, r)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

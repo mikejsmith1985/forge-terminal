@@ -1,12 +1,12 @@
-// Test: Quick Instruction Enter key submits instruction
+// Test: Persistent Instruction Enter key submits instruction
 // TDD: RED phase - test should pass after Enter key fix
 
-describe('Quick Instruction Enter Key', () => {
+describe('Persistent Instruction Enter Key', () => {
   beforeEach(() => {
     cy.visit('http://localhost:3005');
     // Clear localStorage to start fresh
     cy.window().then((win) => {
-      win.localStorage.removeItem('forgeAssist_quickInstructions');
+      win.localStorage.removeItem('forgeAssist_persistentInstructions');
     });
     cy.wait(1000);
   });
@@ -16,8 +16,8 @@ describe('Quick Instruction Enter Key', () => {
     cy.get('body').type('{ctrl}/');
     cy.wait(500);
     
-    // Click the Quick Instructions button (sparkle icon)
-    cy.get('[data-testid="quick-instructions-btn"]').click();
+    // Click the Persistent Instructions button (sparkle icon)
+    cy.get('[data-testid="persistent-instructions-btn"]').click();
     cy.wait(300);
     
     // Find the textarea and type instruction text
@@ -39,8 +39,8 @@ describe('Quick Instruction Enter Key', () => {
     cy.get('body').type('{ctrl}/');
     cy.wait(500);
     
-    // Click the Quick Instructions button
-    cy.get('[data-testid="quick-instructions-btn"]').click();
+    // Click the Persistent Instructions button
+    cy.get('[data-testid="persistent-instructions-btn"]').click();
     cy.wait(300);
     
     // Type text with Shift+Enter for newline
@@ -57,8 +57,8 @@ describe('Quick Instruction Enter Key', () => {
     cy.get('body').type('{ctrl}/');
     cy.wait(500);
     
-    // Click the Quick Instructions button
-    cy.get('[data-testid="quick-instructions-btn"]').click();
+    // Click the Persistent Instructions button
+    cy.get('[data-testid="persistent-instructions-btn"]').click();
     cy.wait(300);
     
     // Press Enter without typing anything
@@ -66,6 +66,6 @@ describe('Quick Instruction Enter Key', () => {
     cy.wait(300);
     
     // Verify no instruction was added (still shows empty state message)
-    cy.contains('No quick instructions yet').should('exist');
+    cy.contains('No persistent instructions yet').should('exist');
   });
 });

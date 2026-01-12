@@ -82,3 +82,60 @@ func IsLLMCommand(cmd string) bool {
 
 	return false
 }
+
+// HasLLMPrompt checks if an LLM command has an actual prompt/question.
+// Returns true only if there's text after the command and flags.
+// This prevents injection on bare commands like "copilot --allow-all-tools" with no prompt.
+func HasLLMPrompt(cmd string) bool {
+	trimmed := strings.TrimSpace(cmd)
+	lower := strings.ToLower(trimmed)
+	
+	// Get the LLM command prefix
+	llmPrefixes := []string{
+		"gh copilot", // Check longer prefix first
+		"copilot",
+		"claude",
+		"aider",
+	}
+	
+	var matchedPrefix string
+	for _, prefix := range llmPrefixes {
+		if strings.HasPrefix(lower, prefix+" ") || lower == prefix {
+			matchedPrefix = prefix
+			break
+		}
+	}
+	
+	// Special case: @ mentions always have prompt (the text after @name)
+	if strings.HasPrefix(trimmed, "@") {
+		// Check if there's content after the mention
+		parts := strings.SplitN(trimmed, " ", 2)
+		return len(parts) > 1 && strings.TrimSpace(parts[1]) != ""
+	}
+	
+	if matchedPrefix == "" {
+		return false
+	}
+	
+	// Extract everything after the command prefix
+	remainder := strings.TrimPrefix(lower, matchedPrefix)
+	remainder = strings.TrimSpace(remainder)
+	
+	if remainder == "" {
+		return false // Just "copilot" with nothing after
+	}
+	
+	// Skip over flags (words starting with -)
+	words := strings.Fields(remainder)
+	for i, word := range words {
+		if !strings.HasPrefix(word, "-") {
+			// Found a non-flag word - this is the start of the prompt
+			// Check if there's actual content
+			promptStart := strings.Join(words[i:], " ")
+			return strings.TrimSpace(promptStart) != ""
+		}
+	}
+	
+	// All words were flags, no prompt
+	return false
+}

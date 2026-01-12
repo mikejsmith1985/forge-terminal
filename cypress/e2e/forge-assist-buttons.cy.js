@@ -19,15 +19,15 @@ describe('Forge Assist Button Layout', () => {
     cy.get('.forge-assist-modal', { timeout: 5000 }).should('be.visible');
     
     // Get button positions
-    cy.get('[data-testid="quick-instructions-btn"]').then($quick => {
+    cy.get('[data-testid="persistent-instructions-btn"]').then($persistent => {
       cy.get('.forge-assist-instruction-toggle').then($files => {
-        const quickRect = $quick[0].getBoundingClientRect();
+        const persistentRect = $persistent[0].getBoundingClientRect();
         const filesRect = $files[0].getBoundingClientRect();
         
-        // Quick button's right edge should not extend past Files button's left edge
-        expect(quickRect.right).to.be.at.most(filesRect.left);
+        // Persistent button's right edge should not extend past Files button's left edge
+        expect(persistentRect.right).to.be.at.most(filesRect.left);
         
-        cy.log(`Quick right: ${quickRect.right}, Files left: ${filesRect.left}`);
+        cy.log(`Persistent right: ${persistentRect.right}, Files left: ${filesRect.left}`);
       });
     });
     
@@ -42,7 +42,7 @@ describe('Forge Assist Button Layout', () => {
     cy.get('body').type('{ctrl}/');
     cy.get('.forge-assist-modal').should('be.visible');
     
-    cy.get('[data-testid="quick-instructions-btn"]').then($btn => {
+    cy.get('[data-testid="persistent-instructions-btn"]').then($btn => {
       const rect = $btn[0].getBoundingClientRect();
       
       // Button should not be excessively wide

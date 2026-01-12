@@ -862,6 +862,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // v3.11.1: Fixed paste reliability - this is now the PRIMARY handler
     // The Ctrl+V handler just lets the event through, and uses clipboard API as fallback
     const handlePaste = async (e) => {
+      // Prevent duplicate handling if Ctrl+V handler already triggered
+      if (isPastingRef.current) {
+        console.log('[Terminal] Paste event ignored - already handling paste');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       // v3.11.1: Mark that paste event fired and is handling it
       // This tells the Ctrl+V fallback not to run
       isPastingRef.current = true;
@@ -1151,6 +1159,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // SOLUTION: Directly read clipboard using navigator.clipboard.read() API, handle all media types,
       // then return false to prevent xterm from doing anything. Simple and reliable.
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
+        // Prevent duplicate handling if paste event already triggered
+        if (isPastingRef.current) return false;
+
         console.log('[Terminal] Ctrl+V pressed - reading clipboard directly (v3.12.8 simple approach)');
         isPastingRef.current = true;
         setTimeout(() => { isPastingRef.current = false; }, 500);

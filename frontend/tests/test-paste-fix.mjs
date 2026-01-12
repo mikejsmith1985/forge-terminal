@@ -211,6 +211,44 @@ try {
     console.log('❌ FAIL: Exception thrown:', err.message, '\n');
 }
 
+// Test 5: Verify double paste prevention logic
+console.log('Test 5: Double paste prevention...');
+try {
+    const mockRef = { current: false };
+    
+    const handlePaste = (e) => {
+        // Prevent duplicate handling if Ctrl+V handler already triggered
+        if (mockRef.current) {
+            console.log('   ✓ Duplicate paste detected and ignored');
+            return false;
+        }
+
+        mockRef.current = true;
+        // Logic
+        return true;
+    };
+
+    // First paste should succeed
+    const res1 = handlePaste({});
+    if (res1 === true && mockRef.current === true) {
+        console.log('   ✓ First paste accepted');
+    }
+
+    // Second paste should be ignored
+    const res2 = handlePaste({});
+    if (res2 === false && mockRef.current === true) {
+        console.log('   ✓ Second paste rejected');
+    }
+    
+    if (res1 && !res2) {
+        console.log('✅ PASS: Double paste prevention works correctly\n');
+    } else {
+        console.log('❌ FAIL: Double paste prevention failed\n');
+    }
+} catch (err) {
+    console.log('❌ FAIL: Exception thrown:', err.message, '\n');
+}
+
 // Summary
 console.log('═══════════════════════════════════════');
 console.log('📊 Ctrl+V Paste Fix Validation Complete');

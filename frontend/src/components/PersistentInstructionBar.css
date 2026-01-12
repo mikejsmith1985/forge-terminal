@@ -1,9 +1,9 @@
-/* QuickInstructionBar - Floating prompt input with auto-appended context
+/* PersistentInstructionBar - Floating prompt input with auto-appended context
  * v3.12.15: Explicit input mechanism (not PTY interception)
  */
 
 /* Collapsed State - Compact indicator */
-.quick-instruction-collapsed {
+.persistent-instruction-collapsed {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -20,12 +20,12 @@
   user-select: none;
 }
 
-.quick-instruction-collapsed:hover {
+.persistent-instruction-collapsed:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
 }
 
-.quick-instruction-collapsed kbd {
+.persistent-instruction-collapsed kbd {
   background: rgba(255, 255, 255, 0.2);
   padding: 2px 6px;
   border-radius: 4px;
@@ -34,7 +34,7 @@
 }
 
 /* Expanded Bar - Full input UI */
-.quick-instruction-bar {
+.persistent-instruction-bar {
   width: 520px;
   max-width: calc(100vw - 40px);
   background: #1e293b;

@@ -1,23 +1,23 @@
 /**
- * Test: Quick Instruction Bar Toggle Fix
+ * Test: Persistent Instruction Bar Toggle Fix
  * 
  * Verifies that the "Bar: ON/OFF" toggle in Forge Assist correctly
  * responds to rapid clicks without getting stuck (stale closure bug fix)
  * 
  * Bug Reference: Functional state update prevents stale closure
- * Fixed: ForgeAssist.jsx:459 - Use setQuickInstructionBarEnabled((prev) => ...)
+ * Fixed: ForgeAssist.jsx:459 - Use setPersistentInstructionBarEnabled((prev) => ...)
  */
 
-describe('Quick Instruction Bar Toggle - Stale Closure Fix', () => {
+describe('Persistent Instruction Bar Toggle - Stale Closure Fix', () => {
   beforeEach(() => {
     cy.visit('/');
     cy.window().then((win) => {
       // Clear localStorage to start fresh
-      win.localStorage.removeItem('forgeAssist_quickInstructionBarEnabled');
-      win.localStorage.removeItem('forgeAssist_quickInstructions');
+      win.localStorage.removeItem('forgeAssist_persistentInstructionBarEnabled');
+      win.localStorage.removeItem('forgeAssist_persistentInstructions');
       
-      // Set up a test quick instruction
-      win.localStorage.setItem('forgeAssist_quickInstructions', JSON.stringify([
+      // Set up a test persistent instruction
+      win.localStorage.setItem('forgeAssist_persistentInstructions', JSON.stringify([
         { id: 'test-1', text: 'Test instruction', enabled: true }
       ]));
     });
@@ -26,39 +26,39 @@ describe('Quick Instruction Bar Toggle - Stale Closure Fix', () => {
   it('should toggle correctly on single click', () => {
     // Open Forge Assist
     cy.get('body').type('{ctrl}/');
-    cy.contains('Quick').click();
+    cy.contains('Persistent').click();
     
     // Find the toggle button
-    cy.get('[data-testid="quick-instruction-bar-toggle"]').should('exist');
+    cy.get('[data-testid="persistent-instruction-bar-toggle"]').should('exist');
     
     // Initial state should be ON (default)
-    cy.get('[data-testid="quick-instruction-bar-toggle"]').should('contain', 'Bar: ON');
+    cy.get('[data-testid="persistent-instruction-bar-toggle"]').should('contain', 'Bar: ON');
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('forgeAssist_quickInstructionBarEnabled')).to.equal('true');
+      expect(win.localStorage.getItem('forgeAssist_persistentInstructionBarEnabled')).to.equal('true');
     });
     
     // Click to toggle OFF
-    cy.get('[data-testid="quick-instruction-bar-toggle"]').click();
-    cy.get('[data-testid="quick-instruction-bar-toggle"]').should('contain', 'Bar: OFF');
+    cy.get('[data-testid="persistent-instruction-bar-toggle"]').click();
+    cy.get('[data-testid="persistent-instruction-bar-toggle"]').should('contain', 'Bar: OFF');
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('forgeAssist_quickInstructionBarEnabled')).to.equal('false');
+      expect(win.localStorage.getItem('forgeAssist_persistentInstructionBarEnabled')).to.equal('false');
     });
     
     // Click to toggle back ON
-    cy.get('[data-testid="quick-instruction-bar-toggle"]').click();
-    cy.get('[data-testid="quick-instruction-bar-toggle"]').should('contain', 'Bar: ON');
+    cy.get('[data-testid="persistent-instruction-bar-toggle"]').click();
+    cy.get('[data-testid="persistent-instruction-bar-toggle"]').should('contain', 'Bar: ON');
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('forgeAssist_quickInstructionBarEnabled')).to.equal('true');
+      expect(win.localStorage.getItem('forgeAssist_persistentInstructionBarEnabled')).to.equal('true');
     });
   });
 
   it('should handle rapid clicks correctly (stale closure regression test)', () => {
     // Open Forge Assist
     cy.get('body').type('{ctrl}/');
-    cy.contains('Quick').click();
+    cy.contains('Persistent').click();
     
     // Find the toggle button
-    const toggleBtn = cy.get('[data-testid="quick-instruction-bar-toggle"]');
+    const toggleBtn = cy.get('[data-testid="persistent-instruction-bar-toggle"]');
     toggleBtn.should('exist');
     
     // Initial state: ON
@@ -75,7 +75,7 @@ describe('Quick Instruction Bar Toggle - Stale Closure Fix', () => {
       const expectedLabel = i % 2 === 0 ? 'Bar: OFF' : 'Bar: ON';
       
       cy.window().then((win) => {
-        const actual = win.localStorage.getItem('forgeAssist_quickInstructionBarEnabled');
+        const actual = win.localStorage.getItem('forgeAssist_persistentInstructionBarEnabled');
         expect(actual).to.equal(expectedState, `Click ${i + 1}: Expected ${expectedState}, got ${actual}`);
       });
       
@@ -90,15 +90,15 @@ describe('Quick Instruction Bar Toggle - Stale Closure Fix', () => {
     let eventFired = false;
     
     cy.window().then((win) => {
-      win.addEventListener('forge-quick-instruction-bar-enabled-changed', () => {
+      win.addEventListener('forge-persistent-instruction-bar-enabled-changed', () => {
         eventFired = true;
       });
     });
     
     // Open Forge Assist and toggle
     cy.get('body').type('{ctrl}/');
-    cy.contains('Quick').click();
-    cy.get('[data-testid="quick-instruction-bar-toggle"]').click();
+    cy.contains('Persistent').click();
+    cy.get('[data-testid="persistent-instruction-bar-toggle"]').click();
     
     // Verify event was fired
     cy.window().then(() => {
@@ -109,13 +109,13 @@ describe('Quick Instruction Bar Toggle - Stale Closure Fix', () => {
   it('should show toast notification on toggle', () => {
     // Open Forge Assist
     cy.get('body').type('{ctrl}/');
-    cy.contains('Quick').click();
+    cy.contains('Persistent').click();
     
     // Toggle OFF
-    cy.get('[data-testid="quick-instruction-bar-toggle"]').click();
+    cy.get('[data-testid="persistent-instruction-bar-toggle"]').click();
     
     // Toast should appear (implementation-dependent, adjust selector as needed)
     // This is a placeholder - adjust based on actual toast implementation
-    cy.contains(/Quick Instruction Bar (Enabled|Disabled)/i, { timeout: 2000 }).should('exist');
+    cy.contains(/Persistent Instruction Bar (Enabled|Disabled)/i, { timeout: 2000 }).should('exist');
   });
 });

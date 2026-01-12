@@ -161,9 +161,9 @@ function App() {
   const [isDraggingBtn, setIsDraggingBtn] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
-  // v3.12.15: Quick Instruction feature
+  // v3.12.15: Persistent Instruction feature
   // Redesigned to use Forge Assist localStorage config instead of API
-  const [showQuickInstruction, setShowQuickInstruction] = useState(false);
+  const [showPersistentInstruction, setShowPersistentInstruction] = useState(false);
   
   // Workflow UI state - REMOVED v3.9.0: Workflows deleted, using Task Dashboard instead
   // Task Dashboard state - REMOVED v3.12.3: Was unimplemented scaffolding
@@ -653,8 +653,8 @@ function App() {
     }
   }
 
-  // v3.12.15: Load quick instruction config - REMOVED (Migrated to ForgeAssist localStorage)
-  // const loadQuickInstructionConfig = async () => { ... }
+  // v3.14.4: Load persistent instruction config - REMOVED (Migrated to ForgeAssist localStorage)
+  // const loadPersistentInstructionConfig = async () => { ... }
 
   const saveConfig = async (config) => {
     const oldShell = shellConfig.shellType;
@@ -806,7 +806,7 @@ function App() {
     saveConfig({ ...shellConfig, shellType: nextShell });
   }
 
-  // v3.12.15: Send text to terminal (for Quick Instruction and Command Cards)
+  // v3.14.4: Send text to terminal (for Persistent Instructions and Command Cards)
   const sendToTerminal = (text) => {
     const termRefObj = getActiveTerminalRef();
 
@@ -815,7 +815,7 @@ function App() {
     const writeFn = termRefObj?.write || termRefObj?.current?.write;
     if (!writeFn) {
       addToast('No active terminal available to receive input. Open a terminal tab and try again.', 'error');
-      console.warn('[QuickInstruction] No terminal ref available to write to');
+      console.warn('[PersistentInstruction] No terminal ref available to write to');
       return;
     }
 
@@ -823,9 +823,9 @@ function App() {
     try {
       writeFn(payload);
       addToast('Inserted into terminal.', 'success');
-      console.log('[QuickInstruction] Wrote to terminal ref:', payload);
+      console.log('[PersistentInstruction] Wrote to terminal ref:', payload);
     } catch (err) {
-      console.error('[QuickInstruction] Write to terminal ref failed:', err);
+      console.error('[PersistentInstruction] Write to terminal ref failed:', err);
       addToast('Failed to write to terminal.', 'error');
     }
   };
@@ -936,10 +936,10 @@ function App() {
         return;
       }
       
-      // Ctrl+I: Toggle Quick Instruction Bar - DISABLED (feature has critical bugs)
+      // Ctrl+I: Toggle Persistent Instruction Bar - DISABLED (feature has critical bugs)
       if (e.ctrlKey && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
         e.preventDefault();
-        addToast('Quick Instruction Bar disabled: breaks commands & Enter key', 'error', 3000);
+        addToast('Persistent Instruction Bar disabled: breaks commands & Enter key', 'error', 3000);
         return;
       }
       
@@ -2040,11 +2040,11 @@ function App() {
           TODO: Implement as LLM context modifier, not terminal input.
       */}
       {/* <PersistentInstructionBar
-        isExpanded={showQuickInstruction}
+        isExpanded={showPersistentInstruction}
         forgeAssistBtnPos={forgeAssistBtnPos}
         onSend={sendToTerminal}
-        onOpen={() => setShowQuickInstruction(true)}
-        onClose={() => setShowQuickInstruction(false)}
+        onOpen={() => setShowPersistentInstruction(true)}
+        onClose={() => setShowPersistentInstruction(false)}
         onEdit={() => setIsForgeAssistOpen(true)}
       /> */}
 

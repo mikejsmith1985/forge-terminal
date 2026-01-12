@@ -1011,10 +1011,78 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// ═══ CRITICAL PERFORMANCE: Write to PTY FIRST, process later ═══
-			// This ensures keyboard input is immediately responsive
-			// NOTE: Context injection happens at LLM API level, NOT here
-			if _, err := session.Write(data); err != nil {
+			// ═══ INPUT BUFFER ACCUMULATION (for LLM command detection) ═══
+			// Accumulate keystrokes to detect full command lines for LLM injection
+			dataStr := string(data)
+			
+			// BOUNDED BUFFER: Prevent OOM attacks
+			if inputBuffer.Len() > 8192 { // 8KB limit
+				inputBuffer.Reset()
+			}
+			
+			// Filter out ANSI escape sequences before accumulating
+			// This prevents escape codes from polluting command detection
+			cleanStr := stripANSI(dataStr)
+			inputBuffer.WriteString(cleanStr)
+			
+			// ═══ CRITICAL PERFORMANCE: Write to PTY, with optional injection ═══
+			// v3.14.4: Persistent context injection for LLM commands
+			dataToWrite := data
+			
+			// Check if this is a command submission (contains newline)
+			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
+				// Get accumulated command line (BEFORE the newline was added)
+				// The buffer now contains the command + the newline, so strip the newline
+				commandLine := strings.TrimSpace(strings.TrimRight(inputBuffer.String(), "\r\n"))
+				
+				// DEBUG: Log every command submission
+				log.Printf("[ContextManager] DEBUG: Command submitted: '%s' (len=%d)", 
+					truncate(commandLine, 80), len(commandLine))
+				
+				// Reset buffer after command extraction
+				inputBuffer.Reset()
+				
+				// Check if command is an LLM tool WITH a prompt (not just flags)
+				isLLM := IsLLMCommand(commandLine)
+				hasPrompt := HasLLMPrompt(commandLine)
+				log.Printf("[ContextManager] DEBUG: IsLLMCommand('%s') = %v, HasPrompt = %v", 
+					truncate(commandLine, 50), isLLM, hasPrompt)
+				
+				// Only inject if it's an LLM command AND has an actual prompt
+				if isLLM && hasPrompt {
+					ctx := h.contextManager.GetContext(sessionID)
+					log.Printf("[ContextManager] DEBUG: Context for session %s: %+v", sessionID, ctx)
+					
+					if ctx != nil && ctx.Enabled && ctx.Text != "" {
+						// The command is already echoed to terminal character by character.
+						// We only need to inject: " INSTRUCTION" + Enter
+						// The user pressed Enter, so dataStr contains "\r" or "\n"
+						// We replace that with: " " + instruction + "\r"
+						
+						// Instead of sending just Enter, send: space + instruction + Enter
+						// We use a single atomic write.
+						// NOTE: Depending on the shell (PowerShell/Bash), this may require the user
+						// to press Enter one more time to confirm the injected command.
+						// This is a known limitation to ensure reliability over "auto-submit" hacks.
+						
+						terminator := "\r"
+						if strings.Contains(dataStr, "\n") {
+							terminator = "\n"
+						}
+						
+						// Atomic write: " " + instruction + "\r"
+						injectedText := " " + ctx.Text + terminator
+						dataToWrite = []byte(injectedText)
+						
+						log.Printf("[ContextManager] SUCCESS: Injected '%s' for session %s", 
+							truncate(ctx.Text, 30), sessionID)
+					} else {
+						log.Printf("[ContextManager] DEBUG: Context not enabled or empty (ctx=%v)", ctx != nil)
+					}
+				}
+			}
+			
+			if _, err := session.Write(dataToWrite); err != nil {
 				log.Printf("[Terminal] PTY write error: %v", err)
 				select {
 				case closeChan <- closeReason{CloseCodePTYError, "Terminal write error"}:
@@ -1024,30 +1092,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// PTY LOGGING: Log bytes sent to PTY (for Follow Me debugger)
-			globalPTYLogger.LogPTY(sessionID, "to_pty", data)
+			globalPTYLogger.LogPTY(sessionID, "to_pty", dataToWrite)
 
 			// AUTO-RESPOND: Process input for state detection
-			autoRespondDetector.ProcessInput(data)
-
-			// Accumulate input for LLM detection (after PTY write)
-			dataStr := string(data)
-			
-			// BOUNDED BUFFER: Prevent OOM attacks
-			if inputBuffer.Len() > 8192 { // 8KB limit
-				inputBuffer.Reset()
-			}
-			inputBuffer.WriteString(dataStr)
-
-			// v3.12.3: AM pipeline removed
-
-			// Check for newline/enter (command submission)
-			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
-				commandLine := strings.TrimSpace(inputBuffer.String())
-				inputBuffer.Reset()
-
-				// v3.12.3: AM command enqueue removed
-				_ = commandLine // Silence unused warning
-			}
+			autoRespondDetector.ProcessInput(dataToWrite)
 		}
 	}()
 

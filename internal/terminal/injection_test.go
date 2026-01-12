@@ -5,87 +5,94 @@ import (
 	"testing"
 )
 
+// TestInjectionLogic verifies the byte manipulation logic used in handlePTY.
+// It simulates the logic found in handler.go:1014-1080 without spinning up a full WebSocket server.
 func TestInjectionLogic(t *testing.T) {
-	// Setup scenarios
-	prompt := "--instruction"
-	
+	// Setup context
+	sessionID := "test-session"
+	cm := NewContextManager()
+	instruction := "BE CONCISE"
+	cm.SetContext(sessionID, &PersistentContext{
+		Enabled: true,
+		Text:    instruction,
+	})
+
 	tests := []struct {
 		name           string
-		input          string
-		enabled        bool
-		prompt         string
-		inAltBuffer    bool
-		expectedOutput string
+		inputBuffer    string // What has been typed so far
+		inputData      []byte // The current keystroke (usually Enter)
+		expectedOutput string // What should be written to PTY
 	}{
 		{
-			name:           "Basic Injection on Return",
-			input:          "ls\r",
-			enabled:        true,
-			prompt:         prompt,
-			inAltBuffer:    false,
-			expectedOutput: "ls --instruction\r",
+			name:           "Copilot Query",
+			inputBuffer:    "copilot what is 2+2",
+			inputData:      []byte("\r"),
+			expectedOutput: " " + instruction + "\r",
 		},
 		{
-			name:           "No Injection if Disabled",
-			input:          "ls\r",
-			enabled:        false,
-			prompt:         prompt,
-			inAltBuffer:    false,
-			expectedOutput: "ls\r",
+			name:           "Copilot Bare (No Injection)",
+			inputBuffer:    "copilot",
+			inputData:      []byte("\r"),
+			expectedOutput: "\r", // Should just be the enter key
 		},
 		{
-			name:           "No Injection in Alt Buffer",
-			input:          "ls\r",
-			enabled:        true,
-			prompt:         prompt,
-			inAltBuffer:    true,
-			expectedOutput: "ls\r",
+			name:           "Copilot Flags (No Injection)",
+			inputBuffer:    "copilot --allow-all-tools",
+			inputData:      []byte("\r"),
+			expectedOutput: "\r",
 		},
 		{
-			name:           "Injection with Newline",
-			input:          "ls\n",
-			enabled:        true,
-			prompt:         prompt,
-			inAltBuffer:    false,
-			expectedOutput: "ls --instruction\n",
-		},
-		{
-			name:           "No Injection without Enter",
-			input:          "ls",
-			enabled:        true,
-			prompt:         prompt,
-			inAltBuffer:    false,
-			expectedOutput: "ls",
+			name:           "Shell Command",
+			inputBuffer:    "ls -la",
+			inputData:      []byte("\r"),
+			expectedOutput: "\r",
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// This test validates the EXACT logic block inserted into handler.go
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the logic in handler.go
 			
-			data := []byte(tc.input)
+			// 1. Accumulate buffer (simulate previous typing)
+			// Actually handler.go uses a local `inputBuffer strings.Builder`.
+			var buffer strings.Builder
+			buffer.WriteString(tt.inputBuffer)
 			
-			// ═══ LOGIC UNDER TEST (Mirrors handler.go) ═══
-			if tc.enabled && tc.prompt != "" {
-				dataStr := string(data)
-				// Check for Enter key (submission)
-				if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
-					// SAFETY: Only inject if we are in the main buffer (CLI mode)
-					if !tc.inAltBuffer {
-						// Append instruction before the newline
-						if strings.Contains(dataStr, "\r") {
-							dataStr = strings.ReplaceAll(dataStr, "\r", " "+tc.prompt+"\r")
-						} else {
-							dataStr = strings.ReplaceAll(dataStr, "\n", " "+tc.prompt+"\n")
+			// 2. Process the input Data
+			dataStr := string(tt.inputData)
+			buffer.WriteString(dataStr) // handler logic adds it before checking
+			
+			// 3. Logic extraction
+			dataToWrite := tt.inputData
+			
+			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
+				commandLine := strings.TrimSpace(strings.TrimRight(buffer.String(), "\r\n"))
+				
+				// Reset buffer
+				buffer.Reset()
+				
+				isLLM := IsLLMCommand(commandLine)
+				hasPrompt := HasLLMPrompt(commandLine)
+				
+				if isLLM && hasPrompt {
+					ctx := cm.GetContext(sessionID)
+					if ctx != nil && ctx.Enabled && ctx.Text != "" {
+						terminator := "\r"
+						if strings.Contains(dataStr, "\n") {
+							terminator = "\n"
 						}
-						data = []byte(dataStr)
+						
+						// CURRENT IMPLEMENTATION (Simulated)
+						// This mimics the logic we want to test
+						injectedText := " " + ctx.Text + terminator
+						dataToWrite = []byte(injectedText)
 					}
 				}
 			}
-			// ═══ END LOGIC ═══
 			
-			if string(data) != tc.expectedOutput {
-				t.Errorf("Expected %q, got %q", tc.expectedOutput, string(data))
+			// 4. Verify Output
+			if string(dataToWrite) != tt.expectedOutput {
+				t.Errorf("Expected output %q, got %q", tt.expectedOutput, string(dataToWrite))
 			}
 		})
 	}

@@ -224,3 +224,59 @@ func TestIsLLMCommand_ShellCommands(t *testing.T) {
 		})
 	}
 }
+
+// TestHasLLMPrompt_WithPrompt verifies prompt detection for commands WITH prompts.
+func TestHasLLMPrompt_WithPrompt(t *testing.T) {
+	tests := []struct {
+		name     string
+		cmd      string
+		expected bool
+	}{
+		{"copilot with question", "copilot what is 2+2", true},
+		{"copilot with flags and question", "copilot --allow-all-tools what is 2+2", true},
+		{"copilot -i with question", "copilot -i explain this code", true},
+		{"gh copilot with question", "gh copilot suggest a fix", true},
+		{"claude with question", "claude how do I refactor this", true},
+		{"aider with prompt", "aider fix the bug in main.go", true},
+		{"@reviewer with message", "@reviewer check this PR", true},
+		{"@architect with task", "@architect design the API", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HasLLMPrompt(tt.cmd)
+			if result != tt.expected {
+				t.Errorf("HasLLMPrompt(%q) = %v, expected %v", tt.cmd, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestHasLLMPrompt_WithoutPrompt verifies commands WITHOUT prompts return false.
+func TestHasLLMPrompt_WithoutPrompt(t *testing.T) {
+	tests := []struct {
+		name     string
+		cmd      string
+		expected bool
+	}{
+		{"bare copilot", "copilot", false},
+		{"copilot with only flags", "copilot --allow-all-tools", false},
+		{"copilot with multiple flags", "copilot -i --help", false},
+		{"bare claude", "claude", false},
+		{"claude with only flags", "claude --version", false},
+		{"bare @mention", "@reviewer", false},
+		{"@ alone", "@", false},
+		{"empty string", "", false},
+		{"whitespace only", "   ", false},
+		{"shell command", "ls -la", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HasLLMPrompt(tt.cmd)
+			if result != tt.expected {
+				t.Errorf("HasLLMPrompt(%q) = %v, expected %v", tt.cmd, result, tt.expected)
+			}
+		})
+	}
+}
