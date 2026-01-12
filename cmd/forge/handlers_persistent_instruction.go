@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 )
 
-// QuickInstructionConfig stores the quick instruction settings
-type QuickInstructionConfig struct {
+// PersistentInstructionConfig stores the persistent instruction settings
+type PersistentInstructionConfig struct {
 	Enabled  bool   `json:"enabled"`
 	Template string `json:"template"`
 }
 
-// getQuickInstructionPath returns the path to the quick instruction config file
-func getQuickInstructionPath() (string, error) {
+// getPersistentInstructionPath returns the path to the persistent instruction config file
+func getPersistentInstructionPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -24,45 +24,45 @@ func getQuickInstructionPath() (string, error) {
 	if err := os.MkdirAll(forgeDir, 0755); err != nil {
 		return "", err
 	}
-	return filepath.Join(forgeDir, "quick-instruction.json"), nil
+	return filepath.Join(forgeDir, "persistent-instruction.json"), nil
 }
 
-// loadQuickInstructionConfig loads the quick instruction config from disk
+// loadPersistentInstructionConfig loads the persistent instruction config from disk
 // Returns default config if file doesn't exist (error-resilient)
-func loadQuickInstructionConfig() QuickInstructionConfig {
-	configPath, err := getQuickInstructionPath()
+func loadPersistentInstructionConfig() PersistentInstructionConfig {
+	configPath, err := getPersistentInstructionPath()
 	if err != nil {
 		// Return defaults if we can't get the path
-		return QuickInstructionConfig{
+		return PersistentInstructionConfig{
 			Enabled:  false,
-			Template: "This is a test prompt to verify the quick instruction system is working correctly.",
+			Template: "This is a test prompt to verify the persistent instruction system is working correctly.",
 		}
 	}
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		// Return defaults if file doesn't exist
-		return QuickInstructionConfig{
+		return PersistentInstructionConfig{
 			Enabled:  false,
-			Template: "This is a test prompt to verify the quick instruction system is working correctly.",
+			Template: "This is a test prompt to verify the persistent instruction system is working correctly.",
 		}
 	}
 
-	var config QuickInstructionConfig
+	var config PersistentInstructionConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		// Return defaults if JSON is invalid
-		return QuickInstructionConfig{
+		return PersistentInstructionConfig{
 			Enabled:  false,
-			Template: "This is a test prompt to verify the quick instruction system is working correctly.",
+			Template: "This is a test prompt to verify the persistent instruction system is working correctly.",
 		}
 	}
 
 	return config
 }
 
-// saveQuickInstructionConfig saves the quick instruction config to disk
-func saveQuickInstructionConfig(config QuickInstructionConfig) error {
-	configPath, err := getQuickInstructionPath()
+// savePersistentInstructionConfig saves the persistent instruction config to disk
+func savePersistentInstructionConfig(config PersistentInstructionConfig) error {
+	configPath, err := getPersistentInstructionPath()
 	if err != nil {
 		return err
 	}
@@ -75,27 +75,27 @@ func saveQuickInstructionConfig(config QuickInstructionConfig) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
-// handleGetQuickInstruction handles GET /api/quick-instruction
-func handleGetQuickInstruction(w http.ResponseWriter, r *http.Request) {
+// handleGetPersistentInstruction handles GET /api/persistent-instruction
+func handleGetPersistentInstruction(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	config := loadQuickInstructionConfig()
+	config := loadPersistentInstructionConfig()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(config)
 }
 
-// handleSaveQuickInstruction handles POST /api/quick-instruction
-func handleSaveQuickInstruction(w http.ResponseWriter, r *http.Request) {
+// handleSavePersistentInstruction handles POST /api/persistent-instruction
+func handleSavePersistentInstruction(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var config QuickInstructionConfig
+	var config PersistentInstructionConfig
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -107,7 +107,7 @@ func handleSaveQuickInstruction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := saveQuickInstructionConfig(config); err != nil {
+	if err := savePersistentInstructionConfig(config); err != nil {
 		http.Error(w, "Failed to save config", http.StatusInternalServerError)
 		return
 	}

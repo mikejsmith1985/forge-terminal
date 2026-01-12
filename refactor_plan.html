@@ -1,96 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forge Terminal: Refactor Plan & Status</title>
+    <title>Refactor Plan: Persistent Instruction Injection</title>
     <style>
-        body { font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #d4d4d4; padding: 20px; line-height: 1.6; }
-        h1, h2, h3 { color: #569cd6; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .card { background-color: #252526; border: 1px solid #333; padding: 15px; margin-bottom: 20px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
-        .badge { padding: 3px 8px; border-radius: 3px; font-size: 0.8em; font-weight: bold; text-transform: uppercase; }
-        .badge-pending { background-color: #555; color: #fff; }
-        .badge-progress { background-color: #007acc; color: #fff; }
-        .badge-completed { background-color: #4ec9b0; color: #000; }
-        .code-block { background-color: #1e1e1e; padding: 10px; border: 1px solid #444; font-family: "Consolas", monospace; overflow-x: auto; }
-        .checklist { list-style-type: none; padding: 0; }
-        .checklist li { margin-bottom: 5px; }
-        .checklist li:before { content: "☐"; margin-right: 10px; color: #888; }
-        .checklist li.checked:before { content: "☑"; color: #4ec9b0; }
-        .mermaid-container { background: #fff; padding: 10px; border-radius: 4px; }
+        body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+        .phase { border: 1px solid #444; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .pending { border-left: 5px solid #f0ad4e; }
+        .in-progress { border-left: 5px solid #5bc0de; }
+        .completed { border-left: 5px solid #5cb85c; }
+        .cancelled { border-left: 5px solid #d9534f; opacity: 0.7; }
+        h2 { margin-top: 0; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <script>mermaid.initialize({startOnLoad:true});</script>
 </head>
 <body>
-
-    <h1>Forge Terminal: Refactor Plan</h1>
-    <p><strong>Mission:</strong> Persistent Prompt Injection & Dev Workflow Restoration</p>
-    <p><strong>Date:</strong> 2026-01-10</p>
+    <h1>Persistent Instruction Injection Fix</h1>
     
-    <div class="card">
-        <h2>Phase 1: Architecture Fix (Lock Separation)</h2>
-        <div class="mermaid-container">
-            <div class="mermaid">
-                graph TD
-                    P[Production App] -->|Locks| PLock[forge.lock]
-                    D[Dev Instance] -->|Locks| DLock[forge-dev.lock]
-                    
-                    W[WebSocket] -->|Config| H[Handler]
-                    H -->|Inject| PTY[Terminal]
-                    
-                    style P fill:#2d4f26,stroke:#4ec9b0,stroke-width:2px
-                    style D fill:#8a2be2,stroke:#d19fe8,stroke-width:2px
-            </div>
-        </div>
+    <div class="phase completed">
+        <h2>Phase 1: Analysis & Planning</h2>
+        <p><strong>Goal:</strong> Fix "Double Enter" bug and ensure injection only on prompts.</p>
+        <p><strong>Problem:</strong> Injected text appends but requires extra Enter. CLI args polution.</p>
     </div>
 
-    <div class="card">
-        <h2>Phase 2: The "Zero-Compromise" Audit [COMPLETED]</h2>
-        <ul class="checklist">
-            <li class="checked"><strong>Safety:</strong> Protecting `fterm.exe` (Production) while killing `forge-dev.exe` (Dev).</li>
-            <li class="checked"><strong>Isolation:</strong> Dev instances now use completely separate lock files (`forge-dev.lock`) and logs.</li>
-            <li class="checked"><strong>Injection Safety:</strong> Prompt injection strictly disabled in TUI/Alternate Buffers.</li>
-        </ul>
+    <div class="phase cancelled">
+        <h2>Phase 2: "Double Enter" Fix Attempt</h2>
+        <p><strong>Status:</strong> ROLLED BACK</p>
+        <p><strong>Reason:</strong> "Double-tap Enter" logic is flaky, aggressive, and poor design. User correctly identified this as unmaintainable.</p>
+        <p><strong>Conclusion:</strong> We cannot reliably inject text AND force-submit it via the PTY stream without risking double-execution or race conditions across different shells/environments.</p>
     </div>
 
-    <div class="card">
-        <h2>Phase 3: Execution [COMPLETED]</h2>
-        
-        <h3>1. Lock File Separation</h3>
-        <p><span class="badge badge-completed">COMPLETED</span> Updated `cmd/forge/main.go` and `internal/lockfile/lockfile.go`</p>
-        
-        <h3>2. Persistent Prompt Injection</h3>
-        <p><span class="badge badge-completed">COMPLETED</span> Implemented in `internal/terminal/handler.go`</p>
-        <div class="code-block">
-            // Test Validation (internal/terminal/injection_test.go):
-            // --- PASS: TestInjectionLogic (0.00s)
-            //    --- PASS: TestInjectionLogic/Basic_Injection_on_Return
-            //    --- PASS: TestInjectionLogic/No_Injection_if_Disabled
-            //    --- PASS: TestInjectionLogic/No_Injection_in_Alt_Buffer
-        </div>
+    <div class="phase in-progress">
+        <h2>Phase 3: Clean Implementation</h2>
+        <p><strong>Strategy:</strong> Revert to the stable "Atomic Write" implementation. It is better to require one extra Enter press (predictable) than to have a flaky auto-submitter (unpredictable).</p>
+        <p><strong>Action:</strong> Restore the simple atomic write logic. Ensure `HasPrompt` check remains.</p>
     </div>
 
-    <div class="card">
-        <h2>Phase 4: Verification [COMPLETED]</h2>
-        <ul class="checklist">
-            <li class="checked">Go Build: Success</li>
-            <li class="checked">Injection Logic: Verified via `TestInjectionLogic` (100% Pass)</li>
-            <li class="checked">Lock Logic: Production uses `forge.lock`, Dev uses `forge-dev.lock`</li>
-        </ul>
+    <div class="phase pending">
+        <h2>Phase 4: Verification</h2>
+        <p>Verify stable behavior: `copilot query` -> `copilot query INSTRUCTION` -> User presses Enter to confirm.</p>
     </div>
-    
-    <div class="card">
-        <h2>Configuration Guide</h2>
-        <p>To enable prompt injection, the frontend must send this WebSocket message:</p>
-        <div class="code-block">
-{
-  "type": "PROMPT_INJECTION_CONFIG",
-  "enabled": true,
-  "instruction": "Follow .github/copilot-instructions.md"
-}
-        </div>
-    </div>
-
 </body>
 </html>

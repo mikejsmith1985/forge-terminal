@@ -11,7 +11,7 @@
 3. [The Terminal](#-the-terminal)
 4. [Tabs - Run Multiple Terminals](#-tabs---run-multiple-terminals)
 5. [Command Cards](#-command-cards)
-6. [Quick Instructions (NEW!)](#-quick-instructions-new)
+6. [Persistent Instructions](#-persistent-instructions)
 7. [Keyboard Shortcuts](#-keyboard-shortcuts)
 8. [Themes & Customization](#-themes--customization)
 9. [Font Size Control](#-font-size-control)
@@ -230,13 +230,13 @@ Commands automatically get shortcuts assigned:
 
 ---
 
-## ⚡ Quick Instructions (NEW!)
+## ⚡ Persistent Instructions
 
-**Quick Instructions** is a floating input bar that lets you automatically append context to any CLI prompt - perfect for working with AI tools like GitHub Copilot CLI, Claude, or Aider.
+**Persistent Instructions** is a floating input bar that lets you automatically append context to any CLI prompt - perfect for working with AI tools like GitHub Copilot CLI, Claude, or Aider.
 
 ### What It Does
 
-Instead of typing the same context or instructions repeatedly, Quick Instructions lets you:
+Instead of typing the same context or instructions repeatedly, Persistent Instructions lets you:
 - Save a custom instruction template in Settings
 - Press **Ctrl+I** to open a floating input bar
 - Type your prompt and see your instruction automatically appended
@@ -246,21 +246,21 @@ Instead of typing the same context or instructions repeatedly, Quick Instruction
 
 1. **Enable the Feature**
    - Open Settings (⚙️ icon or Ctrl+,)
-   - Click the **"Quick Instructions"** tab (⚡ icon)
-   - Toggle **"Enable Quick Instruction Bar"**
+   - Click the **"Persistent Instructions"** tab (⚡ icon)
+   - Toggle **"Enable Persistent Instruction Bar"**
    - Enter your instruction template
    - Click **Save Settings**
 
 2. **Configure Your Template**
    ```
    Example template:
-   "This is a test prompt to verify the quick instruction 
+   "This is a test prompt to verify the persistent instruction 
    system is working correctly."
    ```
 
 3. **Use It in Any CLI**
    - Start a CLI tool (e.g., `gh copilot suggest`, `claude`, `aider`)
-   - Press **Ctrl+I** to open the Quick Instruction bar
+   - Press **Ctrl+I** to open the Persistent Instruction bar
    - Type your prompt: "How do I list all files recursively?"
    - Review the combined preview
    - Click **Send** or press **Ctrl+Enter**
@@ -272,7 +272,7 @@ Your Prompt:
 How do I list all files recursively?
 
 Appended Context:
-This is a test prompt to verify the quick instruction 
+This is a test prompt to verify the persistent instruction 
 system is working correctly.
 ```
 
@@ -280,13 +280,13 @@ system is working correctly.
 
 | Shortcut | Action |
 |----------|--------|
-| **Ctrl+I** | Toggle Quick Instruction bar |
+| **Ctrl+I** | Toggle Persistent Instruction bar |
 | **Ctrl+Enter** | Send prompt (when bar is focused) |
 | **Escape** | Collapse bar |
 
 ### Why It's Better Than Auto-Append
 
-The Quick Instruction bar is **explicit and reliable**:
+The Persistent Instruction bar is **explicit and reliable**:
 - ✅ You see exactly what will be sent
 - ✅ You can edit your prompt before sending
 - ✅ Works with ANY CLI tool (not just specific ones)
@@ -334,13 +334,13 @@ The Quick Instruction bar is **explicit and reliable**:
 | `Ctrl+Shift+0` | Trigger Command #10 |
 | `Ctrl+Shift+A` through `Ctrl+Shift+Z` | Commands #11 and beyond |
 
-### Quick Instructions (NEW!)
+### Persistent Instructions
 
 | Shortcut | What It Does |
 |----------|--------------|
-| `Ctrl+I` | Toggle Quick Instruction bar |
+| `Ctrl+I` | Toggle Persistent Instruction bar |
 | `Ctrl+Enter` | Send prompt (when bar is focused) |
-| `Escape` | Collapse Quick Instruction bar |
+| `Escape` | Collapse Persistent Instruction bar |
 
 ### Other
 

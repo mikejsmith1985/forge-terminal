@@ -40,7 +40,7 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 
 ### AI Integration
 - **🤖 Forge Assist**: AI-powered assistance panel integrated into the sidebar for context-aware help.
-- **⚡ Quick Instructions (NEW v3.12.15)**: 
+- **⚡ Persistent Instructions**: 
   - Floating input bar for adding context to CLI prompts
   - Toggle with `Ctrl+I` shortcut
   - Automatically append instruction templates to your prompts

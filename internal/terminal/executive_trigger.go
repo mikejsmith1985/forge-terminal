@@ -491,6 +491,47 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
+// stripANSI removes ANSI escape sequences from a string.
+// This is used to clean terminal input before command detection.
+func stripANSI(s string) string {
+	// Match ANSI escape sequences: ESC followed by [ and then parameters/commands
+	// Also match other escape sequences like ESC O (application mode)
+	result := make([]byte, 0, len(s))
+	i := 0
+	for i < len(s) {
+		if s[i] == 0x1b { // ESC character
+			// Skip the escape sequence
+			i++
+			if i < len(s) {
+				if s[i] == '[' {
+					// CSI sequence: ESC [ ... (ends with letter)
+					i++
+					for i < len(s) && (s[i] < 0x40 || s[i] > 0x7E) {
+						i++
+					}
+					if i < len(s) {
+						i++ // skip the final character
+					}
+				} else if s[i] == 'O' || s[i] == 'P' || s[i] == ']' {
+					// SS3 (O), DCS (P), or OSC (]) sequence
+					i++
+					// Skip until we hit a terminator or run out of string
+					for i < len(s) && s[i] >= 0x20 && s[i] < 0x7F {
+						i++
+					}
+				} else {
+					// Other escape - skip one more character
+					i++
+				}
+			}
+		} else {
+			result = append(result, s[i])
+			i++
+		}
+	}
+	return string(result)
+}
+
 // LineBuffer accumulates input bytes to detect complete lines.
 type LineBuffer struct {
 	mu     sync.Mutex

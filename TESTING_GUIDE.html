@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Persistent Context - Testing Guide</title>
+  <style>
+    body { font-family: system-ui; max-width: 1200px; margin: 40px auto; padding: 20px; background: #0d1117; color: #c9d1d9; }
+    h1 { color: #58a6ff; }
+    h2 { color: #79c0ff; margin-top: 30px; }
+    .step { background: #161b22; border: 1px solid #30363d; padding: 20px; margin: 15px 0; border-radius: 8px; }
+    .step h3 { margin-top: 0; color: #8b949e; }
+    code { background: #0d1117; padding: 3px 6px; border-radius: 4px; color: #ff7b72; }
+    pre { background: #0d1117; padding: 15px; border-radius: 6px; overflow-x: auto; }
+    .success { color: #2ea043; font-weight: bold; }
+    .error { color: #da3633; font-weight: bold; }
+    .warning { background: #3d2506; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
+    .command { background: #1c2128; border: 1px solid #30363d; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Persistent Context Injection - Testing Guide</h1>
+  
+  <div class="warning">
+    <strong>CRITICAL BUG FIXED:</strong> localStorage key mismatch prevented context from loading.
+    <br>Fix committed in <code>6c7f347</code> - rebuild required before testing.
+  </div>
+
+  <h2>Prerequisites</h2>
+  <div class="step">
+    <h3>1. Build the Latest Code</h3>
+    <div class="command">cd frontend && npm run build</div>
+    <p>Ensure you're running the version with the localStorage key fix.</p>
+  </div>
+
+  <div class="step">
+    <h3>2. Start the Server</h3>
+    <div class="command">.\run-dev-clean.ps1 -Port 9999</div>
+    <p>Or run the compiled binary directly.</p>
+  </div>
+
+  <div class="step">
+    <h3>3. Open Browser Console</h3>
+    <p>Press <code>F12</code> and go to the <strong>Console</strong> tab. Filter for "<code>[ContextInjection]</code>"</p>
+  </div>
+
+  <h2>Test Procedure</h2>
+
+  <div class="step">
+    <h3>Step 1: Enable Persistent Context</h3>
+    <ol>
+      <li>Click the <strong>Forge Assist</strong> button (Ctrl+/)</li>
+      <li>Click the <strong>"Persistent Instruction"</strong> button</li>
+      <li>Enter instruction text: <code>Context: Please be concise and explain like I'm a senior engineer.</code></li>
+      <li>Click <strong>"Add"</strong></li>
+      <li>Verify the instruction shows as <strong>enabled</strong> (green indicator)</li>
+    </ol>
+    
+    <p><strong>Expected Console Output:</strong></p>
+    <pre>[Terminal] Persistent instruction updated: { enabled: true, len: 72 }</pre>
+  </div>
+
+  <div class="step">
+    <h3>Step 2: Test LLM Command (Should Inject)</h3>
+    <p>In the terminal, type:</p>
+    <div class="command">copilot explain React hooks</div>
+    
+    <p><strong>Expected Console Output:</strong></p>
+    <pre>[ContextInjection] LLM command detected, context injected: {
+  command: 'copilot explain React hooks',
+  contextLength: 72
+}</pre>
+    
+    <p><strong>Expected Copilot Behavior:</strong></p>
+    <p>Copilot should respond with a <span class="success">concise, senior-level explanation</span> (because it received the context).</p>
+    
+    <p class="warning">
+      <strong>Test Question to Copilot:</strong> After it responds, ask:
+      <br><code>> Did you receive any instructions with my question?</code>
+      <br><br>
+      <strong>Expected Answer:</strong> "Yes, I received instructions to be concise and explain like you're a senior engineer."
+    </p>
+  </div>
+
+  <div class="step">
+    <h3>Step 3: Test Shell Command (Should NOT Inject)</h3>
+    <p>In the terminal, type:</p>
+    <div class="command">ls -la</div>
+    
+    <p><strong>Expected Console Output:</strong></p>
+    <pre>[ContextInjection] Shell command, no injection: ls -la</pre>
+    
+    <p><strong>Expected Terminal Behavior:</strong></p>
+    <p>Directory listing appears normally, <span class="success">NO context text visible</span> in output.</p>
+  </div>
+
+  <div class="step">
+    <h3>Step 4: Test Command Card (Should NOT Inject)</h3>
+    <ol>
+      <li>Open sidebar → <strong>Cards</strong> view</li>
+      <li>Click any command card (e.g., "Get System Info")</li>
+    </ol>
+    
+    <p><strong>Expected Console Output:</strong></p>
+    <p><span class="success">No injection logs</span> (command cards execute directly via different code path)</p>
+    
+    <p><strong>Expected Terminal Behavior:</strong></p>
+    <p>Command executes normally without any context appended.</p>
+  </div>
+
+  <div class="step">
+    <h3>Step 5: Disable Context and Verify</h3>
+    <ol>
+      <li>Open Forge Assist → Persistent Instructions</li>
+      <li>Click the toggle to <strong>disable</strong> the instruction</li>
+      <li>Type: <code>copilot explain TypeScript</code></li>
+    </ol>
+    
+    <p><strong>Expected Console Output:</strong></p>
+    <pre>[ContextInjection] Shell command, no injection: copilot explain TypeScript</pre>
+    
+    <p><strong>Expected Copilot Behavior:</strong></p>
+    <p>Standard response (not concise, no specific style)</p>
+  </div>
+
+  <h2>Success Criteria</h2>
+  <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+    <thead style="background: #161b22;">
+      <tr>
+        <th style="padding: 12px; border: 1px solid #30363d; text-align: left;">Test</th>
+        <th style="padding: 12px; border: 1px solid #30363d; text-align: left;">Expected Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background: #0d1117;">
+        <td style="padding: 12px; border: 1px solid #30363d;">Console shows injection log for <code>copilot</code></td>
+        <td style="padding: 12px; border: 1px solid #30363d;"><span class="success">✓ MUST PASS</span></td>
+      </tr>
+      <tr style="background: #161b22;">
+        <td style="padding: 12px; border: 1px solid #30363d;">Console shows NO injection for <code>ls</code></td>
+        <td style="padding: 12px; border: 1px solid #30363d;"><span class="success">✓ MUST PASS</span></td>
+      </tr>
+      <tr style="background: #0d1117;">
+        <td style="padding: 12px; border: 1px solid #30363d;">Copilot confirms receiving instructions</td>
+        <td style="padding: 12px; border: 1px solid #30363d;"><span class="success">✓ MUST PASS</span></td>
+      </tr>
+      <tr style="background: #161b22;">
+        <td style="padding: 12px; border: 1px solid #30363d;">Command cards execute without injection</td>
+        <td style="padding: 12px; border: 1px solid #30363d;"><span class="success">✓ MUST PASS</span></td>
+      </tr>
+      <tr style="background: #0d1117;">
+        <td style="padding: 12px; border: 1px solid #30363d;">Terminal stays clean (no visible context)</td>
+        <td style="padding: 12px; border: 1px solid #30363d;"><span class="success">✓ MUST PASS</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Debugging Failed Tests</h2>
+  
+  <div class="step">
+    <h3>If No Console Logs Appear</h3>
+    <ol>
+      <li>Check if you rebuilt after the localStorage key fix</li>
+      <li>Hard refresh the browser (<code>Ctrl+Shift+R</code>)</li>
+      <li>Check <code>localStorage</code> in DevTools:
+        <pre>localStorage.getItem('forgeAssist_persistentInstructions')</pre>
+      </li>
+      <li>Verify context is enabled (should see JSON array with <code>enabled: true</code>)</li>
+    </ol>
+  </div>
+
+  <div class="step">
+    <h3>If Context Not Injected (Copilot doesn't receive it)</h3>
+    <ol>
+      <li>Check console for <code>[ContextInjection] LLM command detected</code> log</li>
+      <li>If log appears but Copilot doesn't receive context:
+        <ul>
+          <li>Issue is with how context is appended to command</li>
+          <li>Check <code>dataToSend</code> value in debugger</li>
+          <li>Verify <code>data.replace(/\r|\n/, ` ${contextText}\r`)</code> logic</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <h2>Known Issue from Previous Test</h2>
+  <div class="warning">
+    <strong>Bug Found:</strong> User's manual test showed Copilot responding:
+    <br><em>"No - I didn't receive any instructions after the question mark."</em>
+    <br><br>
+    <strong>Root Cause:</strong> localStorage key mismatch (<code>forgeAssist_quickInstructions</code> vs <code>forgeAssist_persistentInstructions</code>)
+    <br><br>
+    <strong>Status:</strong> <span class="success">FIXED</span> in commit <code>6c7f347</code>
+  </div>
+
+  <p style="margin-top: 40px; color: #8b949e; text-align: center;">
+    After successful testing, take screenshots and document results in validation dashboard.
+  </p>
+</body>
+</html>
