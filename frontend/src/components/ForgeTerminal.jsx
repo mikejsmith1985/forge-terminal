@@ -492,6 +492,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // v3.14.4: Command buffer for persistent context injection
   const commandBufferRef = useRef(''); // Tracks current command being typed
   const persistentContextRef = useRef(null); // Cached context { enabled, text }
+  const contextAppendedRef = useRef(false); // Ref to track if we just appended context
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -1751,34 +1752,100 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           // Update command buffer
           if (data.includes('\r') || data.includes('\n')) {
             // Command submission detected - check if we should inject context
-            const command = commandBufferRef.current.trim();
+            let command = commandBufferRef.current.trim();
+            
+            // v3.14.5 FIX: Robust command detection using xterm buffer
+            // However, we MUST skip this if we just appended context (Double Enter race condition)
+            // If the user hits Enter quickly, the screen might not have updated with the context yet.
+            if (!contextAppendedRef.current) {
+               try {
+                  const activeBuffer = term.buffer.active;
+                  if (activeBuffer) {
+                     const currentLine = activeBuffer.getLine(activeBuffer.baseY + activeBuffer.cursorY);
+                     if (currentLine) {
+                        const lineText = currentLine.translateToString().trim();
+                        // Attempt to strip prompt: match anything ending in >, $, #, %, ? followed by optional space
+                        // Added '?' for Copilot CLI interactive prompts
+                        const cleanLine = lineText.replace(/^.*[>#$:%?]\s?/, '');
+                        
+                        if (cleanLine && cleanLine.length > 0) {
+                           // Trust the screen content over the keystroke buffer
+                           command = cleanLine;
+                           // Update buffer to match reality so the endsWith check works
+                           commandBufferRef.current = command; 
+                        }
+                     }
+                  }
+               } catch (err) {
+                  console.warn('[ContextInjection] Failed to read terminal line:', err);
+               }
+            } else {
+               console.log('[ContextInjection] Skipping screen read due to pending context confirmation');
+            }
             
             // Only inject if:
             // 1. Context is enabled
-            // 2. Command is detected as LLM command
-            // 3. Command buffer is not empty
+            // 2. Command buffer is not empty (we have something to append to)
+            // v3.14.5 CHANGE: Removed isLLMCommand check. 
+            // User requested this to work "no matter what I type" (e.g. in Copilot interactive mode).
+            // The "Double Enter" mechanism serves as the safety guard.
             if (persistentContextRef.current && 
                 persistentContextRef.current.enabled && 
-                command &&
-                isLLMCommand(command)) {
+                command) {
               
               const contextText = persistentContextRef.current.text;
-              // Inject context before the newline
-              dataToSend = data.replace(/\r|\n/, ` ${contextText}\r`);
               
-              console.log('[ContextInjection] LLM command detected, context injected:', {
-                command: command.substring(0, 50),
-                contextLength: contextText.length
-              });
-            } else if (command) {
-              console.log('[ContextInjection] Shell command, no injection:', command.substring(0, 50));
+              // DOUBLE ENTER LOGIC:
+              // First enter: Append context to input line (visible to user)
+              // Second enter: Submit the command
+              
+              // Check if we already appended the context
+              // We check if the end of the command matches the context text
+              if (command.endsWith(contextText.trim())) {
+                // Context already appended, just send the newline to execute
+                console.log('[ContextInjection] Context already present, executing...');
+                dataToSend = data;
+                commandBufferRef.current = ''; // Clear buffer
+                contextAppendedRef.current = false; // Reset flag
+              } else {
+                // Context NOT present - append it but DO NOT execute
+                // We send the context text + space back to the shell (simulating typing)
+                // but we strip the newline so it doesn't execute yet
+                
+                console.log('[ContextInjection] Appending context, waiting for confirmation...');
+                
+                // Replace the newline with space + context
+                // Note: We don't send \r at the end, so it stays on the line
+                dataToSend = ` ${contextText}`;
+                
+                // Update buffer to reflect what's now on the line
+                commandBufferRef.current += dataToSend;
+                
+                // Set flag to prevent screen read race condition on next Enter
+                contextAppendedRef.current = true;
+              }
+            } else {
+              // Normal command or no context enabled
+              if (command) {
+                console.log('[ContextInjection] Shell command, no injection:', command.substring(0, 50));
+              }
+              commandBufferRef.current = ''; // Clear buffer
+              contextAppendedRef.current = false;
+            }
+          } else {
+            // Any non-Enter key resets the context appended flag
+            // This ensures we go back to reading from screen if the user edits the line
+            contextAppendedRef.current = false;
+
+            // Accumulate keystrokes (but limit buffer to prevent OOM)
+            // Handle Backspace basic editing to keep buffer somewhat sane
+            if (data === '\x7f' || data === '\b') {
+               commandBufferRef.current = commandBufferRef.current.slice(0, -1);
+            } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
+               // Only append printable characters, ignore escape codes/control chars
+               commandBufferRef.current += data;
             }
             
-            // Clear buffer after submission
-            commandBufferRef.current = '';
-          } else {
-            // Accumulate keystrokes (but limit buffer to prevent OOM)
-            commandBufferRef.current += data;
             if (commandBufferRef.current.length > 2048) {
               commandBufferRef.current = commandBufferRef.current.slice(-2048);
             }

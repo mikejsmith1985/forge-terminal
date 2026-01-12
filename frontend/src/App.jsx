@@ -1212,7 +1212,19 @@ function App() {
         // Only update if timeout hasn't fired
         if (timeoutId !== null || commandsLoading) {
           // Ensure data is an array
-          const cards = Array.isArray(data) ? data : [];
+          let cards = Array.isArray(data) ? data : [];
+          
+          // Ensure Release Manager card is present (ID: -1) for sortability
+          if (!cards.find(c => c.id === -1)) {
+            cards = [{
+              id: -1,
+              description: 'Release Manager', 
+              command: 'SYSTEM_RELEASE_MANAGER',
+              pasteOnly: true,
+              favorite: false
+            }, ...cards];
+          }
+          
           setCommands(cards);
           setCommandsLoading(false);
         }

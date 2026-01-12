@@ -1,6 +1,7 @@
 import React from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableCommandCard } from './SortableCommandCard';
+import { SortableOwnerReleaseCard } from './SortableOwnerReleaseCard';
 import { RefreshCw } from 'lucide-react';
 import OwnerReleaseCard from './OwnerReleaseCard';
 
@@ -50,32 +51,44 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
 
   return (
     <div className="command-cards-container">
-      {/* Owner Release Card (only visible to repo owner) */}
-      <OwnerReleaseCard 
-        onExecuteCommand={onExecute}
-        onToast={onToast}
-        shellType={shellType}
-      />
-      
       {/* User Cards Section */}
       {userCards.length > 0 ? (
         <SortableContext
           items={userCards.map(c => c.id)}
           strategy={verticalListSortingStrategy}
         >
-          {userCards.map(cmd => (
-            <SortableCommandCard
-              key={cmd.id}
-              command={cmd}
-              onExecute={onExecute}
-              onPaste={onPaste}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))}
+          {userCards.map(cmd => {
+            if (cmd.id === -1) {
+              return (
+                <SortableOwnerReleaseCard
+                  key={cmd.id}
+                  command={cmd}
+                  onExecuteCommand={onExecute}
+                  onToast={onToast}
+                  shellType={shellType}
+                />
+              );
+            }
+            return (
+              <SortableCommandCard
+                key={cmd.id}
+                command={cmd}
+                onExecute={onExecute}
+                onPaste={onPaste}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            );
+          })}
         </SortableContext>
       ) : (
         <div className="command-cards-empty">
+           {/* Fallback Release Card if list is truly empty */}
+           <OwnerReleaseCard 
+             onExecuteCommand={onExecute}
+             onToast={onToast}
+             shellType={shellType}
+           />
           <p>No command cards yet. Click the + button to add one.</p>
         </div>
       )}
