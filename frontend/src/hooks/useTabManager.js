@@ -227,19 +227,42 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       
       if (session && session.tabs && session.tabs.length > 0) {
         // Restore tabs from session
-        const restoredTabs = session.tabs.map((tabState, index) => ({
-          id: tabState.id || generateId(),
-          title: tabState.title || `Terminal ${index + 1}`,
-          shellConfig: tabState.shellConfig || configRef.current,
-          colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
-          mode: tabState.mode || 'dark',
-          viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
-          autoRespond: tabState.autoRespond || false,
-          // v3.12.3: amEnabled removed
-          visionEnabled: tabState.visionEnabled || false,
-          currentDirectory: tabState.currentDirectory || null,
-          createdAt: Date.now(),
-        }));
+        const restoredTabs = session.tabs.map((tabState, index) => {
+          // v3.14.8: Derive title from currentDirectory if available
+          let title = tabState.title || `Terminal ${index + 1}`;
+          
+          // If we have a currentDirectory but title is generic or "forge-terminal", derive from directory
+          if (tabState.currentDirectory && 
+              (title.startsWith('Terminal ') || 
+               title === 'forge-terminal' || 
+               title === '~' ||
+               !title)) {
+            const dirParts = tabState.currentDirectory.replace(/\\/g, '/').split('/').filter(Boolean);
+            const folderName = dirParts[dirParts.length - 1];
+            if (folderName && folderName !== '~') {
+              title = folderName;
+              logger.session('Derived tab title from directory', { 
+                tabId: tabState.id,
+                directory: tabState.currentDirectory,
+                derivedTitle: title
+              });
+            }
+          }
+          
+          return {
+            id: tabState.id || generateId(),
+            title: title,
+            shellConfig: tabState.shellConfig || configRef.current,
+            colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
+            mode: tabState.mode || 'dark',
+            viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
+            autoRespond: tabState.autoRespond || false,
+            // v3.12.3: amEnabled removed
+            visionEnabled: tabState.visionEnabled || false,
+            currentDirectory: tabState.currentDirectory || null,
+            createdAt: Date.now(),
+          };
+        });
 
         // Update idCounter to avoid collisions
         idCounter = restoredTabs.length + 1;

@@ -376,27 +376,47 @@ function extractDirectory(text) {
     // and handle both "PS >" and "PS ...>" formats
     const psMatch = line.match(/PS\s+([A-Za-z]:\\[^>]*?)>\s*$/i);
     if (psMatch) {
-      return psMatch[1];
+      return psMatch[1].trim();
     }
     
     // CMD prompt: "C:\Users\foo>" or "C:\Users\foo>command"
     // Relaxed regex: Don't enforce start of line
     const cmdMatch = line.match(/([A-Za-z]:\\[^>]*?)>/);
     if (cmdMatch) {
-      return cmdMatch[1];
+      return cmdMatch[1].trim();
     }
     
     // Bash/WSL prompt with path: "user@host:~/projects$" or "user@host:/home/user$"
     // Also handles: "user@host:~/projects$ " (with trailing space)
     const bashMatch = line.match(/[@][\w.-]+:([~\/][^\$#]*?)[\$#]\s*$/);
     if (bashMatch) {
-      return bashMatch[1];
+      return bashMatch[1].trim();
     }
     
     // Simple bash prompt: "~/projects$ " or "/home/user$ "
     const simpleBashMatch = line.match(/^([~\/][^\$#\s]+)[\$#]\s*$/);
     if (simpleBashMatch) {
-      return simpleBashMatch[1];
+      return simpleBashMatch[1].trim();
+    }
+    
+    // v3.14.8: Additional patterns for more shells
+    // Git Bash on Windows: "user@MACHINE MINGW64 ~/projects"
+    const gitBashMatch = line.match(/MINGW\d+\s+([~\/][^\$#\s]+)/i);
+    if (gitBashMatch) {
+      return gitBashMatch[1].trim();
+    }
+    
+    // Oh My Posh / Starship / Modern prompts that show path before prompt symbol
+    // Look for a path-like pattern followed by common prompt indicators (❯, ➜, ›, >)
+    const modernPromptMatch = line.match(/([A-Za-z]:[\\\/][^\s❯➜›>]+|[~\/][^\s❯➜›>$#]+)\s*[❯➜›>]\s*$/);
+    if (modernPromptMatch) {
+      return modernPromptMatch[1].trim();
+    }
+    
+    // Zsh with path: " ~/projects ❯ " or similar
+    const zshMatch = line.match(/([~\/][\w\-./]+)\s+[❯➜›]\s*$/);
+    if (zshMatch) {
+      return zshMatch[1].trim();
     }
   }
   
@@ -1633,14 +1653,22 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             // Only inject if:
             // 1. Context is enabled
             // 2. Command buffer is not empty (we have something to append to)
+            // 3. A CLI tool is actively waiting for input (not a shell command)
             // v3.14.5 CHANGE: Removed isLLMCommand check. 
             // User requested this to work "no matter what I type" (e.g. in Copilot interactive mode).
             // The "Double Enter" mechanism serves as the safety guard.
             // v3.14.6 FIX: Exclude slash commands (e.g. /model, /clear) from injection
+            // v3.14.8 FIX: Only inject when CLI tool is waiting (not for shell commands)
+            
+            // Check if a CLI tool is actively waiting for input
+            const currentBuffer = outputBufferRef.current?.data || '';
+            const { waiting } = detectCliPrompt(currentBuffer, false);
+            
             if (persistentContextRef.current && 
                 persistentContextRef.current.enabled && 
                 command &&
-                !command.startsWith('/')) {
+                !command.startsWith('/') &&
+                waiting) {
               
               const contextText = persistentContextRef.current.text;
               
@@ -1661,7 +1689,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 // We send the context text + space back to the shell (simulating typing)
                 // but we strip the newline so it doesn't execute yet
                 
-                console.log('[ContextInjection] Appending context, waiting for confirmation...');
+                console.log('[ContextInjection] CLI tool detected, appending context, waiting for confirmation...');
                 
                 // Replace the newline with space + context
                 // Note: We don't send \r at the end, so it stays on the line
@@ -1675,8 +1703,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               }
             } else {
               // Normal command or no context enabled
-              if (command) {
-                console.log('[ContextInjection] Shell command, no injection:', command.substring(0, 50));
+              if (command && !waiting) {
+                console.log('[ContextInjection] Shell command (no CLI tool waiting), no injection:', command.substring(0, 50));
+              } else if (command && !persistentContextRef.current?.enabled) {
+                console.log('[ContextInjection] Persistent context disabled, no injection');
               }
               commandBufferRef.current = ''; // Clear buffer
               contextAppendedRef.current = false;
