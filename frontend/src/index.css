@@ -822,8 +822,72 @@ body {
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 16px;
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
+}
+
+.icon-picker-header {
+  margin-bottom: 8px;
+}
+
+.icon-search {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--overlay);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.icon-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.icon-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--overlay);
+}
+
+.category-btn {
+  padding: 6px 12px;
+  background: var(--bg);
+  border: 1px solid var(--overlay);
+  border-radius: 6px;
+  color: var(--subtext);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.category-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.category-btn.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.emoji-picker-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.emoji-picker-container em-emoji-picker {
+  width: 100%;
+  max-width: 100%;
+  --background-rgb: var(--surface);
+  --border-radius: 8px;
 }
 
 .icon-picker-search {

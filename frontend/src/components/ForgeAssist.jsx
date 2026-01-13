@@ -413,6 +413,7 @@ export default function ForgeAssist({
   onSendToTerminal, 
   onToast,
   activeTabId, // Current session ID
+  openToPersistent = false, // v3.15: Auto-open persistent instructions panel
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCLI, setSelectedCLI] = useState(() => {
@@ -538,9 +539,13 @@ export default function ForgeAssist({
   useEffect(() => {
     if (isOpen) {
       setSearchQuery('');
+      // v3.15: Auto-open persistent instructions panel if requested
+      if (openToPersistent) {
+        setShowPersistentInstructionsPanel(true);
+      }
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen]);
+  }, [isOpen, openToPersistent]);
 
   // Keyboard handler
   useEffect(() => {

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Copy, Play, GitBranch, Tag, Upload, Shield, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Play, GitBranch, Tag, Upload, Shield, AlertCircle, Settings, Plus, Trash2, Folder } from 'lucide-react';
 import { useVersionIncrement } from '../hooks/useVersionIncrement';
 import './OwnerReleaseCard.css';
 
 // The GitHub username of the repository owner who can trigger releases
 const OWNER_USERNAME = 'mikejsmith1985';
 
-const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType }) => {
+const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   const [currentVersion, setCurrentVersion] = useState('v1.0.0');
   const [selectedIncrement, setSelectedIncrement] = useState('fix');
   const [showCommand, setShowCommand] = useState(false);
@@ -14,6 +14,14 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType }) => {
   const [error, setError] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
   
+  // Project Configuration
+  const [showSettings, setShowSettings] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectPath, setNewProjectPath] = useState('');
+  const [activeProject, setActiveProject] = useState(null); // null = Internal Forge
+  const [autoDetect, setAutoDetect] = useState(true);
+
   // Authorization state
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [githubUsername, setGithubUsername] = useState(null);
@@ -21,6 +29,56 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType }) => {
   const [commitMessage, setCommitMessage] = useState('');
 
   const { incrementMajor, incrementMinor, incrementFix, getReleaseType } = useVersionIncrement();
+
+  // Load configured projects
+  useEffect(() => {
+    const saved = localStorage.getItem('forge_release_projects');
+    if (saved) {
+      try {
+        setProjects(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse projects', e);
+      }
+    }
+  }, []);
+
+  // Auto-detect project based on CWD
+  useEffect(() => {
+    if (!autoDetect || !cwd || !projects.length) return;
+
+    // Normalize paths for comparison (simple check)
+    const normalizedCwd = cwd.toLowerCase().replace(/\\/g, '/');
+    
+    const match = projects.find(p => {
+        const pPath = p.path.toLowerCase().replace(/\\/g, '/');
+        return normalizedCwd.startsWith(pPath);
+    });
+
+    if (match) {
+        setActiveProject(match);
+    } else {
+        // If no match found and we were on a project, switch back to internal?
+        // Or stay on last selected? Let's switch to internal if explicitly auto-detecting
+        setActiveProject(null);
+    }
+  }, [cwd, projects, autoDetect]);
+
+  const saveProject = () => {
+    if (!newProjectName || !newProjectPath) return;
+    const updated = [...projects, { name: newProjectName, path: newProjectPath, id: Date.now() }];
+    setProjects(updated);
+    localStorage.setItem('forge_release_projects', JSON.stringify(updated));
+    setNewProjectName('');
+    setNewProjectPath('');
+    if (onToast) onToast('Project added', 'success');
+  };
+
+  const deleteProject = (id) => {
+    const updated = projects.filter(p => p.id !== id);
+    setProjects(updated);
+    localStorage.setItem('forge_release_projects', JSON.stringify(updated));
+    if (activeProject && activeProject.id === id) setActiveProject(null);
+  };
 
   // Check GitHub authorization on mount
   useEffect(() => {
@@ -66,7 +124,20 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType }) => {
     const fetchVersion = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/version');
+        let response;
+        
+        if (activeProject) {
+            // Fetch git version for external project
+            response = await fetch('/api/git/version', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: activeProject.path })
+            });
+        } else {
+            // Fetch internal version
+            response = await fetch('/api/version');
+        }
+
         if (response.ok) {
           const data = await response.json();
           const version = data.version || '1.0.0';
@@ -88,7 +159,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType }) => {
     if (isAuthorized) {
       fetchVersion();
     }
-  }, [isAuthorized]);
+  }, [isAuthorized, activeProject]); // Refetch when project changes
 
   const nextVersion = useCallback(() => {
     switch (selectedIncrement) {
@@ -110,17 +181,28 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType }) => {
     if (!next) return '';
     
     const msg = commitMessage.trim() || `Release ${next}`;
+    let cmdPrefix = '';
+
+    // If active project, cd into directory
+    if (activeProject) {
+        // Use cd with quotes to handle spaces
+        if (shellType === 'powershell') {
+            cmdPrefix = `cd "${activeProject.path}"; `;
+        } else {
+            cmdPrefix = `cd "${activeProject.path}" && `;
+        }
+    }
     
     if (shellType === 'powershell') {
       // PowerShell 5.1 compatible syntax (no && chaining)
       // Delete remote tag first (silently continue if doesn't exist), then create and push
-      return `$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}"; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "🚀 Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } }`;
+      return `${cmdPrefix}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}"; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "🚀 Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } }`;
     } else {
       // Bash/zsh
       // Delete remote tag first (silently continue if doesn't exist), then create and push
-      return `b=$(git branch --show-current) && git add -A && git commit -m "${msg}" && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "🚀 Release ${next} triggered! GitHub Actions will build."`;
+      return `${cmdPrefix}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "🚀 Release ${next} triggered! GitHub Actions will build."`;
     }
-  }, [next, shellType, commitMessage]);
+  }, [next, shellType, commitMessage, activeProject]);
 
   const releaseCommand = generateReleaseCommand();
 
@@ -202,11 +284,120 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType }) => {
         <div className="orc-header">
           <div className="orc-title-row">
             <Tag size={20} className="orc-icon" />
-            <h3 className="orc-title">Release Manager</h3>
-            <span className="orc-owner-badge">Owner</span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <h3 className="orc-title">Release Manager</h3>
+                {activeProject && <span style={{ fontSize: '10px', color: '#888' }}>{activeProject.name}</span>}
+            </div>
+            
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                <button 
+                    className="orc-settings-btn"
+                    onClick={() => setShowSettings(!showSettings)}
+                    title="Configure Projects"
+                    style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '4px' }}
+                >
+                    <Settings size={16} />
+                </button>
+            </div>
           </div>
           <p className="orc-description">Commit, merge to main, and create tagged release</p>
         </div>
+
+        {/* Settings Panel */}
+        {showSettings && (
+            <div className="orc-settings-panel" style={{ 
+                background: '#1e1e1e', 
+                border: '1px solid #333', 
+                padding: '12px', 
+                borderRadius: '6px',
+                marginBottom: '12px',
+                fontSize: '12px'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
+                    <h4 style={{ margin: 0 }}>Managed Projects</h4>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                        <input 
+                            type="checkbox" 
+                            checked={autoDetect} 
+                            onChange={(e) => setAutoDetect(e.target.checked)}
+                        />
+                        Auto-detect from Workspace
+                    </label>
+                </div>
+
+                <div className="orc-project-list" style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '8px' }}>
+                    <div 
+                        onClick={() => setActiveProject(null)}
+                        style={{ 
+                            padding: '6px', 
+                            cursor: 'pointer', 
+                            background: !activeProject ? '#2d2d2d' : 'transparent',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }}
+                    >
+                        <Shield size={12} />
+                        <span>Forge Terminal (Internal)</span>
+                    </div>
+                    {projects.map(p => (
+                        <div 
+                            key={p.id} 
+                            style={{ 
+                                padding: '6px', 
+                                cursor: 'pointer', 
+                                background: activeProject?.id === p.id ? '#2d2d2d' : 'transparent',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginTop: '4px'
+                            }}
+                        >
+                            <div 
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}
+                                onClick={() => setActiveProject(p)}
+                            >
+                                <Folder size={12} />
+                                <span>{p.name}</span>
+                                <span style={{ color: '#666', fontSize: '10px' }}>{p.path}</span>
+                            </div>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); deleteProject(p.id); }}
+                                style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: '4px' }}>
+                    <input 
+                        type="text" 
+                        placeholder="Project Name" 
+                        value={newProjectName}
+                        onChange={(e) => setNewProjectName(e.target.value)}
+                        style={{ flex: 1, background: '#111', border: '1px solid #333', color: '#fff', padding: '4px', fontSize: '11px' }}
+                    />
+                    <input 
+                        type="text" 
+                        placeholder="Path (C:\Projects\...)" 
+                        value={newProjectPath}
+                        onChange={(e) => setNewProjectPath(e.target.value)}
+                        style={{ flex: 2, background: '#111', border: '1px solid #333', color: '#fff', padding: '4px', fontSize: '11px' }}
+                    />
+                    <button 
+                        onClick={saveProject}
+                        disabled={!newProjectName || !newProjectPath}
+                        style={{ background: '#238636', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', padding: '0 8px' }}
+                    >
+                        <Plus size={14} />
+                    </button>
+                </div>
+            </div>
+        )}
 
         {/* Version Display */}
         <div className="orc-version-display">

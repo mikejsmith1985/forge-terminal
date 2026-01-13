@@ -25,6 +25,8 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
   const [hasInterruptedSession, setHasInterruptedSession] = useState(false);
   // v3.12.16: Pre-generate session ID for external logs setup
   const [nextSessionId, setNextSessionId] = useState('debug-' + Date.now());
+  // v3.15: Track if unmount is due to page unload vs component unmount
+  const isPageUnloadingRef = useRef(false);
 
   // v3.12.14: Force re-render counter
   const [, forceUpdate] = useState(0);
@@ -200,15 +202,15 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     }
   }, []);
 
-  const saveSessionToLocalStorage = useCallback(() => {
+  const saveSessionToLocalStorage = useCallback((isInterrupted = false) => {
     const session = {
       id: sessionIdRef.current,
       startTime: startTimeRef.current,
       events: eventsRef.current,
       consoleLogs: consoleLogsRef.current,
       networkRequests: networkRequestsRef.current,
-      interrupted: true,
-      isRecording: true, // Mark that recording is active
+      interrupted: isInterrupted, // v3.15: Only mark interrupted if page unloading
+      isRecording: true,
     };
     localStorage.setItem('follow-me-active-session', JSON.stringify(session));
   }, []);
@@ -306,8 +308,16 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
 
   // Cleanup effect - only runs on unmount
   useEffect(() => {
+    // v3.15: Track page unload to distinguish from tab switching
+    const handleBeforeUnload = () => {
+      isPageUnloadingRef.current = true;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
       console.log('[FollowMe] Component unmounting');
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
       // Always clear interval on unmount to prevent memory leaks
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
@@ -316,9 +326,16 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       // Restore console/fetch hooks
       restoreConsole();
       restoreFetch();
-      // If recording was active, save to localStorage for recovery
-      if (isRecordingRef.current) {
-        saveSessionToLocalStorage();
+      
+      // v3.15: Only save for recovery if page is unloading (true interruption)
+      // Tab switching shouldn't trigger auto-restore
+      if (isRecordingRef.current && isPageUnloadingRef.current) {
+        console.log('[FollowMe] Page unloading - saving session for recovery');
+        saveSessionToLocalStorage(true); // Mark as interrupted
+      } else if (isRecordingRef.current) {
+        console.log('[FollowMe] Component unmount (tab switch) - clearing localStorage');
+        // Clear localStorage to prevent auto-restore on tab switch
+        localStorage.removeItem('follow-me-active-session');
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

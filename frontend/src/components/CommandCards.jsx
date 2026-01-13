@@ -5,7 +5,7 @@ import { SortableOwnerReleaseCard } from './SortableOwnerReleaseCard';
 import { RefreshCw } from 'lucide-react';
 import OwnerReleaseCard from './OwnerReleaseCard';
 
-const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType }) => {
+const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd }) => {
   if (loading) {
     return (
       <div className="command-cards-container">
@@ -14,6 +14,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           onExecuteCommand={onExecute}
           onToast={onToast}
           shellType={shellType}
+          cwd={cwd}
         />
         <div className="command-cards-loading">
           <div className="spinner"></div>
@@ -31,6 +32,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           onExecuteCommand={onExecute}
           onToast={onToast}
           shellType={shellType}
+          cwd={cwd}
         />
         <div className="command-cards-error">
           <p className="error-message">⚠️ Failed to load command cards</p>
@@ -66,6 +68,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
                   onExecuteCommand={onExecute}
                   onToast={onToast}
                   shellType={shellType}
+                  cwd={cwd}
                 />
               );
             }
@@ -88,6 +91,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
              onExecuteCommand={onExecute}
              onToast={onToast}
              shellType={shellType}
+             cwd={cwd}
            />
           <p>No command cards yet. Click the + button to add one.</p>
         </div>

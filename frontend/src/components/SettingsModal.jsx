@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap, RotateCcw, Database } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap, RotateCcw, Database, History } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
 import TabControlsPanel from './TabControlsPanel';
-import BackupsPanel from './BackupsPanel';
+import CardHistoryPanel from './CardHistoryPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 import { themes, themeOrder } from '../themes';
 
@@ -233,13 +233,13 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             Tab Controls
           </button>
           <button
-            onClick={() => setActiveTab('backups')}
+            onClick={() => setActiveTab('data')}
             style={{
               padding: '12px 20px',
               background: 'transparent',
               border: 'none',
-              color: activeTab === 'backups' ? '#fff' : '#888',
-              borderBottom: activeTab === 'backups' ? '2px solid #8b5cf6' : '2px solid transparent',
+              color: activeTab === 'data' ? '#fff' : '#888',
+              borderBottom: activeTab === 'data' ? '2px solid #8b5cf6' : '2px solid transparent',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -247,7 +247,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             }}
           >
             <Database size={16} />
-            Data
+            Data & History
           </button>
         </div>
 
@@ -258,6 +258,69 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <CLISettingsPanel onToast={onToast} />
           ) : activeTab === 'tabs' ? (
             <TabControlsPanel onToast={onToast} />
+          ) : activeTab === 'data' ? (
+            <div>
+              {/* Default Cards Section */}
+              <div style={{ marginBottom: '32px', paddingBottom: '32px', borderBottom: '1px solid #333' }}>
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <RotateCcw size={20} />
+                  Default Command Cards
+                </h3>
+                {missingCards.length > 0 ? (
+                  <div>
+                    <p style={{ marginBottom: '16px', color: '#aaa' }}>
+                      The following default command cards are missing and can be restored:
+                    </p>
+                    <div style={{ marginBottom: '16px' }}>
+                      {missingCards.map(card => (
+                        <label key={card.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedCards.includes(card.id)}
+                            onChange={() => {
+                              if (selectedCards.includes(card.id)) {
+                                setSelectedCards(selectedCards.filter(id => id !== card.id));
+                              } else {
+                                setSelectedCards([...selectedCards, card.id]);
+                              }
+                            }}
+                          />
+                          <span style={{ color: '#ddd' }}>{card.description}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleRestoreDefaultCards}
+                      disabled={restoringCards || selectedCards.length === 0}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      <RotateCcw size={16} />
+                      {restoringCards ? 'Restoring...' : `Restore ${selectedCards.length} Card(s)`}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    color: '#22c55e'
+                  }}>
+                    ✓ All default command cards are present
+                  </div>
+                )}
+              </div>
+
+              {/* Card History Section */}
+              <div>
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <History size={20} />
+                  Card Version History
+                </h3>
+                <CardHistoryPanel onToast={onToast} />
+              </div>
+            </div>
           ) : activeTab === 'backups' ? (
             <BackupsPanel onToast={onToast} />
           ) : (

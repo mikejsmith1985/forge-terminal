@@ -31,6 +31,19 @@ type Command struct {
 	MacroDelay   int    `json:"macro_delay,omitempty"`   // Zero-Click: Delay in ms before macro injection (default 1500)
 }
 
+// CommandVersion represents a versioned snapshot of a command
+type CommandVersion struct {
+	Command   Command   `json:"command"`
+	Timestamp time.Time `json:"timestamp"`
+	Version   int       `json:"version"`
+}
+
+// CardHistory contains the version history for a single card
+type CardHistory struct {
+	CardID   int              `json:"card_id"`
+	Versions []CommandVersion `json:"versions"` // Newest first
+}
+
 // Default commands created on first run
 var DefaultCommands = []Command{
 	{
@@ -156,7 +169,7 @@ func LoadCommands() ([]Command, error) {
 	return deduplicated, nil
 }
 
-// SaveCommands saves commands to the JSON file with automated backup
+// SaveCommands saves commands to the JSON file with per-card versioning
 func SaveCommands(commands []Command) error {
 	configDir, err := GetConfigDir()
 	if err != nil {
@@ -174,12 +187,25 @@ func SaveCommands(commands []Command) error {
 		return err
 	}
 
-	// AUTOMATED BACKUP
-	// Only backup if the file exists and has content
-	if info, err := os.Stat(path); err == nil && info.Size() > 0 {
-		if err := performBackup(path, configDir); err != nil {
-			// Log error but continue with save - don't block user operation due to backup failure
-			fmt.Printf("Warning: Failed to create backup: %v\n", err)
+	// Load existing commands to compare for changes
+	existingCommands, _ := LoadCommands()
+	existingMap := make(map[int]Command)
+	for _, cmd := range existingCommands {
+		existingMap[cmd.ID] = cmd
+	}
+
+	// For each command, check if it changed and save version if needed
+	for _, cmd := range commands {
+		if existing, found := existingMap[cmd.ID]; found {
+			// Check if command actually changed
+			if commandsEqual(existing, cmd) {
+				// No change detected, skip versioning
+				continue
+			}
+		}
+		// New card or changed card - save version
+		if err := saveCardVersion(cmd, configDir); err != nil {
+			fmt.Printf("Warning: Failed to save version for card %d: %v\n", cmd.ID, err)
 		}
 	}
 
@@ -191,253 +217,304 @@ func SaveCommands(commands []Command) error {
 	return os.WriteFile(path, data, 0600)
 }
 
-// performBackup creates a timestamped backup and rotates old ones
-func performBackup(sourcePath string, configDir string) error {
-	// Create backups directory
-	backupDir := filepath.Join(configDir, "backups")
-	if err := os.MkdirAll(backupDir, 0700); err != nil {
-		return fmt.Errorf("failed to create backup dir: %w", err)
-	}
-
-	// Read source content
-	content, err := os.ReadFile(sourcePath)
-	if err != nil {
-		return fmt.Errorf("failed to read source for backup: %w", err)
-	}
-
-	// Create timestamped backup
-	timestamp := time.Now().Format("20060102-150405")
-	backupName := fmt.Sprintf("commands-%s.json", timestamp)
-	backupPath := filepath.Join(backupDir, backupName)
-
-	if err := os.WriteFile(backupPath, content, 0600); err != nil {
-		return fmt.Errorf("failed to write backup file: %w", err)
-	}
-
-	// Prune old backups (keep last 20)
-	return pruneBackups(backupDir)
+// commandsEqual checks if two commands are identical (ignoring internal state)
+func commandsEqual(a, b Command) bool {
+	return a.ID == b.ID &&
+		a.Description == b.Description &&
+		a.Command == b.Command &&
+		a.KeyBinding == b.KeyBinding &&
+		a.PasteOnly == b.PasteOnly &&
+		a.Favorite == b.Favorite &&
+		a.TriggerAM == b.TriggerAM &&
+		a.LLMProvider == b.LLMProvider &&
+		a.LLMType == b.LLMType &&
+		a.Icon == b.Icon &&
+		a.Delay == b.Delay &&
+		a.AlwaysAppend == b.AlwaysAppend &&
+		a.MacroPayload == b.MacroPayload &&
+		a.MacroDelay == b.MacroDelay
 }
 
-// pruneBackups keeps only the N most recent backups
-func pruneBackups(backupDir string) error {
-	entries, err := os.ReadDir(backupDir)
+// getCardHistoryDir returns the directory for card version history
+func getCardHistoryDir(configDir string) string {
+	return filepath.Join(configDir, "card-history")
+}
+
+// getCardHistoryPath returns the path for a specific card's history file
+func getCardHistoryPath(configDir string, cardID int) string {
+	return filepath.Join(getCardHistoryDir(configDir), fmt.Sprintf("card-%d.json", cardID))
+}
+
+// saveCardVersion saves a new version of a command card
+func saveCardVersion(cmd Command, configDir string) error {
+	historyDir := getCardHistoryDir(configDir)
+	if err := os.MkdirAll(historyDir, 0700); err != nil {
+		return fmt.Errorf("failed to create history dir: %w", err)
+	}
+
+	historyPath := getCardHistoryPath(configDir, cmd.ID)
+
+	// Load existing history
+	var history CardHistory
+	if data, err := os.ReadFile(historyPath); err == nil {
+		if err := json.Unmarshal(data, &history); err != nil {
+			// Corrupt file, start fresh
+			history = CardHistory{CardID: cmd.ID, Versions: []CommandVersion{}}
+		}
+	} else {
+		// New card
+		history = CardHistory{CardID: cmd.ID, Versions: []CommandVersion{}}
+	}
+
+	// Create new version
+	newVersion := CommandVersion{
+		Command:   cmd,
+		Timestamp: time.Now(),
+		Version:   len(history.Versions) + 1,
+	}
+
+	// Prepend (newest first)
+	history.Versions = append([]CommandVersion{newVersion}, history.Versions...)
+
+	// Keep only last 5 versions
+	maxVersions := 5
+	if len(history.Versions) > maxVersions {
+		history.Versions = history.Versions[:maxVersions]
+	}
+
+	// Save
+	data, err := json.MarshalIndent(history, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	var backups []os.DirEntry
+	return os.WriteFile(historyPath, data, 0600)
+}
+
+// GetCardHistory returns the version history for a specific card
+func GetCardHistory(cardID int) (*CardHistory, error) {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return nil, err
+	}
+
+	historyPath := getCardHistoryPath(configDir, cardID)
+	data, err := os.ReadFile(historyPath)
+	if os.IsNotExist(err) {
+		// No history yet
+		return &CardHistory{CardID: cardID, Versions: []CommandVersion{}}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read card history: %w", err)
+	}
+
+	var history CardHistory
+	if err := json.Unmarshal(data, &history); err != nil {
+		return nil, fmt.Errorf("failed to parse card history: %w", err)
+	}
+
+	return &history, nil
+}
+
+// GetAllCardHistories returns history info for all cards
+func GetAllCardHistories() ([]CardHistory, error) {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return nil, err
+	}
+
+	historyDir := getCardHistoryDir(configDir)
+	entries, err := os.ReadDir(historyDir)
+	if os.IsNotExist(err) {
+		return []CardHistory{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var histories []CardHistory
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "commands-") && strings.HasSuffix(entry.Name(), ".json") {
-			backups = append(backups, entry)
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "card-") || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(historyDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+
+		var history CardHistory
+		if err := json.Unmarshal(data, &history); err != nil {
+			continue
+		}
+
+		histories = append(histories, history)
+	}
+
+	// Sort by card ID
+	sort.Slice(histories, func(i, j int) bool {
+		return histories[i].CardID < histories[j].CardID
+	})
+
+	return histories, nil
+}
+
+// RestoreCardVersion restores a specific version of a card
+func RestoreCardVersion(cardID int, versionNum int) error {
+	// Get history
+	history, err := GetCardHistory(cardID)
+	if err != nil {
+		return err
+	}
+
+	// Find the version
+	var targetVersion *CommandVersion
+	for _, v := range history.Versions {
+		if v.Version == versionNum {
+			targetVersion = &v
+			break
 		}
 	}
 
-	// If we have more than 20, delete the oldest
-	maxBackups := 20
-	if len(backups) <= maxBackups {
-		return nil
+	if targetVersion == nil {
+		return fmt.Errorf("version %d not found for card %d", versionNum, cardID)
 	}
 
-	// Sort by name (timestamp ensures chronological order)
-	// command-20260101... comes before command-20260102...
-	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].Name() < backups[j].Name()
-	})
+	// Load current commands
+	commands, err := LoadCommands()
+	if err != nil {
+		return err
+	}
 
-	// Delete oldest (start of slice)
-	numToDelete := len(backups) - maxBackups
-	for i := 0; i < numToDelete; i++ {
-		path := filepath.Join(backupDir, backups[i].Name())
-		if err := os.Remove(path); err != nil {
-			// Log but continue
-			fmt.Printf("Warning: Failed to delete old backup %s: %v\n", path, err)
+	// Replace the card
+	found := false
+	for i, cmd := range commands {
+		if cmd.ID == cardID {
+			commands[i] = targetVersion.Command
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		// Card was deleted, re-add it
+		commands = append(commands, targetVersion.Command)
+	}
+
+	// Save (this will trigger a new version)
+	return SaveCommands(commands)
+}
+
+// RestoreMultipleCardVersions restores multiple cards to specific versions
+func RestoreMultipleCardVersions(restorations map[int]int) error {
+	// Load current commands
+	commands, err := LoadCommands()
+	if err != nil {
+		return err
+	}
+
+	// Create a map for quick lookup
+	cmdMap := make(map[int]int) // cardID -> index in commands slice
+	for i, cmd := range commands {
+		cmdMap[cmd.ID] = i
+	}
+
+	// Restore each card
+	for cardID, versionNum := range restorations {
+		history, err := GetCardHistory(cardID)
+		if err != nil {
+			return fmt.Errorf("failed to get history for card %d: %w", cardID, err)
+		}
+
+		// Find the version
+		var targetVersion *CommandVersion
+		for _, v := range history.Versions {
+			if v.Version == versionNum {
+				targetVersion = &v
+				break
+			}
+		}
+
+		if targetVersion == nil {
+			return fmt.Errorf("version %d not found for card %d", versionNum, cardID)
+		}
+
+		// Replace or add
+		if idx, found := cmdMap[cardID]; found {
+			commands[idx] = targetVersion.Command
+		} else {
+			commands = append(commands, targetVersion.Command)
+			cmdMap[cardID] = len(commands) - 1
+		}
+	}
+
+	// Save
+	return SaveCommands(commands)
+}
+
+// InitializeCardHistories creates initial version history for all current cards
+func InitializeCardHistories() error {
+	commands, err := LoadCommands()
+	if err != nil {
+		return err
+	}
+
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return err
+	}
+
+	// Clear old backups directory
+	backupDir := filepath.Join(configDir, "backups")
+	if err := os.RemoveAll(backupDir); err != nil && !os.IsNotExist(err) {
+		fmt.Printf("Warning: Failed to remove old backups: %v\n", err)
+	}
+
+	// Create initial version for each card
+	for _, cmd := range commands {
+		if err := saveCardVersion(cmd, configDir); err != nil {
+			return fmt.Errorf("failed to initialize history for card %d: %w", cmd.ID, err)
 		}
 	}
 
 	return nil
 }
 
-// Backup represents a command backup file
+// performBackup is deprecated - kept for compatibility
+func performBackup(sourcePath string, configDir string) error {
+	// No-op - replaced by per-card versioning
+	return nil
+}
+
+// pruneBackups is deprecated - kept for compatibility
+func pruneBackups(backupDir string) error {
+	// No-op - replaced by per-card versioning
+	return nil
+}
+
+// Backup is deprecated - kept for API compatibility
 type Backup struct {
 	Name      string    `json:"name"`
 	Timestamp time.Time `json:"timestamp"`
 	Count     int       `json:"count"`
 }
 
-// GetBackups returns a list of available backups
+// GetBackups is deprecated - returns empty list
 func GetBackups() ([]Backup, error) {
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return nil, err
-	}
-
-	backupDir := filepath.Join(configDir, "backups")
-	entries, err := os.ReadDir(backupDir)
-	if os.IsNotExist(err) {
-		return []Backup{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var backups []Backup
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "commands-") && strings.HasSuffix(entry.Name(), ".json") {
-			// Parse timestamp from filename: commands-20260109-141913.json
-			tsStr := strings.TrimPrefix(entry.Name(), "commands-")
-			tsStr = strings.TrimSuffix(tsStr, ".json")
-			
-			ts, err := time.Parse("20060102-150405", tsStr)
-			if err != nil {
-				continue
-			}
-
-			// Count items (rough check by reading file)
-			count := 0
-			if content, err := os.ReadFile(filepath.Join(backupDir, entry.Name())); err == nil {
-				var cmds []Command
-				if err := json.Unmarshal(content, &cmds); err == nil {
-					count = len(cmds)
-				}
-			}
-
-			backups = append(backups, Backup{
-				Name:      entry.Name(),
-				Timestamp: ts,
-				Count:     count,
-			})
-		}
-	}
-
-	// Sort descending (newest first)
-	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].Timestamp.After(backups[j].Timestamp)
-	})
-
-	return backups, nil
+	return []Backup{}, nil
 }
 
-// RestoreBackup overwrites the current commands.json with the selected backup
+// RestoreBackup is deprecated
 func RestoreBackup(backupName string) error {
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return err
-	}
-
-	backupDir := filepath.Join(configDir, "backups")
-	backupPath := filepath.Join(backupDir, backupName)
-
-	// Security check: ensure path traversal is not possible
-	if filepath.Clean(backupPath) != backupPath {
-		return fmt.Errorf("invalid backup path")
-	}
-
-	content, err := os.ReadFile(backupPath)
-	if err != nil {
-		return fmt.Errorf("failed to read backup: %w", err)
-	}
-
-	// Validate JSON before restoring
-	var cmds []Command
-	if err := json.Unmarshal(content, &cmds); err != nil {
-		return fmt.Errorf("invalid backup file (corrupt JSON): %w", err)
-	}
-
-	// Create a backup of CURRENT state before overwriting (just in case)
-	currentPath, _ := GetCommandsPath()
-	if info, err := os.Stat(currentPath); err == nil && info.Size() > 0 {
-		performBackup(currentPath, configDir)
-	}
-
-	// Overwrite
-	if err := os.WriteFile(currentPath, content, 0600); err != nil {
-		return fmt.Errorf("failed to restore commands: %w", err)
-	}
-
-	return nil
+	return fmt.Errorf("old backup system is deprecated, use per-card version history")
 }
 
-// GetBackupContent returns the commands from a specific backup file
+// GetBackupContent is deprecated
 func GetBackupContent(backupName string) ([]Command, error) {
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return nil, err
-	}
-	backupDir := filepath.Join(configDir, "backups")
-	backupPath := filepath.Join(backupDir, backupName)
-
-	// Security check: ensure path traversal is not possible
-	if filepath.Clean(backupPath) != backupPath {
-		return nil, fmt.Errorf("invalid backup path")
-	}
-
-	content, err := os.ReadFile(backupPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read backup: %w", err)
-	}
-
-	var cmds []Command
-	if err := json.Unmarshal(content, &cmds); err != nil {
-		return nil, fmt.Errorf("invalid backup file (corrupt JSON): %w", err)
-	}
-
-	return cmds, nil
+	return nil, fmt.Errorf("old backup system is deprecated")
 }
 
-// ImportBackup restores specific commands from a backup, merging them into current commands
-// Commands with matching IDs will be overwritten by the backup version
+// ImportBackup is deprecated
 func ImportBackup(backupName string, selectedIDs []int) error {
-	// Get backup commands
-	backupCmds, err := GetBackupContent(backupName)
-	if err != nil {
-		return err
-	}
-
-	// Filter for selected IDs
-	selectedMap := make(map[int]bool)
-	for _, id := range selectedIDs {
-		selectedMap[id] = true
-	}
-
-	var cmdsToRestore []Command
-	for _, cmd := range backupCmds {
-		if selectedMap[cmd.ID] {
-			cmdsToRestore = append(cmdsToRestore, cmd)
-		}
-	}
-
-	if len(cmdsToRestore) == 0 {
-		return fmt.Errorf("no valid commands found to restore in backup")
-	}
-
-	// Load current commands
-	currentCmds, err := LoadCommands()
-	if err != nil {
-		return err
-	}
-
-	// Map current commands by ID
-	cmdMap := make(map[int]Command)
-	for _, cmd := range currentCmds {
-		cmdMap[cmd.ID] = cmd
-	}
-
-	// Overwrite/Add with restored commands
-	for _, cmd := range cmdsToRestore {
-		cmdMap[cmd.ID] = cmd
-	}
-
-	// Reconstruct slice
-	var newCmds []Command
-	for _, cmd := range cmdMap {
-		newCmds = append(newCmds, cmd)
-	}
-
-	// Sort by ID
-	sort.Slice(newCmds, func(i, j int) bool {
-		return newCmds[i].ID < newCmds[j].ID
-	})
-
-	// Save (this will trigger a new backup of the pre-merge state)
-	return SaveCommands(newCmds)
+	return fmt.Errorf("old backup system is deprecated")
 }

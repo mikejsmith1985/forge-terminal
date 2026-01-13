@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 import {
   // Development & Code
   Terminal, Code, Code2, Braces, FileCode, FileCode2, GitBranch, GitCommit, 
@@ -42,48 +44,7 @@ import {
 
 // Icon definitions with categories
 const iconCategories = {
-  'Emoji': [
-    { name: 'emoji-robot', icon: null, label: 'Robot', emoji: '🤖' },
-    { name: 'emoji-rocket', icon: null, label: 'Rocket', emoji: '🚀' },
-    { name: 'emoji-fire', icon: null, label: 'Fire', emoji: '🔥' },
-    { name: 'emoji-sparkles', icon: null, label: 'Sparkles', emoji: '✨' },
-    { name: 'emoji-star', icon: null, label: 'Star', emoji: '⭐' },
-    { name: 'emoji-lightning', icon: null, label: 'Lightning', emoji: '⚡' },
-    { name: 'emoji-brain', icon: null, label: 'Brain', emoji: '🧠' },
-    { name: 'emoji-bulb', icon: null, label: 'Light Bulb', emoji: '💡' },
-    { name: 'emoji-gear', icon: null, label: 'Gear', emoji: '⚙️' },
-    { name: 'emoji-wrench', icon: null, label: 'Wrench', emoji: '🔧' },
-    { name: 'emoji-hammer', icon: null, label: 'Hammer', emoji: '🔨' },
-    { name: 'emoji-link', icon: null, label: 'Link', emoji: '🔗' },
-    { name: 'emoji-package', icon: null, label: 'Package', emoji: '📦' },
-    { name: 'emoji-folder', icon: null, label: 'Folder', emoji: '📁' },
-    { name: 'emoji-file', icon: null, label: 'File', emoji: '📄' },
-    { name: 'emoji-code', icon: null, label: 'Code', emoji: '💻' },
-    { name: 'emoji-terminal', icon: null, label: 'Terminal', emoji: '🖥️' },
-    { name: 'emoji-bug', icon: null, label: 'Bug', emoji: '🐛' },
-    { name: 'emoji-check', icon: null, label: 'Check', emoji: '✅' },
-    { name: 'emoji-cross', icon: null, label: 'Cross', emoji: '❌' },
-    { name: 'emoji-warning', icon: null, label: 'Warning', emoji: '⚠️' },
-    { name: 'emoji-stop', icon: null, label: 'Stop', emoji: '🛑' },
-    { name: 'emoji-play', icon: null, label: 'Play', emoji: '▶️' },
-    { name: 'emoji-target', icon: null, label: 'Target', emoji: '🎯' },
-    { name: 'emoji-trophy', icon: null, label: 'Trophy', emoji: '🏆' },
-    { name: 'emoji-medal', icon: null, label: 'Medal', emoji: '🥇' },
-    { name: 'emoji-gem', icon: null, label: 'Gem', emoji: '💎' },
-    { name: 'emoji-crystal', icon: null, label: 'Crystal Ball', emoji: '🔮' },
-    { name: 'emoji-paint', icon: null, label: 'Paint', emoji: '🎨' },
-    { name: 'emoji-music', icon: null, label: 'Music', emoji: '🎵' },
-    { name: 'emoji-coffee', icon: null, label: 'Coffee', emoji: '☕' },
-    { name: 'emoji-pizza', icon: null, label: 'Pizza', emoji: '🍕' },
-    { name: 'emoji-heart', icon: null, label: 'Heart', emoji: '❤️' },
-    { name: 'emoji-thumbsup', icon: null, label: 'Thumbs Up', emoji: '👍' },
-    { name: 'emoji-clap', icon: null, label: 'Clap', emoji: '👏' },
-    { name: 'emoji-wave', icon: null, label: 'Wave', emoji: '👋' },
-    { name: 'emoji-eyes', icon: null, label: 'Eyes', emoji: '👀' },
-    { name: 'emoji-100', icon: null, label: '100', emoji: '💯' },
-    { name: 'emoji-boom', icon: null, label: 'Boom', emoji: '💥' },
-    { name: 'emoji-zap', icon: null, label: 'Zap', emoji: '💨' },
-  ],
+  'All Emojis': [], // Placeholder for emoji-mart picker
   'AI & Automation': [
     { name: 'Bot', icon: Bot, label: 'Robot/Bot' },
     { name: 'Cpu', icon: Cpu, label: 'CPU' },
@@ -193,8 +154,9 @@ export const iconMap = {
   Leaf, Sun, Pizza,
 };
 
-// Emoji map for rendering emoji icons
+// Emoji map for rendering emoji icons - now supports any unicode emoji
 export const emojiMap = {
+  // Legacy named emojis for backwards compatibility
   'emoji-robot': '🤖',
   'emoji-rocket': '🚀',
   'emoji-fire': '🔥',
@@ -237,11 +199,35 @@ export const emojiMap = {
   'emoji-zap': '💨',
 };
 
+// Helper function to get emoji from icon name
+export const getEmojiFromIcon = (iconName) => {
+  if (!iconName) return null;
+  
+  // If it's a legacy emoji-* format
+  if (iconName.startsWith('emoji-')) {
+    return emojiMap[iconName] || null;
+  }
+  
+  // If it's direct unicode emoji (new format from emoji-mart)
+  // Just return it as-is
+  if (iconName.length <= 4 && /\p{Emoji}/u.test(iconName)) {
+    return iconName;
+  }
+  
+  return null;
+};
+
 const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
-  const [activeCategory, setActiveCategory] = useState('Emoji');
+  const [activeCategory, setActiveCategory] = useState('All Emojis');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter icons based on search
+  // Handle emoji selection from emoji-mart
+  const handleEmojiSelect = (emoji) => {
+    // Store the native emoji character directly
+    onSelect(emoji.native);
+  };
+
+  // Filter icons based on search (for lucide icons only)
   const getFilteredIcons = () => {
     if (!searchTerm) {
       return iconCategories[activeCategory] || [];
@@ -249,8 +235,10 @@ const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
     
     const allIcons = Object.values(iconCategories).flat();
     return allIcons.filter(icon => 
-      icon.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      icon.name.toLowerCase().includes(searchTerm.toLowerCase())
+      icon.label && (
+        icon.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        icon.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     );
   };
 
@@ -259,52 +247,68 @@ const IconPicker = ({ selectedIcon, onSelect, onClose }) => {
   return (
     <div className="icon-picker">
       <div className="icon-picker-header">
-        <input
-          type="text"
-          placeholder="Search icons..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="icon-search"
-        />
+        {activeCategory !== 'All Emojis' && (
+          <input
+            type="text"
+            placeholder="Search icons..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="icon-search"
+          />
+        )}
       </div>
 
-      {!searchTerm && (
-        <div className="icon-categories">
-          {Object.keys(iconCategories).map(category => (
+      <div className="icon-categories">
+        {Object.keys(iconCategories).map(category => (
+          <button
+            key={category}
+            className={`category-btn ${activeCategory === category ? 'active' : ''}`}
+            onClick={() => {
+              setActiveCategory(category);
+              setSearchTerm('');
+            }}
+          >
+            {category}
+          </button>
+        ))}
+      </div>
+
+      {activeCategory === 'All Emojis' ? (
+        <div className="emoji-picker-container">
+          <Picker 
+            data={data} 
+            onEmojiSelect={handleEmojiSelect}
+            theme="auto"
+            previewPosition="none"
+            skinTonePosition="search"
+            maxFrequentRows={2}
+          />
+        </div>
+      ) : (
+        <div className="icon-grid">
+          <button
+            className={`icon-option ${!selectedIcon ? 'selected' : ''}`}
+            onClick={() => onSelect(null)}
+            title="No icon"
+          >
+            <span style={{ color: '#666' }}>∅</span>
+          </button>
+          {filteredIcons.map(({ name, icon: Icon, label, emoji }) => (
             <button
-              key={category}
-              className={`category-btn ${activeCategory === category ? 'active' : ''}`}
-              onClick={() => setActiveCategory(category)}
+              key={name}
+              className={`icon-option ${selectedIcon === name ? 'selected' : ''}`}
+              onClick={() => onSelect(name)}
+              title={label}
             >
-              {category}
+              {emoji ? (
+                <span style={{ fontSize: '20px' }}>{emoji}</span>
+              ) : (
+                <Icon size={20} />
+              )}
             </button>
           ))}
         </div>
       )}
-
-      <div className="icon-grid">
-        <button
-          className={`icon-option ${!selectedIcon ? 'selected' : ''}`}
-          onClick={() => onSelect(null)}
-          title="No icon"
-        >
-          <span style={{ color: '#666' }}>∅</span>
-        </button>
-        {filteredIcons.map(({ name, icon: Icon, label, emoji }) => (
-          <button
-            key={name}
-            className={`icon-option ${selectedIcon === name ? 'selected' : ''}`}
-            onClick={() => onSelect(name)}
-            title={label}
-          >
-            {emoji ? (
-              <span style={{ fontSize: '20px' }}>{emoji}</span>
-            ) : (
-              <Icon size={20} />
-            )}
-          </button>
-        ))}
-      </div>
     </div>
   );
 };

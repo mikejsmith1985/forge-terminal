@@ -151,6 +151,7 @@ function App() {
   
   // Forge Assist state
   const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
+  const [forgeAssistOpenToPersistent, setForgeAssistOpenToPersistent] = useState(false) // v3.15: Auto-open persistent panel
   
   // v3.8.2: Draggable Forge Assist floating button
   const [forgeAssistBtnPos, setForgeAssistBtnPos] = useState(() => {
@@ -905,6 +906,15 @@ function App() {
       if (e.ctrlKey && !e.shiftKey && e.key === '/') {
         e.preventDefault();
         setIsForgeAssistOpen(prev => !prev);
+        setForgeAssistOpenToPersistent(false); // Regular open
+        return;
+      }
+      
+      // Ctrl+I: Toggle Persistent Instructions (via Forge Assist)
+      if (e.ctrlKey && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+        e.preventDefault();
+        setForgeAssistOpenToPersistent(true); // Signal to auto-open persistent panel
+        setIsForgeAssistOpen(true);
         return;
       }
       
@@ -1635,6 +1645,7 @@ function App() {
               onRetry={loadCommands}
               onToast={addToast}
               shellType={shellConfig.shellType}
+              cwd={activeTab?.currentDirectory}
             />
           </DndContext>
         ) : sidebarView === 'files' ? (
@@ -1948,7 +1959,11 @@ function App() {
       {/* v3.9.0: Enhanced with Task Mode + SLM Integration */}
       <ForgeAssist
         isOpen={isForgeAssistOpen}
-        onClose={() => setIsForgeAssistOpen(false)}
+        onClose={() => {
+          setIsForgeAssistOpen(false);
+          setForgeAssistOpenToPersistent(false); // Reset flag
+        }}
+        openToPersistent={forgeAssistOpenToPersistent}
         onSendToTerminal={(cmd) => {
           const termRef = getActiveTerminalRef();
           if (termRef?.sendCommand) {

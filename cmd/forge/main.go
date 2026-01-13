@@ -254,8 +254,13 @@ func main() {
 	// Commands API
 	http.HandleFunc("/api/commands", WrapWithMiddleware(handleCommands))
 	http.HandleFunc("/api/commands/restore-defaults", WrapWithMiddleware(handleRestoreDefaultCommands))
-	http.HandleFunc("/api/commands/backups", WrapWithMiddleware(handleCommandBackups))
-	http.HandleFunc("/api/commands/restore-backup", WrapWithMiddleware(handleRestoreBackup))
+	http.HandleFunc("/api/commands/backups", WrapWithMiddleware(handleCommandBackups)) // Deprecated
+	http.HandleFunc("/api/commands/restore-backup", WrapWithMiddleware(handleRestoreBackup)) // Deprecated
+	
+	// Card History API (new per-card versioning system)
+	http.HandleFunc("/api/commands/card-history", WrapWithMiddleware(handleCardHistory))
+	http.HandleFunc("/api/commands/card-history/restore", WrapWithMiddleware(handleRestoreCardVersion))
+	http.HandleFunc("/api/commands/card-history/init", WrapWithMiddleware(handleInitCardHistory))
 
 	// Config API
 	http.HandleFunc("/api/config", WrapWithMiddleware(handleConfig))
@@ -272,6 +277,7 @@ func main() {
 
 	// Version and system info API
 	http.HandleFunc("/api/version", WrapWithMiddleware(handleVersion))
+	http.HandleFunc("/api/git/version", WrapWithMiddleware(handleGitVersion))
 	http.HandleFunc("/api/system-info", WrapWithMiddleware(handleSystemInfo))  // NEW: Process safeguard info
 	http.HandleFunc("/api/update/check", WrapWithMiddleware(handleUpdateCheck))
 	http.HandleFunc("/api/update/apply", WrapWithMiddleware(handleUpdateApply))
@@ -881,6 +887,71 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleGitVersion returns the git version (tag) for a specific path
+func handleGitVersion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Path == "" {
+		http.Error(w, "Path required", http.StatusBadRequest)
+		return
+	}
+
+	// Security: Verify path exists
+	if _, err := os.Stat(req.Path); os.IsNotExist(err) {
+		http.Error(w, "Path does not exist", http.StatusNotFound)
+		return
+	}
+
+	// Run git describe --tags --abbrev=0
+	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
+	cmd.Dir = req.Path
+	
+	// Check if git directory exists first to avoid fatal errors
+	if _, err := os.Stat(filepath.Join(req.Path, ".git")); os.IsNotExist(err) {
+		// Not a git repo? Or maybe a subdir.
+		// Try running git rev-parse --is-inside-work-tree
+		checkCmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+		checkCmd.Dir = req.Path
+		if err := checkCmd.Run(); err != nil {
+			json.NewEncoder(w).Encode(map[string]string{
+				"version": "v0.0.0", // Default if not a git repo
+				"error": "Not a git repository",
+			})
+			return
+		}
+	}
+
+	out, err := cmd.Output()
+	version := strings.TrimSpace(string(out))
+	
+	if err != nil {
+		// If no tags exist, git describe fails. Fallback to v0.0.0
+		log.Printf("[GitVersion] No tags found or git error in %s: %v", req.Path, err)
+		version = "v0.0.0"
+	}
+	
+	// Ensure v prefix
+	if !strings.HasPrefix(version, "v") && version != "" {
+		version = "v" + version
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"version": version,
+	})
+}
+
 func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	
@@ -1442,6 +1513,113 @@ func handleRestoreBackup(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Backup restored successfully",
+	})
+}
+
+// handleCardHistory handles getting card version history (new system)
+func handleCardHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check if specific card ID requested
+	cardIDParam := r.URL.Query().Get("cardId")
+	if cardIDParam != "" {
+		cardID, err := strconv.Atoi(cardIDParam)
+		if err != nil {
+			http.Error(w, "Invalid card ID", http.StatusBadRequest)
+			return
+		}
+
+		history, err := commands.GetCardHistory(cardID)
+		if err != nil {
+			log.Printf("[CardHistory] Failed to get history for card %d: %v", cardID, err)
+			http.Error(w, "Failed to get card history", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(history)
+		return
+	}
+
+	// Get all card histories
+	histories, err := commands.GetAllCardHistories()
+	if err != nil {
+		log.Printf("[CardHistory] Failed to get all histories: %v", err)
+		http.Error(w, "Failed to get card histories", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(histories)
+}
+
+// handleRestoreCardVersion handles restoring cards to specific versions
+func handleRestoreCardVersion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Restorations map[int]int `json:"restorations"` // cardID -> versionNum
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Restorations) == 0 {
+		http.Error(w, "No cards specified for restoration", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[CardHistory] Restoring %d card(s) to specific versions", len(req.Restorations))
+	
+	if err := commands.RestoreMultipleCardVersions(req.Restorations); err != nil {
+		log.Printf("[CardHistory] Restore failed: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("Restored %d card(s) successfully", len(req.Restorations)),
+	})
+}
+
+// handleInitCardHistory initializes card history for all existing cards
+func handleInitCardHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	log.Println("[CardHistory] Initializing card histories...")
+	
+	if err := commands.InitializeCardHistories(); err != nil {
+		log.Printf("[CardHistory] Initialization failed: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	log.Println("[CardHistory] Successfully initialized card histories")
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Card histories initialized successfully",
 	})
 }
 

@@ -1154,168 +1154,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // v3.12.8 FIX: Revert to v3.8.1 SIMPLE approach - directly read clipboard on Ctrl+V
-      // PROBLEM: The complex approach (return true, wait for paste event, fallback timer) is UNRELIABLE
-      // because xterm has clipboardMode: 'off' and native paste events don't fire consistently.
-      // SOLUTION: Directly read clipboard using navigator.clipboard.read() API, handle all media types,
-      // then return false to prevent xterm from doing anything. Simple and reliable.
+      // v3.14.7 FIX: Use xterm paste event instead of intercepting Ctrl+V
+      // PROBLEM: intercepting Ctrl+V and using navigator.clipboard.read() causes permission prompts
+      // or fails in some contexts (like non-secure contexts or some browsers).
+      // SOLUTION: Let xterm handle the Ctrl+V event, which triggers the 'paste' event on the textarea.
+      // We already have a robust 'paste' event listener attached to the textarea (handlePaste)
+      // which handles both text and media.
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        // Prevent duplicate handling if paste event already triggered
-        if (isPastingRef.current) return false;
-
-        console.log('[Terminal] Ctrl+V pressed - reading clipboard directly (v3.12.8 simple approach)');
-        isPastingRef.current = true;
-        setTimeout(() => { isPastingRef.current = false; }, 500);
-
-        // Immediately read clipboard and handle all content types
-        (async () => {
-          try {
-            // Try navigator.clipboard.read() first - this supports images AND text
-            const items = await navigator.clipboard.read();
-
-            for (const item of items) {
-              // Check for images or videos FIRST - these need special upload handling
-              const imageType = item.types.find(t => t.startsWith('image/'));
-              const videoType = item.types.find(t => t.startsWith('video/'));
-              const mediaType = imageType || videoType;
-
-              if (mediaType) {
-                const isImage = !!imageType;
-                const mediaKind = isImage ? 'image' : 'video';
-                console.log(`[Terminal] Found ${mediaKind} in clipboard:`, mediaType);
-                const blob = await item.getType(mediaType);
-
-                // Get file size for metadata
-                const fileSizeKB = Math.round(blob.size / 1024);
-                const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
-                const sizeStr = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
-
-                // Determine extension from MIME type
-                const extMap = {
-                  'image/png': '.png',
-                  'image/jpeg': '.jpg',
-                  'image/gif': '.gif',
-                  'image/webp': '.webp',
-                  'video/mp4': '.mp4',
-                  'video/webm': '.webm',
-                  'video/quicktime': '.mov',
-                };
-                const ext = extMap[mediaType] || (isImage ? '.png' : '.mp4');
-
-                // Show uploading indicator
-                if (xtermRef.current) {
-                  xtermRef.current.write(`\x1b[33m[Uploading ${mediaKind} (${sizeStr})...]\x1b[0m`);
-                }
-
-                const formData = new FormData();
-                const filename = `clipboard-${Date.now()}${ext}`;
-                formData.append('file', blob, filename);
-
-                const response = await fetch('/api/files/upload', {
-                  method: 'POST',
-                  body: formData
-                });
-
-                if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
-
-                const data = await response.json();
-                const filePath = data.path;
-
-                // Clear uploading indicator
-                if (xtermRef.current) {
-                  xtermRef.current.write('\r\x1b[K');
-                }
-
-                // Handle video frame extraction results
-                let framePaths = [];
-                let ffmpegAvailable = false;
-                const isVideo = !isImage;
-                if (data.isVideo) {
-                  ffmpegAvailable = data.ffmpegAvailable;
-                  framePaths = data.framePaths || [];
-
-                  if (!ffmpegAvailable) {
-                    if (xtermRef.current) {
-                      xtermRef.current.write(`\x1b[33m[Note: Install ffmpeg to enable video frame extraction for AI agents]\x1b[0m\r\n`);
-                    }
-                  } else if (framePaths.length > 0) {
-                    if (xtermRef.current) {
-                      xtermRef.current.write(`\x1b[32m[Extracted ${framePaths.length} frames for AI visibility]\x1b[0m\r\n`);
-                    }
-                  }
-                }
-
-                // Send file path(s) to terminal
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  if (isVideo && framePaths.length > 0) {
-                    // Send each frame path for the agent to see
-                    for (let i = 0; i < framePaths.length; i++) {
-                      const framePath = framePaths[i];
-                      const pathStr = framePath.includes(' ') ? `"${framePath}"` : framePath;
-                      wsRef.current.send(`see file at ${pathStr}`);
-                      if (i < framePaths.length - 1) {
-                        await new Promise(r => setTimeout(r, 100));
-                      }
-                    }
-                    console.log(`[Terminal] Sent ${framePaths.length} video frames to PTY`);
-                  } else {
-                    const pathStr = filePath.includes(' ') ? `"${filePath}"` : filePath;
-                    const textToSend = `see file at ${pathStr}`;
-                    wsRef.current.send(textToSend);
-                    console.log(`[Terminal] Sent ${mediaKind} path to PTY:`, textToSend);
-                  }
-
-                  if (onPasteRef.current) {
-                    onPasteRef.current(mediaKind, {
-                      filename,
-                      path: filePath,
-                      size: blob.size,
-                      sizeKB: fileSizeKB,
-                      mimeType: mediaType,
-                      framePaths,
-                      frameCount: framePaths.length,
-                      ffmpegAvailable,
-                    });
-                  }
-                }
-                return; // Done - we found and handled media
-              }
-
-              // Check for text in items (after checking for media)
-              const textType = item.types.find(t => t === 'text/plain');
-              if (textType) {
-                const textBlob = await item.getType(textType);
-                const text = await textBlob.text();
-                if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  console.log('[Terminal] Pasting text from clipboard:', text.length, 'chars');
-                  wsRef.current.send(text);
-                  if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
-                  return; // Done - we found and handled text
-                }
-              }
-            }
-          } catch (readErr) {
-            // navigator.clipboard.read() failed - try readText() as fallback (text-only)
-            console.warn('[Terminal] clipboard.read() failed, trying readText():', readErr.message);
-
-            try {
-              const text = await navigator.clipboard.readText();
-              if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                console.log('[Terminal] Pasting text via readText() fallback:', text.length, 'chars');
-                wsRef.current.send(text);
-                if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
-                return;
-              }
-            } catch (textErr) {
-              console.error('[Terminal] All clipboard read methods failed:', textErr.message);
-              logPasteError(textErr, { location: 'ctrlV-allFallbacksFailed' });
-            }
-          }
-        })();
-
-        // Return FALSE to prevent xterm from handling (we handle everything above)
-        // This is the key difference from the broken v3.12.2-v3.12.7 approach
-        return false;
+        console.log('[Terminal] Ctrl+V pressed - letting xterm handle it to trigger native paste event');
+        return true; 
       }
 
       return true; // Let all other keys pass through standard xterm processing
@@ -1789,9 +1636,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             // v3.14.5 CHANGE: Removed isLLMCommand check. 
             // User requested this to work "no matter what I type" (e.g. in Copilot interactive mode).
             // The "Double Enter" mechanism serves as the safety guard.
+            // v3.14.6 FIX: Exclude slash commands (e.g. /model, /clear) from injection
             if (persistentContextRef.current && 
                 persistentContextRef.current.enabled && 
-                command) {
+                command &&
+                !command.startsWith('/')) {
               
               const contextText = persistentContextRef.current.text;
               

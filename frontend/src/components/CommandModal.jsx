@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import IconPicker, { iconMap, emojiMap } from './IconPicker';
+import IconPicker, { iconMap, getEmojiFromIcon } from './IconPicker';
 import { ChevronDown } from 'lucide-react';
 import { 
   getNextAvailableKeybinding, 
@@ -84,9 +84,8 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
     };
 
     // Handle emoji vs lucide icon rendering
-    const isEmoji = formData.icon && formData.icon.startsWith('emoji-');
-    const selectedEmoji = isEmoji ? emojiMap[formData.icon] : null;
-    const SelectedIcon = !isEmoji && formData.icon ? iconMap[formData.icon] : null;
+    const selectedEmoji = getEmojiFromIcon(formData.icon);
+    const SelectedIcon = !selectedEmoji && formData.icon ? iconMap[formData.icon] : null;
 
     // Calculate the smart keybinding that will be auto-assigned and availability
     const keybindingInfo = useMemo(() => {

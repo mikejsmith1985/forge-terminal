@@ -2,7 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Play, Clipboard, Edit2, Trash2, GripVertical } from 'lucide-react';
-import { iconMap, emojiMap } from './IconPicker';
+import { iconMap, getEmojiFromIcon } from './IconPicker';
 
 export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDelete }) {
     const {
@@ -20,10 +20,9 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
         zIndex: isDragging ? 999 : 'auto',
     };
 
-    // Get icon component if specified - check emoji first, then lucide icons
-    const isEmoji = command.icon && command.icon.startsWith('emoji-');
-    const emojiChar = isEmoji ? emojiMap[command.icon] : null;
-    const CommandIcon = !isEmoji && command.icon ? iconMap[command.icon] : null;
+    // Get icon - check if it's an emoji first (either legacy or direct unicode)
+    const emojiChar = getEmojiFromIcon(command.icon);
+    const CommandIcon = !emojiChar && command.icon ? iconMap[command.icon] : null;
 
     return (
         <div
