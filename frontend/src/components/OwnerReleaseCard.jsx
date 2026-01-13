@@ -196,11 +196,11 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     if (shellType === 'powershell') {
       // PowerShell 5.1 compatible syntax (no && chaining)
       // Delete remote tag first (silently continue if doesn't exist), then create and push
-      return `${cmdPrefix}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}"; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "🚀 Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } }`;
+      return `${cmdPrefix}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "🚀 Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } }`;
     } else {
       // Bash/zsh
       // Delete remote tag first (silently continue if doesn't exist), then create and push
-      return `${cmdPrefix}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "🚀 Release ${next} triggered! GitHub Actions will build."`;
+      return `${cmdPrefix}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "🚀 Release ${next} triggered! GitHub Actions will build."`;
     }
   }, [next, shellType, commitMessage, activeProject]);
 
