@@ -215,6 +215,14 @@ const TUI_FRAME_INDICATORS = [
   /Ctrl\+c\s+Exit/i,
 ];
 
+// LLM Brand indicators to boost confidence for generic menus
+const LLM_BRAND_PATTERNS = [
+  /Copilot/i,
+  /Claude/i,
+  /Anthropic/i,
+  /GitHub\s+CLI/i,
+];
+
 // ----------------------------------------------------------------------------
 // DETECTION FUNCTIONS
 // ----------------------------------------------------------------------------
@@ -226,25 +234,33 @@ const TUI_FRAME_INDICATORS = [
  * @returns {{ detected: boolean, confidence: 'high'|'medium'|'low' }}
  */
 function detectMenuPrompt(cleanText, debugLog = false) {
+  // Optimization: Only check last 15 lines for menus to avoid false positives from history
+  // while allowing enough context for multi-line menus
+  const lines = cleanText.split(/[\r\n]/);
+  const textToCheck = lines.slice(-15).join('\n');
+
   // Check if "Yes" option is selected (has selection indicator)
-  const hasYesSelected = MENU_SELECTION_PATTERNS.some(p => p.test(cleanText));
+  const hasYesSelected = MENU_SELECTION_PATTERNS.some(p => p.test(textToCheck));
   
   if (!hasYesSelected) {
     return { detected: false, confidence: 'low' };
   }
   
   // Check for supporting context (instructions, question, etc.)
-  const hasMenuContext = MENU_CONTEXT_PATTERNS.some(p => p.test(cleanText));
-  const hasQuestion = QUESTION_PATTERNS.some(p => p.test(cleanText));
-  const hasTuiFrame = TUI_FRAME_INDICATORS.some(p => p.test(cleanText));
+  const hasMenuContext = MENU_CONTEXT_PATTERNS.some(p => p.test(textToCheck));
+  const hasQuestion = QUESTION_PATTERNS.some(p => p.test(textToCheck));
+  const hasTuiFrame = TUI_FRAME_INDICATORS.some(p => p.test(textToCheck));
+  
+  // Check for LLM Brand indicators (Claude, Copilot) to boost confidence
+  const hasLlmBrand = LLM_BRAND_PATTERNS.some(p => p.test(textToCheck));
   
   // High confidence: Yes is selected AND we see menu instructions or TUI frame
   if (hasYesSelected && (hasMenuContext || hasTuiFrame)) {
     return { detected: true, confidence: 'high' };
   }
   
-  // Medium confidence: Yes is selected AND there's a relevant question
-  if (hasYesSelected && hasQuestion) {
+  // Medium confidence: Yes is selected AND (there's a relevant question OR LLM brand detected)
+  if (hasYesSelected && (hasQuestion || hasLlmBrand)) {
     return { detected: true, confidence: 'medium' };
   }
   
@@ -334,7 +350,7 @@ function detectCliPrompt(text, debugLog = false) {
   // Priority 3: Low confidence menu detection (still report as waiting but may not auto-respond)
   if (menuResult.detected && menuResult.confidence === 'low') {
     return { 
-      waiting: true, 
+      waiting: false, // Changed to false to prevent accidental injection on loose matches
       responseType: 'enter', 
       confidence: 'low',
       excluded: false

@@ -57,10 +57,20 @@ if (persistentContextRef.current &&
 3. Press Enter
 4. **Expected**: Command executes normally (slash commands excluded)
 
+### ✅ Test 5: Low Confidence False Positive (Should NOT inject)
+1. Ensure persistent instruction is enabled.
+2. Run a command that outputs text resembling a prompt but isn't one (e.g. `echo "Use > Yes to confirm"`).
+3. Type another command.
+4. **Expected**: No injection. (Fixed in v3.16.3 by ignoring low-confidence CLI detection).
+
 ## Technical Details
 
 **Detection Function**: `detectCliPrompt(text, debugLog)`
 - Returns: `{ waiting: boolean, responseType, confidence, excluded }`
+- **Updated Logic (v3.16.3)**: 
+  - Low confidence detections (e.g. `> Yes` without context) now return `waiting: false`.
+  - Added specific support for `Copilot` and `Claude` brand indicators to boost confidence to 'medium' even without other context.
+  - Constrained detection to last 15 lines of buffer to prevent history false positives.
 - Patterns detected:
   - Menu-style prompts (❯ Yes, numbered options)
   - Y/N prompts
