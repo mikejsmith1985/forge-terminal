@@ -193,14 +193,26 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         }
     }
     
+    // Auto-update package.json if it exists
+    let versionBump = '';
+    if (shellType === 'powershell') {
+        // Check for package.json and run npm version if found
+        // Uses $ver_success flag to ensure we only proceed if version bump succeeds (or is skipped)
+        versionBump = `$ver_success = $true; if (Test-Path package.json) { Write-Host "Bumping npm version to ${next}..." -ForegroundColor Cyan; npm version ${next} --no-git-tag-version --allow-same-version; $ver_success = $? }; if ($ver_success) { `;
+    } else {
+        // Bash equivalent
+        versionBump = `if [ -f package.json ]; then echo "Bumping npm version to ${next}..." && npm version ${next} --no-git-tag-version --allow-same-version; fi && `;
+    }
+
     if (shellType === 'powershell') {
       // PowerShell 5.1 compatible syntax (no && chaining)
-      // Delete remote tag first (silently continue if doesn't exist), then create and push
-      return `${cmdPrefix}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "🚀 Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } }`;
+      // We wrap the main logic in the block opened by versionBump
+      // Note: We need to close the block at the end with an extra }
+      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "🚀 Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } } }`;
     } else {
       // Bash/zsh
       // Delete remote tag first (silently continue if doesn't exist), then create and push
-      return `${cmdPrefix}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "🚀 Release ${next} triggered! GitHub Actions will build."`;
+      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "🚀 Release ${next} triggered! GitHub Actions will build."`;
     }
   }, [next, shellType, commitMessage, activeProject]);
 
