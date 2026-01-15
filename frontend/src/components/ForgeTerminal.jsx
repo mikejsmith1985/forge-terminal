@@ -305,6 +305,49 @@ function shouldExcludeFromAutoRespond(cleanText) {
  * @param {boolean} debugLog - Enable debug logging
  * @returns {{ waiting: boolean, responseType: 'enter'|'y-enter'|null, confidence: string, excluded: boolean }}
  */
+/**
+ * Detect generic interactive prompts (>, ?, :) while excluding shells
+ * Used for Context Injection (Priority 4)
+ * @param {string} cleanText
+ * @returns {{ detected: boolean }}
+ */
+function detectGeneralInputPrompt(cleanText) {
+  const lines = cleanText.split(/[\r\n]/).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return { detected: false };
+  
+  const lastLine = lines[lines.length - 1].trim();
+  
+  // 1. Check for interactive prompt markers at end of line
+  const hasPromptMarker = 
+    lastLine.endsWith('>') || 
+    lastLine.endsWith('›') || // U+203A (Common in modern CLIs)
+    lastLine.endsWith('❯') || // U+276F
+    lastLine.endsWith('?') ||
+    lastLine.endsWith(':');
+
+  if (!hasPromptMarker) return { detected: false };
+
+  // 2. EXCLUDE Known Shell Prompts & REPLs
+  
+  // Python/Node REPLs (>>> or ... >)
+  if (lastLine.endsWith('>>>') || lastLine.endsWith('... >')) return { detected: false };
+  
+  // PowerShell: PS C:\Path> or PS>
+  if (lastLine.match(/^PS\s+/i) || lastLine.includes('PS >')) return { detected: false };
+  
+  // CMD: C:\Path> (Drive letter + path + >)
+  if (lastLine.match(/^[A-Z]:\\.*>$/i)) return { detected: false };
+  
+  // Bash/Linux Standard: ends with $ or #
+  // (We filtered for > ? : above, so $ # are already excluded unless they end with >)
+  
+  // Path-like prompts ending in > (Common in custom shells)
+  // e.g. /home/user/project> 
+  if (lastLine.match(/[/\\][^>]*>$/)) return { detected: false };
+  
+  return { detected: true };
+}
+
 function detectCliPrompt(text, debugLog = false) {
   if (!text || text.length < 10) {
     return { waiting: false, responseType: null, confidence: 'none', excluded: false };
@@ -355,6 +398,18 @@ function detectCliPrompt(text, debugLog = false) {
       confidence: 'low',
       excluded: false
     };
+  }
+
+  // Priority 4: General Input Prompt (for Context Injection)
+  // We identify this as a prompt but exclude it from auto-respond
+  const generalResult = detectGeneralInputPrompt(bufferToCheck);
+  if (generalResult.detected) {
+      return { 
+          waiting: true, // Signal that we are waiting for input (enables injection)
+          responseType: null, // No auto-response action
+          confidence: 'low',
+          excluded: true // EXPLICITLY exclude from auto-respond
+      };
   }
   
   return { waiting: false, responseType: null, confidence: 'none', excluded: false };
@@ -1680,11 +1735,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             const currentBuffer = outputBufferRef.current?.data || '';
             const { waiting } = detectCliPrompt(currentBuffer, false);
             
+            // Check if input is an explicit LLM command (one-shot)
+            // This covers "copilot explain..." typed at a shell prompt
+            const isLLM = isLLMCommand(command);
+            
             if (persistentContextRef.current && 
                 persistentContextRef.current.enabled && 
                 command &&
                 !command.startsWith('/') &&
-                waiting) {
+                (waiting || isLLM)) {
               
               const contextText = persistentContextRef.current.text;
               

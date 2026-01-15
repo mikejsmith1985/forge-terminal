@@ -910,11 +910,49 @@ function App() {
         return;
       }
       
-      // Ctrl+I: Toggle Persistent Instructions (via Forge Assist)
+      // Ctrl+I: Toggle Persistent Instructions (Direct Toggle)
       if (e.ctrlKey && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
         e.preventDefault();
-        setForgeAssistOpenToPersistent(true); // Signal to auto-open persistent panel
-        setIsForgeAssistOpen(true);
+        
+        try {
+          const saved = localStorage.getItem('forgeAssist_persistentInstructions');
+          let instructions = saved ? JSON.parse(saved) : [];
+          const hasEnabled = instructions.some(i => i.enabled);
+          
+          if (hasEnabled) {
+             // Toggle OFF
+             instructions = instructions.map(i => ({ ...i, enabled: false }));
+             addToast('Persistent instructions disabled', 'error', 2000); // Red toast for OFF
+          } else {
+             // Toggle ON
+             if (instructions.length > 0) {
+                // Enable the first one as default
+                instructions[0].enabled = true;
+                addToast(`Persistent instruction enabled: ${instructions[0].label || 'Instruction'}`, 'success', 2000); // Green toast for ON
+             } else {
+                addToast('No persistent instructions configured', 'info', 3000);
+                return;
+             }
+          }
+
+          localStorage.setItem('forgeAssist_persistentInstructions', JSON.stringify(instructions));
+          
+          // Notify ForgeTerminal to update persistent context
+          const activeInst = instructions.find(i => i.enabled);
+          window.dispatchEvent(new CustomEvent('forge-persistent-instruction-change', {
+            detail: {
+              enabled: !!activeInst,
+              instruction: activeInst ? activeInst.text : ''
+            }
+          }));
+          
+          // Notify ForgeAssist UI
+          window.dispatchEvent(new Event('forge-persistent-instructions-updated'));
+          
+        } catch (err) {
+          console.error('Error toggling persistent instructions:', err);
+          addToast('Failed to toggle persistent instructions', 'error', 2000);
+        }
         return;
       }
       
