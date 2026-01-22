@@ -1,0 +1,41 @@
+{
+  "FixedFileInfo": {
+    "FileVersion": {
+      "Major": 3,
+      "Minor": 16,
+      "Patch": 6,
+      "Build": 0
+    },
+    "ProductVersion": {
+      "Major": 3,
+      "Minor": 16,
+      "Patch": 6,
+      "Build": 0
+    },
+    "FileFlagsMask": "3f",
+    "FileFlags": "00",
+    "FileOS": "040004",
+    "FileType": "01",
+    "FileSubType": "00"
+  },
+  "StringFileInfo": {
+    "Comments": "Forge Terminal - An agentic AI-powered terminal IDE",
+    "CompanyName": "Forge Terminal Project",
+    "FileDescription": "Forge Terminal",
+    "FileVersion": "3.16.6.0",
+    "InternalName": "fterm",
+    "LegalCopyright": "Copyright © 2026 Forge Terminal Project",
+    "LegalTrademarks": "",
+    "OriginalFilename": "fterm.exe",
+    "PrivateBuild": "",
+    "ProductName": "Forge Terminal",
+    "ProductVersion": "3.16.6",
+    "SpecialBuild": ""
+  },
+  "VarFileInfo": {
+    "Translation": {
+      "LangID": "0409",
+      "CharsetID": "04B0"
+    }
+  }
+}

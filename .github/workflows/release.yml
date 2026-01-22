@@ -62,6 +62,12 @@ jobs:
           go mod download
           go mod tidy
 
+      - name: Install goversioninfo (Windows resources)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -107,14 +113,29 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
           mkdir -p bin
-          # -s strips symbol table, -w strips DWARF debug info
-          # This reduces binary size and avoids AV false positives
+          
+          # Generate Windows resource file (version info + manifest)
+          # This significantly reduces false positives from antivirus
+          cd cmd/forge
+          goversioninfo -64 -o resource_windows_amd64.syso
+          cd ../..
+          
+          # Build flags explanation:
+          # -s: strips symbol table (reduces size)
+          # -w: strips DWARF debug info (reduces size)
+          # -trimpath: removes file system paths from binary
+          # -buildmode=pie: Position Independent Executable (security)
+          # -H=windowsgui: GUI subsystem (no console window)
+          
           LDFLAGS="-s -w -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=${VERSION}"
           
           # Linux AMD64
-          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-linux-amd64 ./cmd/forge
-          # Windows AMD64 (GUI mode - no console window)
-          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS -H=windowsgui" -o bin/fterm.exe ./cmd/forge
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS" -o bin/forge-linux-amd64 ./cmd/forge
+          
+          # Windows AMD64 (GUI mode with embedded resources)
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS -H=windowsgui" -o bin/fterm.exe ./cmd/forge
+          
+          echo "✅ Binaries built with version info and manifest embedded"
 
       - name: Build macOS Binaries
         if: matrix.os == 'macos-latest'
@@ -122,13 +143,12 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
           mkdir -p bin
-          # -s strips symbol table, -w strips DWARF debug info
           LDFLAGS="-s -w -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=${VERSION}"
           
           # macOS AMD64
-          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/forge-darwin-amd64 ./cmd/forge
+          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS" -o bin/forge-darwin-amd64 ./cmd/forge
           # macOS ARM64
-          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/forge-darwin-arm64 ./cmd/forge
+          GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS" -o bin/forge-darwin-arm64 ./cmd/forge
 
       - name: Ad-hoc Sign macOS Binaries (Development)
         if: matrix.os == 'macos-latest'

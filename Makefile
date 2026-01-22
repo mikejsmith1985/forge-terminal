@@ -3,8 +3,9 @@
 # Version is extracted from git tag or set to dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 # -s strips symbol table, -w strips DWARF debug info (reduces size, avoids AV false positives)
-LDFLAGS := -ldflags "-s -w -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$(VERSION)"
-LDFLAGS_WIN := -ldflags "-s -w -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$(VERSION) -H windowsgui"
+# -trimpath removes file system paths from the binary
+LDFLAGS := -ldflags "-s -w -trimpath -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$(VERSION)"
+LDFLAGS_WIN := -ldflags "-s -w -trimpath -X github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$(VERSION) -H windowsgui"
 
 # Default target
 build: frontend-build
@@ -21,7 +22,10 @@ build-mac-arm: frontend-build
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o bin/forge-darwin-arm64 ./cmd/forge
 
 build-windows: frontend-build
+	@echo "Generating Windows resource file..."
+	cd cmd/forge && goversioninfo -64 -o resource_windows_amd64.syso || true
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS_WIN) -o bin/fterm.exe ./cmd/forge
+	@echo "✅ Windows binary built with embedded version info and manifest"
 
 build-all: frontend-build
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/forge-linux-amd64 ./cmd/forge

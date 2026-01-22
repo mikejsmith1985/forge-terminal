@@ -6,6 +6,9 @@ bin/
 *.so
 *.dylib
 
+# Windows resource files (generated)
+*.syso
+
 # Go
 *.test
 *.out
