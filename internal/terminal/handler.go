@@ -162,7 +162,6 @@ type Handler struct {
 	sessions        sync.Map // map[string]*TerminalSession
 	visionParser    *vision.Parser
 	llmDetector     *llm.Detector
-	contextManager  *ContextManager // Server-side context storage per session
 	restartRequested atomic.Bool // Flag to indicate session restart is in progress
 }
 
@@ -283,13 +282,6 @@ type PTYLogControlMessage struct {
 	Enabled bool   `json:"enabled"` // For ENABLE/DISABLE
 }
 
-// PromptInjectionControlMessage configures persistent prompt injection.
-type PromptInjectionControlMessage struct {
-	Type        string `json:"type"`        // "PROMPT_INJECTION_CONFIG"
-	Enabled     bool   `json:"enabled"`     // Enable/Disable injection
-	Instruction string `json:"instruction"` // The instruction to append on every prompt
-}
-
 // GetPTYLogsForSession retrieves PTY logs for a session (for debug session export)
 func GetPTYLogsForSession(sessionID string) []PTYLogEntry {
 	return globalPTYLogger.GetLogs(sessionID)
@@ -325,9 +317,8 @@ func NewHandlerDirect(amSys interface{}, visionP *vision.Parser, llmDet *llm.Det
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		visionParser:   visionP,
-		llmDetector:    llmDet,
-		contextManager: NewContextManager(), // Initialize server-side context manager
+		visionParser: visionP,
+		llmDetector:  llmDet,
 	}
 }
 
@@ -821,28 +812,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				// Check for PROMPT INJECTION CONFIG
-				var promptMsg PromptInjectionControlMessage
-				if err := json.Unmarshal(data, &promptMsg); err == nil && promptMsg.Type == "PROMPT_INJECTION_CONFIG" {
-					// Store context in ContextManager (server-side storage, no PTY pollution)
-					ctx := &PersistentContext{
-						Enabled: promptMsg.Enabled,
-						Text:    promptMsg.Instruction,
-					}
-					h.contextManager.SetContext(sessionID, ctx)
-					
-					log.Printf("[ContextManager] Context configured for session %s: Enabled=%v, Instruction length=%d",
-						sessionID, ctx.Enabled, len(ctx.Text))
-
-					// Send confirmation back to client
-					_ = conn.WriteJSON(map[string]interface{}{
-						"type":        "PROMPT_INJECTION_CONFIRMED",
-						"enabled":     ctx.Enabled,
-						"instruction": ctx.Text,
-					})
-					continue
-				}
-
 				// Check for PTY logging control messages (Follow Me debugger integration)
 				var ptyLogMsg PTYLogControlMessage
 				if err := json.Unmarshal(data, &ptyLogMsg); err == nil {
@@ -1025,61 +994,13 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			cleanStr := stripANSI(dataStr)
 			inputBuffer.WriteString(cleanStr)
 			
-			// ═══ CRITICAL PERFORMANCE: Write to PTY, with optional injection ═══
-			// v3.14.4: Persistent context injection for LLM commands
+			// ═══ CRITICAL PERFORMANCE: Write to PTY ═══
 			dataToWrite := data
 			
 			// Check if this is a command submission (contains newline)
 			if strings.Contains(dataStr, "\r") || strings.Contains(dataStr, "\n") {
-				// Get accumulated command line (BEFORE the newline was added)
-				// The buffer now contains the command + the newline, so strip the newline
-				commandLine := strings.TrimSpace(strings.TrimRight(inputBuffer.String(), "\r\n"))
-				
-				// DEBUG: Log every command submission
-				log.Printf("[ContextManager] DEBUG: Command submitted: '%s' (len=%d)", 
-					truncate(commandLine, 80), len(commandLine))
-				
-				// Reset buffer after command extraction
+				// Reset buffer after command submission
 				inputBuffer.Reset()
-				
-				// Check if command is an LLM tool WITH a prompt (not just flags)
-				isLLM := IsLLMCommand(commandLine)
-				hasPrompt := HasLLMPrompt(commandLine)
-				log.Printf("[ContextManager] DEBUG: IsLLMCommand('%s') = %v, HasPrompt = %v", 
-					truncate(commandLine, 50), isLLM, hasPrompt)
-				
-				// Only inject if it's an LLM command AND has an actual prompt
-				if isLLM && hasPrompt {
-					ctx := h.contextManager.GetContext(sessionID)
-					log.Printf("[ContextManager] DEBUG: Context for session %s: %+v", sessionID, ctx)
-					
-					if ctx != nil && ctx.Enabled && ctx.Text != "" {
-						// The command is already echoed to terminal character by character.
-						// We only need to inject: " INSTRUCTION" + Enter
-						// The user pressed Enter, so dataStr contains "\r" or "\n"
-						// We replace that with: " " + instruction + "\r"
-						
-						// Instead of sending just Enter, send: space + instruction + Enter
-						// We use a single atomic write.
-						// NOTE: Depending on the shell (PowerShell/Bash), this may require the user
-						// to press Enter one more time to confirm the injected command.
-						// This is a known limitation to ensure reliability over "auto-submit" hacks.
-						
-						terminator := "\r"
-						if strings.Contains(dataStr, "\n") {
-							terminator = "\n"
-						}
-						
-						// Atomic write: " " + instruction + "\r"
-						injectedText := " " + ctx.Text + terminator
-						dataToWrite = []byte(injectedText)
-						
-						log.Printf("[ContextManager] SUCCESS: Injected '%s' for session %s", 
-							truncate(ctx.Text, 30), sessionID)
-					} else {
-						log.Printf("[ContextManager] DEBUG: Context not enabled or empty (ctx=%v)", ctx != nil)
-					}
-				}
 			}
 			
 			if _, err := session.Write(dataToWrite); err != nil {
@@ -1124,10 +1045,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// v3.12.3: AM LLM logger cleanup removed
-
-	// Clean up persistent context for this session
-	h.contextManager.ClearContext(sessionID)
-	log.Printf("[ContextManager] Cleared context for session %s", sessionID)
 
 	// Send close message with reason
 	closeMessage := websocket.FormatCloseMessage(finalReason.code, finalReason.reason)

@@ -1,42 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Refactor Plan: Persistent Instruction Injection</title>
+    <title>Forge Refactor Plan - Persistent Instruction Fix</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
-        .phase { border: 1px solid #444; margin: 10px 0; padding: 15px; border-radius: 5px; }
-        .pending { border-left: 5px solid #f0ad4e; }
-        .in-progress { border-left: 5px solid #5bc0de; }
-        .completed { border-left: 5px solid #5cb85c; }
-        .cancelled { border-left: 5px solid #d9534f; opacity: 0.7; }
-        h2 { margin-top: 0; }
+        body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        .pending { background: #555; color: #fff; }
+        .in-progress { background: #2b5585; color: #fff; }
+        .completed { background: #2ea043; color: #fff; }
+        .section { margin-bottom: 20px; padding: 10px; border: 1px solid #333; }
+        h1, h2, h3 { color: #569cd6; }
     </style>
 </head>
 <body>
-    <h1>Persistent Instruction Injection Fix</h1>
-    
-    <div class="phase completed">
-        <h2>Phase 1: Analysis & Planning</h2>
-        <p><strong>Goal:</strong> Fix "Double Enter" bug and ensure injection only on prompts.</p>
-        <p><strong>Problem:</strong> Injected text appends but requires extra Enter. CLI args polution.</p>
+    <h1>Forge Refactor Plan - Persistent Instruction Fix</h1>
+    <div class="section">
+        <h2>Architecture Analysis</h2>
+        <div class="mermaid">
+            graph TD
+                A[User] -->|Ctrl+I| B[ForgeAssist.jsx]
+                B -->|Event: forge-persistent-instructions-updated| C[UI Sync]
+                B -->|Event: forge-persistent-instruction-change| D[Terminal Component]
+                D -->|WebSocket| E[Backend Handler]
+                E -->|Disabled| F[PTY Injection]
+        </div>
     </div>
-
-    <div class="phase cancelled">
-        <h2>Phase 2: "Double Enter" Fix Attempt</h2>
-        <p><strong>Status:</strong> ROLLED BACK</p>
-        <p><strong>Reason:</strong> "Double-tap Enter" logic is flaky, aggressive, and poor design. User correctly identified this as unmaintainable.</p>
-        <p><strong>Conclusion:</strong> We cannot reliably inject text AND force-submit it via the PTY stream without risking double-execution or race conditions across different shells/environments.</p>
-    </div>
-
-    <div class="phase in-progress">
-        <h2>Phase 3: Clean Implementation</h2>
-        <p><strong>Strategy:</strong> Revert to the stable "Atomic Write" implementation. It is better to require one extra Enter press (predictable) than to have a flaky auto-submitter (unpredictable).</p>
-        <p><strong>Action:</strong> Restore the simple atomic write logic. Ensure `HasPrompt` check remains.</p>
-    </div>
-
-    <div class="phase pending">
-        <h2>Phase 4: Verification</h2>
-        <p>Verify stable behavior: `copilot query` -> `copilot query INSTRUCTION` -> User presses Enter to confirm.</p>
+    <div class="section">
+        <h2>Tasks</h2>
+        <ul>
+            <li><span class="badge completed">[COMPLETED]</span> Disable Backend Injection (internal/terminal/handler.go)</li>
+            <li><span class="badge completed">[COMPLETED]</span> Fix UI Sync Logic (frontend/src/components/ForgeAssist.jsx)</li>
+            <li><span class="badge completed">[COMPLETED]</span> Verify Changes</li>
+            <li><span class="badge completed">[COMPLETED]</span> Rebuild Backend</li>
+            <li><span class="badge completed">[COMPLETED]</span> Visual Proof (Compilation Success)</li>
+        </ul>
     </div>
 </body>
 </html>

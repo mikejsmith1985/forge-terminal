@@ -580,11 +580,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
   
-  // v3.14.4: Command buffer for persistent context injection
-  const commandBufferRef = useRef(''); // Tracks current command being typed
-  const persistentContextRef = useRef(null); // Cached context { enabled, text }
-  const contextAppendedRef = useRef(false); // Ref to track if we just appended context
-  
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
@@ -1245,15 +1240,37 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // v3.14.7 FIX: Use xterm paste event instead of intercepting Ctrl+V
-      // PROBLEM: intercepting Ctrl+V and using navigator.clipboard.read() causes permission prompts
-      // or fails in some contexts (like non-secure contexts or some browsers).
-      // SOLUTION: Let xterm handle the Ctrl+V event, which triggers the 'paste' event on the textarea.
-      // We already have a robust 'paste' event listener attached to the textarea (handlePaste)
-      // which handles both text and media.
+      // Ctrl+V: Manual clipboard read and paste
+      // With clipboardMode: 'off', xterm doesn't handle paste, so we must do it ourselves
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        console.log('[Terminal] Ctrl+V pressed - letting xterm handle it to trigger native paste event');
-        return true; 
+        // Prevent double-handling
+        if (isPastingRef.current) {
+          console.log('[Terminal] Ctrl+V ignored - paste already in progress');
+          return false;
+        }
+        isPastingRef.current = true;
+        setTimeout(() => { isPastingRef.current = false; }, 500);
+        
+        // Read clipboard and send to PTY
+        navigator.clipboard.readText()
+          .then(text => {
+            if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              console.log('[Terminal] Ctrl+V paste:', text.length, 'chars');
+              wsRef.current.send(text);
+              if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
+            }
+          })
+          .catch(err => {
+            console.warn('[Terminal] Clipboard read failed:', err);
+            // Fallback: try to trigger native paste event on the textarea
+            const textarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
+            if (textarea) {
+              textarea.focus();
+              document.execCommand('paste');
+            }
+          });
+        
+        return false; // Prevent xterm from handling it
       }
 
       return true; // Let all other keys pass through standard xterm processing
@@ -1268,25 +1285,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // Record that handlers are now attached
     diagnosticCore.recordInitEvent('handlers_attached', { tabId });
-
-    // Listener for persistent instruction changes
-    const handlePersistentInstructionChange = (e) => {
-      const { enabled, instruction } = e.detail;
-      
-      // Cache context locally for injection (client-side)
-      persistentContextRef.current = enabled ? { enabled: true, text: instruction } : null;
-      
-      // Also send to backend for storage (backwards compat)
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'PROMPT_INJECTION_CONFIG',
-          enabled,
-          instruction
-        }));
-        console.log('[Terminal] Persistent instruction updated:', { enabled, len: instruction.length });
-      }
-    };
-    window.addEventListener('forge-persistent-instruction-change', handlePersistentInstructionChange);
 
     // Connect to WebSocket
     const connectWebSocket = () => {
@@ -1394,26 +1392,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             enabled: true
           }));
           logger.terminal('Auto-respond backend sync on connect: enabled', { tabId });
-        }
-
-        // SYNC: Send initial persistent instruction state if available
-        try {
-          const savedInstructions = JSON.parse(localStorage.getItem('forgeAssist_persistentInstructions') || '[]');
-          const activeInst = savedInstructions.find(i => i.enabled);
-          if (activeInst) {
-            // Cache context locally for client-side injection
-            persistentContextRef.current = { enabled: true, text: activeInst.text };
-            
-            // Also send to backend for storage
-            ws.send(JSON.stringify({
-              type: 'PROMPT_INJECTION_CONFIG',
-              enabled: true,
-              instruction: activeInst.text
-            }));
-            logger.terminal('Persistent instruction sync on connect', { tabId, len: activeInst.text.length });
-          }
-        } catch (e) {
-          console.warn('[Terminal] Failed to sync persistent instruction:', e);
         }
 
         if (onConnectionChange) onConnectionChange(true);
@@ -1683,129 +1661,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
 
         if (ws.readyState === WebSocket.OPEN) {
-          // v3.14.4: CLIENT-SIDE CONTEXT INJECTION
-          // Track command buffer and conditionally inject context for LLM commands
-          let dataToSend = data;
-          
-          // Update command buffer
-          if (data.includes('\r') || data.includes('\n')) {
-            // Command submission detected - check if we should inject context
-            let command = commandBufferRef.current.trim();
-            
-            // v3.14.5 FIX: Robust command detection using xterm buffer
-            // However, we MUST skip this if we just appended context (Double Enter race condition)
-            // If the user hits Enter quickly, the screen might not have updated with the context yet.
-            if (!contextAppendedRef.current) {
-               try {
-                  const activeBuffer = term.buffer.active;
-                  if (activeBuffer) {
-                     const currentLine = activeBuffer.getLine(activeBuffer.baseY + activeBuffer.cursorY);
-                     if (currentLine) {
-                        const lineText = currentLine.translateToString().trim();
-                        // Attempt to strip prompt: match anything ending in >, $, #, %, ? followed by optional space
-                        // Added '?' for Copilot CLI interactive prompts
-                        const cleanLine = lineText.replace(/^.*[>#$:%?]\s?/, '');
-                        
-                        if (cleanLine && cleanLine.length > 0) {
-                           // Trust the screen content over the keystroke buffer
-                           command = cleanLine;
-                           // Update buffer to match reality so the endsWith check works
-                           commandBufferRef.current = command; 
-                        }
-                     }
-                  }
-               } catch (err) {
-                  console.warn('[ContextInjection] Failed to read terminal line:', err);
-               }
-            } else {
-               console.log('[ContextInjection] Skipping screen read due to pending context confirmation');
-            }
-            
-            // Only inject if:
-            // 1. Context is enabled
-            // 2. Command buffer is not empty (we have something to append to)
-            // 3. A CLI tool is actively waiting for input (not a shell command)
-            // v3.14.5 CHANGE: Removed isLLMCommand check. 
-            // User requested this to work "no matter what I type" (e.g. in Copilot interactive mode).
-            // The "Double Enter" mechanism serves as the safety guard.
-            // v3.14.6 FIX: Exclude slash commands (e.g. /model, /clear) from injection
-            // v3.14.8 FIX: Only inject when CLI tool is waiting (not for shell commands)
-            
-            // Check if a CLI tool is actively waiting for input
-            const currentBuffer = outputBufferRef.current?.data || '';
-            const { waiting } = detectCliPrompt(currentBuffer, false);
-            
-            // Check if input is an explicit LLM command (one-shot)
-            // This covers "copilot explain..." typed at a shell prompt
-            const isLLM = isLLMCommand(command);
-            
-            if (persistentContextRef.current && 
-                persistentContextRef.current.enabled && 
-                command &&
-                !command.startsWith('/') &&
-                (waiting || isLLM)) {
-              
-              const contextText = persistentContextRef.current.text;
-              
-              // DOUBLE ENTER LOGIC:
-              // First enter: Append context to input line (visible to user)
-              // Second enter: Submit the command
-              
-              // Check if we already appended the context
-              // We check if the end of the command matches the context text
-              if (command.endsWith(contextText.trim())) {
-                // Context already appended, just send the newline to execute
-                console.log('[ContextInjection] Context already present, executing...');
-                dataToSend = data;
-                commandBufferRef.current = ''; // Clear buffer
-                contextAppendedRef.current = false; // Reset flag
-              } else {
-                // Context NOT present - append it but DO NOT execute
-                // We send the context text + space back to the shell (simulating typing)
-                // but we strip the newline so it doesn't execute yet
-                
-                console.log('[ContextInjection] CLI tool detected, appending context, waiting for confirmation...');
-                
-                // Replace the newline with space + context
-                // Note: We don't send \r at the end, so it stays on the line
-                dataToSend = ` ${contextText}`;
-                
-                // Update buffer to reflect what's now on the line
-                commandBufferRef.current += dataToSend;
-                
-                // Set flag to prevent screen read race condition on next Enter
-                contextAppendedRef.current = true;
-              }
-            } else {
-              // Normal command or no context enabled
-              if (command && !waiting) {
-                console.log('[ContextInjection] Shell command (no CLI tool waiting), no injection:', command.substring(0, 50));
-              } else if (command && !persistentContextRef.current?.enabled) {
-                console.log('[ContextInjection] Persistent context disabled, no injection');
-              }
-              commandBufferRef.current = ''; // Clear buffer
-              contextAppendedRef.current = false;
-            }
-          } else {
-            // Any non-Enter key resets the context appended flag
-            // This ensures we go back to reading from screen if the user edits the line
-            contextAppendedRef.current = false;
-
-            // Accumulate keystrokes (but limit buffer to prevent OOM)
-            // Handle Backspace basic editing to keep buffer somewhat sane
-            if (data === '\x7f' || data === '\b') {
-               commandBufferRef.current = commandBufferRef.current.slice(0, -1);
-            } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
-               // Only append printable characters, ignore escape codes/control chars
-               commandBufferRef.current += data;
-            }
-            
-            if (commandBufferRef.current.length > 2048) {
-              commandBufferRef.current = commandBufferRef.current.slice(-2048);
-            }
-          }
-          
-          ws.send(dataToSend);
+          ws.send(data);
           
           // v3.12.12: AM logging removed
           
@@ -1871,8 +1727,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           xtermTextarea.removeEventListener('paste', handlePaste, true);
         }
       }
-      
-      window.removeEventListener('forge-persistent-instruction-change', handlePersistentInstructionChange);
 
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();

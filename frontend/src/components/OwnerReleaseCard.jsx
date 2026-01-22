@@ -46,20 +46,26 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   useEffect(() => {
     if (!autoDetect || !cwd || !projects.length) return;
 
-    // Normalize paths for comparison (simple check)
-    const normalizedCwd = cwd.toLowerCase().replace(/\\/g, '/');
+    // Normalize paths for comparison - ensure trailing slash for accurate matching
+    const normalizedCwd = (cwd.toLowerCase().replace(/\\/g, '/') + '/').replace(/\/+$/, '/');
     
     const match = projects.find(p => {
-        const pPath = p.path.toLowerCase().replace(/\\/g, '/');
-        return normalizedCwd.startsWith(pPath);
+        const pPath = (p.path.toLowerCase().replace(/\\/g, '/') + '/').replace(/\/+$/, '/');
+        // CWD must be exactly the project path OR a subdirectory of it
+        return normalizedCwd === pPath || normalizedCwd.startsWith(pPath);
     });
 
+    console.log('[ReleaseManager] Auto-detect: cwd=', cwd, 'match=', match?.name || 'none');
+
     if (match) {
-        setActiveProject(match);
+        if (!activeProject || activeProject.id !== match.id) {
+            setActiveProject(match);
+        }
     } else {
-        // If no match found and we were on a project, switch back to internal?
-        // Or stay on last selected? Let's switch to internal if explicitly auto-detecting
-        setActiveProject(null);
+        // If no match found, switch back to internal Forge
+        if (activeProject !== null) {
+            setActiveProject(null);
+        }
     }
   }, [cwd, projects, autoDetect]);
 
@@ -298,7 +304,9 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
             <Tag size={20} className="orc-icon" />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h3 className="orc-title">Release Manager</h3>
-                {activeProject && <span style={{ fontSize: '10px', color: '#888' }}>{activeProject.name}</span>}
+                <span style={{ fontSize: '10px', color: activeProject ? '#4CAF50' : '#888' }}>
+                  {activeProject ? activeProject.name : 'Forge Terminal (Internal)'}
+                </span>
             </div>
             
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>

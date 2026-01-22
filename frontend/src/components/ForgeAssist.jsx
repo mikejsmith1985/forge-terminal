@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { 
   Search, X, Copy, Play, ChevronRight, ChevronDown,
   Zap, Settings, GitBranch, FileCode, Brain, Bot, Terminal,
-  Shield, Workflow, BookOpen, Sparkles, AlertTriangle, ExternalLink
+  Shield, Workflow, BookOpen, AlertTriangle, ExternalLink
 } from 'lucide-react';
 import './ForgeAssist.css';
 
@@ -413,7 +412,6 @@ export default function ForgeAssist({
   onSendToTerminal, 
   onToast,
   activeTabId, // Current session ID
-  openToPersistent = false, // v3.15: Auto-open persistent instructions panel
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCLI, setSelectedCLI] = useState(() => {
@@ -423,129 +421,13 @@ export default function ForgeAssist({
   const [expandedCategories, setExpandedCategories] = useState(new Set(['Subagents', 'Session Management']));
   const inputRef = useRef(null);
   
-  // Persistent Instructions state - toggle-able text snippets that append to prompts
-  // This is what the user asked for: "always append" instructions independent of command cards
-  const [persistentInstructions, setPersistentInstructions] = useState(() => {
-    const saved = localStorage.getItem('forgeAssist_persistentInstructions');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
-  const [showPersistentInstructionsPanel, setShowPersistentInstructionsPanel] = useState(false);
-  const [newInstructionText, setNewInstructionText] = useState('');
-  const [newInstructionLabel, setNewInstructionLabel] = useState('');
-
-  // Global toggle for Persistent Instruction Bar visibility (persisted)
-  const [persistentInstructionBarEnabled, setPersistentInstructionBarEnabled] = useState(() => {
-    const v = localStorage.getItem('forgeAssist_persistentInstructionBarEnabled');
-    return v === null ? true : v === 'true';
-  });
-  
-
-  
-  const togglePersistentInstructionBar = useCallback(() => {
-    setPersistentInstructionBarEnabled((prev) => {
-      const next = !prev;
-      localStorage.setItem('forgeAssist_persistentInstructionBarEnabled', next.toString());
-      window.dispatchEvent(new Event('forge-persistent-instruction-bar-enabled-changed'));
-      if (onToast) onToast(`Persistent Instruction Bar ${next ? 'Enabled' : 'Disabled'}`, 'info', 1500);
-      return next;
-    });
-  }, [onToast]);
-
-  // Save persistent instructions to localStorage
-  const savePersistentInstructions = useCallback((instructions) => {
-    localStorage.setItem('forgeAssist_persistentInstructions', JSON.stringify(instructions));
-    setPersistentInstructions(instructions);
-    // Dispatch event so other components (PersistentInstructionBar) can sync
-    window.dispatchEvent(new Event('forge-persistent-instructions-updated'));
-    
-    // Also dispatch to terminal for backend sync
-    // Find if we have an enabled instruction
-    const active = instructions.find(i => i.enabled);
-    window.dispatchEvent(new CustomEvent('forge-persistent-instruction-change', { 
-      detail: { 
-        enabled: !!active, 
-        instruction: active ? active.text : '' 
-      } 
-    }));
-  }, []);
-
-  // Add a new persistent instruction
-  const addPersistentInstruction = useCallback(() => {
-    if (!newInstructionText.trim()) return;
-    const newInstruction = {
-      id: Date.now().toString(),
-      label: newInstructionLabel.trim() || `Instruction ${persistentInstructions.length + 1}`,
-      text: newInstructionText.trim(),
-      enabled: true,
-    };
-    const updated = [...persistentInstructions, newInstruction];
-    savePersistentInstructions(updated);
-    setNewInstructionText('');
-    setNewInstructionLabel('');
-    if (onToast) onToast(`Added: ${newInstruction.label}`, 'success', 1500);
-  }, [newInstructionText, newInstructionLabel, persistentInstructions, savePersistentInstructions, onToast]);
-
-  // Toggle instruction enabled state - enforce SINGLE selection (Persistent Mode)
-  const togglePersistentInstruction = useCallback((id) => {
-    // Find the instruction being toggled
-    const target = persistentInstructions.find(i => i.id === id);
-    if (!target) return;
-    
-    const newEnabledState = !target.enabled;
-    
-    // Update state: if enabling, disable all others (Single Mode)
-    const updated = persistentInstructions.map(inst => {
-      if (inst.id === id) {
-        return { ...inst, enabled: newEnabledState };
-      }
-      // If we are enabling one, disable all others
-      return newEnabledState ? { ...inst, enabled: false } : inst;
-    });
-    
-    savePersistentInstructions(updated);
-    
-    // Notify parent about the active persistent instruction via global event
-    // The ForgeTerminal component listens for this to configure the backend
-    const activeInstruction = newEnabledState ? target.text : null;
-    
-    window.dispatchEvent(new CustomEvent('forge-persistent-instruction-change', {
-      detail: { 
-        enabled: !!activeInstruction,
-        instruction: activeInstruction || ""
-      }
-    }));
-    
-  }, [persistentInstructions, savePersistentInstructions]);
-
-  // Delete a persistent instruction
-  const deletePersistentInstruction = useCallback((id) => {
-    const updated = persistentInstructions.filter(inst => inst.id !== id);
-    savePersistentInstructions(updated);
-  }, [persistentInstructions, savePersistentInstructions]);
-
-  // Get enabled persistent instructions for appending
-  const getEnabledPersistentInstructions = useCallback(() => {
-    return persistentInstructions.filter(inst => inst.enabled).map(inst => inst.text);
-  }, [persistentInstructions]);
-
   // Focus search on open
   useEffect(() => {
     if (isOpen) {
       setSearchQuery('');
-      // v3.15: Auto-open persistent instructions panel if requested
-      if (openToPersistent) {
-        setShowPersistentInstructionsPanel(true);
-      }
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen, openToPersistent]);
+  }, [isOpen]);
 
   // Keyboard handler
   useEffect(() => {
@@ -599,13 +481,7 @@ export default function ForgeAssist({
   const executeFeature = (feature) => {
     if (!feature) return;
     
-    let finalCmd = feature.cmd;
-    
-    // Append enabled persistent instructions (user's custom "always append" snippets)
-    const enabledInstructions = getEnabledPersistentInstructions();
-    if (enabledInstructions.length > 0) {
-      finalCmd += `\n\n${enabledInstructions.join('\n')}`;
-    }
+    const finalCmd = feature.cmd;
     
     if (feature.appendCursor) {
       onSendToTerminal(finalCmd);
@@ -662,73 +538,6 @@ export default function ForgeAssist({
                 <span className="cli-name">{name}</span>
               </button>
             ))}
-          </div>
-          
-          {/* Persistent Instruction Controls */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
-            {/* Persistent Instruction Button */}
-            <button 
-              data-testid="persistent-instruction-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowPersistentInstructionsPanel(!showPersistentInstructionsPanel);
-              }}
-              title="Persistent Instruction - Set a single instruction that appends to every prompt"
-              style={{
-                background: persistentInstructions.some(i => i.enabled) ? '#238636' : '#333',
-                border: `2px solid ${persistentInstructions.some(i => i.enabled) ? '#2ea043' : '#555'}`,
-                color: persistentInstructions.some(i => i.enabled) ? '#fff' : '#888',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                transition: 'all 0.2s ease',
-                flexShrink: 0
-              }}
-            >
-              <Sparkles size={14} />
-              <span>Persistent Instruction</span>
-              {persistentInstructions.some(i => i.enabled) && (
-                <span style={{background: 'rgba(255,255,255,0.3)', padding: '2px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: 700}}>
-                  ON
-                </span>
-              )}
-            </button>
-            {/* Bar Toggle - DISABLED: Persistent Instruction Bar has critical bugs
-                - Breaks command cards by appending instructions to commands
-                - Enter key doesn't work (keeps appending instead of sending)
-                - Fix requires server-side LLM integration, not PTY writes
-            */}
-            <button
-              data-testid="persistent-instruction-bar-toggle"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onToast) onToast('Feature Disabled: Breaks commands & Enter key. Fix in progress.', 'error', 3000);
-              }}
-              title="Feature temporarily disabled due to critical bugs (breaks command execution)"
-              style={{
-                background: '#222',
-                border: '1px solid #555',
-                color: '#555',
-                padding: '6px 8px',
-                borderRadius: '6px',
-                cursor: 'not-allowed',
-                fontSize: '11px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                transition: 'all 0.15s ease',
-                flexShrink: 0,
-                opacity: 0.5
-              }}
-            >
-              Bar: DISABLED
-            </button>
           </div>
           
           <button className="forge-assist-close" onClick={onClose}>
@@ -845,232 +654,6 @@ export default function ForgeAssist({
           </div>
         </div>
       </div>
-
-      {/* Persistent Instructions Panel - Toggle-able text snippets that always append */}
-      {/* Using Portal to render OUTSIDE ForgeAssist DOM tree to prevent click bubbling */}
-      {showPersistentInstructionsPanel && createPortal(
-        <div 
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.85)',
-          zIndex: 10001, // Must be above ForgeAssist overlay (z-index: 10000)
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'var(--bg-secondary, #1a1a1a)',
-            width: '100%',
-            maxWidth: '600px',
-            maxHeight: '80%',
-            borderRadius: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
-            border: '2px solid #238636'
-          }}>
-            {/* Header */}
-            <div style={{
-              padding: '20px',
-              borderBottom: '1px solid var(--border-color, #333)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start'
-            }}>
-              <div>
-                <h3 style={{margin: 0, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontSize: '18px'}}>
-                  <Sparkles size={24} style={{color: '#238636'}} />
-                  Persistent Instructions
-                </h3>
-                <p style={{margin: 0, fontSize: '13px', color: '#888'}}>
-                  Add custom text snippets that automatically append to your prompts when enabled
-                </p>
-              </div>
-              <button 
-                onClick={() => setShowPersistentInstructionsPanel(false)}
-                style={{background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px'}}
-              >
-                <X size={24} />
-              </button>
-            </div>
-            
-            {/* Add New Instruction */}
-            <div style={{padding: '16px 20px', borderBottom: '1px solid var(--border-color, #333)'}}>
-              <div style={{display: 'flex', gap: '8px', marginBottom: '8px'}}>
-                <input
-                  type="text"
-                  placeholder="Label (e.g., 'Follow Standards')"
-                  value={newInstructionLabel}
-                  onChange={(e) => setNewInstructionLabel(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    background: '#0d1117',
-                    border: '1px solid #333',
-                    borderRadius: '6px',
-                    color: '#fff',
-                    fontSize: '13px'
-                  }}
-                />
-              </div>
-              <div style={{display: 'flex', gap: '8px'}}>
-                <textarea
-                  placeholder="Enter instruction text (e.g., 'ensure you follow copilot-instructions.md')"
-                  value={newInstructionText}
-                  onChange={(e) => setNewInstructionText(e.target.value)}
-                  onKeyDown={(e) => {
-                    // Enter (without Shift) adds the instruction
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (newInstructionText.trim()) {
-                        addPersistentInstruction();
-                      }
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    background: '#0d1117',
-                    border: '1px solid #333',
-                    borderRadius: '6px',
-                    color: '#fff',
-                    fontSize: '13px',
-                    minHeight: '60px',
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                />
-                <button
-                  onClick={addPersistentInstruction}
-                  disabled={!newInstructionText.trim()}
-                  style={{
-                    padding: '10px 16px',
-                    background: newInstructionText.trim() ? '#238636' : '#333',
-                    border: 'none',
-                    borderRadius: '6px',
-                    color: newInstructionText.trim() ? '#fff' : '#666',
-                    cursor: newInstructionText.trim() ? 'pointer' : 'not-allowed',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    alignSelf: 'flex-end'
-                  }}
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-            
-            {/* Instruction List */}
-            <div style={{flex: 1, overflowY: 'auto', padding: '12px 20px'}}>
-              {persistentInstructions.length === 0 ? (
-                <div style={{textAlign: 'center', padding: '40px 20px', color: '#666'}}>
-                  <Sparkles size={32} style={{marginBottom: '12px', opacity: 0.5}} />
-                  <p style={{margin: 0, fontSize: '14px'}}>No persistent instructions yet</p>
-                  <p style={{margin: '8px 0 0', fontSize: '12px'}}>Add one above to always append it to your prompts</p>
-                </div>
-              ) : (
-                persistentInstructions.map((inst) => (
-                  <div 
-                    key={inst.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
-                      padding: '12px',
-                      background: inst.enabled ? 'rgba(35,134,54,0.15)' : '#0d1117',
-                      border: `1px solid ${inst.enabled ? '#238636' : '#333'}`,
-                      borderRadius: '8px',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    <button
-                      onClick={() => togglePersistentInstruction(inst.id)}
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '4px',
-                        border: `2px solid ${inst.enabled ? '#238636' : '#555'}`,
-                        background: inst.enabled ? '#238636' : 'transparent',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '14px',
-                        flexShrink: 0,
-                        marginTop: '2px'
-                      }}
-                    >
-                      {inst.enabled ? '✓' : ''}
-                    </button>
-                    <div style={{flex: 1, minWidth: 0}}>
-                      <div style={{fontWeight: 600, fontSize: '13px', color: inst.enabled ? '#2ea043' : '#888', marginBottom: '4px'}}>
-                        {inst.label}
-                      </div>
-                      <div style={{fontSize: '12px', color: '#aaa', whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
-                        {inst.text}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => deletePersistentInstruction(inst.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#666',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        flexShrink: 0
-                      }}
-                      title="Delete"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-            
-            {/* Footer */}
-            <div style={{
-              padding: '16px 20px',
-              borderTop: '1px solid var(--border-color, #333)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div style={{fontSize: '12px', color: '#666'}}>
-                {persistentInstructions.some(i => i.enabled) ? (
-                  <span style={{color: '#2ea043'}}>✓ Persistent instruction active</span>
-                ) : (
-                  'No persistent instruction active'
-                )}
-              </div>
-              <button 
-                onClick={() => setShowPersistentInstructionsPanel(false)}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: '#238636',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }

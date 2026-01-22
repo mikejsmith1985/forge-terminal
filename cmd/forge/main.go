@@ -358,18 +358,6 @@ func main() {
 		}
 	}))
 
-	// v3.14.4: Persistent instruction API
-	http.HandleFunc("/api/persistent-instruction", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			handleGetPersistentInstruction(w, r)
-		case http.MethodPost:
-			handleSavePersistentInstruction(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	}))
-
 	// Start freeze detector on startup
 	_ = diagnostic.GetFreezeDetector() // Auto-starts on first access
 
