@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, X, Copy, Play, ChevronRight, ChevronDown,
   Zap, Settings, GitBranch, FileCode, Brain, Bot, Terminal,
-  Shield, Workflow, BookOpen, AlertTriangle, ExternalLink
+  Shield, Workflow, BookOpen, AlertTriangle, ExternalLink, Sparkles
 } from 'lucide-react';
 import './ForgeAssist.css';
 
