@@ -4,7 +4,7 @@
   "description": "Start new Copilot session with Forge awareness",
   "command": "copilot --allow-all-tools",
   "macro_delay": 1500,
-  "macro_payload": "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
+  "macro_payload": "",
   "category": "ai",
   "icon": "emoji-robot",
   "favorite": false,

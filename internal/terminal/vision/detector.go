@@ -43,6 +43,7 @@ func NewRegistry() *Registry {
 	r.Register(NewFilePathDetector())
 	r.Register(NewCompilerErrorDetector())
 	r.Register(NewStackTraceDetector())
+	r.Register(NewUrlDetector())
 	
 	return r
 }

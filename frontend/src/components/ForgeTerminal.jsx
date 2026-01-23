@@ -903,6 +903,30 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       clipboardMode: 'off', // Disabled: we handle Ctrl+V ourselves in custom handler
     });
 
+    // Register OSC handler for directory updates (OSC 9;9;<path>)
+    term.parser.registerOscHandler(9, (data) => {
+      // data comes in as "9;<path>" (the first 9 is the OSC code, handled by xterm, the rest is payload)
+      // Check for the second '9;' which indicates the FT/ConEmu CWD notification
+      if (data.startsWith('9;')) {
+        const path = data.substring(2);
+        // Only trigger update if we have a valid path
+        if (path && path.trim().length > 0) {
+          // Normalize backslashes to forward slashes for consistency
+          const normalizedPath = path.replace(/\\/g, '/');
+          
+          // Extract folder name
+          const parts = normalizedPath.split('/').filter(Boolean);
+          const folderName = parts.length > 0 ? parts[parts.length - 1] : 'Terminal';
+          
+          if (onDirectoryChange) {
+             onDirectoryChange(folderName, path);
+          }
+        }
+        return true; // handled
+      }
+      return false; // not handled
+    });
+
     // Add fit addon
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
@@ -1251,24 +1275,80 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         isPastingRef.current = true;
         setTimeout(() => { isPastingRef.current = false; }, 500);
         
-        // Read clipboard and send to PTY
-        navigator.clipboard.readText()
-          .then(text => {
-            if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              console.log('[Terminal] Ctrl+V paste:', text.length, 'chars');
-              wsRef.current.send(text);
-              if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
+        // Read clipboard items (preferred for images) if available
+        if (navigator.clipboard.read) {
+          navigator.clipboard.read().then(async items => {
+            let handled = false;
+            
+            // Check for images first
+            for (const item of items) {
+              const imageType = item.types.find(type => type.startsWith('image/'));
+              if (imageType) {
+                console.log('[Terminal] Ctrl+V: Image detected in clipboard');
+                const blob = await item.getType(imageType);
+                
+                // Upload logic similar to ImageDropZone
+                const formData = new FormData();
+                formData.append('image', blob);
+                
+                try {
+                  const response = await fetch('/api/temp-image', {
+                    method: 'POST',
+                    body: formData,
+                  });
+                  
+                  if (response.ok) {
+                    const result = await response.json();
+                    if (result.filePath) {
+                      console.log('[Terminal] Image uploaded, pasting path:', result.filePath);
+                      // Paste the file path into terminal
+                      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(result.filePath);
+                        if (onPasteRef.current) onPasteRef.current('image', { sizeKB: blob.size / 1024 });
+                      }
+                      handled = true;
+                    }
+                  }
+                } catch (err) {
+                  console.error('[Terminal] Failed to upload pasted image:', err);
+                }
+                break;
+              }
             }
-          })
-          .catch(err => {
-            console.warn('[Terminal] Clipboard read failed:', err);
-            // Fallback: try to trigger native paste event on the textarea
-            const textarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
-            if (textarea) {
-              textarea.focus();
-              document.execCommand('paste');
+            
+            // Fallback to text if no image or image handling failed
+            if (!handled) {
+              navigator.clipboard.readText()
+                .then(text => {
+                  if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    console.log('[Terminal] Ctrl+V paste text:', text.length, 'chars');
+                    wsRef.current.send(text);
+                    if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
+                  }
+                });
             }
+          }).catch(err => {
+            console.warn('[Terminal] Clipboard read items failed:', err);
+            // Fallback to text read
+            navigator.clipboard.readText()
+              .then(text => {
+                if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  wsRef.current.send(text);
+                  if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
+                }
+              });
           });
+        } else {
+          // Fallback for browsers without clipboard.read()
+          navigator.clipboard.readText()
+            .then(text => {
+              if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                console.log('[Terminal] Ctrl+V paste:', text.length, 'chars');
+                wsRef.current.send(text);
+                if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
+              }
+            });
+        }
         
         return false; // Prevent xterm from handling it
       }

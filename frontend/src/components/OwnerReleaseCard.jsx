@@ -59,11 +59,13 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
 
     if (match) {
         if (!activeProject || activeProject.id !== match.id) {
+            console.log('[ReleaseManager] Auto-switch to:', match.name);
             setActiveProject(match);
         }
     } else {
         // If no match found, switch back to internal Forge
         if (activeProject !== null) {
+            console.log('[ReleaseManager] No match, switching to Internal. CWD:', normalizedCwd);
             setActiveProject(null);
         }
     }

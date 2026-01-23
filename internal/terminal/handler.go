@@ -708,14 +708,40 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// Spawning goroutines per chunk caused unbounded growth and freezes
 				if visionParser.Enabled() {
 					if match := visionParser.Feed(buf[:n]); match != nil {
-						overlayMsg := VisionOverlayMessage{
-							Type:        "VISION_OVERLAY",
-							OverlayType: match.Type,
-							Payload:     match.Payload,
-						}
-						// Best effort write - log error but don't crash
-						if err := conn.WriteJSON(overlayMsg); err != nil {
-							log.Printf("[Terminal] Vision overlay write failed: %v", err)
+						// Special handling for detected URLs - we want to analyze them immediately
+						// and if they are images, inject a vision summary back into the PTY context
+						if match.Type == "URL_DETECTED" {
+							if url, ok := match.Payload["url"].(string); ok {
+								log.Printf("[Vision] Image URL detected: %s", url)
+								// Notify frontend to fetch/display if needed
+								_ = conn.WriteJSON(VisionOverlayMessage{
+									Type:        "VISION_OVERLAY",
+									OverlayType: "IMAGE_URL_DETECTED",
+									Payload:     match.Payload,
+								})
+								
+								// Async fetch and analyze to avoid blocking PTY
+								go func(imageUrl string) {
+									// Here we would download and analyze.
+									// For now, we inject a marker that the multimodal bridge can pick up.
+									// In a full implementation, we'd call an LLM here.
+									// For now, we just ensure the URL is highlighted as a "Vision Object"
+									
+									// If we had the image analysis, we'd do:
+									// summary := analyzeImage(imageUrl)
+									// visionParser.SetLastImageSummary(summary)
+								}(url)
+							}
+						} else {
+							overlayMsg := VisionOverlayMessage{
+								Type:        "VISION_OVERLAY",
+								OverlayType: match.Type,
+								Payload:     match.Payload,
+							}
+							// Best effort write - log error but don't crash
+							if err := conn.WriteJSON(overlayMsg); err != nil {
+								log.Printf("[Terminal] Vision overlay write failed: %v", err)
+							}
 						}
 					}
 				}
