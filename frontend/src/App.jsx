@@ -1153,24 +1153,13 @@ function App() {
 
   // File explorer handlers
   const handleFileOpen = useCallback((file) => {
-    // Check if file is already open in a tab
-    const existingTab = tabs.find(t => t.path === file.path && t.type === 'file');
-    if (existingTab) {
-      switchTab(existingTab.id);
-      return;
-    }
-
-    // Create new tab for file
-    createTab(shellConfig, {
-      type: 'file',
-      title: file.name,
-      file: file,
-      path: file.path
-    });
+    // Open file in editor instead of new tab
+    setEditorFile(file);
+    setShowEditor(true);
     
     // Ensure sidebar stays on files or whatever is appropriate
     // setSidebarView('files'); // Optional, keep current view
-  }, [tabs, createTab, switchTab, shellConfig]);
+  }, [setEditorFile, setShowEditor]);
 
   const handleEditorClose = useCallback(() => {
     setShowEditor(false);
@@ -1290,36 +1279,6 @@ function App() {
         // Execute command directly in terminal
         termRef.sendCommand(cmd.command, cmd.delay);
         termRef.focus();
-
-        // Zero-Click Workflow: If macro_payload exists, auto-inject after delay
-        console.log('[SmartCard] Checking macro for:', cmd.name, 'Payload:', cmd.macro_payload ? 'YES' : 'NO');
-        
-        if (cmd.macro_payload && cmd.macro_payload.trim().length > 0) {
-          const macroDelay = cmd.macro_delay || 1500; // Default 1500ms
-          console.log('[SmartCard] Scheduling macro in', macroDelay, 'ms');
-          
-          setTimeout(() => {
-            console.log('[SmartCard] Timer fired. Checking termRef...');
-            // Re-acquire ref to be safe? No, termRef should be stable for the specific tab.
-            // But let's check connection state explicitly.
-            if (termRef) {
-                const connected = termRef.isConnected ? termRef.isConnected() : 'unknown';
-                console.log('[SmartCard] TermRef exists. Connected:', connected);
-                
-                if (connected === true || connected === 'unknown') {
-                    console.log('[SmartCard] Sending payload...');
-                    // Normalize newlines to \r for PTY execution and allow small delay for TUI processing
-                    const payload = cmd.macro_payload.replace(/\n/g, '\r');
-                    termRef.sendCommand(payload, 50);
-                    console.log('[SmartCard] SENT.');
-                } else {
-                    console.error('[SmartCard] Terminal not connected, skipped.');
-                }
-            } else {
-                console.error('[SmartCard] termRef is null inside timeout.');
-            }
-          }, macroDelay);
-        }
       } else {
         // Focus terminal even if command is empty
         termRef.focus();

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Validation Dashboard</title>
+    <style>
+        body { background: #1e1e1e; color: #d4d4d4; font-family: sans-serif; padding: 20px; }
+        .card { background: #252526; border: 1px solid #333; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .success { border-left: 5px solid #4caf50; }
+        .warning { border-left: 5px solid #ff9800; }
+        img { max-width: 100%; border: 1px solid #555; margin-top: 10px; }
+        h2 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <h1>Forge Terminal Fixes Validation</h1>
+    
+    <div class="card success">
+        <h2>1. Injection Removal</h2>
+        <p>Status: <strong>VERIFIED</strong></p>
+        <p>The <code>setTimeout</code> payload injection logic has been completely removed from <code>handleExecute</code> in <code>App.jsx</code>.</p>
+        <img src="proof_injection.png" alt="Injection Proof" />
+    </div>
+
+    <div class="card success">
+        <h2>2. Ctrl+V Paste Fix</h2>
+        <p>Status: <strong>VERIFIED</strong></p>
+        <p>Paste handler updated to use <code>term.paste()</code> (xterm native handling) instead of WebSocket send. This supports bracketed paste and is more robust.</p>
+        <img src="proof_paste.png" alt="Paste Proof" />
+    </div>
+
+    <div class="card warning">
+        <h2>3. File Editor Open Fix</h2>
+        <p>Status: <strong>CODE VERIFIED (UI Test Blocked)</strong></p>
+        <p>Code updated in <code>handleFileOpen</code> to use <code>setEditorFile</code> instead of <code>createTab</code>. Automated E2E verification was blocked by persistent "First Run" modals in the dev environment, but the logic changes are confirmed in source.</p>
+        <!-- No image for this as test failed to navigate UI -->
+    </div>
+</body>
+</html>

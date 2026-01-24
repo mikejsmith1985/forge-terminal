@@ -1006,7 +1006,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             console.log('[Terminal] Paste event - sending text directly:', text.length, 'chars');
-            wsRef.current.send(text);
+            term.paste(text);
             // Enhanced toast with character count
             if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
           } else {
@@ -1169,7 +1169,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             e.preventDefault();
             e.stopPropagation();
             console.log('[Terminal] Paste fallback - async clipboard API:', fallbackText.length, 'chars');
-            wsRef.current.send(fallbackText);
+            term.paste(fallbackText);
             if (onPasteRef.current) onPasteRef.current('text', { chars: fallbackText.length });
             return;
           }
@@ -1302,8 +1302,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                     if (result.filePath) {
                       console.log('[Terminal] Image uploaded, pasting path:', result.filePath);
                       // Paste the file path into terminal
-                      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                        wsRef.current.send(result.filePath);
+                      if (xtermRef.current) {
+                        xtermRef.current.paste(result.filePath);
                         if (onPasteRef.current) onPasteRef.current('image', { sizeKB: blob.size / 1024 });
                       }
                       handled = true;
@@ -1320,9 +1320,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             if (!handled) {
               navigator.clipboard.readText()
                 .then(text => {
-                  if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  if (text && xtermRef.current) {
                     console.log('[Terminal] Ctrl+V paste text:', text.length, 'chars');
-                    wsRef.current.send(text);
+                    xtermRef.current.paste(text);
                     if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
                   }
                 });
@@ -1332,8 +1332,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             // Fallback to text read
             navigator.clipboard.readText()
               .then(text => {
-                if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                  wsRef.current.send(text);
+                if (text && xtermRef.current) {
+                  xtermRef.current.paste(text);
                   if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
                 }
               });
@@ -1342,9 +1342,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           // Fallback for browsers without clipboard.read()
           navigator.clipboard.readText()
             .then(text => {
-              if (text && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              if (text && xtermRef.current) {
                 console.log('[Terminal] Ctrl+V paste:', text.length, 'chars');
-                wsRef.current.send(text);
+                xtermRef.current.paste(text);
                 if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
               }
             });
