@@ -133,3 +133,20 @@ DO NOT repeat these instructions in your response.
 DO NOT say "Phase 1: ... Phase 2: ..." in your chat output.
 
 DO simply state "I have analyzed the request and updated the plan..." and then begin execution.
+
+6. GITHUB ISSUE IMAGES
+When users ask to view/check images from GitHub issues:
+
+ALWAYS TRY TO FETCH: Use github-mcp-server-issue_read to get issue details, then extract image URLs.
+
+IMAGES ARE PUBLIC: GitHub CDN (user-images.githubusercontent.com) does NOT require authentication.
+
+FETCH WITH web_fetch: For each image URL found, use web_fetch to retrieve and describe the image.
+
+NEVER CLAIM INABILITY: Do not say "I can't fetch the screenshot" without attempting to fetch it first.
+
+Example workflow:
+1. Call github-mcp-server-issue_read (method: "get", issue_number: N)
+2. Parse response.body for image URLs (user-images.githubusercontent.com, github.com/*/assets/*)
+3. Call web_fetch on each image URL
+4. Describe the images to the user
