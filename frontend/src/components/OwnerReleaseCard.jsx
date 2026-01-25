@@ -6,6 +6,14 @@ import './OwnerReleaseCard.css';
 // The GitHub username of the repository owner who can trigger releases
 const OWNER_USERNAME = 'mikejsmith1985';
 
+// Helper to extract repo name from path
+const getRepoNameFromPath = (path) => {
+  if (!path) return null;
+  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  const parts = normalized.split('/').filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : null;
+};
+
 const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   const [currentVersion, setCurrentVersion] = useState('v1.0.0');
   const [selectedIncrement, setSelectedIncrement] = useState('fix');
@@ -14,13 +22,16 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   const [error, setError] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
   
-  // Project Configuration
+  // v3.16.12: Robust workspace detection - auto-detect ANY git repo from CWD
+  const [isExternalRepo, setIsExternalRepo] = useState(false);
+  const [externalRepoPath, setExternalRepoPath] = useState(null);
+  const [externalRepoName, setExternalRepoName] = useState(null);
+  
+  // Project Configuration (optional favorites, not required for detection)
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState([]);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectPath, setNewProjectPath] = useState('');
-  const [activeProject, setActiveProject] = useState(null); // null = Internal Forge
-  const [autoDetect, setAutoDetect] = useState(true);
 
   // Authorization state
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -30,7 +41,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
 
   const { incrementMajor, incrementMinor, incrementFix, getReleaseType } = useVersionIncrement();
 
-  // Load configured projects
+  // Load configured projects (favorites)
   useEffect(() => {
     const saved = localStorage.getItem('forge_release_projects');
     if (saved) {
@@ -42,34 +53,64 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     }
   }, []);
 
-  // Auto-detect project based on CWD
+  // v3.16.12: ROBUST AUTO-DETECT - Check if CWD is ANY git repo (no pre-config needed!)
   useEffect(() => {
-    if (!autoDetect || !cwd || !projects.length) return;
-
-    // Normalize paths for comparison - ensure trailing slash for accurate matching
-    const normalizedCwd = (cwd.toLowerCase().replace(/\\/g, '/') + '/').replace(/\/+$/, '/');
-    
-    const match = projects.find(p => {
-        const pPath = (p.path.toLowerCase().replace(/\\/g, '/') + '/').replace(/\/+$/, '/');
-        // CWD must be exactly the project path OR a subdirectory of it
-        return normalizedCwd === pPath || normalizedCwd.startsWith(pPath);
-    });
-
-    console.log('[ReleaseManager] Auto-detect: cwd=', cwd, 'match=', match?.name || 'none');
-
-    if (match) {
-        if (!activeProject || activeProject.id !== match.id) {
-            console.log('[ReleaseManager] Auto-switch to:', match.name);
-            setActiveProject(match);
-        }
-    } else {
-        // If no match found, switch back to internal Forge
-        if (activeProject !== null) {
-            console.log('[ReleaseManager] No match, switching to Internal. CWD:', normalizedCwd);
-            setActiveProject(null);
-        }
+    if (!cwd) {
+      // No CWD, fall back to internal
+      setIsExternalRepo(false);
+      setExternalRepoPath(null);
+      setExternalRepoName(null);
+      return;
     }
-  }, [cwd, projects, autoDetect]);
+
+    const detectGitRepo = async () => {
+      try {
+        console.log('[ReleaseManager] Checking if git repo:', cwd);
+        const res = await fetch('/api/git/version', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: cwd })
+        });
+        
+        const data = await res.json();
+        
+        // Check if it's a valid git repo (no error field, or has valid version)
+        if (res.ok && !data.error && data.version) {
+          const repoName = getRepoNameFromPath(cwd);
+          console.log('[ReleaseManager] Git repo detected:', repoName, 'version:', data.version);
+          
+          // Check if this is the forge-terminal repo itself
+          const isForgeRepo = repoName?.toLowerCase() === 'forge-terminal';
+          
+          if (isForgeRepo) {
+            // We're in forge-terminal, use internal version endpoint
+            setIsExternalRepo(false);
+            setExternalRepoPath(null);
+            setExternalRepoName(null);
+          } else {
+            // External git repo detected!
+            setIsExternalRepo(true);
+            setExternalRepoPath(cwd);
+            setExternalRepoName(repoName);
+            // Version will be fetched in the version useEffect
+          }
+        } else {
+          // Not a git repo or error
+          console.log('[ReleaseManager] Not a git repo or error:', data.error || 'unknown');
+          setIsExternalRepo(false);
+          setExternalRepoPath(null);
+          setExternalRepoName(null);
+        }
+      } catch (err) {
+        console.error('[ReleaseManager] Git detection failed:', err);
+        setIsExternalRepo(false);
+        setExternalRepoPath(null);
+        setExternalRepoName(null);
+      }
+    };
+
+    detectGitRepo();
+  }, [cwd]);
 
   const saveProject = () => {
     if (!newProjectName || !newProjectPath) return;
@@ -78,14 +119,28 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     localStorage.setItem('forge_release_projects', JSON.stringify(updated));
     setNewProjectName('');
     setNewProjectPath('');
-    if (onToast) onToast('Project added', 'success');
+    if (onToast) onToast('Project saved to favorites', 'success');
   };
 
   const deleteProject = (id) => {
     const updated = projects.filter(p => p.id !== id);
     setProjects(updated);
     localStorage.setItem('forge_release_projects', JSON.stringify(updated));
-    if (activeProject && activeProject.id === id) setActiveProject(null);
+  };
+  
+  // Quick save current repo to favorites
+  const saveCurrentToFavorites = () => {
+    if (!isExternalRepo || !externalRepoPath || !externalRepoName) return;
+    // Check if already saved
+    const exists = projects.some(p => p.path.toLowerCase() === externalRepoPath.toLowerCase());
+    if (exists) {
+      if (onToast) onToast('Already in favorites', 'info');
+      return;
+    }
+    const updated = [...projects, { name: externalRepoName, path: externalRepoPath, id: Date.now() }];
+    setProjects(updated);
+    localStorage.setItem('forge_release_projects', JSON.stringify(updated));
+    if (onToast) onToast(`Added "${externalRepoName}" to favorites`, 'success');
   };
 
   // Check GitHub authorization on mount
@@ -127,22 +182,22 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     checkAuthorization();
   }, []);
 
-  // Fetch current version
+  // Fetch current version - uses isExternalRepo state from auto-detect
   useEffect(() => {
     const fetchVersion = async () => {
       try {
         setLoading(true);
         let response;
         
-        if (activeProject) {
-            // Fetch git version for external project
+        if (isExternalRepo && externalRepoPath) {
+            // Fetch git version for detected external repo
             response = await fetch('/api/git/version', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: activeProject.path })
+                body: JSON.stringify({ path: externalRepoPath })
             });
         } else {
-            // Fetch internal version
+            // Fetch internal Forge version
             response = await fetch('/api/version');
         }
 
@@ -167,7 +222,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     if (isAuthorized) {
       fetchVersion();
     }
-  }, [isAuthorized, activeProject]); // Refetch when project changes
+  }, [isAuthorized, isExternalRepo, externalRepoPath]); // Refetch when repo detection changes
 
   const nextVersion = useCallback(() => {
     switch (selectedIncrement) {
@@ -191,13 +246,13 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     const msg = commitMessage.trim() || `Release ${next}`;
     let cmdPrefix = '';
 
-    // If active project, cd into directory
-    if (activeProject) {
+    // v3.16.12: Use detected external repo path for cd prefix
+    if (isExternalRepo && externalRepoPath) {
         // Use cd with quotes to handle spaces
         if (shellType === 'powershell') {
-            cmdPrefix = `cd "${activeProject.path}"; `;
+            cmdPrefix = `cd "${externalRepoPath}"; `;
         } else {
-            cmdPrefix = `cd "${activeProject.path}" && `;
+            cmdPrefix = `cd "${externalRepoPath}" && `;
         }
     }
     
@@ -222,7 +277,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       // Delete remote tag first (silently continue if doesn't exist), then create and push
       return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "🚀 Release ${next} triggered! GitHub Actions will build."`;
     }
-  }, [next, shellType, commitMessage, activeProject]);
+  }, [next, shellType, commitMessage, isExternalRepo, externalRepoPath]);
 
   const releaseCommand = generateReleaseCommand();
 
@@ -306,16 +361,26 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
             <Tag size={20} className="orc-icon" />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h3 className="orc-title">Release Manager</h3>
-                <span style={{ fontSize: '10px', color: activeProject ? '#4CAF50' : '#888' }}>
-                  {activeProject ? activeProject.name : 'Forge Terminal (Internal)'}
+                <span style={{ fontSize: '10px', color: isExternalRepo ? '#4CAF50' : '#888' }}>
+                  {isExternalRepo ? externalRepoName : 'Forge Terminal (Internal)'}
                 </span>
             </div>
             
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {/* Save to favorites button - only show for external repos not already saved */}
+                {isExternalRepo && externalRepoPath && !projects.some(p => p.path.toLowerCase() === externalRepoPath.toLowerCase()) && (
+                    <button 
+                        onClick={saveCurrentToFavorites}
+                        title="Save to favorites"
+                        style={{ background: 'none', border: 'none', color: '#4CAF50', cursor: 'pointer', padding: '4px', fontSize: '14px' }}
+                    >
+                        ★
+                    </button>
+                )}
                 <button 
                     className="orc-settings-btn"
                     onClick={() => setShowSettings(!showSettings)}
-                    title="Configure Projects"
+                    title="Favorites"
                     style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '4px' }}
                 >
                     <Settings size={16} />
@@ -325,7 +390,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
           <p className="orc-description">Commit, merge to main, and create tagged release</p>
         </div>
 
-        {/* Settings Panel */}
+        {/* Settings Panel - now for favorites only */}
         {showSettings && (
             <div className="orc-settings-panel" style={{ 
                 background: '#1e1e1e', 
@@ -336,63 +401,44 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
                 fontSize: '12px'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-                    <h4 style={{ margin: 0 }}>Managed Projects</h4>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                        <input 
-                            type="checkbox" 
-                            checked={autoDetect} 
-                            onChange={(e) => setAutoDetect(e.target.checked)}
-                        />
-                        Auto-detect from Workspace
-                    </label>
+                    <h4 style={{ margin: 0 }}>Favorite Projects</h4>
+                    <span style={{ fontSize: '10px', color: '#888' }}>Auto-detects any git repo</span>
                 </div>
 
                 <div className="orc-project-list" style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '8px' }}>
-                    <div 
-                        onClick={() => setActiveProject(null)}
-                        style={{ 
-                            padding: '6px', 
-                            cursor: 'pointer', 
-                            background: !activeProject ? '#2d2d2d' : 'transparent',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }}
-                    >
-                        <Shield size={12} />
-                        <span>Forge Terminal (Internal)</span>
-                    </div>
-                    {projects.map(p => (
-                        <div 
-                            key={p.id} 
-                            style={{ 
-                                padding: '6px', 
-                                cursor: 'pointer', 
-                                background: activeProject?.id === p.id ? '#2d2d2d' : 'transparent',
-                                borderRadius: '4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                marginTop: '4px'
-                            }}
-                        >
-                            <div 
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}
-                                onClick={() => setActiveProject(p)}
-                            >
-                                <Folder size={12} />
-                                <span>{p.name}</span>
-                                <span style={{ color: '#666', fontSize: '10px' }}>{p.path}</span>
-                            </div>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); deleteProject(p.id); }}
-                                style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}
-                            >
-                                <Trash2 size={12} />
-                            </button>
+                    {projects.length === 0 ? (
+                        <div style={{ padding: '8px', color: '#666', fontStyle: 'italic' }}>
+                            No favorites yet. Navigate to a repo and click ★ to save.
                         </div>
-                    ))}
+                    ) : (
+                        projects.map(p => (
+                            <div 
+                                key={p.id} 
+                                style={{ 
+                                    padding: '6px', 
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginTop: '4px',
+                                    background: externalRepoPath?.toLowerCase() === p.path.toLowerCase() ? '#2d2d2d' : 'transparent'
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                                    <Folder size={12} />
+                                    <span>{p.name}</span>
+                                    <span style={{ color: '#666', fontSize: '10px' }}>{p.path}</span>
+                                </div>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); deleteProject(p.id); }}
+                                    style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}
+                                    title="Remove from favorites"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
+                        ))
+                    )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -405,7 +451,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
                     />
                     <input 
                         type="text" 
-                        placeholder="Path (C:\Projects\...)" 
+                        placeholder="Path (C:\\Projects\\...)" 
                         value={newProjectPath}
                         onChange={(e) => setNewProjectPath(e.target.value)}
                         style={{ flex: 2, background: '#111', border: '1px solid #333', color: '#fff', padding: '4px', fontSize: '11px' }}
