@@ -1377,8 +1377,25 @@ body {
   flex-direction: row;
 }
 
+/* v3.16.12: Fix ghost terminal flash on tab switch
+   Use combination of visibility, opacity, and z-index for bulletproof hiding
+   - visibility: hidden prevents rendering/painting
+   - opacity: 0 ensures transparency during any brief transition
+   - z-index: 0 pushes hidden terminals below active one
+   - pointer-events: none prevents accidental interaction
+*/
 .terminal-wrapper.hidden {
-  display: none; /* v3.14.12: Changed from visibility:hidden to prevent flashing during tab switch */
+  visibility: hidden;
+  opacity: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* v3.16.12: Active terminal gets higher z-index to always be on top */
+.terminal-wrapper:not(.hidden) {
+  z-index: 10;
+  visibility: visible;
+  opacity: 1;
 }
 
 /* v3.8.2: Task Dashboard Panel */
