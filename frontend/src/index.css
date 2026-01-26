@@ -1378,10 +1378,7 @@ body {
 }
 
 .terminal-wrapper.hidden {
-  visibility: hidden;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0;
+  display: none; /* v3.14.12: Changed from visibility:hidden to prevent flashing during tab switch */
 }
 
 /* v3.8.2: Task Dashboard Panel */

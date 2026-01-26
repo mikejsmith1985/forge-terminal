@@ -4,6 +4,17 @@
 // Import cypress-real-events for REAL keyboard/mouse events
 import 'cypress-real-events';
 
+// Skip tour in all tests by setting localStorage before visit
+// This prevents the "Welcome to Forge Terminal" modal from blocking tests
+Cypress.Commands.add('skipTour', () => {
+  cy.window().then((win) => {
+    // Set the tour as completed to skip it
+    win.localStorage.setItem('forge_tour_completed', 'v3.4.0');
+    // Also set to skip any future version checks
+    win.localStorage.setItem('forge_tour_version', 'v999.0.0');
+  });
+});
+
 // Custom command: Get terminal output from xterm buffer
 // This reads the actual terminal buffer, not DOM text (which is hidden in canvas)
 Cypress.Commands.add('getTerminalOutput', (lineCount = 10) => {
@@ -32,14 +43,31 @@ Cypress.Commands.add('waitForTerminal', (timeout = 30000) => {
   // Wait for the xterm element to exist first
   cy.get('.xterm', { timeout }).should('exist');
   
+  // Click Skip Tour button if it appears
+  cy.get('body').then(($body) => {
+    const skipButton = $body.find('button').filter(':contains("Skip Tour")');
+    if (skipButton.length > 0) {
+      cy.wrap(skipButton).click({ force: true });
+      cy.wait(500);
+    }
+  });
+  
   // Then wait for window.term to be set
   return cy.window({ timeout }).should((win) => {
-    // The terminal might take a moment to be set on window
-    // We check both term and term.buffer
     if (win.term && win.term.buffer && win.term.buffer.active) {
       expect(win.term).to.exist;
     } else {
       throw new Error('Terminal not ready yet');
+    }
+  });
+});
+
+// Custom command: Visit app with tour skipped
+Cypress.Commands.add('visitWithoutTour', (url = '/') => {
+  cy.visit(url, {
+    onBeforeLoad(win) {
+      // Use tour_disabled which is checked first (line 59) and returns early
+      win.localStorage.setItem('tour_disabled', 'true');
     }
   });
 });

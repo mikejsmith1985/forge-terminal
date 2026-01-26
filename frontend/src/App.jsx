@@ -1030,13 +1030,16 @@ function App() {
     
     // Theme will be applied by the activeTab useEffect
     
-    // Small delay to ensure the terminal is visible before focusing
-    setTimeout(() => {
-      const termRef = terminalRefs.current[tabId];
-      if (termRef) {
-        termRef.focus();
-      }
-    }, 50);
+    // v3.14.12: Increased delay to ensure terminal is fully rendered after display:none -> display:flex
+    // Use requestAnimationFrame to wait for next paint, then focus
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const termRef = terminalRefs.current[tabId];
+        if (termRef) {
+          termRef.focus();
+        }
+      }, 100);
+    });
   }, [switchTab, tabs, activeTabId, colorTheme, waitingTabs]);
 
   // Handle tab close
@@ -1726,6 +1729,7 @@ function App() {
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                     onInteractiveTUI={(tuiType) => handleInteractiveTUI(tab.id, tuiType)}
                     onCopy={() => addToast('✓ Copied to clipboard', 'success', 1500)}
+                    onFileOpen={handleFileOpen}
                     onPaste={(type, metadata) => {
                       // v3.9.8: Enhanced toast with metadata for better visibility
                       if (type === 'image') {

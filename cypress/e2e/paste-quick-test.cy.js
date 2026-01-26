@@ -15,7 +15,7 @@
 
 describe('Quick Paste Validation', () => {
   beforeEach(() => {
-    cy.visit('/');
+    cy.visitWithoutTour('/');
     cy.waitForTerminal(30000);
     cy.wait(2000);
   });
