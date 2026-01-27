@@ -33,7 +33,7 @@ export default function MonacoEditor({
     } else if (file) {
       console.error('[MonacoEditor] File object missing path:', file);
     }
-  }, [file]);
+  }, [file, rootPath]);
 
   const loadFile = async (path) => {
     setLoading(true);
@@ -41,9 +41,10 @@ export default function MonacoEditor({
 
     console.log('[MonacoEditor] ===== FILE LOAD START =====');
     console.log('[MonacoEditor] Path:', path);
+    console.log('[MonacoEditor] Root Path:', rootPath);
 
     try {
-      const data = await readFile(path);
+      const data = await readFile(path, rootPath);
       
       if (data.content === undefined || data.content === null) {
          console.error('[MonacoEditor] CRITICAL: Content is null/undefined in response!');
@@ -74,7 +75,7 @@ export default function MonacoEditor({
 
     setSaving(true);
     try {
-      await writeFile(file.path, editorRef.current?.getValue() || content);
+      await writeFile(file.path, editorRef.current?.getValue() || content, rootPath);
       setModified(false);
       if (onSave) onSave(file);
     } catch (err) {

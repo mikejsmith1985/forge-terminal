@@ -36,17 +36,17 @@ export const useAPI = () => {
     }
   }, [])
 
-  const readFile = useCallback(async (path) => {
+  const readFile = useCallback(async (path, rootPath = '.') => {
     return apiCall('/api/files/read', {
       method: 'POST',
-      body: JSON.stringify({ path, rootPath: '.' })
+      body: JSON.stringify({ path, rootPath })
     })
   }, [apiCall])
 
-  const writeFile = useCallback(async (path, content) => {
+  const writeFile = useCallback(async (path, content, rootPath = '.') => {
     return apiCall('/api/files/write', {
       method: 'POST',
-      body: JSON.stringify({ path, content, rootPath: '.' })
+      body: JSON.stringify({ path, content, rootPath })
     })
   }, [apiCall])
 
