@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Viewer Feature - Visual Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #ff6b35;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+    .subtitle {
+      color: #888;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+    .section {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .section h2 {
+      color: #ff6b35;
+      margin-bottom: 16px;
+      font-size: 20px;
+      border-bottom: 2px solid #333;
+      padding-bottom: 8px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .feature-card {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 16px;
+    }
+    .feature-card h3 {
+      color: #4fc3f7;
+      font-size: 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .feature-card p {
+      color: #aaa;
+      font-size: 14px;
+    }
+    .code-block {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #4fc3f7;
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+    .test-checklist {
+      list-style: none;
+      margin-top: 12px;
+    }
+    .test-checklist li {
+      padding: 8px 0;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .test-checklist li:last-child {
+      border-bottom: none;
+    }
+    .checkbox {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #4fc3f7;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4fc3f7;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+    .status.success {
+      background: #1b5e20;
+      color: #4caf50;
+    }
+    .status.pending {
+      background: #f57f17;
+      color: #fbc02d;
+    }
+    .mockup {
+      background: #1a1a1a;
+      border: 2px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+    .mockup-header {
+      background: #2a2a2a;
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mockup-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #e0e0e0;
+    }
+    .mockup-controls {
+      display: flex;
+      gap: 8px;
+    }
+    .mockup-btn {
+      background: #333;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 6px 10px;
+      color: #aaa;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .mockup-content {
+      padding: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+      background: linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
+                  linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
+                  linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
+                  linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+    .mockup-image {
+      max-width: 80%;
+      max-height: 400px;
+      border: 2px solid #444;
+      border-radius: 4px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #333;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #888;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🖼️ Image Viewer Feature</h1>
+    <div class="subtitle">
+      <span class="status success">IMPLEMENTED</span>
+      View image files directly in Forge Terminal alongside Monaco editor
+    </div>
+
+    <div class="section">
+      <h2>📋 Feature Summary</h2>
+      <p>
+        Added the ability to view image files when clicking them in the File Explorer or Lens File Picker. 
+        Image files automatically open in a dedicated viewer with zoom, rotation, and download controls, 
+        while code files continue to open in Monaco editor.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>✨ Key Features</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>🔍 Zoom Controls</h3>
+          <p>Zoom in/out in 25% increments from 25% to 500%. Includes "Fit to View" button for automatic sizing.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🔄 Rotation</h3>
+          <p>Rotate images 90° clockwise with smooth transitions. Useful for viewing portrait/landscape photos.</p>
+        </div>
+        <div class="feature-card">
+          <h3>💾 Download</h3>
+          <p>Download images directly from the viewer with original filename preserved.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🎨 Format Support</h3>
+          <p>Supports PNG, JPG, JPEG, GIF, BMP, WEBP, SVG, and ICO formats.</p>
+        </div>
+        <div class="feature-card">
+          <h3>⚡ Fast Loading</h3>
+          <p>Uses Blob URLs for efficient loading and automatic memory cleanup on close.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🎯 Smart Detection</h3>
+          <p>Automatically detects image files by extension and routes to appropriate viewer.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>🎨 UI Mockup</h2>
+      <div class="mockup">
+        <div class="mockup-header">
+          <div class="mockup-title">
+            <span>🖼️</span>
+            <span>zero-click-proof.png</span>
+          </div>
+          <div class="mockup-controls">
+            <span class="mockup-btn">🔍-</span>
+            <span class="mockup-btn">100%</span>
+            <span class="mockup-btn">🔍+</span>
+            <span class="mockup-btn">⛶</span>
+            <span class="mockup-btn">🔄</span>
+            <span class="mockup-btn">💾</span>
+            <span class="mockup-btn">✕</span>
+          </div>
+        </div>
+        <div class="mockup-content">
+          <div style="background: #2a2a2a; padding: 40px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 64px; margin-bottom: 16px;">🖼️</div>
+            <div style="color: #aaa; font-size: 14px;">Image displays here</div>
+            <div style="color: #666; font-size: 12px; margin-top: 8px;">Supports zoom, rotation, and fit-to-view</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>🧪 Testing Checklist</h2>
+      <ul class="test-checklist">
+        <li>
+          <span class="checkbox">✓</span>
+          <span><strong>Component Created:</strong> ImageViewer.jsx and ImageViewer.css files created</span>
+        </li>
+        <li>
+          <span class="checkbox">✓</span>
+          <span><strong>App Integration:</strong> isImageFile() utility and conditional rendering added to App.jsx</span>
+        </li>
+        <li>
+          <span class="checkbox">✓</span>
+          <span><strong>Compilation:</strong> Vite dev server compiles without errors</span>
+        </li>
+        <li>
+          <span class="checkbox">⏳</span>
+          <span><strong>UI Testing:</strong> Manual browser testing of image viewer controls <span class="badge">PENDING</span></span>
+        </li>
+        <li>
+          <span class="checkbox">⏳</span>
+          <span><strong>Format Testing:</strong> Test PNG, JPG, SVG, ICO formats <span class="badge">PENDING</span></span>
+        </li>
+        <li>
+          <span class="checkbox">⏳</span>
+          <span><strong>Controls Testing:</strong> Verify zoom, rotation, download, and close buttons <span class="badge">PENDING</span></span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>📝 Files Modified</h2>
+      <div class="code-block">
+frontend/src/components/ImageViewer.jsx      [NEW - 162 lines]
+frontend/src/components/ImageViewer.css      [NEW - 140 lines]
+frontend/src/App.jsx                         [MODIFIED - 3 changes]
+  - Import ImageViewer component
+  - Add isImageFile() utility function
+  - Update editor panel rendering logic
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>🚀 How to Test</h2>
+      <ol style="color: #aaa; margin-left: 20px;">
+        <li style="margin-bottom: 8px;">Start dev servers: <code style="background: #1a1a1a; padding: 2px 6px; border-radius: 3px;">cd frontend && npm run dev</code></li>
+        <li style="margin-bottom: 8px;">In another terminal: <code style="background: #1a1a1a; padding: 2px 6px; border-radius: 3px;">go run ./cmd/forge</code></li>
+        <li style="margin-bottom: 8px;">Open browser to <code style="background: #1a1a1a; padding: 2px 6px; border-radius: 3px;">http://localhost:5173</code></li>
+        <li style="margin-bottom: 8px;">Click Files icon in sidebar</li>
+        <li style="margin-bottom: 8px;">Double-click any .png, .jpg, or .svg file</li>
+        <li style="margin-bottom: 8px;">Verify image displays with working controls</li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h2>💡 Implementation Notes</h2>
+      <ul style="color: #aaa; margin-left: 20px;">
+        <li style="margin-bottom: 8px;">Uses existing <code style="background: #1a1a1a; padding: 2px 6px; border-radius: 3px;">/api/files/read</code> endpoint - no backend changes needed</li>
+        <li style="margin-bottom: 8px;">Blob URLs prevent CORS issues and properly handle binary data</li>
+        <li style="margin-bottom: 8px;">Memory-safe: Object URLs cleaned up on component unmount</li>
+        <li style="margin-bottom: 8px;">Renders in same editor-panel as Monaco/Agentic editors for consistent UX</li>
+        <li style="margin-bottom: 8px;">File type detection happens at render time, not file selection</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

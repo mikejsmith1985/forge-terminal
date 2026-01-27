@@ -1,13 +1,14 @@
 import React from 'react';
 import { Globe, Bug } from 'lucide-react';
-import FollowMeDebugger from './FollowMeDebugger';
 import './WebAppDebuggerCard.css';
 
 /**
  * Web App Debugger Card
  *
  * Standalone card for debugging web applications.
- * Wraps the FollowMeDebugger with clear messaging about its purpose.
+ * Displays information about the Follow Me debugger.
+ * 
+ * v3.16.14: FollowMeDebugger moved to App.jsx for persistence across tab switches
  */
 const WebAppDebuggerCard = () => {
   return (
@@ -34,10 +35,6 @@ const WebAppDebuggerCard = () => {
           💡 <strong>Note:</strong> This tool debugs <u>client-side web apps</u> only.
           It won't capture terminal commands, backend errors, or native desktop applications.
         </p>
-      </div>
-
-      <div className="debugger-action-area">
-        <FollowMeDebugger />
       </div>
 
       <div className="debugger-footer">

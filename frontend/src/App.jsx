@@ -20,9 +20,11 @@ import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import LensFilePicker from './components/LensFilePicker'
 import MonacoEditor from './components/MonacoEditor'
+import ImageViewer from './components/ImageViewer'
 import AgenticEditor from './components/AgenticEditor'
 import DebugPanel from './components/DebugPanel'
 import WebAppDebuggerCard from './components/WebAppDebuggerCard'
+import FollowMeDebugger from './components/FollowMeDebugger'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
@@ -1154,6 +1156,13 @@ function App() {
     return parts[parts.length - 1] || normalized;
   };
 
+  // Check if file is an image
+  const isImageFile = (fileName) => {
+    if (!fileName) return false;
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    return ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico'].includes(ext);
+  };
+
   // File explorer handlers
   const handleFileOpen = useCallback((file) => {
     // Open file in editor instead of new tab
@@ -1621,6 +1630,15 @@ function App() {
           </div>
         ) : null}
       </div>
+
+      {/* v3.16.14: FollowMe Debugger - always mounted outside conditional rendering */}
+      <div style={{ 
+        display: sidebarView === 'debug' ? 'block' : 'none',
+        padding: '12px',
+        overflowY: 'auto'
+      }}>
+        <FollowMeDebugger />
+      </div>
     </div>
   );
 
@@ -1768,7 +1786,13 @@ function App() {
       </div>
       {showEditor && editorFile && (
         <div className="editor-panel">
-          {editorMode === 'agentic' ? (
+          {isImageFile(editorFile.name) ? (
+            <ImageViewer
+              file={editorFile}
+              onClose={handleEditorClose}
+              rootPath={activeTab?.currentDirectory || '.'}
+            />
+          ) : editorMode === 'agentic' ? (
             <AgenticEditor
               file={editorFile}
               proposedChanges={editorProposedChanges}
