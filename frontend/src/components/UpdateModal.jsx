@@ -9,6 +9,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
   const [versions, setVersions] = useState([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [installFromFileInput, setInstallFromFileInput] = useState('');
+  const [customVersionInput, setCustomVersionInput] = useState('');
   const [pollingInterval, setPollingInterval] = useState(null);
   const [timeoutTimer, setTimeoutTimer] = useState(null);
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
@@ -24,6 +25,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       setErrorMessage('');
       setShowVersions(false);
       setInstallFromFileInput('');
+      setCustomVersionInput('');
       setIsCheckingForUpdates(false);
       setCheckStatus(null);
       setFreshUpdateInfo(null);
@@ -335,6 +337,52 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
     localStorage.setItem('updateDismissedAt', Date.now().toString());
     localStorage.setItem('updateDismissedVersion', updateInfo?.latestVersion || '');
     onClose();
+  };
+
+  /**
+   * Handle setting a custom version number (for version skipping or manual control)
+   */
+  const handleSetCustomVersion = async () => {
+    if (!customVersionInput.trim()) {
+      setErrorMessage('Please enter a version number');
+      return;
+    }
+
+    // Validate version format (basic check for X.Y.Z or vX.Y.Z)
+    const versionPattern = /^v?\d+\.\d+\.\d+(-[\w.]+)?$/;
+    if (!versionPattern.test(customVersionInput.trim())) {
+      setErrorMessage('Invalid version format. Use format: 3.16.14 or v3.16.14');
+      return;
+    }
+
+    setIsUpdating(true);
+    setUpdateStatus('applying');
+    setErrorMessage('');
+
+    try {
+      const res = await fetch('/api/update/set-version', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: customVersionInput.trim() })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setUpdateStatus('success');
+        // Force page refresh to show new version
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        setUpdateStatus('error');
+        setErrorMessage(data.error || 'Failed to set custom version');
+        setIsUpdating(false);
+      }
+    } catch (err) {
+      setUpdateStatus('error');
+      setErrorMessage(err.message || 'Failed to connect to server');
+      setIsUpdating(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -708,6 +756,67 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Custom Version Section */}
+          <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+            <h4 style={{ marginBottom: '12px', fontSize: '0.9em', color: '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <History size={16} />
+              Set Custom Version
+            </h4>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="text"
+                placeholder="Enter version number (e.g., 3.17.0 or 4.0.0)"
+                value={customVersionInput}
+                onChange={(e) => setCustomVersionInput(e.target.value)}
+                disabled={isUpdating}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  background: '#0a0a0a',
+                  border: '1px solid #333',
+                  borderRadius: '6px',
+                  color: '#ccc',
+                  fontSize: '0.85em',
+                  fontFamily: 'monospace'
+                }}
+              />
+              <button
+                onClick={handleSetCustomVersion}
+                disabled={isUpdating || !customVersionInput.trim()}
+                style={{
+                  padding: '10px 16px',
+                  background: '#8b5cf6',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  cursor: isUpdating || !customVersionInput.trim() ? 'not-allowed' : 'pointer',
+                  opacity: isUpdating || !customVersionInput.trim() ? 0.5 : 1,
+                  fontSize: '0.85em',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {isUpdating && updateStatus === 'applying' ? (
+                  <>
+                    <RefreshCw size={14} className="spin" />
+                    Setting...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} />
+                    Set Version
+                  </>
+                )}
+              </button>
+            </div>
+            <div style={{ fontSize: '0.75em', color: '#666', marginTop: '8px' }}>
+              Manually override the current version. Useful for skipping versions or testing.
+            </div>
           </div>
 
           {/* Manual Install Section */}

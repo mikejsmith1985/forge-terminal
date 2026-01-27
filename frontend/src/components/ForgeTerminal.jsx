@@ -1243,15 +1243,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
       
-      // v3.12.13 FIX: Remove Backspace interception - let xterm handle it naturally
-      // The previous "fix" that sent \x7f directly caused freezing issues with Copilot CLI
-      // because xterm's internal state wasn't updated. By returning true, xterm will:
-      // 1. Process the backspace locally (update cursor position, etc.)
-      // 2. Call onData() with the correct character (\x7f or \x08)
-      // 3. We send that via websocket in the onData handler
-      // This is the standard flow and works with all CLIs.
-      if (arg.code === 'Backspace') {
-        return true; // Let xterm handle backspace naturally
+      // v3.16.14 FIX: Force backspace to work in Copilot TUI
+      // PROBLEM: xterm.js sometimes doesn't send backspace in TUI modes (80% failure rate)
+      // ROOT CAUSE: When CLIs switch to "application mode" (DECCKM), xterm changes key handling
+      // SOLUTION: Intercept backspace and ALWAYS send \x7f, logging for diagnostics
+      if (arg.code === 'Backspace' && arg.type === 'keydown') {
+        console.log('[Terminal] Backspace intercepted - forcing \\x7f');
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send('\x7f');
+          return false; // Prevent xterm from processing (we already sent it)
+        }
+        // Fallback: let xterm handle if WebSocket not ready
+        return true;
       }
       
       // Handle Ctrl+C (Copy vs Interrupt)
@@ -1763,6 +1766,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
       // Handle terminal input
       term.onData((data) => {
+        // v3.16.14: Log backspace to diagnose TUI issues
+        if (data === '\x7f' || data === '\x08') {
+          console.log('[Terminal] onData backspace:', data === '\x7f' ? '\\x7f (DEL)' : '\\x08 (BS)');
+        }
+        
         // PERF FIX: Only record diagnostics when explicitly enabled
         if (diagnosticCore.isEnabled()) {
           diagnosticCore.recordTerminalData(data);

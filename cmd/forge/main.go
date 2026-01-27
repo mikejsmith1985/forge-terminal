@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -284,6 +285,7 @@ func main() {
 	http.HandleFunc("/api/update/versions", WrapWithMiddleware(handleListVersions))
 	http.HandleFunc("/api/update/events", WrapWithMiddleware(handleUpdateEvents))                // SSE for push update notifications
 	http.HandleFunc("/api/update/install-manual", WrapWithMiddleware(handleInstallManualUpdate)) // Install manually downloaded binary
+	http.HandleFunc("/api/update/set-version", WrapWithMiddleware(handleSetCustomVersion))       // Set custom version number
 
 	// Sessions API - persist tab state across refreshes
 	http.HandleFunc("/api/sessions", WrapWithMiddleware(handleSessions))
@@ -1124,6 +1126,67 @@ func handleInstallManualUpdate(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Updater] Restarting now...")
 		restartSelf()
 	}()
+}
+
+// handleSetCustomVersion allows manually setting the version number
+// Useful for version skipping, testing, or manual version control
+func handleSetCustomVersion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Parse request body for the version string
+	var req struct {
+		Version string `json:"version"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("[Version] Failed to decode request: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	if req.Version == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Version is required",
+		})
+		return
+	}
+
+	// Validate version format (basic check)
+	version := strings.TrimSpace(req.Version)
+	version = strings.TrimPrefix(version, "v") // Remove v prefix if present
+
+	// Basic semver validation
+	versionPattern := `^\d+\.\d+\.\d+(-[\w.]+)?$`
+	matched, err := regexp.MatchString(versionPattern, version)
+	if err != nil || !matched {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid version format. Expected: X.Y.Z or X.Y.Z-suffix",
+		})
+		return
+	}
+
+	// Update the version in the updater package
+	oldVersion := updater.Version
+	updater.Version = version
+	
+	log.Printf("[Version] Custom version set: %s -> %s", oldVersion, version)
+
+	// Send success response
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":     true,
+		"oldVersion":  oldVersion,
+		"newVersion":  version,
+		"message":     fmt.Sprintf("Version updated from %s to %s", oldVersion, version),
+	})
 }
 
 func restartSelf() {
