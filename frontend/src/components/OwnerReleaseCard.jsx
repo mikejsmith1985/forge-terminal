@@ -38,6 +38,10 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   const [githubUsername, setGithubUsername] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [commitMessage, setCommitMessage] = useState('');
+  
+  // v3.17.9: Custom version support
+  const [customVersion, setCustomVersion] = useState('');
+  const [useCustomVersion, setUseCustomVersion] = useState(false);
 
   const { incrementMajor, incrementMinor, incrementFix, getReleaseType } = useVersionIncrement();
 
@@ -224,7 +228,24 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     }
   }, [isAuthorized, isExternalRepo, externalRepoPath]); // Refetch when repo detection changes
 
+  // v3.17.9: Parse and validate custom version
+  const parseCustomVersion = useCallback((input) => {
+    if (!input) return null;
+    // Remove 'v' prefix if present and validate format
+    const cleaned = input.trim().replace(/^v/i, '');
+    // Match semver: major.minor.patch with optional pre-release
+    const match = cleaned.match(/^(\d+)\.(\d+)\.(\d+)(-[\w.]+)?$/);
+    if (!match) return null;
+    return `v${cleaned}`;
+  }, []);
+
   const nextVersion = useCallback(() => {
+    // v3.17.9: Use custom version if enabled and valid
+    if (useCustomVersion && customVersion) {
+      const parsed = parseCustomVersion(customVersion);
+      if (parsed) return parsed;
+    }
+    
     switch (selectedIncrement) {
       case 'major':
         return incrementMajor(currentVersion);
@@ -234,7 +255,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       default:
         return incrementFix(currentVersion);
     }
-  }, [currentVersion, selectedIncrement, incrementMajor, incrementMinor, incrementFix]);
+  }, [currentVersion, selectedIncrement, incrementMajor, incrementMinor, incrementFix, useCustomVersion, customVersion, parseCustomVersion]);
 
   const next = nextVersion();
   const releaseType = getReleaseType(currentVersion, next);
@@ -497,29 +518,78 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         {/* Version Increment Buttons */}
         <div className="orc-buttons-group">
           <button
-            className={`orc-button ${selectedIncrement === 'major' ? 'selected' : ''}`}
-            onClick={() => setSelectedIncrement('major')}
+            className={`orc-button ${selectedIncrement === 'major' && !useCustomVersion ? 'selected' : ''}`}
+            onClick={() => { setSelectedIncrement('major'); setUseCustomVersion(false); }}
             data-testid="major-btn"
           >
             <span className="orc-button-label">MAJOR</span>
             <span className="orc-button-preview">{incrementMajor(currentVersion)}</span>
           </button>
           <button
-            className={`orc-button ${selectedIncrement === 'minor' ? 'selected' : ''}`}
-            onClick={() => setSelectedIncrement('minor')}
+            className={`orc-button ${selectedIncrement === 'minor' && !useCustomVersion ? 'selected' : ''}`}
+            onClick={() => { setSelectedIncrement('minor'); setUseCustomVersion(false); }}
             data-testid="minor-btn"
           >
             <span className="orc-button-label">MINOR</span>
             <span className="orc-button-preview">{incrementMinor(currentVersion)}</span>
           </button>
           <button
-            className={`orc-button ${selectedIncrement === 'fix' ? 'selected' : ''}`}
-            onClick={() => setSelectedIncrement('fix')}
+            className={`orc-button ${selectedIncrement === 'fix' && !useCustomVersion ? 'selected' : ''}`}
+            onClick={() => { setSelectedIncrement('fix'); setUseCustomVersion(false); }}
             data-testid="fix-btn"
           >
             <span className="orc-button-label">FIX</span>
             <span className="orc-button-preview">{incrementFix(currentVersion)}</span>
           </button>
+        </div>
+
+        {/* v3.17.9: Custom Version Input */}
+        <div className="orc-custom-version-section" style={{
+          marginTop: '8px',
+          padding: '8px',
+          background: useCustomVersion ? 'rgba(35, 134, 54, 0.1)' : 'transparent',
+          borderRadius: '6px',
+          border: useCustomVersion ? '1px solid #238636' : '1px solid transparent',
+          transition: 'all 0.2s ease'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              type="checkbox"
+              id="use-custom-version"
+              checked={useCustomVersion}
+              onChange={(e) => setUseCustomVersion(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <label 
+              htmlFor="use-custom-version" 
+              style={{ fontSize: '11px', color: '#888', cursor: 'pointer', userSelect: 'none' }}
+            >
+              Custom version
+            </label>
+            {useCustomVersion && (
+              <input
+                type="text"
+                placeholder="e.g., 2.0.0 or v2.0.0-beta"
+                value={customVersion}
+                onChange={(e) => setCustomVersion(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: '#111',
+                  border: parseCustomVersion(customVersion) || !customVersion ? '1px solid #333' : '1px solid #f44',
+                  color: '#fff',
+                  padding: '4px 8px',
+                  fontSize: '12px',
+                  borderRadius: '4px'
+                }}
+                data-testid="custom-version-input"
+              />
+            )}
+          </div>
+          {useCustomVersion && customVersion && !parseCustomVersion(customVersion) && (
+            <div style={{ fontSize: '10px', color: '#f44', marginTop: '4px', marginLeft: '24px' }}>
+              Invalid version format. Use: X.Y.Z (e.g., 2.0.0)
+            </div>
+          )}
         </div>
 
         {/* Commit Message Input */}
