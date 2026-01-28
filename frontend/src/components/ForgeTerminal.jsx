@@ -1067,23 +1067,40 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // - Works with both real Ctrl+V presses AND synthetic paste events (for testing)
     // - Single code path for all paste operations
     const handlePaste = async (e) => {
-      // CRITICAL: Only handle paste if this terminal is visible
-      // Without this check, ALL terminals (visible or not) compete to handle paste,
-      // causing paste to go to wrong tab (usually first tab wins the race)
+      // CRITICAL FIX v3.17.3: Multi-layered paste routing protection
+      // Problem: ALL terminals attach document-level listeners, causing race conditions
+      // Solution: Check multiple conditions to ensure ONLY the focused terminal handles paste
+      
+      // Layer 1: Is this terminal visible?
       if (!isVisible) {
+        console.log(`[Terminal ${tabId}] Paste ignored - terminal not visible`);
         return;
       }
 
-      // Prevent duplicate handling
-      if (isPastingRef.current) {
-        return; // Don't preventDefault - let xterm handle if needed
+      // Layer 2: Does this terminal's textarea have focus?
+      const xtermTextarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
+      const hasFocus = xtermTextarea && document.activeElement === xtermTextarea;
+      
+      if (!hasFocus) {
+        console.log(`[Terminal ${tabId}] Paste ignored - terminal not focused (activeElement: ${document.activeElement?.className})`);
+        return;
       }
+
+      // Layer 3: Prevent duplicate handling
+      if (isPastingRef.current) {
+        console.log(`[Terminal ${tabId}] Paste ignored - already processing paste`);
+        return;
+      }
+
+      // This terminal IS focused and should handle the paste
+      console.log(`[Terminal ${tabId}] ✅ Handling paste (focused and visible)`);
 
       // Mark that we're handling a paste
       isPastingRef.current = true;
       setTimeout(() => { isPastingRef.current = false; }, 500);
       
       if (!e.clipboardData) {
+        console.log(`[Terminal ${tabId}] Paste aborted - no clipboardData`);
         return;
       }
       
@@ -1220,9 +1237,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         xtermTextarea.addEventListener('paste', handlePaste, true);
       }
       
-      // ROBUST FIX: Also attach to document in capture phase as a fallback
-      // This ensures we catch paste events even if they don't bubble properly
-      document.addEventListener('paste', handlePaste, true);
+      // v3.17.3 FIX: REMOVED document-level listener
+      // Previous code had: document.addEventListener('paste', handlePaste, true);
+      // This caused ALL terminals to compete for paste events, creating race conditions
+      // The textarea listener above is sufficient - it captures paste when terminal is focused
     }
     
     // Expose xterm paste for testing - allows direct invocation bypassing clipboard
@@ -1313,17 +1331,30 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // 1. Try to dispatch a synthetic paste event (works in most browsers)
       // 2. Fallback to navigator.clipboard.readText() for text
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        // CRITICAL: Only handle Ctrl+V if this terminal is visible
+        // CRITICAL FIX v3.17.3: Multi-layered paste routing protection
+        // Layer 1: Is terminal visible?
         if (!isVisible) {
-          console.log('[Terminal] Ctrl+V ignored - terminal not visible');
+          console.log(`[Terminal ${tabId}] Ctrl+V ignored - terminal not visible`);
           return false;
         }
 
-        // Prevent double-handling
-        if (isPastingRef.current) {
-          console.log('[Terminal] Ctrl+V ignored - paste already in progress');
+        // Layer 2: Does this terminal have focus?
+        const xtermTextarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
+        const hasFocus = xtermTextarea && document.activeElement === xtermTextarea;
+        
+        if (!hasFocus) {
+          console.log(`[Terminal ${tabId}] Ctrl+V ignored - terminal not focused`);
           return false;
         }
+
+        // Layer 3: Prevent double-handling
+        if (isPastingRef.current) {
+          console.log(`[Terminal ${tabId}] Ctrl+V ignored - paste already in progress`);
+          return false;
+        }
+        
+        console.log(`[Terminal ${tabId}] ✅ Handling Ctrl+V (focused and visible)`);
+        
         isPastingRef.current = true;
         setTimeout(() => { isPastingRef.current = false; }, 500);
         
@@ -1856,7 +1887,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           xtermTextarea.removeEventListener('paste', handlePaste, true);
         }
       }
-      document.removeEventListener('paste', handlePaste, true);
+      // v3.17.3: Removed document-level listener cleanup (no longer added)
       
       // Clean up test hook
       if (typeof window !== 'undefined') {

@@ -133,6 +133,75 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     });
   }, []);
 
+  // v3.17.3: Capture paste events with full context
+  const capturePaste = useCallback((e) => {
+    const now = Date.now();
+    
+    // Get active element info
+    const activeEl = document.activeElement;
+    let activeElementInfo = {
+      tagName: activeEl?.tagName || 'unknown',
+      className: activeEl?.className || '',
+      id: activeEl?.id || '',
+    };
+    
+    // Try to get terminal-specific info
+    let terminalInfo = null;
+    if (activeEl && activeEl.className && activeEl.className.includes('xterm-helper-textarea')) {
+      const terminalContainer = activeEl.closest('.terminal-container');
+      const terminalWrapper = activeEl.closest('.terminal-wrapper');
+      terminalInfo = {
+        containerClass: terminalContainer?.className || '',
+        wrapperDataAttrs: terminalWrapper ? {
+          tabId: terminalWrapper.getAttribute('data-tab-id'),
+          isVisible: terminalWrapper.style.display !== 'none',
+        } : {},
+      };
+    }
+    
+    // Get clipboard data info
+    let clipboardInfo = {
+      hasText: false,
+      textLength: 0,
+      hasImage: false,
+      hasVideo: false,
+      itemTypes: [],
+    };
+    
+    if (e.clipboardData) {
+      const text = e.clipboardData.getData('text/plain');
+      clipboardInfo.hasText = !!text;
+      clipboardInfo.textLength = text ? text.length : 0;
+      clipboardInfo.textPreview = text ? text.substring(0, 100) : '';
+      
+      const items = Array.from(e.clipboardData.items || []);
+      clipboardInfo.itemTypes = items.map(item => item.type);
+      clipboardInfo.hasImage = items.some(item => item.type.startsWith('image/'));
+      clipboardInfo.hasVideo = items.some(item => item.type.startsWith('video/'));
+    }
+    
+    eventsRef.current.push({
+      type: 'paste',
+      timestamp: now - startTimeRef.current,
+      activeElement: activeElementInfo,
+      terminalInfo,
+      clipboardInfo,
+      eventPhase: e.eventPhase,
+      target: {
+        tagName: e.target?.tagName || 'unknown',
+        className: e.target?.className || '',
+        id: e.target?.id || '',
+      },
+    });
+    
+    console.log('[FollowMe] Paste event captured:', {
+      timestamp: now - startTimeRef.current,
+      activeElement: activeElementInfo.tagName,
+      terminalInfo,
+      clipboardInfo,
+    });
+  }, []);
+
   const interceptConsole = useCallback(() => {
     const methods = ['log', 'warn', 'error', 'info', 'debug'];
     methods.forEach(method => {
@@ -251,6 +320,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
             window.addEventListener('click', captureClick, true);
             window.addEventListener('mousemove', captureMouseMove, true);
             window.addEventListener('scroll', captureScroll, true);
+            window.addEventListener('paste', capturePaste, true); // v3.17.3
             interceptConsole();
             interceptFetch();
           }
@@ -260,7 +330,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
         localStorage.removeItem('follow-me-active-session');
       }
     }
-  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
+  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, capturePaste, interceptConsole, interceptFetch]);
 
   // v3.12.13: Keep isRecordingRef in sync with state
   useEffect(() => {
@@ -424,6 +494,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       window.addEventListener('click', captureClick, true);
       window.addEventListener('mousemove', captureMouseMove, true);
       window.addEventListener('scroll', captureScroll, true);
+      window.addEventListener('paste', capturePaste, true); // v3.17.3: Capture paste events
       interceptConsole();
       interceptFetch();
 
@@ -454,7 +525,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       window.__followMeStartError = err.message;
       setError('Failed to start: ' + err.message);
     }
-  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
+  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, capturePaste, interceptConsole, interceptFetch]);
 
   const stopRecording = useCallback(async () => {
     try {
@@ -476,6 +547,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       window.removeEventListener('click', captureClick, true);
       window.removeEventListener('mousemove', captureMouseMove, true);
       window.removeEventListener('scroll', captureScroll, true);
+      window.removeEventListener('paste', capturePaste, true); // v3.17.3
       restoreConsole();
       restoreFetch();
 
@@ -552,7 +624,7 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
       isRecordingRef.current = false; // v3.12.13: Keep ref in sync
       setIsRecording(false);
     }
-  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, restoreConsole, restoreFetch, recordingDuration, onSessionComplete]);
+  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, capturePaste, restoreConsole, restoreFetch, recordingDuration, onSessionComplete]);
 
   const generateSummary = useCallback(() => {
     const events = eventsRef.current;
@@ -705,9 +777,10 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     window.addEventListener('click', captureClick, true);
     window.addEventListener('mousemove', captureMouseMove, true);
     window.addEventListener('scroll', captureScroll, true);
+    window.addEventListener('paste', capturePaste, true); // v3.17.3
     interceptConsole();
     interceptFetch();
-  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, interceptConsole, interceptFetch]);
+  }, [captureKeystroke, captureClick, captureMouseMove, captureScroll, capturePaste, interceptConsole, interceptFetch]);
 
   const discardSession = useCallback(() => {
     localStorage.removeItem('follow-me-active-session');
