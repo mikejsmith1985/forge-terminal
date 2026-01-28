@@ -1067,6 +1067,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // - Works with both real Ctrl+V presses AND synthetic paste events (for testing)
     // - Single code path for all paste operations
     const handlePaste = async (e) => {
+      // CRITICAL: Only handle paste if this terminal is visible
+      // Without this check, ALL terminals (visible or not) compete to handle paste,
+      // causing paste to go to wrong tab (usually first tab wins the race)
+      if (!isVisible) {
+        return;
+      }
+
       // Prevent duplicate handling
       if (isPastingRef.current) {
         return; // Don't preventDefault - let xterm handle if needed
@@ -1306,6 +1313,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // 1. Try to dispatch a synthetic paste event (works in most browsers)
       // 2. Fallback to navigator.clipboard.readText() for text
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
+        // CRITICAL: Only handle Ctrl+V if this terminal is visible
+        if (!isVisible) {
+          console.log('[Terminal] Ctrl+V ignored - terminal not visible');
+          return false;
+        }
+
         // Prevent double-handling
         if (isPastingRef.current) {
           console.log('[Terminal] Ctrl+V ignored - paste already in progress');
