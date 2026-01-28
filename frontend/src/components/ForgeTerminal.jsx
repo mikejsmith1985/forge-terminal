@@ -664,16 +664,21 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Refit terminal when becoming visible
   useEffect(() => {
     if (isVisible && fitAddonRef.current && xtermRef.current) {
-      // Small delay to ensure the container is properly sized
-      setTimeout(() => {
-        fitAddonRef.current.fit();
-        // Critical fix: Re-focus after fit on visibility change
-        queueMicrotask(() => {
-          if (xtermRef.current) {
-            xtermRef.current.focus();
+      // v3.17.5: Use double RAF for reliable post-layout fit timing
+      // Fixes text cut-off issue when switching back to tabs
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (fitAddonRef.current && xtermRef.current) {
+            fitAddonRef.current.fit();
+            // Critical fix: Re-focus after fit on visibility change
+            queueMicrotask(() => {
+              if (xtermRef.current) {
+                xtermRef.current.focus();
+              }
+            });
           }
         });
-      }, 50);
+      });
     }
   }, [isVisible]);
 
