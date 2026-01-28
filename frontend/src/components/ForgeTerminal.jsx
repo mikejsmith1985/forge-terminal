@@ -663,24 +663,70 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
   // Refit terminal when becoming visible
   useEffect(() => {
-    if (isVisible && fitAddonRef.current && xtermRef.current) {
-      // v3.17.5: Use double RAF for reliable post-layout fit timing
-      // Fixes text cut-off issue when switching back to tabs
+    if (isVisible && fitAddonRef.current && xtermRef.current && terminalRef.current && wsRef.current) {
+      // v3.17.5: Fix terminal content cutoff after tab switch
+      // Problem: Prompt shows "Users\Downloads>" instead of "PS C:\Users\Downloads>"
+      // Root cause: Terminal dimensions change but buffer content not redrawn
+      const performFit = () => {
+        if (!fitAddonRef.current || !xtermRef.current || !terminalRef.current || !wsRef.current) return;
+        
+        // Get container dimensions
+        const container = terminalRef.current;
+        const rect = container.getBoundingClientRect();
+        
+        // Only fit if container has valid dimensions
+        if (rect.width > 0 && rect.height > 0) {
+          console.log(`[Terminal ${tabId}] Fitting with container dimensions: ${rect.width}x${rect.height}`);
+          
+          // Get current terminal size before fit
+          const oldCols = xtermRef.current.cols;
+          const oldRows = xtermRef.current.rows;
+          
+          // Fit terminal to container - this changes cols/rows
+          fitAddonRef.current.fit();
+          
+          // Get new terminal size after fit
+          const newCols = xtermRef.current.cols;
+          const newRows = xtermRef.current.rows;
+          
+          console.log(`[Terminal ${tabId}] Resized from ${oldCols}x${oldRows} to ${newCols}x${newRows}`);
+          
+          // If dimensions changed, send resize to backend AND force terminal refresh
+          if (oldCols !== newCols || oldRows !== newRows) {
+            // Send resize to backend (PTY)
+            if (wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ 
+                type: 'resize', 
+                cols: newCols, 
+                rows: newRows 
+              }));
+              console.log(`[Terminal ${tabId}] Sent resize to backend: ${newCols}x${newRows}`);
+            }
+            
+            // Force full terminal refresh to redraw buffer content with new dimensions
+            xtermRef.current.refresh(0, newRows - 1);
+            console.log(`[Terminal ${tabId}] Refreshed terminal display`);
+          }
+          
+          // Critical fix: Re-focus after fit on visibility change
+          queueMicrotask(() => {
+            if (xtermRef.current) {
+              xtermRef.current.focus();
+            }
+          });
+        } else {
+          console.warn(`[Terminal ${tabId}] Skipping fit - invalid container dimensions: ${rect.width}x${rect.height}`);
+        }
+      };
+      
+      // Use triple RAF for absolute guarantee of post-layout timing
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          if (fitAddonRef.current && xtermRef.current) {
-            fitAddonRef.current.fit();
-            // Critical fix: Re-focus after fit on visibility change
-            queueMicrotask(() => {
-              if (xtermRef.current) {
-                xtermRef.current.focus();
-              }
-            });
-          }
+          requestAnimationFrame(performFit);
         });
       });
     }
-  }, [isVisible]);
+  }, [isVisible, tabId]);
 
   // Fix spacebar issue: Focus terminal on window focus
   useEffect(() => {
