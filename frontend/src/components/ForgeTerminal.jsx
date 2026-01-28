@@ -1117,12 +1117,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // With clipboardMode: 'off', xterm won't handle paste natively.
     // This listener handles ALL paste operations - both text and media.
     // 
-    // WHY THIS APPROACH IS RELIABLE:
-    // - Uses e.clipboardData which is synchronous and always available in paste events
-    // - No permission prompts for text
-    // - Works consistently across Chrome, Edge, Firefox
-    // - Works with both real Ctrl+V presses AND synthetic paste events (for testing)
-    // - Single code path for all paste operations
+    // v3.17.8: PASTE EVENT HANDLER (Fallback + Right-Click)
+    // 
+    // WHEN THIS FIRES:
+    // - Right-click → Paste (browser native)
+    // - Edit menu → Paste
+    // - Ctrl+V when clipboard.read() is unavailable (Firefox, permissions denied)
+    // 
+    // WHEN THIS DOESN'T FIRE:
+    // - Ctrl+V in Chromium browsers (our Ctrl+V handler returns false, preventing event)
+    //
+    // WHY WE NEED BOTH HANDLERS:
+    // - Ctrl+V handler: Required for images (needs navigator.clipboard.read())
+    // - This handler: Fallback for text-only paste and right-click paste
     const handlePaste = async (e) => {
       // CRITICAL FIX v3.17.3: Multi-layered paste routing protection
       // v3.17.6: Use isVisibleRef to avoid stale closure bug
@@ -1380,24 +1387,31 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // Ctrl+V: Manually read clipboard and paste
-      // With clipboardMode: 'off', xterm won't handle paste natively.
-      // We use navigator.clipboard.readText() to get text content.
-      // For images, we dispatch a synthetic paste event that our handlePaste catches.
+      // v3.17.8: PROPER ARCHITECTURE - Ctrl+V handler for image support without double-paste
+      // 
+      // WHY WE NEED THIS HANDLER:
+      // - navigator.clipboard.read() can access ClipboardItem types (images/video)
+      // - e.clipboardData in paste events cannot access raw image data
+      // - We MUST intercept Ctrl+V at keyboard level to use clipboard.read()
       //
-      // ROBUST FIX (v3.14.9): We try multiple approaches for maximum reliability:
-      // 1. Try to dispatch a synthetic paste event (works in most browsers)
-      // 2. Fallback to navigator.clipboard.readText() for text
+      // HOW WE PREVENT DOUBLE-PASTE:
+      // - Read clipboard programmatically
+      // - Paste the content directly via xtermRef.current.paste()
+      // - Return FALSE to prevent browser from dispatching paste event
+      // - This ensures ONLY our code runs, no race condition
+      //
+      // FALLBACK PATH:
+      // - If clipboard.read() fails (permissions/Firefox), return TRUE
+      // - Browser dispatches native paste event
+      // - handlePaste catches it and handles via e.clipboardData (text-only fallback)
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        // CRITICAL FIX v3.17.3: Multi-layered paste routing protection
-        // v3.17.6: Use isVisibleRef to avoid stale closure bug
-        // Layer 1: Is terminal visible?
+        // Layer 1: Visibility check (avoid stale closure bug with ref)
         if (!isVisibleRef.current) {
           console.log(`[Terminal ${tabId}] Ctrl+V ignored - terminal not visible`);
           return false;
         }
 
-        // Layer 2: Does this terminal have focus?
+        // Layer 2: Focus check
         const xtermTextarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
         const hasFocus = xtermTextarea && document.activeElement === xtermTextarea;
         
@@ -1406,7 +1420,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           return false;
         }
 
-        // Layer 3: Prevent double-handling
+        // Layer 3: Prevent re-entrancy
         if (isPastingRef.current) {
           console.log(`[Terminal ${tabId}] Ctrl+V ignored - paste already in progress`);
           return false;
@@ -1414,77 +1428,107 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         
         console.log(`[Terminal ${tabId}] ✅ Handling Ctrl+V (focused and visible)`);
         
+        // Mark paste in progress (prevents handlePaste from also firing)
         isPastingRef.current = true;
-        setTimeout(() => { isPastingRef.current = false; }, 500);
+        const clearPasting = () => { isPastingRef.current = false; };
         
-        console.log('[Terminal] Ctrl+V - reading clipboard');
-        
-        // Try to read from clipboard
+        // Attempt to read clipboard with full API access
         (async () => {
           try {
-            // First try clipboard.read() for full clipboard access (includes images)
-            if (navigator.clipboard.read) {
-              try {
-                const items = await navigator.clipboard.read();
-                for (const item of items) {
-                  // Check for images
-                  const imageType = item.types.find(t => t.startsWith('image/'));
-                  if (imageType) {
-                    console.log('[Terminal] Ctrl+V: Image found in clipboard');
-                    const blob = await item.getType(imageType);
-                    
-                    // Upload the image
-                    const formData = new FormData();
-                    formData.append('file', blob, `clipboard-${Date.now()}.png`);
-                    
-                    const response = await fetch('/api/files/upload', {
-                      method: 'POST',
-                      body: formData
-                    });
-                    
-                    if (response.ok) {
-                      const data = await response.json();
-                      if (data.path && xtermRef.current) {
-                        const textToSend = `see file at ${data.path}`;
-                        xtermRef.current.paste(textToSend);
-                        if (onPasteRef.current) onPasteRef.current('image', { sizeKB: blob.size / 1024 });
-                        console.log('[Terminal] Image uploaded and path pasted');
-                        return;
-                      }
-                    }
+            // Try navigator.clipboard.read() for images
+            if (!navigator.clipboard?.read) {
+              console.log('[Terminal] clipboard.read() not available, falling back to paste event');
+              clearPasting();
+              return; // Let browser dispatch paste event for handlePaste
+            }
+
+            const items = await navigator.clipboard.read();
+            
+            // Process clipboard items
+            for (const item of items) {
+              // Check for images FIRST (priority over text)
+              const imageType = item.types.find(t => t.startsWith('image/'));
+              if (imageType) {
+                console.log('[Terminal] Ctrl+V: Image found in clipboard');
+                const blob = await item.getType(imageType);
+                
+                // Upload the image
+                const formData = new FormData();
+                const filename = `clipboard-${Date.now()}.png`;
+                formData.append('file', blob, filename);
+                
+                // Show uploading indicator
+                if (xtermRef.current) {
+                  const sizeKB = Math.round(blob.size / 1024);
+                  const sizeStr = sizeKB > 1024 ? `${(sizeKB/1024).toFixed(2)}MB` : `${sizeKB}KB`;
+                  xtermRef.current.write(`\x1b[33m[Uploading image (${sizeStr})...]\x1b[0m`);
+                }
+                
+                const response = await fetch('/api/files/upload', {
+                  method: 'POST',
+                  body: formData
+                });
+                
+                if (response.ok) {
+                  const data = await response.json();
+                  
+                  // Clear uploading indicator
+                  if (xtermRef.current) {
+                    xtermRef.current.write('\r\x1b[K');
                   }
                   
-                  // Check for text
-                  if (item.types.includes('text/plain')) {
-                    const textBlob = await item.getType('text/plain');
-                    const text = await textBlob.text();
-                    if (text && xtermRef.current) {
-                      console.log('[Terminal] Ctrl+V paste text:', text.length, 'chars');
-                      xtermRef.current.paste(text);
-                      if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
-                      return;
+                  if (data.path && xtermRef.current) {
+                    const textToSend = `see file at ${data.path}`;
+                    xtermRef.current.paste(textToSend);
+                    if (onPasteRef.current) {
+                      onPasteRef.current('image', { 
+                        filename, 
+                        path: data.path, 
+                        size: blob.size, 
+                        sizeKB: Math.round(blob.size / 1024) 
+                      });
                     }
+                    console.log('[Terminal] Image uploaded and path pasted');
+                  }
+                } else {
+                  throw new Error(`Upload failed: ${response.statusText}`);
+                }
+                
+                clearPasting();
+                return; // Image handled, done
+              }
+              
+              // Check for text
+              if (item.types.includes('text/plain')) {
+                const textBlob = await item.getType('text/plain');
+                const text = await textBlob.text();
+                if (text && xtermRef.current) {
+                  console.log('[Terminal] Ctrl+V paste text:', text.length, 'chars');
+                  xtermRef.current.paste(text);
+                  if (onPasteRef.current) {
+                    onPasteRef.current('text', { chars: text.length });
                   }
                 }
-              } catch (readErr) {
-                console.log('[Terminal] clipboard.read() failed, trying readText():', readErr.message);
+                clearPasting();
+                return; // Text handled, done
               }
             }
             
-            // Fallback: Just read text
-            const text = await navigator.clipboard.readText();
-            if (text && xtermRef.current) {
-              console.log('[Terminal] Ctrl+V paste text (fallback):', text.length, 'chars');
-              xtermRef.current.paste(text);
-              if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
-            }
+            // No content found
+            clearPasting();
           } catch (err) {
-            logPasteError(err, { location: 'ctrl-v-handler' });
-            console.error('[Terminal] Ctrl+V paste failed:', err.message);
+            console.log('[Terminal] clipboard.read() failed, will fallback to paste event:', err.message);
+            clearPasting();
+            // Don't call logPasteError for permission denials - expected behavior
+            if (!err.message.includes('denied') && !err.message.includes('permission')) {
+              logPasteError(err, { location: 'ctrl-v-clipboard-read' });
+            }
           }
         })();
         
-        return false; // Prevent xterm from handling
+        // CRITICAL: Return FALSE immediately to prevent browser's paste event
+        // This ensures ONLY our programmatic paste runs (no double-paste)
+        return false;
       }
 
       return true; // Let all other keys pass through standard xterm processing
