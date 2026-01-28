@@ -581,6 +581,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const effectiveMaxAttemptsRef = useRef(maxReconnectAttempts);
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
+  const isVisibleRef = useRef(isVisible); // Track visibility to avoid stale closures in paste handlers
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -641,6 +642,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onPasteRef.current = onPaste;
   }, [onPaste]);
+  
+  // Keep isVisible ref updated - CRITICAL for paste routing
+  useEffect(() => {
+    isVisibleRef.current = isVisible;
+  }, [isVisible]);
   
   // Keep onFileOpen ref updated
   useEffect(() => {
@@ -1119,11 +1125,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // - Single code path for all paste operations
     const handlePaste = async (e) => {
       // CRITICAL FIX v3.17.3: Multi-layered paste routing protection
+      // v3.17.6: Use isVisibleRef to avoid stale closure bug
       // Problem: ALL terminals attach document-level listeners, causing race conditions
       // Solution: Check multiple conditions to ensure ONLY the focused terminal handles paste
       
       // Layer 1: Is this terminal visible?
-      if (!isVisible) {
+      if (!isVisibleRef.current) {
         console.log(`[Terminal ${tabId}] Paste ignored - terminal not visible`);
         return;
       }
@@ -1383,8 +1390,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // 2. Fallback to navigator.clipboard.readText() for text
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
         // CRITICAL FIX v3.17.3: Multi-layered paste routing protection
+        // v3.17.6: Use isVisibleRef to avoid stale closure bug
         // Layer 1: Is terminal visible?
-        if (!isVisible) {
+        if (!isVisibleRef.current) {
           console.log(`[Terminal ${tabId}] Ctrl+V ignored - terminal not visible`);
           return false;
         }
