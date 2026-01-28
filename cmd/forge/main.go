@@ -906,6 +906,7 @@ func handleGitVersion(w http.ResponseWriter, r *http.Request) {
 	// Run git describe --tags --abbrev=0
 	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
 	cmd.Dir = req.Path
+	hideWindow(cmd) // v3.17.1.1: Prevent console window flash on tab switch
 	
 	// Check if git directory exists first to avoid fatal errors
 	if _, err := os.Stat(filepath.Join(req.Path, ".git")); os.IsNotExist(err) {
@@ -913,6 +914,7 @@ func handleGitVersion(w http.ResponseWriter, r *http.Request) {
 		// Try running git rev-parse --is-inside-work-tree
 		checkCmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
 		checkCmd.Dir = req.Path
+		hideWindow(checkCmd) // v3.17.1.1: Prevent console window flash on tab switch
 		if err := checkCmd.Run(); err != nil {
 			json.NewEncoder(w).Encode(map[string]string{
 				"version": "v0.0.0", // Default if not a git repo
