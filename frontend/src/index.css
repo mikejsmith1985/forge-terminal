@@ -1402,11 +1402,14 @@ body {
 }
 
 /* v3.16.14: Active terminal gets higher z-index and forced GPU layer */
+/* v3.17.9: Added transition for smooth tab switch (prevents flicker) */
 .terminal-wrapper:not(.hidden) {
   display: flex;
   z-index: 10;
   visibility: visible;
   opacity: 1;
+  transition: opacity 0.05s ease-out;
+  will-change: opacity;
 }
 
 /* v3.8.2: Task Dashboard Panel */

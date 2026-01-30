@@ -11,7 +11,7 @@ description: Auto-fetches and displays images from GitHub issues when user reque
 
 Users frequently ask to view images/screenshots from GitHub issues (e.g., "check the screenshot from issue #5"). Copilot incorrectly claims it cannot fetch these images, even though:
 - GitHub issue images are publicly accessible at `user-images.githubusercontent.com`
-- The tools exist to fetch and display them (`web_fetch`, `view`)
+- Images can be downloaded with PowerShell and viewed with the `view` tool
 
 ## Skill Directive
 
@@ -29,10 +29,18 @@ Parse the issue body for image URLs matching:
 - `![]()` markdown syntax
 - `<img src="">` HTML syntax
 
-### Step 3: Fetch Each Image
+### Step 3: Download and View Each Image
+**CRITICAL**: The `web_fetch` tool CANNOT handle images (returns "Content type image/png cannot be simplified to markdown"). You MUST download images to a temp file first, then use `view`.
+
 For each image URL found:
+```powershell
+# Download to temp file
+Invoke-WebRequest -Uri "<IMAGE_URL>" -OutFile "$env:TEMP\issue-image-<N>.png"
 ```
-Use web_fetch with the image URL
+
+Then use the `view` tool on the downloaded file:
+```
+view path: C:\Users\mikej\AppData\Local\Temp\issue-image-1.png
 ```
 
 **Note**: GitHub issue images are PUBLIC and do NOT require authentication. They are served from CDN URLs that are accessible to anyone.
@@ -50,8 +58,9 @@ Use web_fetch with the image URL
 ### Correct Response Pattern
 1. Call `github-mcp-server-issue_read` (method: "get", issue_number: 5)
 2. Parse body for image URLs
-3. Call `web_fetch` on each image URL found
-4. Describe the images
+3. Download each image with `Invoke-WebRequest -Uri "<URL>" -OutFile "$env:TEMP\issue-image-N.png"`
+4. Call `view` on each downloaded file
+5. Describe the images
 
 ### WRONG Response (Never Do This)
 ❌ "I can see the issue but can't fetch the screenshot directly"
@@ -60,16 +69,18 @@ Use web_fetch with the image URL
 
 ## Critical Rules
 
-1. **ALWAYS TRY TO FETCH FIRST** - Never claim you can't access GitHub issue images without attempting
-2. **GitHub CDN is PUBLIC** - No authentication required for user-images.githubusercontent.com
-3. **Use web_fetch for images** - It's designed for this exact purpose
+1. **NEVER USE `web_fetch` FOR IMAGES** - It cannot parse image content types and will fail
+2. **Download first, then `view`** - Use PowerShell's `Invoke-WebRequest` to download, then `view` tool to display
+3. **GitHub CDN is PUBLIC** - No authentication required for user-images.githubusercontent.com
 4. **Be proactive** - Don't wait for the user to ask twice
 
 ## Tool Priority
 
 1. `github-mcp-server-issue_read` - Get issue details
-2. `web_fetch` - Fetch image content (works with githubusercontent.com)
-3. `view` - If image is already downloaded locally
+2. `powershell` with `Invoke-WebRequest` - Download image to temp file
+3. `view` - Display the downloaded image (supports PNG, JPG, GIF, etc.)
+
+**NEVER use `web_fetch` for images** - it only works for HTML pages.
 
 ## Success Criteria
 

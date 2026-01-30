@@ -580,7 +580,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Track effective max for display (higher in dev mode)
   const effectiveMaxAttemptsRef = useRef(maxReconnectAttempts);
   const isCopyingRef = useRef(false); // Prevent clipboard spam
-  const isPastingRef = useRef(false); // Prevent double paste handling
   const isVisibleRef = useRef(isVisible); // Track visibility to avoid stale closures in paste handlers
   
   // State for scroll button visibility
@@ -668,16 +667,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   }, [visionEnabled, tabId]);
 
   // Refit terminal when becoming visible
+  // v3.17.9: Fix flicker + truncation on tab switch
+  // Solution: Hide content during transition, fit, then reveal
   useEffect(() => {
     if (isVisible && fitAddonRef.current && xtermRef.current && terminalRef.current && wsRef.current) {
-      // v3.17.5: Fix terminal content cutoff after tab switch
-      // Problem: Prompt shows "Users\Downloads>" instead of "PS C:\Users\Downloads>"
-      // Root cause: Terminal dimensions change but buffer content not redrawn
+      const container = terminalRef.current;
+      
+      // Step 1: Immediately hide content to prevent flash of stale content
+      container.style.opacity = '0';
+      
       const performFit = () => {
-        if (!fitAddonRef.current || !xtermRef.current || !terminalRef.current || !wsRef.current) return;
+        if (!fitAddonRef.current || !xtermRef.current || !terminalRef.current || !wsRef.current) {
+          // Restore visibility if we bail early
+          container.style.opacity = '1';
+          return;
+        }
         
         // Get container dimensions
-        const container = terminalRef.current;
         const rect = container.getBoundingClientRect();
         
         // Only fit if container has valid dimensions
@@ -714,23 +720,37 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             console.log(`[Terminal ${tabId}] Refreshed terminal display`);
           }
           
-          // Critical fix: Re-focus after fit on visibility change
-          queueMicrotask(() => {
-            if (xtermRef.current) {
-              xtermRef.current.focus();
-            }
+          // Step 2: Reveal terminal after fit is complete
+          // Use RAF to ensure the refresh has rendered before showing
+          requestAnimationFrame(() => {
+            container.style.opacity = '1';
+            
+            // Critical fix: Re-focus after fit on visibility change
+            queueMicrotask(() => {
+              if (xtermRef.current) {
+                xtermRef.current.focus();
+              }
+            });
           });
         } else {
           console.warn(`[Terminal ${tabId}] Skipping fit - invalid container dimensions: ${rect.width}x${rect.height}`);
+          // Retry with longer delay if dimensions aren't ready yet
+          setTimeout(() => {
+            if (terminalRef.current) {
+              terminalRef.current.style.opacity = '1';
+            }
+            performFit();
+          }, 50);
         }
       };
       
-      // Use triple RAF for absolute guarantee of post-layout timing
-      requestAnimationFrame(() => {
+      // Use setTimeout to ensure display:flex has fully applied before measuring
+      // RAF alone isn't reliable for display:none→flex transitions
+      setTimeout(() => {
         requestAnimationFrame(() => {
           requestAnimationFrame(performFit);
         });
-      });
+      }, 16); // ~1 frame delay to let CSS apply
     }
   }, [isVisible, tabId]);
 
@@ -1113,29 +1133,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       term.focus();
     });
 
-    // ROBUST PASTE HANDLER (v3.14.9): Listen for native paste events
-    // With clipboardMode: 'off', xterm won't handle paste natively.
-    // This listener handles ALL paste operations - both text and media.
-    // 
-    // v3.17.8: PASTE EVENT HANDLER (Fallback + Right-Click)
-    // 
-    // WHEN THIS FIRES:
-    // - Right-click → Paste (browser native)
-    // - Edit menu → Paste
-    // - Ctrl+V when clipboard.read() is unavailable (Firefox, permissions denied)
-    // 
-    // WHEN THIS DOESN'T FIRE:
-    // - Ctrl+V in Chromium browsers (our Ctrl+V handler returns false, preventing event)
+    // ROBUST PASTE HANDLER (v3.18.0): Single-source paste architecture
+    // This is the ONLY paste handler - no competing Ctrl+V keyboard handler.
+    // Handles ALL paste operations: text, images, video, right-click, Ctrl+V, Edit menu.
     //
-    // WHY WE NEED BOTH HANDLERS:
-    // - Ctrl+V handler: Required for images (needs navigator.clipboard.read())
-    // - This handler: Fallback for text-only paste and right-click paste
+    // ARCHITECTURE:
+    // 1. Check focus (only focused terminal handles paste)
+    // 2. Try modern clipboard API (clipboard.read()) for images/video support
+    // 3. Fallback to e.clipboardData for text-only or if clipboard.read() fails
+    // 4. No race conditions, no timing-dependent flags, deterministic behavior
     const handlePaste = async (e) => {
-      // CRITICAL FIX v3.17.3: Multi-layered paste routing protection
-      // v3.17.6: Use isVisibleRef to avoid stale closure bug
-      // Problem: ALL terminals attach document-level listeners, causing race conditions
-      // Solution: Check multiple conditions to ensure ONLY the focused terminal handles paste
-      
       // Layer 1: Is this terminal visible?
       if (!isVisibleRef.current) {
         console.log(`[Terminal ${tabId}] Paste ignored - terminal not visible`);
@@ -1151,38 +1158,137 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return;
       }
 
-      // Layer 3: Prevent duplicate handling
-      if (isPastingRef.current) {
-        console.log(`[Terminal ${tabId}] Paste ignored - already processing paste`);
-        return;
-      }
-
       // This terminal IS focused and should handle the paste
       console.log(`[Terminal ${tabId}] ✅ Handling paste (focused and visible)`);
 
-      // Mark that we're handling a paste
-      isPastingRef.current = true;
-      setTimeout(() => { isPastingRef.current = false; }, 500);
+      // Prevent browser default paste behavior
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Try modern clipboard API first (supports images/video)
+      try {
+        if (navigator.clipboard?.read) {
+          console.log('[Terminal] Attempting clipboard.read() for media support');
+          const clipboardItems = await navigator.clipboard.read();
+          
+          for (const item of clipboardItems) {
+            // Priority 1: Check for images/video (premium feature)
+            const imageType = item.types.find(t => t.startsWith('image/'));
+            const videoType = item.types.find(t => t.startsWith('video/'));
+            const mediaType = imageType || videoType;
+            
+            if (mediaType) {
+              const isImage = !!imageType;
+              const mediaTypeStr = isImage ? 'image' : 'video';
+              console.log(`[Terminal] ${mediaTypeStr} found in clipboard:`, mediaType);
+              
+              const blob = await item.getType(mediaType);
+              const fileSizeKB = Math.round(blob.size / 1024);
+              const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+              
+              const extMap = {
+                'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif',
+                'image/webp': '.webp', 'image/bmp': '.bmp', 'video/mp4': '.mp4',
+                'video/webm': '.webm', 'video/quicktime': '.mov', 'video/x-msvideo': '.avi',
+              };
+              const ext = extMap[mediaType] || (isImage ? '.png' : '.mp4');
+              const filename = `clipboard-${Date.now()}${ext}`;
+              
+              // Show uploading indicator
+              if (xtermRef.current) {
+                const sizeStr = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
+                xtermRef.current.write(`\x1b[33m[Uploading ${mediaTypeStr} (${sizeStr})...]\x1b[0m`);
+              }
+              
+              const formData = new FormData();
+              formData.append('file', blob, filename);
+              
+              const response = await fetch('/api/files/upload', {
+                method: 'POST',
+                body: formData
+              });
+              
+              if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+              
+              const data = await response.json();
+              const filePath = data.path;
+              
+              // Clear uploading indicator
+              if (xtermRef.current) {
+                xtermRef.current.write('\r\x1b[K');
+                
+                // Handle video frame extraction
+                if (data.isVideo) {
+                  if (!data.ffmpegAvailable) {
+                    xtermRef.current.write(`\x1b[33m[Note: Install ffmpeg for AI video analysis]\x1b[0m\r\n`);
+                  } else if (data.framePaths?.length > 0) {
+                    xtermRef.current.write(`\x1b[32m[Extracted ${data.framePaths.length} frames]\x1b[0m\r\n`);
+                  }
+                }
+                
+                // Send the file path to the terminal
+                if (wsRef.current?.readyState === WebSocket.OPEN && filePath) {
+                  const textToSend = `see file at ${filePath}`;
+                  xtermRef.current.write(textToSend);
+                  wsRef.current.send(textToSend);
+                  console.log(`[Terminal] Sent ${mediaTypeStr} path to backend:`, textToSend);
+                }
+                
+                // Show toast
+                if (onPasteRef.current) {
+                  onPasteRef.current(mediaTypeStr, {
+                    filename, path: filePath, size: blob.size, sizeKB: fileSizeKB,
+                    mimeType: mediaType, frameCount: data.framePaths?.length || 0,
+                    ffmpegAvailable: data.ffmpegAvailable
+                  });
+                }
+              }
+              
+              return; // Media handled successfully
+            }
+            
+            // Priority 2: Check for text
+            if (item.types.includes('text/plain')) {
+              const textBlob = await item.getType('text/plain');
+              const text = await textBlob.text();
+              if (text && xtermRef.current) {
+                console.log('[Terminal] Text paste from clipboard.read():', text.length, 'chars');
+                xtermRef.current.paste(text);
+                if (onPasteRef.current) {
+                  onPasteRef.current('text', { chars: text.length });
+                }
+              }
+              return; // Text handled successfully
+            }
+          }
+          
+          console.log('[Terminal] clipboard.read() found no usable content');
+        }
+      } catch (err) {
+        // clipboard.read() failed - this is expected in Firefox or if permission denied
+        console.log('[Terminal] clipboard.read() not available or failed, using fallback:', err.message);
+        // Don't log permission denials as errors (expected behavior)
+        if (!err.message.includes('denied') && !err.message.includes('permission')) {
+          logPasteError(err, { location: 'clipboard-read-fallback' });
+        }
+      }
       
+      // Fallback: Use traditional e.clipboardData API (works in all browsers for text, some for media)
       if (!e.clipboardData) {
-        console.log(`[Terminal ${tabId}] Paste aborted - no clipboardData`);
+        console.log(`[Terminal ${tabId}] Paste aborted - no clipboard data available`);
         return;
       }
       
+      console.log('[Terminal] Using fallback e.clipboardData API');
       const text = e.clipboardData.getData('text/plain');
       const hasMedia = Array.from(e.clipboardData.items || []).some(item => 
         item.type.startsWith('image/') || item.type.startsWith('video/')
       );
       
-      // Check for images/videos FIRST
-      // Some screenshot tools put file path as text AND image in clipboard
-      // We want the image, not the path!
+      // Check for images/videos in clipboardData
       if (hasMedia) {
-        console.log('[Terminal] Media detected in clipboard, handling upload');
-        e.preventDefault(); // STOP xterm from handling - we'll handle the media
-        e.stopPropagation();
+        console.log('[Terminal] Media detected in e.clipboardData, handling upload');
         
-        // Handle media upload
         for (const item of e.clipboardData.items) {
           const isImage = item.type.startsWith('image/');
           const isVideo = item.type.startsWith('video/');
@@ -1205,16 +1311,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 'video/webm': '.webm', 'video/quicktime': '.mov', 'video/x-msvideo': '.avi',
               };
               const ext = extMap[mimeType] || (isImage ? '.png' : '.mp4');
-              
-              const formData = new FormData();
               const filename = `clipboard-${Date.now()}${ext}`;
-              formData.append('file', blob, filename);
               
               // Show uploading indicator
               if (xtermRef.current) {
                 const sizeStr = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
                 xtermRef.current.write(`\x1b[33m[Uploading ${mediaType} (${sizeStr})...]\x1b[0m`);
               }
+              
+              const formData = new FormData();
+              formData.append('file', blob, filename);
               
               const response = await fetch('/api/files/upload', {
                 method: 'POST',
@@ -1229,39 +1335,35 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               // Clear uploading indicator
               if (xtermRef.current) {
                 xtermRef.current.write('\r\x1b[K');
-              }
-              
-              // Handle video frame extraction
-              if (data.isVideo) {
-                if (!data.ffmpegAvailable) {
-                  if (xtermRef.current) {
+                
+                // Handle video frame extraction
+                if (data.isVideo) {
+                  if (!data.ffmpegAvailable) {
                     xtermRef.current.write(`\x1b[33m[Note: Install ffmpeg for AI video analysis]\x1b[0m\r\n`);
-                  }
-                } else if (data.framePaths?.length > 0) {
-                  if (xtermRef.current) {
+                  } else if (data.framePaths?.length > 0) {
                     xtermRef.current.write(`\x1b[32m[Extracted ${data.framePaths.length} frames]\x1b[0m\r\n`);
                   }
                 }
-              }
-              
-              // Send the file path to the terminal
-              if (wsRef.current?.readyState === WebSocket.OPEN && filePath) {
-                const textToSend = `see file at ${filePath}`;
-                xtermRef.current.write(textToSend);
-                wsRef.current.send(textToSend);
-                console.log(`[Terminal] Sent ${mediaType} path to backend:`, textToSend);
-              }
-              
-              // Show toast
-              if (onPasteRef.current) {
-                onPasteRef.current(mediaType, {
-                  filename, path: filePath, size: blob.size, sizeKB: fileSizeKB,
-                  mimeType, frameCount: data.framePaths?.length || 0,
-                  ffmpegAvailable: data.ffmpegAvailable
-                });
+                
+                // Send the file path to the terminal
+                if (wsRef.current?.readyState === WebSocket.OPEN && filePath) {
+                  const textToSend = `see file at ${filePath}`;
+                  xtermRef.current.write(textToSend);
+                  wsRef.current.send(textToSend);
+                  console.log(`[Terminal] Sent ${mediaType} path to backend:`, textToSend);
+                }
+                
+                // Show toast
+                if (onPasteRef.current) {
+                  onPasteRef.current(mediaType, {
+                    filename, path: filePath, size: blob.size, sizeKB: fileSizeKB,
+                    mimeType, frameCount: data.framePaths?.length || 0,
+                    ffmpegAvailable: data.ffmpegAvailable
+                  });
+                }
               }
             } catch (err) {
-              logPasteError(err, { location: 'handlePaste-media', mimeType: item.type });
+              logPasteError(err, { mediaType, location: 'paste-event-media-fallback' });
               console.error(`[Terminal] ${mediaType} upload failed:`, err);
               if (xtermRef.current) {
                 xtermRef.current.write(`\r\x1b[K\x1b[31m[Upload failed: ${err.message}]\x1b[0m\r\n`);
@@ -1270,16 +1372,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             break; // Only handle first media item
           }
         }
-        return; // Media handled, don't let xterm process
+        return; // Media handled
       }
       
-      // TEXT PASTE: Handle it ourselves since clipboardMode is 'off'
+      // TEXT PASTE: Handle plain text
       if (text) {
-        console.log('[Terminal] Text paste - handling:', text.length, 'chars');
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Use xterm's paste method which handles the text properly
+        console.log('[Terminal] Text paste from e.clipboardData:', text.length, 'chars');
         if (xtermRef.current) {
           xtermRef.current.paste(text);
           if (onPasteRef.current) {
@@ -1288,24 +1386,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
         return;
       }
+      
+      console.log('[Terminal] No usable clipboard content found');
     };
 
-    // v3.14.10: Attach paste listeners in multiple locations for maximum reliability
-    // This ensures paste works across all browsers and test environments
+    // v3.18.0: Attach paste listener to textarea only (single listener = no race conditions)
+    // This ensures paste works for all paste methods (Ctrl+V, right-click, Edit menu)
     if (terminalRef.current) {
-      // Container listener (capture phase) - catches paste from anywhere in the terminal area
-      terminalRef.current.addEventListener('paste', handlePaste, true);
-      
-      // Also attach to the xterm textarea directly - this is where keyboard paste events fire
+      // Attach to the xterm textarea directly - this is where paste events fire
       const xtermTextarea = terminalRef.current.querySelector('.xterm-helper-textarea');
       if (xtermTextarea) {
         xtermTextarea.addEventListener('paste', handlePaste, true);
       }
-      
-      // v3.17.3 FIX: REMOVED document-level listener
-      // Previous code had: document.addEventListener('paste', handlePaste, true);
-      // This caused ALL terminals to compete for paste events, creating race conditions
-      // The textarea listener above is sufficient - it captures paste when terminal is focused
     }
     
     // Expose xterm paste for testing - allows direct invocation bypassing clipboard
@@ -1387,149 +1479,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // v3.17.8: PROPER ARCHITECTURE - Ctrl+V handler for image support without double-paste
-      // 
-      // WHY WE NEED THIS HANDLER:
-      // - navigator.clipboard.read() can access ClipboardItem types (images/video)
-      // - e.clipboardData in paste events cannot access raw image data
-      // - We MUST intercept Ctrl+V at keyboard level to use clipboard.read()
-      //
-      // HOW WE PREVENT DOUBLE-PASTE:
-      // - Read clipboard programmatically
-      // - Paste the content directly via xtermRef.current.paste()
-      // - Return FALSE to prevent browser from dispatching paste event
-      // - This ensures ONLY our code runs, no race condition
-      //
-      // FALLBACK PATH:
-      // - If clipboard.read() fails (permissions/Firefox), return TRUE
-      // - Browser dispatches native paste event
-      // - handlePaste catches it and handles via e.clipboardData (text-only fallback)
-      if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        // Layer 1: Visibility check (avoid stale closure bug with ref)
-        if (!isVisibleRef.current) {
-          console.log(`[Terminal ${tabId}] Ctrl+V ignored - terminal not visible`);
-          return false;
-        }
-
-        // Layer 2: Focus check
-        const xtermTextarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
-        const hasFocus = xtermTextarea && document.activeElement === xtermTextarea;
-        
-        if (!hasFocus) {
-          console.log(`[Terminal ${tabId}] Ctrl+V ignored - terminal not focused`);
-          return false;
-        }
-
-        // Layer 3: Prevent re-entrancy
-        if (isPastingRef.current) {
-          console.log(`[Terminal ${tabId}] Ctrl+V ignored - paste already in progress`);
-          return false;
-        }
-        
-        console.log(`[Terminal ${tabId}] ✅ Handling Ctrl+V (focused and visible)`);
-        
-        // Mark paste in progress (prevents handlePaste from also firing)
-        isPastingRef.current = true;
-        const clearPasting = () => { isPastingRef.current = false; };
-        
-        // Attempt to read clipboard with full API access
-        (async () => {
-          try {
-            // Try navigator.clipboard.read() for images
-            if (!navigator.clipboard?.read) {
-              console.log('[Terminal] clipboard.read() not available, falling back to paste event');
-              clearPasting();
-              return; // Let browser dispatch paste event for handlePaste
-            }
-
-            const items = await navigator.clipboard.read();
-            
-            // Process clipboard items
-            for (const item of items) {
-              // Check for images FIRST (priority over text)
-              const imageType = item.types.find(t => t.startsWith('image/'));
-              if (imageType) {
-                console.log('[Terminal] Ctrl+V: Image found in clipboard');
-                const blob = await item.getType(imageType);
-                
-                // Upload the image
-                const formData = new FormData();
-                const filename = `clipboard-${Date.now()}.png`;
-                formData.append('file', blob, filename);
-                
-                // Show uploading indicator
-                if (xtermRef.current) {
-                  const sizeKB = Math.round(blob.size / 1024);
-                  const sizeStr = sizeKB > 1024 ? `${(sizeKB/1024).toFixed(2)}MB` : `${sizeKB}KB`;
-                  xtermRef.current.write(`\x1b[33m[Uploading image (${sizeStr})...]\x1b[0m`);
-                }
-                
-                const response = await fetch('/api/files/upload', {
-                  method: 'POST',
-                  body: formData
-                });
-                
-                if (response.ok) {
-                  const data = await response.json();
-                  
-                  // Clear uploading indicator
-                  if (xtermRef.current) {
-                    xtermRef.current.write('\r\x1b[K');
-                  }
-                  
-                  if (data.path && xtermRef.current) {
-                    const textToSend = `see file at ${data.path}`;
-                    xtermRef.current.paste(textToSend);
-                    if (onPasteRef.current) {
-                      onPasteRef.current('image', { 
-                        filename, 
-                        path: data.path, 
-                        size: blob.size, 
-                        sizeKB: Math.round(blob.size / 1024) 
-                      });
-                    }
-                    console.log('[Terminal] Image uploaded and path pasted');
-                  }
-                } else {
-                  throw new Error(`Upload failed: ${response.statusText}`);
-                }
-                
-                clearPasting();
-                return; // Image handled, done
-              }
-              
-              // Check for text
-              if (item.types.includes('text/plain')) {
-                const textBlob = await item.getType('text/plain');
-                const text = await textBlob.text();
-                if (text && xtermRef.current) {
-                  console.log('[Terminal] Ctrl+V paste text:', text.length, 'chars');
-                  xtermRef.current.paste(text);
-                  if (onPasteRef.current) {
-                    onPasteRef.current('text', { chars: text.length });
-                  }
-                }
-                clearPasting();
-                return; // Text handled, done
-              }
-            }
-            
-            // No content found
-            clearPasting();
-          } catch (err) {
-            console.log('[Terminal] clipboard.read() failed, will fallback to paste event:', err.message);
-            clearPasting();
-            // Don't call logPasteError for permission denials - expected behavior
-            if (!err.message.includes('denied') && !err.message.includes('permission')) {
-              logPasteError(err, { location: 'ctrl-v-clipboard-read' });
-            }
-          }
-        })();
-        
-        // CRITICAL: Return FALSE immediately to prevent browser's paste event
-        // This ensures ONLY our programmatic paste runs (no double-paste)
-        return false;
-      }
+      // v3.18.0: Removed Ctrl+V keyboard handler - using single-source paste architecture
+      // All paste operations (Ctrl+V, right-click, Edit menu) now handled by handlePaste() only
+      // This eliminates race conditions and double-paste issues
 
       return true; // Let all other keys pass through standard xterm processing
     });
