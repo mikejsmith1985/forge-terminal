@@ -1385,16 +1385,15 @@ body {
 }
 
 /* v3.16.14: Fix ghost terminal flash on sidebar view switch
-   Use combination of visibility, opacity, z-index, and display for bulletproof hiding
-   - display: none completely removes from layout calculations
-   - visibility: hidden prevents rendering/painting
-   - opacity: 0 ensures transparency during any brief transition
-   - z-index: -1 pushes hidden terminals below everything
-   - pointer-events: none prevents accidental interaction
-   - transform: translateZ(0) forces GPU layer isolation
+   v3.17.11: REVERTED display:none - it breaks xterm.js layout calculations
+   When switching from display:none to display:flex, xterm's internal viewport
+   gets corrupted and renders content starting from wrong position (left edge cutoff).
+   
+   Solution: Use visibility:hidden + opacity:0 WITHOUT display:none
+   This keeps the terminal in the DOM layout, allowing xterm to maintain proper
+   internal state while being invisible to the user.
 */
 .terminal-wrapper.hidden {
-  display: none;
   visibility: hidden;
   opacity: 0;
   z-index: -1;
@@ -1402,14 +1401,11 @@ body {
 }
 
 /* v3.16.14: Active terminal gets higher z-index and forced GPU layer */
-/* v3.17.9: Added transition for smooth tab switch (prevents flicker) */
+/* v3.17.11: Removed display:flex (no longer needed since we don't use display:none) */
 .terminal-wrapper:not(.hidden) {
-  display: flex;
   z-index: 10;
   visibility: visible;
   opacity: 1;
-  transition: opacity 0.05s ease-out;
-  will-change: opacity;
 }
 
 /* v3.8.2: Task Dashboard Panel */

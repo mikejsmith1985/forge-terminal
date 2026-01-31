@@ -667,92 +667,25 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   }, [visionEnabled, tabId]);
 
   // Refit terminal when becoming visible
-  // v3.17.9: Fix flicker + truncation on tab switch
-  // Solution: Hide content during transition, fit, then reveal
+  // v3.17.11: SIMPLIFIED - reverted to v3.16.6 approach
+  // The complex hide-fit-reveal logic was needed for display:none transitions
+  // but we've reverted to visibility:hidden which doesn't need that complexity
   useEffect(() => {
-    if (isVisible && fitAddonRef.current && xtermRef.current && terminalRef.current && wsRef.current) {
-      const container = terminalRef.current;
-      
-      // Step 1: Immediately hide content to prevent flash of stale content
-      container.style.opacity = '0';
-      
-      const performFit = () => {
-        if (!fitAddonRef.current || !xtermRef.current || !terminalRef.current || !wsRef.current) {
-          // Restore visibility if we bail early
-          container.style.opacity = '1';
-          return;
-        }
-        
-        // Get container dimensions
-        const rect = container.getBoundingClientRect();
-        
-        // Only fit if container has valid dimensions
-        if (rect.width > 0 && rect.height > 0) {
-          console.log(`[Terminal ${tabId}] Fitting with container dimensions: ${rect.width}x${rect.height}`);
-          
-          // Get current terminal size before fit
-          const oldCols = xtermRef.current.cols;
-          const oldRows = xtermRef.current.rows;
-          
-          // Fit terminal to container - this changes cols/rows
-          fitAddonRef.current.fit();
-          
-          // Get new terminal size after fit
-          const newCols = xtermRef.current.cols;
-          const newRows = xtermRef.current.rows;
-          
-          console.log(`[Terminal ${tabId}] Resized from ${oldCols}x${oldRows} to ${newCols}x${newRows}`);
-          
-          // If dimensions changed, send resize to backend AND force terminal refresh
-          if (oldCols !== newCols || oldRows !== newRows) {
-            // Send resize to backend (PTY)
-            if (wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(JSON.stringify({ 
-                type: 'resize', 
-                cols: newCols, 
-                rows: newRows 
-              }));
-              console.log(`[Terminal ${tabId}] Sent resize to backend: ${newCols}x${newRows}`);
-            }
-            
-            // Force full terminal refresh to redraw buffer content with new dimensions
-            xtermRef.current.refresh(0, newRows - 1);
-            console.log(`[Terminal ${tabId}] Refreshed terminal display`);
-          }
-          
-          // Step 2: Reveal terminal after fit is complete
-          // Use RAF to ensure the refresh has rendered before showing
-          requestAnimationFrame(() => {
-            container.style.opacity = '1';
-            
-            // Critical fix: Re-focus after fit on visibility change
-            queueMicrotask(() => {
-              if (xtermRef.current) {
-                xtermRef.current.focus();
-              }
-            });
-          });
-        } else {
-          console.warn(`[Terminal ${tabId}] Skipping fit - invalid container dimensions: ${rect.width}x${rect.height}`);
-          // Retry with longer delay if dimensions aren't ready yet
-          setTimeout(() => {
-            if (terminalRef.current) {
-              terminalRef.current.style.opacity = '1';
-            }
-            performFit();
-          }, 50);
-        }
-      };
-      
-      // Use setTimeout to ensure display:flex has fully applied before measuring
-      // RAF alone isn't reliable for display:none→flex transitions
+    if (isVisible && fitAddonRef.current && xtermRef.current) {
+      // Small delay to ensure the container is properly sized
       setTimeout(() => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(performFit);
-        });
-      }, 16); // ~1 frame delay to let CSS apply
+        if (fitAddonRef.current && xtermRef.current) {
+          fitAddonRef.current.fit();
+          // Critical fix: Re-focus after fit on visibility change
+          queueMicrotask(() => {
+            if (xtermRef.current) {
+              xtermRef.current.focus();
+            }
+          });
+        }
+      }, 50);
     }
-  }, [isVisible, tabId]);
+  }, [isVisible]);
 
   // Fix spacebar issue: Focus terminal on window focus
   useEffect(() => {
