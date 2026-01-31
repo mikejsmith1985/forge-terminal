@@ -14,12 +14,9 @@ const getAPIBase = () => {
     return stored
   }
 
-  // 3. Try localhost (local development)
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `http://${window.location.hostname}:8333`
-  }
-
-  // 4. Return current origin (same-origin deployment)
+  // 3. Use current origin (same-origin deployment)
+  // This works for embedded mode where frontend is served from the Go backend
+  // The port will match whatever port the server is actually running on
   return window.location.origin
 }
 

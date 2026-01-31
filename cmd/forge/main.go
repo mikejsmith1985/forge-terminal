@@ -90,6 +90,11 @@ func main() {
 
 	forgeDir := filepath.Join(homeDir, ".forge")
 	
+	// Check for devMode from environment if not set via ldflags
+	if devMode == "" {
+		devMode = os.Getenv("FORGE_DEV_MODE")
+	}
+	
 	// Ensure directory exists for logging (created by lockfile usually, but we want to log earlier)
 	_ = os.MkdirAll(forgeDir, 0755)
 
@@ -402,6 +407,9 @@ func main() {
 	// Error logging API - client-side error reporting
 	http.HandleFunc("/api/log-error", WrapWithMiddleware(handleLogError))
 
+	// Open external files (HTML in browser, etc.)
+	http.HandleFunc("/api/open-external", WrapWithMiddleware(handleOpenExternal))
+
 	// Temp image upload API
 	http.HandleFunc("/api/temp-image", WrapWithMiddleware(handleTempImageUpload))
 
@@ -578,6 +586,89 @@ func openBrowser(url string) {
 	if cmd != nil {
 		_ = cmd.Start()
 	}
+}
+
+// handleOpenExternal opens a file in the system's default application
+// Used for HTML files to open in browser, etc.
+func handleOpenExternal(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Path == "" {
+		http.Error(w, "Path is required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[API] Opening external: %s", req.Path)
+
+	// Resolve path
+	absPath, err := filepath.Abs(req.Path)
+	if err != nil {
+		http.Error(w, "Invalid path: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(absPath); err != nil {
+		http.Error(w, "File not found: "+absPath, http.StatusNotFound)
+		return
+	}
+
+	// Detect file type to choose appropriate handler
+	ext := strings.ToLower(filepath.Ext(absPath))
+	isHTML := ext == ".html" || ext == ".htm"
+
+	// Open with system default application
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		if isHTML {
+			// Force browser for HTML files on macOS
+			cmd = exec.Command("open", "-a", "Safari", absPath)
+		} else {
+			cmd = exec.Command("open", absPath)
+		}
+	case "linux":
+		if isHTML {
+			// Try xdg-open which should use default browser for HTML
+			cmd = exec.Command("xdg-open", absPath)
+		} else {
+			cmd = exec.Command("xdg-open", absPath)
+		}
+	case "windows":
+		// On Windows, use 'start' with file:// URL for proper handling
+		// Clean path for URL format
+		urlPath := "file:///" + strings.ReplaceAll(absPath, "\\", "/")
+		if isHTML {
+			// For HTML, explicitly use browser protocol to avoid VS Code association
+			// The http:// trick forces browser even if .html is associated with editor
+			cmd = exec.Command("cmd", "/c", "start", "", urlPath)
+		} else {
+			cmd = exec.Command("cmd", "/c", "start", "", urlPath)
+		}
+		hideWindow(cmd)
+	}
+
+	if cmd != nil {
+		if err := cmd.Start(); err != nil {
+			log.Printf("[API] Failed to open external: %v", err)
+			http.Error(w, "Failed to open: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 func handleShutdown(w http.ResponseWriter, r *http.Request) {

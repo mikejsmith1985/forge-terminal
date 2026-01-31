@@ -25,20 +25,21 @@ export default function ImageViewer({
     setError(null);
 
     try {
-      const params = new URLSearchParams();
-      params.set('path', path);
-      params.set('rootPath', rootPath);
-
-      const response = await fetch(`/api/files/read?${params.toString()}`);
+      console.log('[ImageViewer] Loading image:', path, 'rootPath:', rootPath);
+      
+      // Use stream endpoint for binary file support
+      const response = await fetch(`/api/files/stream?path=${encodeURIComponent(path)}&rootPath=${encodeURIComponent(rootPath)}`);
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
       }
 
-      // Get the image as blob and create object URL
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setImageUrl(url);
+      
+      console.log('[ImageViewer] Image loaded successfully');
     } catch (err) {
       console.error('[ImageViewer] Load error:', err);
       setError(err.message || 'Failed to load image');

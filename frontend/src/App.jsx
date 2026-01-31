@@ -1163,15 +1163,89 @@ function App() {
     return ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico'].includes(ext);
   };
 
+  // Check if file should open in browser (HTML files)
+  const isBrowserFile = (fileName) => {
+    if (!fileName) return false;
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    return ['html', 'htm'].includes(ext);
+  };
+
   // File explorer handlers
-  const handleFileOpen = useCallback((file) => {
-    // Open file in editor instead of new tab
-    setEditorFile(file);
-    setShowEditor(true);
+  const handleFileOpen = useCallback(async (file) => {
+    console.log('[App] handleFileOpen called:', file);
     
-    // Ensure sidebar stays on files or whatever is appropriate
-    // setSidebarView('files'); // Optional, keep current view
-  }, [setEditorFile, setShowEditor]);
+    if (!file || !file.path) {
+      console.error('[App] Invalid file object:', file);
+      addToast('Cannot open file: invalid file object', 'error', 3000);
+      return;
+    }
+
+    const fileName = file.name || file.path.split(/[/\\]/).pop();
+    
+    // HTML files: open in browser
+    if (isBrowserFile(fileName)) {
+      try {
+        // Get the active tab's current directory to resolve relative paths
+        const cwd = activeTab?.currentDirectory || '.';
+        
+        // Resolve the full path
+        let fullPath = file.path;
+        if (!file.path.match(/^[A-Za-z]:/) && !file.path.startsWith('/') && !file.path.startsWith('\\\\')) {
+          // Relative path - join with cwd
+          fullPath = cwd.replace(/\\/g, '/') + '/' + file.path.replace(/\\/g, '/');
+        }
+        
+        console.log('[App] Opening HTML in browser:', fullPath);
+        
+        // Use the backend API to open in system browser
+        const response = await fetch('/api/open-external', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: fullPath }),
+        });
+        
+        if (response.ok) {
+          addToast(`🌐 Opened ${fileName} in browser`, 'success', 2000);
+        } else {
+          // Fallback: try file:// URL in new tab
+          const fileUrl = `file:///${fullPath.replace(/\\/g, '/')}`;
+          window.open(fileUrl, '_blank');
+          addToast(`🌐 Opened ${fileName}`, 'success', 2000);
+        }
+      } catch (err) {
+        console.error('[App] Failed to open in browser:', err);
+        // Fallback to editor if browser open fails
+        setEditorFile({ ...file, name: fileName });
+        setShowEditor(true);
+      }
+      return;
+    }
+
+    // Images: use ImageViewer
+    // Other files: use MonacoEditor
+    // Both are handled by the existing render logic
+    
+    // Compute the correct rootPath for the file
+    // If path is absolute, use the file's directory as rootPath
+    // If relative, use the current tab's directory
+    let computedRootPath = activeTab?.currentDirectory || '.';
+    const isAbsolutePath = file.path.match(/^[A-Za-z]:/) || file.path.startsWith('/') || file.path.startsWith('\\\\');
+    
+    if (isAbsolutePath) {
+      // For absolute paths, use the file's parent directory as rootPath
+      // This allows reading files outside the current working directory
+      const pathParts = file.path.replace(/\\/g, '/').split('/');
+      pathParts.pop(); // Remove filename
+      computedRootPath = pathParts.join('/') || '/';
+      console.log('[App] Absolute path detected, using parent as rootPath:', computedRootPath);
+    }
+    
+    setEditorFile({ ...file, name: fileName, rootPath: computedRootPath });
+    setShowEditor(true);
+  }, [activeTab, addToast]);
+
+  // Ensure file has a name property
+  // (Some callers only provide path)
 
   const handleEditorClose = useCallback(() => {
     setShowEditor(false);
@@ -1790,7 +1864,7 @@ function App() {
             <ImageViewer
               file={editorFile}
               onClose={handleEditorClose}
-              rootPath={activeTab?.currentDirectory || '.'}
+              rootPath={editorFile?.rootPath || activeTab?.currentDirectory || '.'}
             />
           ) : editorMode === 'agentic' ? (
             <AgenticEditor
@@ -1830,7 +1904,7 @@ function App() {
               onClose={handleEditorClose}
               onSave={handleEditorSave}
               theme={activeTab?.mode || theme}
-              rootPath={activeTab?.currentDirectory || '.'}
+              rootPath={editorFile?.rootPath || activeTab?.currentDirectory || '.'}
               terminalRef={getActiveTerminalRef()}
             />
           )}
