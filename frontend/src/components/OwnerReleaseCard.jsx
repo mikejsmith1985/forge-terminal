@@ -172,12 +172,40 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
           const userData = await res.json();
           setGithubUsername(userData.login);
           setIsAuthorized(userData.login.toLowerCase() === OWNER_USERNAME.toLowerCase());
+          // Cache username for offline/rate-limited fallback
+          localStorage.setItem('forge_github_username', userData.login);
+        } else if (res.status === 401) {
+          // Token is invalid or expired - clear cached username
+          setIsAuthorized(false);
+          setGithubUsername(null);
+          localStorage.removeItem('forge_github_username');
+        } else {
+          // Rate limited (403) or other transient error - trust the stored token
+          // Use cached username if available, otherwise assume authorized
+          const cachedUsername = localStorage.getItem('forge_github_username');
+          if (cachedUsername) {
+            setGithubUsername(cachedUsername);
+            setIsAuthorized(cachedUsername.toLowerCase() === OWNER_USERNAME.toLowerCase());
+          } else {
+            // Token exists but we can't verify - allow access rather than block
+            setIsAuthorized(true);
+            console.warn('[OwnerReleaseCard] GitHub API returned', res.status, '- allowing access with stored token');
+          }
+        }
+      } catch (err) {
+        console.error('[OwnerReleaseCard] Auth check failed (network error):', err);
+        // Network error (offline, sleep/wake, DNS failure) - trust stored token
+        const cachedUsername = localStorage.getItem('forge_github_username');
+        if (cachedUsername) {
+          setGithubUsername(cachedUsername);
+          setIsAuthorized(cachedUsername.toLowerCase() === OWNER_USERNAME.toLowerCase());
+        } else if (token) {
+          // Token exists but can't reach GitHub - allow access
+          setIsAuthorized(true);
+          console.warn('[OwnerReleaseCard] Network error - allowing access with stored token');
         } else {
           setIsAuthorized(false);
         }
-      } catch (err) {
-        console.error('[OwnerReleaseCard] Auth check failed:', err);
-        setIsAuthorized(false);
       } finally {
         setAuthChecking(false);
       }

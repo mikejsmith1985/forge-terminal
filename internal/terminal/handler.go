@@ -24,6 +24,7 @@ const (
 	CloseCodeTimeout         = 4001 // Session timed out
 	CloseCodePTYError        = 4002 // PTY read/write error
 	CloseCodeSessionRestart  = 4003 // All sessions restarted (server still running)
+	CloseCodeSystemSleep     = 4004 // System is suspending (sleep/hibernate)
 )
 
 // PTYLogEntry represents a single PTY I/O operation for debugging
@@ -158,11 +159,12 @@ func getPrintableText(data []byte) string {
 
 // Handler manages WebSocket terminal connections.
 type Handler struct {
-	upgrader        websocket.Upgrader
-	sessions        sync.Map // map[string]*TerminalSession
-	visionParser    *vision.Parser
-	llmDetector     *llm.Detector
-	restartRequested atomic.Bool // Flag to indicate session restart is in progress
+	upgrader             websocket.Upgrader
+	sessions             sync.Map // map[string]*TerminalSession
+	visionParser         *vision.Parser
+	llmDetector          *llm.Detector
+	restartRequested     atomic.Bool // Flag to indicate session restart is in progress
+	systemSleepRequested atomic.Bool // Flag to indicate system sleep is closing sessions
 }
 
 // connWriter wraps a websocket.Conn with a mutex for thread-safe writes.
@@ -353,6 +355,29 @@ func (h *Handler) CloseAllSessions() int {
 		return true // continue iteration
 	})
 	log.Printf("[Terminal] Closed %d sessions for restart", count)
+	return count
+}
+
+// SuspendSessions closes all sessions due to system sleep/hibernate.
+// Uses CloseCodeSystemSleep (4004) so the frontend knows to reconnect
+// with higher tolerance when the system wakes.
+func (h *Handler) SuspendSessions() int {
+	h.systemSleepRequested.Store(true)
+	defer func() {
+		time.Sleep(100 * time.Millisecond)
+		h.systemSleepRequested.Store(false)
+	}()
+
+	count := 0
+	h.sessions.Range(func(key, value interface{}) bool {
+		if session, ok := value.(*TerminalSession); ok {
+			log.Printf("[Terminal] Closing session %s for system sleep", key)
+			session.Close()
+			count++
+		}
+		return true
+	})
+	log.Printf("[Terminal] Suspended %d sessions for system sleep", count)
 	return count
 }
 
@@ -1057,8 +1082,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			finalReason = closeReason{websocket.CloseNormalClosure, "Connection closed"}
 		}
 	case <-session.Done():
-		// Check if this is a restart or normal exit
-		if h.restartRequested.Load() {
+		// Check if this is a system sleep, restart, or normal exit
+		if h.systemSleepRequested.Load() {
+			log.Printf("[Terminal] Session %s: Closed for system sleep", sessionID)
+			finalReason = closeReason{CloseCodeSystemSleep, "System is going to sleep"}
+		} else if h.restartRequested.Load() {
 			log.Printf("[Terminal] Session %s: Restarting (server still running)", sessionID)
 			finalReason = closeReason{CloseCodeSessionRestart, "Session restarted"}
 		} else {

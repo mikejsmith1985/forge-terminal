@@ -445,6 +445,14 @@ func main() {
 		os.Exit(0)
 	}()
 
+	// Monitor system power events (sleep/wake) to gracefully handle sessions
+	go startPowerEventListener(func() {
+		if termHandler != nil {
+			count := termHandler.SuspendSessions()
+			log.Printf("⚡ Suspended %d terminal sessions before system sleep", count)
+		}
+	})
+
 	// Auto-open browser (skip if NO_BROWSER env var is set for testing)
 	if os.Getenv("NO_BROWSER") == "" {
 		go openBrowser("http://" + addr)

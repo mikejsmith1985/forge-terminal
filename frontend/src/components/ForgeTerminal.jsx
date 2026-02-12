@@ -1889,6 +1889,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             messageColor = '1;33'; // Yellow
             shouldReconnect = true;
             break;
+          case 4004:
+            // Custom: System sleep/hibernate - reconnect with extra patience
+            disconnectMessage = 'System went to sleep. Reconnecting...';
+            messageColor = '1;36'; // Cyan
+            shouldReconnect = true;
+            break;
           default:
             if (event.reason) {
               disconnectMessage = event.reason;
@@ -1905,15 +1911,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Attempt reconnection with exponential backoff
         // SAFETY: Only reconnect if we should AND we're not already trying
         if (shouldReconnect && !reconnectTimeoutRef.current) {
-          // If we are in dev mode (localhost), retry more times
           // v3.14.3: User requested max 3 retries (50 was too many)
-          const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-          const effectiveMaxAttempts = 3; 
+          // System sleep (4004) gets more attempts and longer delays since the server is alive
+          const isSystemSleep = event.code === 4004;
+          const effectiveMaxAttempts = isSystemSleep ? 10 : 3;
+          const baseDelay = isSystemSleep ? 3000 : 1000; // 3s initial delay after sleep for system to stabilize
           // Store for display in overlay
           effectiveMaxAttemptsRef.current = effectiveMaxAttempts;
 
           if (reconnectAttemptsRef.current < effectiveMaxAttempts) {
-            const delay = Math.min(1000 * Math.pow(1.5, reconnectAttemptsRef.current), 10000); // Cap at 10s, slower backoff
+            const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttemptsRef.current), 15000); // Cap at 15s
             reconnectAttemptsRef.current += 1;
             setReconnecting(true);
             
