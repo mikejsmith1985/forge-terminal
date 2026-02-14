@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Copy, Play, GitBranch, Tag, Upload, Shield, AlertCircle, Settings, Plus, Trash2, Folder } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Play, GitBranch, Tag, Upload, AlertCircle, Settings, Plus, Trash2, Folder } from 'lucide-react';
 import { useVersionIncrement } from '../hooks/useVersionIncrement';
 import './OwnerReleaseCard.css';
-
-// The GitHub username of the repository owner who can trigger releases
-const OWNER_USERNAME = 'mikejsmith1985';
 
 // Helper to extract repo name from path
 const getRepoNameFromPath = (path) => {
@@ -33,10 +30,6 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectPath, setNewProjectPath] = useState('');
 
-  // Authorization state
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [githubUsername, setGithubUsername] = useState(null);
-  const [authChecking, setAuthChecking] = useState(true);
   const [commitMessage, setCommitMessage] = useState('');
   
   // v3.17.9: Custom version support
@@ -147,72 +140,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     if (onToast) onToast(`Added "${externalRepoName}" to favorites`, 'success');
   };
 
-  // Check GitHub authorization on mount
-  useEffect(() => {
-    const checkAuthorization = async () => {
-      setAuthChecking(true);
-      const token = localStorage.getItem('forge_github_token');
-      
-      if (!token) {
-        setIsAuthorized(false);
-        setAuthChecking(false);
-        return;
-      }
-
-      try {
-        const authHeader = token.startsWith('github_pat_') ? `Bearer ${token}` : `token ${token}`;
-        const res = await fetch('https://api.github.com/user', {
-          headers: {
-            'Authorization': authHeader,
-            'X-GitHub-Api-Version': '2022-11-28',
-          }
-        });
-
-        if (res.ok) {
-          const userData = await res.json();
-          setGithubUsername(userData.login);
-          setIsAuthorized(userData.login.toLowerCase() === OWNER_USERNAME.toLowerCase());
-          // Cache username for offline/rate-limited fallback
-          localStorage.setItem('forge_github_username', userData.login);
-        } else if (res.status === 401) {
-          // Token is invalid or expired - clear cached username
-          setIsAuthorized(false);
-          setGithubUsername(null);
-          localStorage.removeItem('forge_github_username');
-        } else {
-          // Rate limited (403) or other transient error - trust the stored token
-          // Use cached username if available, otherwise assume authorized
-          const cachedUsername = localStorage.getItem('forge_github_username');
-          if (cachedUsername) {
-            setGithubUsername(cachedUsername);
-            setIsAuthorized(cachedUsername.toLowerCase() === OWNER_USERNAME.toLowerCase());
-          } else {
-            // Token exists but we can't verify - allow access rather than block
-            setIsAuthorized(true);
-            console.warn('[OwnerReleaseCard] GitHub API returned', res.status, '- allowing access with stored token');
-          }
-        }
-      } catch (err) {
-        console.error('[OwnerReleaseCard] Auth check failed (network error):', err);
-        // Network error (offline, sleep/wake, DNS failure) - trust stored token
-        const cachedUsername = localStorage.getItem('forge_github_username');
-        if (cachedUsername) {
-          setGithubUsername(cachedUsername);
-          setIsAuthorized(cachedUsername.toLowerCase() === OWNER_USERNAME.toLowerCase());
-        } else if (token) {
-          // Token exists but can't reach GitHub - allow access
-          setIsAuthorized(true);
-          console.warn('[OwnerReleaseCard] Network error - allowing access with stored token');
-        } else {
-          setIsAuthorized(false);
-        }
-      } finally {
-        setAuthChecking(false);
-      }
-    };
-
-    checkAuthorization();
-  }, []);
+  // Authorization removed - releases use git credentials, not PAT
 
   // Fetch current version - uses isExternalRepo state from auto-detect
   useEffect(() => {
@@ -251,10 +179,8 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       }
     };
 
-    if (isAuthorized) {
-      fetchVersion();
-    }
-  }, [isAuthorized, isExternalRepo, externalRepoPath]); // Refetch when repo detection changes
+    fetchVersion();
+  }, [isExternalRepo, externalRepoPath]); // Refetch when repo detection changes
 
   // v3.17.9: Parse and validate custom version
   const parseCustomVersion = useCallback((input) => {
@@ -373,33 +299,6 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   };
 
   const releaseDisplay = getReleaseTypeDisplay();
-
-  // Show loading while checking auth
-  if (authChecking) {
-    return (
-      <div className="owner-release-card loading-auth">
-        <div className="orc-spinner"></div>
-        <span>Checking authorization...</span>
-      </div>
-    );
-  }
-
-  // Show unauthorized message if not owner
-  if (!isAuthorized) {
-    return (
-      <div className="owner-release-card unauthorized">
-        <div className="orc-unauthorized-content">
-          <Shield size={24} className="orc-shield-icon" />
-          <h3 className="orc-title">Release Manager</h3>
-          <p className="orc-unauthorized-msg">
-            {githubUsername 
-              ? `Logged in as @${githubUsername}. Only the repository owner can create releases.`
-              : 'Configure GitHub PAT in Feedback modal to enable release management.'}
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="owner-release-card" data-testid="owner-release-card">
