@@ -101,7 +101,6 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
         id: 'release-manager',
         command: releaseCommand,
         description: `Release ${next}`,
-        triggerAM: true,
       });
     }
   }, [releaseCommand, next, onExecuteCommand]);

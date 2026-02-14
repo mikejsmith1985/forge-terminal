@@ -356,7 +356,6 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         id: 'owner-release',
         command: releaseCommand,
         description: `Release ${next}`,
-        triggerAM: true,
       });
     }
   }, [releaseCommand, next, onExecuteCommand]);

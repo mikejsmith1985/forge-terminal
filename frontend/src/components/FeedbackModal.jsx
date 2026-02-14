@@ -48,6 +48,12 @@ const FeedbackModal = ({ isOpen, onClose }) => {
             const isTextInput = e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT';
             if (isTextInput) return; // Let default paste behavior work in text inputs
 
+            // Don't intercept paste if target is outside the modal (e.g., terminal)
+            const modal = document.querySelector('.modal-overlay');
+            if (modal && !modal.contains(e.target)) {
+                return; // Let terminal or other components handle it
+            }
+
             const items = e.clipboardData?.items;
             if (!items || items.length === 0) return;
 
