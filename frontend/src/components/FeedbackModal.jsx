@@ -28,13 +28,16 @@ const FeedbackModal = ({ isOpen, onClose }) => {
     const [status, setStatus] = useState({ type: '', msg: '' });
 
     useEffect(() => {
+        if (!isOpen) return;
+        
         const savedToken = localStorage.getItem('forge_github_token');
         if (savedToken) {
             setGithubToken(savedToken);
+            setShowSetup(false);
         } else {
             setShowSetup(true);
         }
-    }, []);
+    }, [isOpen]);
 
     // Setup paste event listener for Ctrl+V functionality
     useEffect(() => {
