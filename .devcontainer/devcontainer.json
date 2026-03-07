@@ -1,0 +1,33 @@
+{
+  "name": "Forge Terminal",
+  "image": "mcr.microsoft.com/devcontainers/go:1-1.24-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [3005],
+  "portsAttributes": {
+    "3005": {
+      "label": "Forge Terminal",
+      "onAutoForward": "notify",
+      "visibility": "private"
+    }
+  },
+  "postCreateCommand": "npm ci --prefix frontend && go build -o fterm ./cmd/forge && echo '✅ Forge Terminal built successfully'",
+  "postStartCommand": "NO_BROWSER=1 ./fterm",
+  "remoteEnv": {
+    "FORGE_HOST": "0.0.0.0"
+  },
+  "secrets": {
+    "FORGE_TOKEN": {
+      "description": "Auth token for Forge Terminal remote access (leave blank to auto-generate)"
+    }
+  },
+  "customizations": {
+    "codespaces": {
+      "openFiles": []
+    }
+  }
+}

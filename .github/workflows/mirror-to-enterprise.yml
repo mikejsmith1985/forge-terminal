@@ -1,0 +1,40 @@
+name: Mirror to Enterprise GitHub
+
+# Automatically mirrors main branch to an enterprise GitHub repository.
+# Setup (one-time):
+#   1. Create a deploy key on the enterprise repo (write access)
+#   2. Add the private key as a secret named ENTERPRISE_SSH_KEY in this repo
+#   3. Set ENTERPRISE_REPO_SSH to the SSH URL of the enterprise repo (e.g. git@github.enterprise.com:org/repo.git)
+#      Either as a secret or update the env var below
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  mirror:
+    name: Mirror to enterprise
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.ENTERPRISE_SSH_KEY }}
+
+      - name: Push to enterprise repo
+        env:
+          ENTERPRISE_REPO: ${{ secrets.ENTERPRISE_REPO_SSH }}
+        run: |
+          if [ -z "$ENTERPRISE_REPO" ]; then
+            echo "⚠️  ENTERPRISE_REPO_SSH secret not set. Skipping mirror."
+            exit 0
+          fi
+          git remote add enterprise "$ENTERPRISE_REPO"
+          git push enterprise main --force-with-lease
+          echo "✅ Mirrored to enterprise"

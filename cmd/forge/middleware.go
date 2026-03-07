@@ -66,7 +66,7 @@ func SecureHeaders(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// WrapWithMiddleware wraps a handler with CORS and security middleware
+// WrapWithMiddleware wraps a handler with CORS, security, and auth middleware
 func WrapWithMiddleware(handler http.HandlerFunc) http.HandlerFunc {
-	return CORSMiddleware(SecureHeaders(handler))
+	return CORSMiddleware(SecureHeaders(AuthMiddleware(handler)))
 }

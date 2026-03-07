@@ -146,8 +146,9 @@ func main() {
 		CleanupOldDebugSessions(7 * 24 * time.Hour)
 	}()
 	
-	// Parse port from command line or environment
+	// Parse port and host from command line or environment
 	var overridePort int
+	var overrideHost string
 	for i := 1; i < len(os.Args); i++ {
 		if os.Args[i] == "-port" || os.Args[i] == "--port" {
 			if i+1 < len(os.Args) {
@@ -156,14 +157,41 @@ func main() {
 				}
 			}
 		}
+		if os.Args[i] == "-host" || os.Args[i] == "--host" {
+			if i+1 < len(os.Args) {
+				overrideHost = os.Args[i+1]
+			}
+		}
 	}
-	// Also check environment variable
+	// Also check environment variables
 	if overridePort == 0 {
 		if envPort := os.Getenv("FORGE_PORT"); envPort != "" {
 			if p, err := strconv.Atoi(envPort); err == nil {
 				overridePort = p
 			}
 		}
+	}
+	if overrideHost == "" {
+		overrideHost = os.Getenv("FORGE_HOST")
+	}
+	// Auto-detect GitHub Codespaces environment
+	inCodespaces := os.Getenv("CODESPACES") == "true"
+	if inCodespaces && overrideHost == "" {
+		overrideHost = "0.0.0.0"
+		log.Printf("[Forge] GitHub Codespaces detected, binding to 0.0.0.0")
+	}
+	// Default to localhost
+	if overrideHost == "" {
+		overrideHost = "localhost"
+	}
+	// Auto-generate auth token for non-localhost bindings
+	if overrideHost != "localhost" && overrideHost != "127.0.0.1" {
+		token := os.Getenv("FORGE_TOKEN")
+		if token == "" {
+			token = GenerateToken()
+		}
+		SetAuthToken(token)
+		log.Printf("[Forge] Auth token set for remote access")
 	}
 	
 	// v3.7.1: Handle subcommands before starting web server
@@ -188,9 +216,13 @@ func main() {
 			fmt.Println("  forge lens [path]      Open the Context Builder file picker")
 			fmt.Println("  forge -port PORT       Start server on specific port")
 			fmt.Println("  forge --port PORT      Start server on specific port")
+			fmt.Println("  forge --host HOST      Bind to specific host (default: localhost)")
+			fmt.Println("  forge --host 0.0.0.0   Bind to all interfaces (enables token auth)")
 			fmt.Println("")
 			fmt.Println("Environment:")
 			fmt.Println("  FORGE_PORT=9999        Override default port")
+			fmt.Println("  FORGE_HOST=0.0.0.0     Override default host")
+			fmt.Println("  FORGE_TOKEN=secret     Set auth token (auto-generated if host is non-localhost)")
 			fmt.Println("  FORGE_DEV_MODE=true    Enable dev mode logging")
 			fmt.Println("")
 			return
@@ -223,7 +255,7 @@ func main() {
 
 	// Wrap file server with cache-control headers and explicit MIME types
 	fileServer := http.FileServer(http.FS(webFS))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		// Serve index.html with version-busted asset URLs
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			serveIndexWithVersion(w, r, webFS)
@@ -241,7 +273,7 @@ func main() {
 		wrapped.Header().Set("Pragma", "no-cache")
 		wrapped.Header().Set("Expires", "0")
 		fileServer.ServeHTTP(wrapped, r)
-	})
+	}))
 
 	// WebSocket terminal handler
 
@@ -255,7 +287,7 @@ func main() {
 
 	// Create terminal handler with direct dependencies
 	termHandler = terminal.NewHandlerDirect(nil, visionParser, llmDetector)
-	http.HandleFunc("/ws", termHandler.HandleWebSocket)
+	http.HandleFunc("/ws", AuthMiddleware(termHandler.HandleWebSocket))
 
 	// Commands API
 	http.HandleFunc("/api/commands", WrapWithMiddleware(handleCommands))
@@ -419,7 +451,7 @@ func main() {
 	}
 
 	// Find an available port (use override if specified)
-	addr, listener, err := findAvailablePort(overridePort)
+	addr, listener, err := findAvailablePort(overrideHost, overridePort)
 	if err != nil {
 		log.Fatalf("Failed to find available port: %v", err)
 	}
@@ -434,6 +466,23 @@ func main() {
 	}
 
 	log.Printf("🔥 Forge Terminal starting at http://%s (PID: %d)", addr, os.Getpid())
+	// Print access URL when running remotely
+	if inCodespaces {
+		codespaceName := os.Getenv("CODESPACE_NAME")
+		domain := os.Getenv("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN")
+		if domain == "" {
+			domain = "app.github.dev"
+		}
+		if _, portStr, err2 := net.SplitHostPort(addr); err2 == nil {
+			externalURL := fmt.Sprintf("https://%s-%s.%s", codespaceName, portStr, domain)
+			if globalToken != "" {
+				externalURL += "?token=" + globalToken
+			}
+			log.Printf("🌐 External Codespace URL: %s", externalURL)
+		}
+	} else if globalToken != "" {
+		log.Printf("🔗 Remote access URL: http://%s?token=%s", addr, globalToken)
+	}
 
 	// Handle graceful shutdown
 	stop := make(chan os.Signal, 1)
@@ -453,8 +502,8 @@ func main() {
 		}
 	})
 
-	// Auto-open browser (skip if NO_BROWSER env var is set for testing)
-	if os.Getenv("NO_BROWSER") == "" {
+	// Auto-open browser (skip if NO_BROWSER env var is set or running in Codespaces)
+	if os.Getenv("NO_BROWSER") == "" && !inCodespaces {
 		go openBrowser("http://" + addr)
 	}
 
@@ -786,12 +835,13 @@ func handleWSLDetect(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// findAvailablePort tries preferred ports in order and returns the first available one
-// If overridePort is specified (> 0), it will try that port first
-func findAvailablePort(overridePort int) (string, net.Listener, error) {
+// findAvailablePort tries preferred ports in order and returns the first available one.
+// If overridePort is specified (> 0), it will try that port first.
+// host controls the bind address (e.g. "localhost", "0.0.0.0").
+func findAvailablePort(host string, overridePort int) (string, net.Listener, error) {
 	// If override port specified, try it first
 	if overridePort > 0 {
-		addr := fmt.Sprintf("localhost:%d", overridePort)
+		addr := fmt.Sprintf("%s:%d", host, overridePort)
 		listener, err := net.Listen("tcp", addr)
 		if err == nil {
 			log.Printf("[Dev] Using override port: %d", overridePort)
@@ -802,8 +852,7 @@ func findAvailablePort(overridePort int) (string, net.Listener, error) {
 	}
 	
 	for _, port := range preferredPorts {
-		// Use localhost to allow OS to choose IPv4/IPv6 as needed
-		addr := fmt.Sprintf("localhost:%d", port)
+		addr := fmt.Sprintf("%s:%d", host, port)
 		listener, err := net.Listen("tcp", addr)
 		if err == nil {
 			return addr, listener, nil
@@ -812,7 +861,7 @@ func findAvailablePort(overridePort int) (string, net.Listener, error) {
 	}
 
 	// Fallback: let OS assign a random available port
-	listener, err := net.Listen("tcp", "localhost:0")
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", host))
 	if err != nil {
 		return "", nil, fmt.Errorf("no available ports: %w", err)
 	}
