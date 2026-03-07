@@ -918,7 +918,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
-      clipboardMode: 'off', // We handle paste in handlePaste listener for full control
+      // clipboardMode: 'off' was removed in xterm 5.5 - we suppress paste via stopPropagation in handlePaste
     });
 
     // Register OSC handler for directory updates (OSC 9;9;<path>)
@@ -1092,8 +1092,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
 
       // Layer 3: Prevent duplicate handling (Ctrl+V handler already processed this)
+      // MUST call preventDefault+stopPropagation here so xterm's internal paste listener
+      // (which replaced clipboardMode:'off' in xterm 5.5+) doesn't fire a second paste.
       if (isPastingRef.current) {
         console.log(`[Terminal ${tabId}] Paste ignored - already processing paste`);
+        e.preventDefault();
+        e.stopPropagation();
         return;
       }
 
