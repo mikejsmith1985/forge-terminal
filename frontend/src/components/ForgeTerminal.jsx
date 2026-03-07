@@ -918,7 +918,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
-      // clipboardMode: 'off' was removed in xterm 5.5 - we suppress paste via stopPropagation in handlePaste
+      clipboardMode: 'off', // We handle paste exclusively in handlePaste for full control (image/video support)
     });
 
     // Register OSC handler for directory updates (OSC 9;9;<path>)
@@ -1067,14 +1067,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       term.focus();
     });
 
-    // ROBUST PASTE HANDLER (v3.17.12): Fallback for right-click paste and Edit menu
-    // The Ctrl+V keyboard handler is the PRIMARY paste path (uses navigator.clipboard.read()).
-    // This handler is a FALLBACK for paste operations that don't trigger the keyboard handler.
+    // SINGLE PASTE HANDLER: Handles ALL paste operations (Ctrl+V, right-click, Edit menu).
+    // clipboardMode: 'off' prevents xterm from pasting on its own.
+    // The Ctrl+V keyboard handler (attachCustomKeyEventHandler) only suppresses ^V from reaching the PTY.
     //
     // WHEN THIS FIRES:
-    // - Right-click → Paste (browser native)
+    // - Ctrl+V (browser fires paste event after keydown)
+    // - Right-click → Paste
     // - Edit menu → Paste
-    // - Ctrl+V when clipboard.read() is unavailable (Firefox, permissions denied)
     const handlePaste = async (e) => {
       // Layer 1: Is this terminal visible?
       if (!isVisibleRef.current) {
@@ -1091,13 +1091,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return;
       }
 
-      // Layer 3: Prevent duplicate handling (Ctrl+V handler already processed this)
-      // MUST call preventDefault+stopPropagation here so xterm's internal paste listener
-      // (which replaced clipboardMode:'off' in xterm 5.5+) doesn't fire a second paste.
+      // Layer 3: Prevent duplicate handling between our two listeners (container + textarea)
       if (isPastingRef.current) {
         console.log(`[Terminal ${tabId}] Paste ignored - already processing paste`);
-        e.preventDefault();
-        e.stopPropagation();
         return;
       }
 
@@ -1337,8 +1333,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       console.log('[Terminal] No usable clipboard content found');
     };
 
-    // v3.17.12: Attach paste listeners for fallback (right-click, Edit menu)
-    // Primary paste path is the Ctrl+V keyboard handler; this is fallback
+    // Attach paste listeners (capture phase) - handles Ctrl+V, right-click, Edit menu
     if (terminalRef.current) {
       // Container listener (capture phase) - catches paste from anywhere in the terminal area
       terminalRef.current.addEventListener('paste', handlePaste, true);
@@ -1429,146 +1424,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return true;
       }
 
-      // v3.17.12: RESTORED Ctrl+V keyboard handler - REQUIRED for paste to work
-      // With clipboardMode: 'off', xterm doesn't process paste events natively.
-      // We MUST intercept Ctrl+V at keyboard level and use navigator.clipboard to read content.
-      // The paste event handler is a FALLBACK for right-click paste and Edit menu.
+      // Ctrl+V: suppress the key so xterm doesn't send a literal ^V to the PTY.
+      // The actual paste is handled by the 'paste' event listener (handlePaste) below,
+      // which uses e.clipboardData (reliable) and navigator.clipboard.read() for images.
       if (arg.ctrlKey && arg.code === 'KeyV' && arg.type === 'keydown') {
-        // Layer 1: Is terminal visible?
-        if (!isVisibleRef.current) {
-          console.log(`[Terminal ${tabId}] Ctrl+V ignored - terminal not visible`);
-          return false;
-        }
-
-        // Layer 2: Does this terminal have focus?
-        const xtermTextarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
-        const hasFocus = xtermTextarea && document.activeElement === xtermTextarea;
-        
-        if (!hasFocus) {
-          console.log(`[Terminal ${tabId}] Ctrl+V ignored - terminal not focused`);
-          return false;
-        }
-
-        // Layer 3: Prevent double-handling
-        if (isPastingRef.current) {
-          console.log(`[Terminal ${tabId}] Ctrl+V ignored - paste already in progress`);
-          return false;
-        }
-        
-        console.log(`[Terminal ${tabId}] ✅ Handling Ctrl+V (focused and visible)`);
-        
-        isPastingRef.current = true;
-        setTimeout(() => { isPastingRef.current = false; }, 500);
-        
-        // Read clipboard and paste content
-        (async () => {
-          try {
-            // Try clipboard.read() for full clipboard access (includes images)
-            if (navigator.clipboard?.read) {
-              try {
-                const items = await navigator.clipboard.read();
-                for (const item of items) {
-                  // Check for images first (priority over text)
-                  const imageType = item.types.find(t => t.startsWith('image/'));
-                  const videoType = item.types.find(t => t.startsWith('video/'));
-                  const mediaType = imageType || videoType;
-                  
-                  if (mediaType) {
-                    const isImage = !!imageType;
-                    const mediaTypeStr = isImage ? 'image' : 'video';
-                    console.log(`[Terminal] Ctrl+V: ${mediaTypeStr} found in clipboard`);
-                    const blob = await item.getType(mediaType);
-                    
-                    const fileSizeKB = Math.round(blob.size / 1024);
-                    const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
-                    const extMap = {
-                      'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif',
-                      'image/webp': '.webp', 'image/bmp': '.bmp', 'video/mp4': '.mp4',
-                      'video/webm': '.webm', 'video/quicktime': '.mov', 'video/x-msvideo': '.avi',
-                    };
-                    const ext = extMap[mediaType] || (isImage ? '.png' : '.mp4');
-                    const filename = `clipboard-${Date.now()}${ext}`;
-                    
-                    // Show uploading indicator
-                    if (xtermRef.current) {
-                      const sizeStr = fileSizeKB > 1024 ? `${fileSizeMB}MB` : `${fileSizeKB}KB`;
-                      xtermRef.current.write(`\x1b[33m[Uploading ${mediaTypeStr} (${sizeStr})...]\x1b[0m`);
-                    }
-                    
-                    const formData = new FormData();
-                    formData.append('file', blob, filename);
-                    
-                    const response = await fetch('/api/files/upload', {
-                      method: 'POST',
-                      body: formData
-                    });
-                    
-                    if (response.ok) {
-                      const data = await response.json();
-                      
-                      // Clear uploading indicator
-                      if (xtermRef.current) {
-                        xtermRef.current.write('\r\x1b[K');
-                        
-                        // Handle video frame extraction feedback
-                        if (data.isVideo) {
-                          if (!data.ffmpegAvailable) {
-                            xtermRef.current.write(`\x1b[33m[Note: Install ffmpeg for AI video analysis]\x1b[0m\r\n`);
-                          } else if (data.framePaths?.length > 0) {
-                            xtermRef.current.write(`\x1b[32m[Extracted ${data.framePaths.length} frames]\x1b[0m\r\n`);
-                          }
-                        }
-                      }
-                      
-                      if (data.path && xtermRef.current) {
-                        const textToSend = `see file at ${data.path}`;
-                        xtermRef.current.paste(textToSend);
-                        if (onPasteRef.current) {
-                          onPasteRef.current(mediaTypeStr, {
-                            filename, path: data.path, size: blob.size, sizeKB: fileSizeKB,
-                            mimeType: mediaType, frameCount: data.framePaths?.length || 0,
-                            ffmpegAvailable: data.ffmpegAvailable
-                          });
-                        }
-                        console.log(`[Terminal] ${mediaTypeStr} uploaded and path pasted`);
-                      }
-                    } else {
-                      throw new Error(`Upload failed: ${response.statusText}`);
-                    }
-                    return; // Media handled
-                  }
-                  
-                  // Check for text
-                  if (item.types.includes('text/plain')) {
-                    const textBlob = await item.getType('text/plain');
-                    const text = await textBlob.text();
-                    if (text && xtermRef.current) {
-                      console.log('[Terminal] Ctrl+V paste text:', text.length, 'chars');
-                      xtermRef.current.paste(text);
-                      if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
-                    }
-                    return; // Text handled
-                  }
-                }
-              } catch (readErr) {
-                console.log('[Terminal] clipboard.read() failed, trying readText():', readErr.message);
-              }
-            }
-            
-            // Fallback: Just read text
-            const text = await navigator.clipboard.readText();
-            if (text && xtermRef.current) {
-              console.log('[Terminal] Ctrl+V paste text (fallback):', text.length, 'chars');
-              xtermRef.current.paste(text);
-              if (onPasteRef.current) onPasteRef.current('text', { chars: text.length });
-            }
-          } catch (err) {
-            logPasteError(err, { location: 'ctrl-v-handler' });
-            console.error('[Terminal] Ctrl+V paste failed:', err.message);
-          }
-        })();
-        
-        return false; // Prevent xterm from handling
+        return false; // Prevent xterm from sending ^V to the PTY
       }
 
       return true; // Let all other keys pass through standard xterm processing
