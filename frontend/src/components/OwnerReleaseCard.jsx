@@ -149,15 +149,19 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         setLoading(true);
         let response;
         
-        if (isExternalRepo && externalRepoPath) {
-            // Fetch git version for detected external repo
+        // Always use git describe to get the actual repo tag version.
+        // The running binary version can be stale (e.g. user downloaded an old release),
+        // which would cause the Release Manager to create duplicate/wrong version tags.
+        const repoPath = (isExternalRepo && externalRepoPath) ? externalRepoPath : cwd;
+        
+        if (repoPath) {
             response = await fetch('/api/git/version', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: externalRepoPath })
+                body: JSON.stringify({ path: repoPath })
             });
         } else {
-            // Fetch internal Forge version
+            // No path available, fall back to binary version
             response = await fetch('/api/version');
         }
 
@@ -180,7 +184,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     };
 
     fetchVersion();
-  }, [isExternalRepo, externalRepoPath]); // Refetch when repo detection changes
+  }, [isExternalRepo, externalRepoPath, cwd]); // Refetch when repo detection changes
 
   // v3.17.9: Parse and validate custom version
   const parseCustomVersion = useCallback((input) => {
