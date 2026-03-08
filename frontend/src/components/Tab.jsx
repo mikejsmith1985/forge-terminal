@@ -206,6 +206,22 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
         ) : (
           <span className="tab-title">{tab.title}</span>
         )}
+        {tab.jiraTicketKey && (
+          <span className="tab-jira-badge" title={`Jira: ${tab.jiraTicketKey}`} style={{
+            fontSize: '10px',
+            fontWeight: 'bold',
+            color: '#60a5fa',
+            background: 'rgba(96,165,250,0.12)',
+            border: '1px solid rgba(96,165,250,0.3)',
+            borderRadius: '3px',
+            padding: '0 4px',
+            marginLeft: '4px',
+            lineHeight: '16px',
+            whiteSpace: 'nowrap',
+          }}>
+            {tab.jiraTicketKey}
+          </span>
+        )}
         <button
           className="tab-close"
           onClick={handleCloseClick}

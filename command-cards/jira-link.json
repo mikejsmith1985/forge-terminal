@@ -1,0 +1,13 @@
+{
+  "id": "jira-link",
+  "name": "🎟 Jira: Link Ticket",
+  "description": "Link the current tab to a Jira ticket by key (e.g. PROJ-123)",
+  "command": "",
+  "macro_delay": 0,
+  "macro_payload": "",
+  "category": "jira",
+  "icon": "emoji-ticket",
+  "favorite": false,
+  "pasteOnly": false,
+  "action": "jira-modal"
+}

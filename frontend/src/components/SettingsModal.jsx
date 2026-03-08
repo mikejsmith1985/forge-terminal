@@ -5,6 +5,7 @@ import TabControlsPanel from './TabControlsPanel';
 import CardHistoryPanel from './CardHistoryPanel';
 import NotificationsPanel from './NotificationsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
+import JiraSettingsPanel from './JiraSettingsPanel';
 import { themes, themeOrder } from '../themes';
 
 const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, initialTab = 'shell', onRestartTour, defaultTabTheme = 'auto-cycle', onDefaultTabThemeChange }) => {
@@ -269,6 +270,22 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <Bell size={16} />
             Notifications
           </button>
+          <button
+            onClick={() => setActiveTab('jira')}
+            style={{
+              padding: '12px 20px',
+              background: 'transparent',
+              border: 'none',
+              color: activeTab === 'jira' ? '#fff' : '#888',
+              borderBottom: activeTab === 'jira' ? '2px solid #8b5cf6' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            🎟 Jira
+          </button>
         </div>
 
         <div className="modal-body">
@@ -345,6 +362,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <BackupsPanel onToast={onToast} />
           ) : activeTab === 'notifications' ? (
             <NotificationsPanel onToast={onToast} />
+          ) : activeTab === 'jira' ? (
+            <JiraSettingsPanel onToast={onToast} />
           ) : (
             <>
               <div style={{

@@ -16,6 +16,7 @@ type TabState struct {
 	AutoRespond      bool        `json:"autoRespond"`
 	AMEnabled        bool        `json:"amEnabled"`
 	CurrentDirectory string      `json:"currentDirectory,omitempty"` // Current working directory
+	JiraTicketKey    string      `json:"jiraTicketKey,omitempty"`    // Linked Jira issue key (e.g. PROJ-123)
 }
 
 // ShellConfig represents the shell configuration for a tab

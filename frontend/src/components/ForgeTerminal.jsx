@@ -537,6 +537,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onConnectionChange = null,
   onWaitingChange = null, // Callback when prompt waiting state changes
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
+  onJiraKeyDetected = null, // Callback when a Jira issue key is detected in output
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
   onFileOpen = null, // Callback when file path is double-clicked to open in editor
@@ -569,7 +570,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // const amEnabledRef = useRef(amEnabled); // v3.12.12: AM feature removed
   const tabNameRef = useRef(tabName);
   const lastDirectoryRef = useRef(null);
+  const lastJiraKeyRef = useRef(null); // Last Jira key detected — prevents re-firing for same key
   const onDirectoryChangeRef = useRef(onDirectoryChange);
+  const onJiraKeyDetectedRef = useRef(onJiraKeyDetected);
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
   const onFileOpenRef = useRef(onFileOpen);
@@ -658,6 +661,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onDirectoryChangeRef.current = onDirectoryChange;
   }, [onDirectoryChange]);
+
+  // Keep onJiraKeyDetected ref updated
+  useEffect(() => {
+    onJiraKeyDetectedRef.current = onJiraKeyDetected;
+  }, [onJiraKeyDetected]);
   
   // Keep onCopy ref updated
   useEffect(() => {
@@ -1490,13 +1498,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       params.set('tabId', tabId);
       if (cfg && cfg.shellType) {
         params.set('shell', cfg.shellType);
+        // Use currentDirectory as fallback initial dir when no explicit home path is configured.
+        // This ensures the PTY starts in the saved directory rather than the process cwd.
+        const restoredDir = currentDirectoryRef.current;
         if (cfg.shellType === 'wsl') {
           if (cfg.wslDistro) params.set('distro', cfg.wslDistro);
           if (cfg.wslHomePath) params.set('wslHome', cfg.wslHomePath);
         } else if (cfg.shellType === 'cmd') {
-          if (cfg.cmdHomePath) params.set('cmdHome', cfg.cmdHomePath);
+          const cmdHome = cfg.cmdHomePath || restoredDir;
+          if (cmdHome) params.set('cmdHome', cmdHome);
         } else if (cfg.shellType === 'powershell') {
-          if (cfg.psHomePath) params.set('psHome', cfg.psHomePath);
+          const psHome = cfg.psHomePath || restoredDir;
+          if (psHome) params.set('psHome', psHome);
         }
       }
       wsUrl += '?' + params.toString();
@@ -1686,6 +1699,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             const folderName = getFolderName(detectedDir);
             if (folderName && onDirectoryChangeRef.current) {
               onDirectoryChangeRef.current(folderName, detectedDir);
+            }
+          }
+
+          // Jira key detection — scan visible output for patterns like PROJ-123
+          if (onJiraKeyDetectedRef.current) {
+            const jiraKeyMatch = buf.data.match(/\b([A-Z]{2,10}-\d+)\b/);
+            if (jiraKeyMatch) {
+              const detectedKey = jiraKeyMatch[1];
+              if (detectedKey !== lastJiraKeyRef.current) {
+                lastJiraKeyRef.current = detectedKey;
+                onJiraKeyDetectedRef.current(detectedKey);
+              }
             }
           }
 

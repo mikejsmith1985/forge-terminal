@@ -80,6 +80,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     // v3.12.3: amEnabled removed - AM system no longer exists
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
     currentDirectory: currentDirectory || null, // Current working directory
+    jiraTicketKey: null, // Linked Jira issue key (e.g. PROJ-123)
     createdAt: Date.now(),
     type: options.type || 'terminal',
     file: options.file || null,
@@ -119,6 +120,7 @@ function tabsToSession(tabs, activeTabId) {
       // v3.12.3: amEnabled removed
       visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
+      jiraTicketKey: tab.jiraTicketKey || null,
     })),
     activeTabId: activeTabId,
   };
@@ -260,6 +262,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
             // v3.12.3: amEnabled removed
             visionEnabled: tabState.visionEnabled || false,
             currentDirectory: tabState.currentDirectory || null,
+            jiraTicketKey: tabState.jiraTicketKey || null,
             createdAt: Date.now(),
           };
         });
@@ -723,6 +726,21 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
+   * Link a Jira ticket key to a tab
+   * @param {string} tabId - ID of tab to update
+   * @param {string} jiraTicketKey - Jira issue key (e.g. "PROJ-123"), or null to unlink
+   */
+  const linkJiraTicket = useCallback((tabId, jiraTicketKey) => {
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) return prev;
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], jiraTicketKey: jiraTicketKey || null };
+      return { ...prev, tabs: newTabs };
+    });
+  }, []);
+
+  /**
    * Toggle view mode for a tab (chat -> terminal -> notebook -> chat)
    * @param {string} tabId - ID of tab to update
    * @param {string} targetMode - Optional: directly set to a specific mode
@@ -752,6 +770,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     updateTabModified,
     toggleTabViewMode, // v3.3.0: Toggle between chat and terminal view
     updateTabDirectory,
+    linkJiraTicket,
     reorderTabs,
   };
 }

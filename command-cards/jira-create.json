@@ -1,0 +1,13 @@
+{
+  "id": "jira-create",
+  "name": "🎟 Jira: Create Ticket",
+  "description": "Create a new Jira ticket and link it to the current tab",
+  "command": "",
+  "macro_delay": 0,
+  "macro_payload": "",
+  "category": "jira",
+  "icon": "emoji-ticket",
+  "favorite": false,
+  "pasteOnly": false,
+  "action": "jira-create"
+}
