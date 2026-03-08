@@ -6,11 +6,11 @@ import { RefreshCw } from 'lucide-react';
 import OwnerReleaseCard from './OwnerReleaseCard';
 import DirectoryCard from './DirectoryCard';
 
-const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd }) => {
+const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd, directoryCardVisible = true, onHideDirectoryCard }) => {
   if (loading) {
     return (
       <div className="command-cards-container">
-        <DirectoryCard onExecute={onExecute} />
+        {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} />}
         {/* Owner Release Card always renders */}
         <OwnerReleaseCard 
           onExecuteCommand={onExecute}
@@ -29,7 +29,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
   if (error) {
     return (
       <div className="command-cards-container">
-        <DirectoryCard onExecute={onExecute} />
+        {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} />}
         {/* Owner Release Card always renders */}
         <OwnerReleaseCard 
           onExecuteCommand={onExecute}
@@ -56,7 +56,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
 
   return (
     <div className="command-cards-container">
-      <DirectoryCard onExecute={onExecute} />
+      {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} />}
       {/* User Cards Section */}
       {userCards.length > 0 ? (
         <SortableContext
@@ -69,6 +69,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
                 <SortableOwnerReleaseCard
                   key={cmd.id}
                   command={cmd}
+                  onDelete={onDelete}
                   onExecuteCommand={onExecute}
                   onToast={onToast}
                   shellType={shellType}

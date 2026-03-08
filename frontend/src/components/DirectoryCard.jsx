@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, FolderOpen, RefreshCw, Settings, X, ChevronUp, ChevronDown } from 'lucide-react';
 import './DirectoryCard.css';
 
-const DirectoryCard = ({ onExecute }) => {
+const DirectoryCard = ({ onExecute, onHide }) => {
   const [rootPath, setRootPath] = useState(() => localStorage.getItem('forge_directory_card_root') || '');
   const [editingPath, setEditingPath] = useState('');
   const [showPathInput, setShowPathInput] = useState(false);
@@ -114,6 +114,16 @@ const DirectoryCard = ({ onExecute }) => {
           >
             {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
           </button>
+          {onHide && (
+            <button
+              className="directory-card-action-btn"
+              title="Hide Projects Browser"
+              onClick={onHide}
+              style={{ color: '#888' }}
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
       </div>
 

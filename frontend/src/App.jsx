@@ -64,6 +64,9 @@ function App() {
   const [commands, setCommands] = useState([])
   const [commandsLoading, setCommandsLoading] = useState(true)
   const [commandsError, setCommandsError] = useState(null)
+  const [directoryCardVisible, setDirectoryCardVisible] = useState(
+    () => localStorage.getItem('forge_directory_card_visible') !== 'false'
+  )
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
@@ -1287,18 +1290,7 @@ function App() {
         // Only update if timeout hasn't fired
         if (timeoutId !== null || commandsLoading) {
           // Ensure data is an array
-          let cards = Array.isArray(data) ? data : [];
-          
-          // Ensure Release Manager card is present (ID: -1) for sortability
-          if (!cards.find(c => c.id === -1)) {
-            cards = [{
-              id: -1,
-              description: 'Release Manager', 
-              command: 'SYSTEM_RELEASE_MANAGER',
-              pasteOnly: true,
-              favorite: false
-            }, ...cards];
-          }
+          const cards = Array.isArray(data) ? data : [];
           
           setCommands(cards);
           setCommandsLoading(false);
@@ -1428,6 +1420,21 @@ function App() {
     setIsModalOpen(true)
   }
 
+  const handleHideDirectoryCard = () => {
+    setDirectoryCardVisible(false)
+    localStorage.setItem('forge_directory_card_visible', 'false')
+  }
+
+  const handleShowDirectoryCard = () => {
+    setDirectoryCardVisible(true)
+    localStorage.setItem('forge_directory_card_visible', 'true')
+  }
+
+  const handleRestoreReleaseManager = () => {
+    const entry = { id: -1, description: '🚀 Release Manager', command: 'SYSTEM_RELEASE_MANAGER', pasteOnly: true, favorite: false }
+    saveCommands([entry, ...commands])
+  }
+
   const handleEdit = (cmd) => {
     setEditingCommand(cmd)
     setIsModalOpen(true)
@@ -1542,7 +1549,27 @@ function App() {
         {sidebarView === 'cards' ? (
           <>
             <h3>⚡ Commands</h3>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              {!directoryCardVisible && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleShowDirectoryCard}
+                  title="Show Projects Browser"
+                  style={{ padding: '5px 8px' }}
+                >
+                  <Folder size={14} />
+                </button>
+              )}
+              {!commands.find(c => c.id === -1) && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleRestoreReleaseManager}
+                  title="Add Release Manager card"
+                  style={{ padding: '5px 8px' }}
+                >
+                  🚀
+                </button>
+              )}
               <button className="btn btn-primary" onClick={handleAdd}>
                 <Plus size={16} /> Add
               </button>
@@ -1681,6 +1708,8 @@ function App() {
               onToast={addToast}
               shellType={shellConfig.shellType}
               cwd={activeTab?.currentDirectory}
+              directoryCardVisible={directoryCardVisible}
+              onHideDirectoryCard={handleHideDirectoryCard}
             />
           </DndContext>
         ) : sidebarView === 'files' ? (

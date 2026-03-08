@@ -47,6 +47,13 @@ type CardHistory struct {
 // Default commands created on first run
 var DefaultCommands = []Command{
 	{
+		ID:          -1,
+		Description: "🚀 Release Manager",
+		Command:     "SYSTEM_RELEASE_MANAGER",
+		PasteOnly:   true,
+		Favorite:    false,
+	},
+	{
 		ID:          1,
 		Description: "🤖 Run Claude Code",
 		Command:     "claude",

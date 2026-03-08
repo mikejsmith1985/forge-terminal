@@ -1,10 +1,10 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Trash2 } from 'lucide-react';
 import OwnerReleaseCard from './OwnerReleaseCard';
 
-export function SortableOwnerReleaseCard({ command, ...props }) {
+export function SortableOwnerReleaseCard({ command, onDelete, ...props }) {
     const {
         attributes,
         listeners,
@@ -48,6 +48,33 @@ export function SortableOwnerReleaseCard({ command, ...props }) {
             >
                 <GripVertical size={18} />
             </div>
+            {/* Delete Button Overlay */}
+            {onDelete && (
+                <button
+                    onClick={() => onDelete(command.id)}
+                    style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '12px',
+                        zIndex: 20,
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#666',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: 0.7,
+                        borderRadius: '4px',
+                    }}
+                    title="Remove Release Manager card"
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#f44336'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.color = '#666'; }}
+                >
+                    <Trash2 size={16} />
+                </button>
+            )}
             <OwnerReleaseCard {...props} />
         </div>
     );

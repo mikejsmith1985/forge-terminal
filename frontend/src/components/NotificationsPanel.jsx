@@ -63,6 +63,22 @@ const NotificationsPanel = ({ onToast }) => {
 
   const update = (key, value) => setConfig(c => ({ ...c, [key]: value }));
 
+  // Auto-save a single field immediately (used by the idle detection toggle so
+  // the preference persists even if the user closes the modal without hitting Save).
+  const updateAndSave = async (key, value) => {
+    const newConfig = { ...config, [key]: value };
+    setConfig(newConfig);
+    try {
+      await fetch('/api/notify/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig),
+      });
+    } catch {
+      // silently swallow — the Save Settings button remains as fallback
+    }
+  };
+
   if (loading) {
     return <div style={{ padding: '24px', color: 'var(--text-muted, #888)' }}>Loading…</div>;
   }
@@ -132,7 +148,7 @@ const NotificationsPanel = ({ onToast }) => {
       {/* Idle detection toggle */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
         <button
-          onClick={() => update('idleDetectionEnabled', !config.idleDetectionEnabled)}
+          onClick={() => updateAndSave('idleDetectionEnabled', !config.idleDetectionEnabled)}
           style={{
             ...toggleStyle,
             background: config.idleDetectionEnabled ? 'var(--accent, #7c9ef7)' : 'var(--surface, #333)',

@@ -170,7 +170,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
 
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: '550px' }}>
+      <div className="modal" style={{ width: '620px', maxWidth: '95vw' }}>
         <div className="modal-header">
           <h3><Settings size={20} style={{ marginRight: '8px', verticalAlign: 'bottom' }} /> Settings</h3>
           <button className="btn-close" onClick={onClose}>×</button>
@@ -180,7 +180,9 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
         <div style={{
           display: 'flex',
           borderBottom: '1px solid #333',
-          padding: '0 16px'
+          padding: '0 16px',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
         }}>
           <button
             onClick={() => setActiveTab('shell')}
