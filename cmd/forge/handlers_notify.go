@@ -22,7 +22,7 @@ type NotifyConfig struct {
 
 func defaultNotifyConfig() NotifyConfig {
 	return NotifyConfig{
-		IdleDetectionEnabled: false,
+		IdleDetectionEnabled: true,
 		IdleTimeoutSeconds:   30,
 	}
 }

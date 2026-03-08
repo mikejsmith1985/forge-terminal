@@ -4,7 +4,7 @@ import { Bell, BellOff, Send, Eye, EyeOff, CheckCircle, AlertCircle } from 'luci
 const DEFAULT_CONFIG = {
   webhookURL: '',
   webhookSecret: '',
-  idleDetectionEnabled: false,
+  idleDetectionEnabled: true,
   idleTimeoutSeconds: 30,
 };
 
@@ -67,7 +67,7 @@ const NotificationsPanel = ({ onToast }) => {
     return <div style={{ padding: '24px', color: 'var(--text-muted, #888)' }}>Loading…</div>;
   }
 
-  const isConfigured = config.webhookURL && config.webhookSecret && config.webhookSecret !== '••••••••';
+  const isConfigured = config.webhookURL && config.webhookSecret;
 
   return (
     <div style={{ padding: '24px', maxWidth: '520px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -96,7 +96,7 @@ const NotificationsPanel = ({ onToast }) => {
           style={inputStyle}
         />
         <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)' }}>
-          The root URL of your mbl2pc instance (no trailing slash).
+          Root URL only — do <strong>not</strong> include <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '3px' }}>/webhook</code> (e.g. <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '3px' }}>https://mbl2pc.onrender.com</code>)
         </span>
       </div>
 
