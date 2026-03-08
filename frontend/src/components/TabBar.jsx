@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, BarChart3 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, BarChart3, Bell, BellOff } from 'lucide-react';
 import Tab from './Tab';
 
 /**
@@ -97,6 +97,8 @@ function TabBar({
           <BarChart3 size={16} />
         </button>
       )}
+      {/* Manual notify bell */}
+      <NotifyBellButton />
       <button
         className="new-tab-btn"
         onClick={onNewTab}
@@ -107,6 +109,48 @@ function TabBar({
         <Plus size={16} />
       </button>
     </div>
+  );
+}
+
+/**
+ * NotifyBellButton — one-click manual notification trigger.
+ * Sends an immediate /api/notify POST. Shows a filled bell briefly on success.
+ */
+function NotifyBellButton() {
+  const [sent, setSent] = useState(false);
+  const [configured, setConfigured] = useState(null); // null=unknown, true/false
+
+  // Check on first render whether notifications are configured
+  React.useEffect(() => {
+    fetch('/api/notify/config')
+      .then(r => r.json())
+      .then(cfg => setConfigured(!!(cfg.webhookURL && cfg.webhookSecret)))
+      .catch(() => setConfigured(false));
+  }, []);
+
+  if (!configured) return null; // Hide button if not set up
+
+  const handleClick = () => {
+    fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: '🔔 Forge Terminal: stepping away — ping me when you need me.' }),
+    })
+      .then(r => r.ok && setSent(true))
+      .catch(() => {})
+      .finally(() => setTimeout(() => setSent(false), 3000));
+  };
+
+  return (
+    <button
+      className="dashboard-btn"
+      onClick={handleClick}
+      aria-label={sent ? 'Notification sent' : 'Send notification to phone'}
+      title={sent ? '✓ Notification sent' : 'Ping me on my phone (mbl2pc)'}
+      style={{ color: sent ? '#fbbf24' : undefined, transition: 'color 0.2s' }}
+    >
+      {sent ? <Bell size={16} fill="currentColor" /> : <Bell size={16} />}
+    </button>
   );
 }
 

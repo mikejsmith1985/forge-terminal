@@ -591,7 +591,33 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   
   // PERF FIX: Track isWaiting in ref to avoid stale closures in hot paths
   const isWaitingRef = useRef(false);
-  
+
+  // Idle notification: fires a /api/notify POST when terminal output goes silent
+  const idleNotifyTimerRef = useRef(null);
+  const idleNotifyFiredRef = useRef(false); // fire only once per idle period
+
+  const resetIdleNotifyTimer = () => {
+    idleNotifyFiredRef.current = false;
+    if (idleNotifyTimerRef.current) clearTimeout(idleNotifyTimerRef.current);
+    // Read config fresh each time — no React state needed
+    fetch('/api/notify/config')
+      .then(r => r.json())
+      .then(cfg => {
+        if (!cfg.idleDetectionEnabled || !cfg.webhookURL) return;
+        const ms = (cfg.idleTimeoutSeconds || 30) * 1000;
+        idleNotifyTimerRef.current = setTimeout(() => {
+          if (idleNotifyFiredRef.current) return;
+          idleNotifyFiredRef.current = true;
+          fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: '🔔 Forge Terminal: agent is waiting for your response.' }),
+          }).catch(() => {}); // fire-and-forget
+        }, ms);
+      })
+      .catch(() => {});
+  };
+
   // Vision state
   const visionEnabledRef = useRef(visionEnabled);
 
@@ -1609,6 +1635,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // PERF FIX: Append to buffer efficiently (reuse buffer object)
         const buf = outputBufferRef.current;
         buf.data = (buf.data + textData).slice(-800);
+
+        // Reset idle notification timer on every chunk of PTY output
+        resetIdleNotifyTimer();
 
         // v3.12.12: AM logging removed
 

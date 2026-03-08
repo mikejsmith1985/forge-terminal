@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap, RotateCcw, Database, History } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap, RotateCcw, Database, History, Bell } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
 import TabControlsPanel from './TabControlsPanel';
 import CardHistoryPanel from './CardHistoryPanel';
+import NotificationsPanel from './NotificationsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 import { themes, themeOrder } from '../themes';
 
@@ -249,6 +250,23 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <Database size={16} />
             Data & History
           </button>
+          <button
+            onClick={() => setActiveTab('notifications')}
+            style={{
+              padding: '12px 20px',
+              background: 'transparent',
+              border: 'none',
+              color: activeTab === 'notifications' ? '#fff' : '#888',
+              borderBottom: activeTab === 'notifications' ? '2px solid #8b5cf6' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Bell size={16} />
+            Notifications
+          </button>
         </div>
 
         <div className="modal-body">
@@ -323,6 +341,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             </div>
           ) : activeTab === 'backups' ? (
             <BackupsPanel onToast={onToast} />
+          ) : activeTab === 'notifications' ? (
+            <NotificationsPanel onToast={onToast} />
           ) : (
             <>
               <div style={{

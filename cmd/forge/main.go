@@ -303,6 +303,20 @@ func main() {
 	// Config API
 	http.HandleFunc("/api/config", WrapWithMiddleware(handleConfig))
 
+	// Notification API
+	http.HandleFunc("/api/notify", WrapWithMiddleware(handleNotifySend))
+	http.HandleFunc("/api/notify/config", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handleNotifyConfigGet(w, r)
+		case http.MethodPost:
+			handleNotifyConfigPost(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+	http.HandleFunc("/api/notify/test", WrapWithMiddleware(handleNotifyTest))
+
 	// WSL detection API
 	http.HandleFunc("/api/wsl/detect", WrapWithMiddleware(handleWSLDetect))
 
