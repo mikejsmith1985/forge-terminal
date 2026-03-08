@@ -1228,22 +1228,45 @@ function App() {
     // Other files: use MonacoEditor
     // Both are handled by the existing render logic
     
+    // For WSL terminals: convert Linux absolute paths to Windows-compatible paths
+    // The Go backend is a Windows binary and cannot resolve /home/... paths natively
+    let filePath = file.path;
+    const isWSL = activeTab?.shellConfig?.shellType === 'wsl';
+    const wslDistro = activeTab?.shellConfig?.wslDistro;
+    if (isWSL && filePath.startsWith('/')) {
+      if (filePath.startsWith('/mnt/') && filePath.length > 6) {
+        // /mnt/c/Users/... → C:/Users/... (WSL accessing Windows drives)
+        const parts = filePath.split('/');
+        if (parts.length >= 3) {
+          const drive = parts[2].toUpperCase();
+          const remainder = parts.slice(3).join('/');
+          filePath = `${drive}:/${remainder}`;
+          console.log('[App] WSL /mnt/ path → Windows drive:', filePath);
+        }
+      } else if (wslDistro) {
+        // /home/user/... → \\wsl.localhost\Ubuntu\home\user\...
+        const linuxPath = filePath.slice(1).replace(/\//g, '\\');
+        filePath = `\\\\wsl.localhost\\${wslDistro}\\${linuxPath}`;
+        console.log('[App] WSL Linux path → UNC:', filePath);
+      }
+    }
+
     // Compute the correct rootPath for the file
     // If path is absolute, use the file's directory as rootPath
     // If relative, use the current tab's directory
     let computedRootPath = activeTab?.currentDirectory || '.';
-    const isAbsolutePath = file.path.match(/^[A-Za-z]:/) || file.path.startsWith('/') || file.path.startsWith('\\\\');
+    const isAbsolutePath = filePath.match(/^[A-Za-z]:/) || filePath.startsWith('/') || filePath.startsWith('\\\\');
     
     if (isAbsolutePath) {
       // For absolute paths, use the file's parent directory as rootPath
       // This allows reading files outside the current working directory
-      const pathParts = file.path.replace(/\\/g, '/').split('/');
+      const pathParts = filePath.replace(/\\/g, '/').split('/');
       pathParts.pop(); // Remove filename
       computedRootPath = pathParts.join('/') || '/';
       console.log('[App] Absolute path detected, using parent as rootPath:', computedRootPath);
     }
     
-    setEditorFile({ ...file, name: fileName, rootPath: computedRootPath });
+    setEditorFile({ ...file, path: filePath, name: fileName, rootPath: computedRootPath });
     setShowEditor(true);
   }, [activeTab, addToast]);
 

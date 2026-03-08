@@ -535,17 +535,20 @@ func HandleRead(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// If path is relative, resolve it against rootPath, not server cwd
 		var pathToResolve string
-		if !filepath.IsAbs(req.Path) {
+		// On Windows, filepath.IsAbs returns false for Unix-style paths like /home/user/...
+		// so also check for a leading slash to catch WSL /mnt/c/... paths
+		isAbsOrUnix := filepath.IsAbs(req.Path) || strings.HasPrefix(req.Path, "/")
+		if !isAbsOrUnix {
 			// Relative path - join with rootPath first
 			pathToResolve = filepath.Join(rootPath, req.Path)
 			log.Printf("[Files] Relative path detected: joined %s + %s = %s", rootPath, req.Path, pathToResolve)
 		} else {
-			// Already absolute
+			// Already absolute (including Unix-style absolute paths)
 			pathToResolve = req.Path
 		}
-		
-		// Now make it absolute (handles . and ..)
-		absPath, err = filepath.Abs(pathToResolve)
+
+		// Use resolvePath which handles /mnt/c/... WSL drive paths and falls back to filepath.Abs
+		absPath, err = resolvePath(pathToResolve)
 		if err != nil {
 			log.Printf("[Files] Invalid path: %v", err)
 			http.Error(w, "Invalid path", http.StatusBadRequest)
