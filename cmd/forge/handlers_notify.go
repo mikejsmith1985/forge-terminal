@@ -2,12 +2,16 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 )
 
 // ── Notification config ──────────────────────────────────────────────────────
@@ -18,6 +22,10 @@ type NotifyConfig struct {
 	WebhookSecret        string `json:"webhookSecret"`
 	IdleDetectionEnabled bool   `json:"idleDetectionEnabled"`
 	IdleTimeoutSeconds   int    `json:"idleTimeoutSeconds"`
+	// BaseURL is the externally-reachable base URL of this Forge instance
+	// (e.g. "http://192.168.1.100:8080"). When set, response URLs are embedded
+	// in notifications so the user can reply remotely without touching the PC.
+	BaseURL string `json:"baseURL"`
 }
 
 func defaultNotifyConfig() NotifyConfig {
@@ -239,4 +247,223 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// ── Remote-response prompt system ────────────────────────────────────────────
+
+// PendingPrompt represents a dialog waiting for a remote user response.
+type PendingPrompt struct {
+	ID        string    `json:"id"`
+	Kind      string    `json:"kind"`    // e.g. "file-access"
+	Message   string    `json:"message"` // human-readable question
+	Options   []string  `json:"options"` // machine values, e.g. ["restricted","unrestricted"]
+	Labels    []string  `json:"labels"`  // display names aligned with Options
+	Token     string    `json:"-"`       // one-time secret embedded in response URLs
+	Response  string    `json:"response"`
+	Resolved  bool      `json:"resolved"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+var (
+	pendingPrompts   = make(map[string]*PendingPrompt)
+	pendingPromptsMu sync.Mutex
+)
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// handleNotifyPrompt handles POST /api/notify/prompt
+// Creates a pending prompt, sends an enriched notification with response URLs (if BaseURL configured).
+// Body: {"kind":"file-access","message":"...","options":["restricted","unrestricted"],"labels":["Project-Scoped","Full Access"]}
+// Returns: {"promptId":"..."}
+func handleNotifyPrompt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Kind    string   `json:"kind"`
+		Message string   `json:"message"`
+		Options []string `json:"options"`
+		Labels  []string `json:"labels"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if req.Kind == "" || len(req.Options) == 0 {
+		http.Error(w, "kind and options are required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Labels) != len(req.Options) {
+		req.Labels = req.Options
+	}
+
+	promptID := randomHex(8)
+	token := randomHex(16)
+	prompt := &PendingPrompt{
+		ID:        promptID,
+		Kind:      req.Kind,
+		Message:   req.Message,
+		Options:   req.Options,
+		Labels:    req.Labels,
+		Token:     token,
+		ExpiresAt: time.Now().Add(10 * time.Minute),
+	}
+
+	pendingPromptsMu.Lock()
+	pendingPrompts[promptID] = prompt
+	pendingPromptsMu.Unlock()
+
+	// Send notification — enrich with response URLs if BaseURL is configured.
+	cfg, _ := loadNotifyConfig()
+	sender, err := newSenderFromConfig(cfg)
+	if err == nil {
+		notifyMsg := req.Message
+		if cfg.BaseURL != "" {
+			notifyMsg += "\n\nTap to respond:"
+			for i, opt := range req.Options {
+				label := opt
+				if i < len(req.Labels) {
+					label = req.Labels[i]
+				}
+				notifyMsg += fmt.Sprintf(
+					"\n▶ %s\n%s/api/notify/respond?id=%s&choice=%s&token=%s",
+					label, cfg.BaseURL, promptID, opt, token,
+				)
+			}
+		}
+		_ = sender.Send(notifyMsg, "Forge Terminal")
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"promptId": promptID})
+}
+
+// handleNotifyRespond handles GET /api/notify/respond?id=...&choice=...&token=...
+// Called when the user taps a response URL from their phone.
+// Returns a friendly HTML confirmation page.
+func handleNotifyRespond(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	choice := r.URL.Query().Get("choice")
+	token := r.URL.Query().Get("token")
+
+	pendingPromptsMu.Lock()
+	defer pendingPromptsMu.Unlock()
+
+	prompt, ok := pendingPrompts[id]
+	if !ok {
+		writeRespondPage(w, false, "Unknown or expired prompt.", "")
+		return
+	}
+	if time.Now().After(prompt.ExpiresAt) {
+		delete(pendingPrompts, id)
+		writeRespondPage(w, false, "This prompt has expired. Please respond locally in Forge.", "")
+		return
+	}
+	if prompt.Token != token {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeRespondPage(w, false, "Invalid token. Response not accepted.", "")
+		return
+	}
+	if prompt.Resolved {
+		writeRespondPage(w, true, "Already resolved.", prompt.Response)
+		return
+	}
+
+	// Validate choice is in options
+	valid := false
+	for _, opt := range prompt.Options {
+		if opt == choice {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		writeRespondPage(w, false, "Invalid choice.", "")
+		return
+	}
+
+	prompt.Response = choice
+	prompt.Resolved = true
+
+	// Find display label for the chosen option
+	label := choice
+	for i, opt := range prompt.Options {
+		if opt == choice && i < len(prompt.Labels) {
+			label = prompt.Labels[i]
+			break
+		}
+	}
+	writeRespondPage(w, true, "Response recorded. You may close this page.", label)
+}
+
+// writeRespondPage returns a clean mobile-friendly HTML confirmation page.
+func writeRespondPage(w http.ResponseWriter, success bool, msg, choice string) {
+	icon := "✅"
+	color := "#22c55e"
+	if !success {
+		icon = "❌"
+		color = "#ef4444"
+	}
+	choiceHTML := ""
+	if choice != "" {
+		choiceHTML = fmt.Sprintf(`<p style="font-size:1.1em;margin-top:12px;color:#ccc;">Selected: <strong style="color:#fff">%s</strong></p>`, choice)
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Forge Terminal</title>
+<style>body{background:#0f0f0f;color:#fff;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+.card{background:#1a1a1a;border-radius:16px;padding:32px 24px;max-width:360px;width:90%%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.5);}
+h1{font-size:3em;margin:0 0 12px}p{color:#aaa;line-height:1.5;margin:0}</style></head>
+<body><div class="card"><h1>%s</h1><p style="color:%s;font-weight:600;font-size:1.2em">%s</p>%s</div></body></html>`,
+		icon, color, msg, choiceHTML)
+}
+
+// handleNotifyPending handles GET /api/notify/pending?id=...
+// Frontend polls this to learn when a remote response has arrived.
+// Returns: {"resolved":false} or {"resolved":true,"choice":"restricted"}
+func handleNotifyPending(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "id is required", http.StatusBadRequest)
+		return
+	}
+
+	pendingPromptsMu.Lock()
+	prompt, ok := pendingPrompts[id]
+	if ok && !prompt.Resolved && time.Now().After(prompt.ExpiresAt) {
+		delete(pendingPrompts, id)
+		ok = false
+	}
+	pendingPromptsMu.Unlock()
+
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]any{"resolved": false, "expired": true})
+		return
+	}
+
+	if prompt.Resolved {
+		writeJSON(w, http.StatusOK, map[string]any{"resolved": true, "choice": prompt.Response})
+		// Clean up after delivery
+		pendingPromptsMu.Lock()
+		delete(pendingPrompts, id)
+		pendingPromptsMu.Unlock()
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"resolved": false})
 }

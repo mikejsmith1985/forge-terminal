@@ -6,6 +6,7 @@ const DEFAULT_CONFIG = {
   webhookSecret: '',
   idleDetectionEnabled: true,
   idleTimeoutSeconds: 30,
+  baseURL: '',
 };
 
 const NotificationsPanel = ({ onToast }) => {
@@ -139,6 +140,27 @@ const NotificationsPanel = ({ onToast }) => {
         </div>
         <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)' }}>
           Must match <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '3px' }}>WEBHOOK_SECRET</code> env var on Render.
+        </span>
+      </div>
+
+      {/* Divider */}
+      <div style={{ borderTop: '1px solid var(--border, #333)' }} />
+
+      {/* Remote Response Base URL */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>
+          Forge Base URL <span style={{ fontWeight: 400, color: 'var(--text-muted, #888)' }}>(optional — for remote responses)</span>
+        </label>
+        <input
+          type="url"
+          value={config.baseURL}
+          onChange={e => update('baseURL', e.target.value)}
+          placeholder="http://192.168.1.100:8080"
+          style={inputStyle}
+        />
+        <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)', lineHeight: 1.5 }}>
+          When set, Forge embeds clickable response links in notifications so you can answer prompts
+          directly from your phone — without returning to the PC. Use your local IP or hostname.
         </span>
       </div>
 

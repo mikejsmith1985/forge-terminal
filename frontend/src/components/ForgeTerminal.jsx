@@ -807,13 +807,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // This prevents each line from being executed as a separate command
         const sanitized = text.replace(/[\r\n]+/g, ' ').trim();
         
-        // CRITICAL FIX: Write to local terminal FIRST so user sees what was pasted
-        // The backend will echo it back, but that can be delayed
-        if (xtermRef.current && sanitized) {
-          xtermRef.current.write(sanitized);
-        }
-        
-        // Send text WITHOUT Enter key - user can continue typing
+        // Send text WITHOUT Enter key - user can continue typing.
+        // Do NOT write to xterm locally here — the PTY echoes input back naturally,
+        // so a local write would cause the text to appear twice.
         wsRef.current.send(sanitized);
         
         // Always log user input to AM for crash recovery
@@ -1545,38 +1541,30 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
         logger.terminal('Initial size sent', { tabId, cols, rows });
 
-        // Restore directory if available
-        if (currentDirectoryRef.current) {
+        // Restore directory if available — but ONLY for hidden (non-active) tabs.
+        // For the visible/active tab the psHome query param already told the backend to
+        // run Set-Location at 100ms, so we don't need to send a visible cd command here
+        // (which would clutter the terminal screen).  Hidden tabs can run the cd silently
+        // as a belt-and-suspenders fallback without the user ever seeing it.
+        if (currentDirectoryRef.current && !isVisibleRef.current) {
           const dir = currentDirectoryRef.current;
-          logger.terminal('Restoring directory', { tabId, directory: dir });
+          logger.terminal('Restoring directory (hidden tab fallback)', { tabId, directory: dir });
           
-          // PERFORMANCE FIX: Increased delay from 100ms to 800ms
-          // 100ms was too aggressive for some systems causing directory restore to fail
-          // when the shell wasn't fully ready to receive input
           setTimeout(() => {
             if (ws.readyState === WebSocket.OPEN) {
-              // Different cd command syntax for different shells
               const shellType = cfg?.shellType || 'powershell';
               let cdCommand = '';
               
               if (shellType === 'wsl') {
-                // For bash/WSL: Don't quote if path starts with ~, bash needs to expand it
-                // For paths with spaces, escape them instead of quoting the whole path
-                if (dir.startsWith('~')) {
-                  cdCommand = `cd ${dir.replace(/ /g, '\\ ')}\r`;
-                } else {
-                  cdCommand = `cd "${dir}"\r`;
-                }
+                cdCommand = dir.startsWith('~') ? `cd ${dir.replace(/ /g, '\\ ')}\r` : `cd "${dir}"\r`;
               } else if (shellType === 'cmd') {
-                // CMD needs /d flag to change drive too
                 cdCommand = `cd /d "${dir}"\r`;
               } else {
-                // PowerShell
                 cdCommand = `cd "${dir}"\r`;
               }
               
               ws.send(cdCommand);
-              logger.terminal('Directory restore command sent', { tabId, command: cdCommand.trim() });
+              logger.terminal('Directory restore command sent (hidden)', { tabId, command: cdCommand.trim() });
             }
           }, 800);
         }

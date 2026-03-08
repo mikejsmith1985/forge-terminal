@@ -316,6 +316,9 @@ func main() {
 		}
 	}))
 	http.HandleFunc("/api/notify/test", WrapWithMiddleware(handleNotifyTest))
+	http.HandleFunc("/api/notify/prompt", WrapWithMiddleware(handleNotifyPrompt))
+	http.HandleFunc("/api/notify/respond", handleNotifyRespond) // no auth middleware — accessed by phone browser
+	http.HandleFunc("/api/notify/pending", WrapWithMiddleware(handleNotifyPending))
 
 	// WSL detection API
 	http.HandleFunc("/api/wsl/detect", WrapWithMiddleware(handleWSLDetect))

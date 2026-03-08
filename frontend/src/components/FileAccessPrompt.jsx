@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Shield, ShieldAlert, Info } from 'lucide-react';
+import { Shield, ShieldAlert, Info, Smartphone } from 'lucide-react';
 
-export default function FileAccessPrompt({ isOpen, onChoice }) {
+export default function FileAccessPrompt({ isOpen, onChoice, remoteResponsePending }) {
   const [selectedMode, setSelectedMode] = useState('restricted');
 
   if (!isOpen) return null;
@@ -44,6 +44,31 @@ export default function FileAccessPrompt({ isOpen, onChoice }) {
             Choose how Forge Terminal should access files on your system. 
             You can change this later in Settings.
           </p>
+
+          {/* Remote response banner */}
+          {remoteResponsePending && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '12px 16px',
+              marginBottom: '16px',
+              background: '#1e3a2f',
+              border: '1px solid #22c55e',
+              borderRadius: '8px',
+              color: '#86efac',
+              fontSize: '0.9em',
+            }}>
+              <Smartphone size={18} style={{ flexShrink: 0, animation: 'pulse 1.5s ease-in-out infinite' }} />
+              <span>
+                <strong>Waiting for your remote response…</strong><br />
+                <span style={{ color: '#4ade80', fontSize: '0.9em' }}>
+                  Tap the link in your MBL2PC notification to respond from your phone.
+                  Or make a selection below to respond locally.
+                </span>
+              </span>
+            </div>
+          )}
 
           {/* Restricted Option */}
           <div 
