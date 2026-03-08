@@ -1,0 +1,250 @@
+.directory-card {
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--card-border, #313244);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.directory-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background 0.15s;
+}
+
+.directory-card-header:hover {
+  background: var(--card-hover, rgba(255, 255, 255, 0.04));
+}
+
+.directory-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.directory-card-icon {
+  color: var(--accent, #cba6f7);
+  flex-shrink: 0;
+}
+
+.directory-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+  white-space: nowrap;
+}
+
+.directory-card-root-badge {
+  font-size: 11px;
+  color: var(--text-muted, #6c7086);
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  padding: 1px 6px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.directory-card-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #6c7086);
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.directory-card-action-btn:hover:not(:disabled) {
+  color: var(--text-primary, #cdd6f4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.directory-card-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.directory-card-collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #6c7086);
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.directory-card-collapse-btn:hover {
+  color: var(--text-primary, #cdd6f4);
+}
+
+/* Body */
+.directory-card-body {
+  padding: 8px 10px 10px;
+}
+
+/* Path input row */
+.directory-card-path-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.directory-card-path-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border, #313244);
+  border-radius: 5px;
+  padding: 5px 8px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 12px;
+  outline: none;
+}
+
+.directory-card-path-input:focus {
+  border-color: var(--accent, #cba6f7);
+}
+
+.directory-card-btn-save {
+  background: var(--accent, #cba6f7);
+  color: #1e1e2e;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.directory-card-btn-save:hover {
+  opacity: 0.9;
+}
+
+.directory-card-btn-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #6c7086);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.directory-card-btn-cancel:hover {
+  color: var(--text-primary, #cdd6f4);
+}
+
+/* Empty state */
+.directory-card-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  color: var(--text-muted, #6c7086);
+  font-size: 12px;
+}
+
+.directory-card-set-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(203, 166, 247, 0.15);
+  border: 1px solid rgba(203, 166, 247, 0.3);
+  color: var(--accent, #cba6f7);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.directory-card-set-btn:hover {
+  background: rgba(203, 166, 247, 0.25);
+}
+
+/* Error */
+.directory-card-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #f38ba8;
+  font-size: 12px;
+  padding: 4px 0 6px;
+}
+
+/* Directory grid */
+.directory-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.directory-card-folder-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--card-border, #313244);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.directory-card-folder-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-card-folder-btn svg {
+  color: var(--accent, #cba6f7);
+  flex-shrink: 0;
+}
+
+.directory-card-folder-btn:hover,
+.directory-card-folder-btn.hovered {
+  background: rgba(203, 166, 247, 0.12);
+  border-color: rgba(203, 166, 247, 0.4);
+  color: var(--accent, #cba6f7);
+}
+
+/* Spin animation for refresh */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
+}

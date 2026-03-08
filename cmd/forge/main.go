@@ -440,6 +440,9 @@ func main() {
 	// Desktop shortcut API
 	http.HandleFunc("/api/desktop-shortcut", WrapWithMiddleware(handleDesktopShortcut))
 
+	// Directory Card API - list subdirectories for project navigation
+	http.HandleFunc("/api/directory/list", WrapWithMiddleware(handleDirectoryList))
+
 	// File management API
 	http.HandleFunc("/api/files/list", WrapWithMiddleware(handleListFiles)) // v3.3.7 Active Engineer
 	http.HandleFunc("/api/files/flat", WrapWithMiddleware(files.HandleFlatList)) // v3.3.6 @ mentions

@@ -4,11 +4,13 @@ import { SortableCommandCard } from './SortableCommandCard';
 import { SortableOwnerReleaseCard } from './SortableOwnerReleaseCard';
 import { RefreshCw } from 'lucide-react';
 import OwnerReleaseCard from './OwnerReleaseCard';
+import DirectoryCard from './DirectoryCard';
 
 const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd }) => {
   if (loading) {
     return (
       <div className="command-cards-container">
+        <DirectoryCard onExecute={onExecute} />
         {/* Owner Release Card always renders */}
         <OwnerReleaseCard 
           onExecuteCommand={onExecute}
@@ -27,6 +29,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
   if (error) {
     return (
       <div className="command-cards-container">
+        <DirectoryCard onExecute={onExecute} />
         {/* Owner Release Card always renders */}
         <OwnerReleaseCard 
           onExecuteCommand={onExecute}
@@ -53,6 +56,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
 
   return (
     <div className="command-cards-container">
+      <DirectoryCard onExecute={onExecute} />
       {/* User Cards Section */}
       {userCards.length > 0 ? (
         <SortableContext
@@ -87,6 +91,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
       ) : (
         <div className="command-cards-empty">
            {/* Fallback Release Card if list is truly empty */}
+           <DirectoryCard onExecute={onExecute} />
            <OwnerReleaseCard 
              onExecuteCommand={onExecute}
              onToast={onToast}
