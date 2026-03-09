@@ -38,7 +38,15 @@ func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadW
 		commandLine += " " + strings.Join(args, " ")
 	}
 
-	cpty, err := conpty.Start(commandLine)
+	// Pass workingDir to ConPTY directly so the process starts in the correct
+	// directory immediately. Without this, ConPTY inherits the server's CWD,
+	// which causes all tab titles to temporarily (or permanently) show the
+	// server's CWD instead of each tab's saved directory after an update.
+	var startOpts []conpty.ConPtyOption
+	if workingDir != "" {
+		startOpts = append(startOpts, conpty.ConPtyWorkDir(workingDir))
+	}
+	cpty, err := conpty.Start(commandLine, startOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("conpty start failed for %s: %w", commandLine, err)
 	}
