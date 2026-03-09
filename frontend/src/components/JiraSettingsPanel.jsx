@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import JiraSetupWizard from './JiraSetupWizard';
 
 const DEFAULT_FORM = {
   baseUrl: '',
@@ -20,6 +21,7 @@ export default function JiraSettingsPanel({ onToast }) {
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState(null); // { success, projectCount?, error? }
   const [authType, setAuthType] = useState('cloud'); // derived from URL
+  const [showWizard, setShowWizard] = useState(false);
 
   // Load existing config on mount
   useEffect(() => {
@@ -87,11 +89,43 @@ export default function JiraSettingsPanel({ onToast }) {
   const set = (key, value) => setForm(f => ({ ...f, [key]: value }));
   const setUI = (key, value) => setForm(f => ({ ...f, uiMode: { ...f.uiMode, [key]: value } }));
 
+  const handleWizardComplete = (config) => {
+    setForm(f => ({
+      ...f,
+      baseUrl:          config.baseUrl           || '',
+      email:            config.email             || '',
+      apiToken:         config.apiToken          || '',
+      defaultProjectKey: config.defaultProjectKey || '',
+      branchTemplate:   config.branchTemplate    || f.branchTemplate,
+      prTemplate:       config.prTemplate        || f.prTemplate,
+      uiMode:           config.uiMode            || f.uiMode,
+    }));
+    setShowWizard(false);
+    onToast?.('Jira configured successfully ✓');
+  };
+
   return (
     <div style={{ maxWidth: 600 }}>
-      <h3 style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-        🎟 Jira Integration
-      </h3>
+      {showWizard && (
+        <JiraSetupWizard
+          initialForm={form}
+          onComplete={handleWizardComplete}
+          onDismiss={() => setShowWizard(false)}
+        />
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4, gap: 12 }}>
+        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          🎟 Jira Integration
+        </h3>
+        <button
+          className="settings-btn settings-btn--primary"
+          onClick={() => setShowWizard(true)}
+          style={{ flexShrink: 0, fontSize: 13, padding: '6px 14px' }}
+        >
+          ✨ Setup Wizard
+        </button>
+      </div>
       <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>
         Connect Forge Terminal to your Jira instance. Credentials are stored locally and never leave your machine.
       </p>
