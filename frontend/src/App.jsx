@@ -193,6 +193,7 @@ function App() {
     tabs,
     activeTabId,
     activeTab,
+    sessionLoaded,
     createTab,
     closeTab,
     switchTab,
@@ -1898,8 +1899,10 @@ function App() {
         />
         <div className="terminal-pane-content">
           <div className="terminal-container">
-            {/* Block terminal rendering until version is verified to prevent stale JS issues */}
-            {!versionReady ? (
+            {/* Block terminal rendering until version is verified AND session is loaded.
+                  Rendering before session loads causes all tabs to connect with currentDirectory=null,
+                  starting every PTY in the server's CWD (e.g. Downloads) and corrupting the session. */}
+            {(!versionReady || !sessionLoaded) ? (
               <div className="terminal-loading" style={{ 
                 display: 'flex', 
                 alignItems: 'center', 

@@ -756,6 +756,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     tabs: state.tabs,
     activeTabId: state.activeTabId,
     activeTab,
+    sessionLoaded: state.sessionLoaded,
     createTab: createTabAction,
     closeTab,
     switchTab,
