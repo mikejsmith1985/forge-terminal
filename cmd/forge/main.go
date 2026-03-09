@@ -319,6 +319,19 @@ func main() {
 	http.HandleFunc("/api/notify/prompt", WrapWithMiddleware(handleNotifyPrompt))
 	http.HandleFunc("/api/notify/respond", handleNotifyRespond) // no auth middleware — accessed by phone browser
 	http.HandleFunc("/api/notify/pending", WrapWithMiddleware(handleNotifyPending))
+	http.HandleFunc("/api/notify/inbound", handleNotifyInbound)      // no middleware — called by MBL2PC server
+	http.HandleFunc("/api/notify/inbound/poll", WrapWithMiddleware(handleNotifyInboundPoll))
+
+	// Cloudflare tunnel management API
+	http.HandleFunc("/api/tunnel/status", WrapWithMiddleware(handleTunnelStatus))
+	http.HandleFunc("/api/tunnel/start", WrapWithMiddleware(handleTunnelStart))
+	http.HandleFunc("/api/tunnel/stop", WrapWithMiddleware(handleTunnelStop))
+
+	// Setup wizard
+	http.HandleFunc("/setup", WrapWithMiddleware(handleSetupWizard))
+	http.HandleFunc("/api/setup/check", WrapWithMiddleware(handleSetupCheck))
+	http.HandleFunc("/api/setup/install-cloudflared", WrapWithMiddleware(handleSetupInstallCloudflared))
+	http.HandleFunc("/api/setup/activate", WrapWithMiddleware(handleSetupActivate))
 
 	// WSL detection API
 	http.HandleFunc("/api/wsl/detect", WrapWithMiddleware(handleWSLDetect))
@@ -496,6 +509,18 @@ func main() {
 	}
 
 	log.Printf("🔥 Forge Terminal starting at http://%s (PID: %d)", addr, os.Getpid())
+
+	// Auto-start cloudflared tunnel if configured
+	go func() {
+		cfg, err := loadNotifyConfig()
+		if err == nil && cfg.TunnelAutoStart {
+			if startErr := tunnelMgr.Start(activePort, onTunnelURL); startErr != nil {
+				log.Printf("[Tunnel] Auto-start failed: %v", startErr)
+			} else {
+				log.Printf("[Tunnel] Auto-started cloudflared on port %d", activePort)
+			}
+		}
+	}()
 	// Print access URL when running remotely
 	if inCodespaces {
 		codespaceName := os.Getenv("CODESPACE_NAME")

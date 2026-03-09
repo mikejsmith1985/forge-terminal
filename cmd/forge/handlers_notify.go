@@ -22,10 +22,16 @@ type NotifyConfig struct {
 	WebhookSecret        string `json:"webhookSecret"`
 	IdleDetectionEnabled bool   `json:"idleDetectionEnabled"`
 	IdleTimeoutSeconds   int    `json:"idleTimeoutSeconds"`
-	// BaseURL is the externally-reachable base URL of this Forge instance
-	// (e.g. "http://192.168.1.100:8080"). When set, response URLs are embedded
-	// in notifications so the user can reply remotely without touching the PC.
+	// BaseURL is the externally-reachable base URL of this Forge instance.
+	// When set, response URLs are embedded in notifications so the user can
+	// reply remotely without touching the PC.
 	BaseURL string `json:"baseURL"`
+
+	// Tunnel automation — auto-manage a cloudflared quick tunnel so the
+	// public URL is always kept in sync with Render's FORGE_INBOUND_URL.
+	TunnelAutoStart  bool   `json:"tunnelAutoStart"`
+	RenderAPIKey     string `json:"renderAPIKey"`
+	RenderServiceID  string `json:"renderServiceID"`
 }
 
 func defaultNotifyConfig() NotifyConfig {
@@ -33,6 +39,14 @@ func defaultNotifyConfig() NotifyConfig {
 		IdleDetectionEnabled: true,
 		IdleTimeoutSeconds:   30,
 	}
+}
+
+// maskSecret returns "••••••••" if s is non-empty, otherwise "".
+func maskSecret(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "••••••••"
 }
 
 func notifyConfigPath() (string, error) {
@@ -186,7 +200,10 @@ func handleNotifyConfigGet(w http.ResponseWriter, r *http.Request) {
 	// Mask secret — never send plaintext to frontend
 	masked := cfg
 	if masked.WebhookSecret != "" {
-		masked.WebhookSecret = "••••••••"
+		masked.WebhookSecret = maskSecret(masked.WebhookSecret)
+	}
+	if masked.RenderAPIKey != "" {
+		masked.RenderAPIKey = maskSecret(masked.RenderAPIKey)
 	}
 	writeJSON(w, http.StatusOK, masked)
 }
@@ -203,10 +220,13 @@ func handleNotifyConfigPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	// Load existing config to preserve the secret if the frontend sent the mask
+	// Load existing config to preserve secrets if the frontend sent the mask
 	existing, _ := loadNotifyConfig()
-	if incoming.WebhookSecret == "••••••••" {
+	if incoming.WebhookSecret == maskSecret("x") {
 		incoming.WebhookSecret = existing.WebhookSecret
+	}
+	if incoming.RenderAPIKey == maskSecret("x") {
+		incoming.RenderAPIKey = existing.RenderAPIKey
 	}
 	if incoming.IdleTimeoutSeconds <= 0 {
 		incoming.IdleTimeoutSeconds = 30
@@ -249,7 +269,122 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// ── Remote-response prompt system ────────────────────────────────────────────
+// ── Inbound message buffer (replies from MBL2PC) ─────────────────────────────
+
+// InboundMessage is a message sent by the user from the MBL2PC UI, forwarded
+// to Forge so the agent can receive replies without the user touching the PC.
+type InboundMessage struct {
+	ID        string    `json:"id"`
+	Text      string    `json:"text"`
+	Sender    string    `json:"sender"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+const inboundBufferCap = 100
+
+var (
+	inboundMessages   []InboundMessage
+	inboundMessagesMu sync.Mutex
+)
+
+// handleNotifyInbound handles POST /api/notify/inbound
+// Called by MBL2PC when the user sends a message, or by any trusted caller.
+// Body: {"text":"...","sender":"...","token":"..."}
+func handleNotifyInbound(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Text   string `json:"text"`
+		Sender string `json:"sender"`
+		Token  string `json:"token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Auth: token must match webhookSecret
+	cfg, err := loadNotifyConfig()
+	if err != nil || cfg.WebhookSecret == "" || req.Token != cfg.WebhookSecret {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if req.Text == "" {
+		http.Error(w, "text is required", http.StatusBadRequest)
+		return
+	}
+
+	msg := InboundMessage{
+		ID:        randomHex(8),
+		Text:      req.Text,
+		Sender:    req.Sender,
+		Timestamp: time.Now(),
+	}
+
+	inboundMessagesMu.Lock()
+	inboundMessages = append(inboundMessages, msg)
+	if len(inboundMessages) > inboundBufferCap {
+		inboundMessages = inboundMessages[len(inboundMessages)-inboundBufferCap:]
+	}
+	inboundMessagesMu.Unlock()
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "received", "id": msg.ID})
+}
+
+// handleNotifyInboundPoll handles GET /api/notify/inbound/poll?since=<id>
+// Frontend polls this to receive messages forwarded from MBL2PC.
+// Returns messages added after the given ID (or all recent if no ID given).
+func handleNotifyInboundPoll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sinceID := r.URL.Query().Get("since")
+
+	inboundMessagesMu.Lock()
+	var result []InboundMessage
+	if sinceID == "" {
+		// Return nothing on first poll — establishes the baseline
+		result = []InboundMessage{}
+	} else {
+		found := false
+		for i, m := range inboundMessages {
+			if m.ID == sinceID {
+				result = inboundMessages[i+1:]
+				found = true
+				break
+			}
+		}
+		if !found {
+			// sinceID not in buffer (cleared/restarted) — return last 5 as safety net
+			if len(inboundMessages) > 5 {
+				result = inboundMessages[len(inboundMessages)-5:]
+			} else {
+				result = inboundMessages
+			}
+		}
+	}
+	// Snapshot to avoid holding the lock while marshalling
+	snapshot := make([]InboundMessage, len(result))
+	copy(snapshot, result)
+	inboundMessagesMu.Unlock()
+
+	// Also return the latest ID the client should track going forward
+	lastID := ""
+	if len(inboundMessages) > 0 {
+		inboundMessagesMu.Lock()
+		lastID = inboundMessages[len(inboundMessages)-1].ID
+		inboundMessagesMu.Unlock()
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"messages": snapshot,
+		"lastId":   lastID,
+	})
+}
 
 // PendingPrompt represents a dialog waiting for a remote user response.
 type PendingPrompt struct {

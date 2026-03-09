@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, us
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
@@ -994,6 +995,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     queueMicrotask(() => {
       term.focus();
     });
+
+    // URL link provider — clicking an http(s) URL opens it in a new browser tab.
+    // Single-click (no modifier required) matches Forge's file-link UX.
+    term.loadAddon(new WebLinksAddon((event, uri) => {
+      window.open(uri, '_blank', 'noopener,noreferrer');
+    }, { hover: true }));
 
     // Register custom file path link provider
     // This makes file paths clickable - double-click opens in Monaco editor

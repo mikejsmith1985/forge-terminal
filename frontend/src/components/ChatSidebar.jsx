@@ -11,6 +11,11 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
+  // Stable ref for inbound message poller (avoids stale closure)
+  const handleSendMessageRef = useRef(null);
+  // Tracks the last inbound message ID seen — avoids replaying old messages
+  const lastInboundIdRef = useRef(null);
+
   // @ mention state (v3.3.6 Deep Context - Active Engineer mode)
   const [mentionActive, setMentionActive] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
@@ -175,16 +180,18 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
     return matches;
   };
 
-  const handleSendMessage = useCallback(async () => {
-    if (!inputValue.trim() || isLoading) return;
-
-    const userMessage = inputValue.trim();
+  const handleSendMessage = useCallback(async (overrideText = null) => {
+    const userMessage = (overrideText != null ? overrideText : inputValue).trim();
+    if (!userMessage || isLoading) return;
 
     // Parse [@file] tokens for context files
     const contextFiles = parseContextFiles(userMessage);
 
-    setInputValue('');
-    setMentionActive(false);
+    // Only clear the input box when the user typed (not a remote injection)
+    if (overrideText == null) {
+      setInputValue('');
+      setMentionActive(false);
+    }
     setMessages(prev => [...prev, {
       role: 'user',
       content: userMessage,
@@ -257,6 +264,25 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
           });
         }
       }
+
+      // Notify the user that the agent finished — fire-and-forget, never throws
+      fetch('/api/notify/config')
+        .then(r => r.json())
+        .then(cfg => {
+          if (cfg.idleDetectionEnabled && cfg.webhookURL && cfg.webhookSecret) {
+            // Provide a short preview of the response (first 80 chars)
+            const preview = fullResponse.trim().replace(/\s+/g, ' ').slice(0, 80);
+            const suffix = fullResponse.trim().length > 80 ? '…' : '';
+            fetch('/api/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: `✅ Forge Agent finished responding.\n\n"${preview}${suffix}"`,
+              }),
+            }).catch(() => {});
+          }
+        })
+        .catch(() => {});
     } catch (err) {
       console.error('[ChatSidebar] Error:', err);
       setError(err.message);
@@ -269,6 +295,41 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
       setIsLoading(false);
     }
   }, [inputValue, isLoading, tabId, activeModel]);
+
+  // Keep ref current so the inbound poller always calls the latest version
+  useEffect(() => { handleSendMessageRef.current = handleSendMessage; }, [handleSendMessage]);
+
+  // Poll for inbound messages forwarded from MBL2PC
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // On first open, prime the lastId so we don't replay old messages
+    if (lastInboundIdRef.current === null) {
+      fetch('/api/notify/inbound/poll')
+        .then(r => r.json())
+        .then(data => { lastInboundIdRef.current = data.lastId || ''; })
+        .catch(() => { lastInboundIdRef.current = ''; });
+    }
+
+    const interval = setInterval(async () => {
+      if (!lastInboundIdRef.current && lastInboundIdRef.current !== '') return; // still priming
+      try {
+        const res = await fetch(`/api/notify/inbound/poll?since=${lastInboundIdRef.current}`);
+        const data = await res.json();
+        if (data.lastId) lastInboundIdRef.current = data.lastId;
+        if (data.messages && data.messages.length > 0) {
+          for (const msg of data.messages) {
+            // Small delay between injected messages to avoid race conditions
+            await handleSendMessageRef.current(msg.text);
+          }
+        }
+      } catch {
+        // Ignore network errors — keep polling
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   // Get display model - prioritize last routed, then active config
   const displayModel = lastRoutedModel || activeModel || 'gpt-4o-mini';
