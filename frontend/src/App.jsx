@@ -260,6 +260,10 @@ function App() {
     openSettings: () => setIsSettingsModalOpen(true),
     closeSettings: () => setIsSettingsModalOpen(false),
 
+    // Jira panel
+    openJiraPanel: () => setIsJiraPanelOpen(true),
+    closeJiraPanel: () => setIsJiraPanelOpen(false),
+
     // Legacy router config (kept for compatibility)
     openRouterConfig: () => setIsRouterConfigOpen(true),
     closeRouterConfig: () => setIsRouterConfigOpen(false),

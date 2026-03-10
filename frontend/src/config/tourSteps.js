@@ -403,6 +403,55 @@ const TOUR_STEPS = [
   },
 
   // ============================================================================
+  // JIRA INTEGRATION
+  // ============================================================================
+  {
+    id: 'jira-toggle',
+    selector: 'button[title="Jira Integration"]',
+    fallbackSelector: '.theme-controls',
+    title: 'Jira Integration 🎟',
+    content: 'Click the ticket icon (🎟) in the toolbar to open the Jira panel. You can link a Jira ticket to each terminal tab, track its status, add comments, and get auto-generated branch names — without leaving your terminal.',
+    placement: 'center',
+    spotlight: true,
+    arrow: 'up-right',
+    action: 'openJiraPanel',
+  },
+
+  {
+    id: 'jira-panel-features',
+    selector: '.jira-panel',
+    fallbackSelector: '.jira-panel-container',
+    title: 'Jira Panel Features',
+    content: '**Three views in one panel:**\n\n🎫 **Ticket** — See the linked ticket\'s status, priority, and assignee. Transition its status (e.g. "In Review") with one click.\n\n🌿 **Git helpers** — Copy a suggested branch name or PR title directly from the ticket.\n\n🔍 **Search** — Search your Jira project by text or ticket key (e.g. PROJ-123) and link it to this tab.\n\n➕ **Create** — Create a new ticket and link it instantly.',
+    placement: 'center',
+    spotlight: true,
+    arrow: 'right',
+    requiresOpen: 'jiraPanel',
+  },
+
+  {
+    id: 'jira-hud',
+    selector: '.jira-panel-container',
+    fallbackSelector: '.theme-controls',
+    title: 'Auto-Detection HUD',
+    content: 'While you work, Forge Terminal watches your terminal output for Jira ticket keys (like PROJ-123). When one is spotted, a small toast appears letting you link it to the current tab with a single click. No manual copy-paste needed!',
+    placement: 'center',
+    spotlight: false,
+    action: 'closeJiraPanel',
+  },
+
+  {
+    id: 'jira-setup',
+    selector: 'button[title*="Settings"]',
+    fallbackSelector: '.terminal-controls',
+    title: 'Set Up Jira (First Time)',
+    content: 'To connect Jira: open **Settings → Jira** and enter your Jira base URL (e.g. https://mycompany.atlassian.net) plus an API token. Both Cloud (email + API token) and Server/Data Center (personal access token) are supported. The setup wizard will guide you through it.',
+    placement: 'center',
+    spotlight: true,
+    arrow: 'up-right',
+  },
+
+  // ============================================================================
   // KEYBOARD SHORTCUTS & POWER USER FEATURES
   // ============================================================================
   {
