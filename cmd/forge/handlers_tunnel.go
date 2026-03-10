@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/tunnel"
 )
@@ -20,6 +21,10 @@ type renderEnvVar struct {
 	Value string `json:"value"`
 }
 
+// renderHTTPClient is used for outbound Render API calls.
+// A 15-second timeout prevents goroutine leaks when the API is slow or unreachable.
+var renderHTTPClient = &http.Client{Timeout: 15 * time.Second}
+
 // updateRenderEnvVar GETs all env vars for the service, upserts key=value,
 // and PUTs the updated list back.  Requires a Render v1 API key.
 func updateRenderEnvVar(apiKey, serviceID, key, value string) error {
@@ -30,7 +35,7 @@ func updateRenderEnvVar(apiKey, serviceID, key, value string) error {
 	getReq.Header.Set("Authorization", "Bearer "+apiKey)
 	getReq.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(getReq)
+	resp, err := renderHTTPClient.Do(getReq)
 	if err != nil {
 		return fmt.Errorf("GET env-vars failed: %w", err)
 	}
@@ -74,7 +79,7 @@ func updateRenderEnvVar(apiKey, serviceID, key, value string) error {
 	putReq.Header.Set("Content-Type", "application/json")
 	putReq.Header.Set("Accept", "application/json")
 
-	putResp, err := http.DefaultClient.Do(putReq)
+	putResp, err := renderHTTPClient.Do(putReq)
 	if err != nil {
 		return fmt.Errorf("PUT env-vars failed: %w", err)
 	}

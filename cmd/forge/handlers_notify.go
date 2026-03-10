@@ -98,6 +98,10 @@ type NotificationSender interface {
 	Send(message, sender string) error
 }
 
+// notifyHTTPClient is used for all outbound notification/webhook requests.
+// A 15-second timeout prevents goroutine leaks when remote endpoints are slow or unreachable.
+var notifyHTTPClient = &http.Client{Timeout: 15 * time.Second}
+
 // mbl2pcSender sends notifications to an mbl2pc /webhook endpoint.
 type mbl2pcSender struct {
 	webhookURL    string
@@ -120,7 +124,12 @@ func (s *mbl2pcSender) Send(message, sender string) error {
 	if err != nil {
 		return fmt.Errorf("marshal error: %w", err)
 	}
-	resp, err := http.Post(s.webhookURL+"/webhook", "application/json", bytes.NewReader(body)) //nolint:gosec
+	req, err := http.NewRequest(http.MethodPost, s.webhookURL+"/webhook", bytes.NewReader(body)) //nolint:gosec
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := notifyHTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("POST /webhook failed: %w", err)
 	}
@@ -367,18 +376,14 @@ func handleNotifyInboundPoll(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// Snapshot to avoid holding the lock while marshalling
+	// Snapshot to avoid holding the lock while marshalling; also capture lastID under the same lock.
 	snapshot := make([]InboundMessage, len(result))
 	copy(snapshot, result)
-	inboundMessagesMu.Unlock()
-
-	// Also return the latest ID the client should track going forward
 	lastID := ""
 	if len(inboundMessages) > 0 {
-		inboundMessagesMu.Lock()
 		lastID = inboundMessages[len(inboundMessages)-1].ID
-		inboundMessagesMu.Unlock()
 	}
+	inboundMessagesMu.Unlock()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"messages": snapshot,
