@@ -113,6 +113,10 @@ func handleJiraIssue(w http.ResponseWriter, r *http.Request) {
 		if req.Fields.Project.Key == "" {
 			req.Fields.Project.Key = cfg.DefaultProjectKey
 		}
+		if req.Fields.Project.Key == "" {
+			http.Error(w, `{"error":"No project key — set a Default Project in Settings → Jira, or enter a project key in the create form."}`, http.StatusBadRequest)
+			return
+		}
 		issue, err := client.CreateIssue(&req)
 		if err != nil {
 			log.Printf("[Jira] CreateIssue failed: %v", err)

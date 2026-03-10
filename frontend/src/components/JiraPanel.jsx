@@ -35,8 +35,9 @@ export default function JiraPanel({
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching]       = useState(false);
   const [view, setView]                 = useState('ticket'); // 'ticket' | 'search' | 'create'
-  const [createForm, setCreateForm]     = useState({ summary: '', description: '', issueType: 'Task', priority: 'Medium' });
+  const [createForm, setCreateForm]     = useState({ summary: '', description: '', issueType: 'Task', priority: 'Medium', projectKey: '' });
   const [creating, setCreating]         = useState(false);
+  const [createError, setCreateError]   = useState('');
   const [branchSuggestion, setBranchSuggestion] = useState('');
   const [prSuggestion, setPrSuggestion] = useState('');
 
@@ -62,6 +63,17 @@ export default function JiraPanel({
       setPrSuggestion(pr || '');
     }).finally(() => setLoading(false));
   }, [jiraTicketKey, isConfigured, jiraApi]);
+
+  // Pre-populate projectKey from config when switching to create view
+  useEffect(() => {
+    if (view === 'create') {
+      setCreateForm(f => ({
+        ...f,
+        projectKey: f.projectKey || jiraApi.jiraConfig?.defaultProjectKey || '',
+      }));
+      setCreateError('');
+    }
+  }, [view, jiraApi.jiraConfig?.defaultProjectKey]);
 
   const handleTransition = useCallback(async (transitionId) => {
     if (!jiraTicketKey) return;
@@ -89,8 +101,13 @@ export default function JiraPanel({
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
-    // Build a simple JQL: text search + unresolved only
-    const jql = `text ~ "${searchQuery.replace(/"/g, '\\"')}" AND resolution = Unresolved ORDER BY updated DESC`;
+    const q = searchQuery.trim();
+    // If query looks like a Jira key (e.g. KAN-1, PROJ-123), use key= lookup
+    // rather than a full-text search — text~ on a key value often fails or returns nothing.
+    const keyPattern = /^[A-Z]{2,10}-\d+$/i;
+    const jql = keyPattern.test(q)
+      ? `key = "${q.toUpperCase()}"`
+      : `text ~ "${q.replace(/"/g, '\\"')}" AND resolution = Unresolved ORDER BY updated DESC`;
     const { issues } = await jiraApi.searchIssues(jql);
     setSearchResults(issues || []);
     setSearching(false);
@@ -99,16 +116,20 @@ export default function JiraPanel({
   const handleCreate = useCallback(async () => {
     if (!createForm.summary.trim()) return;
     setCreating(true);
+    setCreateError('');
     const issue = await jiraApi.createIssue({
       summary: createForm.summary,
       description: createForm.description,
       issuetype: { name: createForm.issueType },
       priority: { name: createForm.priority },
+      ...(createForm.projectKey.trim() ? { project: { key: createForm.projectKey.trim().toUpperCase() } } : {}),
     });
     setCreating(false);
     if (issue?.key) {
       onLinkTicket(issue.key);
       setView('ticket');
+    } else {
+      setCreateError(jiraApi.error || 'Failed to create ticket. Check your Jira configuration in Settings → Jira.');
     }
   }, [createForm, jiraApi, onLinkTicket]);
 
@@ -282,6 +303,8 @@ export default function JiraPanel({
       {view === 'create' && (
         <div className="jira-panel__body">
           <div className="jira-form">
+            {createError && <div className="jira-error">{createError}</div>}
+
             <label className="jira-label">Summary *</label>
             <input className="jira-input" value={createForm.summary} onChange={e => setCreateForm(f => ({ ...f, summary: e.target.value }))} placeholder="Short description of the issue" />
 
@@ -303,11 +326,25 @@ export default function JiraPanel({
               </div>
             </div>
 
+            <label className="jira-label">
+              Project Key
+              {jiraApi.jiraConfig?.defaultProjectKey
+                ? <span style={{ color: 'var(--subtext)', fontWeight: 400, marginLeft: 6 }}>(default: {jiraApi.jiraConfig.defaultProjectKey})</span>
+                : <span style={{ color: 'var(--red)', fontWeight: 400, marginLeft: 6 }}>* required — set in Settings → Jira</span>
+              }
+            </label>
+            <input
+              className="jira-input"
+              value={createForm.projectKey}
+              onChange={e => setCreateForm(f => ({ ...f, projectKey: e.target.value }))}
+              placeholder={jiraApi.jiraConfig?.defaultProjectKey || 'e.g. KAN'}
+            />
+
             <div className="jira-section__actions">
               <button className="jira-btn jira-btn--primary" onClick={handleCreate} disabled={!createForm.summary.trim() || creating}>
                 {creating ? 'Creating…' : '➕ Create & Link'}
               </button>
-              <button className="jira-btn jira-btn--ghost" onClick={() => setView('ticket')}>Cancel</button>
+              <button className="jira-btn jira-btn--ghost" onClick={() => { setView('ticket'); setCreateError(''); }}>Cancel</button>
             </div>
           </div>
         </div>
