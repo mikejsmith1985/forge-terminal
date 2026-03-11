@@ -26,7 +26,7 @@ const TOUR_STEPS = [
   {
     id: 'welcome',
     selector: null, // Centered, no spotlight
-    title: 'Welcome to Forge Terminal! 🔥',
+    title: 'Welcome to Forge Terminal! ≡ƒöÑ',
     content: 'A powerful terminal interface that works with any CLI tool. This interactive tour will show you all the features by actually using them. Click Next to begin!',
     placement: 'center',
     spotlight: false,
@@ -100,7 +100,7 @@ const TOUR_STEPS = [
     id: 'persistent-instruction-intro',
     selector: '.persistent-instruction-collapsed',
     fallbackSelector: '.forge-assist-floating-btn',
-    title: 'Persistent Instructions ⚡',
+    title: 'Persistent Instructions ΓÜí',
     content: 'Press Ctrl+I to instantly toggle persistent instructions on or off. A toast notification will show the status. Use Forge Assist (Ctrl+/) to manage your instructions.',
     placement: 'center',
     spotlight: true,
@@ -125,7 +125,7 @@ const TOUR_STEPS = [
     selector: '.forge-assist-modal .mode-tab:last-child',
     fallbackSelector: '.forge-assist-modal',
     title: 'Task Mode - Structured Workflow',
-    content: 'Press Tab or click here to switch to Task Mode! This gives you a 5-stage workflow: Context → Plan → Implement → Validate → Deliver. Each stage provides smart suggestions.',
+    content: 'Press Tab or click here to switch to Task Mode! This gives you a 5-stage workflow: Context ΓåÆ Plan ΓåÆ Implement ΓåÆ Validate ΓåÆ Deliver. Each stage provides smart suggestions.',
     placement: 'center',
     spotlight: true,
     arrow: 'down',
@@ -203,7 +203,7 @@ const TOUR_STEPS = [
     selector: '.lens-view-selector',
     fallbackSelector: '.lens-file-picker',
     title: 'Three Intelligent Views',
-    content: '🔥 Heatmap shows recently modified files. 📊 Graph visualizes file dependencies. 🔎 Search lets you fuzzy-find any file in your project.',
+    content: '≡ƒöÑ Heatmap shows recently modified files. ≡ƒôè Graph visualizes file dependencies. ≡ƒöÄ Search lets you fuzzy-find any file in your project.',
     placement: 'center',
     spotlight: true,
     arrow: 'right',
@@ -403,62 +403,13 @@ const TOUR_STEPS = [
   },
 
   // ============================================================================
-  // JIRA INTEGRATION
-  // ============================================================================
-  {
-    id: 'jira-toggle',
-    selector: 'button[title="Jira Integration"]',
-    fallbackSelector: '.theme-controls',
-    title: 'Jira Integration 🎟',
-    content: 'Click the ticket icon (🎟) in the toolbar to open the Jira panel. You can link a Jira ticket to each terminal tab, track its status, add comments, and get auto-generated branch names — without leaving your terminal.',
-    placement: 'center',
-    spotlight: true,
-    arrow: 'up-right',
-    action: 'openJiraPanel',
-  },
-
-  {
-    id: 'jira-panel-features',
-    selector: '.jira-panel',
-    fallbackSelector: '.jira-panel-container',
-    title: 'Jira Panel Features',
-    content: '**Three views in one panel:**\n\n🎫 **Ticket** — See the linked ticket\'s status, priority, and assignee. Transition its status (e.g. "In Review") with one click.\n\n🌿 **Git helpers** — Copy a suggested branch name or PR title directly from the ticket.\n\n🔍 **Search** — Search your Jira project by text or ticket key (e.g. PROJ-123) and link it to this tab.\n\n➕ **Create** — Create a new ticket and link it instantly.',
-    placement: 'center',
-    spotlight: true,
-    arrow: 'right',
-    requiresOpen: 'jiraPanel',
-  },
-
-  {
-    id: 'jira-hud',
-    selector: '.jira-panel-container',
-    fallbackSelector: '.theme-controls',
-    title: 'Auto-Detection HUD',
-    content: 'While you work, Forge Terminal watches your terminal output for Jira ticket keys (like PROJ-123). When one is spotted, a small toast appears letting you link it to the current tab with a single click. No manual copy-paste needed!',
-    placement: 'center',
-    spotlight: false,
-    action: 'closeJiraPanel',
-  },
-
-  {
-    id: 'jira-setup',
-    selector: 'button[title*="Settings"]',
-    fallbackSelector: '.terminal-controls',
-    title: 'Set Up Jira (First Time)',
-    content: 'To connect Jira: open **Settings → Jira** and enter your Jira base URL (e.g. https://mycompany.atlassian.net) plus an API token. Both Cloud (email + API token) and Server/Data Center (personal access token) are supported. The setup wizard will guide you through it.',
-    placement: 'center',
-    spotlight: true,
-    arrow: 'up-right',
-  },
-
-  // ============================================================================
   // KEYBOARD SHORTCUTS & POWER USER FEATURES
   // ============================================================================
   {
     id: 'keyboard-shortcuts',
     selector: null,
-    title: 'Keyboard Power User ⌨️',
-    content: '**Essential Shortcuts:**\n\n• Ctrl+T: New tab\n• Ctrl+W: Close tab\n• Ctrl+Tab: Cycle tabs\n• Ctrl+1-9: Jump to tab\n• Ctrl+F: Search terminal\n• Ctrl+/: Forge Assist\n• Ctrl+I: Persistent Instructions\n• Ctrl+Shift+H: Time Travel\n• Ctrl+Shift+1-9: Run command cards\n• Ctrl+,: Settings',
+    title: 'Keyboard Power User Γî¿∩╕Å',
+    content: '**Essential Shortcuts:**\n\nΓÇó Ctrl+T: New tab\nΓÇó Ctrl+W: Close tab\nΓÇó Ctrl+Tab: Cycle tabs\nΓÇó Ctrl+1-9: Jump to tab\nΓÇó Ctrl+F: Search terminal\nΓÇó Ctrl+/: Forge Assist\nΓÇó Ctrl+I: Persistent Instructions\nΓÇó Ctrl+Shift+H: Time Travel\nΓÇó Ctrl+Shift+1-9: Run command cards\nΓÇó Ctrl+,: Settings',
     placement: 'center',
     spotlight: false,
   },
@@ -480,8 +431,8 @@ const TOUR_STEPS = [
   {
     id: 'complete',
     selector: null,
-    title: 'You\'re Ready to Go! 🚀',
-    content: '**Try these next:**\n\n• Press Ctrl+/ to open Forge Assist\n• Press Ctrl+I to toggle Persistent Instructions\n• Create a Command Card for your favorite command\n• Browse files and use @ mentions\n• Try Time Travel with Ctrl+Shift+H\n• Customize your theme\n\nReplay this tour anytime from Settings → Shell tab. Happy coding!',
+    title: 'You\'re Ready to Go! ≡ƒÜÇ',
+    content: '**Try these next:**\n\nΓÇó Press Ctrl+/ to open Forge Assist\nΓÇó Press Ctrl+I to toggle Persistent Instructions\nΓÇó Create a Command Card for your favorite command\nΓÇó Browse files and use @ mentions\nΓÇó Try Time Travel with Ctrl+Shift+H\nΓÇó Customize your theme\n\nReplay this tour anytime from Settings ΓåÆ Shell tab. Happy coding!',
     placement: 'center',
     spotlight: false,
     isFinal: true,

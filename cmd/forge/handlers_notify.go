@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -18,6 +21,18 @@ import (
 
 // NotifyConfig holds user-configured notification settings.
 type NotifyConfig struct {
+	// Transport selects the delivery backend: "ntfy" (default) or "mbl2pc".
+	Transport string `json:"transport"`
+	// ── ntfy transport ──────────────────────────────────────────────────────
+	// NtfyTopic is the ntfy.sh topic Forge publishes notifications to.
+	// e.g. "forge-abc123" → delivers to https://ntfy.sh/forge-abc123
+	NtfyTopic string `json:"ntfyTopic"`
+	// NtfyInboundTopic is the ntfy.sh topic Forge subscribes to for phone→PC replies.
+	// Optional. The user publishes to this topic from the ntfy app.
+	NtfyInboundTopic string `json:"ntfyInboundTopic"`
+	// NtfyServerURL allows using a self-hosted ntfy server (default: https://ntfy.sh).
+	NtfyServerURL string `json:"ntfyServerURL"`
+	// ── mbl2pc transport (legacy) ────────────────────────────────────────────
 	WebhookURL           string `json:"webhookURL"`
 	WebhookSecret        string `json:"webhookSecret"`
 	IdleDetectionEnabled bool   `json:"idleDetectionEnabled"`
@@ -36,6 +51,7 @@ type NotifyConfig struct {
 
 func defaultNotifyConfig() NotifyConfig {
 	return NotifyConfig{
+		Transport:            "ntfy",
 		IdleDetectionEnabled: true,
 		IdleTimeoutSeconds:   30,
 	}
@@ -102,6 +118,159 @@ type NotificationSender interface {
 // A 15-second timeout prevents goroutine leaks when remote endpoints are slow or unreachable.
 var notifyHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
+// ── ntfy transport ───────────────────────────────────────────────────────────
+
+// ntfySender delivers notifications to a ntfy.sh topic (or self-hosted ntfy server).
+// Setup: install the ntfy app on your phone and subscribe to ntfyTopic.
+// Zero-infrastructure: no server, no auth required for public topics.
+type ntfySender struct {
+	serverURL string // e.g. "https://ntfy.sh" (no trailing slash)
+	topic     string
+}
+
+func (s *ntfySender) Send(message, sender string) error {
+	base := s.serverURL
+	if base == "" {
+		base = "https://ntfy.sh"
+	}
+	url := base + "/" + s.topic
+	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(message)) //nolint:gosec
+	if err != nil {
+		return fmt.Errorf("ntfy create request: %w", err)
+	}
+	req.Header.Set("Title", sender)
+	req.Header.Set("Priority", "default")
+	req.Header.Set("Content-Type", "text/plain")
+	resp, err := notifyHTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("ntfy POST failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ntfy returned %d: %s", resp.StatusCode, string(b))
+	}
+	return nil
+}
+
+// ── ntfy inbound poller ──────────────────────────────────────────────────────
+
+// ntfyEvent is a single event in ntfy's newline-delimited JSON stream.
+type ntfyEvent struct {
+	ID      string `json:"id"`
+	Time    int64  `json:"time"`
+	Event   string `json:"event"`
+	Message string `json:"message"`
+	Title   string `json:"title"`
+}
+
+var (
+	ntfyPollerStop chan struct{}
+	ntfyPollerMu   sync.Mutex
+)
+
+// startNtfyInboundPoller starts (or restarts) the goroutine that polls a ntfy
+// topic for inbound messages from the user's phone.  Pass an empty topic to
+// stop a running poller without starting a new one.
+func startNtfyInboundPoller(serverURL, topic string) {
+	ntfyPollerMu.Lock()
+	defer ntfyPollerMu.Unlock()
+
+	// Stop any existing poller.
+	if ntfyPollerStop != nil {
+		close(ntfyPollerStop)
+		ntfyPollerStop = nil
+	}
+	if topic == "" {
+		return
+	}
+
+	stop := make(chan struct{})
+	ntfyPollerStop = stop
+	go func() {
+		since := "all" // fetch messages from the last ~10 min on first connect
+		base := serverURL
+		if base == "" {
+			base = "https://ntfy.sh"
+		}
+		for {
+			msgs, lastID, err := pollNtfyInbound(base, topic, since)
+			if err != nil {
+				log.Printf("[ntfy] inbound poll error: %v", err)
+			} else {
+				if lastID != "" {
+					since = lastID
+				}
+				if len(msgs) > 0 {
+					inboundMessagesMu.Lock()
+					inboundMessages = append(inboundMessages, msgs...)
+					if len(inboundMessages) > inboundBufferCap {
+						inboundMessages = inboundMessages[len(inboundMessages)-inboundBufferCap:]
+					}
+					inboundMessagesMu.Unlock()
+				}
+			}
+
+			select {
+			case <-stop:
+				return
+			case <-time.After(5 * time.Second):
+			}
+		}
+	}()
+	log.Printf("[ntfy] inbound poller started for topic %q", topic)
+}
+
+// pollNtfyInbound fetches new messages from a ntfy topic using poll mode.
+// Returns parsed messages, the last message ID seen (for use as next `since`),
+// and any network/parse error.
+func pollNtfyInbound(serverURL, topic, since string) ([]InboundMessage, string, error) {
+	url := fmt.Sprintf("%s/%s/json?poll=1&since=%s", serverURL, topic, since)
+	req, err := http.NewRequest(http.MethodGet, url, nil) //nolint:gosec
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := notifyHTTPClient.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("ntfy poll returned %d", resp.StatusCode)
+	}
+
+	var msgs []InboundMessage
+	var lastID string
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var evt ntfyEvent
+		if err := json.Unmarshal([]byte(line), &evt); err != nil {
+			continue
+		}
+		if evt.Event != "message" || evt.Message == "" {
+			continue
+		}
+		sender := evt.Title
+		if sender == "" {
+			sender = "Phone"
+		}
+		msgs = append(msgs, InboundMessage{
+			ID:        evt.ID,
+			Text:      evt.Message,
+			Sender:    sender,
+			Timestamp: time.Unix(evt.Time, 0),
+		})
+		lastID = evt.ID
+	}
+	return msgs, lastID, scanner.Err()
+}
+
+// ── mbl2pc transport (legacy) ─────────────────────────────────────────────────
+
 // mbl2pcSender sends notifications to an mbl2pc /webhook endpoint.
 type mbl2pcSender struct {
 	webhookURL    string
@@ -142,15 +311,25 @@ func (s *mbl2pcSender) Send(message, sender string) error {
 }
 
 // newSenderFromConfig builds the right transport from the current config.
-// Currently only mbl2pc is supported; Twilio/others can be added here.
 func newSenderFromConfig(cfg NotifyConfig) (NotificationSender, error) {
-	if cfg.WebhookURL == "" || cfg.WebhookSecret == "" {
-		return nil, fmt.Errorf("notification not configured: webhookURL and webhookSecret are required")
+	transport := cfg.Transport
+	if transport == "" {
+		transport = "ntfy" // default
 	}
-	return &mbl2pcSender{
-		webhookURL:    cfg.WebhookURL,
-		webhookSecret: cfg.WebhookSecret,
-	}, nil
+	switch transport {
+	case "ntfy":
+		if cfg.NtfyTopic == "" {
+			return nil, fmt.Errorf("ntfy not configured: ntfyTopic is required")
+		}
+		return &ntfySender{serverURL: cfg.NtfyServerURL, topic: cfg.NtfyTopic}, nil
+	case "mbl2pc":
+		if cfg.WebhookURL == "" || cfg.WebhookSecret == "" {
+			return nil, fmt.Errorf("mbl2pc not configured: webhookURL and webhookSecret are required")
+		}
+		return &mbl2pcSender{webhookURL: cfg.WebhookURL, webhookSecret: cfg.WebhookSecret}, nil
+	default:
+		return nil, fmt.Errorf("unknown transport %q — use \"ntfy\" or \"mbl2pc\"", transport)
+	}
 }
 
 // ── HTTP handlers ────────────────────────────────────────────────────────────
@@ -243,6 +422,12 @@ func handleNotifyConfigPost(w http.ResponseWriter, r *http.Request) {
 	if err := saveNotifyConfig(incoming); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
+	}
+	// Restart the ntfy inbound poller if the ntfy transport is active.
+	if incoming.Transport == "ntfy" || incoming.Transport == "" {
+		startNtfyInboundPoller(incoming.NtfyServerURL, incoming.NtfyInboundTopic)
+	} else {
+		startNtfyInboundPoller("", "") // stop poller if switching away from ntfy
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 }
@@ -477,7 +662,11 @@ func handleNotifyPrompt(w http.ResponseWriter, r *http.Request) {
 				)
 			}
 		}
-		_ = sender.Send(notifyMsg, "Forge Terminal")
+		if sendErr := sender.Send(notifyMsg, "Forge Terminal"); sendErr != nil {
+			log.Printf("[notify] prompt send failed: %v", sendErr)
+		}
+	} else {
+		log.Printf("[notify] prompt sender unavailable: %v", err)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"promptId": promptID})

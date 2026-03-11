@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -426,7 +427,17 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Terminal] Warning: No tabID provided, using session ID: %s", tabID)
 	}
 
-	// v3.12.3: AM system removed - amEnabled param ignored
+	// Parse initial terminal dimensions from query params.
+	// TUI apps (e.g. Copilot CLI) query the PTY size at startup; if the PTY is
+	// created at 80x24 and resized later the app caches a wrong layout.
+	initialCols := uint16(80)
+	initialRows := uint16(24)
+	if c, err := strconv.ParseUint(query.Get("cols"), 10, 16); err == nil && c > 0 {
+		initialCols = uint16(c)
+	}
+	if r2, err := strconv.ParseUint(query.Get("rows"), 10, 16); err == nil && r2 > 0 {
+		initialRows = uint16(r2)
+	}
 
 	// Create terminal session with config
 	sessionID := tabID // Use tabID as session ID for consistency
@@ -446,8 +457,14 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		h.sessions.CompareAndDelete(sessionID, session)
 	}()
 
-	// Set initial terminal size (default 80x24)
-	_ = session.Resize(80, 24)
+	// Set initial terminal size using client-reported dimensions (or 80x24 fallback)
+	_ = session.Resize(initialCols, initialRows)
+	log.Printf("[Terminal] Initial size: %dx%d (from %s)", initialCols, initialRows, func() string {
+		if query.Get("cols") != "" {
+			return "client"
+		}
+		return "default"
+	}())
 
 	// Get Vision parser using getter method (supports both direct and assistantCore)
 	visionParser := h.GetVisionParser()

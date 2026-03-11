@@ -357,16 +357,6 @@ func main() {
 	// Sessions API - persist tab state across refreshes
 	http.HandleFunc("/api/sessions", WrapWithMiddleware(handleSessions))
 
-	// Jira Integration API
-	http.HandleFunc("/api/jira/config", WrapWithMiddleware(handleJiraConfig))
-	http.HandleFunc("/api/jira/config/verify", WrapWithMiddleware(handleJiraConfigVerify))
-	http.HandleFunc("/api/jira/issue/", WrapWithMiddleware(handleJiraIssue))
-	http.HandleFunc("/api/jira/issue", WrapWithMiddleware(handleJiraIssue))
-	http.HandleFunc("/api/jira/projects", WrapWithMiddleware(handleJiraProjects))
-	http.HandleFunc("/api/jira/search", WrapWithMiddleware(handleJiraSearch))
-	http.HandleFunc("/api/jira/suggest/branch", WrapWithMiddleware(handleJiraSuggest))
-	http.HandleFunc("/api/jira/suggest/pr", WrapWithMiddleware(handleJiraSuggest))
-
 	// Welcome screen API - track if welcome has been shown
 	http.HandleFunc("/api/welcome", WrapWithMiddleware(handleWelcome))
 
@@ -519,6 +509,10 @@ func main() {
 			} else {
 				log.Printf("[Tunnel] Auto-started cloudflared on port %d", activePort)
 			}
+		}
+		// Auto-start ntfy inbound poller if transport=ntfy and topic is set
+		if err == nil && (cfg.Transport == "ntfy" || cfg.Transport == "") && cfg.NtfyInboundTopic != "" {
+			startNtfyInboundPoller(cfg.NtfyServerURL, cfg.NtfyInboundTopic)
 		}
 	}()
 	// Print access URL when running remotely

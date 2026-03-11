@@ -552,6 +552,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
   assistantEnabled = false, // Forge Assistant panel enabled (Dev Mode)
   isAgentMode = false, // New prop: Agent Mode (full screen chat)
+  onToast = null, // Optional toast callback for user-visible errors
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -607,7 +608,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     fetch('/api/notify/config')
       .then(r => r.json())
       .then(cfg => {
-        if (!cfg.idleDetectionEnabled || !cfg.webhookURL) return;
+        // Support both ntfy (ntfyTopic) and mbl2pc (webhookURL) transport checks
+        const isNtfy = !cfg.transport || cfg.transport === 'ntfy';
+        const isReady = isNtfy ? !!cfg.ntfyTopic : (!!cfg.webhookURL && !!cfg.webhookSecret);
+        if (!cfg.idleDetectionEnabled || !isReady) return;
         const ms = (cfg.idleTimeoutSeconds || 30) * 1000;
         idleNotifyTimerRef.current = setTimeout(() => {
           if (idleNotifyFiredRef.current) return;
@@ -616,7 +620,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: '🔔 Forge Terminal: agent is waiting for your response.' }),
-          }).catch(() => {}); // fire-and-forget
+          }).then(r => {
+            if (!r.ok) r.json().then(e => onToast?.(`Notification failed: ${e.error || r.status}`, 'error')).catch(() => {});
+          }).catch(err => onToast?.(`Notification failed: ${err.message}`, 'error'));
         }, ms);
       })
       .catch(() => {});
@@ -1516,6 +1522,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
       }
       wsUrl += '?' + params.toString();
+
+      // Pass terminal dimensions in query params so the PTY is created at the
+      // correct size before the shell process starts. This prevents TUI apps
+      // (e.g. Copilot CLI) from caching a wrong layout based on the 80x24 default.
+      if (xtermRef.current) {
+        const { cols, rows } = xtermRef.current;
+        if (cols > 0 && rows > 0) {
+          wsUrl += `&cols=${cols}&rows=${rows}`;
+        }
+      }
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;

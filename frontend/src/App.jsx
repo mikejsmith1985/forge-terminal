@@ -32,10 +32,6 @@ import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
 import { useDevMode } from './hooks/useDevMode'
-import { useJira } from './hooks/useJira'
-import JiraPanel from './components/JiraPanel'
-import JiraModal from './components/JiraModal'
-import JiraHUD from './components/JiraHUD'
 // useWorkflowManager REMOVED - v3.9.0: Workflows deleted
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
@@ -207,15 +203,8 @@ function App() {
     updateTabModified,
     toggleTabViewMode,
     updateTabDirectory,
-    linkJiraTicket,
     reorderTabs,
   } = useTabManager(shellConfig, defaultTabTheme);
-  
-  // Jira integration
-  const jiraApi = useJira();
-  const [isJiraPanelOpen, setIsJiraPanelOpen] = useState(false);
-  const [isJiraModalOpen, setIsJiraModalOpen] = useState(false);
-  const [jiraHudKey, setJiraHudKey] = useState(null); // key detected in terminal output
   
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
@@ -260,11 +249,7 @@ function App() {
     openSettings: () => setIsSettingsModalOpen(true),
     closeSettings: () => setIsSettingsModalOpen(false),
 
-    // Jira panel
-    openJiraPanel: () => setIsJiraPanelOpen(true),
-    closeJiraPanel: () => setIsJiraPanelOpen(false),
-
-    // Legacy router config (kept for compatibility)
+    // Legacy router config(kept for compatibility)
     openRouterConfig: () => setIsRouterConfigOpen(true),
     closeRouterConfig: () => setIsRouterConfigOpen(false),
   }), [tabs, createTab, closeTab]);
@@ -1694,25 +1679,6 @@ function App() {
         <button className="btn btn-ghost btn-icon" onClick={toggleSidebarPosition} title={`Move sidebar to ${sidebarPosition === 'right' ? 'left' : 'right'}`}>
           {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
         </button>
-        {/* Jira panel toggle */}
-        <button
-          className={`btn btn-ghost btn-icon ${isJiraPanelOpen ? 'active' : ''}`}
-          onClick={() => setIsJiraPanelOpen(prev => !prev)}
-          title="Jira Integration"
-        >
-          🎟
-        </button>
-        {/* Jira quick-modal */}
-        {jiraApi.isConfigured && activeTab?.jiraTicketKey && (
-          <button
-            className="btn btn-ghost btn-icon"
-            onClick={() => setIsJiraModalOpen(true)}
-            title={`Jira: ${activeTab.jiraTicketKey}`}
-            style={{ fontSize: '11px', fontWeight: 'bold', color: '#60a5fa' }}
-          >
-            {activeTab.jiraTicketKey}
-          </button>
-        )}
         {/* Time-Travel button */}
         <button 
           className={`btn btn-ghost btn-icon ${isHistorySliderOpen ? 'active' : ''}`}
@@ -1950,6 +1916,7 @@ function App() {
                     autoRespond={tab.autoRespond || false}
                     tabName={tab.title}
                     currentDirectory={tab.currentDirectory || null}
+                    onToast={addToast}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                     onInteractiveTUI={(tuiType) => handleInteractiveTUI(tab.id, tuiType)}
@@ -1982,7 +1949,6 @@ function App() {
                     onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                     onTerminalCommand={queryModelTier}
                     onRoutingUpdate={handleRoutingUpdate}
-                    onJiraKeyDetected={jiraApi.jiraConfig?.uiMode?.hud !== false ? (key) => setJiraHudKey(key) : null}
                   />
                   )}
                 </div>
@@ -2218,41 +2184,6 @@ function App() {
         />
       )}
 
-      {/* Jira Panel — persistent sidebar (conditionally visible) */}
-      {jiraApi.jiraConfig?.uiMode?.sidebar !== false && isJiraPanelOpen && (
-        <div className="jira-panel-container">
-          <JiraPanel
-            tabId={activeTabId}
-            jiraTicketKey={activeTab?.jiraTicketKey || null}
-            onLinkTicket={(key) => linkJiraTicket(activeTabId, key)}
-            onUnlinkTicket={() => linkJiraTicket(activeTabId, null)}
-            jiraApi={jiraApi}
-            isConfigured={jiraApi.isConfigured}
-          />
-        </div>
-      )}
-
-      {/* Jira Modal — quick search & create */}
-      {jiraApi.jiraConfig?.uiMode?.modal !== false && (
-        <JiraModal
-          isOpen={isJiraModalOpen}
-          onClose={() => setIsJiraModalOpen(false)}
-          onLinkTicket={(key) => { linkJiraTicket(activeTabId, key); setIsJiraModalOpen(false); }}
-          jiraApi={jiraApi}
-          isConfigured={jiraApi.isConfigured}
-        />
-      )}
-
-      {/* Jira HUD — terminal output key detector */}
-      {jiraApi.jiraConfig?.uiMode?.hud !== false && (
-        <JiraHUD
-          detectedKey={jiraHudKey}
-          onLinkToTab={() => jiraHudKey && linkJiraTicket(activeTabId, jiraHudKey)}
-          onDismiss={() => setJiraHudKey(null)}
-          jiraApi={jiraApi}
-          isConfigured={jiraApi.isConfigured}
-        />
-      )}
     </div>
   )
 }
