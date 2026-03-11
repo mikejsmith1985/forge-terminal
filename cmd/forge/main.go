@@ -327,6 +327,11 @@ func main() {
 	http.HandleFunc("/api/tunnel/start", WrapWithMiddleware(handleTunnelStart))
 	http.HandleFunc("/api/tunnel/stop", WrapWithMiddleware(handleTunnelStop))
 
+	// Atlassian / MCP integration
+	http.HandleFunc("/api/atlassian/status", WrapWithMiddleware(handleAtlassianStatus))
+	http.HandleFunc("/api/atlassian/setup", WrapWithMiddleware(handleAtlassianSetup))
+	http.HandleFunc("/api/atlassian/config", WrapWithMiddleware(handleAtlassianDelete))
+
 	// Setup wizard
 	http.HandleFunc("/setup", WrapWithMiddleware(handleSetupWizard))
 	http.HandleFunc("/api/setup/check", WrapWithMiddleware(handleSetupCheck))
