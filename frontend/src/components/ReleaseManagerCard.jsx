@@ -57,19 +57,15 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
   const generateReleaseCommand = useCallback(() => {
     if (!next) return '';
     
-    // Generate command based on shell type
-    // The workflow is triggered by pushing a tag, not by gh release create
-    // Uses --no-edit for merge to avoid quote escaping issues in commit messages
-    // Deletes remote tag first (if exists) to ensure fresh push triggers workflow
+    // Invoke local release pipeline — builds all platforms and publishes
+    // GitHub Release directly via gh CLI (no GitHub Actions required).
+    const bumpType = selectedIncrement === 'fix' ? 'patch' : selectedIncrement;
     if (shellType === 'powershell') {
-      // PowerShell 5.1 compatible syntax (no &&)
-      // Uses backticks for strings that might contain special chars
-      return `$b = git branch --show-current; git add -A; if ($?) { git commit -m 'Release ${next}' --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host 'Tag ${next} pushed! GitHub Actions will build.' -ForegroundColor Green } } } } } } } } }`;
+      return `.\\scripts\\local-release.ps1 ${bumpType}`;
     } else {
-      // Bash, CMD, and PowerShell 7+ support &&
-      return `b=$(git branch --show-current) && git add -A && git commit -m 'Release ${next}' --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "Tag ${next} pushed! GitHub Actions will build."`;
+      return `pwsh -File ./scripts/local-release.ps1 ${bumpType}`;
     }
-  }, [next, shellType]);
+  }, [next, shellType, selectedIncrement]);
 
   const releaseCommand = generateReleaseCommand();
 

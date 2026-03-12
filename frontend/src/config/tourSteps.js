@@ -26,7 +26,7 @@ const TOUR_STEPS = [
   {
     id: 'welcome',
     selector: null, // Centered, no spotlight
-    title: 'Welcome to Forge Terminal! ≡ƒöÑ',
+    title: 'Welcome to Forge Terminal! â‰¡Æ’Ã¶Ã‘',
     content: 'A powerful terminal interface that works with any CLI tool. This interactive tour will show you all the features by actually using them. Click Next to begin!',
     placement: 'center',
     spotlight: false,
@@ -100,7 +100,7 @@ const TOUR_STEPS = [
     id: 'persistent-instruction-intro',
     selector: '.persistent-instruction-collapsed',
     fallbackSelector: '.forge-assist-floating-btn',
-    title: 'Persistent Instructions ΓÜí',
+    title: 'Persistent Instructions Î“ÃœÃ­',
     content: 'Press Ctrl+I to instantly toggle persistent instructions on or off. A toast notification will show the status. Use Forge Assist (Ctrl+/) to manage your instructions.',
     placement: 'center',
     spotlight: true,
@@ -125,7 +125,7 @@ const TOUR_STEPS = [
     selector: '.forge-assist-modal .mode-tab:last-child',
     fallbackSelector: '.forge-assist-modal',
     title: 'Task Mode - Structured Workflow',
-    content: 'Press Tab or click here to switch to Task Mode! This gives you a 5-stage workflow: Context ΓåÆ Plan ΓåÆ Implement ΓåÆ Validate ΓåÆ Deliver. Each stage provides smart suggestions.',
+    content: 'Press Tab or click here to switch to Task Mode! This gives you a 5-stage workflow: Context Î“Ã¥Ã† Plan Î“Ã¥Ã† Implement Î“Ã¥Ã† Validate Î“Ã¥Ã† Deliver. Each stage provides smart suggestions.',
     placement: 'center',
     spotlight: true,
     arrow: 'down',
@@ -203,7 +203,7 @@ const TOUR_STEPS = [
     selector: '.lens-view-selector',
     fallbackSelector: '.lens-file-picker',
     title: 'Three Intelligent Views',
-    content: '≡ƒöÑ Heatmap shows recently modified files. ≡ƒôè Graph visualizes file dependencies. ≡ƒöÄ Search lets you fuzzy-find any file in your project.',
+    content: 'â‰¡Æ’Ã¶Ã‘ Heatmap shows recently modified files. â‰¡Æ’Ã´Ã¨ Graph visualizes file dependencies. â‰¡Æ’Ã¶Ã„ Search lets you fuzzy-find any file in your project.',
     placement: 'center',
     spotlight: true,
     arrow: 'right',
@@ -408,8 +408,8 @@ const TOUR_STEPS = [
   {
     id: 'keyboard-shortcuts',
     selector: null,
-    title: 'Keyboard Power User Γî¿∩╕Å',
-    content: '**Essential Shortcuts:**\n\nΓÇó Ctrl+T: New tab\nΓÇó Ctrl+W: Close tab\nΓÇó Ctrl+Tab: Cycle tabs\nΓÇó Ctrl+1-9: Jump to tab\nΓÇó Ctrl+F: Search terminal\nΓÇó Ctrl+/: Forge Assist\nΓÇó Ctrl+I: Persistent Instructions\nΓÇó Ctrl+Shift+H: Time Travel\nΓÇó Ctrl+Shift+1-9: Run command cards\nΓÇó Ctrl+,: Settings',
+    title: 'Keyboard Power User Î“Ã®Â¿âˆ©â••Ã…',
+    content: '**Essential Shortcuts:**\n\nÎ“Ã‡Ã³ Ctrl+T: New tab\nÎ“Ã‡Ã³ Ctrl+W: Close tab\nÎ“Ã‡Ã³ Ctrl+Tab: Cycle tabs\nÎ“Ã‡Ã³ Ctrl+1-9: Jump to tab\nÎ“Ã‡Ã³ Ctrl+F: Search terminal\nÎ“Ã‡Ã³ Ctrl+/: Forge Assist\nÎ“Ã‡Ã³ Ctrl+I: Persistent Instructions\nÎ“Ã‡Ã³ Ctrl+Shift+H: Time Travel\nÎ“Ã‡Ã³ Ctrl+Shift+1-9: Run command cards\nÎ“Ã‡Ã³ Ctrl+,: Settings',
     placement: 'center',
     spotlight: false,
   },
@@ -431,8 +431,8 @@ const TOUR_STEPS = [
   {
     id: 'complete',
     selector: null,
-    title: 'You\'re Ready to Go! ≡ƒÜÇ',
-    content: '**Try these next:**\n\nΓÇó Press Ctrl+/ to open Forge Assist\nΓÇó Press Ctrl+I to toggle Persistent Instructions\nΓÇó Create a Command Card for your favorite command\nΓÇó Browse files and use @ mentions\nΓÇó Try Time Travel with Ctrl+Shift+H\nΓÇó Customize your theme\n\nReplay this tour anytime from Settings ΓåÆ Shell tab. Happy coding!',
+    title: 'You\'re Ready to Go! â‰¡Æ’ÃœÃ‡',
+    content: '**Try these next:**\n\nÎ“Ã‡Ã³ Press Ctrl+/ to open Forge Assist\nÎ“Ã‡Ã³ Press Ctrl+I to toggle Persistent Instructions\nÎ“Ã‡Ã³ Create a Command Card for your favorite command\nÎ“Ã‡Ã³ Browse files and use @ mentions\nÎ“Ã‡Ã³ Try Time Travel with Ctrl+Shift+H\nÎ“Ã‡Ã³ Customize your theme\n\nReplay this tour anytime from Settings Î“Ã¥Ã† Shell tab. Happy coding!',
     placement: 'center',
     spotlight: false,
     isFinal: true,
@@ -440,6 +440,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '3.12.10'; // v3.12.10: Tour UX improvements, backspace fix, theme dark/light modes
+const TOUR_VERSION = '3.19.0'; // v3.12.10: Tour UX improvements, backspace fix, theme dark/light modes
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
