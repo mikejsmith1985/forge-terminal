@@ -89,6 +89,16 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
             setIsExternalRepo(true);
             setExternalRepoPath(cwd);
             setExternalRepoName(repoName);
+            // Check for local release pipeline script
+            try {
+              const sr = await fetch('/api/project/release-script', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: cwd })
+              });
+              const sd = await sr.json();
+              setHasLocalScript(sd.exists === true);
+            } catch { setHasLocalScript(false); }
             // Version will be fetched in the version useEffect
           }
         } else {
@@ -124,6 +134,9 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     setProjects(updated);
     localStorage.setItem('forge_release_projects', JSON.stringify(updated));
   };
+  
+  // v3.19.1: detect local release pipeline script
+  const [hasLocalScript, setHasLocalScript] = useState(false);
   
   // Quick save current repo to favorites
   const saveCurrentToFavorites = () => {
@@ -222,41 +235,42 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   const generateReleaseCommand = useCallback(() => {
     if (!next) return '';
     
-    const msg = commitMessage.trim() || `Release ${next}`;
     let cmdPrefix = '';
-
     // v3.16.12: Use detected external repo path for cd prefix
     if (isExternalRepo && externalRepoPath) {
-        // Use cd with quotes to handle spaces
         if (shellType === 'powershell') {
             cmdPrefix = `cd "${externalRepoPath}"; `;
         } else {
             cmdPrefix = `cd "${externalRepoPath}" && `;
         }
     }
+
+    // v3.19.1: Use local release pipeline if the project has it
+    if (hasLocalScript) {
+      const bumpType = selectedIncrement === 'fix' ? 'patch' : selectedIncrement;
+      if (shellType === 'powershell') {
+        return `${cmdPrefix}.\\scripts\\local-release.ps1 ${bumpType}`;
+      } else {
+        return `${cmdPrefix}pwsh -File ./scripts/local-release.ps1 ${bumpType}`;
+      }
+    }
+
+    const msg = commitMessage.trim() || `Release ${next}`;
     
     // Auto-update package.json if it exists
     let versionBump = '';
     if (shellType === 'powershell') {
-        // Check for package.json and run npm version if found
-        // Uses $ver_success flag to ensure we only proceed if version bump succeeds (or is skipped)
         versionBump = `$ver_success = $true; if (Test-Path package.json) { Write-Host "Bumping npm version to ${next}..." -ForegroundColor Cyan; npm version ${next} --no-git-tag-version --allow-same-version; $ver_success = $? }; if ($ver_success) { `;
     } else {
-        // Bash equivalent
         versionBump = `if [ -f package.json ]; then echo "Bumping npm version to ${next}..." && npm version ${next} --no-git-tag-version --allow-same-version; fi && `;
     }
 
     if (shellType === 'powershell') {
-      // PowerShell 5.1 compatible syntax (no && chaining)
-      // We wrap the main logic in the block opened by versionBump
-      // Note: We need to close the block at the end with an extra }
-      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "🚀 Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } } }`;
+      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } } }`;
     } else {
-      // Bash/zsh
-      // Delete remote tag first (silently continue if doesn't exist), then create and push
-      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "🚀 Release ${next} triggered! GitHub Actions will build."`;
+      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "Release ${next} triggered! GitHub Actions will build."`;
     }
-  }, [next, shellType, commitMessage, isExternalRepo, externalRepoPath]);
+  }, [next, shellType, commitMessage, isExternalRepo, externalRepoPath, hasLocalScript, selectedIncrement]);
 
   const releaseCommand = generateReleaseCommand();
 
@@ -537,13 +551,23 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
 
         {/* Workflow Steps Preview */}
         <div className="orc-workflow">
-          <div className="orc-step"><GitBranch size={14} /> Commit & push branch</div>
-          <div className="orc-step-arrow">↓</div>
-          <div className="orc-step"><GitBranch size={14} /> Checkout & merge to main</div>
-          <div className="orc-step-arrow">↓</div>
-          <div className="orc-step"><Tag size={14} /> Create & push tag {next}</div>
-          <div className="orc-step-arrow">↓</div>
-          <div className="orc-step"><Upload size={14} /> GitHub Actions builds release</div>
+          {hasLocalScript ? (
+            <>
+              <div className="orc-step"><Play size={14} /> Run local-release.ps1</div>
+              <div className="orc-step-arrow">↓</div>
+              <div className="orc-step"><Upload size={14} /> Builds & publishes GitHub Release</div>
+            </>
+          ) : (
+            <>
+              <div className="orc-step"><GitBranch size={14} /> Commit & push branch</div>
+              <div className="orc-step-arrow">↓</div>
+              <div className="orc-step"><GitBranch size={14} /> Checkout & merge to main</div>
+              <div className="orc-step-arrow">↓</div>
+              <div className="orc-step"><Tag size={14} /> Create & push tag {next}</div>
+              <div className="orc-step-arrow">↓</div>
+              <div className="orc-step"><Upload size={14} /> GitHub Actions builds release</div>
+            </>
+          )}
         </div>
 
         {/* Command Toggle */}

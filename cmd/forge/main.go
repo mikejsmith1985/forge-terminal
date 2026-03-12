@@ -331,6 +331,7 @@ func main() {
 	http.HandleFunc("/api/atlassian/status", WrapWithMiddleware(handleAtlassianStatus))
 	http.HandleFunc("/api/atlassian/setup", WrapWithMiddleware(handleAtlassianSetup))
 	http.HandleFunc("/api/atlassian/config", WrapWithMiddleware(handleAtlassianDelete))
+	http.HandleFunc("/api/project/release-script", WrapWithMiddleware(handleProjectReleaseScript))
 
 	// Setup wizard
 	http.HandleFunc("/setup", WrapWithMiddleware(handleSetupWizard))
