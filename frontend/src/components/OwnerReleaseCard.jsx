@@ -79,27 +79,25 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
           // Check if this is the forge-terminal repo itself
           const isForgeRepo = repoName?.toLowerCase() === 'forge-terminal';
           
+          // Always check for local release pipeline regardless of which repo it is
+          try {
+            const sr = await fetch('/api/project/release-script', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ path: cwd })
+            });
+            const sd = await sr.json();
+            setHasLocalScript(sd.exists === true);
+          } catch { setHasLocalScript(false); }
+
           if (isForgeRepo) {
-            // We're in forge-terminal, use internal version endpoint
             setIsExternalRepo(false);
             setExternalRepoPath(null);
             setExternalRepoName(null);
           } else {
-            // External git repo detected!
             setIsExternalRepo(true);
             setExternalRepoPath(cwd);
             setExternalRepoName(repoName);
-            // Check for local release pipeline script
-            try {
-              const sr = await fetch('/api/project/release-script', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: cwd })
-              });
-              const sd = await sr.json();
-              setHasLocalScript(sd.exists === true);
-            } catch { setHasLocalScript(false); }
-            // Version will be fetched in the version useEffect
           }
         } else {
           // Not a git repo or error
@@ -266,9 +264,9 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     }
 
     if (shellType === 'powershell') {
-      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "Release ${next} triggered! GitHub Actions will build." -ForegroundColor Green } } } } } } } } } }`;
+      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host "Release ${next} tagged and pushed." -ForegroundColor Green } } } } } } } } } }`;
     } else {
-      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "Release ${next} triggered! GitHub Actions will build."`;
+      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "Release ${next} tagged and pushed."`;
     }
   }, [next, shellType, commitMessage, isExternalRepo, externalRepoPath, hasLocalScript, selectedIncrement]);
 
