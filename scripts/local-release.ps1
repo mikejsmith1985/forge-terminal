@@ -201,11 +201,14 @@ $RELEASE_NOTES = if ($lines.Count -gt 0) { $lines -join "`n" } else { "Release $
 Write-Banner "Publishing GitHub Release"
 
 Write-Step "Creating draft release $TAG..."
+$notesFile = [System.IO.Path]::GetTempFileName()
+[System.IO.File]::WriteAllText($notesFile, $RELEASE_NOTES, [System.Text.UTF8Encoding]::new($false))
 gh release create $TAG `
     --title "Forge Terminal $TAG" `
-    --notes $RELEASE_NOTES `
+    --notes-file $notesFile `
     --draft
-if ($LASTEXITCODE -ne 0) { Write-Fail "gh release create failed" }
+if ($LASTEXITCODE -ne 0) { Remove-Item $notesFile -ErrorAction SilentlyContinue; Write-Fail "gh release create failed" }
+Remove-Item $notesFile -ErrorAction SilentlyContinue
 Write-OK "Draft release created"
 
 Write-Step "Uploading binaries..."
