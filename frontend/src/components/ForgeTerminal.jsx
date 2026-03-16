@@ -600,32 +600,52 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Idle notification: fires a /api/notify POST when terminal output goes silent
   const idleNotifyTimerRef = useRef(null);
   const idleNotifyFiredRef = useRef(false); // fire only once per idle period
+  // PERF FIX: Cache notify config to avoid fetching on every PTY message.
+  // During fast output (Copilot streaming), the old code fired 50-200+ HTTP
+  // requests/sec to /api/notify/config, flooding the browser connection pool
+  // and starving the main thread — causing scroll flicker / viewport jumps.
+  const idleNotifyCfgRef = useRef(null);
+  const idleNotifyCfgFetchedRef = useRef(0); // timestamp of last config fetch
 
   const resetIdleNotifyTimer = () => {
     idleNotifyFiredRef.current = false;
     if (idleNotifyTimerRef.current) clearTimeout(idleNotifyTimerRef.current);
-    // Read config fresh each time — no React state needed
-    fetch('/api/notify/config')
-      .then(r => r.json())
-      .then(cfg => {
-        // Support both ntfy (ntfyTopic) and mbl2pc (webhookURL) transport checks
-        const isNtfy = !cfg.transport || cfg.transport === 'ntfy';
-        const isReady = isNtfy ? !!cfg.ntfyTopic : (!!cfg.webhookURL && !!cfg.webhookSecret);
-        if (!cfg.idleDetectionEnabled || !isReady) return;
-        const ms = (cfg.idleTimeoutSeconds || 30) * 1000;
-        idleNotifyTimerRef.current = setTimeout(() => {
-          if (idleNotifyFiredRef.current) return;
-          idleNotifyFiredRef.current = true;
-          fetch('/api/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: '🔔 Forge Terminal: agent is waiting for your response.' }),
-          }).then(r => {
-            if (!r.ok) r.json().then(e => onToast?.(`Notification failed: ${e.error || r.status}`, 'error')).catch(() => {});
-          }).catch(err => onToast?.(`Notification failed: ${err.message}`, 'error'));
-        }, ms);
-      })
-      .catch(() => {});
+
+    const now = Date.now();
+    const CONFIG_TTL = 60_000; // re-fetch config at most once per minute
+
+    const applyConfig = (cfg) => {
+      if (!cfg) return;
+      const isNtfy = !cfg.transport || cfg.transport === 'ntfy';
+      const isReady = isNtfy ? !!cfg.ntfyTopic : (!!cfg.webhookURL && !!cfg.webhookSecret);
+      if (!cfg.idleDetectionEnabled || !isReady) return;
+      const ms = (cfg.idleTimeoutSeconds || 30) * 1000;
+      idleNotifyTimerRef.current = setTimeout(() => {
+        if (idleNotifyFiredRef.current) return;
+        idleNotifyFiredRef.current = true;
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: '🔔 Forge Terminal: agent is waiting for your response.' }),
+        }).then(r => {
+          if (!r.ok) r.json().then(e => onToast?.(`Notification failed: ${e.error || r.status}`, 'error')).catch(() => {});
+        }).catch(err => onToast?.(`Notification failed: ${err.message}`, 'error'));
+      }, ms);
+    };
+
+    // Use cached config when available and fresh; fetch only when stale
+    if (idleNotifyCfgRef.current && (now - idleNotifyCfgFetchedRef.current) < CONFIG_TTL) {
+      applyConfig(idleNotifyCfgRef.current);
+    } else {
+      fetch('/api/notify/config')
+        .then(r => r.json())
+        .then(cfg => {
+          idleNotifyCfgRef.current = cfg;
+          idleNotifyCfgFetchedRef.current = Date.now();
+          applyConfig(cfg);
+        })
+        .catch(() => {});
+    }
   };
 
   // Vision state
@@ -1921,11 +1941,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       });
       
       // Track scroll position to show/hide scroll button
+      // PERF FIX: Throttle via rAF to avoid rapid setShowScrollButton toggles
+      // during fast term.write() — previously fired on every scroll event, causing
+      // unnecessary React re-renders that contributed to viewport flicker.
       const viewport = terminalRef.current?.querySelector('.xterm-viewport');
+      let scrollRafPending = false;
       if (viewport) {
         const checkScroll = () => {
-          const isAtBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 50;
-          setShowScrollButton(!isAtBottom);
+          if (scrollRafPending) return;
+          scrollRafPending = true;
+          requestAnimationFrame(() => {
+            scrollRafPending = false;
+            const isAtBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 50;
+            setShowScrollButton(!isAtBottom);
+          });
         };
         viewport.addEventListener('scroll', checkScroll);
       }
