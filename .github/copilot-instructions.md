@@ -134,7 +134,25 @@ DO NOT say "Phase 1: ... Phase 2: ..." in your chat output.
 
 DO simply state "I have analyzed the request and updated the plan..." and then begin execution.
 
-6. GITHUB ISSUE IMAGES
+6. RELEASE PROCESS — ABSOLUTE RULE
+When asked to release, publish, bump version, or create a release for ANY project:
+
+MANDATORY: Use the Forge local pipeline — NEVER GitHub Actions.
+
+Detection order:
+1. If `scripts/local-release.ps1` exists in the project → run `.\scripts\local-release.ps1 [patch|minor|major|X.Y.Z]`
+2. Otherwise → generate the self-contained git+gh command: commit → merge to main → tag → `gh release create`
+
+FORBIDDEN:
+- Creating or modifying `.github/workflows/*.yml` for release purposes
+- Pushing a tag and waiting for GH Actions to create the release
+- Any flow that depends on GH Actions runners
+
+The `release.yml` workflow in forge-terminal is a legacy artifact (workflow_dispatch only, not automatic). Do not reference it or suggest enabling it.
+
+The `gh` CLI must be authenticated (`gh auth login`) in the terminal. The release creates the GitHub Release directly via `gh release create` with no Actions dependency.
+
+7. GITHUB ISSUE IMAGES
 When users ask to view/check images from GitHub issues:
 
 ALWAYS TRY TO FETCH: Use github-mcp-server-issue_read to get issue details, then extract image URLs.
