@@ -581,9 +581,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // v3.12.12: AM logging refs removed - AM feature deprecated
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
-  const maxReconnectAttempts = 5;
+  const maxReconnectAttempts = 15; // Was 5 — increased for robustness during active Copilot work
   // Track effective max for display (higher in dev mode)
   const effectiveMaxAttemptsRef = useRef(maxReconnectAttempts);
+  const sessionReattachedRef = useRef(false); // Server restored existing PTY session
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
   const isVisibleRef = useRef(isVisible); // Track visibility to avoid stale closures in paste handlers
@@ -1571,25 +1572,40 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         
         // Reset reconnection state
         reconnectAttemptsRef.current = 0;
+        sessionReattachedRef.current = false; // Will be set to true by SESSION_REATTACHED message
         setReconnecting(false);
         setIsConnected(true);
         
-        // Use orange for the welcome message to match theme
-        const shellLabel = cfg?.shellType ? ` (${cfg.shellType.toUpperCase()})` : '';
-        const reconnectLabel = wasReconnection ? ' [Reconnected]' : '';
-        term.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}${reconnectLabel}.\r\n\r\n`);
-
-        // Send initial size
+        // Send initial size (always needed — terminal may have been resized during disconnect)
         const { cols, rows } = term;
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
         logger.terminal('Initial size sent', { tabId, cols, rows });
 
-        // Restore directory if available — but ONLY for hidden (non-active) tabs.
+        // Delay the welcome message briefly to allow SESSION_REATTACHED to arrive first.
+        // If the server reattached us to an existing PTY, we suppress the fresh "Connected" 
+        // message since the server sends its own "Session Restored" message.
+        setTimeout(() => {
+          if (sessionReattachedRef.current) {
+            // Session was reattached — don't print "Connected" or restore directory
+            // (the shell is already running in its previous state)
+            logger.terminal('Skipping welcome message — session reattached', { tabId });
+          } else {
+            // Fresh connection — print welcome message
+            const shellLabel = cfg?.shellType ? ` (${cfg.shellType.toUpperCase()})` : '';
+            const reconnectLabel = wasReconnection ? ' [Reconnected]' : '';
+            if (xtermRef.current) {
+              xtermRef.current.write(`\r\n\x1b[38;2;249;115;22m[Forge Terminal]\x1b[0m Connected${shellLabel}${reconnectLabel}.\r\n\r\n`);
+            }
+          }
+        }, 100);
+
+        // Restore directory if available — but ONLY for hidden (non-active) tabs
+        // and NEVER for reattached sessions (the shell already has its directory).
         // For the visible/active tab the psHome query param already told the backend to
         // run Set-Location at 100ms, so we don't need to send a visible cd command here
         // (which would clutter the terminal screen).  Hidden tabs can run the cd silently
         // as a belt-and-suspenders fallback without the user ever seeing it.
-        if (currentDirectoryRef.current && !isVisibleRef.current) {
+        if (currentDirectoryRef.current && !isVisibleRef.current && !wasReconnection) {
           const dir = currentDirectoryRef.current;
           logger.terminal('Restoring directory (hidden tab fallback)', { tabId, directory: dir });
           
@@ -1659,6 +1675,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   xtermRef.current.write(`\r\n\x1b[31mError: ${msg.error}\x1b[0m\r\n`);
                 }
                 // Don't close connection - let normal close handling manage reconnection
+                return;
+              }
+
+              // Handle session reattachment (PTY was kept alive during disconnect)
+              if (msg.type === 'SESSION_REATTACHED') {
+                logger.terminal('Session reattached', { tabId, detachedDuration: msg.detachedDuration });
+                if (xtermRef.current) {
+                  const duration = msg.detachedDuration ? ` (disconnected ${Math.round(msg.detachedDuration)}s)` : '';
+                  xtermRef.current.write(`\r\n\x1b[38;2;34;197;94m[Session Restored]\x1b[0m Terminal session recovered${duration}.\r\n`);
+                }
+                sessionReattachedRef.current = true;
                 return;
               }
             } catch (e) {
@@ -1860,10 +1887,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Attempt reconnection with exponential backoff
         // SAFETY: Only reconnect if we should AND we're not already trying
         if (shouldReconnect && !reconnectTimeoutRef.current) {
-          // v3.14.3: User requested max 3 retries (50 was too many)
-          // System sleep (4004) gets more attempts and longer delays since the server is alive
+          // Session persistence: server keeps PTY alive for 5 minutes after disconnect.
+          // We now retry up to 15 times (was 3) since reconnection actually recovers
+          // the live session instead of creating a fresh one.
           const isSystemSleep = event.code === 4004;
-          const effectiveMaxAttempts = isSystemSleep ? 10 : 3;
+          const effectiveMaxAttempts = isSystemSleep ? 20 : 15;
           const baseDelay = isSystemSleep ? 3000 : 1000; // 3s initial delay after sleep for system to stabilize
           // Store for display in overlay
           effectiveMaxAttemptsRef.current = effectiveMaxAttempts;
@@ -1903,7 +1931,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
       };
 
-      // Handle terminal input
+      // Handle terminal input — uses wsRef.current to always reference the LIVE WebSocket.
+      // Previously captured the `ws` closure variable, which broke after reconnection.
       term.onData((data) => {
         // v3.16.14: Log backspace to diagnose TUI issues
         if (data === '\x7f' || data === '\x08') {
@@ -1915,10 +1944,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           diagnosticCore.recordTerminalData(data);
         }
 
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(data);
-          
-          // v3.12.12: AM logging removed
+        const activeWs = wsRef.current;
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+          activeWs.send(data);
           
           // Clear waiting state when user types (they're responding to the prompt)
           // PERF FIX: Use ref instead of state to avoid stale closure
@@ -1933,10 +1961,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
       });
 
-      // Handle terminal resize
+      // Handle terminal resize — uses wsRef.current for same reason as onData above.
       term.onResize(({ cols, rows }) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        const activeWs = wsRef.current;
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+          activeWs.send(JSON.stringify({ type: 'resize', cols, rows }));
         }
       });
       

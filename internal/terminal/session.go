@@ -346,3 +346,20 @@ func (s *TerminalSession) Close() error {
 func (s *TerminalSession) Done() <-chan struct{} {
 	return s.doneChan
 }
+
+// IsDone returns true if the session's PTY process has exited.
+func (s *TerminalSession) IsDone() bool {
+	select {
+	case <-s.doneChan:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsClosed returns true if Close() has been called on this session.
+func (s *TerminalSession) IsClosed() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.closed
+}

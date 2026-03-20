@@ -162,10 +162,71 @@ func getPrintableText(data []byte) string {
 type Handler struct {
 	upgrader             websocket.Upgrader
 	sessions             sync.Map // map[string]*TerminalSession
+	detachedSessions     sync.Map // map[string]*DetachedSession — PTY sessions kept alive after WS disconnect
 	visionParser         *vision.Parser
 	llmDetector          *llm.Detector
 	restartRequested     atomic.Bool // Flag to indicate session restart is in progress
 	systemSleepRequested atomic.Bool // Flag to indicate system sleep is closing sessions
+}
+
+// DetachedSession represents a PTY session that outlived its WebSocket connection.
+// The PTY process continues running; output accumulates in the OS pipe buffer.
+// A reconnecting client can reattach within the grace period to resume I/O.
+type DetachedSession struct {
+	session    *TerminalSession
+	graceTimer *time.Timer
+	detachedAt time.Time
+}
+
+const sessionGracePeriod = 5 * time.Minute // How long a detached PTY stays alive
+
+// detachSession keeps a PTY alive after its WebSocket disconnects.
+// If the PTY process has already exited, the session is closed immediately.
+func (h *Handler) detachSession(sessionID string, session *TerminalSession) {
+	// Don't detach if PTY is already dead — nothing to reconnect to
+	if session.IsDone() || session.IsClosed() {
+		log.Printf("[Terminal] Session %s: PTY already exited, closing (not detaching)", sessionID)
+		session.Close()
+		return
+	}
+
+	ds := &DetachedSession{
+		session:    session,
+		detachedAt: time.Now(),
+	}
+
+	ds.graceTimer = time.AfterFunc(sessionGracePeriod, func() {
+		log.Printf("[Terminal] Session %s: grace period expired after %v, closing PTY",
+			sessionID, sessionGracePeriod)
+		h.detachedSessions.Delete(sessionID)
+		session.Close()
+	})
+
+	h.detachedSessions.Store(sessionID, ds)
+	log.Printf("[Terminal] Session %s detached — PTY kept alive (grace: %v)", sessionID, sessionGracePeriod)
+}
+
+// reattachSession retrieves a detached PTY session for reconnection.
+// Returns the session if found and still alive, nil otherwise.
+func (h *Handler) reattachSession(sessionID string) (*DetachedSession, bool) {
+	value, ok := h.detachedSessions.LoadAndDelete(sessionID)
+	if !ok {
+		return nil, false
+	}
+
+	ds := value.(*DetachedSession)
+	ds.graceTimer.Stop()
+
+	// Verify PTY is still alive
+	if ds.session.IsDone() || ds.session.IsClosed() {
+		log.Printf("[Terminal] Session %s: detached PTY already exited, cannot reattach", sessionID)
+		ds.session.Close()
+		return nil, false
+	}
+
+	log.Printf("[Terminal] Session %s: reattaching (was detached for %v)",
+		sessionID, time.Since(ds.detachedAt))
+	return ds, true
 }
 
 // connWriter wraps a websocket.Conn with a mutex for thread-safe writes.
@@ -355,6 +416,19 @@ func (h *Handler) CloseAllSessions() int {
 		}
 		return true // continue iteration
 	})
+
+	// Also close any detached sessions (PTYs kept alive for reconnection)
+	h.detachedSessions.Range(func(key, value interface{}) bool {
+		if ds, ok := value.(*DetachedSession); ok {
+			ds.graceTimer.Stop()
+			ds.session.Close()
+			log.Printf("[Terminal] Closing detached session %s for restart", key)
+			count++
+		}
+		h.detachedSessions.Delete(key)
+		return true
+	})
+
 	log.Printf("[Terminal] Closed %d sessions for restart", count)
 	return count
 }
@@ -378,6 +452,19 @@ func (h *Handler) SuspendSessions() int {
 		}
 		return true
 	})
+
+	// Also close any detached sessions
+	h.detachedSessions.Range(func(key, value interface{}) bool {
+		if ds, ok := value.(*DetachedSession); ok {
+			ds.graceTimer.Stop()
+			ds.session.Close()
+			log.Printf("[Terminal] Closing detached session %s for system sleep", key)
+			count++
+		}
+		h.detachedSessions.Delete(key)
+		return true
+	})
+
 	log.Printf("[Terminal] Suspended %d sessions for system sleep", count)
 	return count
 }
@@ -439,32 +526,59 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		initialRows = uint16(r2)
 	}
 
-	// Create terminal session with config
+	// Create terminal session with config — or reattach to a detached one
 	sessionID := tabID // Use tabID as session ID for consistency
-	session, err := NewTerminalSessionWithConfig(sessionID, shellConfig)
-	if err != nil {
-		log.Printf("[Terminal] Failed to create session: %v", err)
-		_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
-		return
+	var session *TerminalSession
+	var isReattach bool
+
+	if ds, ok := h.reattachSession(sessionID); ok {
+		session = ds.session
+		isReattach = true
+		log.Printf("[Terminal] Session %s reattached (shell was detached for %v)",
+			sessionID, time.Since(ds.detachedAt))
+		// Notify frontend this is a session recovery, not a fresh start
+		_ = conn.WriteJSON(map[string]interface{}{
+			"type":             "SESSION_REATTACHED",
+			"sessionId":        sessionID,
+			"detachedDuration": time.Since(ds.detachedAt).Seconds(),
+		})
+	} else {
+		var err error
+		session, err = NewTerminalSessionWithConfig(sessionID, shellConfig)
+		if err != nil {
+			log.Printf("[Terminal] Failed to create session: %v", err)
+			_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
+			return
+		}
+		log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
 	}
 	h.sessions.Store(sessionID, session)
-	log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
 
 	defer func() {
-		session.Close()
 		// RACE CONDITION FIX: Only delete if the map still holds THIS session
 		// This prevents deleting a NEW session if a reconnection happened quickly
 		h.sessions.CompareAndDelete(sessionID, session)
+		// Keep PTY alive for reconnection instead of killing it immediately.
+		// detachSession checks IsDone()/IsClosed() and closes immediately if PTY is dead.
+		h.detachSession(sessionID, session)
 	}()
+
+	// Flag: set to false when PTY exits or session is intentionally ended.
+	// When true, the defer's detachSession() will keep the PTY alive.
+	// When false (PTY exited), detachSession() detects IsDone() and closes immediately.
+	// This is a documentation hint — the actual decision is in detachSession().
 
 	// Set initial terminal size using client-reported dimensions (or 80x24 fallback)
 	_ = session.Resize(initialCols, initialRows)
-	log.Printf("[Terminal] Initial size: %dx%d (from %s)", initialCols, initialRows, func() string {
-		if query.Get("cols") != "" {
-			return "client"
-		}
-		return "default"
-	}())
+	sizeSource := "default"
+	if query.Get("cols") != "" {
+		sizeSource = "client"
+	}
+	if isReattach {
+		log.Printf("[Terminal] Reattached session resized to %dx%d (from %s)", initialCols, initialRows, sizeSource)
+	} else {
+		log.Printf("[Terminal] Initial size: %dx%d (from %s)", initialCols, initialRows, sizeSource)
+	}
 
 	// Get Vision parser using getter method (supports both direct and assistantCore)
 	visionParser := h.GetVisionParser()
@@ -581,8 +695,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Configure ping/pong to prevent idle disconnects
 	// Browsers and proxies often close idle WebSockets after 60-120 seconds
 	const (
-		pingPeriod = 30 * time.Second  // Send ping every 30 seconds
-		pongWait   = 60 * time.Second  // Wait up to 60 seconds for pong response
+		pingPeriod = 15 * time.Second  // Send ping every 15 seconds (was 30s — too slow for some proxies)
+		pongWait   = 45 * time.Second  // Wait up to 45 seconds for pong response
 	)
 	
 	// Set up pong handler - client must respond to our pings
@@ -1099,7 +1213,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			finalReason = closeReason{websocket.CloseNormalClosure, "Connection closed"}
 		}
 	case <-session.Done():
-		// Check if this is a system sleep, restart, or normal exit
+		// PTY process exited — close the session to prevent detach attempt
 		if h.systemSleepRequested.Load() {
 			log.Printf("[Terminal] Session %s: Closed for system sleep", sessionID)
 			finalReason = closeReason{CloseCodeSystemSleep, "System is going to sleep"}
@@ -1110,9 +1224,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[Terminal] Session %s: Process exited", sessionID)
 			finalReason = closeReason{CloseCodePTYExited, "Shell process exited"}
 		}
+		// Mark session closed so detachSession won't try to keep a dead PTY alive
+		session.Close()
 	case <-time.After(24 * time.Hour):
 		log.Printf("[Terminal] Session %s: Timeout (24h)", sessionID)
 		finalReason = closeReason{CloseCodeTimeout, "Session timed out after 24 hours"}
+		session.Close()
 	}
 
 	// v3.12.3: AM LLM logger cleanup removed
