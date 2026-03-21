@@ -1300,6 +1300,25 @@ function App() {
     // If path is absolute, use the file's directory as rootPath
     // If relative, use the current tab's directory
     let computedRootPath = activeTab?.currentDirectory || '.';
+
+    // For WSL terminals: convert rootPath (currentDirectory) from Linux path to Windows-compatible
+    // Same logic as filePath conversion above — the Go backend is Windows-only
+    if (isWSL && computedRootPath.startsWith('/')) {
+      if (computedRootPath.startsWith('/mnt/') && computedRootPath.length > 5) {
+        const parts = computedRootPath.split('/');
+        if (parts.length >= 3) {
+          const drive = parts[2].toUpperCase();
+          const remainder = parts.slice(3).join('/');
+          computedRootPath = remainder ? `${drive}:/${remainder}` : `${drive}:/`;
+          console.log('[App] WSL rootPath /mnt/ → Windows drive:', computedRootPath);
+        }
+      } else if (wslDistro) {
+        const linuxPath = computedRootPath.slice(1).replace(/\//g, '\\');
+        computedRootPath = `\\\\wsl.localhost\\${wslDistro}\\${linuxPath}`;
+        console.log('[App] WSL rootPath Linux → UNC:', computedRootPath);
+      }
+    }
+
     const isAbsolutePath = filePath.match(/^[A-Za-z]:/) || filePath.startsWith('/') || filePath.startsWith('\\\\');
     
     if (isAbsolutePath) {
@@ -1896,6 +1915,7 @@ function App() {
                       onClose={() => closeTab(tab.id)}
                       onSave={handleEditorSave}
                       onModifiedChange={(modified) => updateTabModified(tab.id, modified)}
+                      onError={(msg) => addToast(msg, 'error', 6000)}
                       theme={tab.mode || theme}
                       rootPath={tab.currentDirectory || '.'}
                       terminalRef={null}
@@ -2003,6 +2023,7 @@ function App() {
               file={editorFile}
               onClose={handleEditorClose}
               onSave={handleEditorSave}
+              onError={(msg) => addToast(msg, 'error', 6000)}
               theme={activeTab?.mode || theme}
               rootPath={editorFile?.rootPath || activeTab?.currentDirectory || '.'}
               terminalRef={getActiveTerminalRef()}

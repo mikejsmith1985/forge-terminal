@@ -9,6 +9,7 @@ export default function MonacoEditor({
   onClose,
   onSave,
   onModifiedChange,
+  onError,
   theme = 'vs-dark',
   rootPath = '.',
   terminalRef
@@ -60,10 +61,21 @@ export default function MonacoEditor({
       console.error('[MonacoEditor] ===== FILE LOAD FAILED =====');
       console.error('[MonacoEditor] Error details:', err);
 
+      const is404 = err.message?.includes('404');
+      if (is404 && onError) {
+        const hint = rootPath && rootPath !== '.'
+          ? ` (looked in ${rootPath})`
+          : '';
+        onError(`File not found: "${path}"${hint} — it may have been deleted, moved, or not exist at this path.`);
+        if (onClose) onClose();
+        return;
+      }
+
       setContent(
         `// ❌ Error loading file\n` +
         `// Error: ${err.message}\n` +
-        `// Path: ${path}\n`
+        `// Path: ${path}\n` +
+        (rootPath ? `// Root: ${rootPath}\n` : '')
       );
     } finally {
       setLoading(false);
