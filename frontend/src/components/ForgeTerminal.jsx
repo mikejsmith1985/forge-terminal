@@ -1118,6 +1118,26 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.open(terminalRef.current);
     xtermRef.current = term;
     diagnosticCore.recordInitEvent('xterm_created', { tabId });
+
+    // Track scroll position via xterm's native onScroll API.
+    // Using DOM scroll events on .xterm-viewport is unreliable in xterm.js 5.x —
+    // the event was previously placed inside connectWebSocket(), which also caused
+    // duplicate listeners to accumulate on each reconnect without cleanup.
+    // onScroll fires directly from xterm's internal scroll engine, reliably covering
+    // wheel scroll, keyboard scroll, programmatic scrollToBottom(), and auto-scroll
+    // during fast PTY output.
+    let scrollRafPending = false;
+    const scrollDisposable = term.onScroll(() => {
+      if (scrollRafPending) return;
+      scrollRafPending = true;
+      requestAnimationFrame(() => {
+        scrollRafPending = false;
+        if (!xtermRef.current) return;
+        const buffer = xtermRef.current.buffer.active;
+        const isAtBottom = buffer.viewportY >= buffer.baseY;
+        setShowScrollButton(!isAtBottom);
+      });
+    });
     
     // CYPRESS TESTING: Expose terminal instance for E2E tests
     // This allows cy.getTerminalOutput() to read the actual buffer
@@ -1969,25 +1989,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
       });
       
-      // Track scroll position to show/hide scroll button
-      // PERF FIX: Throttle via rAF to avoid rapid setShowScrollButton toggles
-      // during fast term.write() — previously fired on every scroll event, causing
-      // unnecessary React re-renders that contributed to viewport flicker.
-      const viewport = terminalRef.current?.querySelector('.xterm-viewport');
-      let scrollRafPending = false;
-      if (viewport) {
-        const checkScroll = () => {
-          if (scrollRafPending) return;
-          scrollRafPending = true;
-          requestAnimationFrame(() => {
-            scrollRafPending = false;
-            const isAtBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 50;
-            setShowScrollButton(!isAtBottom);
-          });
-        };
-        viewport.addEventListener('scroll', checkScroll);
-      }
-
       return ws;
     };
 
@@ -2029,6 +2030,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
       window.removeEventListener('resize', debouncedFit);
       resizeObserver.disconnect();
+
+      scrollDisposable.dispose();
 
       // PERF FIX: Cancel idle callbacks instead of timeouts
       if (waitingCheckIdleRef.current) {
