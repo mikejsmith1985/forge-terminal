@@ -440,6 +440,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '3.19.4'; // v3.12.10: Tour UX improvements, backspace fix, theme dark/light modes
+const TOUR_VERSION = '3.19.5'; // v3.12.10: Tour UX improvements, backspace fix, theme dark/light modes
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };

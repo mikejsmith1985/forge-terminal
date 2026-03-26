@@ -1119,15 +1119,22 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     xtermRef.current = term;
     diagnosticCore.recordInitEvent('xterm_created', { tabId });
 
-    // Track scroll position via xterm's native onScroll API.
-    // Using DOM scroll events on .xterm-viewport is unreliable in xterm.js 5.x —
-    // the event was previously placed inside connectWebSocket(), which also caused
-    // duplicate listeners to accumulate on each reconnect without cleanup.
-    // onScroll fires directly from xterm's internal scroll engine, reliably covering
-    // wheel scroll, keyboard scroll, programmatic scrollToBottom(), and auto-scroll
-    // during fast PTY output.
+    // Track scroll position to show/hide the "scroll to bottom" button.
+    //
+    // Two listeners are required because xterm.js 5.x has two separate scroll paths:
+    //
+    // 1. term.onScroll — fires for keyboard scroll (Page Up/Down), programmatic
+    //    scrollToBottom(), and data-driven auto-scroll when new PTY output arrives.
+    //    It does NOT fire for mouse wheel scrolling (xterm routes wheel events through
+    //    the DOM viewport with suppressScrollEvent:true, bypassing _onScroll.fire).
+    //
+    // 2. DOM "scroll" on .xterm-viewport — fires for mouse wheel scrolling. xterm's
+    //    Viewport.handleWheel() updates scrollTop directly, which triggers this event.
+    //    By the time our listener runs, buffer.viewportY is already updated.
+    //
+    // Using both ensures complete coverage without duplicate listeners on reconnect.
     let scrollRafPending = false;
-    const scrollDisposable = term.onScroll(() => {
+    const checkScrollPosition = () => {
       if (scrollRafPending) return;
       scrollRafPending = true;
       requestAnimationFrame(() => {
@@ -1137,7 +1144,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         const isAtBottom = buffer.viewportY >= buffer.baseY;
         setShowScrollButton(!isAtBottom);
       });
-    });
+    };
+
+    const scrollDisposable = term.onScroll(checkScrollPosition);
+
+    // Mouse wheel scrolling bypasses term.onScroll — listen directly on the DOM viewport.
+    const viewport = terminalRef.current.querySelector('.xterm-viewport');
+    if (viewport) {
+      viewport.addEventListener('scroll', checkScrollPosition, { passive: true });
+    }
     
     // CYPRESS TESTING: Expose terminal instance for E2E tests
     // This allows cy.getTerminalOutput() to read the actual buffer
@@ -2032,6 +2047,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       resizeObserver.disconnect();
 
       scrollDisposable.dispose();
+      if (viewport) {
+        viewport.removeEventListener('scroll', checkScrollPosition);
+      }
 
       // PERF FIX: Cancel idle callbacks instead of timeouts
       if (waitingCheckIdleRef.current) {
