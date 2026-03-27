@@ -174,6 +174,14 @@ func main() {
 	if overrideHost == "" {
 		overrideHost = os.Getenv("FORGE_HOST")
 	}
+	// Parse hosted mode before applying defaults
+	hostedCfg := parseHostedConfig(os.Args)
+	if hostedCfg.Enabled {
+		overrideHost = hostedCfg.Host
+		applyHostedConfig(hostedCfg)
+		log.Printf("[Forge] 📱 Hosted mode enabled — binding to %s with auth + tunnel", hostedCfg.Host)
+	}
+
 	// Auto-detect GitHub Codespaces environment
 	inCodespaces := os.Getenv("CODESPACES") == "true"
 	if inCodespaces && overrideHost == "" {
@@ -184,8 +192,8 @@ func main() {
 	if overrideHost == "" {
 		overrideHost = "localhost"
 	}
-	// Auto-generate auth token for non-localhost bindings
-	if overrideHost != "localhost" && overrideHost != "127.0.0.1" {
+	// Auto-generate auth token for non-localhost bindings (skip if hosted mode already set it)
+	if !hostedCfg.Enabled && overrideHost != "localhost" && overrideHost != "127.0.0.1" {
 		token := os.Getenv("FORGE_TOKEN")
 		if token == "" {
 			token = GenerateToken()
@@ -218,6 +226,7 @@ func main() {
 			fmt.Println("  forge --port PORT      Start server on specific port")
 			fmt.Println("  forge --host HOST      Bind to specific host (default: localhost)")
 			fmt.Println("  forge --host 0.0.0.0   Bind to all interfaces (enables token auth)")
+			fmt.Println("  forge --hosted         Hosted mode: 0.0.0.0 + auth + tunnel + no browser")
 			fmt.Println("")
 			fmt.Println("Environment:")
 			fmt.Println("  FORGE_PORT=9999        Override default port")
@@ -509,10 +518,11 @@ func main() {
 
 	log.Printf("🔥 Forge Terminal starting at http://%s (PID: %d)", addr, os.Getpid())
 
-	// Auto-start cloudflared tunnel if configured
+	// Auto-start cloudflared tunnel if configured or hosted mode is active
 	go func() {
 		cfg, err := loadNotifyConfig()
-		if err == nil && cfg.TunnelAutoStart {
+		shouldStartTunnel := (err == nil && cfg.TunnelAutoStart) || hostedCfg.TunnelAutoStart
+		if shouldStartTunnel {
 			if startErr := tunnelMgr.Start(activePort, onTunnelURL); startErr != nil {
 				log.Printf("[Tunnel] Auto-start failed: %v", startErr)
 			} else {
@@ -560,8 +570,8 @@ func main() {
 		}
 	})
 
-	// Auto-open browser (skip if NO_BROWSER env var is set or running in Codespaces)
-	if os.Getenv("NO_BROWSER") == "" && !inCodespaces {
+	// Auto-open browser (skip if NO_BROWSER env var is set, running in Codespaces, or hosted mode)
+	if os.Getenv("NO_BROWSER") == "" && !inCodespaces && !hostedCfg.NoBrowser {
 		go openBrowser("http://" + addr)
 	}
 
