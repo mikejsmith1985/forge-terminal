@@ -10,7 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	_ "net/http/pprof" // CPU/memory profiling - access at /debug/pprof/
+
 	"os"
 	"os/exec"
 	"os/signal"
@@ -246,6 +246,9 @@ func main() {
 
 	// v3.9.6: ChatView and Chat Store removed - functionality moved to Forge Assist
 	// Chat bridge initialization removed
+
+	// Register pprof endpoints behind auth middleware
+	RegisterPprofRoutes()
 
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
