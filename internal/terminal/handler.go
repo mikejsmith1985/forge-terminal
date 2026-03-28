@@ -163,6 +163,7 @@ type Handler struct {
 	upgrader             websocket.Upgrader
 	sessions             sync.Map // map[string]*TerminalSession
 	detachedSessions     sync.Map // map[string]*DetachedSession — PTY sessions kept alive after WS disconnect
+	hubs                 sync.Map // map[string]*sessionHub — one hub per sessionID, shared across clients
 	visionParser         *vision.Parser
 	llmDetector          *llm.Detector
 	restartRequested     atomic.Bool // Flag to indicate session restart is in progress
@@ -496,7 +497,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Wrap connection for thread-safe writes
 	// gorilla/websocket is NOT thread-safe for concurrent writes
 	conn := &connWriter{conn: rawConn}
-	defer conn.markClosed() // Ensure closed flag is set on exit
+	// NOTE: conn.markClosed() is called in the session hub defer below.
 
 	// Parse shell config from query params
 	query := r.URL.Query()
@@ -528,44 +529,73 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		initialRows = uint16(r2)
 	}
 
-	// Create terminal session with config — or reattach to a detached one
+	// Create terminal session with config — or join a live one, or reattach a detached one.
 	sessionID := tabID // Use tabID as session ID for consistency
+
+	// ── HUB: one hub per sessionID, shared across all concurrent clients ──
+	hubRaw, _ := h.hubs.LoadOrStore(sessionID, newSessionHub())
+	hub := hubRaw.(*sessionHub)
+	hub.add(conn)
+
 	var session *TerminalSession
 	var isReattach bool
+	var isWatcher bool // true when joining a PTY that is already owned by another connection
 
-	if ds, ok := h.reattachSession(sessionID); ok {
-		session = ds.session
-		isReattach = true
-		log.Printf("[Terminal] Session %s reattached (shell was detached for %v)",
-			sessionID, time.Since(ds.detachedAt))
-		// Notify frontend this is a session recovery, not a fresh start
-		_ = conn.WriteJSON(map[string]interface{}{
-			"type":             "SESSION_REATTACHED",
-			"sessionId":        sessionID,
-			"detachedDuration": time.Since(ds.detachedAt).Seconds(),
-		})
-	} else {
-		var err error
-		session, err = NewTerminalSessionWithConfig(sessionID, shellConfig)
-		if err != nil {
-			log.Printf("[Terminal] Failed to create session: %v", err)
-			_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
-			return
+	// Priority 1: Live session (another connection already owns the PTY).
+	// Join as a watcher: share PTY output via hub, send input normally.
+	if liveVal, ok := h.sessions.Load(sessionID); ok {
+		live := liveVal.(*TerminalSession)
+		if !live.IsClosed() && !live.IsDone() {
+			session = live
+			isWatcher = true
+			log.Printf("[Terminal] Session %s: client joining live session (hub size now %d)", sessionID, hub.size())
+			_ = conn.WriteJSON(map[string]interface{}{
+				"type":      "SESSION_JOINED",
+				"sessionId": sessionID,
+			})
 		}
-		log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
 	}
-	h.sessions.Store(sessionID, session)
+
+	if !isWatcher {
+		// Priority 2: Detached session (PTY survived a previous disconnect).
+		if ds, ok := h.reattachSession(sessionID); ok {
+			session = ds.session
+			isReattach = true
+			log.Printf("[Terminal] Session %s reattached (shell was detached for %v)",
+				sessionID, time.Since(ds.detachedAt))
+			_ = conn.WriteJSON(map[string]interface{}{
+				"type":             "SESSION_REATTACHED",
+				"sessionId":        sessionID,
+				"detachedDuration": time.Since(ds.detachedAt).Seconds(),
+			})
+		} else {
+			// Priority 3: New session.
+			var err error
+			session, err = NewTerminalSessionWithConfig(sessionID, shellConfig)
+			if err != nil {
+				log.Printf("[Terminal] Failed to create session: %v", err)
+				_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
+				hub.remove(conn)
+				return
+			}
+			log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
+		}
+		h.sessions.Store(sessionID, session)
+	}
 
 	// Compute grace period before the defer closure captures it
 	gracePeriod := GracePeriodForClient(r.Header.Get("User-Agent"))
 
 	defer func() {
-		// RACE CONDITION FIX: Only delete if the map still holds THIS session
-		// This prevents deleting a NEW session if a reconnection happened quickly
-		h.sessions.CompareAndDelete(sessionID, session)
-		// Keep PTY alive for reconnection instead of killing it immediately.
-		// detachSession checks IsDone()/IsClosed() and closes immediately if PTY is dead.
-		h.detachSession(sessionID, session, gracePeriod)
+		conn.markClosed()
+		hub.remove(conn)
+		// Only clean up the session when the last client leaves.
+		// While any client remains in the hub, the PTY goroutine keeps broadcasting to them.
+		if hub.size() == 0 {
+			h.hubs.Delete(sessionID)
+			h.sessions.CompareAndDelete(sessionID, session)
+			h.detachSession(sessionID, session, gracePeriod)
+		}
 	}()
 
 	// Flag: set to false when PTY exits or session is intentionally ended.
@@ -579,113 +609,117 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if query.Get("cols") != "" {
 		sizeSource = "client"
 	}
-	if isReattach {
+	switch {
+	case isWatcher:
+		log.Printf("[Terminal] Session %s: watcher resized to %dx%d (from %s)", sessionID, initialCols, initialRows, sizeSource)
+	case isReattach:
 		log.Printf("[Terminal] Reattached session resized to %dx%d (from %s)", initialCols, initialRows, sizeSource)
-	} else {
+	default:
 		log.Printf("[Terminal] Initial size: %dx%d (from %s)", initialCols, initialRows, sizeSource)
 	}
 
-	// Get Vision parser using getter method (supports both direct and assistantCore)
-	visionParser := h.GetVisionParser()
-
-	// v3.5.3: PromptDetector for Chat PTY bridge response detection
-	promptDetector := NewPromptDetector()
-	promptDetector.SetHeuristicMode(true) // Enable heuristic fallback for non-integrated shells
+	// ── Owner-only state: prompt detection, auto-respond, vision insights ──
+	// Watchers share the PTY output via the hub; they don't need separate state machines.
+	var visionParser *vision.Parser
+	var promptDetector *PromptDetector
 	var chatResponsePending atomic.Bool
-	
-	// Set up prompt detection callbacks for Chat bridge
-	promptDetector.OnResponseComplete(func(response string) {
-		if chatResponsePending.Load() {
-			log.Printf("[ChatBridge] Response complete detected (%d chars)", len(response))
+	var autoRespondDetector *AutoRespondDetector
+	var autoRespondEnabled atomic.Bool
+	var insightsTracker *vision.InsightsTracker
+	var executiveTrigger *ExecutiveTriggerHandler
+	var lineBuffer *LineBuffer
+	var smartRoutingEnabled atomic.Bool
+
+	if !isWatcher {
+		// Get Vision parser using getter method (supports both direct and assistantCore)
+		visionParser = h.GetVisionParser()
+
+		// v3.5.3: PromptDetector for Chat PTY bridge response detection
+		promptDetector = NewPromptDetector()
+		promptDetector.SetHeuristicMode(true) // Enable heuristic fallback for non-integrated shells
+
+		// Set up prompt detection callbacks for Chat bridge
+		promptDetector.OnResponseComplete(func(response string) {
+			if chatResponsePending.Load() {
+				log.Printf("[ChatBridge] Response complete detected (%d chars)", len(response))
+				_ = conn.WriteJSON(map[string]interface{}{
+					"type":      "CHAT_RESPONSE_COMPLETE",
+					"response":  response,
+					"timestamp": time.Now().UnixMilli(),
+				})
+				chatResponsePending.Store(false)
+			}
+		})
+
+		promptDetector.OnWaitingForInput(func(promptText string) {
+			log.Printf("[PromptDetector] Waiting for input detected: %s", promptText)
 			_ = conn.WriteJSON(map[string]interface{}{
-				"type":      "CHAT_RESPONSE_COMPLETE",
-				"response":  response,
+				"type":       "PROMPT_WAITING_FOR_INPUT",
+				"promptText": promptText,
+				"timestamp":  time.Now().UnixMilli(),
+			})
+		})
+
+		promptDetector.OnStateChange(func(old, new PromptState) {
+			_ = conn.WriteJSON(map[string]interface{}{
+				"type":      "PROMPT_STATE_CHANGE",
+				"oldState":  old.String(),
+				"newState":  new.String(),
 				"timestamp": time.Now().UnixMilli(),
 			})
-			chatResponsePending.Store(false)
-		}
-	})
-	
-	promptDetector.OnWaitingForInput(func(promptText string) {
-		log.Printf("[PromptDetector] Waiting for input detected: %s", promptText)
-		_ = conn.WriteJSON(map[string]interface{}{
-			"type":       "PROMPT_WAITING_FOR_INPUT",
-			"promptText": promptText, // v3.7.1: Include prompt text for chat UI
-			"timestamp":  time.Now().UnixMilli(),
 		})
-	})
-	
-	promptDetector.OnStateChange(func(old, new PromptState) {
-		_ = conn.WriteJSON(map[string]interface{}{
-			"type":      "PROMPT_STATE_CHANGE",
-			"oldState":  old.String(),
-			"newState":  new.String(),
-			"timestamp": time.Now().UnixMilli(),
-		})
-	})
 
-	// PRECISION AUTO-RESPONDER v2.0 (independent of AM)
-	// Uses EchoBuffer to filter user echo and SequenceEngine for action chains
-	ptyWriter := func(data []byte) error {
-		_, err := session.Write(data)
-		return err
-	}
-	// v3.5.3: Use shared PromptDetector for unified detection across AutoRespond, AM, and Chat
-	autoRespondDetector := NewAutoRespondDetectorWithPromptDetector("github-copilot", ptyWriter, promptDetector)
-	var autoRespondEnabled atomic.Bool
-	autoRespondDetector.SetCallbacks(
-		func() {
-			// Callback when waiting for user input
-			if autoRespondEnabled.Load() {
-				log.Printf("[AutoRespond] Detected: Waiting for user input")
-				_ = conn.WriteJSON(map[string]interface{}{
-					"type":      "AUTO_RESPOND_STATE",
-					"state":     "waiting_for_user",
-					"timestamp": time.Now(),
-				})
-			}
-		},
-		func() {
-			// Callback when assistant is responding
-			if autoRespondEnabled.Load() {
-				log.Printf("[AutoRespond] Detected: Assistant responding")
-				_ = conn.WriteJSON(map[string]interface{}{
-					"type":      "AUTO_RESPOND_STATE",
-					"state":     "assistant_responding",
-					"timestamp": time.Now(),
-				})
-			}
-		},
-	)
-
-	// v3.12.3: AM system removed - simplified initialization
-	var insightsTracker *vision.InsightsTracker
-
-	// Launch async initialization for vision insights only
-	go func() {
-		// Initialize Vision Insights tracker (doesn't depend on AM)
-		cwd, _ := os.Getwd()
-		sessionInfo := vision.SessionInfo{
-			TabID:      tabID,
-			WorkingDir: cwd,
-			ShellType:  shellConfig.ShellType,
-			InAutoMode: false,
+		// PRECISION AUTO-RESPONDER v2.0 (independent of AM)
+		ptyWriter := func(data []byte) error {
+			_, err := session.Write(data)
+			return err
 		}
-		insightsTracker = vision.NewInsightsTracker("", sessionInfo)
-		visionParser.SetInsightsTracker(insightsTracker)
-		log.Printf("[Terminal] Vision insights tracker initialized for session %s", sessionID)
-	}()
+		autoRespondDetector = NewAutoRespondDetectorWithPromptDetector("github-copilot", ptyWriter, promptDetector)
+		autoRespondDetector.SetCallbacks(
+			func() {
+				if autoRespondEnabled.Load() {
+					log.Printf("[AutoRespond] Detected: Waiting for user input")
+					_ = conn.WriteJSON(map[string]interface{}{
+						"type":      "AUTO_RESPOND_STATE",
+						"state":     "waiting_for_user",
+						"timestamp": time.Now(),
+					})
+				}
+			},
+			func() {
+				if autoRespondEnabled.Load() {
+					log.Printf("[AutoRespond] Detected: Assistant responding")
+					_ = conn.WriteJSON(map[string]interface{}{
+						"type":      "AUTO_RESPOND_STATE",
+						"state":     "assistant_responding",
+						"timestamp": time.Now(),
+					})
+				}
+			},
+		)
 
-	// NOTE: detector is kept but LLM detection now happens in async pipeline
-	_ = h.GetLLMDetector() // Keep for backward compatibility
-	var inputBuffer strings.Builder
-	// v3.12.3: AM removed - input/output logging disabled
+		// Launch async initialization for vision insights only
+		go func() {
+			cwd, _ := os.Getwd()
+			sessionInfo := vision.SessionInfo{
+				TabID:      tabID,
+				WorkingDir: cwd,
+				ShellType:  shellConfig.ShellType,
+				InAutoMode: false,
+			}
+			insightsTracker = vision.NewInsightsTracker("", sessionInfo)
+			visionParser.SetInsightsTracker(insightsTracker)
+			log.Printf("[Terminal] Vision insights tracker initialized for session %s", sessionID)
+		}()
 
-	// EXECUTIVE TRIGGER: Smart Model Routing via "?" prefix
-	executiveTrigger := NewExecutiveTriggerHandler(visionParser)
-	lineBuffer := NewLineBuffer()
-	var smartRoutingEnabled atomic.Bool
-	smartRoutingEnabled.Store(true) // Enabled by default
+		_ = h.GetLLMDetector() // Keep for backward compatibility
+
+		executiveTrigger = NewExecutiveTriggerHandler(visionParser)
+		lineBuffer = NewLineBuffer()
+		smartRoutingEnabled.Store(true) // Enabled by default
+	} // end owner-only setup
+
+	var inputBuffer strings.Builder // shared by WS read goroutine for all connection types
 
 	// Channel to coordinate shutdown with reason
 	type closeReason struct {
@@ -737,42 +771,44 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	// v3.5.3: Periodically check for quiescence (for heuristic prompt detection)
-	go func() {
-		ticker := time.NewTicker(50 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				promptDetector.CheckQuiescence()
-			case <-done:
-				return
-			}
-		}
-	}()
-
-	// v3.12.3: AM EventBus subscription removed
-
-	// AUTO-RESPOND: Periodic check for state changes
-	go func() {
-		ticker := time.NewTicker(500 * time.Millisecond)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				if autoRespondDetector.Check() {
-					// State changed to waiting for user
-					log.Printf("[AutoRespond] State check: Waiting for user input detected")
+	if !isWatcher {
+		go func() {
+			ticker := time.NewTicker(50 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					promptDetector.CheckQuiescence()
+				case <-done:
+					return
 				}
-			case <-done:
-				return
 			}
-		}
-	}()
+		}()
 
-	// PTY -> WebSocket (read from terminal, send to browser)
-	go func() {
-		defer closeOnce.Do(func() { close(done) })
+		// AUTO-RESPOND: Periodic check for state changes
+		go func() {
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					if autoRespondDetector.Check() {
+						log.Printf("[AutoRespond] State check: Waiting for user input detected")
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
+	}
+
+	// PTY -> WebSocket (owner only).
+	// Watchers join the hub and receive broadcasts from this goroutine.
+	// The goroutine intentionally outlives individual WS connections: it keeps
+	// broadcasting to hub members until the PTY process exits.
+	if !isWatcher {
+		go func() {
+			defer closeOnce.Do(func() { close(done) })
 		buf := make([]byte, 4096)
 		var messageCount int64
 		var totalWriteTime time.Duration
@@ -822,28 +858,28 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				
-				// ═══ CRITICAL PERFORMANCE: Send to browser FIRST ═══
-				// This ensures terminal output is immediately visible
-				
-				// FREEZE INSTRUMENTATION: Time WebSocket writes
+				// ═══ CRITICAL PERFORMANCE: Broadcast to all hub clients FIRST ═══
+				// This ensures terminal output is immediately visible to every viewer.
+
+				// FREEZE INSTRUMENTATION: Time hub broadcast
 				writeStart := time.Now()
-				err = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+				hub.broadcast(websocket.BinaryMessage, buf[:n])
 				writeDuration := time.Since(writeStart)
-				
+
 				// Track cumulative stats
 				totalWriteTime += writeDuration
 				if writeDuration > maxWriteTime {
 					maxWriteTime = writeDuration
 				}
-				
+
 				// v3.9.1: Increase threshold to 200ms to reduce log noise
 				if writeDuration > 200*time.Millisecond {
-					log.Printf("[FREEZE-DEBUG] Slow WebSocket write: %v for %d bytes", writeDuration, n)
+					log.Printf("[FREEZE-DEBUG] Slow hub broadcast: %v for %d bytes", writeDuration, n)
 				}
 				if writeDuration > 500*time.Millisecond {
-					log.Printf("[FREEZE-CRITICAL] WebSocket write blocked for %v - %d bytes", writeDuration, n)
+					log.Printf("[FREEZE-CRITICAL] Hub broadcast blocked for %v - %d bytes", writeDuration, n)
 				}
-				
+
 				// Periodic stats report (every 30 seconds)
 				if time.Since(lastStatsReport) > 30*time.Second {
 					avgWrite := time.Duration(0)
@@ -852,11 +888,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 					log.Printf("[FREEZE-STATS] Messages: %d, AvgWrite: %v, MaxWrite: %v", messageCount, avgWrite, maxWriteTime)
 					lastStatsReport = time.Now()
-				}
-				
-				if err != nil {
-					log.Printf("[Terminal] WebSocket write error: %v", err)
-					return
 				}
 
 				// AUTO-RESPOND: Process output for state detection
@@ -911,8 +942,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
-
-	// WebSocket -> PTY (read from browser, send to terminal)
+	} // end if !isWatcher — PTY goroutine
 	go func() {
 		defer closeOnce.Do(func() { close(done) })
 		for {
@@ -934,7 +964,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				// Check for Vision control messages
+				// Watchers only handle resize; all other control messages are owner-only.
+				if isWatcher {
+					continue
+				}
 				var visionMsg VisionControlMessage
 				if err := json.Unmarshal(data, &visionMsg); err == nil {
 					switch visionMsg.Type {
@@ -1123,9 +1156,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// ═══ EXECUTIVE TRIGGER: Check for "?" smart routing ═══
+			// ═══ EXECUTIVE TRIGGER: Check for "?" smart routing (owner only) ═══
 			// Detect complete lines ending with Enter and check for "?" prefix
-			if smartRoutingEnabled.Load() {
+			if !isWatcher && smartRoutingEnabled.Load() && lineBuffer != nil {
 				lines := lineBuffer.Add(data)
 				for _, line := range lines {
 					if IsExecutiveTrigger(line) {
@@ -1202,8 +1235,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// PTY LOGGING: Log bytes sent to PTY (for Follow Me debugger)
 			globalPTYLogger.LogPTY(sessionID, "to_pty", dataToWrite)
 
-			// AUTO-RESPOND: Process input for state detection
-			autoRespondDetector.ProcessInput(dataToWrite)
+			// AUTO-RESPOND: Process input for state detection (owner only)
+			if !isWatcher && autoRespondDetector != nil {
+				autoRespondDetector.ProcessInput(dataToWrite)
+			}
 		}
 	}()
 

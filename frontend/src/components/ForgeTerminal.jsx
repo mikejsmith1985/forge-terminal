@@ -1649,7 +1649,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         
         // Reset reconnection state
         reconnectAttemptsRef.current = 0;
-        sessionReattachedRef.current = false; // Will be set to true by SESSION_REATTACHED message
+        sessionReattachedRef.current = false; // Will be set to true by SESSION_REATTACHED or SESSION_JOINED message
         setReconnecting(false);
         setIsConnected(true);
         
@@ -1763,6 +1763,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   xtermRef.current.write(`\r\n\x1b[38;2;34;197;94m[Session Restored]\x1b[0m Terminal session recovered${duration}.\r\n`);
                 }
                 sessionReattachedRef.current = true;
+                return;
+              }
+
+              if (msg.type === 'SESSION_JOINED') {
+                logger.terminal('Joined live session', { tabId });
+                if (xtermRef.current) {
+                  xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing live terminal session.\r\n`);
+                }
+                sessionReattachedRef.current = true; // suppress fresh "Connected" banner
                 return;
               }
             } catch (e) {
