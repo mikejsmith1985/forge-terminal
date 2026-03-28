@@ -259,6 +259,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '4.0.0'; // v4.0.0: Complete rewrite - Hosted Mode tour
+const TOUR_VERSION = '4.0.1'; // v4.0.0: Complete rewrite - Hosted Mode tour
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };

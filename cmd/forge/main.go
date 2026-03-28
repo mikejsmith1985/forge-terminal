@@ -25,7 +25,6 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
-	"github.com/mikejsmith1985/forge-terminal/internal/lockfile"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
@@ -75,9 +74,6 @@ func (w *headerFixingResponseWriter) WriteHeader(statusCode int) {
 }
 
 func main() {
-	// v3.7.2: Acquire instance lock to prevent multiple instances
-	// This prevents resource contention and keystroke latency issues
-	
 	// Determine home directory reliably
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -118,27 +114,9 @@ func main() {
 	log.Printf("[Forge] Starting up... (Version: %s)", updater.GetVersion())
 	log.Printf("[Forge] Home directory: %s", homeDir)
 
-	lockFileName := "forge.lock"
 	if devMode == "true" {
-		lockFileName = "forge-dev.lock"
-		log.Printf("[Forge] Dev mode enabled - using lockfile: %s", lockFileName)
+		log.Printf("[Forge] Dev mode enabled")
 	}
-
-	lock, err := lockfile.AcquireWithFileName(forgeDir, lockFileName)
-	if err != nil {
-		msg := fmt.Sprintf("Failed to start Forge Terminal:\n%v\n\nIf you're sure no other instance is running, delete:\n%s", err, filepath.Join(forgeDir, lockFileName))
-		showErrorDialog("Forge Startup Error", msg)
-		
-		log.Printf("CRITICAL ERROR: Failed to acquire lock: %v", err)
-		log.Printf("If you're sure no other instance is running, remove: %s", filepath.Join(forgeDir, lockFileName))
-		fmt.Fprintf(os.Stderr, "ERROR: %v\n\n", err)
-		// Wait a moment purely to ensure log flush if async (it's not, but good hygiene)
-		time.Sleep(100 * time.Millisecond) 
-		os.Exit(1)
-	}
-	defer lock.Release()
-	
-	log.Printf("[Forge] Instance lock acquired (PID: %d)", os.Getpid())
 
 	// Run cleanup of old debug sessions (older than 7 days) in background
 	go func() {
