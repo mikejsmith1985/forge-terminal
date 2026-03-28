@@ -36,33 +36,93 @@
   background: var(--bg-hover, #333);
 }
 
+/* Backdrop behind open drawer */
 .mobile-sidebar-overlay {
   position: fixed;
-  top: 44px;
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1099;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* Off-canvas sidebar drawer */
 .mobile-sidebar-drawer {
   position: fixed;
-  top: 44px;
+  top: 0;
   left: 0;
   bottom: 0;
-  width: 300px;
-  max-width: 85vw;
+  width: 320px;
+  max-width: 88vw;
   background: var(--bg-secondary, #1e1e1e);
   transform: translateX(-100%);
   transition: transform 0.25s ease-out;
-  z-index: 1000;
+  z-index: 1100;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
 }
 
 .mobile-sidebar-drawer.open {
   transform: translateX(0);
+}
+
+/* Close button row inside the drawer */
+.mobile-drawer-close-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 8px 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary, #1e1e1e);
+  z-index: 1;
+}
+
+.mobile-drawer-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: var(--bg-tertiary, #2a2a3e);
+  color: var(--text-secondary, #aaa);
+  border-radius: 50%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.mobile-drawer-close-btn:active {
+  background: var(--border-color, #444);
+}
+
+/* Hamburger FAB — opens the drawer */
+.mobile-sidebar-fab {
+  position: fixed;
+  bottom: 80px;
+  left: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1.5px solid var(--border-color, #444);
+  color: var(--text-primary, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 998;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.mobile-sidebar-fab:active {
+  background: var(--bg-tertiary, #2a2a3e);
 }
 
 .mobile-main-content {
@@ -87,26 +147,60 @@
   overflow: hidden;
 }
 
-/* General mobile responsive overrides */
+/* ── Mobile-specific UI density fixes ─────────────────────────────────────── */
 @media (max-width: 768px) {
-  .sidebar {
-    display: none !important;
-  }
-
+  /* Terminal pane fills the whole screen — drawer handles sidebar */
   .terminal-pane {
     width: 100% !important;
     max-width: 100% !important;
+    flex: 1 !important;
   }
 
-  .editor-panel {
+  /* Sidebar inside the drawer: reset fixed width so it fills the drawer */
+  .mobile-sidebar-drawer .sidebar {
     width: 100% !important;
-    max-width: 100% !important;
     min-width: unset !important;
+    max-width: 100% !important;
+    height: 100%;
+    overflow-y: auto;
+    display: flex !important;
+    flex-direction: column;
   }
 
-  /* Stack panels vertically */
-  .main-content {
-    flex-direction: column !important;
+  /* Sidebar content area: smaller font, tighter spacing */
+  .mobile-sidebar-drawer .sidebar-header h3 {
+    font-size: 14px;
+  }
+
+  .mobile-sidebar-drawer .command-card {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  /* Theme & terminal control rows: wrap on mobile */
+  .mobile-sidebar-drawer .theme-controls,
+  .mobile-sidebar-drawer .terminal-controls {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* Ensure tab bar doesn't get crushed */
+  .tab-bar {
+    min-height: 40px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent editor panel from appearing on mobile */
+  .editor-panel {
+    display: none !important;
+  }
+
+  /* Tighter sidebar view tabs */
+  .mobile-sidebar-drawer .sidebar-view-tab {
+    font-size: 12px;
+    padding: 8px 10px;
+    gap: 4px;
   }
 }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen, QrCode } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen, QrCode, Menu, X } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
@@ -10,6 +10,7 @@ import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import RemoteAccessModal from './components/RemoteAccessModal'
+import { useMobileDetect } from './hooks/useMobileDetect'
 import UpdateModal from './components/UpdateModal'
 import DeveloperDashboard from './components/DeveloperDashboard'
 // WelcomeModal REMOVED - replaced by guided tour (user request: 20+ times)
@@ -72,6 +73,7 @@ function App() {
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isRemoteAccessOpen, setIsRemoteAccessOpen] = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
   // WelcomeModal state REMOVED - replaced by guided tour
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
@@ -167,6 +169,10 @@ function App() {
   });
   const [isDraggingBtn, setIsDraggingBtn] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Mobile detection — drives drawer sidebar and touch-optimised interactions
+  const { isMobile, isTablet } = useMobileDetect();
+  const isCompact = isMobile || isTablet;
   
   // Workflow UI state - REMOVED v3.9.0: Workflows deleted, using Task Dashboard instead
   // Task Dashboard state - REMOVED v3.12.3: Was unimplemented scaffolding
@@ -1865,7 +1871,7 @@ function App() {
 
   return (
     <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''} ${showEditor ? 'with-editor' : ''}`}>
-      {sidebarPosition === 'left' && (<>{sidebar}<div className="sidebar-resizer" onMouseDown={startDrag} /></>)}
+      {!isCompact && sidebarPosition === 'left' && (<>{sidebar}<div className="sidebar-resizer" onMouseDown={startDrag} /></>)}
       <div className="terminal-pane">
         <TabBar
           tabs={tabs}
@@ -2040,7 +2046,31 @@ function App() {
           )}
         </div>
       )}
-      {sidebarPosition === 'right' && (<><div className="sidebar-resizer" onMouseDown={startDrag} />{sidebar}</>)}
+      {!isCompact && sidebarPosition === 'right' && (<><div className="sidebar-resizer" onMouseDown={startDrag} />{sidebar}</>)}
+
+      {/* Mobile: slide-in sidebar drawer with backdrop and hamburger FAB */}
+      {isCompact && (
+        <>
+          {mobileSidebarOpen && (
+            <div className="mobile-sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />
+          )}
+          <div className={`mobile-sidebar-drawer${mobileSidebarOpen ? ' open' : ''}`}>
+            <div className="mobile-drawer-close-row">
+              <button className="mobile-drawer-close-btn" onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu">
+                <X size={20} />
+              </button>
+            </div>
+            {sidebar}
+          </div>
+          <button
+            className="mobile-sidebar-fab"
+            onClick={() => setMobileSidebarOpen(o => !o)}
+            aria-label={mobileSidebarOpen ? 'Close menu' : 'Open menu'}
+          >
+            {mobileSidebarOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </>
+      )}
 
       <CommandModal
         isOpen={isModalOpen}
@@ -2178,10 +2208,10 @@ function App() {
           width: '48px',
           height: '48px',
           borderRadius: '50%',
-          background: 'var(--accent-color, #8b5cf6)',
-          border: 'none',
+          background: isForgeAssistOpen ? 'var(--accent-color, #8b5cf6)' : 'var(--bg-secondary, #1e1e2e)',
+          border: '2px solid var(--accent-color, #8b5cf6)',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          cursor: isDraggingBtn ? 'grabbing' : 'grab',
+          cursor: isCompact ? 'pointer' : (isDraggingBtn ? 'grabbing' : 'grab'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2190,22 +2220,27 @@ function App() {
           transition: isDraggingBtn ? 'none' : 'transform 0.2s, box-shadow 0.2s',
           userSelect: 'none',
         }}
-        onMouseDown={handleBtnMouseDown}
+        onMouseDown={isCompact ? undefined : handleBtnMouseDown}
+        onClick={isCompact ? () => {
+          setIsForgeAssistOpen(prev => !prev);
+          setMobileSidebarOpen(false);
+        } : undefined}
         onMouseEnter={(e) => {
-          if (!isDraggingBtn) {
+          if (!isDraggingBtn && !isCompact) {
             e.currentTarget.style.transform = 'scale(1.1)';
             e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
           }
         }}
         onMouseLeave={(e) => {
-          if (!isDraggingBtn) {
+          if (!isDraggingBtn && !isCompact) {
             e.currentTarget.style.transform = 'scale(1)';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
           }
         }}
-        title="Forge Assist - Drag to reposition (Ctrl+/)"
+        title={isCompact ? 'Forge Assist' : 'Forge Assist - Drag to reposition (Ctrl+/)'}
+        aria-label={isForgeAssistOpen ? 'Close Forge Assist' : 'Open Forge Assist'}
       >
-        <Command size={24} />
+        {isCompact && isForgeAssistOpen ? <X size={22} /> : <Command size={24} />}
       </button>
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
