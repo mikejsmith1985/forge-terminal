@@ -259,6 +259,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '4.1.2'; // v4.0.2: Clarified QR code steps; added in-app Remote Access button
+const TOUR_VERSION = '4.1.3'; // v4.0.2: Clarified QR code steps; added in-app Remote Access button
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };

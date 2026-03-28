@@ -18,6 +18,8 @@ import DeveloperDashboard from './components/DeveloperDashboard'
 import FileAccessPrompt from './components/FileAccessPrompt'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
+import { MobileTabStrip } from './components/MobileTabStrip'
+import { MobileInputBar } from './components/MobileInputBar'
 import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import LensFilePicker from './components/LensFilePicker'
@@ -161,6 +163,13 @@ function App() {
   
   // Forge Assist state
   const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
+  const [showForgeAssistBtn, setShowForgeAssistBtn] = useState(() => {
+    const saved = localStorage.getItem('forge_assist_btn_visible');
+    if (saved !== null) return saved !== 'false';
+    // Default off on mobile/tablet — the modal isn't usable at small sizes
+    const compact = window.innerWidth <= 1024;
+    return !compact;
+  })
   
   // v3.8.2: Draggable Forge Assist floating button
   const [forgeAssistBtnPos, setForgeAssistBtnPos] = useState(() => {
@@ -959,10 +968,10 @@ function App() {
         return;
       }
       
-      // Ctrl+/: Toggle Forge Assist
+      // Ctrl+/: Toggle Forge Assist (desktop only — modal not usable on compact screens)
       if (e.ctrlKey && !e.shiftKey && e.key === '/') {
         e.preventDefault();
-        setIsForgeAssistOpen(prev => !prev);
+        if (!isCompact) setIsForgeAssistOpen(prev => !prev);
         return;
       }
       
@@ -1745,6 +1754,22 @@ function App() {
         <button className="btn btn-danger btn-icon" onClick={handleShutdown} title="Quit Forge">
           <Power size={18} />
         </button>
+        {/* Mobile: toggle Forge Assist floating button visibility */}
+        {isCompact && (
+          <button
+            className={`btn btn-ghost btn-icon ${!showForgeAssistBtn ? 'active' : ''}`}
+            onClick={() => {
+              const next = !showForgeAssistBtn;
+              setShowForgeAssistBtn(next);
+              localStorage.setItem('forge_assist_btn_visible', String(next));
+              if (!next) setIsForgeAssistOpen(false);
+            }}
+            title={showForgeAssistBtn ? 'Hide Forge Assist button' : 'Show Forge Assist button'}
+            style={{ opacity: showForgeAssistBtn ? 1 : 0.45 }}
+          >
+            <Command size={18} />
+          </button>
+        )}
       </div>
 
       {/* Row 4: Shell and terminal controls */}
@@ -1873,24 +1898,35 @@ function App() {
     <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''} ${showEditor ? 'with-editor' : ''}`}>
       {!isCompact && sidebarPosition === 'left' && (<>{sidebar}<div className="sidebar-resizer" onMouseDown={startDrag} /></>)}
       <div className="terminal-pane">
-        <TabBar
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onTabClick={handleTabSwitch}
-          onTabClose={handleTabClose}
-          onTabRename={handleTabRename}
-          onNewTab={handleNewTab}
-          onReorder={reorderTabs}
-          onToggleAutoRespond={toggleTabAutoRespond}
-          onToggleMode={toggleTabMode}
-          onToggleViewMode={toggleTabViewMode}
-          onChangeTheme={changeTabTheme}
-          onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
-          disableNewTab={tabs.length >= MAX_TABS}
-          waitingTabs={waitingTabs}
-          mode={theme}
-          devMode={devMode}
-        />
+        {!isCompact && (
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabClick={handleTabSwitch}
+            onTabClose={handleTabClose}
+            onTabRename={handleTabRename}
+            onNewTab={handleNewTab}
+            onReorder={reorderTabs}
+            onToggleAutoRespond={toggleTabAutoRespond}
+            onToggleMode={toggleTabMode}
+            onToggleViewMode={toggleTabViewMode}
+            onChangeTheme={changeTabTheme}
+            onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
+            disableNewTab={tabs.length >= MAX_TABS}
+            waitingTabs={waitingTabs}
+            mode={theme}
+            devMode={devMode}
+          />
+        )}
+        {isCompact && (
+          <MobileTabStrip
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabSelect={handleTabSwitch}
+            onTabClose={handleTabClose}
+            onNewTab={handleNewTab}
+          />
+        )}
 
         <SearchBar
           isOpen={isSearchOpen}
@@ -2072,6 +2108,38 @@ function App() {
         </>
       )}
 
+      {/* Mobile key bar — Tab, Esc, arrows, Ctrl+C/D, text input */}
+      {isCompact && (
+        <MobileInputBar
+          onSubmit={(text) => {
+            const termRef = getActiveTerminalRef();
+            termRef?.sendCommand(text);
+          }}
+          onSpecialKey={(key) => {
+            const termRef = getActiveTerminalRef();
+            if (!termRef?.sendRaw) return;
+            const sequences = {
+              'Tab':        '\t',
+              'Escape':     '\x1b',
+              'ArrowUp':    '\x1b[A',
+              'ArrowDown':  '\x1b[B',
+              'ArrowRight': '\x1b[C',
+              'ArrowLeft':  '\x1b[D',
+              'Ctrl+c':     '\x03',
+              'Ctrl+d':     '\x04',
+            };
+            if (sequences[key]) {
+              termRef.sendRaw(sequences[key]);
+            } else if (key.startsWith('Ctrl+') && key.length === 6) {
+              // Generic Ctrl+<letter>
+              const char = key[5].toLowerCase();
+              const code = char.charCodeAt(0) - 96;
+              if (code >= 1 && code <= 26) termRef.sendRaw(String.fromCharCode(code));
+            }
+          }}
+        />
+      )}
+
       <CommandModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -2171,10 +2239,9 @@ function App() {
         />
       )}
 
-      {/* Forge Assist - Context-aware command palette (Ctrl+/) */}
-      {/* Forge Assist - Context-aware command palette (Ctrl+/) */}
+      {/* Forge Assist - desktop only; not rendered on mobile/tablet */}
       {/* v3.9.0: Enhanced with Task Mode + SLM Integration */}
-      <ForgeAssist
+      {!isCompact && <ForgeAssist
         isOpen={isForgeAssistOpen}
         onClose={() => {
           setIsForgeAssistOpen(false);
@@ -2196,9 +2263,10 @@ function App() {
         onToast={addToast}
         activeTabId={activeTabId}
         contextFiles={contextFiles}
-      />
+      />}
 
       {/* v3.8.2: Draggable Forge Assist floating button */}
+      {showForgeAssistBtn && (
       <button
         className={`forge-assist-floating-btn ${isDraggingBtn ? 'dragging' : ''}`}
         style={{
@@ -2242,6 +2310,7 @@ function App() {
       >
         {isCompact && isForgeAssistOpen ? <X size={22} /> : <Command size={24} />}
       </button>
+      )}
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (

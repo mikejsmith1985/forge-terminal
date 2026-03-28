@@ -1,13 +1,9 @@
 import { useRef } from 'react'
-import { useMobileDetect } from '../hooks/useMobileDetect'
 import { Plus, X } from 'lucide-react'
 import './MobileTabStrip.css'
 
 export function MobileTabStrip({ tabs, activeTabId, onTabSelect, onTabClose, onNewTab }) {
-  const { isMobile } = useMobileDetect()
   const scrollRef = useRef(null)
-
-  if (!isMobile) return null
 
   return (
     <div className="mobile-tab-strip" ref={scrollRef}>

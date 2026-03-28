@@ -432,6 +432,25 @@ function detectCliPrompt(text, debugLog = false) {
  * @param {string} text - Raw terminal output
  * @returns {string|null} - Extracted directory path or null
  */
+
+/**
+ * Strip shell decorations from an extracted path so only the filesystem
+ * path is kept.  Removes:
+ *   - "&&" (command chaining) and everything that follows
+ *   - Trailing git-status brackets like "[master *%]"
+ *   - Trailing git-status symbols like *, %, ±, ↑, ↓
+ */
+function sanitizePath(path) {
+  if (!path) return path;
+  // Remove && (and everything after) — not valid inside a filesystem path
+  path = path.replace(/\s*&&.*$/, '');
+  // Remove trailing git-status / prompt decoration brackets, e.g. [master *%]
+  path = path.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+  // Remove stray trailing status glyphs
+  path = path.replace(/\s*[*%±↑↓⇡⇣]\s*$/, '').trim();
+  return path.trim();
+}
+
 function extractDirectory(text) {
   // Strip ANSI codes
   const clean = stripAnsi(text);
@@ -448,47 +467,47 @@ function extractDirectory(text) {
     // and handle both "PS >" and "PS ...>" formats
     const psMatch = line.match(/PS\s+([A-Za-z]:\\[^>]*?)>\s*$/i);
     if (psMatch) {
-      return psMatch[1].trim();
+      return sanitizePath(psMatch[1].trim());
     }
     
     // CMD prompt: "C:\Users\foo>" or "C:\Users\foo>command"
     // Relaxed regex: Don't enforce start of line
     const cmdMatch = line.match(/([A-Za-z]:\\[^>]*?)>/);
     if (cmdMatch) {
-      return cmdMatch[1].trim();
+      return sanitizePath(cmdMatch[1].trim());
     }
     
     // Bash/WSL prompt with path: "user@host:~/projects$" or "user@host:/home/user$"
     // Also handles: "user@host:~/projects$ " (with trailing space)
     const bashMatch = line.match(/[@][\w.-]+:([~\/][^\$#]*?)[\$#]\s*$/);
     if (bashMatch) {
-      return bashMatch[1].trim();
+      return sanitizePath(bashMatch[1].trim());
     }
     
     // Simple bash prompt: "~/projects$ " or "/home/user$ "
     const simpleBashMatch = line.match(/^([~\/][^\$#\s]+)[\$#]\s*$/);
     if (simpleBashMatch) {
-      return simpleBashMatch[1].trim();
+      return sanitizePath(simpleBashMatch[1].trim());
     }
     
     // v3.14.8: Additional patterns for more shells
     // Git Bash on Windows: "user@MACHINE MINGW64 ~/projects"
     const gitBashMatch = line.match(/MINGW\d+\s+([~\/][^\$#\s]+)/i);
     if (gitBashMatch) {
-      return gitBashMatch[1].trim();
+      return sanitizePath(gitBashMatch[1].trim());
     }
     
     // Oh My Posh / Starship / Modern prompts that show path before prompt symbol
     // Look for a path-like pattern followed by common prompt indicators (❯, ➜, ›, >)
     const modernPromptMatch = line.match(/([A-Za-z]:[\\\/][^\s❯➜›>]+|[~\/][^\s❯➜›>$#]+)\s*[❯➜›>]\s*$/);
     if (modernPromptMatch) {
-      return modernPromptMatch[1].trim();
+      return sanitizePath(modernPromptMatch[1].trim());
     }
     
     // Zsh with path: " ~/projects ❯ " or similar
     const zshMatch = line.match(/([~\/][\w\-./]+)\s+[❯➜›]\s*$/);
     if (zshMatch) {
-      return zshMatch[1].trim();
+      return sanitizePath(zshMatch[1].trim());
     }
   }
   
@@ -913,6 +932,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         setShowScrollButton(false);
       }
     },
+    sendRaw: (bytes) => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(bytes);
+        return true;
+      }
+      return false;
+    },
     isWaitingForPrompt: () => isWaiting,
   }), [isWaiting]); // Only update when state changes
 
@@ -984,15 +1010,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // data comes in as "9;<path>" (the first 9 is the OSC code, handled by xterm, the rest is payload)
       // Check for the second '9;' which indicates the FT/ConEmu CWD notification
       if (data.startsWith('9;')) {
-        const path = data.substring(2);
+        const rawPath = data.substring(2);
         // Only trigger update if we have a valid path
-        if (path && path.trim().length > 0) {
+        if (rawPath && rawPath.trim().length > 0) {
+          const path = sanitizePath(rawPath.trim());
           // Normalize backslashes to forward slashes for consistency
           const normalizedPath = path.replace(/\\/g, '/');
           
           // Extract folder name
           const parts = normalizedPath.split('/').filter(Boolean);
           let folderName = parts.length > 0 ? parts[parts.length - 1] : 'Terminal';
+          // Sanitize the folder name too (catches any residual decorations)
+          folderName = sanitizePath(folderName);
 
           // Guard: if the last segment looks like a filename (has a recognisable
           // script/file extension, optionally followed by spaces and extra chars),

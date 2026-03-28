@@ -77,6 +77,7 @@ func (m *Manager) Start(localPort int, onURL func(url string)) error {
 		fmt.Sprintf("http://localhost:%d", localPort), "--no-autoupdate")
 	cmd.Stdout = pw
 	cmd.Stderr = pw
+	hideWindow(cmd)
 
 	if err := cmd.Start(); err != nil {
 		cancel()

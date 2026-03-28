@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useMobileDetect } from '../hooks/useMobileDetect'
+import '../styles/mobile-input.css'
 
 const SPECIAL_KEYS = [
   { label: 'Tab', key: 'Tab' },
@@ -14,12 +14,9 @@ const SPECIAL_KEYS = [
 ]
 
 export function MobileInputBar({ onSubmit, onSpecialKey }) {
-  const { isMobile, isDesktop } = useMobileDetect()
   const [input, setInput] = useState('')
   const [ctrlActive, setCtrlActive] = useState(false)
   const inputRef = useRef(null)
-
-  if (isDesktop && !isMobile) return null
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
