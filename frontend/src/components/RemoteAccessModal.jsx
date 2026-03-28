@@ -191,20 +191,25 @@ export default function RemoteAccessModal({ isOpen, onClose }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* QR code */}
               {status.qrCodeBase64 && (
-                <div
-                  style={{
-                    background: '#fff',
-                    borderRadius: 10,
-                    padding: 12,
-                    display: 'flex',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <img
-                    src={`data:image/png;base64,${status.qrCodeBase64}`}
-                    alt="Scan to connect"
-                    style={{ width: 260, height: 260, borderRadius: 8, display: 'block', margin: '0 auto' }}
-                  />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div
+                    style={{
+                      background: '#fff',
+                      borderRadius: 10,
+                      padding: 12,
+                      display: 'flex',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      src={`data:image/png;base64,${status.qrCodeBase64}`}
+                      alt="Scan to connect"
+                      style={{ width: 260, height: 260, borderRadius: 8, display: 'block', margin: '0 auto' }}
+                    />
+                  </div>
+                  <p style={{ margin: 0, fontSize: 11, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+                    ⚠️ This URL changes every session — scan fresh each time. Don't save it as a bookmark.
+                  </p>
                 </div>
               )}
 
