@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen, QrCode } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
@@ -9,6 +9,7 @@ import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
+import RemoteAccessModal from './components/RemoteAccessModal'
 import UpdateModal from './components/UpdateModal'
 import DeveloperDashboard from './components/DeveloperDashboard'
 // WelcomeModal REMOVED - replaced by guided tour (user request: 20+ times)
@@ -70,6 +71,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
+  const [isRemoteAccessOpen, setIsRemoteAccessOpen] = useState(false)
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
   // WelcomeModal state REMOVED - replaced by guided tour
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
@@ -1766,6 +1768,13 @@ function App() {
           </button>
         </div>
         {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={() => setIsRemoteAccessOpen(true)}
+          title="Remote Access"
+        >
+          <QrCode size={18} />
+        </button>
         <button 
           className="btn btn-ghost btn-icon" 
           onClick={() => setIsSettingsModalOpen(true)} 
@@ -2053,6 +2062,11 @@ function App() {
         isOpen={isDeveloperDashboardOpen}
         onClose={() => setIsDeveloperDashboardOpen(false)}
         devMode={devMode}
+      />
+
+      <RemoteAccessModal
+        isOpen={isRemoteAccessOpen}
+        onClose={() => setIsRemoteAccessOpen(false)}
       />
 
       <SettingsModal

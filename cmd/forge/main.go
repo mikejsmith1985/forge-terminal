@@ -317,6 +317,11 @@ func main() {
 	http.HandleFunc("/api/tunnel/start", WrapWithMiddleware(handleTunnelStart))
 	http.HandleFunc("/api/tunnel/stop", WrapWithMiddleware(handleTunnelStop))
 
+	// Hosted mode API — in-app remote access launch
+	http.HandleFunc("/api/hosted/status", WrapWithMiddleware(handleHostedStatus))
+	http.HandleFunc("/api/hosted/start", WrapWithMiddleware(handleHostedStart))
+	http.HandleFunc("/api/hosted/stop", WrapWithMiddleware(handleHostedStop))
+
 	// Atlassian / MCP integration
 	http.HandleFunc("/api/atlassian/status", WrapWithMiddleware(handleAtlassianStatus))
 	http.HandleFunc("/api/atlassian/setup", WrapWithMiddleware(handleAtlassianSetup))

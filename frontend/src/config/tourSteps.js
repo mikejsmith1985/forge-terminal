@@ -51,7 +51,7 @@ const TOUR_STEPS = [
     id: 'setup-hosted-flag',
     selector: null,
     title: 'Starting Hosted Mode',
-    content: '**Launch with one flag:**\n\nforge --hosted\n\nThis does four things automatically:\n\n1. Binds to all network interfaces (0.0.0.0)\n2. Generates a secure auth token\n3. Starts a Cloudflare tunnel for internet access\n4. Prints a QR code you can scan',
+    content: '**The easiest way** is to click the QR code button (📶) in the sidebar — right next to the Settings gear. It opens the Remote Access panel where you can start the tunnel and scan the QR code without leaving the app.\n\nAlternatively, launch Forge from your OS terminal with:\n```\nforge --hosted\n```\nThis auto-starts the tunnel on launch and prints the QR code to the console.',
     placement: 'center',
     spotlight: false,
   },
@@ -59,8 +59,8 @@ const TOUR_STEPS = [
   {
     id: 'qr-pairing',
     selector: null,
-    title: 'QR Code Pairing \ud83d\udcf7',
-    content: 'When hosted mode starts, a **QR code** appears in your terminal. Point your phone\'s camera at it \u2014 the URL includes your auth token, so you\'re instantly authenticated. No typing passwords on a tiny keyboard!',
+    title: 'Getting the QR Code \ud83d\udcf7',
+    content: 'After running `forge --hosted`, look at **the console window where you launched Forge** (not this browser window). You\'ll see:\n\n```\n🔥 Forge Terminal starting at http://0.0.0.0:3000\n🌐 Tunnel URL: https://abc123.trycloudflare.com\n\n█▀▀▀█ ▀ █▀▀▀█\n█ ▄ █ ▀ █ ▄ █   ← QR code here\n...\n\n📱 Scan to connect: https://abc123.trycloudflare.com?token=...\n```\n\nPoint your phone camera at the QR code — the URL bakes in your auth token so you\'re **instantly signed in**. No passwords to type on a tiny keyboard!',
     placement: 'center',
     spotlight: false,
   },
@@ -259,6 +259,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '4.0.1'; // v4.0.0: Complete rewrite - Hosted Mode tour
+const TOUR_VERSION = '4.1.0'; // v4.0.2: Clarified QR code steps; added in-app Remote Access button
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
