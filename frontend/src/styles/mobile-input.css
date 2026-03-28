@@ -1,0 +1,76 @@
+.mobile-input-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary, #1e1e1e);
+  border-top: 1px solid var(--border-color, #333);
+  z-index: 900;
+  padding: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-special-keys {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.mobile-special-keys::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-special-key {
+  flex-shrink: 0;
+  min-width: 44px;
+  height: 36px;
+  border: 1px solid var(--border-color, #555);
+  border-radius: 4px;
+  background: var(--bg-tertiary, #2d2d2d);
+  color: var(--text-primary, #ccc);
+  font-size: 13px;
+  font-family: monospace;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-special-key:active {
+  background: var(--accent-color, #ff6b00);
+  color: white;
+}
+
+.mobile-special-key.active {
+  background: var(--accent-color, #ff6b00);
+  color: white;
+  border-color: var(--accent-color, #ff6b00);
+}
+
+.mobile-input-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.mobile-command-input {
+  flex: 1;
+  height: 44px;
+  border: 1px solid var(--border-color, #555);
+  border-radius: 4px;
+  background: var(--bg-primary, #111);
+  color: var(--text-primary, #fff);
+  font-size: 16px; /* Prevents iOS zoom on focus */
+  font-family: monospace;
+  padding: 0 12px;
+  outline: none;
+}
+
+.mobile-command-input:focus {
+  border-color: var(--accent-color, #ff6b00);
+}

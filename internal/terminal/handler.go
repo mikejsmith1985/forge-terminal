@@ -173,16 +173,17 @@ type Handler struct {
 // The PTY process continues running; output accumulates in the OS pipe buffer.
 // A reconnecting client can reattach within the grace period to resume I/O.
 type DetachedSession struct {
-	session    *TerminalSession
-	graceTimer *time.Timer
-	detachedAt time.Time
+	session     *TerminalSession
+	graceTimer  *time.Timer
+	detachedAt  time.Time
+	gracePeriod time.Duration
 }
 
 const sessionGracePeriod = 5 * time.Minute // How long a detached PTY stays alive
 
 // detachSession keeps a PTY alive after its WebSocket disconnects.
 // If the PTY process has already exited, the session is closed immediately.
-func (h *Handler) detachSession(sessionID string, session *TerminalSession) {
+func (h *Handler) detachSession(sessionID string, session *TerminalSession, gracePeriod time.Duration) {
 	// Don't detach if PTY is already dead — nothing to reconnect to
 	if session.IsDone() || session.IsClosed() {
 		log.Printf("[Terminal] Session %s: PTY already exited, closing (not detaching)", sessionID)
@@ -191,19 +192,20 @@ func (h *Handler) detachSession(sessionID string, session *TerminalSession) {
 	}
 
 	ds := &DetachedSession{
-		session:    session,
-		detachedAt: time.Now(),
+		session:     session,
+		detachedAt:  time.Now(),
+		gracePeriod: gracePeriod,
 	}
 
-	ds.graceTimer = time.AfterFunc(sessionGracePeriod, func() {
+	ds.graceTimer = time.AfterFunc(gracePeriod, func() {
 		log.Printf("[Terminal] Session %s: grace period expired after %v, closing PTY",
-			sessionID, sessionGracePeriod)
+			sessionID, gracePeriod)
 		h.detachedSessions.Delete(sessionID)
 		session.Close()
 	})
 
 	h.detachedSessions.Store(sessionID, ds)
-	log.Printf("[Terminal] Session %s detached — PTY kept alive (grace: %v)", sessionID, sessionGracePeriod)
+	log.Printf("[Terminal] Session %s detached — PTY kept alive (grace: %v)", sessionID, gracePeriod)
 }
 
 // reattachSession retrieves a detached PTY session for reconnection.
@@ -554,13 +556,16 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	h.sessions.Store(sessionID, session)
 
+	// Compute grace period before the defer closure captures it
+	gracePeriod := GracePeriodForClient(r.Header.Get("User-Agent"))
+
 	defer func() {
 		// RACE CONDITION FIX: Only delete if the map still holds THIS session
 		// This prevents deleting a NEW session if a reconnection happened quickly
 		h.sessions.CompareAndDelete(sessionID, session)
 		// Keep PTY alive for reconnection instead of killing it immediately.
 		// detachSession checks IsDone()/IsClosed() and closes immediately if PTY is dead.
-		h.detachSession(sessionID, session)
+		h.detachSession(sessionID, session, gracePeriod)
 	}()
 
 	// Flag: set to false when PTY exits or session is intentionally ended.
