@@ -992,8 +992,21 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           
           // Extract folder name
           const parts = normalizedPath.split('/').filter(Boolean);
-          const folderName = parts.length > 0 ? parts[parts.length - 1] : 'Terminal';
-          
+          let folderName = parts.length > 0 ? parts[parts.length - 1] : 'Terminal';
+
+          // Guard: if the last segment looks like a filename (has a recognisable
+          // script/file extension, optionally followed by spaces and extra chars),
+          // the shell sent a process/script name rather than a real CWD.
+          // Fall back to the parent segment so the tab shows the directory instead.
+          const looksLikeFile = /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(folderName);
+          if (looksLikeFile) {
+            if (parts.length > 1) {
+              folderName = parts[parts.length - 2];
+            } else {
+              return true; // nothing useful to extract, ignore
+            }
+          }
+
           if (onDirectoryChange) {
              onDirectoryChange(folderName, path);
           }

@@ -240,7 +240,14 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
                title === '~' ||
                !title)) {
             const dirParts = tabState.currentDirectory.replace(/\\/g, '/').split('/').filter(Boolean);
-            const folderName = dirParts[dirParts.length - 1];
+            let folderName = dirParts[dirParts.length - 1];
+            // Guard against saved paths ending in a filename (e.g. "build.ps1 2")
+            const looksLikeFile = /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(folderName);
+            if (looksLikeFile && dirParts.length > 1) {
+              folderName = dirParts[dirParts.length - 2];
+            } else if (looksLikeFile) {
+              folderName = '';
+            }
             if (folderName && folderName !== '~') {
               title = folderName;
               logger.session('Derived tab title from directory', { 
