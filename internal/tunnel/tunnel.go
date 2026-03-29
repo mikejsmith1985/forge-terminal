@@ -202,28 +202,45 @@ func (m *Manager) startCloudflared(cfg StartConfig, onURL func(url string)) erro
 }
 
 // startTailscale handles ModeTailscale.
-// Calls "tailscale funnel <port>" to enable the funnel (managed by Tailscale
-// daemon — no long-running subprocess needed), then reads the stable device
-// URL from "tailscale status --json". Must be called with m.mu held.
+// Calls "tailscale funnel --bg <port>" to enable the funnel (a stateful
+// config change managed by the Tailscale daemon — exits quickly), then reads
+// the stable device URL from "tailscale status --json".
+// Must be called with m.mu held.
 func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error {
 	bin := ResolveTailscalePath()
 	if bin == "" {
 		return fmt.Errorf("tailscale not found — install Tailscale from https://tailscale.com/download")
 	}
 
-	// Enable funnel for the given port.
-	funnelCmd := exec.Command(bin, "funnel", strconv.Itoa(cfg.LocalPort))
-	hideWindow(funnelCmd)
-	if out, err := funnelCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("tailscale funnel failed: %w\n%s", err, strings.TrimSpace(string(out)))
+	portStr := strconv.Itoa(cfg.LocalPort)
+
+	// "tailscale funnel --bg <port>" enables funnel for the port and exits.
+	// The --bg flag was added in Tailscale v1.56; fall back to without it on error.
+	funnelOut, funnelErr := func() ([]byte, error) {
+		cmd := exec.Command(bin, "funnel", "--bg", portStr)
+		hideWindow(cmd)
+		return cmd.CombinedOutput()
+	}()
+	if funnelErr != nil {
+		// Fallback: older Tailscale CLI without --bg
+		cmd := exec.Command(bin, "funnel", portStr)
+		hideWindow(cmd)
+		funnelOut, funnelErr = cmd.CombinedOutput()
+	}
+	if funnelErr != nil {
+		msg := strings.TrimSpace(string(funnelOut))
+		if strings.Contains(msg, "HTTPS") || strings.Contains(msg, "https") {
+			return fmt.Errorf("tailscale funnel requires HTTPS certificates — enable HTTPS in your Tailscale admin console at https://login.tailscale.com/admin/dns then try again")
+		}
+		return fmt.Errorf("tailscale funnel failed: %s", msg)
 	}
 
-	// Retrieve the device's stable Tailscale hostname.
+	// Retrieve the device's stable Tailscale hostname from status.
 	statusCmd := exec.Command(bin, "status", "--json")
 	hideWindow(statusCmd)
 	statusOut, err := statusCmd.Output()
 	if err != nil {
-		exec.Command(bin, "funnel", "reset").Run() //nolint:errcheck
+		exec.Command(bin, "funnel", "--reset").Run() //nolint:errcheck
 		return fmt.Errorf("tailscale status failed: %w", err)
 	}
 
@@ -233,8 +250,8 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 		} `json:"Self"`
 	}
 	if err := json.Unmarshal(statusOut, &tsStatus); err != nil || tsStatus.Self.DNSName == "" {
-		exec.Command(bin, "funnel", "reset").Run() //nolint:errcheck
-		return fmt.Errorf("could not read Tailscale device URL — is tailscale signed in?")
+		exec.Command(bin, "funnel", "--reset").Run() //nolint:errcheck
+		return fmt.Errorf("could not read Tailscale device URL — is Tailscale signed in?")
 	}
 
 	tunnelURL := "https://" + strings.TrimSuffix(tsStatus.Self.DNSName, ".")
@@ -242,7 +259,10 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 	m.cmd = nil
 	m.cancel = nil
 	m.stopFn = func() {
-		exec.Command(bin, "funnel", "reset").Run() //nolint:errcheck
+		// Try both reset flag styles for compatibility
+		if err := exec.Command(bin, "funnel", "--reset").Run(); err != nil {
+			exec.Command(bin, "funnel", "reset").Run() //nolint:errcheck
+		}
 	}
 	m.url = tunnelURL
 	m.running = true
