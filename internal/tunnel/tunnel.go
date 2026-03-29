@@ -258,7 +258,7 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 	funnelCtx, funnelCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer funnelCancel()
 
-	funnelCmd := exec.CommandContext(funnelCtx, bin, "funnel", portStr)
+	funnelCmd := exec.CommandContext(funnelCtx, bin, "funnel", "--bg", portStr)
 	hideWindow(funnelCmd)
 	funnelOut, funnelErr := funnelCmd.CombinedOutput()
 
