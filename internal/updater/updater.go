@@ -16,7 +16,7 @@ import (
 )
 
 // Version is set at build time via ldflags
-var Version = "4.4.3"
+var Version = "4.4.4"
 
 // GitHub repo info
 const (
@@ -302,25 +302,24 @@ func ApplyUpdate(newBinaryPath string) error {
 		return err
 	}
 
-	// On Windows, we can't replace a running binary directly
-	// We need to rename it first, then copy the new one
+	// On Windows, we can't replace a running binary directly.
+	// Rename current → unique temp backup, then copy new binary in.
+	// Using a unique path avoids "Access is denied" failures when a previous
+	// fterm.exe.old is still locked by Windows Defender or a prior process.
 	if runtime.GOOS == "windows" {
-		oldPath := currentPath + ".old"
-		// Remove old backup if exists
-		os.Remove(oldPath)
-		// Rename current to .old
-		if err := os.Rename(currentPath, oldPath); err != nil {
+		backupPath := filepath.Join(os.TempDir(), fmt.Sprintf("fterm-backup-%d.exe", time.Now().UnixMilli()))
+		if err := os.Rename(currentPath, backupPath); err != nil {
 			return fmt.Errorf("failed to backup current binary: %w", err)
 		}
 		// Copy new binary to current path
 		if err := copyFile(newBinaryPath, currentPath); err != nil {
 			// Restore backup
-			os.Rename(oldPath, currentPath)
+			os.Rename(backupPath, currentPath) //nolint:errcheck
 			return fmt.Errorf("failed to install new binary: %w", err)
 		}
-		// Clean up
-		os.Remove(newBinaryPath)
-		// Note: .old file will be cleaned up on next update
+		// Clean up temp files; ignore errors (OS will clean them up eventually)
+		os.Remove(newBinaryPath) //nolint:errcheck
+		os.Remove(backupPath)    //nolint:errcheck
 	} else {
 		// On Unix, we can do atomic replace
 		if err := os.Rename(newBinaryPath, currentPath); err != nil {
