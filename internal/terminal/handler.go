@@ -369,8 +369,8 @@ func NewHandlerDirect(amSys interface{}, visionP *vision.Parser, llmDet *llm.Det
 				// Allow any origin for backward compatibility (can be restricted via ALLOWED_ORIGINS env var)
 				return true
 			},
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
+			ReadBufferSize:  16384,
+			WriteBufferSize: 16384,
 		},
 		visionParser: visionP,
 		llmDetector:  llmDet,
@@ -492,6 +492,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rawConn.Close()
+
+	// Allow large messages (up to 1MB) — mobile sends long prompts as single frames
+	rawConn.SetReadLimit(1024 * 1024)
 
 	// Wrap connection for thread-safe writes
 	// gorilla/websocket is NOT thread-safe for concurrent writes

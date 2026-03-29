@@ -108,7 +108,7 @@ const TOUR_STEPS = [
     id: 'mobile-input',
     selector: null,
     title: 'Typing on Mobile \u2014 Solved',
-    content: 'Terminal input on phones is notoriously hard. Forge solves this with a **hybrid input system**:\n\n\u2022 A floating text input bar sits above the keyboard\n\u2022 A **special key toolbar** provides: Tab, Esc, Ctrl, arrow keys, Ctrl+C, Ctrl+D\n\u2022 Ctrl acts as a toggle \u2014 tap it, then tap a letter for Ctrl+combos\n\u2022 The virtual keyboard\'s autocorrect is disabled to prevent mangling commands',
+    content: 'Terminal input on phones is notoriously hard. Forge solves this with a **hybrid input system**:\n\n\u2022 A floating text input bar sits above the keyboard\n\u2022 A **special key toolbar** provides: Tab, Esc, Ctrl, arrow keys, Ctrl+C, Ctrl+D\n\u2022 Ctrl acts as a toggle \u2014 tap it, then tap a letter for Ctrl+combos\n\u2022 Tap ▴ to expand input for **long multi-line prompts** (Shift+Enter for newlines)\n\u2022 Tap 📷 to **upload images/files** directly from your phone\n\u2022 The virtual keyboard\'s autocorrect is disabled to prevent mangling commands',
     placement: 'center',
     spotlight: false,
   },
@@ -117,8 +117,8 @@ const TOUR_STEPS = [
     id: 'mobile-tabs',
     selector: '.tab-bar',
     fallbackSelector: '.tabs-container',
-    title: 'Tabs on Mobile',
-    content: 'On your phone, tabs appear as a **horizontal scroll strip** with scroll-snap. Swipe left/right to find your tab, tap to switch, tap X to close. A + button at the end creates new tabs.\n\nOn desktop, you see the regular tab bar \u2014 the mobile strip only appears on small screens.',
+    title: 'Tabs \u2014 Desktop & Mobile',
+    content: '**On desktop:**\n\u2022 **Ctrl+T** new tab \u2022 **Ctrl+W** close \u2022 **Ctrl+Tab** cycle \u2022 **Ctrl+1-9** jump\n\u2022 **Right-click** any tab for per-tab light/dark mode and color themes\n\u2022 **Double-click** to rename \u2022 **Drag** to reorder\n\u2022 Up to 20 tabs, each with its own shell session\n\n**On mobile:**\n\u2022 Horizontal scroll strip with scroll-snap\n\u2022 Swipe to find, tap to switch, tap X to close\n\u2022 + button creates new tabs\n\nTabs auto-rename to match your working directory.',
     placement: 'center',
     spotlight: true,
     arrow: 'up',
@@ -259,6 +259,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '4.2.0'; // v4.0.2: Clarified QR code steps; added in-app Remote Access button
+const TOUR_VERSION = '4.3.0'; // v4.3.0: Updated tabs/input tour steps with desktop features, multiline, image upload
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };

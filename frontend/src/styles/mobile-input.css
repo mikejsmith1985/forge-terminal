@@ -76,7 +76,9 @@
 }
 
 .mobile-paste-btn,
-.mobile-send-btn {
+.mobile-send-btn,
+.mobile-expand-btn,
+.mobile-image-btn {
   flex-shrink: 0;
   width: 44px;
   height: 44px;
@@ -92,13 +94,38 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-paste-btn:active {
+.mobile-paste-btn:active,
+.mobile-expand-btn:active,
+.mobile-image-btn:active {
   background: var(--bg-secondary, #1e1e1e);
 }
 
 .mobile-paste-btn.error {
   border-color: #f59e0b;
   color: #f59e0b;
+}
+
+.mobile-expand-btn {
+  width: 32px;
+  font-size: 14px;
+}
+
+.mobile-image-btn {
+  font-size: 16px;
+}
+
+.mobile-image-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mobile-command-textarea {
+  height: auto !important;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 10px 12px;
+  resize: none;
+  line-height: 1.4;
 }
 
 .mobile-send-btn {

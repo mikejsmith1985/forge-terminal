@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { getTerminalTheme } from '../themes';
@@ -748,25 +749,42 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Send the command and Enter key separately with a small delay.
         // This ensures proper execution in both regular shells and TUI applications.
-        // In TUI contexts (Claude CLI, Copilot CLI), the TUI needs time to process
-        // the pasted text before receiving the Enter key.
 
-        // Use provided delay or default to 15ms
-        // If delay is explicitly 0, we still use it (fast execution)
         const executionDelay = (delay !== undefined && delay !== null) ? parseInt(delay, 10) : 15;
 
-        // First, send the command text
-        wsRef.current.send(command);
+        // For large inputs (>8KB), chunk to avoid WebSocket frame issues
+        const CHUNK_SIZE = 8192;
+        if (command.length > CHUNK_SIZE) {
+          let offset = 0;
+          const sendChunk = () => {
+            if (offset >= command.length) {
+              // All chunks sent — send Enter
+              setTimeout(() => {
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  wsRef.current.send('\r');
+                }
+              }, executionDelay);
+              return;
+            }
+            const chunk = command.slice(offset, offset + CHUNK_SIZE);
+            offset += CHUNK_SIZE;
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(chunk);
+            }
+            // Small delay between chunks to let PTY process
+            setTimeout(sendChunk, 5);
+          };
+          sendChunk();
+        } else {
+          wsRef.current.send(command);
+          setTimeout(() => {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send('\r');
+            }
+          }, executionDelay);
+        }
 
-        // Then send Enter key after a small delay to allow text processing
-        // 15ms is enough for xterm.js and PTY to process the text before Enter
-        setTimeout(() => {
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send('\r');
-          }
-        }, executionDelay);
-
-        // Always log commands to AM for crash recovery
+        // Log command for crash recovery
         if (command) {
           fetch('/api/am/log', {
             method: 'POST',
@@ -776,7 +794,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               tabName: tabNameRef.current || 'Terminal',
               workspace: window.location.pathname,
               entryType: 'COMMAND_EXECUTED',
-              content: command,
+              content: command.length > 500 ? command.substring(0, 500) + '...' : command,
             }),
           }).catch(err => console.warn('[AM] Failed to log command:', err));
         }
@@ -936,11 +954,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     const term = new Terminal({
       cursorBlink: true,
       fontSize: fontSize,
-      fontFamily: '"Cascadia Code", "Fira Code", Consolas, Monaco, monospace',
+      fontFamily: '"Cascadia Code", "Fira Code", Consolas, Monaco, "Courier New", monospace',
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
       clipboardMode: 'off', // We handle paste exclusively in handlePaste for full control (image/video support)
+      lineHeight: 1.0,
+      letterSpacing: 0,
+      minimumContrastRatio: 1, // Don't auto-adjust colors — respect theme
     });
 
     // Register OSC handler for directory updates (OSC 9;9;<path>)
@@ -1002,6 +1023,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     queueMicrotask(() => {
       term.focus();
     });
+
+    // Unicode 11 support — required for box-drawing characters (├ ─ ┤ etc.)
+    // used by TUI apps like Copilot CLI, gh dash, lazygit, etc.
+    const unicode11Addon = new Unicode11Addon();
+    term.loadAddon(unicode11Addon);
+    term.unicode.activeVersion = '11';
 
     // URL link provider — clicking an http(s) URL opens it in a new browser tab.
     // Single-click (no modifier required) matches Forge's file-link UX.
