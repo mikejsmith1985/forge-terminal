@@ -573,6 +573,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			session = live
 			isWatcher = true
 			log.Printf("[Terminal] Session %s: client joining live session (hub size now %d)", sessionID, hub.size())
+			// Replay recent PTY output so the watcher sees terminal history
+			// instead of a blank screen.
+			hub.replayTo(conn, websocket.BinaryMessage)
 			_ = conn.WriteJSON(map[string]interface{}{
 				"type":      "SESSION_JOINED",
 				"sessionId": sessionID,
@@ -966,6 +969,13 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			if msgType == websocket.TextMessage {
 				var msg ResizeMessage
 				if err := json.Unmarshal(data, &msg); err == nil && msg.Type == "resize" {
+					// Watchers must NOT resize — only the owner controls PTY dimensions.
+					// Without this, a mobile viewer's small screen (e.g. 40 cols) would
+					// resize the shared PTY and break word-wrapping on the desktop.
+					if isWatcher {
+						log.Printf("[Terminal] Ignoring resize from watcher (%dx%d)", msg.Cols, msg.Rows)
+						continue
+					}
 					// Validate dimensions to prevent nonsensical PTY sizes
 					if msg.Cols < 10 || msg.Cols > 500 || msg.Rows < 2 || msg.Rows > 200 {
 						log.Printf("[Terminal] Ignoring invalid resize %dx%d", msg.Cols, msg.Rows)
@@ -979,9 +989,17 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				// Watchers only handle resize; all other control messages are owner-only.
+				// Watchers skip all JSON control messages (vision, smart routing, chat, etc.)
+				// but non-JSON text (raw terminal input from command cards) falls through to
+				// the PTY write below — this allows remote viewers to type and run commands.
 				if isWatcher {
-					continue
+					// If it parsed as JSON at all, it's a control message — drop it.
+					var probe json.RawMessage
+					if json.Unmarshal(data, &probe) == nil {
+						continue
+					}
+					// Not JSON → raw terminal input (e.g. command card text).
+					// Fall through to PTY write at the bottom of the loop.
 				}
 				var visionMsg VisionControlMessage
 				if err := json.Unmarshal(data, &visionMsg); err == nil {
