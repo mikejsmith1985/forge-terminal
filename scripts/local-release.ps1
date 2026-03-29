@@ -226,8 +226,9 @@ $RELEASE_NOTES = if ($lines.Count -gt 0) { $lines -join "`n" } else { "Release $
 Write-Banner "Publishing GitHub Release"
 
 # Delete stale GitHub release if it already exists (idempotent re-runs)
-$existingRelease = gh release view $TAG --json tagName --jq '.tagName' 2>$null
-if ($existingRelease) {
+$existingRelease = $null
+try { $existingRelease = gh release view $TAG --json tagName --jq '.tagName' 2>$null } catch {}
+if ($LASTEXITCODE -eq 0 -and $existingRelease) {
     Write-Warn "GitHub release $TAG already exists — deleting stale release"
     gh release delete $TAG --yes 2>$null
     if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to delete stale GitHub release $TAG" }
