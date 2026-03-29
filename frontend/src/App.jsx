@@ -159,7 +159,6 @@ function App() {
   // File access permission state
   const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false)
   const [fileAccessModeReady, setFileAccessModeReady] = useState(false)
-  const [remotePromptId, setRemotePromptId] = useState(null) // polling ID for remote response
   
   // Forge Assist state
   const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
@@ -213,8 +212,6 @@ function App() {
     updateTabTitle,
     updateTabShellConfig,
     updateTabColorTheme,
-    // v3.18: toggleTabAutoRespond removed — auto-respond feature removed from frontend
-    // toggleTabAM, // v3.12.12: AM feature removed
     toggleTabMode,
     changeTabTheme,
     updateTabModified,
@@ -793,28 +790,6 @@ function App() {
     const modeSet = localStorage.getItem('fileAccessModeSet');
     if (modeSet !== 'true') {
       setShowFileAccessPrompt(true);
-      // Try to create a remote-response prompt so the user can reply from their phone
-      fetch('/api/notify/config')
-        .then(r => r.json())
-        .then(cfg => {
-          if (cfg.webhookURL && cfg.webhookSecret) {
-            fetch('/api/notify/prompt', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                kind: 'file-access',
-                message: '🔐 Forge Terminal: File Access Permission required. Choose an access mode:',
-                options: ['restricted', 'unrestricted'],
-                labels: ['Project-Scoped (Recommended)', 'Full System Access'],
-              }),
-            })
-              .then(r => r.json())
-              .then(data => {
-                if (data.promptId) setRemotePromptId(data.promptId);
-              })
-              .catch(() => {});
-          }
-        }).catch(() => {});
       return false;
     }
     return true;
@@ -823,32 +798,11 @@ function App() {
   const handleFileAccessChoice = (mode) => {
     setShowFileAccessPrompt(false);
     setFileAccessModeReady(true);
-    setRemotePromptId(null);
     console.log('[App] File access mode set to:', mode);
     
     // Now that permission is set, show the files view
     setSidebarView('files');
   };
-
-  // Poll for remote response when a prompt is pending
-  useEffect(() => {
-    if (!remotePromptId) return;
-    const interval = setInterval(() => {
-      fetch(`/api/notify/pending?id=${remotePromptId}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.resolved) {
-            clearInterval(interval);
-            handleFileAccessChoice(data.choice);
-          } else if (data.expired) {
-            clearInterval(interval);
-            setRemotePromptId(null);
-          }
-        })
-        .catch(() => {});
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [remotePromptId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleShellToggle = () => {
     // Cycle through available shells
@@ -2201,7 +2155,6 @@ function App() {
       <FileAccessPrompt
         isOpen={showFileAccessPrompt}
         onChoice={handleFileAccessChoice}
-        remoteResponsePending={!!remotePromptId}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />

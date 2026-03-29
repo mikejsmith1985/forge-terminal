@@ -32,7 +32,6 @@ tools = ["compiler-expert", "vision-debugger"]
 description = "State-of-the-art model for deep debugging, visual analysis, and creative code generation."
 
 [features]
-auto_respond = true
 vision_enabled = true
 context_injection = true
 

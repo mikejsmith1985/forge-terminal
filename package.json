@@ -1,17 +1,10 @@
 {
-  "dependencies": {
-    "chromedriver": "^144.0.0",
-    "recast": "^0.23.11",
-    "selenium-webdriver": "^4.40.0",
-    "sharp": "^0.34.5",
-    "ws": "^8.18.3"
-  },
+  "dependencies": {},
   "devDependencies": {
     "cypress": "^15.8.1",
     "cypress-real-events": "^1.15.0",
     "js-yaml": "^4.1.1",
-    "png-to-ico": "^3.0.1",
-    "puppeteer": "^24.34.0",
+    "recast": "^0.23.11",
     "to-ico": "^1.1.5"
   },
   "version": "3.18.11"

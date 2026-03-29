@@ -303,18 +303,6 @@ type VisionOverlayMessage struct {
 	Payload     map[string]interface{} `json:"payload"`
 }
 
-// AMControlMessage represents AM control commands from client.
-type AMControlMessage struct {
-	Type        string `json:"type"` // "AM_AUTO_RESPOND"
-	AutoRespond bool   `json:"autoRespond"`
-}
-
-// AutoRespondControlMessage represents standalone auto-respond control.
-type AutoRespondControlMessage struct {
-	Type    string `json:"type"` // "AUTO_RESPOND_TOGGLE"
-	Enabled bool   `json:"enabled"`
-}
-
 // ChatCommandMessage represents a Chat UI command to inject into PTY.
 // v3.5.3: Enables Chat view to use the same PTY session as Terminal view.
 type ChatCommandMessage struct {
@@ -618,13 +606,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Terminal] Initial size: %dx%d (from %s)", initialCols, initialRows, sizeSource)
 	}
 
-	// ── Owner-only state: prompt detection, auto-respond, vision insights ──
+	// ── Owner-only state: prompt detection, vision insights ──
 	// Watchers share the PTY output via the hub; they don't need separate state machines.
 	var visionParser *vision.Parser
 	var promptDetector *PromptDetector
 	var chatResponsePending atomic.Bool
-	var autoRespondDetector *AutoRespondDetector
-	var autoRespondEnabled atomic.Bool
 	var insightsTracker *vision.InsightsTracker
 	var executiveTrigger *ExecutiveTriggerHandler
 	var lineBuffer *LineBuffer
@@ -668,35 +654,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				"timestamp": time.Now().UnixMilli(),
 			})
 		})
-
-		// PRECISION AUTO-RESPONDER v2.0 (independent of AM)
-		ptyWriter := func(data []byte) error {
-			_, err := session.Write(data)
-			return err
-		}
-		autoRespondDetector = NewAutoRespondDetectorWithPromptDetector("github-copilot", ptyWriter, promptDetector)
-		autoRespondDetector.SetCallbacks(
-			func() {
-				if autoRespondEnabled.Load() {
-					log.Printf("[AutoRespond] Detected: Waiting for user input")
-					_ = conn.WriteJSON(map[string]interface{}{
-						"type":      "AUTO_RESPOND_STATE",
-						"state":     "waiting_for_user",
-						"timestamp": time.Now(),
-					})
-				}
-			},
-			func() {
-				if autoRespondEnabled.Load() {
-					log.Printf("[AutoRespond] Detected: Assistant responding")
-					_ = conn.WriteJSON(map[string]interface{}{
-						"type":      "AUTO_RESPOND_STATE",
-						"state":     "assistant_responding",
-						"timestamp": time.Now(),
-					})
-				}
-			},
-		)
 
 		// Launch async initialization for vision insights only
 		go func() {
@@ -785,21 +742,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 
-		// AUTO-RESPOND: Periodic check for state changes
-		go func() {
-			ticker := time.NewTicker(500 * time.Millisecond)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-					if autoRespondDetector.Check() {
-						log.Printf("[AutoRespond] State check: Waiting for user input detected")
-					}
-				case <-done:
-					return
-				}
-			}
-		}()
 	}
 
 	// PTY -> WebSocket (owner only).
@@ -889,9 +831,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					log.Printf("[FREEZE-STATS] Messages: %d, AvgWrite: %v, MaxWrite: %v", messageCount, avgWrite, maxWriteTime)
 					lastStatsReport = time.Now()
 				}
-
-				// AUTO-RESPOND: Process output for state detection
-				autoRespondDetector.ProcessOutput(buf[:n])
 
 				// v3.5.3: Feed output to prompt detector for Chat bridge
 				promptDetector.ProcessOutput(buf[:n])
@@ -991,30 +930,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 						continue
 					}
 					// No match - fall through to other handlers
-				}
-
-				// Check for AM control messages (auto-respond state sync)
-				// v3.12.3: AM removed - skip AM_AUTO_RESPOND messages
-				var amMsg AMControlMessage
-				if err := json.Unmarshal(data, &amMsg); err == nil && amMsg.Type == "AM_AUTO_RESPOND" {
-					log.Printf("[Terminal] v3.12.3: AM_AUTO_RESPOND message ignored (AM removed)")
-					continue
-				}
-
-				// Check for standalone auto-respond control (independent of AM)
-				var autoRespondMsg AutoRespondControlMessage
-				if err := json.Unmarshal(data, &autoRespondMsg); err == nil && autoRespondMsg.Type == "AUTO_RESPOND_TOGGLE" {
-					autoRespondDetector.SetEnabled(autoRespondMsg.Enabled)
-					autoRespondEnabled.Store(autoRespondMsg.Enabled)
-					log.Printf("[AutoRespond] Standalone auto-respond set to %v for session %s", autoRespondMsg.Enabled, sessionID)
-					
-					// Send confirmation back to client
-					_ = conn.WriteJSON(map[string]interface{}{
-						"type":    "AUTO_RESPOND_CONFIRMED",
-						"enabled": autoRespondMsg.Enabled,
-						"stats":   autoRespondDetector.GetStats(),
-					})
-					continue
 				}
 
 				// Check for smart routing toggle control
@@ -1234,11 +1149,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// PTY LOGGING: Log bytes sent to PTY (for Follow Me debugger)
 			globalPTYLogger.LogPTY(sessionID, "to_pty", dataToWrite)
-
-			// AUTO-RESPOND: Process input for state detection (owner only)
-			if !isWatcher && autoRespondDetector != nil {
-				autoRespondDetector.ProcessInput(dataToWrite)
-			}
 		}
 	}()
 

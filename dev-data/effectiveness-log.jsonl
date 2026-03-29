@@ -26,3 +26,5 @@
 {"pattern":"feature","model":"claude-sonnet-4.5","prompts":1,"success":true,"timestamp":"2026-03-27T23:52:14Z","files_changed":2}
 {"pattern":"bugfix","model":"claude-opus-4.6","prompts":1,"success":true,"timestamp":"2026-03-28T06:36:57Z","files_changed":2}
 {"pattern":"feature","model":"claude-sonnet-4.6","prompts":3,"success":true,"timestamp":"2026-03-28T07:01:45Z","files_changed":6}
+{"pattern":"multi-file-refactor","model":"claude-sonnet-4.5","prompts":3,"success":true,"timestamp":"2026-03-29T07:10:17Z","files_changed":7}
+{"pattern":"multi-file-refactor","model":"claude-sonnet-4.5","prompts":3,"success":true,"timestamp":"2026-03-29T07:10:23Z","files_changed":7}

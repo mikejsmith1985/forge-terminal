@@ -2,23 +2,7 @@
 
 **"One binary, double-click, works."**
 
-Forge Terminal is a standalone, cross-platform terminal application designed for AI-assisted development. It combines a full-featured terminal with "command cards" - saved commands that can be executed or pasted with a single click or keyboard shortcut.
-
-![Forge Terminal Screenshot](https://via.placeholder.com/800x500?text=Forge+Terminal+Screenshot)
-
-> **🚀 NEW: GitHub Pages Deployment!**  
-> Run forge-terminal from your browser on ANY device (Mac, Linux, Windows). See [Installation](#installation) below or try the **[interactive setup wizard](#-interactive-setup-wizard-recommended)**.
-
-# Forge Terminal
-
-**"One binary, double-click, works."**
-
-Forge Terminal is a standalone, cross-platform terminal application designed for AI-assisted development. It combines a full-featured terminal with "command cards" - saved commands that can be executed or pasted with a single click or keyboard shortcut.
-
-![Forge Terminal Screenshot](https://via.placeholder.com/800x500?text=Forge+Terminal+Screenshot)
-
-> **🚀 NEW: GitHub Pages Deployment!**  
-> Run forge-terminal from your browser on ANY device (Mac, Linux, Windows). See [Installation](#installation) below or try the **[interactive setup wizard](#-interactive-setup-wizard-recommended)**.
+Forge Terminal is a standalone, cross-platform terminal application designed for AI-assisted development. It combines a full-featured terminal with "command cards" — saved commands that can be executed or pasted with a single click or keyboard shortcut.
 
 ## ✨ Features
 
@@ -76,7 +60,6 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **🔓 Unrestricted Mode**: Optional full filesystem access for advanced users.
 
 ### Quality of Life
-- **🤖 Auto-Respond**: Automatically respond to CLI confirmation prompts (per-tab toggle).
 - **🎓 Interactive Guided Tour**: First-run experience with interactive guide introducing key features.
 - **🔄 Auto-Updates**: Automatic update checking with one-click installation.
 - **📜 Version History**: View and rollback to previous versions.
@@ -96,17 +79,15 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 
 Choose your setup method below. **All options are FREE** (Codespaces includes 120 free hours/month).
 
-### 🧙 Interactive Setup Wizard (Recommended)
+### 🧙 Quick Start
 
 **Quickest way to get started:**
 ```bash
-# Download and run the setup wizard
-node setup-wizard.js
+# Download the binary for your platform from releases
+# https://github.com/mikejsmith1985/forge-terminal/releases
 ```
 
-The wizard will ask you 2 simple questions and generate step-by-step instructions for your setup.
-
-**No Node.js?** Just follow the sections below for your preferred option.
+Follow the sections below for your preferred deployment option.
 
 ---
 
@@ -215,7 +196,7 @@ export ALLOWED_ORIGINS="https://your-domain.com"
 2. Run it: `./forge-[your-os]`
 3. Done! (Embedded mode - everything included)
 
-Or try the wizard: `node setup-wizard.js`
+Or download a binary from [Releases](https://github.com/mikejsmith1985/forge-terminal/releases).
 
 ---
 
@@ -428,8 +409,6 @@ Forge Terminal stores configuration in `~/.forge/`:
 ## Version History
 
 See [Release Notes](https://github.com/mikejsmith1985/forge-terminal/releases) for detailed changelogs and downloads.
-
-**Current Version**: v3.12.15
 
 ## License
 MIT

@@ -39,7 +39,6 @@ const DebugPanel = ({ terminalRef, tabId }) => {
   // State for each debug section
   const [diagnostics, setDiagnostics] = useState(null);
   const [freezeMetrics, setFreezeMetrics] = useState(null);
-  // v3.18: autoRespondLogs removed — auto-respond feature removed from frontend
   const [keyboardEvents, setKeyboardEvents] = useState([]);
   const [consoleLogs, setConsoleLogs] = useState([]);
   const [performance, setPerformance] = useState({ fps: 0, memory: null, wsMessageRate: 0 });
@@ -269,8 +268,6 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     return () => clearInterval(interval);
   }, []); // isCardExpanded is stable
 
-  // v3.18: Auto-respond log interception removed — auto-respond feature removed from frontend
-
   // Main update loop
   useEffect(() => {
     // Initial capture
@@ -364,8 +361,6 @@ const DebugPanel = ({ terminalRef, tabId }) => {
                       )}
                     </DebugCard>
                   );
-
-                // v3.18: auto-respond card removed
 
                 case 'freeze-monitor':
                   return (

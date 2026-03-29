@@ -13,7 +13,6 @@ bin/
 *.test
 *.out
 
-
 # Node
 node_modules/
 frontend/node_modules/
@@ -22,7 +21,6 @@ frontend/node_modules/
 # Build artifacts
 frontend/dist/
 web/assets/
-# cmd/forge/web/assets/  # Include in releases
 cmd/forge/web/index.html
 
 # IDE
@@ -35,16 +33,16 @@ cmd/forge/web/index.html
 # Logs
 *.log
 
-# Handshake document (auto-generated, shared with Orchestrator)
+# Handshake document (auto-generated)
 FORGE_HANDSHAKE.md
 
-# Issue images (downloaded for debugging, auto-cleaned after 7 days)
+# Issue images (downloaded for debugging)
 issue-images/
 
 # AM logs (local session data)
 .forge/
 
-# Copilot session documentation (temporary, conversational)
+# Copilot session documentation (temporary)
 docs/sessions/
 
 # Test artifacts
@@ -55,6 +53,18 @@ frontend/test-results/
 
 # Tool configurations
 .claude/
+
+# Backup and temp files
+*.bak
+*.old
+*.broken
+*.backup
+*~
+
+# Debug/proof artifacts (should never be committed)
+*.diff
+*.pid
+*.txt.tmp
 
 # Temporary documentation and status files
 PR_DESCRIPTION*.md
@@ -74,7 +84,6 @@ PR_DESCRIPTION*.md
 *_VERIFICATION.md
 VERIFICATION_*.md
 *_CHARTER.md
-Freeze-Fix-Data.md
 
 # Detailed changelogs (keep locally, not customer-facing)
 RELEASE_NOTES_*.md
@@ -84,7 +93,6 @@ V*.md
 v*.md
 *_RELEASE_*.md
 *_FIX_*.md
-*_COMPLETE.md
 *_VALIDATION*.md
 *_DASHBOARD*.html
 *-dashboard*.html

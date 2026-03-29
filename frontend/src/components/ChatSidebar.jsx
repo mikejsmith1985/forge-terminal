@@ -269,7 +269,7 @@ const ChatSidebar = ({ isOpen, onClose, tabId, fontSize, onOpenSettings }) => {
       fetch('/api/notify/config')
         .then(r => r.json())
         .then(cfg => {
-          if (cfg.idleDetectionEnabled && cfg.webhookURL && cfg.webhookSecret) {
+          if (cfg.idleDetectionEnabled && cfg.ntfyTopic) {
             // Provide a short preview of the response (first 80 chars)
             const preview = fullResponse.trim().replace(/\s+/g, ' ').slice(0, 80);
             const suffix = fullResponse.trim().length > 80 ? '…' : '';

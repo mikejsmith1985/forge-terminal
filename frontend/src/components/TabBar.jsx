@@ -38,9 +38,7 @@ function TabBar({
     }
   };
 
-  // v3.18: handleToggleAutoRespond removed — auto-respond feature removed from frontend
-
-  // v3.12.12: handleToggleAM removed - AM feature deprecated
+  // v3.12.12: handleToggleAM removed- AM feature deprecated
 
   const handleToggleMode = (tabId) => {
     if (onToggleMode) {

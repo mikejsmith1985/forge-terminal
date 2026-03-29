@@ -154,8 +154,6 @@ const MENU_CONTEXT_PATTERNS = [
   /allow.*to\s+(execute|run|access)/i,
 ];
 
-// v3.18: AUTO_RESPOND_EXCLUSION_PATTERNS removed — auto-respond feature removed from frontend
-
 // Y/N style prompts: These expect typing 'y' or 'n' then Enter
 const YN_PROMPT_PATTERNS = [
   // Standard y/n patterns at end of line
@@ -276,8 +274,6 @@ function detectYnPrompt(cleanText, debugLog = false) {
   
   return { detected: hasYnPrompt };
 }
-
-// v3.18: shouldExcludeFromAutoRespond removed — auto-respond feature removed from frontend
 
 /**
  * Main detection function - determines if CLI is waiting for user input
@@ -533,7 +529,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name
   isVisible = true, // Whether this terminal is currently visible
-  // v3.18: autoRespond prop removed — auto-respond feature removed from frontend
   // amEnabled = false, // v3.12.12: AM feature removed
   currentDirectory = null, // Current working directory to restore on connect
   visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
@@ -555,7 +550,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const outputBufferRef = useRef({ data: '', writePos: 0 });
   const lastOutputRef = useRef(''); // Keep for compatibility but update less often
   const waitingCheckIdleRef = useRef(null); // Changed from timeout to idle callback
-  // v3.18: autoRespondRef removed — auto-respond feature removed from frontend
   // const amEnabledRef = useRef(amEnabled); // v3.12.12: AM feature removed
   const tabNameRef = useRef(tabName);
   const lastDirectoryRef = useRef(null);
@@ -602,8 +596,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     const applyConfig = (cfg) => {
       if (!cfg) return;
-      const isNtfy = !cfg.transport || cfg.transport === 'ntfy';
-      const isReady = isNtfy ? !!cfg.ntfyTopic : (!!cfg.webhookURL && !!cfg.webhookSecret);
+      const isReady = !!cfg.ntfyTopic;
       if (!cfg.idleDetectionEnabled || !isReady) return;
       const ms = (cfg.idleTimeoutSeconds || 30) * 1000;
       idleNotifyTimerRef.current = setTimeout(() => {
@@ -637,9 +630,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Vision state
   const visionEnabledRef = useRef(visionEnabled);
 
-  // v3.18: autoRespond sync effect removed — auto-respond feature removed from frontend
-
-  // v3.12.12: AM feature removed - amEnabled effect deleted
+  // v3.12.12: AM feature removed- amEnabled effect deleted
 
   // Keep tabName ref updated
   useEffect(() => {
@@ -1652,8 +1643,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }, 800);
         }
 
-        // v3.18: auto-respond on-connect sync removed
-
         if (onConnectionChange) onConnectionChange(true);
       };
 
@@ -1772,7 +1761,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // v3.18: auto-respond execution block removed
         });
       };
 

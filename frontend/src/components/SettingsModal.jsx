@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap, RotateCcw, Database, History, Bell, Link } from 'lucide-react';
-import MCPAtlassianWizard from './MCPAtlassianWizard';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap, RotateCcw, Database, History, Bell } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
 import TabControlsPanel from './TabControlsPanel';
 import CardHistoryPanel from './CardHistoryPanel';
@@ -270,23 +269,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <Bell size={16} />
             Notifications
           </button>
-          <button
-            onClick={() => setActiveTab('atlassian')}
-            style={{
-              padding: '12px 20px',
-              background: 'transparent',
-              border: 'none',
-              color: activeTab === 'atlassian' ? '#fff' : '#888',
-              borderBottom: activeTab === 'atlassian' ? '2px solid #8b5cf6' : '2px solid transparent',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Link size={16} />
-            Atlassian
-          </button>
+
         </div>
 
         <div className="modal-body">
@@ -363,8 +346,6 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <BackupsPanel onToast={onToast} />
           ) : activeTab === 'notifications' ? (
             <NotificationsPanel onToast={onToast} />
-          ) : activeTab === 'atlassian' ? (
-            <MCPAtlassianWizard />
           ) : (
             <>
               <div style={{

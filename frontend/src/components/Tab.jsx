@@ -162,7 +162,6 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggle
   let titleText = tab.title;
   const indicators = [];
   // v3.12.12: AM feature removed
-  // v3.18: autoRespond removed
   if (tabMode === 'light') indicators.push('Light');
   if (indicators.length > 0) {
     titleText = `${tab.title} (${indicators.join(', ')})`;
@@ -187,7 +186,6 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggle
           {getShellIcon(shellType)}
         </span>
         {/* v3.12.12: AM indicator removed */}
-        {/* v3.18: Auto-respond indicator removed */}
         {isEditing ? (
           <input
             ref={inputRef}
@@ -254,7 +252,6 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggle
           </button>
           {/* v3.8.2: View Mode toggle REMOVED - Terminal is the only view */}
           {/* v3.12.12: AM toggle REMOVED - AM feature deprecated */}
-          {/* v3.18: Auto-respond toggle REMOVED - auto-respond feature removed from frontend */}
           <button onClick={() => { setShowContextMenu(false); onClose(); }}>
             <X size={14} />
             Close

@@ -18,7 +18,6 @@ import (
 //
 // This ensures:
 // - Same session state between Terminal and Chat views
-// - Auto-respond works (watching the same PTY output)
 // - Interactive prompts are visible and answerable from Chat
 // - No context pollution between tabs
 type ChatPTYBridge struct {
@@ -28,10 +27,6 @@ type ChatPTYBridge struct {
 	// Output handling
 	outputHandler func([]byte)
 	outputMu      sync.RWMutex
-
-	// Auto-respond state
-	autoRespond   bool
-	autoRespondMu sync.RWMutex
 
 	// Prompt detection patterns
 	yesNoPattern    *regexp.Regexp
@@ -133,21 +128,6 @@ func (b *ChatPTYBridge) OnOutput(handler func([]byte)) {
 	b.outputHandler = handler
 }
 
-// SetAutoRespond enables/disables automatic response to prompts.
-func (b *ChatPTYBridge) SetAutoRespond(enabled bool) {
-	b.autoRespondMu.Lock()
-	defer b.autoRespondMu.Unlock()
-	b.autoRespond = enabled
-	log.Printf("[ChatPTYBridge] Auto-respond set to: %v", enabled)
-}
-
-// IsAutoRespond returns whether auto-respond is enabled.
-func (b *ChatPTYBridge) IsAutoRespond() bool {
-	b.autoRespondMu.RLock()
-	defer b.autoRespondMu.RUnlock()
-	return b.autoRespond
-}
-
 // StartReading begins reading from the PTY and forwarding to handlers.
 // This should be called in a goroutine.
 func (b *ChatPTYBridge) StartReading(ctx context.Context) {
@@ -198,34 +178,8 @@ func (b *ChatPTYBridge) StartReading(ctx context.Context) {
 				if handler != nil {
 					handler(data)
 				}
-
-				// Check for auto-respond triggers
-				b.checkAutoRespond(data)
 			}
 		}
-	}
-}
-
-// checkAutoRespond checks output for prompts and responds automatically.
-func (b *ChatPTYBridge) checkAutoRespond(data []byte) {
-	if !b.IsAutoRespond() {
-		return
-	}
-
-	text := string(data)
-
-	// Check for Y/n prompts
-	if b.yesNoPattern.MatchString(text) {
-		log.Printf("[ChatPTYBridge] Auto-responding 'y' to prompt")
-		b.pty.Write([]byte("y\n"))
-		return
-	}
-
-	// Check for continue prompts
-	if b.continuePattern.MatchString(text) {
-		log.Printf("[ChatPTYBridge] Auto-responding Enter to continue prompt")
-		b.pty.Write([]byte("\n"))
-		return
 	}
 }
 

@@ -76,7 +76,6 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
     viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
-    // v3.18: autoRespond removed — auto-respond feature removed from frontend
     // v3.12.3: amEnabled removed - AM system no longer exists
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
     currentDirectory: currentDirectory || null, // Current working directory
@@ -115,7 +114,6 @@ function tabsToSession(tabs, activeTabId) {
       colorTheme: tab.colorTheme,
       mode: tab.mode || 'dark',
       viewMode: 'terminal', // v3.8.2: Terminal only (viewMode no longer needed)
-      // v3.18: autoRespond removed
       // v3.12.3: amEnabled removed
       visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
@@ -264,7 +262,6 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
             colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
             mode: tabState.mode || 'dark',
             viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
-            // v3.18: autoRespond removed
             // v3.12.3: amEnabled removed
             visionEnabled: tabState.visionEnabled || false,
             currentDirectory: tabState.currentDirectory || null,
@@ -529,7 +526,6 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     });
   }, []);
 
-  // v3.18: toggleTabAutoRespond removed — auto-respond feature removed from frontend
 
   /**
    * v3.12.3: Toggle AM removed - AM system no longer exists
@@ -725,7 +721,6 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     updateTabTitle,
     updateTabShellConfig,
     updateTabColorTheme,
-    // v3.18: toggleTabAutoRespond removed
     toggleTabAM,
     toggleTabVision,
     toggleTabMode,

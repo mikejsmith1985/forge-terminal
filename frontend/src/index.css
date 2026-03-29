@@ -1048,13 +1048,11 @@ body {
   }
 }
 
-/* v3.18: .tab.auto-respond CSS removed — auto-respond feature removed from frontend */
 
 .tab.am-enabled {
   border-right: 2px solid #10b981; /* Green for AM logging */
 }
 
-/* v3.18: .tab.am-enabled.auto-respond CSS removed */
 
 .am-indicator {
   display: flex;
@@ -1074,7 +1072,6 @@ body {
   flex-shrink: 0;
 }
 
-/* v3.18: .auto-respond-indicator CSS removed */
 
 .tab.active {
   position: relative;
