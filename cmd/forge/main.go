@@ -535,6 +535,12 @@ func main() {
 		log.Printf("🔗 Remote access URL: http://%s?token=%s", addr, globalToken)
 	}
 
+	// In hosted mode, also print stable local-network URLs the user can bookmark.
+	// These don't change between restarts as long as the IP and port are stable.
+	if hostedCfg.Enabled {
+		printLocalNetworkURLs(activePort, globalToken)
+	}
+
 	// Handle graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -884,6 +890,41 @@ func handleWSLDetect(w http.ResponseWriter, r *http.Request) {
 		"defaultUser": username,
 		"defaultHome": "/home/" + username,
 	})
+}
+
+// printLocalNetworkURLs logs the LAN access URLs for hosted mode so users can
+// bookmark a stable address without waiting for Cloudflare tunnel output.
+func printLocalNetworkURLs(port int, token string) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() || ip.To4() == nil {
+				continue
+			}
+			localURL := fmt.Sprintf("http://%s:%d", ip, port)
+			if token != "" {
+				localURL += "?token=" + token
+			}
+			log.Printf("📱 Local network (bookmark this): %s", localURL)
+		}
+	}
 }
 
 // findAvailablePort tries preferred ports in order and returns the first available one.

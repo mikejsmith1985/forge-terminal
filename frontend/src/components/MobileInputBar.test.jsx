@@ -67,19 +67,38 @@ describe('MobileInputBar', () => {
     expect(mockOnSpecialKey).toHaveBeenCalledWith('Escape')
   })
 
-  it('Ctrl modifier toggles on tap', () => {
+  it('Ctrl modifier + single char sends control sequence', () => {
     render(<MobileInputBar onSubmit={mockOnSubmit} onSpecialKey={mockOnSpecialKey} />)
     
     const ctrlBtn = screen.getByRole('button', { name: /ctrl/i })
     fireEvent.click(ctrlBtn)
     expect(ctrlBtn).toHaveClass('active')
     
-    // Type 'c' while Ctrl is active => Ctrl+C
-    const input = screen.getByPlaceholderText(/command/i)
+    // Type 'c' while Ctrl is active => Ctrl+c
+    const input = screen.getByRole('textbox')
     fireEvent.change(input, { target: { value: 'c' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     
     expect(mockOnSpecialKey).toHaveBeenCalledWith('Ctrl+c')
+    expect(mockOnSubmit).not.toHaveBeenCalled()
+  })
+
+  it('Ctrl modifier + multi-char text submits normally and resets Ctrl', () => {
+    render(<MobileInputBar onSubmit={mockOnSubmit} onSpecialKey={mockOnSpecialKey} />)
+    
+    const ctrlBtn = screen.getByRole('button', { name: /ctrl/i })
+    fireEvent.click(ctrlBtn)
+    expect(ctrlBtn).toHaveClass('active')
+    
+    // Type multi-char while Ctrl is accidentally active => should submit normally
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'hello world' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    
+    expect(mockOnSubmit).toHaveBeenCalledWith('hello world')
+    expect(mockOnSpecialKey).not.toHaveBeenCalled()
+    // Ctrl should have been reset
+    expect(ctrlBtn).not.toHaveClass('active')
   })
 
   it('arrow key buttons fire events', () => {
@@ -92,7 +111,7 @@ describe('MobileInputBar', () => {
     expect(mockOnSpecialKey).toHaveBeenCalledWith('ArrowDown')
   })
 
-  it('hidden on desktop', () => {
+  it('always renders (visibility controlled by parent layout)', () => {
     useMobileDetect.mockReturnValue({
       isMobile: false, isDesktop: true, isKeyboardOpen: false,
       viewportHeight: 1080, hasTouch: false,
@@ -101,6 +120,7 @@ describe('MobileInputBar', () => {
     const { container } = render(
       <MobileInputBar onSubmit={mockOnSubmit} onSpecialKey={mockOnSpecialKey} />
     )
-    expect(container.firstChild).toBeNull()
+    // MobileInputBar always renders; the parent decides whether to show it
+    expect(container.firstChild).not.toBeNull()
   })
 })

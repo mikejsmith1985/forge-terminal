@@ -21,10 +21,14 @@ export function MobileInputBar({ onSubmit, onSpecialKey }) {
 
   const submit = (text) => {
     if (!text) return
-    if (ctrlActive) {
+    if (ctrlActive && text.length === 1) {
+      // Single char with Ctrl active → send as Ctrl+<char> (e.g. Ctrl+c)
       onSpecialKey(`Ctrl+${text}`)
       setCtrlActive(false)
     } else {
+      // Multi-char text always submits normally.
+      // If Ctrl was accidentally left on, reset it so the next keystroke is clean.
+      if (ctrlActive) setCtrlActive(false)
       onSubmit(text)
     }
     setInput('')

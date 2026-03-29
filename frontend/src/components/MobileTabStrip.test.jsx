@@ -87,7 +87,7 @@ describe('MobileTabStrip', () => {
     expect(mockOnNewTab).toHaveBeenCalled()
   })
 
-  it('close button on each tab works', () => {
+  it('close button only appears on active tab', () => {
     render(
       <MobileTabStrip
         tabs={mockTabs}
@@ -97,17 +97,16 @@ describe('MobileTabStrip', () => {
         onNewTab={mockOnNewTab}
       />
     )
+    // Only the active tab has a close button
     const closeButtons = screen.getAllByRole('button', { name: /close/i })
-    expect(closeButtons).toHaveLength(3)
+    expect(closeButtons).toHaveLength(1)
 
-    fireEvent.click(closeButtons[1]) // Close tab-2
-    expect(mockOnTabClose).toHaveBeenCalledWith('tab-2')
+    fireEvent.click(closeButtons[0]) // Close tab-1 (the active one)
+    expect(mockOnTabClose).toHaveBeenCalledWith('tab-1')
   })
 
-  it('renders nothing on desktop', () => {
-    useMobileDetect.mockReturnValue({ isMobile: false, isDesktop: true })
-
-    const { container } = render(
+  it('switching tabs disables close button briefly to prevent ghost-clicks', () => {
+    render(
       <MobileTabStrip
         tabs={mockTabs}
         activeTabId="tab-1"
@@ -116,7 +115,11 @@ describe('MobileTabStrip', () => {
         onNewTab={mockOnNewTab}
       />
     )
-    expect(container.firstChild).toBeNull()
+    // Clicking an inactive tab calls onTabSelect
+    fireEvent.click(screen.getByText('Terminal 2'))
+    expect(mockOnTabSelect).toHaveBeenCalledWith('tab-2')
+    // onTabClose must NOT have been triggered
+    expect(mockOnTabClose).not.toHaveBeenCalled()
   })
 
   it('handles empty tabs array', () => {
