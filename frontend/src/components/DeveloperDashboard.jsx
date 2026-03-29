@@ -1,159 +1,34 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  BarChart3, GitCommit, FileCode, MessageSquare, Clock, 
-  Zap, ChevronDown, ChevronUp, RefreshCw, X, TrendingUp, Hash, ArrowLeftRight
+  BarChart3, GitCommit, FileCode, Clock, 
+  Cpu, ChevronDown, ChevronUp, RefreshCw, X, TrendingUp, 
+  GitBranch, Monitor, Server, Layers
 } from 'lucide-react';
 import './DeveloperDashboard.css';
 
-/**
- * DeveloperDashboard - Daily developer stats from terminal activity
- * 
- * v3.12.3: AM system removed - now uses localStorage and GitHub API only
- * Data Sources:
- * - localStorage (forge_daily_stats) - local tracking
- * - GitHub API (if token available) - commit stats
- */
-const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
+const DAY_ORDER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const DeveloperDashboard = ({ isOpen, onClose, devMode = false, tabCount = 0 }) => {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    promptsSent: 0,
-    totalTurns: 0,
-    conversationsCount: 0,
-    providersUsed: {},
-    workingDirectories: {},
-    gitCommits: 0,
-    filesModified: 0,
-    testsRun: 0,
-    lastActivity: null,
-    sessionDuration: 0,
-    totalTokensIn: 0,
-    totalTokensOut: 0,
-    modelSwitches: 0,
-    modelsUsed: {},
-  });
-  const [dailyStats, setDailyStats] = useState([]);
-  const [expandedSection, setExpandedSection] = useState(null);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [expandedSection, setExpandedSection] = useState('chart');
   const [refreshing, setRefreshing] = useState(false);
+  const sessionStart = useRef(Date.now());
 
   const fetchStats = useCallback(async () => {
     if (!isOpen) return;
     
     setRefreshing(true);
+    setError(null);
     try {
-      // v3.12.3: AM APIs removed - use localStorage only
-      let totalPrompts = 0;
-      let totalTurns = 0;
-      let conversationsCount = 0;
-      let providersUsed = {};
-      let workingDirs = {};
-      let sessionDuration = 0;
-      let gitCommits = 0;
-      let filesModified = 0;
-      let testsRun = 0;
-      let lastActivity = null;
-      let totalTokensIn = 0;
-      let totalTokensOut = 0;
-      let modelSwitches = 0;
-      let modelsUsed = {};
-
-      // Try to get GitHub stats if token is available
-      const githubToken = localStorage.getItem('forge_github_token');
-      if (githubToken) {
-        try {
-          const authHeader = githubToken.startsWith('github_pat_') 
-            ? `Bearer ${githubToken}` 
-            : `token ${githubToken}`;
-          
-          // Get today's commits from authenticated user
-          const today = new Date().toISOString().split('T')[0];
-          const eventsRes = await fetch('https://api.github.com/users/me/events?per_page=50', {
-            headers: {
-              'Authorization': authHeader,
-              'X-GitHub-Api-Version': '2022-11-28',
-            }
-          }).catch(() => null);
-
-          if (eventsRes && eventsRes.ok) {
-            const events = await eventsRes.json();
-            const todayEvents = events.filter(e => 
-              e.created_at.startsWith(today) && e.type === 'PushEvent'
-            );
-            
-            todayEvents.forEach(event => {
-              if (event.payload?.commits) {
-                gitCommits += event.payload.commits.length;
-              }
-            });
-          }
-        } catch (err) {
-          console.log('[Dashboard] GitHub API error:', err.message);
-        }
-      }
-
-      // Get stats from localStorage (for locally tracked data)
-      const storedStats = localStorage.getItem('forge_daily_stats');
-      if (storedStats) {
-        try {
-          const parsed = JSON.parse(storedStats);
-          const today = new Date().toDateString();
-          if (parsed.date === today) {
-            filesModified = parsed.filesModified || 0;
-            testsRun = parsed.testsRun || 0;
-            // Merge with git commits if stored
-            if (parsed.gitCommits && parsed.gitCommits > gitCommits) {
-              gitCommits = parsed.gitCommits;
-            }
-          }
-        } catch (e) {
-          // Ignore parse errors
-        }
-      }
-
-      setStats({
-        promptsSent: totalPrompts,
-        totalTurns,
-        conversationsCount,
-        providersUsed,
-        workingDirectories: workingDirs,
-        gitCommits,
-        filesModified,
-        testsRun,
-        lastActivity,
-        sessionDuration: Math.round(sessionDuration),
-        // v3.12.3: Real stats from SLMTracking
-        totalTokensIn,
-        totalTokensOut,
-        modelSwitches,
-        modelsUsed,
-      });
-
-      // Build daily stats array for chart
-      const days = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dayKey = date.toDateString();
-        const storedDayStats = localStorage.getItem(`forge_stats_${dayKey}`);
-        let dayData = { date: dayKey, prompts: 0, commits: 0 };
-        
-        if (storedDayStats) {
-          try {
-            dayData = { ...dayData, ...JSON.parse(storedDayStats) };
-          } catch (e) {}
-        }
-        
-        // Today's data comes from live stats
-        if (i === 0) {
-          dayData.prompts = totalPrompts;
-          dayData.commits = gitCommits;
-        }
-        
-        days.push(dayData);
-      }
-      setDailyStats(days);
-
+      const res = await fetch('/api/dashboard/stats');
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const data = await res.json();
+      setStats(data);
     } catch (err) {
       console.error('[Dashboard] Failed to fetch stats:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -162,56 +37,53 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
 
   useEffect(() => {
     if (isOpen) {
+      setLoading(true);
       fetchStats();
-      // Refresh every 30 seconds when open
-      const interval = setInterval(fetchStats, 30000);
+      const interval = setInterval(fetchStats, 15000);
       return () => clearInterval(interval);
     }
   }, [isOpen, fetchStats]);
 
-  // Save today's stats to localStorage on update
-  useEffect(() => {
-    if (stats.promptsSent > 0 || stats.gitCommits > 0) {
-      const today = new Date().toDateString();
-      const dayStats = {
-        date: today,
-        prompts: stats.promptsSent,
-        commits: stats.gitCommits,
-        filesModified: stats.filesModified,
-        testsRun: stats.testsRun,
-      };
-      localStorage.setItem(`forge_stats_${today}`, JSON.stringify(dayStats));
-      localStorage.setItem('forge_daily_stats', JSON.stringify({
-        date: today,
-        ...dayStats
-      }));
-    }
-  }, [stats]);
-
   if (!isOpen) return null;
 
-  const formatDuration = (minutes) => {
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  const formatUptime = (seconds) => {
+    if (!seconds) return '0s';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    if (m > 0) return `${m}m`;
+    return `${Math.floor(seconds)}s`;
   };
 
-  const formatLastActivity = (date) => {
-    if (!date) return 'No activity';
-    const now = new Date();
-    const diff = (now - date) / 1000; // seconds
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return date.toLocaleDateString();
+  const formatSessionTime = () => {
+    const elapsed = (Date.now() - sessionStart.current) / 1000;
+    return formatUptime(elapsed);
+  };
+
+  const formatMB = (mb) => {
+    if (!mb) return '0 MB';
+    return mb < 1 ? `${(mb * 1024).toFixed(0)} KB` : `${mb.toFixed(1)} MB`;
   };
 
   const toggleSection = (section) => {
     setExpandedSection(expandedSection === section ? null : section);
   };
 
-  const maxPrompts = Math.max(...dailyStats.map(d => d.prompts), 1);
+  // Build ordered 7-day chart data from gitWeekly map
+  const getChartData = () => {
+    if (!stats?.gitWeekly) return [];
+    const today = new Date().getDay();
+    const ordered = [];
+    for (let i = 6; i >= 0; i--) {
+      const dayIdx = (today - i + 7) % 7;
+      const label = DAY_ORDER[dayIdx];
+      ordered.push({ label, commits: stats.gitWeekly[label] || 0 });
+    }
+    return ordered;
+  };
+
+  const chartData = getChartData();
+  const maxCommits = Math.max(...chartData.map(d => d.commits), 1);
 
   return (
     <div className="dev-dashboard-overlay" onClick={onClose}>
@@ -242,150 +114,128 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false }) => {
             <RefreshCw size={24} className="spinning" />
             <span>Loading stats...</span>
           </div>
-        ) : (
+        ) : error ? (
+          <div className="dd-loading">
+            <span style={{ color: '#ef4444' }}>Failed to load: {error}</span>
+            <button className="dd-refresh-btn" onClick={fetchStats} style={{ marginTop: 8 }}>
+              <RefreshCw size={16} /> Retry
+            </button>
+          </div>
+        ) : stats && (
           <div className="dd-content">
-            {/* Today's Stats Grid */}
+            {/* Top Stats Grid */}
             <div className="dd-stats-grid">
               <div className="dd-stat-card primary">
-                <MessageSquare size={20} />
-                <div className="dd-stat-value">{stats.promptsSent}</div>
-                <div className="dd-stat-label">Prompts Today</div>
-              </div>
-              <div className="dd-stat-card">
-                <Zap size={20} />
-                <div className="dd-stat-value">{stats.totalTurns}</div>
-                <div className="dd-stat-label">Total Turns</div>
-              </div>
-              <div className="dd-stat-card">
                 <GitCommit size={20} />
-                <div className="dd-stat-value">{stats.gitCommits}</div>
-                <div className="dd-stat-label">Commits</div>
+                <div className="dd-stat-value">{stats.gitCommitsToday}</div>
+                <div className="dd-stat-label">Commits Today</div>
+              </div>
+              <div className="dd-stat-card">
+                <FileCode size={20} />
+                <div className="dd-stat-value">{stats.gitChangedFiles}</div>
+                <div className="dd-stat-label">Changed Files</div>
+              </div>
+              <div className="dd-stat-card">
+                <Layers size={20} />
+                <div className="dd-stat-value">{tabCount || stats.activeSessions}</div>
+                <div className="dd-stat-label">Active Tabs</div>
               </div>
               <div className="dd-stat-card">
                 <Clock size={20} />
-                <div className="dd-stat-value">{formatDuration(stats.sessionDuration)}</div>
-                <div className="dd-stat-label">Session Time</div>
+                <div className="dd-stat-value">{formatUptime(stats.uptimeSec)}</div>
+                <div className="dd-stat-label">Server Uptime</div>
               </div>
             </div>
 
-            {/* Token Usage Stats - v3.12.3 */}
-            {(stats.totalTokensIn > 0 || stats.totalTokensOut > 0) && (
+            {/* Git Info Bar */}
+            {stats.gitBranch && (
               <div className="dd-token-stats">
                 <div className="dd-token-stat">
-                  <Hash size={14} />
-                  <span className="dd-token-label">Tokens In:</span>
-                  <span className="dd-token-value">{stats.totalTokensIn.toLocaleString()}</span>
+                  <GitBranch size={14} />
+                  <span className="dd-token-label">Branch:</span>
+                  <span className="dd-token-value">{stats.gitBranch}</span>
                 </div>
-                <div className="dd-token-stat">
-                  <Hash size={14} />
-                  <span className="dd-token-label">Tokens Out:</span>
-                  <span className="dd-token-value">{stats.totalTokensOut.toLocaleString()}</span>
-                </div>
-                {stats.modelSwitches > 0 && (
-                  <div className="dd-token-stat">
-                    <ArrowLeftRight size={14} />
-                    <span className="dd-token-label">Model Switches:</span>
-                    <span className="dd-token-value">{stats.modelSwitches}</span>
+                {stats.gitLastCommit && (
+                  <div className="dd-token-stat" style={{ flex: 1, minWidth: 0 }}>
+                    <GitCommit size={14} />
+                    <span className="dd-token-label">Last:</span>
+                    <span className="dd-token-value" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {stats.gitLastCommit}
+                    </span>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Activity Chart */}
+            {/* 7-Day Commit Chart */}
             <div className="dd-section">
               <div className="dd-section-header" onClick={() => toggleSection('chart')}>
                 <TrendingUp size={16} />
-                <span>7-Day Activity</span>
+                <span>7-Day Commits</span>
                 {expandedSection === 'chart' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
               {expandedSection === 'chart' && (
                 <div className="dd-chart">
-                  {dailyStats.map((day, i) => (
+                  {chartData.map((day, i) => (
                     <div key={i} className="dd-chart-bar-container">
                       <div 
                         className="dd-chart-bar"
-                        style={{ height: `${(day.prompts / maxPrompts) * 100}%` }}
-                        title={`${day.prompts} prompts`}
+                        style={{ height: `${(day.commits / maxCommits) * 100}%` }}
+                        title={`${day.commits} commit${day.commits !== 1 ? 's' : ''}`}
                       />
-                      <div className="dd-chart-label">
-                        {new Date(day.date).toLocaleDateString('en', { weekday: 'short' })}
-                      </div>
+                      <div className="dd-chart-label">{day.label}</div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Providers Used */}
-            {Object.keys(stats.providersUsed).length > 0 && (
-              <div className="dd-section">
-                <div className="dd-section-header" onClick={() => toggleSection('providers')}>
-                  <Zap size={16} />
-                  <span>AI Providers</span>
-                  {expandedSection === 'providers' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </div>
-                {expandedSection === 'providers' && (
-                  <div className="dd-list">
-                    {Object.entries(stats.providersUsed).map(([provider, count]) => (
-                      <div key={provider} className="dd-list-item">
-                        <span className="dd-provider-name">{provider}</span>
-                        <span className="dd-provider-count">{count} sessions</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            {/* System Info */}
+            <div className="dd-section">
+              <div className="dd-section-header" onClick={() => toggleSection('system')}>
+                <Monitor size={16} />
+                <span>System</span>
+                {expandedSection === 'system' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
-            )}
-
-            {/* Models Used - v3.12.3 */}
-            {Object.keys(stats.modelsUsed).length > 0 && (
-              <div className="dd-section">
-                <div className="dd-section-header" onClick={() => toggleSection('models')}>
-                  <Hash size={16} />
-                  <span>Models Used</span>
-                  {expandedSection === 'models' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </div>
-                {expandedSection === 'models' && (
-                  <div className="dd-list">
-                    {Object.entries(stats.modelsUsed).map(([model, count]) => (
-                      <div key={model} className="dd-list-item">
-                        <span className="dd-provider-name">{model}</span>
-                        <span className="dd-provider-count">{count} conversations</span>
-                      </div>
-                    ))}
+              {expandedSection === 'system' && (
+                <div className="dd-list">
+                  <div className="dd-list-item">
+                    <span className="dd-provider-name">Memory (Alloc)</span>
+                    <span className="dd-provider-count">{formatMB(stats.memAllocMB)}</span>
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* Working Directories */}
-            {Object.keys(stats.workingDirectories).length > 0 && (
-              <div className="dd-section">
-                <div className="dd-section-header" onClick={() => toggleSection('dirs')}>
-                  <FileCode size={16} />
-                  <span>Projects</span>
-                  {expandedSection === 'dirs' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </div>
-                {expandedSection === 'dirs' && (
-                  <div className="dd-list">
-                    {Object.entries(stats.workingDirectories).map(([dir, count]) => (
-                      <div key={dir} className="dd-list-item">
-                        <span className="dd-dir-name">{dir}</span>
-                        <span className="dd-dir-count">{count} sessions</span>
-                      </div>
-                    ))}
+                  <div className="dd-list-item">
+                    <span className="dd-provider-name">Memory (Sys)</span>
+                    <span className="dd-provider-count">{formatMB(stats.memSysMB)}</span>
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="dd-list-item">
+                    <span className="dd-provider-name">Goroutines</span>
+                    <span className="dd-provider-count">{stats.goroutines}</span>
+                  </div>
+                  <div className="dd-list-item">
+                    <span className="dd-provider-name">GC Cycles</span>
+                    <span className="dd-provider-count">{stats.numGC}</span>
+                  </div>
+                  <div className="dd-list-item">
+                    <span className="dd-provider-name">Runtime</span>
+                    <span className="dd-provider-count">{stats.goVersion}</span>
+                  </div>
+                  <div className="dd-list-item">
+                    <span className="dd-provider-name">Platform</span>
+                    <span className="dd-provider-count">{stats.os}/{stats.arch} ({stats.numCPU} CPU)</span>
+                  </div>
+                </div>
+              )}
+            </div>
 
-            {/* Last Activity */}
+            {/* Footer */}
             <div className="dd-footer">
               <span className="dd-last-activity">
-                Last activity: {formatLastActivity(stats.lastActivity)}
+                <Server size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                Session: {formatSessionTime()}
               </span>
               <span className="dd-conversations-count">
-                {stats.conversationsCount} conversation{stats.conversationsCount !== 1 ? 's' : ''} logged
+                <Cpu size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                {stats.activeSessions} PTY session{stats.activeSessions !== 1 ? 's' : ''}
               </span>
             </div>
           </div>

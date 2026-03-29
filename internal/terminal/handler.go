@@ -472,6 +472,17 @@ func (h *Handler) GetSession(sessionID string) (*TerminalSession, bool) {
 	return session, ok
 }
 
+// RangeSessions iterates over all active sessions.
+// The callback receives the session ID; return false to stop iteration.
+func (h *Handler) RangeSessions(fn func(id string) bool) {
+	h.sessions.Range(func(key, _ interface{}) bool {
+		if id, ok := key.(string); ok {
+			return fn(id)
+		}
+		return true
+	})
+}
+
 // HandleWebSocket upgrades the HTTP connection to WebSocket and manages PTY I/O.
 func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Upgrade to WebSocket

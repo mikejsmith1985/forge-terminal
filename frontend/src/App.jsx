@@ -2026,6 +2026,7 @@ function App() {
         isOpen={isDeveloperDashboardOpen}
         onClose={() => setIsDeveloperDashboardOpen(false)}
         devMode={devMode}
+        tabCount={tabs.length}
       />
 
       <RemoteAccessModal

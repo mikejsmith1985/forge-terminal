@@ -411,6 +411,9 @@ func main() {
 	http.HandleFunc("/api/diagnostics/freeze/goroutines", WrapWithMiddleware(diagnostic.HandleGoroutines))
 	http.HandleFunc("/api/diagnostics/runtime", WrapWithMiddleware(diagnostic.HandleRuntimeStats))
 
+	// Developer Dashboard API
+	http.HandleFunc("/api/dashboard/stats", WrapWithMiddleware(handleDashboardStats))
+
 	// Tab theme defaults API
 	http.HandleFunc("/api/tab-defaults", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
