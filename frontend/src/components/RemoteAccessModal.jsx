@@ -80,7 +80,8 @@ export default function RemoteAccessModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const isCloudflaredError = error && error.toLowerCase().includes('cloudflared');
-  const isTailscaleError = error && error.toLowerCase().includes('tailscale');
+  const isTailscaleNotFound = error && error.toLowerCase().includes('tailscale not found');
+  const isTailscaleError = error && error.toLowerCase().includes('tailscale') && !isTailscaleNotFound;
   const hasTunnel = status.running && status.tunnelURL;
   const waitingForTunnel = status.running && !status.tunnelURL;
   const isPersistent = status.persistent === true;
@@ -241,7 +242,7 @@ export default function RemoteAccessModal({ isOpen, onClose }) {
                   </a>
                 </div>
               )}
-              {isTailscaleError && (
+              {isTailscaleNotFound && (
                 <div style={{ marginTop: 8, color: 'var(--text-secondary)', fontSize: 12 }}>
                   Install Tailscale from{' '}
                   <a href="https://tailscale.com/download" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline' }}>

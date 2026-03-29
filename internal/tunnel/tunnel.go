@@ -247,9 +247,14 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 		}
 	}
 
-	// Step 2: enable Funnel for the local port.
+	// Step 2: reset any existing funnel config first to avoid "listener already exists" errors,
+	// then enable Funnel for the local port.
 	// Run with a 30-second timeout — the command should exit in under a second
 	// once the daemon is running; the timeout guards against daemon hangs.
+	resetCtx, resetCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer resetCancel()
+	exec.CommandContext(resetCtx, bin, "funnel", "--reset").Run() //nolint:errcheck
+
 	funnelCtx, funnelCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer funnelCancel()
 
@@ -262,6 +267,16 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 			return fmt.Errorf("tailscale funnel timed out — make sure Tailscale is running and HTTPS certificates are enabled at https://login.tailscale.com/admin/dns")
 		}
 		msg := strings.TrimSpace(string(funnelOut))
+		if strings.Contains(msg, "not enabled") || strings.Contains(msg, "login.tailscale.com/f/funnel") {
+			// Extract the enable URL if Tailscale provided one
+			for _, line := range strings.Split(msg, "\n") {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "https://login.tailscale.com/f/funnel") {
+					return fmt.Errorf("Tailscale Funnel is not enabled on your tailnet — visit this URL to enable it: %s", line)
+				}
+			}
+			return fmt.Errorf("Tailscale Funnel is not enabled on your tailnet — visit https://login.tailscale.com/admin/settings/acls to enable it")
+		}
 		if strings.Contains(msg, "HTTPS") || strings.Contains(msg, "https") || strings.Contains(msg, "certificate") {
 			return fmt.Errorf("tailscale funnel requires HTTPS certificates — enable HTTPS in your Tailscale admin console at https://login.tailscale.com/admin/dns then try again")
 		}
