@@ -895,6 +895,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			if msgType == websocket.TextMessage {
 				var msg ResizeMessage
 				if err := json.Unmarshal(data, &msg); err == nil && msg.Type == "resize" {
+					// Validate dimensions to prevent nonsensical PTY sizes
+					if msg.Cols < 10 || msg.Cols > 500 || msg.Rows < 2 || msg.Rows > 200 {
+						log.Printf("[Terminal] Ignoring invalid resize %dx%d", msg.Cols, msg.Rows)
+						continue
+					}
 					if err := session.Resize(msg.Cols, msg.Rows); err != nil {
 						log.Printf("[Terminal] Resize error: %v", err)
 					} else {

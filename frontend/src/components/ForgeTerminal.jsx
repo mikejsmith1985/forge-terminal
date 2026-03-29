@@ -1513,10 +1513,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       return true; // Let all other keys pass through standard xterm processing
     });
 
-    // Initial fit - PERFORMANCE FIX: Call directly instead of setTimeout(0)
-    fitAddon.fit();
-    // Critical fix: Re-focus after fit() call (fit triggers hidden re-render)
-    queueMicrotask(() => {
+    // Initial fit — run after the next paint so the container has its final
+    // dimensions.  Immediate fit() during mount can measure before absolute-
+    // positioned ancestors have resolved their layout.
+    requestAnimationFrame(() => {
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit();
+      }
       term.focus();
     });
 
@@ -1942,12 +1945,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // Initial connection
     connectWebSocket();
 
-    // Handle window resize
+    // Handle window/container resize — fit inside rAF to ensure the DOM has
+    // reflowed before we measure.  The debounce collapses rapid events (e.g.
+    // continuous window drag-resize) into a single measurement.
     const debouncedFit = debounce(() => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-    }, 100);
+      requestAnimationFrame(() => {
+        if (fitAddonRef.current) {
+          fitAddonRef.current.fit();
+        }
+      });
+    }, 50);
 
     window.addEventListener('resize', debouncedFit);
 
