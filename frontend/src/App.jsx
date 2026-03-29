@@ -2003,6 +2003,10 @@ function App() {
               if (code >= 1 && code <= 26) termRef.sendRaw(String.fromCharCode(code));
             }
           }}
+          onImageUpload={(filePath) => {
+            const termRef = getActiveTerminalRef();
+            termRef?.sendCommand(`see file at ${filePath}`);
+          }}
         />
       )}
 

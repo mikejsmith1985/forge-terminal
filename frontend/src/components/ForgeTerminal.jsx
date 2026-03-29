@@ -784,21 +784,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }, executionDelay);
         }
 
-        // Log command for crash recovery
-        if (command) {
-          fetch('/api/am/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tabId: tabId,
-              tabName: tabNameRef.current || 'Terminal',
-              workspace: window.location.pathname,
-              entryType: 'COMMAND_EXECUTED',
-              content: command.length > 500 ? command.substring(0, 500) + '...' : command,
-            }),
-          }).catch(err => console.warn('[AM] Failed to log command:', err));
-        }
-
         return true;
       }
       console.warn('[Terminal] Cannot send command - WebSocket not connected');
@@ -954,7 +939,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     const term = new Terminal({
       cursorBlink: true,
       fontSize: fontSize,
-      fontFamily: '"Cascadia Code", "Fira Code", Consolas, Monaco, "Courier New", monospace',
+      // Cascadia Mono (not Cascadia Code) — same font, no programming ligatures.
+      // Ligatures in "Cascadia Code" can cause character-cell-width mismatches in
+      // Edge on Windows, leading to box-drawing char misalignment in TUI apps.
+      fontFamily: '"Cascadia Mono", "Cascadia Code", "Fira Code", Consolas, Monaco, "Courier New", monospace',
+      fontWeight: 'normal',
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,

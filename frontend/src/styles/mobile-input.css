@@ -26,7 +26,7 @@
 .mobile-special-key {
   flex-shrink: 0;
   min-width: 44px;
-  height: 36px;
+  height: 38px;
   border: 1px solid var(--border-color, #555);
   border-radius: 4px;
   background: var(--bg-tertiary, #2d2d2d);
@@ -37,8 +37,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
+  padding: 0 10px;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Utility keys (Paste, Multi) are slightly wider since they have text labels */
+.mobile-special-key.mobile-utility-key {
+  min-width: 60px;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  gap: 3px;
 }
 
 .mobile-special-key:active {
@@ -52,10 +60,17 @@
   border-color: var(--accent-color, #ff6b00);
 }
 
+.mobile-special-key.error {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+/* Main input row: text field + image button + send button */
 .mobile-input-row {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   padding: 4px;
+  align-items: flex-end;
 }
 
 .mobile-command-input {
@@ -69,15 +84,23 @@
   font-family: monospace;
   padding: 0 12px;
   outline: none;
+  min-width: 0; /* Prevent flex overflow */
 }
 
 .mobile-command-input:focus {
   border-color: var(--accent-color, #ff6b00);
 }
 
-.mobile-paste-btn,
-.mobile-send-btn,
-.mobile-expand-btn,
+.mobile-command-textarea {
+  height: auto !important;
+  min-height: 44px;
+  max-height: 140px;
+  padding: 10px 12px;
+  resize: none;
+  line-height: 1.4;
+}
+
+/* Image button — compact, sits left of send */
 .mobile-image-btn {
   flex-shrink: 0;
   width: 44px;
@@ -94,24 +117,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-paste-btn:active,
-.mobile-expand-btn:active,
 .mobile-image-btn:active {
   background: var(--bg-secondary, #1e1e1e);
-}
-
-.mobile-paste-btn.error {
-  border-color: #f59e0b;
-  color: #f59e0b;
-}
-
-.mobile-expand-btn {
-  width: 32px;
-  font-size: 14px;
-}
-
-.mobile-image-btn {
-  font-size: 16px;
 }
 
 .mobile-image-btn:disabled {
@@ -119,19 +126,21 @@
   cursor: default;
 }
 
-.mobile-command-textarea {
-  height: auto !important;
-  min-height: 44px;
-  max-height: 120px;
-  padding: 10px 12px;
-  resize: none;
-  line-height: 1.4;
-}
-
+/* Send button — primary action, accent color */
 .mobile-send-btn {
+  flex-shrink: 0;
+  width: 52px;
+  height: 44px;
+  border: 1px solid var(--accent-color, #ff6b00);
+  border-radius: 4px;
   background: var(--accent-color, #ff6b00);
   color: white;
-  border-color: var(--accent-color, #ff6b00);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .mobile-send-btn:active {

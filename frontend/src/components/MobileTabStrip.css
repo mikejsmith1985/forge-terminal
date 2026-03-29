@@ -22,17 +22,18 @@
 .mobile-tab {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 9px 14px;
   border-radius: 4px;
   background: var(--bg-tertiary, #2d2d2d);
-  color: var(--text-secondary, #999);
-  font-size: 13px;
+  color: var(--text-secondary, #aaa);
+  font-size: 14px;
   white-space: nowrap;
   flex-shrink: 0;
   scroll-snap-align: start;
   cursor: pointer;
-  min-height: 36px;
+  min-height: 44px;
+  min-width: 70px;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -71,14 +72,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 1px dashed var(--border-color, #555);
   border-radius: 4px;
   background: transparent;
   color: var(--text-secondary, #999);
   cursor: pointer;
   flex-shrink: 0;
+  font-size: 18px;
 }
 
 .mobile-new-tab:active {

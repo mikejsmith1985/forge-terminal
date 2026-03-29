@@ -113,7 +113,26 @@ export function MobileInputBar({ onSubmit, onSpecialKey, onImageUpload }) {
 
   return (
     <div className="mobile-input-bar">
+      {/* Scrollable row: utility actions + terminal special keys */}
       <div className="mobile-special-keys">
+        {/* Paste — moved here so main row stays uncluttered */}
+        <button
+          className={`mobile-special-key mobile-utility-key ${pasteError ? 'error' : ''}`}
+          onClick={handlePaste}
+          aria-label="paste from clipboard"
+          title={pasteError ? 'Long-press input to paste' : 'Paste clipboard'}
+        >
+          {pasteError ? '⚠' : '⎘ Paste'}
+        </button>
+        {/* Expand toggle — moved here so main row stays uncluttered */}
+        <button
+          className={`mobile-special-key mobile-utility-key ${expanded ? 'active' : ''}`}
+          onClick={toggleExpand}
+          aria-label={expanded ? 'collapse input' : 'expand for long input'}
+          title={expanded ? 'Single line' : 'Multi-line (long prompts)'}
+        >
+          {expanded ? '▾ Multi' : '▴ Multi'}
+        </button>
         {SPECIAL_KEYS.map((keyDef) => (
           <button
             key={keyDef.key}
@@ -125,23 +144,8 @@ export function MobileInputBar({ onSubmit, onSpecialKey, onImageUpload }) {
           </button>
         ))}
       </div>
+      {/* Main input row: text field + image picker + send — nothing else */}
       <div className="mobile-input-row">
-        <button
-          className={`mobile-paste-btn ${pasteError ? 'error' : ''}`}
-          onClick={handlePaste}
-          aria-label="paste from clipboard"
-          title={pasteError ? 'Long-press input to paste' : 'Paste clipboard'}
-        >
-          {pasteError ? '⚠' : '⎘'}
-        </button>
-        <button
-          className="mobile-expand-btn"
-          onClick={toggleExpand}
-          aria-label={expanded ? 'collapse input' : 'expand for long input'}
-          title={expanded ? 'Single line' : 'Multi-line (long prompts)'}
-        >
-          {expanded ? '▾' : '▴'}
-        </button>
         <InputComponent
           ref={inputRef}
           {...inputProps}
@@ -157,7 +161,7 @@ export function MobileInputBar({ onSubmit, onSpecialKey, onImageUpload }) {
         <button
           className="mobile-image-btn"
           onClick={() => fileInputRef.current?.click()}
-          aria-label="attach image"
+          aria-label="attach image or file"
           title="Upload image/file"
           disabled={uploading}
         >
