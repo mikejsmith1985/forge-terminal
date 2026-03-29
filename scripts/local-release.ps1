@@ -186,6 +186,16 @@ git push origin HEAD
 if ($LASTEXITCODE -ne 0) { Write-Fail "git push failed" }
 Write-OK "Pushed to origin"
 
+# ── Git tag ───────────────────────────────────────────────────────────────────
+Write-Banner "Tagging"
+git tag -a $TAG -m "Release $TAG"
+if ($LASTEXITCODE -ne 0) { Write-Fail "git tag failed" }
+Write-OK "Tag $TAG created locally"
+
+git push origin $TAG
+if ($LASTEXITCODE -ne 0) { Write-Fail "Tag push failed — is $TAG already on remote? Delete it first with: git push origin :$TAG" }
+Write-OK "Tag $TAG pushed to origin"
+
 # ── Release notes ─────────────────────────────────────────────────────────────
 Write-Banner "Release notes"
 Write-Host "  Enter release notes (press Enter twice to finish):" -ForegroundColor Yellow
@@ -232,13 +242,6 @@ Write-Step "Publishing release..."
 gh release edit $TAG --draft=false
 if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to publish release" }
 Write-OK "Release $TAG published"
-
-# ── Git tag ───────────────────────────────────────────────────────────────────
-Write-Banner "Tagging"
-git tag -a $TAG -m "Release $TAG"
-git push origin $TAG
-if ($LASTEXITCODE -ne 0) { Write-Warn "Tag push failed (release already published — non-fatal)" }
-else { Write-OK "Tag $TAG pushed" }
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 Write-Host ""
