@@ -309,7 +309,6 @@ func main() {
 	http.HandleFunc("/api/notify/prompt", WrapWithMiddleware(handleNotifyPrompt))
 	http.HandleFunc("/api/notify/respond", handleNotifyRespond) // no auth middleware — accessed by phone browser
 	http.HandleFunc("/api/notify/pending", WrapWithMiddleware(handleNotifyPending))
-	http.HandleFunc("/api/notify/inbound", handleNotifyInbound)      // no middleware — called by MBL2PC server
 	http.HandleFunc("/api/notify/inbound/poll", WrapWithMiddleware(handleNotifyInboundPoll))
 
 	// Cloudflare tunnel management API
@@ -322,10 +321,6 @@ func main() {
 	http.HandleFunc("/api/hosted/start", WrapWithMiddleware(handleHostedStart))
 	http.HandleFunc("/api/hosted/stop", WrapWithMiddleware(handleHostedStop))
 
-	// Atlassian / MCP integration
-	http.HandleFunc("/api/atlassian/status", WrapWithMiddleware(handleAtlassianStatus))
-	http.HandleFunc("/api/atlassian/setup", WrapWithMiddleware(handleAtlassianSetup))
-	http.HandleFunc("/api/atlassian/config", WrapWithMiddleware(handleAtlassianDelete))
 	http.HandleFunc("/api/project/release-script", WrapWithMiddleware(handleProjectReleaseScript))
 
 	// Setup wizard

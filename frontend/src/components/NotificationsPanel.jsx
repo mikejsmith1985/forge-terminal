@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, BellOff, Send, Eye, EyeOff, CheckCircle, AlertCircle, Radio } from 'lucide-react';
+import { Bell, Send, CheckCircle, AlertCircle } from 'lucide-react';
 
 const DEFAULT_CONFIG = {
-  webhookURL: '',
-  webhookSecret: '',
   idleDetectionEnabled: true,
   idleTimeoutSeconds: 30,
   baseURL: '',
@@ -14,8 +12,6 @@ const DEFAULT_CONFIG = {
 
 const NotificationsPanel = ({ onToast }) => {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
-  const [showSecret, setShowSecret] = useState(false);
-  const [showRenderKey, setShowRenderKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -107,8 +103,7 @@ const NotificationsPanel = ({ onToast }) => {
 
   const transport = config.transport || 'ntfy';
   const isNtfy = transport === 'ntfy';
-  const isMbl2pc = transport === 'mbl2pc';
-  const isConfigured = isNtfy ? !!config.ntfyTopic : (!!config.webhookURL && !!config.webhookSecret);
+  const isConfigured = !!config.ntfyTopic;
 
   return (
     <div style={{ padding: '24px', maxWidth: '520px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -129,7 +124,6 @@ const NotificationsPanel = ({ onToast }) => {
         <div style={{ display: 'flex', gap: '8px' }}>
           {[
             { value: 'ntfy', label: '🔔 ntfy.sh', sublabel: 'Recommended — zero setup' },
-            { value: 'mbl2pc', label: '📡 mbl2pc', sublabel: 'Legacy' },
           ].map(opt => (
             <button
               key={opt.value}
@@ -221,130 +215,6 @@ const NotificationsPanel = ({ onToast }) => {
         </>
       )}
 
-      {/* ── mbl2pc config (legacy) ──────────────────────────────────────── */}
-      {isMbl2pc && (
-        <>
-          <div style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '6px', padding: '10px 14px', fontSize: '12px', color: '#fde68a', lineHeight: 1.6 }}>
-            <strong style={{ color: '#fbbf24' }}>⚠️ Legacy transport.</strong> mbl2pc runs on Render's free tier which <strong>spins down</strong> after 15 min of inactivity,
-            causing cold-start timeouts. Consider switching to ntfy.sh for reliable delivery.
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>mbl2pc URL</label>
-            <input
-              type="url"
-              value={config.webhookURL}
-              onChange={e => update('webhookURL', e.target.value)}
-              placeholder="https://mbl2pc.onrender.com"
-              style={inputStyle}
-            />
-            <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)' }}>
-              Root URL only — do <strong>not</strong> include <code style={codeStyle}>/webhook</code>
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>Webhook Secret</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type={showSecret ? 'text' : 'password'}
-                value={config.webhookSecret}
-                onChange={e => update('webhookSecret', e.target.value)}
-                placeholder="your WEBHOOK_SECRET from Render"
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              <button onClick={() => setShowSecret(s => !s)} style={iconBtnStyle} title={showSecret ? 'Hide' : 'Show'}>
-                {showSecret ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>
-              Forge Base URL <span style={{ fontWeight: 400, color: 'var(--text-muted, #888)' }}>(optional — for remote responses)</span>
-            </label>
-            <input
-              type="url"
-              value={config.baseURL}
-              onChange={e => update('baseURL', e.target.value)}
-              placeholder="http://192.168.1.100:8080"
-              style={inputStyle}
-            />
-          </div>
-
-          {config.baseURL && (
-            <div style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: '6px', padding: '10px 14px', fontSize: '12px', color: '#93c5fd', lineHeight: 1.6 }}>
-              <strong style={{ color: '#bfdbfe' }}>Two-way replies enabled</strong><br />
-              Set on your MBL2PC Render instance:
-              <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px 10px', fontFamily: 'monospace', fontSize: '12px', color: '#e0f2fe', wordBreak: 'break-all' }}>
-                  FORGE_INBOUND_URL={config.baseURL}
-                </div>
-                <button
-                  onClick={() => navigator.clipboard.writeText(`FORGE_INBOUND_URL=${config.baseURL}`).then(() => onToast?.('Copied', 'success'))}
-                  style={{ flexShrink: 0, background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.3)', borderRadius: '4px', color: '#93c5fd', cursor: 'pointer', padding: '6px 10px', fontSize: '12px' }}
-                >📋 Copy</button>
-              </div>
-            </div>
-          )}
-
-          {/* Cloudflare Tunnel section */}
-          <div>
-            <h4 style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary, #e0e0e0)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Radio size={14} /> Cloudflare Tunnel
-            </h4>
-            <p style={{ margin: '0 0 14px', fontSize: '12px', color: 'var(--text-muted, #888)', lineHeight: 1.5 }}>
-              Auto-manage a <code style={codeStyle}>cloudflared</code> quick tunnel to keep <code style={codeStyle}>FORGE_INBOUND_URL</code> on Render in sync.
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px 12px', background: 'var(--surface, #1e1e1e)', borderRadius: '6px', border: '1px solid var(--border, #333)' }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: tunnelStatus.running ? '#22c55e' : '#555', boxShadow: tunnelStatus.running ? '0 0 6px #22c55e' : 'none', display: 'inline-block' }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {tunnelStatus.running && tunnelStatus.url
-                  ? <span style={{ fontSize: '12px', color: '#4ade80', fontFamily: 'monospace', wordBreak: 'break-all' }}>{tunnelStatus.url}</span>
-                  : tunnelStatus.running
-                    ? <span style={{ fontSize: '12px', color: '#888' }}>Starting…</span>
-                    : <span style={{ fontSize: '12px', color: '#555' }}>Not running</span>
-                }
-                {tunnelStatus.error && <div style={{ fontSize: '11px', color: '#f87171', marginTop: '2px' }}>{tunnelStatus.error}</div>}
-              </div>
-              <button
-                disabled={tunnelLoading}
-                onClick={async () => {
-                  setTunnelLoading(true);
-                  try {
-                    await fetch(tunnelStatus.running ? '/api/tunnel/stop' : '/api/tunnel/start', { method: 'POST' });
-                    const s = await fetch('/api/tunnel/status').then(r => r.json());
-                    setTunnelStatus(s);
-                  } catch { /* ignore */ } finally { setTunnelLoading(false); }
-                }}
-                style={{ ...btnStyle, background: tunnelStatus.running ? '#7f1d1d' : 'var(--accent, #7c9ef7)', color: tunnelStatus.running ? '#fca5a5' : '#000', padding: '6px 12px', fontSize: '12px' }}
-              >
-                {tunnelLoading ? '…' : tunnelStatus.running ? 'Stop' : 'Start'}
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '14px' }}>
-              <button onClick={() => updateAndSave('tunnelAutoStart', !config.tunnelAutoStart)} style={{ ...toggleStyle, background: config.tunnelAutoStart ? 'var(--accent, #7c9ef7)' : 'var(--surface, #333)' }}>
-                <span style={{ ...toggleKnobStyle, transform: config.tunnelAutoStart ? 'translateX(18px)' : 'translateX(2px)' }} />
-              </button>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>Auto-start tunnel when Forge opens</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>Render API Key</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type={showRenderKey ? 'text' : 'password'} value={config.renderAPIKey} onChange={e => update('renderAPIKey', e.target.value)} placeholder="rnd_…" style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={() => setShowRenderKey(s => !s)} style={iconBtnStyle}>{showRenderKey ? <EyeOff size={15} /> : <Eye size={15} />}</button>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>MBL2PC Service ID</label>
-              <input type="text" value={config.renderServiceID} onChange={e => update('renderServiceID', e.target.value)} placeholder="srv-…" style={inputStyle} />
-            </div>
-          </div>
-        </>
-      )}
-
       {/* ── Shared: idle detection ──────────────────────────────────────── */}
       <div style={{ borderTop: '1px solid var(--border, #333)' }} />
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -391,7 +261,7 @@ const NotificationsPanel = ({ onToast }) => {
           onClick={handleTest}
           disabled={testing || !isConfigured}
           style={{ ...btnStyle, background: 'var(--surface-2, #444)', color: 'var(--text-primary, #e0e0e0)', display: 'flex', alignItems: 'center', gap: '6px' }}
-          title={!isConfigured ? (isNtfy ? 'Enter a notification topic first' : 'Enter a webhook URL and secret first') : 'Send a test notification to your phone'}
+          title={!isConfigured ? 'Enter a notification topic first' : 'Send a test notification to your phone'}
         >
           {testing ? 'Sending…' : <><Send size={13} /> Test Notification</>}
         </button>
@@ -402,10 +272,7 @@ const NotificationsPanel = ({ onToast }) => {
       {/* Setup reminder */}
       {!isConfigured && (
         <div style={{ background: 'rgba(255,200,0,0.08)', border: '1px solid rgba(255,200,0,0.2)', borderRadius: '6px', padding: '10px 14px', fontSize: '12px', color: '#ffc107', lineHeight: 1.5 }}>
-          {isNtfy
-            ? <><strong>Setup required:</strong> Enter a topic name above, then subscribe to it in the <a href="https://ntfy.sh" target="_blank" rel="noreferrer" style={{ color: '#ffd54f' }}>ntfy app</a> on your phone.</>
-            : <><strong>Setup required:</strong> Add <code>WEBHOOK_SECRET</code> and <code>WEBHOOK_USER_ID</code> to your Render environment variables on mbl2pc, then enter the matching values here.</>
-          }
+          <strong>Setup required:</strong> Enter a topic name above, then subscribe to it in the <a href="https://ntfy.sh" target="_blank" rel="noreferrer" style={{ color: '#ffd54f' }}>ntfy app</a> on your phone.
         </div>
       )}
     </div>

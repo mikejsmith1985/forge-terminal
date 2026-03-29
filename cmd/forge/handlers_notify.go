@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -21,7 +20,7 @@ import (
 
 // NotifyConfig holds user-configured notification settings.
 type NotifyConfig struct {
-	// Transport selects the delivery backend: "ntfy" (default) or "mbl2pc".
+	// Transport selects the delivery backend: "ntfy" (default).
 	Transport string `json:"transport"`
 	// ── ntfy transport ──────────────────────────────────────────────────────
 	// NtfyTopic is the ntfy.sh topic Forge publishes notifications to.
@@ -32,9 +31,6 @@ type NotifyConfig struct {
 	NtfyInboundTopic string `json:"ntfyInboundTopic"`
 	// NtfyServerURL allows using a self-hosted ntfy server (default: https://ntfy.sh).
 	NtfyServerURL string `json:"ntfyServerURL"`
-	// ── mbl2pc transport (legacy) ────────────────────────────────────────────
-	WebhookURL           string `json:"webhookURL"`
-	WebhookSecret        string `json:"webhookSecret"`
 	IdleDetectionEnabled bool   `json:"idleDetectionEnabled"`
 	IdleTimeoutSeconds   int    `json:"idleTimeoutSeconds"`
 	// BaseURL is the externally-reachable base URL of this Forge instance.
@@ -269,47 +265,6 @@ func pollNtfyInbound(serverURL, topic, since string) ([]InboundMessage, string, 
 	return msgs, lastID, scanner.Err()
 }
 
-// ── mbl2pc transport (legacy) ─────────────────────────────────────────────────
-
-// mbl2pcSender sends notifications to an mbl2pc /webhook endpoint.
-type mbl2pcSender struct {
-	webhookURL    string
-	webhookSecret string
-}
-
-type mbl2pcWebhookPayload struct {
-	Text   string `json:"text"`
-	Token  string `json:"token"`
-	Sender string `json:"sender"`
-}
-
-func (s *mbl2pcSender) Send(message, sender string) error {
-	payload := mbl2pcWebhookPayload{
-		Text:   message,
-		Token:  s.webhookSecret,
-		Sender: sender,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal error: %w", err)
-	}
-	req, err := http.NewRequest(http.MethodPost, s.webhookURL+"/webhook", bytes.NewReader(body)) //nolint:gosec
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := notifyHTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("POST /webhook failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("webhook returned %d: %s", resp.StatusCode, string(b))
-	}
-	return nil
-}
-
 // newSenderFromConfig builds the right transport from the current config.
 func newSenderFromConfig(cfg NotifyConfig) (NotificationSender, error) {
 	transport := cfg.Transport
@@ -322,13 +277,8 @@ func newSenderFromConfig(cfg NotifyConfig) (NotificationSender, error) {
 			return nil, fmt.Errorf("ntfy not configured: ntfyTopic is required")
 		}
 		return &ntfySender{serverURL: cfg.NtfyServerURL, topic: cfg.NtfyTopic}, nil
-	case "mbl2pc":
-		if cfg.WebhookURL == "" || cfg.WebhookSecret == "" {
-			return nil, fmt.Errorf("mbl2pc not configured: webhookURL and webhookSecret are required")
-		}
-		return &mbl2pcSender{webhookURL: cfg.WebhookURL, webhookSecret: cfg.WebhookSecret}, nil
 	default:
-		return nil, fmt.Errorf("unknown transport %q — use \"ntfy\" or \"mbl2pc\"", transport)
+		return nil, fmt.Errorf("unknown transport %q — use \"ntfy\"", transport)
 	}
 }
 
@@ -387,9 +337,6 @@ func handleNotifyConfigGet(w http.ResponseWriter, r *http.Request) {
 	}
 	// Mask secret — never send plaintext to frontend
 	masked := cfg
-	if masked.WebhookSecret != "" {
-		masked.WebhookSecret = maskSecret(masked.WebhookSecret)
-	}
 	if masked.RenderAPIKey != "" {
 		masked.RenderAPIKey = maskSecret(masked.RenderAPIKey)
 	}
@@ -410,9 +357,6 @@ func handleNotifyConfigPost(w http.ResponseWriter, r *http.Request) {
 	}
 	// Load existing config to preserve secrets if the frontend sent the mask
 	existing, _ := loadNotifyConfig()
-	if incoming.WebhookSecret == maskSecret("x") {
-		incoming.WebhookSecret = existing.WebhookSecret
-	}
 	if incoming.RenderAPIKey == maskSecret("x") {
 		incoming.RenderAPIKey = existing.RenderAPIKey
 	}
@@ -463,9 +407,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// ── Inbound message buffer (replies from MBL2PC) ─────────────────────────────
+// ── Inbound message buffer (replies from phone) ──────────────────────────────
 
-// InboundMessage is a message sent by the user from the MBL2PC UI, forwarded
+// InboundMessage is a message sent by the user from their phone, forwarded
 // to Forge so the agent can receive replies without the user touching the PC.
 type InboundMessage struct {
 	ID        string    `json:"id"`
@@ -481,54 +425,8 @@ var (
 	inboundMessagesMu sync.Mutex
 )
 
-// handleNotifyInbound handles POST /api/notify/inbound
-// Called by MBL2PC when the user sends a message, or by any trusted caller.
-// Body: {"text":"...","sender":"...","token":"..."}
-func handleNotifyInbound(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	var req struct {
-		Text   string `json:"text"`
-		Sender string `json:"sender"`
-		Token  string `json:"token"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	// Auth: token must match webhookSecret
-	cfg, err := loadNotifyConfig()
-	if err != nil || cfg.WebhookSecret == "" || req.Token != cfg.WebhookSecret {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	if req.Text == "" {
-		http.Error(w, "text is required", http.StatusBadRequest)
-		return
-	}
-
-	msg := InboundMessage{
-		ID:        randomHex(8),
-		Text:      req.Text,
-		Sender:    req.Sender,
-		Timestamp: time.Now(),
-	}
-
-	inboundMessagesMu.Lock()
-	inboundMessages = append(inboundMessages, msg)
-	if len(inboundMessages) > inboundBufferCap {
-		inboundMessages = inboundMessages[len(inboundMessages)-inboundBufferCap:]
-	}
-	inboundMessagesMu.Unlock()
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "received", "id": msg.ID})
-}
-
 // handleNotifyInboundPoll handles GET /api/notify/inbound/poll?since=<id>
-// Frontend polls this to receive messages forwarded from MBL2PC.
+// Frontend polls this to receive inbound messages from phone (via ntfy).
 // Returns messages added after the given ID (or all recent if no ID given).
 func handleNotifyInboundPoll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

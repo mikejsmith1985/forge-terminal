@@ -24,10 +24,6 @@ func handleSetupWizard(w http.ResponseWriter, r *http.Request) {
 type setupCheckResponse struct {
 	CloudflaredInstalled bool   `json:"cloudflaredInstalled"`
 	CloudflaredPath      string `json:"cloudflaredPath"`
-	WebhookSecret        string `json:"webhookSecret"`
-	WebhookURL           string `json:"webhookURL"`
-	RenderAPIKey         string `json:"renderAPIKey"` // masked
-	RenderServiceID      string `json:"renderServiceID"`
 	BaseURL              string `json:"baseURL"`
 	TunnelAutoStart      bool   `json:"tunnelAutoStart"`
 	TunnelRunning        bool   `json:"tunnelRunning"`
@@ -47,10 +43,6 @@ func handleSetupCheck(w http.ResponseWriter, r *http.Request) {
 	resp := setupCheckResponse{
 		CloudflaredInstalled: binPath != "",
 		CloudflaredPath:      binPath,
-		WebhookSecret:        cfg.WebhookSecret,
-		WebhookURL:           cfg.WebhookURL,
-		RenderAPIKey:         maskSecret(cfg.RenderAPIKey),
-		RenderServiceID:      cfg.RenderServiceID,
 		BaseURL:              cfg.BaseURL,
 		TunnelAutoStart:      cfg.TunnelAutoStart,
 		TunnelRunning:        running,
@@ -131,10 +123,6 @@ func cloudflaredDownloadURL() string {
 // ── /api/setup/activate — save config + start tunnel in one shot ─────────────
 
 type activateRequest struct {
-	WebhookURL      string `json:"webhookURL"`
-	WebhookSecret   string `json:"webhookSecret"`
-	RenderAPIKey    string `json:"renderAPIKey"`
-	RenderServiceID string `json:"renderServiceID"`
 	TunnelAutoStart bool   `json:"tunnelAutoStart"`
 }
 
@@ -153,19 +141,6 @@ func handleSetupActivate(w http.ResponseWriter, r *http.Request) {
 	// Load existing config so we don't wipe fields we don't touch.
 	cfg, _ := loadNotifyConfig()
 
-	if req.WebhookURL != "" {
-		cfg.WebhookURL = req.WebhookURL
-	}
-	if req.WebhookSecret != "" && req.WebhookSecret != maskSecret(cfg.WebhookSecret) {
-		cfg.WebhookSecret = req.WebhookSecret
-	}
-	// Render API key — preserve existing if masked value sent
-	if req.RenderAPIKey != "" && req.RenderAPIKey != maskSecret(cfg.RenderAPIKey) {
-		cfg.RenderAPIKey = req.RenderAPIKey
-	}
-	if req.RenderServiceID != "" {
-		cfg.RenderServiceID = req.RenderServiceID
-	}
 	cfg.TunnelAutoStart = req.TunnelAutoStart
 
 	if err := saveNotifyConfig(cfg); err != nil {
@@ -192,7 +167,7 @@ const setupWizardHTML = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Forge · MBL2PC Setup Wizard</title>
+<title>Forge · Tunnel Setup Wizard</title>
 <style>
   :root {
     --bg: #0d0d0f;
@@ -477,23 +452,21 @@ const setupWizardHTML = `<!DOCTYPE html>
     <div class="logo-icon">⚡</div>
     <div>
       <div class="logo-text">Forge Terminal</div>
-      <div class="logo-sub">MBL2PC Remote Setup Wizard</div>
+      <div class="logo-sub">Tunnel Setup Wizard</div>
     </div>
   </div>
 
   <!-- Step indicators -->
   <div class="steps" id="steps">
     <div class="step-item active" id="si-0"><div class="step-circle">1</div><div class="step-label">Cloudflared</div></div>
-    <div class="step-item" id="si-1"><div class="step-circle">2</div><div class="step-label">Render<br>Credentials</div></div>
-    <div class="step-item" id="si-2"><div class="step-circle">3</div><div class="step-label">MBL2PC<br>Webhook</div></div>
-    <div class="step-item" id="si-3"><div class="step-circle">4</div><div class="step-label">Activate</div></div>
-    <div class="step-item" id="si-4"><div class="step-circle">✓</div><div class="step-label">Done</div></div>
+    <div class="step-item" id="si-1"><div class="step-circle">2</div><div class="step-label">Activate</div></div>
+    <div class="step-item" id="si-2"><div class="step-circle">✓</div><div class="step-label">Done</div></div>
   </div>
 
   <!-- STEP 0: cloudflared -->
   <div class="card visible" id="step-0">
     <h2>⚡ Install cloudflared</h2>
-    <p class="card-desc">Forge uses Cloudflare's free quick tunnel to give itself a public HTTPS URL so MBL2PC (running on Render) can reach it from anywhere — even when you're on a different network.<br><br>This step installs the <strong>cloudflared</strong> binary automatically.</p>
+    <p class="card-desc">Forge uses Cloudflare's free quick tunnel to give itself a public HTTPS URL so it can be reached from anywhere — even when you're on a different network.<br><br>This step installs the <strong>cloudflared</strong> binary automatically.</p>
 
     <div class="detect-row" id="cf-detect-row">
       <div class="label">
@@ -514,77 +487,10 @@ const setupWizardHTML = `<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- STEP 1: Render credentials -->
+  <!-- STEP 1: Activate -->
   <div class="card" id="step-1">
-    <h2>🔑 Render Credentials</h2>
-    <p class="card-desc">Forge needs your Render API key and MBL2PC service ID to automatically update the <code style="font-family:monospace;font-size:12px;background:var(--surface2);padding:1px 5px;border-radius:3px">FORGE_INBOUND_URL</code> env var whenever the tunnel URL changes.</p>
-
-    <div class="field">
-      <label>Render API Key</label>
-      <div class="input-row">
-        <input type="password" id="f-renderKey" placeholder="rnd_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
-        <button class="eye-btn" onclick="toggleEye('f-renderKey',this)">👁</button>
-      </div>
-      <div class="hint">
-        Get from <a href="https://dashboard.render.com/u/settings#api-keys" target="_blank">Render Dashboard → Account Settings → API Keys</a>.<br>
-        Click <strong>+ New API Key</strong>, name it "Forge", and paste it here.
-      </div>
-    </div>
-
-    <div class="field">
-      <label>MBL2PC Service ID</label>
-      <input type="text" id="f-serviceID" placeholder="srv-xxxxxxxxxxxxxxxxxxxx">
-      <div class="hint">
-        Open your MBL2PC service on Render. The service ID is in the URL:<br>
-        <code style="font-size:11px">https://dashboard.render.com/web/<strong>srv-xxxxxxxxxxxxxxxxxxxx</strong></code>
-      </div>
-    </div>
-
-    <div class="btn-row">
-      <button class="btn btn-secondary" onclick="goStep(0)">← Back</button>
-      <button class="btn btn-primary" onclick="goStep(2)">Next →</button>
-    </div>
-  </div>
-
-  <!-- STEP 2: MBL2PC webhook -->
-  <div class="card" id="step-2">
-    <h2>🔗 MBL2PC Webhook</h2>
-    <p class="card-desc">Forge uses a shared webhook secret to authenticate messages from MBL2PC (so only your MBL2PC instance can send commands to Forge). This secret must match the <code style="font-family:monospace;font-size:12px;background:var(--surface2);padding:1px 5px;border-radius:3px">FORGE_WEBHOOK_SECRET</code> environment variable set on your Render MBL2PC service.</p>
-
-    <div class="field">
-      <label>MBL2PC Webhook URL</label>
-      <input type="url" id="f-webhookURL" placeholder="https://your-mbl2pc.onrender.com">
-      <div class="hint">The base URL of your MBL2PC deployment on Render (no trailing slash).</div>
-    </div>
-
-    <div class="field">
-      <label>Webhook Secret</label>
-      <div class="input-row">
-        <input type="password" id="f-webhookSecret" placeholder="auto-generated if blank" autocomplete="off">
-        <button class="eye-btn" onclick="toggleEye('f-webhookSecret',this)">👁</button>
-        <button class="btn btn-secondary btn-sm" onclick="genSecret()" style="white-space:nowrap">Generate</button>
-      </div>
-      <div class="hint">
-        Any strong random string. After setup, copy this exact value to<br>
-        <strong>Render → MBL2PC → Environment → FORGE_WEBHOOK_SECRET</strong>.
-      </div>
-    </div>
-
-    <div id="render-env-block" style="display:none;margin-top:4px">
-      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Copy these two env vars to your Render MBL2PC service:</p>
-      <div class="code-block" id="render-env-text"></div>
-    </div>
-
-    <div class="btn-row">
-      <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
-      <button class="btn btn-primary" onclick="showRenderEnvAndContinue()">Next →</button>
-    </div>
-  </div>
-
-  <!-- STEP 3: Activate -->
-  <div class="card" id="step-3">
     <h2>🚀 Activate</h2>
-    <p class="card-desc">Everything is ready. Click <strong>Save &amp; Launch</strong> to save your settings and start the Cloudflare tunnel. Forge will automatically update <code style="font-family:monospace;font-size:12px;background:var(--surface2);padding:1px 5px;border-radius:3px">FORGE_INBOUND_URL</code> on Render once the tunnel URL is assigned.</p>
+    <p class="card-desc">Everything is ready. Click <strong>Save &amp; Launch</strong> to save your settings and start the Cloudflare tunnel.</p>
 
     <div class="field">
       <label style="display:flex;align-items:center;gap:10px">
@@ -597,33 +503,22 @@ const setupWizardHTML = `<!DOCTYPE html>
       <li><span class="icon" id="ap-save-icon">⏳</span> Saving configuration</li>
       <li><span class="icon" id="ap-start-icon">⏳</span> Starting cloudflared tunnel</li>
       <li><span class="icon" id="ap-url-icon">⏳</span> Waiting for public URL</li>
-      <li><span class="icon" id="ap-render-icon">⏳</span> Updating Render FORGE_INBOUND_URL</li>
     </ul>
 
     <div id="activate-error" style="display:none;margin-top:12px" class="badge badge-err"></div>
 
     <div class="btn-row">
-      <button class="btn btn-secondary" id="activate-back-btn" onclick="goStep(2)">← Back</button>
+      <button class="btn btn-secondary" id="activate-back-btn" onclick="goStep(0)">← Back</button>
       <button class="btn btn-primary" id="activate-btn" onclick="activate()">Save &amp; Launch ⚡</button>
     </div>
   </div>
 
-  <!-- STEP 4: Done -->
-  <div class="card" id="step-4">
+  <!-- STEP 2: Done -->
+  <div class="card" id="step-2">
     <h2>✅ Setup Complete!</h2>
     <p class="card-desc">Forge is live and connected. Here's a summary of your configuration:</p>
 
     <div class="summary-grid" id="done-summary"></div>
-
-    <hr>
-
-    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-      <strong style="color:var(--text)">One last step:</strong> Make sure these env vars are set on your Render MBL2PC service. Forge has already updated <code style="font-family:monospace;font-size:12px;background:var(--surface2);padding:1px 5px;border-radius:3px">FORGE_INBOUND_URL</code> automatically.
-    </p>
-
-    <div class="code-block" id="done-env-block">
-      <button class="copy-btn" onclick="copyEl('done-env-block')">Copy</button>
-    </div>
 
     <div class="btn-row" style="margin-top:24px">
       <button class="btn btn-primary" onclick="window.close()">Close Wizard</button>
@@ -638,8 +533,6 @@ const setupWizardHTML = `<!DOCTYPE html>
 <script>
 let state = {
   cfInstalled: false, cfPath: '',
-  renderKey: '', serviceID: '',
-  webhookURL: '', webhookSecret: '',
   autoStart: false,
   tunnelURL: ''
 };
@@ -651,18 +544,10 @@ async function init() {
     const d = await fetch('/api/setup/check').then(r => r.json());
     state.cfInstalled   = d.cloudflaredInstalled;
     state.cfPath        = d.cloudflaredPath;
-    state.renderKey     = d.renderAPIKey   || '';
-    state.serviceID     = d.renderServiceID || '';
-    state.webhookURL    = d.webhookURL     || '';
-    state.webhookSecret = d.webhookSecret  || '';
     state.autoStart     = d.tunnelAutoStart || false;
     state.tunnelURL     = d.tunnelURL      || '';
 
     // Pre-fill form fields
-    if (state.renderKey)     document.getElementById('f-renderKey').value   = state.renderKey;
-    if (state.serviceID)     document.getElementById('f-serviceID').value   = state.serviceID;
-    if (state.webhookURL)    document.getElementById('f-webhookURL').value  = state.webhookURL;
-    if (state.webhookSecret) document.getElementById('f-webhookSecret').value = state.webhookSecret;
     document.getElementById('f-autoStart').checked = state.autoStart;
 
     setCFStatus(d.cloudflaredInstalled, d.cloudflaredPath);
@@ -739,34 +624,6 @@ async function installCloudflared() {
   }
 }
 
-// ── Webhook step ─────────────────────────────────────────────────────────────
-
-function showRenderEnvAndContinue() {
-  const secret = document.getElementById('f-webhookSecret').value.trim();
-  const webhookURL = document.getElementById('f-webhookURL').value.trim();
-  if (!webhookURL) {
-    toast('⚠️ Please enter your MBL2PC webhook URL first.');
-    return;
-  }
-  // Show env vars to copy to Render
-  const block = document.getElementById('render-env-block');
-  const envText = document.getElementById('render-env-text');
-  const display = secret || '(paste the secret you entered above)';
-  envText.innerHTML =
-    'FORGE_WEBHOOK_SECRET=' + escHtml(display) + '\n' +
-    '(FORGE_INBOUND_URL will be set automatically by Forge)';
-  block.style.display = 'block';
-  goStep(3);
-}
-
-function genSecret() {
-  const arr = new Uint8Array(24);
-  crypto.getRandomValues(arr);
-  const hex = Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
-  document.getElementById('f-webhookSecret').value = hex;
-  document.getElementById('f-webhookSecret').type = 'text';
-}
-
 // ── Activate ─────────────────────────────────────────────────────────────────
 
 async function activate() {
@@ -786,10 +643,6 @@ async function activate() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        webhookURL:      document.getElementById('f-webhookURL').value.trim(),
-        webhookSecret:   document.getElementById('f-webhookSecret').value.trim(),
-        renderAPIKey:    document.getElementById('f-renderKey').value.trim(),
-        renderServiceID: document.getElementById('f-serviceID').value.trim(),
         tunnelAutoStart: document.getElementById('f-autoStart').checked,
       })
     });
@@ -828,17 +681,6 @@ async function activate() {
   }
   setIcon('ap-url-icon', '✓');
 
-  // ─ 4. Render update is automatic via onTunnelURL callback — just confirm ─
-  spin('ap-render-icon');
-  await sleep(2000); // give Render API call time to complete
-  const s = await fetch('/api/tunnel/status').then(r => r.json());
-  if (s.error) {
-    setIcon('ap-render-icon', '⚠');
-    toast('⚠️ Render update issue: ' + s.error, 6000);
-  } else {
-    setIcon('ap-render-icon', '✓');
-  }
-
   state.tunnelURL = tunnelURL;
   showFinalDone(tunnelURL);
 }
@@ -850,36 +692,16 @@ function showActivateError(msg) {
 }
 
 function showFinalDone(tunnelURL) {
-  const renderKey = document.getElementById('f-renderKey').value.trim();
-  const serviceID = document.getElementById('f-serviceID').value.trim();
-  const webhookURL = document.getElementById('f-webhookURL').value.trim();
-  const secret    = document.getElementById('f-webhookSecret').value.trim();
-
   // Summary grid
   const grid = document.getElementById('done-summary');
   const rows = [
     ['Tunnel URL', tunnelURL],
-    ['Render Service', serviceID || '—'],
-    ['MBL2PC URL', webhookURL || '—'],
   ];
   grid.innerHTML = rows.map(([k,v]) =>
     '<div class="key">' + escHtml(k) + '</div><div class="val">' + escHtml(v) + '</div>'
   ).join('');
 
-  // Env block
-  const envBlock = document.getElementById('done-env-block');
-  const lines = [
-    'FORGE_INBOUND_URL=' + tunnelURL + '  ← auto-managed, already set',
-    'FORGE_WEBHOOK_SECRET=' + (secret || '(your webhook secret)') + '  ← set this on Render',
-  ];
-  const existing = envBlock.querySelector('.copy-btn');
-  envBlock.textContent = lines.join('\n');
-  envBlock.prepend(existing || Object.assign(document.createElement('button'), {
-    className: 'copy-btn', textContent: 'Copy',
-    onclick: () => copyEl('done-env-block')
-  }));
-
-  goStep(4);
+  goStep(2);
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
