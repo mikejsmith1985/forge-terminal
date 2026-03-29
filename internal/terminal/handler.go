@@ -178,13 +178,16 @@ type DetachedSession struct {
 	graceTimer  *time.Timer
 	detachedAt  time.Time
 	gracePeriod time.Duration
+	readerDone  chan struct{} // Close to stop the orphaned PTY reader goroutine
 }
 
 const sessionGracePeriod = 5 * time.Minute // How long a detached PTY stays alive
 
 // detachSession keeps a PTY alive after its WebSocket disconnects.
 // If the PTY process has already exited, the session is closed immediately.
-func (h *Handler) detachSession(sessionID string, session *TerminalSession, gracePeriod time.Duration) {
+// readerDone is closed on reattach to stop the orphaned PTY reader goroutine,
+// preventing two goroutines from racing on the same PTY fd.
+func (h *Handler) detachSession(sessionID string, session *TerminalSession, gracePeriod time.Duration, readerDone chan struct{}) {
 	// Don't detach if PTY is already dead — nothing to reconnect to
 	if session.IsDone() || session.IsClosed() {
 		log.Printf("[Terminal] Session %s: PTY already exited, closing (not detaching)", sessionID)
@@ -196,12 +199,18 @@ func (h *Handler) detachSession(sessionID string, session *TerminalSession, grac
 		session:     session,
 		detachedAt:  time.Now(),
 		gracePeriod: gracePeriod,
+		readerDone:  readerDone,
 	}
 
 	ds.graceTimer = time.AfterFunc(gracePeriod, func() {
 		log.Printf("[Terminal] Session %s: grace period expired after %v, closing PTY",
 			sessionID, gracePeriod)
 		h.detachedSessions.Delete(sessionID)
+		// Close readerDone so the orphaned PTY reader goroutine exits cleanly
+		// instead of blocking on Read() until the PTY error propagates.
+		if readerDone != nil {
+			close(readerDone)
+		}
 		session.Close()
 	})
 
@@ -219,6 +228,13 @@ func (h *Handler) reattachSession(sessionID string) (*DetachedSession, bool) {
 
 	ds := value.(*DetachedSession)
 	ds.graceTimer.Stop()
+
+	// Stop the orphaned PTY reader goroutine from the previous handler.
+	// Without this, two goroutines race to Read() from the same PTY fd,
+	// splitting output and corrupting the terminal stream.
+	if ds.readerDone != nil {
+		close(ds.readerDone)
+	}
 
 	// Verify PTY is still alive
 	if ds.session.IsDone() || ds.session.IsClosed() {
@@ -412,6 +428,9 @@ func (h *Handler) CloseAllSessions() int {
 	h.detachedSessions.Range(func(key, value interface{}) bool {
 		if ds, ok := value.(*DetachedSession); ok {
 			ds.graceTimer.Stop()
+			if ds.readerDone != nil {
+				close(ds.readerDone)
+			}
 			ds.session.Close()
 			log.Printf("[Terminal] Closing detached session %s for restart", key)
 			count++
@@ -448,6 +467,9 @@ func (h *Handler) SuspendSessions() int {
 	h.detachedSessions.Range(func(key, value interface{}) bool {
 		if ds, ok := value.(*DetachedSession); ok {
 			ds.graceTimer.Stop()
+			if ds.readerDone != nil {
+				close(ds.readerDone)
+			}
 			ds.session.Close()
 			log.Printf("[Terminal] Closing detached session %s for system sleep", key)
 			count++
@@ -588,6 +610,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Compute grace period before the defer closure captures it
 	gracePeriod := GracePeriodForClient(r.Header.Get("User-Agent"))
 
+	// readerDone is closed on reattach to stop this handler's PTY reader goroutine,
+	// preventing two goroutines from racing on the same PTY fd after reconnection.
+	readerDone := make(chan struct{})
+
 	defer func() {
 		conn.markClosed()
 		hub.remove(conn)
@@ -596,7 +622,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if hub.size() == 0 {
 			h.hubs.Delete(sessionID)
 			h.sessions.CompareAndDelete(sessionID, session)
-			h.detachSession(sessionID, session, gracePeriod)
+			h.detachSession(sessionID, session, gracePeriod, readerDone)
 		}
 	}()
 
@@ -760,8 +786,8 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// PTY -> WebSocket (owner only).
 	// Watchers join the hub and receive broadcasts from this goroutine.
-	// The goroutine intentionally outlives individual WS connections: it keeps
-	// broadcasting to hub members until the PTY process exits.
+	// On reattach, the new handler closes readerDone to stop this goroutine
+	// and starts a fresh one, avoiding two goroutines racing on the same PTY fd.
 	if !isWatcher {
 		go func() {
 			defer closeOnce.Do(func() { close(done) })
@@ -772,10 +798,33 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		lastStatsReport := time.Now()
 		
 		for {
+			// Check if this reader has been superseded by a reattaching handler.
+			// This must be checked BEFORE the blocking Read() to exit promptly
+			// when the signal arrives between iterations.
+			select {
+			case <-readerDone:
+				log.Printf("[Terminal] Session %s: PTY reader goroutine stopped (session reattached)", sessionID)
+				return
+			default:
+			}
+
 			// FREEZE INSTRUMENTATION: Time PTY reads
 			readStart := time.Now()
 			n, err := session.Read(buf)
 			readDuration := time.Since(readStart)
+
+			// After waking from a blocking Read, check readerDone again.
+			// If a new handler reattached while we were blocked, flush any data
+			// we read before exiting — otherwise those bytes are silently lost.
+			select {
+			case <-readerDone:
+				if n > 0 {
+					hub.broadcast(websocket.BinaryMessage, buf[:n])
+				}
+				log.Printf("[Terminal] Session %s: PTY reader goroutine stopped after read (session reattached, flushed %d bytes)", sessionID, n)
+				return
+			default:
+			}
 			
 			// v3.9.1: Increase threshold to 500ms to reduce log noise
 			if readDuration > 500*time.Millisecond {
@@ -902,6 +951,14 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			msgType, data, err := rawConn.ReadMessage() // Reads don't need mutex
 			if err != nil {
 				log.Printf("[Terminal] WebSocket read error: %v", err)
+				// Report the unexpected disconnect so the server sends a proper
+				// close code (1001 "Going Away") instead of defaulting to 1000.
+				// Without this, pong timeouts send code 1000 and the frontend
+				// doesn't attempt reconnection.
+				select {
+				case closeChan <- closeReason{1001, "Connection lost"}:
+				default:
+				}
 				return
 			}
 
@@ -1179,7 +1236,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		select {
 		case finalReason = <-closeChan:
 		default:
-			finalReason = closeReason{websocket.CloseNormalClosure, "Connection closed"}
+			// Belt-and-suspenders: if closeChan is empty (shouldn't happen now
+			// that the WS read goroutine reports 1001), use 1001 "Going Away"
+			// instead of 1000. Code 1000 causes the frontend to NOT reconnect.
+			finalReason = closeReason{1001, "Connection lost"}
 		}
 	case <-session.Done():
 		// PTY process exited — close the session to prevent detach attempt

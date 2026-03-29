@@ -408,8 +408,13 @@ function detectCliPrompt(text, debugLog = false) {
  */
 function sanitizePath(path) {
   if (!path) return path;
+  // Strip double-quotes and everything after (quotes are invalid in Windows paths
+  // and indicate a command argument leaked into the path detection)
+  path = path.replace(/".*$/, '');
   // Remove && (and everything after) — not valid inside a filesystem path
   path = path.replace(/\s*&&.*$/, '');
+  // Strip argument-like suffixes: " -flag..." or " /flag..."
+  path = path.replace(/\s+[-\/][A-Za-z].*$/, '');
   // Remove trailing git-status / prompt decoration brackets, e.g. [master *%]
   path = path.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
   // Remove stray trailing status glyphs
@@ -437,8 +442,8 @@ function extractDirectory(text) {
     }
     
     // CMD prompt: "C:\Users\foo>" or "C:\Users\foo>command"
-    // Relaxed regex: Don't enforce start of line
-    const cmdMatch = line.match(/([A-Za-z]:\\[^>]*?)>/);
+    // Only match valid Windows path chars (no quotes, pipes, or redirections)
+    const cmdMatch = line.match(/([A-Za-z]:\\[^>"'|<]*?)>/);
     if (cmdMatch) {
       return sanitizePath(cmdMatch[1].trim());
     }
@@ -565,6 +570,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Track effective max for display (higher in dev mode)
   const effectiveMaxAttemptsRef = useRef(maxReconnectAttempts);
   const sessionReattachedRef = useRef(false); // Server restored existing PTY session
+  const unmountingRef = useRef(false); // Set during cleanup — suppresses reconnection on unmount
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
   const isVisibleRef = useRef(isVisible); // Track visibility to avoid stale closures in paste handlers
@@ -1794,72 +1800,63 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         setIsConnected(false);
         if (onConnectionChange) onConnectionChange(false);
         
-        // Provide meaningful disconnect messages based on close code
-        let disconnectMessage = 'Terminal session ended.';
+        // Provide meaningful disconnect messages based on close code.
+        // ALWAYS reconnect unless the component is unmounting.
+        // Previously, code 1000 set shouldReconnect=false, which meant
+        // pong-timeout disconnects (server sent 1000 by mistake) never recovered.
+        let disconnectMessage = 'Connection lost. Reconnecting...';
         let messageColor = '1;33'; // Yellow by default
-        let shouldReconnect = false;
+        let shouldReconnect = !unmountingRef.current;
         
         switch (event.code) {
           case 1000:
-            // Normal closure
-            disconnectMessage = 'Session closed normally.';
+            // Server sent "normal closure" — but this was historically sent
+            // erroneously on pong timeouts. Always reconnect to be safe.
+            disconnectMessage = 'Connection closed. Reconnecting...';
             break;
           case 1001:
-          case 1012:
-            disconnectMessage = 'Server is restarting...';
-            shouldReconnect = true;
+            disconnectMessage = 'Connection lost. Reconnecting...';
             break;
           case 1006:
-            // Abnormal closure (no close frame received) - likely server restart
+            // Abnormal closure (no close frame received)
             disconnectMessage = 'Connection lost. Attempting to reconnect...';
-            messageColor = '1;33'; // Yellow
-            shouldReconnect = true;
             break;
           case 1011:
-            // Server error
-            disconnectMessage = 'Server encountered an error.';
+            disconnectMessage = 'Server encountered an error. Reconnecting...';
             messageColor = '1;31'; // Red
-            shouldReconnect = true;
+            break;
+          case 1012:
+            disconnectMessage = 'Server is restarting...';
             break;
           case 1013:
             disconnectMessage = 'Server is overloaded, trying again...';
-            messageColor = '1;33'; // Yellow
-            shouldReconnect = true;
             break;
           case 4000:
             // Custom: PTY process exited - reconnect to get new shell
             disconnectMessage = 'Shell process exited. Reconnecting...';
-            shouldReconnect = true;
             break;
           case 4001:
             // Custom: Session timeout - reconnect to restore
             disconnectMessage = 'Session timed out. Reconnecting...';
-            shouldReconnect = true;
             break;
           case 4002:
             // Custom: PTY read error - reconnect to recover
             disconnectMessage = 'Terminal read error. Reconnecting...';
             messageColor = '1;31'; // Red
-            shouldReconnect = true;
             break;
           case 4003:
-            // Custom: Session restart requested - reconnect immediately (5 attempts default)
+            // Custom: Session restart requested
             disconnectMessage = 'Session restarted. Reconnecting...';
-            messageColor = '1;33'; // Yellow
-            shouldReconnect = true;
             break;
           case 4004:
             // Custom: System sleep/hibernate - reconnect with extra patience
             disconnectMessage = 'System went to sleep. Reconnecting...';
             messageColor = '1;36'; // Cyan
-            shouldReconnect = true;
             break;
           default:
             if (event.reason) {
               disconnectMessage = event.reason;
             }
-            // For unknown errors, try to reconnect
-            shouldReconnect = true;
         }
         
         // Only write to terminal if it's still active (not disposed)
@@ -1961,6 +1958,29 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // Initial connection
     connectWebSocket();
 
+    // Detect tab visibility changes to catch dead connections faster.
+    // When a browser tab is hidden, WebSocket connections can silently die
+    // (OS sleep, browser throttling, network changes). When the tab becomes
+    // visible again, proactively check if the connection is still alive.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !unmountingRef.current) {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          logger.terminal('Tab became visible — WebSocket dead, triggering reconnect', { tabId });
+          // Cancel any pending reconnection to avoid duplicates
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+          }
+          reconnectAttemptsRef.current = 0;
+          if (connectFnRef.current) {
+            connectFnRef.current();
+          }
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // Handle window/container resize — fit inside rAF to ensure the DOM has
     // reflowed before we measure.  The debounce collapses rapid events (e.g.
     // continuous window drag-resize) into a single measurement.
@@ -1996,6 +2016,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       }
 
       window.removeEventListener('resize', debouncedFit);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       resizeObserver.disconnect();
 
       scrollDisposable.dispose();
@@ -2014,7 +2035,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // Clear buffer
       outputBufferRef.current = { data: '', writePos: 0 };
 
+      // Cancel any pending reconnection attempt
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        // Signal that this is an intentional unmount, not a connectivity issue.
+        // The onclose handler checks this to suppress reconnection attempts.
+        unmountingRef.current = true;
         // Remove onclose handler before closing to avoid race condition
         // (component unmount is intentional, not a disconnect to display)
         wsRef.current.onclose = null;
