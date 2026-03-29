@@ -188,12 +188,27 @@ Write-OK "Pushed to origin"
 
 # ── Git tag ───────────────────────────────────────────────────────────────────
 Write-Banner "Tagging"
+
+# Delete stale local tag if it exists (idempotent re-runs)
+$existingLocal = git tag -l $TAG 2>$null
+if ($existingLocal) {
+    Write-Warn "Local tag $TAG exists — deleting and recreating"
+    git tag -d $TAG | Out-Null
+}
 git tag -a $TAG -m "Release $TAG"
 if ($LASTEXITCODE -ne 0) { Write-Fail "git tag failed" }
 Write-OK "Tag $TAG created locally"
 
+# Delete stale remote tag if it exists, then push fresh
+$remoteTag = git ls-remote --tags origin "refs/tags/$TAG" 2>$null
+if ($remoteTag) {
+    Write-Warn "Remote tag $TAG exists — deleting stale remote tag"
+    git push origin ":refs/tags/$TAG" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to delete stale remote tag $TAG" }
+    Write-OK "Stale remote tag deleted"
+}
 git push origin $TAG
-if ($LASTEXITCODE -ne 0) { Write-Fail "Tag push failed — is $TAG already on remote? Delete it first with: git push origin :$TAG" }
+if ($LASTEXITCODE -ne 0) { Write-Fail "Tag push failed" }
 Write-OK "Tag $TAG pushed to origin"
 
 # ── Release notes ─────────────────────────────────────────────────────────────
@@ -209,6 +224,15 @@ $RELEASE_NOTES = if ($lines.Count -gt 0) { $lines -join "`n" } else { "Release $
 
 # ── Create GitHub Release ─────────────────────────────────────────────────────
 Write-Banner "Publishing GitHub Release"
+
+# Delete stale GitHub release if it already exists (idempotent re-runs)
+$existingRelease = gh release view $TAG --json tagName --jq '.tagName' 2>$null
+if ($existingRelease) {
+    Write-Warn "GitHub release $TAG already exists — deleting stale release"
+    gh release delete $TAG --yes 2>$null
+    if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to delete stale GitHub release $TAG" }
+    Write-OK "Stale GitHub release deleted"
+}
 
 Write-Step "Creating draft release $TAG..."
 $notesFile = [System.IO.Path]::GetTempFileName()
