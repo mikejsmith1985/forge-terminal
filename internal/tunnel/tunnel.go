@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Mode controls which tunnel backend is used.
@@ -202,9 +203,11 @@ func (m *Manager) startCloudflared(cfg StartConfig, onURL func(url string)) erro
 }
 
 // startTailscale handles ModeTailscale.
-// Calls "tailscale funnel --bg <port>" to enable the funnel (a stateful
-// config change managed by the Tailscale daemon — exits quickly), then reads
-// the stable device URL from "tailscale status --json".
+// Verifies the Tailscale daemon is running, calls "tailscale funnel <port>"
+// to enable the funnel (a stateful config change managed by the daemon — exits
+// quickly), then reads the stable device URL from "tailscale status --json".
+// All subcommands run with a 30-second timeout to prevent indefinite hangs
+// when the daemon is unresponsive.
 // Must be called with m.mu held.
 func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error {
 	bin := ResolveTailscalePath()
@@ -214,33 +217,68 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 
 	portStr := strconv.Itoa(cfg.LocalPort)
 
-	// "tailscale funnel --bg <port>" enables funnel for the port and exits.
-	// The --bg flag was added in Tailscale v1.56; fall back to without it on error.
-	funnelOut, funnelErr := func() ([]byte, error) {
-		cmd := exec.Command(bin, "funnel", "--bg", portStr)
-		hideWindow(cmd)
-		return cmd.CombinedOutput()
-	}()
-	if funnelErr != nil {
-		// Fallback: older Tailscale CLI without --bg
-		cmd := exec.Command(bin, "funnel", portStr)
-		hideWindow(cmd)
-		funnelOut, funnelErr = cmd.CombinedOutput()
+	// Step 1: verify the daemon is running and the user is signed in.
+	// Use a short timeout so we fail fast if the daemon is not responding.
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		checkCmd := exec.CommandContext(ctx, bin, "status", "--json")
+		hideWindow(checkCmd)
+		checkOut, checkErr := checkCmd.Output()
+		if checkErr != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				return fmt.Errorf("tailscale daemon is not responding — open the Tailscale app and make sure it is running, then try again")
+			}
+			return fmt.Errorf("tailscale is not running — open the Tailscale app, sign in, and try again")
+		}
+		var checkStatus struct {
+			BackendState string `json:"BackendState"`
+			Self         struct {
+				DNSName string `json:"DNSName"`
+			} `json:"Self"`
+		}
+		if err := json.Unmarshal(checkOut, &checkStatus); err == nil {
+			if checkStatus.BackendState != "" && checkStatus.BackendState != "Running" {
+				return fmt.Errorf("tailscale is not connected (state: %s) — open the Tailscale app and sign in first", checkStatus.BackendState)
+			}
+			if checkStatus.Self.DNSName == "" {
+				return fmt.Errorf("tailscale is not signed in — open the Tailscale app and sign in first")
+			}
+		}
 	}
+
+	// Step 2: enable Funnel for the local port.
+	// Run with a 30-second timeout — the command should exit in under a second
+	// once the daemon is running; the timeout guards against daemon hangs.
+	funnelCtx, funnelCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer funnelCancel()
+
+	funnelCmd := exec.CommandContext(funnelCtx, bin, "funnel", portStr)
+	hideWindow(funnelCmd)
+	funnelOut, funnelErr := funnelCmd.CombinedOutput()
+
 	if funnelErr != nil {
+		if funnelCtx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("tailscale funnel timed out — make sure Tailscale is running and HTTPS certificates are enabled at https://login.tailscale.com/admin/dns")
+		}
 		msg := strings.TrimSpace(string(funnelOut))
-		if strings.Contains(msg, "HTTPS") || strings.Contains(msg, "https") {
+		if strings.Contains(msg, "HTTPS") || strings.Contains(msg, "https") || strings.Contains(msg, "certificate") {
 			return fmt.Errorf("tailscale funnel requires HTTPS certificates — enable HTTPS in your Tailscale admin console at https://login.tailscale.com/admin/dns then try again")
+		}
+		if msg == "" {
+			return fmt.Errorf("tailscale funnel failed — make sure Tailscale is running and HTTPS certificates are enabled")
 		}
 		return fmt.Errorf("tailscale funnel failed: %s", msg)
 	}
 
-	// Retrieve the device's stable Tailscale hostname from status.
-	statusCmd := exec.Command(bin, "status", "--json")
+	// Step 3: read the stable device hostname from status.
+	statusCtx, statusCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer statusCancel()
+	statusCmd := exec.CommandContext(statusCtx, bin, "status", "--json")
 	hideWindow(statusCmd)
 	statusOut, err := statusCmd.Output()
 	if err != nil {
-		exec.Command(bin, "funnel", "--reset").Run() //nolint:errcheck
+		resetTailscaleFunnel(bin)
 		return fmt.Errorf("tailscale status failed: %w", err)
 	}
 
@@ -250,7 +288,7 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 		} `json:"Self"`
 	}
 	if err := json.Unmarshal(statusOut, &tsStatus); err != nil || tsStatus.Self.DNSName == "" {
-		exec.Command(bin, "funnel", "--reset").Run() //nolint:errcheck
+		resetTailscaleFunnel(bin)
 		return fmt.Errorf("could not read Tailscale device URL — is Tailscale signed in?")
 	}
 
@@ -258,12 +296,7 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 
 	m.cmd = nil
 	m.cancel = nil
-	m.stopFn = func() {
-		// Try both reset flag styles for compatibility
-		if err := exec.Command(bin, "funnel", "--reset").Run(); err != nil {
-			exec.Command(bin, "funnel", "reset").Run() //nolint:errcheck
-		}
-	}
+	m.stopFn = func() { resetTailscaleFunnel(bin) }
 	m.url = tunnelURL
 	m.running = true
 	m.lastErr = ""
@@ -273,6 +306,17 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 	}
 
 	return nil
+}
+
+// resetTailscaleFunnel disables the Tailscale Funnel configuration for this device.
+func resetTailscaleFunnel(bin string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := exec.CommandContext(ctx, bin, "funnel", "--reset").Run(); err != nil {
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel2()
+		exec.CommandContext(ctx2, bin, "funnel", "reset").Run() //nolint:errcheck
+	}
 }
 
 // Stop kills the cloudflared process or resets the Tailscale funnel.
