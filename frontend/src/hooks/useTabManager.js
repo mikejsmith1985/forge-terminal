@@ -308,9 +308,10 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   /**
    * Create a new tab
    * @param {Object} shellConfig - Optional shell config, defaults to initialShellConfig
+   * @param {string|null} currentDirectory - Optional starting directory to inherit from active tab
    * @returns {{ success: boolean, tabId: string|null, tab: Object|null, error: string|null }}
    */
-  const createTabAction = useCallback((shellConfig) => {
+  const createTabAction = useCallback((shellConfig, currentDirectory = null) => {
     // Check current state synchronously from ref
     const currentState = stateRef.current;
     
@@ -329,7 +330,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     setState(prev => {
       const config = shellConfig || configRef.current;
       const newTabNumber = prev.tabs.length + 1;
-      const newTab = createTab(config, newTabNumber, null, null, null, themePreferenceRef.current);
+      const newTab = createTab(config, newTabNumber, null, null, currentDirectory, themePreferenceRef.current);
       createdTab = newTab;
       
       logger.tabs('Tab created successfully', { 

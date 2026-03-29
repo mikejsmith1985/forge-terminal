@@ -990,11 +990,16 @@ function App() {
   // Handle new tab creation
   const handleNewTab = useCallback((options = {}) => {
     logger.tabs('New tab button clicked', options);
+
+    // Inherit the active tab's working directory so the new tab opens in the
+    // same workspace rather than falling back to the server's process CWD.
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    const inheritedDir = activeTab?.currentDirectory || null;
     
     const result = createTab({
       ...shellConfig,
       type: options.type || 'terminal' // 'terminal' or 'agent'
-    });
+    }, inheritedDir);
     
     if (!result.success) {
       if (result.error === 'max_tabs') {
@@ -1011,7 +1016,7 @@ function App() {
     
     logger.tabs('New tab created', { tabId: result.tabId, colorTheme: result.tab?.colorTheme, type: options.type });
     // Theme will be applied by the activeTab useEffect below
-  }, [createTab, shellConfig, addToast]);
+  }, [createTab, shellConfig, addToast, tabs, activeTabId]);
 
   // Handle tab switch - focus terminal after switching and apply tab's theme
   const handleTabSwitch = useCallback((tabId) => {
@@ -1085,9 +1090,11 @@ function App() {
   }, []);
 
   // Handle directory change from terminal - auto-rename tab and save directory.
-  // Shows the last 2 meaningful path segments so the project context is never
-  // lost when navigating into subdirectories (e.g. "forge-terminal/frontend"
-  // instead of just "frontend").
+  // Shows the last 2 meaningful path segments when 3+ segments exist, giving
+  // "workspace/subdir" context. At workspace-root depth (only 2 meaningful
+  // segments after the drive letter, e.g. "ProjectsWin/forge-terminal"), just
+  // the workspace name is shown ("forge-terminal") so the tab bar never wastes
+  // space on the parent collection folder.
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
     if (folderName || fullPath) {
       let title = folderName || '';
@@ -1099,10 +1106,12 @@ function App() {
           .replace(/\/+$/, '')
           .split('/')
           .filter(p => p && !/^[a-zA-Z]:$/.test(p));
-        if (parts.length >= 2) {
+        if (parts.length >= 3) {
+          // Deep enough to show parent/child without including a container dir.
           title = `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
-        } else if (parts.length === 1) {
-          title = parts[0];
+        } else if (parts.length > 0) {
+          // At workspace-root depth: just the workspace name.
+          title = parts[parts.length - 1];
         }
       }
       logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title });
