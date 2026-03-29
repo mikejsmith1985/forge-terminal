@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { 
-  Bug, RefreshCw, MessageSquare, Activity, ChevronDown, ChevronRight, 
+  Bug, RefreshCw, Activity, ChevronDown, ChevronRight, 
   Cpu, Wifi, Eye, Keyboard, Terminal as TerminalIcon, Gauge, AlertTriangle,
   GripVertical
 } from 'lucide-react';
@@ -17,7 +17,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
   // This is a pure function that only reads localStorage, no React deps
   const isCardExpanded = (cardId) => {
     const saved = localStorage.getItem(`debug-card-${cardId}-collapsed`);
-    const defaultCollapsed = cardId === 'freeze-monitor' || cardId === 'auto-respond';
+    const defaultCollapsed = cardId === 'freeze-monitor';
     return saved !== null ? saved === 'false' : !defaultCollapsed;
   };
 
@@ -27,7 +27,6 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     return saved ? JSON.parse(saved) : [
       'terminal-info',
       'websocket',
-      'auto-respond',
       'freeze-monitor',
       'performance',
       'keyboard',
@@ -40,7 +39,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
   // State for each debug section
   const [diagnostics, setDiagnostics] = useState(null);
   const [freezeMetrics, setFreezeMetrics] = useState(null);
-  const [autoRespondLogs, setAutoRespondLogs] = useState([]);
+  // v3.18: autoRespondLogs removed — auto-respond feature removed from frontend
   const [keyboardEvents, setKeyboardEvents] = useState([]);
   const [consoleLogs, setConsoleLogs] = useState([]);
   const [performance, setPerformance] = useState({ fps: 0, memory: null, wsMessageRate: 0 });
@@ -270,54 +269,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
     return () => clearInterval(interval);
   }, []); // isCardExpanded is stable
 
-  // Auto-Respond log interception
-  // FIXED: Don't override console.log - use logger API instead
-  useEffect(() => {
-    if (!isCardExpanded('auto-respond')) return;
-
-    // Instead of overriding console.log, poll the logger for auto-respond entries
-    const checkAutoRespondLogs = () => {
-      try {
-        const logs = getRecentLogs(1); // Get last minute of logs
-        if (logs) {
-          const lines = logs.split('\n').filter(line => line.includes('[Auto-Respond]'));
-          
-          lines.forEach(line => {
-            if (line) {
-              const timestamp = new Date().toISOString();
-              setAutoRespondLogs(prev => {
-                // Check if this log already exists
-                if (prev.some(log => log.message === line)) {
-                  return prev;
-                }
-                
-                const last3Mins = Date.now() - (3 * 60 * 1000);
-                const filtered = prev.filter(log => 
-                  new Date(log.timestamp).getTime() > last3Mins
-                );
-                return [...filtered, {
-                  timestamp,
-                  message: line,
-                  data: {}
-                }].slice(-20);
-              });
-
-              setActiveCards(prev => new Set(prev).add('auto-respond'));
-            }
-          });
-        }
-      } catch (e) {
-        // Ignore errors
-      }
-    };
-
-    checkAutoRespondLogs();
-    const interval = setInterval(checkAutoRespondLogs, 1000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []); // isCardExpanded is stable
+  // v3.18: Auto-respond log interception removed — auto-respond feature removed from frontend
 
   // Main update loop
   useEffect(() => {
@@ -413,71 +365,7 @@ const DebugPanel = ({ terminalRef, tabId }) => {
                     </DebugCard>
                   );
 
-                case 'auto-respond':
-                  return (
-                    <DebugCard
-                      key={cardId}
-                      id={cardId}
-                      title="Auto-Respond Monitor"
-                      icon={MessageSquare}
-                      defaultCollapsed={true}
-                      isActive={activeCards.has(cardId)}
-                    >
-                      <div style={{ maxHeight: '300px', overflowY: 'auto', fontSize: '10px', fontFamily: 'monospace' }}>
-                        {autoRespondLogs.length === 0 ? (
-                          <div style={{ color: '#888', textAlign: 'center', padding: '16px', fontStyle: 'italic' }}>
-                            No activity in last 3 minutes
-                          </div>
-                        ) : (
-                          autoRespondLogs.map((log, idx) => (
-                            <div key={idx} style={{
-                              marginBottom: '8px',
-                              padding: '6px',
-                              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                              borderRadius: '3px',
-                              borderLeft: log.message.includes('ACTIVATED') ? '2px solid #00ff00' : 
-                                          log.message.includes('ENABLED') ? '2px solid #0080ff' :
-                                          log.message.includes('waiting') ? '2px solid #ffa500' :
-                                          '2px solid #666'
-                            }}>
-                              <div style={{ color: '#666', marginBottom: '2px', fontSize: '8px' }}>
-                                {new Date(log.timestamp).toLocaleTimeString()}
-                              </div>
-                              <div style={{ 
-                                color: log.message.includes('ACTIVATED') ? '#00ff00' : 
-                                       log.message.includes('ENABLED') ? '#0080ff' :
-                                       log.message.includes('waiting') ? '#ffa500' : '#ccc',
-                                fontWeight: log.message.includes('ACTIVATED') || log.message.includes('waiting') ? 'bold' : 'normal',
-                                marginBottom: '4px',
-                                fontSize: '9px'
-                              }}>
-                                {log.message}
-                              </div>
-                              {log.data && Object.keys(log.data).length > 0 && (
-                                <div style={{ fontSize: '8px', color: '#888' }}>
-                                  {log.data.waiting !== undefined && (
-                                    <div style={{ color: log.data.waiting ? '#00ff00' : '#ff4444' }}>
-                                      ⚡ Waiting: {log.data.waiting ? 'YES' : 'NO'}
-                                    </div>
-                                  )}
-                                  {log.data.responseType && (
-                                    <div style={{ color: '#ffa500' }}>
-                                      📤 Response: {log.data.responseType}
-                                    </div>
-                                  )}
-                                  {log.data.confidence && (
-                                    <div style={{ color: '#0080ff' }}>
-                                      🎯 Confidence: {log.data.confidence}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </DebugCard>
-                  );
+                // v3.18: auto-respond card removed
 
                 case 'freeze-monitor':
                   return (

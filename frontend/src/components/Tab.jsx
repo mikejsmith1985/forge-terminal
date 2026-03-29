@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Zap, Sun, Moon, Palette } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Sun, Moon, Palette } from 'lucide-react';
 import { themes, themeOrder } from '../themes';
 
 /**
@@ -32,7 +32,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -161,8 +161,8 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   // Build title with indicators
   let titleText = tab.title;
   const indicators = [];
-  if (tab.autoRespond) indicators.push('Auto-respond');
   // v3.12.12: AM feature removed
+  // v3.18: autoRespond removed
   if (tabMode === 'light') indicators.push('Light');
   if (indicators.length > 0) {
     titleText = `${tab.title} (${indicators.join(', ')})`;
@@ -171,7 +171,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
   return (
     <>
       <div
-        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${tab.autoRespond ? 'auto-respond' : ''}`}
+        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
@@ -187,11 +187,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
           {getShellIcon(shellType)}
         </span>
         {/* v3.12.12: AM indicator removed */}
-        {tab.autoRespond && (
-          <span className="auto-respond-indicator" title="Auto-respond enabled">
-            <Zap size={10} />
-          </span>
-        )}
+        {/* v3.18: Auto-respond indicator removed */}
         {isEditing ? (
           <input
             ref={inputRef}
@@ -206,22 +202,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
         ) : (
           <span className="tab-title">{tab.title}</span>
         )}
-        {tab.jiraTicketKey && (
-          <span className="tab-jira-badge" title={`Jira: ${tab.jiraTicketKey}`} style={{
-            fontSize: '10px',
-            fontWeight: 'bold',
-            color: '#60a5fa',
-            background: 'rgba(96,165,250,0.12)',
-            border: '1px solid rgba(96,165,250,0.3)',
-            borderRadius: '3px',
-            padding: '0 4px',
-            marginLeft: '4px',
-            lineHeight: '16px',
-            whiteSpace: 'nowrap',
-          }}>
-            {tab.jiraTicketKey}
-          </span>
-        )}
+
         <button
           className="tab-close"
           onClick={handleCloseClick}
@@ -273,16 +254,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleAutoRespond, o
           </button>
           {/* v3.8.2: View Mode toggle REMOVED - Terminal is the only view */}
           {/* v3.12.12: AM toggle REMOVED - AM feature deprecated */}
-          <button 
-            onClick={() => { 
-              setShowContextMenu(false); 
-              if (onToggleAutoRespond) onToggleAutoRespond(); 
-            }}
-            className={tab.autoRespond ? 'active' : ''}
-          >
-            <Zap size={14} />
-            Auto-respond {tab.autoRespond ? '✓' : ''}
-          </button>
+          {/* v3.18: Auto-respond toggle REMOVED - auto-respond feature removed from frontend */}
           <button onClick={() => { setShowContextMenu(false); onClose(); }}>
             <X size={14} />
             Close

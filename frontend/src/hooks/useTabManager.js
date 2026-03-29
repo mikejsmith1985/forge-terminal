@@ -76,11 +76,10 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
     viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
-    autoRespond: false, // Auto-respond to CLI confirmation prompts
+    // v3.18: autoRespond removed — auto-respond feature removed from frontend
     // v3.12.3: amEnabled removed - AM system no longer exists
     visionEnabled: false, // Forge Vision overlays - DEFAULT OFF (Dev Mode feature)
     currentDirectory: currentDirectory || null, // Current working directory
-    jiraTicketKey: null, // Linked Jira issue key (e.g. PROJ-123)
     createdAt: Date.now(),
     type: options.type || 'terminal',
     file: options.file || null,
@@ -116,11 +115,11 @@ function tabsToSession(tabs, activeTabId) {
       colorTheme: tab.colorTheme,
       mode: tab.mode || 'dark',
       viewMode: 'terminal', // v3.8.2: Terminal only (viewMode no longer needed)
-      autoRespond: tab.autoRespond || false,
+      // v3.18: autoRespond removed
       // v3.12.3: amEnabled removed
       visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
-      jiraTicketKey: tab.jiraTicketKey || null,
+
     })),
     activeTabId: activeTabId,
   };
@@ -265,11 +264,11 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
             colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
             mode: tabState.mode || 'dark',
             viewMode: 'terminal', // v3.8.2: Terminal only (chat and notebook removed)
-            autoRespond: tabState.autoRespond || false,
+            // v3.18: autoRespond removed
             // v3.12.3: amEnabled removed
             visionEnabled: tabState.visionEnabled || false,
             currentDirectory: tabState.currentDirectory || null,
-            jiraTicketKey: tabState.jiraTicketKey || null,
+
             createdAt: Date.now(),
           };
         });
@@ -530,36 +529,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     });
   }, []);
 
-  /**
-   * Toggle auto-respond for a tab
-   * @param {string} tabId - ID of tab to update
-   */
-  const toggleTabAutoRespond = useCallback((tabId) => {
-    logger.tabs('Toggling tab auto-respond', { tabId });
-    
-    setState(prev => {
-      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
-      if (tabIndex === -1) {
-        logger.tabs('Tab not found for auto-respond toggle', { tabId });
-        return prev;
-      }
-
-      const oldValue = prev.tabs[tabIndex].autoRespond;
-      const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], autoRespond: !oldValue };
-      
-      logger.tabs('Tab auto-respond toggled', { 
-        tabId, 
-        oldValue, 
-        newValue: !oldValue 
-      });
-      
-      return {
-        ...prev,
-        tabs: newTabs,
-      };
-    });
-  }, []);
+  // v3.18: toggleTabAutoRespond removed — auto-respond feature removed from frontend
 
   /**
    * v3.12.3: Toggle AM removed - AM system no longer exists
@@ -733,21 +703,6 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
-   * Link a Jira ticket key to a tab
-   * @param {string} tabId - ID of tab to update
-   * @param {string} jiraTicketKey - Jira issue key (e.g. "PROJ-123"), or null to unlink
-   */
-  const linkJiraTicket = useCallback((tabId, jiraTicketKey) => {
-    setState(prev => {
-      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
-      if (tabIndex === -1) return prev;
-      const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], jiraTicketKey: jiraTicketKey || null };
-      return { ...prev, tabs: newTabs };
-    });
-  }, []);
-
-  /**
    * Toggle view mode for a tab (chat -> terminal -> notebook -> chat)
    * @param {string} tabId - ID of tab to update
    * @param {string} targetMode - Optional: directly set to a specific mode
@@ -770,7 +725,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     updateTabTitle,
     updateTabShellConfig,
     updateTabColorTheme,
-    toggleTabAutoRespond,
+    // v3.18: toggleTabAutoRespond removed
     toggleTabAM,
     toggleTabVision,
     toggleTabMode,
@@ -778,7 +733,6 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     updateTabModified,
     toggleTabViewMode, // v3.3.0: Toggle between chat and terminal view
     updateTabDirectory,
-    linkJiraTicket,
     reorderTabs,
   };
 }

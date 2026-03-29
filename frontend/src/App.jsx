@@ -213,7 +213,7 @@ function App() {
     updateTabTitle,
     updateTabShellConfig,
     updateTabColorTheme,
-    toggleTabAutoRespond,
+    // v3.18: toggleTabAutoRespond removed — auto-respond feature removed from frontend
     // toggleTabAM, // v3.12.12: AM feature removed
     toggleTabMode,
     changeTabTheme,
@@ -1907,7 +1907,6 @@ function App() {
             onTabRename={handleTabRename}
             onNewTab={handleNewTab}
             onReorder={reorderTabs}
-            onToggleAutoRespond={toggleTabAutoRespond}
             onToggleMode={toggleTabMode}
             onToggleViewMode={toggleTabViewMode}
             onChangeTheme={changeTabTheme}
@@ -1984,7 +1983,6 @@ function App() {
                     colorTheme={tab.colorTheme || colorTheme}
                     fontSize={fontSize}
                     shellConfig={tab.shellConfig}
-                    autoRespond={tab.autoRespond || false}
                     tabName={tab.title}
                     currentDirectory={tab.currentDirectory || null}
                     onToast={addToast}

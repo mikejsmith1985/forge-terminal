@@ -13,7 +13,7 @@ function TabBar({
   onTabRename,
   onNewTab,
   onReorder,
-  onToggleAutoRespond = null, // Callback to toggle auto-respond for a tab
+  onToggleAutoRespond = null, // v3.18: deprecated, kept for API compat
   // onToggleAM = null, // v3.12.12: AM feature removed
   onToggleMode = null, // Callback to toggle light/dark mode for a tab
   onToggleViewMode = null, // Callback to toggle view mode (chat/terminal/notebook) for a tab
@@ -38,11 +38,7 @@ function TabBar({
     }
   };
 
-  const handleToggleAutoRespond = (tabId) => {
-    if (onToggleAutoRespond) {
-      onToggleAutoRespond(tabId);
-    }
-  };
+  // v3.18: handleToggleAutoRespond removed — auto-respond feature removed from frontend
 
   // v3.12.12: handleToggleAM removed - AM feature deprecated
 
@@ -77,7 +73,6 @@ function TabBar({
             onClick={() => handleTabClick(tab.id)}
             onClose={() => handleTabClose(tab.id)}
             onRename={(newTitle) => handleTabRename(tab.id, newTitle)}
-            onToggleAutoRespond={() => handleToggleAutoRespond(tab.id)}
             onToggleMode={() => handleToggleMode(tab.id)}
             onToggleViewMode={() => handleToggleViewMode(tab.id)}
             onChangeTheme={(themeName, themeMode) => handleChangeTheme(tab.id, themeName, themeMode)}
@@ -124,7 +119,7 @@ function NotifyBellButton() {
   React.useEffect(() => {
     fetch('/api/notify/config')
       .then(r => r.json())
-      .then(cfg => setConfigured(!!(cfg.webhookURL && cfg.webhookSecret)))
+      .then(cfg => setConfigured(!!(cfg.ntfyTopic || cfg.transport === 'ntfy')))
       .catch(() => setConfigured(false));
   }, []);
 
@@ -146,7 +141,7 @@ function NotifyBellButton() {
       className="dashboard-btn"
       onClick={handleClick}
       aria-label={sent ? 'Notification sent' : 'Send notification to phone'}
-      title={sent ? '✓ Notification sent' : 'Ping me on my phone (mbl2pc)'}
+      title={sent ? '✓ Notification sent' : 'Send notification to phone'}
       style={{ color: sent ? '#fbbf24' : undefined, transition: 'color 0.2s' }}
     >
       {sent ? <Bell size={16} fill="currentColor" /> : <Bell size={16} />}

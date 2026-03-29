@@ -154,21 +154,7 @@ const MENU_CONTEXT_PATTERNS = [
   /allow.*to\s+(execute|run|access)/i,
 ];
 
-// EXCLUSION patterns - menus where we should NOT auto-respond
-// These are user choice menus where the user needs to pick an option, not confirm
-const AUTO_RESPOND_EXCLUSION_PATTERNS = [
-  // Model selection menus (Copilot /model command)
-  /Select a model/i,
-  /Choose.*model/i,
-  /gpt-4|gpt-3\.5|claude|o1-|o3-|gemini/i, // Model names in selection context
-  // Generic selection menus (not confirmation)
-  /Select an option/i,
-  /Choose an option/i,
-  /Pick.*:/i,
-  // Multiple numbered options with 3+ items (not just Yes/No which has 2)
-  // This detects lists like "1. Option A\n2. Option B\n3. Option C"
-  /\d+\.\s*\S+.*\n.*\d+\.\s*\S+.*\n.*\d+\.\s*\S+/i,
-];
+// v3.18: AUTO_RESPOND_EXCLUSION_PATTERNS removed — auto-respond feature removed from frontend
 
 // Y/N style prompts: These expect typing 'y' or 'n' then Enter
 const YN_PROMPT_PATTERNS = [
@@ -291,14 +277,7 @@ function detectYnPrompt(cleanText, debugLog = false) {
   return { detected: hasYnPrompt };
 }
 
-/**
- * Check if the buffer matches exclusion patterns (user selection menus where we shouldn't auto-respond)
- * @param {string} cleanText - ANSI-stripped text buffer
- * @returns {boolean} - true if we should NOT auto-respond
- */
-function shouldExcludeFromAutoRespond(cleanText) {
-  return AUTO_RESPOND_EXCLUSION_PATTERNS.some(p => p.test(cleanText));
-}
+// v3.18: shouldExcludeFromAutoRespond removed — auto-respond feature removed from frontend
 
 /**
  * Main detection function - determines if CLI is waiting for user input
@@ -360,15 +339,6 @@ function detectCliPrompt(text, debugLog = false) {
   // Use smaller buffer for performance (reduced from 2000)
   const bufferToCheck = cleanText.slice(-800);
   
-  // FIRST: Check exclusion patterns - these are user choice menus where we should NOT auto-respond
-  // This prevents auto-respond from firing during /model selection and similar menus
-  if (shouldExcludeFromAutoRespond(bufferToCheck)) {
-    if (debugLog) {
-      console.log('[AutoRespond] EXCLUDED - matches exclusion pattern (model selection, etc.)');
-    }
-    return { waiting: false, responseType: null, confidence: 'none', excluded: true };
-  }
-  
   // Priority 1: Check for menu-style prompts (Copilot, Claude, etc.)
   const menuResult = detectMenuPrompt(bufferToCheck, debugLog);
   if (menuResult.detected && menuResult.confidence !== 'low') {
@@ -391,10 +361,10 @@ function detectCliPrompt(text, debugLog = false) {
     };
   }
   
-  // Priority 3: Low confidence menu detection (still report as waiting but may not auto-respond)
+  // Priority 3: Low confidence menu detection
   if (menuResult.detected && menuResult.confidence === 'low') {
     return { 
-      waiting: false, // Changed to false to prevent accidental injection on loose matches
+      waiting: false, // Prevent accidental injection on loose matches
       responseType: 'enter', 
       confidence: 'low',
       excluded: false
@@ -402,14 +372,13 @@ function detectCliPrompt(text, debugLog = false) {
   }
 
   // Priority 4: General Input Prompt (for Context Injection)
-  // We identify this as a prompt but exclude it from auto-respond
   const generalResult = detectGeneralInputPrompt(bufferToCheck);
   if (generalResult.detected) {
       return { 
           waiting: true, // Signal that we are waiting for input (enables injection)
-          responseType: null, // No auto-response action
+          responseType: null,
           confidence: 'low',
-          excluded: true // EXPLICITLY exclude from auto-respond
+          excluded: true
       };
   }
   
@@ -557,7 +526,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onConnectionChange = null,
   onWaitingChange = null, // Callback when prompt waiting state changes
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
-  onJiraKeyDetected = null, // Callback when a Jira issue key is detected in output
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
   onFileOpen = null, // Callback when file path is double-clicked to open in editor
@@ -565,7 +533,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name
   isVisible = true, // Whether this terminal is currently visible
-  autoRespond = false, // Auto-respond "yes" to CLI confirmation prompts
+  // v3.18: autoRespond prop removed — auto-respond feature removed from frontend
   // amEnabled = false, // v3.12.12: AM feature removed
   currentDirectory = null, // Current working directory to restore on connect
   visionEnabled = false, // Forge Vision overlay enabled (Dev Mode)
@@ -587,13 +555,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const outputBufferRef = useRef({ data: '', writePos: 0 });
   const lastOutputRef = useRef(''); // Keep for compatibility but update less often
   const waitingCheckIdleRef = useRef(null); // Changed from timeout to idle callback
-  const autoRespondRef = useRef(autoRespond);
+  // v3.18: autoRespondRef removed — auto-respond feature removed from frontend
   // const amEnabledRef = useRef(amEnabled); // v3.12.12: AM feature removed
   const tabNameRef = useRef(tabName);
   const lastDirectoryRef = useRef(null);
-  const lastJiraKeyRef = useRef(null); // Last Jira key detected — prevents re-firing for same key
   const onDirectoryChangeRef = useRef(onDirectoryChange);
-  const onJiraKeyDetectedRef = useRef(onJiraKeyDetected);
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
   const onFileOpenRef = useRef(onFileOpen);
@@ -671,21 +637,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Vision state
   const visionEnabledRef = useRef(visionEnabled);
 
-  // Keep autoRespond ref updated and sync with backend SequenceEngine
-  useEffect(() => {
-    autoRespondRef.current = autoRespond;
-    
-    // CRITICAL FIX: Send AUTO_RESPOND_TOGGLE to backend to enable SequenceEngine
-    // Without this, the backend's advanced pattern detection never runs
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const msg = {
-        type: 'AUTO_RESPOND_TOGGLE',
-        enabled: autoRespond
-      };
-      wsRef.current.send(JSON.stringify(msg));
-      logger.terminal(`Auto-respond backend sync: ${autoRespond ? 'enabled' : 'disabled'}`, { tabId });
-    }
-  }, [autoRespond, tabId]);
+  // v3.18: autoRespond sync effect removed — auto-respond feature removed from frontend
 
   // v3.12.12: AM feature removed - amEnabled effect deleted
 
@@ -709,11 +661,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     onDirectoryChangeRef.current = onDirectoryChange;
   }, [onDirectoryChange]);
 
-  // Keep onJiraKeyDetected ref updated
-  useEffect(() => {
-    onJiraKeyDetectedRef.current = onJiraKeyDetected;
-  }, [onJiraKeyDetected]);
-  
   // Keep onCopy ref updated
   useEffect(() => {
     onCopyRef.current = onCopy;
@@ -1705,15 +1652,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }, 800);
         }
 
-        // CRITICAL FIX: Sync auto-respond state to backend SequenceEngine on connect
-        // This enables the backend's advanced pattern detection when restoring a session
-        if (autoRespondRef.current) {
-          ws.send(JSON.stringify({
-            type: 'AUTO_RESPOND_TOGGLE',
-            enabled: true
-          }));
-          logger.terminal('Auto-respond backend sync on connect: enabled', { tabId });
-        }
+        // v3.18: auto-respond on-connect sync removed
 
         if (onConnectionChange) onConnectionChange(true);
       };
@@ -1813,20 +1752,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           lastOutputRef.current = buf.data;
 
           // Now do the expensive regex work
-          const { waiting, responseType, confidence, excluded } = detectCliPrompt(buf.data, false);
-          
-          // DEBUG: Log auto-respond check (uncomment for debugging)
-          if (autoRespondRef.current) {
-            console.log('[AutoRespond] Check:', { 
-              waiting, 
-              responseType, 
-              confidence,
-              excluded,
-              autoRespondEnabled: autoRespondRef.current,
-              wsReady: ws.readyState === WebSocket.OPEN,
-              bufferLen: buf.data.length
-            });
-          }
+          const { waiting } = detectCliPrompt(buf.data, false);
 
           if (waiting !== isWaitingRef.current) {
             isWaitingRef.current = waiting;
@@ -1846,43 +1772,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Jira key detection — scan visible output for patterns like PROJ-123
-          if (onJiraKeyDetectedRef.current) {
-            const jiraKeyMatch = buf.data.match(/\b([A-Z]{2,10}-\d+)\b/);
-            if (jiraKeyMatch) {
-              const detectedKey = jiraKeyMatch[1];
-              if (detectedKey !== lastJiraKeyRef.current) {
-                lastJiraKeyRef.current = detectedKey;
-                onJiraKeyDetectedRef.current(detectedKey);
-              }
-            }
-          }
-
-          // Auto-respond logic - CRITICAL: Skip if excluded (model selection, etc.)
-          const shouldAutoRespond = waiting && 
-            !excluded &&
-            autoRespondRef.current && 
-            ws.readyState === WebSocket.OPEN;
-            
-          if (shouldAutoRespond) {
-            console.log('[AutoRespond] SENDING response:', { responseType, confidence });
-            logger.terminal('Auto-responding to CLI prompt', { tabId, responseType, confidence });
-            
-            if (responseType === 'enter') {
-              ws.send('\r');
-            } else {
-              ws.send('y\r');
-            }
-            
-            // Clear buffer and state after auto-respond
-            buf.data = '';
-            lastOutputRef.current = '';
-            isWaitingRef.current = false;
-            setIsWaiting(false);
-            if (onWaitingChange) {
-              onWaitingChange(false);
-            }
-          }
+          // v3.18: auto-respond execution block removed
         });
       };
 
