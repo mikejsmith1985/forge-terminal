@@ -30,3 +30,5 @@
 {"pattern":"multi-file-refactor","model":"claude-sonnet-4.5","prompts":3,"success":true,"timestamp":"2026-03-29T07:10:23Z","files_changed":7}
 {"pattern":"bugfix","model":"claude-opus-4.6","prompts":3,"success":true,"timestamp":"2026-03-29T11:26:00Z","files_changed":4}
 {"pattern":"bugfix","model":"claude-opus-4.6","prompts":3,"success":true,"timestamp":"2026-03-29T11:26:00Z","files_changed":4}
+{"pattern":"feature","model":"claude-opus-4.6","prompts":4,"success":true,"timestamp":"2026-03-29T12:22:47Z","files_changed":7}
+{"pattern":"bugfix","model":"claude-opus-4.6","prompts":1,"success":true,"timestamp":"2026-03-29T12:22:47Z","files_changed":1}
