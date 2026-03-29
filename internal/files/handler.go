@@ -917,6 +917,10 @@ func HandleFlatList(w http.ResponseWriter, r *http.Request) {
 		".vscode":      true,
 		"coverage":     true,
 		".nyc_output":  true,
+		".cache":       true,
+		".tox":         true,
+		".terraform":   true,
+		".gradle":      true,
 	}
 
 	var files []FlatFileInfo
@@ -943,11 +947,6 @@ func HandleFlatList(w http.ResponseWriter, r *http.Request) {
 				return filepath.SkipDir
 			}
 			return nil // Don't add directories to the list, only files
-		}
-
-		// Skip hidden files (starting with .)
-		if strings.HasPrefix(info.Name(), ".") {
-			return nil
 		}
 
 		// Skip binary/large files by extension
