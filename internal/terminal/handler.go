@@ -996,10 +996,21 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					// If it parsed as JSON at all, it's a control message — drop it.
 					var probe json.RawMessage
 					if json.Unmarshal(data, &probe) == nil {
+						log.Printf("[Terminal] Watcher %s: dropping JSON control message (%d bytes)", sessionID, len(data))
 						continue
 					}
-					// Not JSON → raw terminal input (e.g. command card text).
-					// Fall through to PTY write at the bottom of the loop.
+					// Not JSON → raw terminal input (e.g. command card text or keyboard input).
+					// Jump directly to PTY write, skipping owner-only processing.
+					log.Printf("[Terminal] Watcher %s: forwarding raw input to PTY (%d bytes: %q)", sessionID, len(data), truncate(string(data), 32))
+					if _, err := session.Write(data); err != nil {
+						log.Printf("[Terminal] Watcher PTY write error: %v", err)
+						select {
+						case closeChan <- closeReason{CloseCodePTYError, "Terminal write error"}:
+						default:
+						}
+						return
+					}
+					continue
 				}
 				var visionMsg VisionControlMessage
 				if err := json.Unmarshal(data, &visionMsg); err == nil {
