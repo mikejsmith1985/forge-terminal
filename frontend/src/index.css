@@ -1344,6 +1344,12 @@ body {
   border-color: rgba(249, 115, 22, 0.3);
 }
 
+.dashboard-btn.active {
+  background: rgba(249, 115, 22, 0.2);
+  color: var(--accent);
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
 /* Terminal Container for multiple terminals */
 .terminal-container {
   flex: 1;

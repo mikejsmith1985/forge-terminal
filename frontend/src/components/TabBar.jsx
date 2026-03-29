@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, BarChart3, Bell, BellOff } from 'lucide-react';
+import { Plus, BarChart3, Bell, BellOff, Zap } from 'lucide-react';
 import Tab from './Tab';
 
 /**
@@ -13,16 +13,16 @@ function TabBar({
   onTabRename,
   onNewTab,
   onReorder,
-  onToggleAutoRespond = null, // v3.18: deprecated, kept for API compat
-  // onToggleAM = null, // v3.12.12: AM feature removed
-  onToggleMode = null, // Callback to toggle light/dark mode for a tab
-  onToggleViewMode = null, // Callback to toggle view mode (chat/terminal/notebook) for a tab
-  onChangeTheme = null, // Callback to change theme+mode for a tab
-  onOpenDashboard = null, // Callback to open Developer Dashboard
+  onToggleMode = null,
+  onToggleViewMode = null,
+  onChangeTheme = null,
+  onOpenDashboard = null,
+  onToggleForgeAssist = null,
+  isForgeAssistOpen = false,
   disableNewTab = false,
-  waitingTabs = {}, // Map of tabId -> isWaiting
-  mode = 'dark', // 'dark' or 'light' for theme mode
-  devMode = false, // Whether dev mode is enabled
+  waitingTabs = {},
+  mode = 'dark',
+  devMode = false,
 }) {
   const handleTabClick = (tabId) => {
     onTabClick(tabId);
@@ -88,6 +88,18 @@ function TabBar({
           data-testid="dashboard-btn"
         >
           <BarChart3 size={16} />
+        </button>
+      )}
+      {/* Forge Assist — Power Features */}
+      {onToggleForgeAssist && (
+        <button
+          className={`dashboard-btn ${isForgeAssistOpen ? 'active' : ''}`}
+          onClick={onToggleForgeAssist}
+          aria-label={isForgeAssistOpen ? 'Close Power Features' : 'Power Features (Ctrl+/)'}
+          title="Power Features (Ctrl+/)"
+          data-testid="forge-assist-btn"
+        >
+          <Zap size={16} />
         </button>
       )}
       {/* Manual notify bell */}

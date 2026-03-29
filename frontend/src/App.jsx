@@ -162,21 +162,6 @@ function App() {
   
   // Forge Assist state
   const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
-  const [showForgeAssistBtn, setShowForgeAssistBtn] = useState(() => {
-    const saved = localStorage.getItem('forge_assist_btn_visible');
-    if (saved !== null) return saved !== 'false';
-    // Default off on mobile/tablet — the modal isn't usable at small sizes
-    const compact = window.innerWidth <= 1024;
-    return !compact;
-  })
-  
-  // v3.8.2: Draggable Forge Assist floating button
-  const [forgeAssistBtnPos, setForgeAssistBtnPos] = useState(() => {
-    const saved = localStorage.getItem('forge_assist_btn_pos');
-    return saved ? JSON.parse(saved) : { right: 60, bottom: 80 };
-  });
-  const [isDraggingBtn, setIsDraggingBtn] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Mobile detection — drives drawer sidebar and touch-optimised interactions
   const { isMobile, isTablet } = useMobileDetect();
@@ -1078,63 +1063,6 @@ function App() {
     }
   }, [tabs.length, closeTab]);
 
-  // v3.8.2: Draggable Forge Assist button handlers
-  const dragStartPosRef = useRef({ x: 0, y: 0 }); // Track start position to distinguish click vs drag
-
-  const handleBtnMouseDown = useCallback((e) => {
-    if (e.button !== 0) return; // Only left click
-    e.preventDefault();
-    setIsDraggingBtn(true);
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
-    // Record start position
-    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-  }, []);
-
-  const handleBtnMouseMove = useCallback((e) => {
-    if (!isDraggingBtn) return;
-    const newRight = window.innerWidth - e.clientX - dragOffset.x;
-    const newBottom = window.innerHeight - e.clientY - dragOffset.y;
-    const constrainedPos = {
-      right: Math.max(10, Math.min(window.innerWidth - 60, newRight)),
-      bottom: Math.max(10, Math.min(window.innerHeight - 60, newBottom)),
-    };
-    setForgeAssistBtnPos(constrainedPos);
-  }, [isDraggingBtn, dragOffset]);
-
-  const handleBtnMouseUp = useCallback((e) => {
-    if (isDraggingBtn) {
-      setIsDraggingBtn(false);
-      localStorage.setItem('forge_assist_btn_pos', JSON.stringify(forgeAssistBtnPos));
-      
-      // Calculate distance moved
-      const dist = Math.sqrt(
-        Math.pow(e.clientX - dragStartPosRef.current.x, 2) + 
-        Math.pow(e.clientY - dragStartPosRef.current.y, 2)
-      );
-      
-      // If moved less than 5 pixels, treat as a click
-      if (dist < 5) {
-        setIsForgeAssistOpen(prev => !prev);
-      }
-    }
-  }, [isDraggingBtn, forgeAssistBtnPos]);
-
-  // Add/remove mouse event listeners for dragging
-  useEffect(() => {
-    if (isDraggingBtn) {
-      window.addEventListener('mousemove', handleBtnMouseMove);
-      window.addEventListener('mouseup', handleBtnMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleBtnMouseMove);
-        window.removeEventListener('mouseup', handleBtnMouseUp);
-      };
-    }
-  }, [isDraggingBtn, handleBtnMouseMove, handleBtnMouseUp]);
-
   // Handle tab rename
   const handleTabRename = useCallback((tabId, newTitle) => {
     logger.tabs('Tab rename', { tabId, newTitle });
@@ -1708,22 +1636,6 @@ function App() {
         <button className="btn btn-danger btn-icon" onClick={handleShutdown} title="Quit Forge">
           <Power size={18} />
         </button>
-        {/* Mobile: toggle Forge Assist floating button visibility */}
-        {isCompact && (
-          <button
-            className={`btn btn-ghost btn-icon ${!showForgeAssistBtn ? 'active' : ''}`}
-            onClick={() => {
-              const next = !showForgeAssistBtn;
-              setShowForgeAssistBtn(next);
-              localStorage.setItem('forge_assist_btn_visible', String(next));
-              if (!next) setIsForgeAssistOpen(false);
-            }}
-            title={showForgeAssistBtn ? 'Hide Forge Assist button' : 'Show Forge Assist button'}
-            style={{ opacity: showForgeAssistBtn ? 1 : 0.45 }}
-          >
-            <Command size={18} />
-          </button>
-        )}
       </div>
 
       {/* Row 4: Shell and terminal controls */}
@@ -1865,6 +1777,8 @@ function App() {
             onToggleViewMode={toggleTabViewMode}
             onChangeTheme={changeTabTheme}
             onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
+            onToggleForgeAssist={() => setIsForgeAssistOpen(prev => !prev)}
+            isForgeAssistOpen={isForgeAssistOpen}
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
             mode={theme}
@@ -2215,53 +2129,6 @@ function App() {
         activeTabId={activeTabId}
         contextFiles={contextFiles}
       />}
-
-      {/* v3.8.2: Draggable Forge Assist floating button */}
-      {showForgeAssistBtn && (
-      <button
-        className={`forge-assist-floating-btn ${isDraggingBtn ? 'dragging' : ''}`}
-        style={{
-          position: 'fixed',
-          right: `${forgeAssistBtnPos.right}px`,
-          bottom: `${forgeAssistBtnPos.bottom}px`,
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
-          background: isForgeAssistOpen ? 'var(--accent-color, #8b5cf6)' : 'var(--bg-secondary, #1e1e2e)',
-          border: '2px solid var(--accent-color, #8b5cf6)',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          cursor: isCompact ? 'pointer' : (isDraggingBtn ? 'grabbing' : 'grab'),
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          zIndex: 1000,
-          transition: isDraggingBtn ? 'none' : 'transform 0.2s, box-shadow 0.2s',
-          userSelect: 'none',
-        }}
-        onMouseDown={isCompact ? undefined : handleBtnMouseDown}
-        onClick={isCompact ? () => {
-          setIsForgeAssistOpen(prev => !prev);
-          setMobileSidebarOpen(false);
-        } : undefined}
-        onMouseEnter={(e) => {
-          if (!isDraggingBtn && !isCompact) {
-            e.currentTarget.style.transform = 'scale(1.1)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isDraggingBtn && !isCompact) {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-          }
-        }}
-        title={isCompact ? 'Forge Assist' : 'Forge Assist - Drag to reposition (Ctrl+/)'}
-        aria-label={isForgeAssistOpen ? 'Close Forge Assist' : 'Open Forge Assist'}
-      >
-        {isCompact && isForgeAssistOpen ? <X size={22} /> : <Command size={24} />}
-      </button>
-      )}
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (

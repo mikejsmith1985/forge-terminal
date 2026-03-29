@@ -196,177 +196,303 @@ const CLI_POWER_FEATURES = {
     color: '#8b5cf6',
     categories: [
       {
-        name: 'Session Management',
-        icon: Terminal,
-        description: 'Control conversation state',
+        name: 'Modes & Workflow',
+        icon: Workflow,
+        description: 'Plan, autopilot, research, delegate',
         features: [
-          { 
-            name: 'Continue Session', 
-            cmd: 'copilot --continue',
-            desc: 'Resume last conversation',
-            category: 'cli'
+          {
+            name: 'Cycle Modes',
+            cmd: '# Press Shift+Tab in Copilot CLI',
+            desc: 'Cycle between interactive → plan → autopilot modes',
+            category: 'shortcut',
+            learnMore: 'https://docs.github.com/copilot/how-tos/use-copilot-agents/use-copilot-cli'
           },
-          { 
-            name: 'Resume Specific', 
-            cmd: 'copilot --resume',
-            desc: 'Pick from recent sessions',
-            category: 'cli'
+          {
+            name: 'Plan Mode',
+            cmd: '/plan',
+            desc: 'Create an implementation plan before coding',
+            category: 'slash'
           },
-          { 
-            name: 'Quick Prompt', 
-            cmd: 'copilot -p "',
-            desc: 'One-off question, no session',
-            category: 'cli',
+          {
+            name: 'Deep Research',
+            cmd: '/research ',
+            desc: 'Run deep investigation using GitHub search + web sources',
+            category: 'slash',
+            appendCursor: true,
+            learnMore: 'https://docs.github.com/copilot/how-tos/use-copilot-agents/use-copilot-cli'
+          },
+          {
+            name: 'Delegate to GitHub',
+            cmd: '/delegate',
+            desc: 'Send session to GitHub — Copilot creates a PR for you',
+            category: 'slash'
+          },
+          {
+            name: 'Fleet Mode',
+            cmd: '/fleet',
+            desc: 'Enable parallel subagent execution for complex tasks',
+            category: 'slash'
+          },
+          {
+            name: 'Enable Experimental',
+            cmd: '/experimental',
+            desc: 'Toggle experimental features (autopilot mode, etc.)',
+            category: 'slash'
+          },
+        ]
+      },
+      {
+        name: 'Session Control',
+        icon: Terminal,
+        description: 'Resume, compact, rewind, share',
+        features: [
+          {
+            name: 'Resume Session',
+            cmd: '/resume',
+            desc: 'Switch to or resume a previous session',
+            category: 'slash'
+          },
+          {
+            name: 'Compact Context',
+            cmd: '/compact',
+            desc: 'Summarize conversation history to free context window',
+            category: 'slash'
+          },
+          {
+            name: 'Rewind / Undo',
+            cmd: '/rewind',
+            desc: 'Rewind last turn and revert file changes',
+            category: 'slash'
+          },
+          {
+            name: 'Share Session',
+            cmd: '/share',
+            desc: 'Export session to markdown file or GitHub gist',
+            category: 'slash'
+          },
+          {
+            name: 'Context Usage',
+            cmd: '/context',
+            desc: 'Show context window token usage and visualization',
+            category: 'slash'
+          },
+          {
+            name: 'Session Usage',
+            cmd: '/usage',
+            desc: 'Display session usage metrics and statistics',
+            category: 'slash'
+          },
+          {
+            name: 'Copy Response',
+            cmd: '/copy',
+            desc: 'Copy the last response to clipboard',
+            category: 'slash'
+          },
+          {
+            name: 'Manage Sessions',
+            cmd: '/session',
+            desc: 'View and manage all sessions',
+            category: 'slash'
+          },
+        ]
+      },
+      {
+        name: 'Code & Review',
+        icon: FileCode,
+        description: 'Diff, PR, review, LSP, IDE',
+        features: [
+          {
+            name: '@ File Mentions',
+            cmd: '@ ',
+            desc: 'Type @ to mention files and include their contents in context',
+            category: 'context',
+            appendCursor: true
+          },
+          {
+            name: 'Review Diff',
+            cmd: '/diff',
+            desc: 'Review all changes made in the current directory',
+            category: 'slash'
+          },
+          {
+            name: 'PR Operations',
+            cmd: '/pr',
+            desc: 'Operate on pull requests for the current branch',
+            category: 'slash'
+          },
+          {
+            name: 'Code Review Agent',
+            cmd: '/review',
+            desc: 'Run the code review agent to analyze changes',
+            category: 'slash'
+          },
+          {
+            name: 'Language Server',
+            cmd: '/lsp',
+            desc: 'Manage LSP server configuration for code intelligence',
+            category: 'slash'
+          },
+          {
+            name: 'Connect IDE',
+            cmd: '/ide',
+            desc: 'Connect to an IDE workspace',
+            category: 'slash'
+          },
+          {
+            name: 'Shell Escape',
+            cmd: '!',
+            desc: 'Prefix with ! to run command in local shell directly',
+            category: 'shortcut',
             appendCursor: true
           },
         ]
       },
       {
-        name: 'Model & Output',
-        icon: Sparkles,
-        description: 'Control AI behavior',
+        name: 'Agents & Extensibility',
+        icon: Bot,
+        description: 'MCP, agents, skills, plugins',
         features: [
-          { 
-            name: 'Switch Model', 
-            cmd: '/model',
-            desc: 'Choose different AI model',
+          {
+            name: 'Init Instructions',
+            cmd: '/init',
+            desc: 'Initialize Copilot instructions for this repository',
             category: 'slash'
           },
-          { 
-            name: 'Stream Output', 
-            cmd: 'copilot --stream',
-            desc: 'Token-by-token output',
-            category: 'cli'
+          {
+            name: 'Browse Agents',
+            cmd: '/agent',
+            desc: 'Browse and select from available agents',
+            category: 'slash'
           },
-          { 
-            name: 'Show Banner', 
-            cmd: 'copilot --banner',
-            desc: 'Display animated startup banner',
-            category: 'cli'
+          {
+            name: 'Manage Skills',
+            cmd: '/skills',
+            desc: 'Manage skills for enhanced capabilities',
+            category: 'slash'
           },
-          { 
-            name: 'Screen Reader', 
-            cmd: 'copilot --screen-reader',
-            desc: 'Optimize output for accessibility',
-            category: 'cli'
+          {
+            name: 'MCP Servers',
+            cmd: '/mcp',
+            desc: 'Manage MCP server configuration',
+            category: 'slash'
+          },
+          {
+            name: 'Plugins',
+            cmd: '/plugin',
+            desc: 'Manage plugins and plugin marketplaces',
+            category: 'slash'
+          },
+          {
+            name: 'Background Tasks',
+            cmd: '/tasks',
+            desc: 'View and manage background tasks (subagents and shell sessions)',
+            category: 'slash'
+          },
+          {
+            name: 'Custom Instructions',
+            cmd: '/instructions',
+            desc: 'View and toggle custom instruction files',
+            category: 'slash'
           },
         ]
       },
       {
-        name: 'Security & Permissions',
+        name: 'Permissions & Security',
         icon: Shield,
         description: 'Control what Copilot can access',
         features: [
-          { 
-            name: 'Allow Tool', 
-            cmd: 'copilot --allow-tool ',
-            desc: 'Explicitly allow a system tool',
-            category: 'cli',
-            appendCursor: true
+          {
+            name: 'Allow All',
+            cmd: '/allow-all',
+            desc: 'Enable all permissions (tools, paths, and URLs)',
+            category: 'slash',
+            dangerous: true
           },
-          { 
-            name: 'Deny Tool', 
-            cmd: 'copilot --deny-tool ',
-            desc: 'Block a specific tool',
-            category: 'cli',
-            appendCursor: true
-          },
-          { 
-            name: 'Allow All Paths', 
-            cmd: 'copilot --allow-all-paths',
-            desc: '⚠️ Bypass path approvals',
+          {
+            name: 'Launch Pre-Approved',
+            cmd: 'copilot --allow-all-tools',
+            desc: 'Start Copilot with all tools already allowed',
             category: 'cli',
             dangerous: true
           },
-          { 
-            name: 'Serial Execution', 
-            cmd: 'copilot --disable-parallel-tools-execution',
-            desc: 'Run tools one at a time (safer)',
-            category: 'cli'
+          {
+            name: 'Add Directory',
+            cmd: '/add-dir',
+            desc: 'Add a directory to the allowed file access list',
+            category: 'slash'
+          },
+          {
+            name: 'List Directories',
+            cmd: '/list-dirs',
+            desc: 'Display all allowed directories',
+            category: 'slash'
+          },
+          {
+            name: 'Change Directory',
+            cmd: '/cwd',
+            desc: 'Change working directory or show current directory',
+            category: 'slash'
+          },
+          {
+            name: 'Reset Tools',
+            cmd: '/reset-allowed-tools',
+            desc: 'Reset the list of allowed tools',
+            category: 'slash'
           },
         ]
       },
       {
-        name: 'Context Variables',
-        icon: FileCode,
-        description: 'Reference code in prompts',
-        features: [
-          { 
-            name: '#file', 
-            cmd: '#file:',
-            desc: 'Reference a specific file',
-            category: 'context',
-            appendCursor: true
-          },
-          { 
-            name: '#selection', 
-            cmd: '#selection',
-            desc: 'Reference current selection',
-            category: 'context'
-          },
-          { 
-            name: '#function', 
-            cmd: '#function:',
-            desc: 'Reference a function by name',
-            category: 'context',
-            appendCursor: true
-          },
-          { 
-            name: '#class', 
-            cmd: '#class:',
-            desc: 'Reference a class by name',
-            category: 'context',
-            appendCursor: true
-          },
-        ]
-      },
-      {
-        name: 'Built-in Commands',
+        name: 'Power Shortcuts',
         icon: Zap,
-        description: 'Slash commands in conversation',
+        description: 'Keyboard shortcuts and launch flags',
         features: [
-          { 
-            name: 'Explain Code', 
-            cmd: '/explain',
-            desc: 'Get explanation of code',
+          {
+            name: 'Select Model',
+            cmd: '/model',
+            desc: 'Choose AI model (Claude Sonnet 4.5, GPT-5, etc.)',
             category: 'slash'
           },
-          { 
-            name: 'Fix Issues', 
-            cmd: '/fix',
-            desc: 'Auto-fix code problems',
+          {
+            name: 'Toggle Reasoning',
+            cmd: '# Press Ctrl+T in Copilot CLI',
+            desc: 'Toggle model reasoning display on/off',
+            category: 'shortcut'
+          },
+          {
+            name: 'Run & Preserve',
+            cmd: '# Press Ctrl+S in Copilot CLI',
+            desc: 'Run command while preserving your input text',
+            category: 'shortcut'
+          },
+          {
+            name: 'External Editor',
+            cmd: '# Press Ctrl+G in Copilot CLI',
+            desc: 'Edit your prompt in an external editor',
+            category: 'shortcut'
+          },
+          {
+            name: 'Expand Timeline',
+            cmd: '# Press Ctrl+O in Copilot CLI',
+            desc: 'Expand recent timeline (Ctrl+E for all)',
+            category: 'shortcut'
+          },
+          {
+            name: 'Open Link',
+            cmd: '# Press Ctrl+X then O in Copilot CLI',
+            desc: 'Open link from most recent timeline event',
+            category: 'shortcut'
+          },
+          {
+            name: 'Streamer Mode',
+            cmd: '/streamer-mode',
+            desc: 'Hide model names and quota details for streaming',
             category: 'slash'
           },
-          { 
-            name: 'Generate Tests', 
-            cmd: '/tests',
-            desc: 'Create tests for code',
-            category: 'slash'
-          },
-          { 
-            name: 'Show Usage', 
-            cmd: '/usage',
-            desc: 'Display token statistics',
-            category: 'slash'
-          },
-        ]
-      },
-      {
-        name: 'MCP Integration',
-        icon: Settings,
-        description: 'Connect external AI tools',
-        features: [
-          { 
-            name: 'View Config', 
-            cmd: 'cat ~/.copilot/config.json 2>/dev/null || echo "No config found at ~/.copilot/config.json"',
-            desc: 'Show Copilot configuration',
-            category: 'info'
-          },
-          { 
-            name: 'Config Location', 
-            cmd: 'echo "Windows: %USERPROFILE%\\.copilot\\config.json" && echo "macOS/Linux: ~/.copilot/config.json"',
-            desc: 'Where to edit settings',
-            category: 'info'
+          {
+            name: 'Show Banner',
+            cmd: 'copilot --banner',
+            desc: 'Launch with the animated startup banner',
+            category: 'cli'
           },
         ]
       },
@@ -418,7 +544,7 @@ export default function ForgeAssist({
     // v3.11.3: Remember last selected CLI tool
     return localStorage.getItem('forgeAssist_lastCLI') || 'claude';
   });
-  const [expandedCategories, setExpandedCategories] = useState(new Set(['Subagents', 'Session Management']));
+  const [expandedCategories, setExpandedCategories] = useState(new Set(['Subagents', 'Modes & Workflow']));
   const inputRef = useRef(null);
   
   // Focus search on open
