@@ -152,7 +152,7 @@ func handleSetupActivate(w http.ResponseWriter, r *http.Request) {
 	if tunnelMgr.IsRunning() {
 		tunnelMgr.Stop()
 	}
-	if err := tunnelMgr.Start(activePort, onTunnelURL); err != nil {
+	if err := tunnelMgr.Start(buildTunnelStartConfig(), onTunnelURL); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "tunnel start failed: " + err.Error()})
 		return
 	}

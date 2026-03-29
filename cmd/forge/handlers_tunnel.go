@@ -14,6 +14,33 @@ import (
 // Global tunnel manager — one instance for the lifetime of the process.
 var tunnelMgr = &tunnel.Manager{}
 
+// buildTunnelStartConfig reads the current notify config and returns the
+// appropriate StartConfig based on the configured tunnel provider.
+func buildTunnelStartConfig() tunnel.StartConfig {
+	cfg, err := loadNotifyConfig()
+	if err == nil {
+		switch cfg.TunnelProvider {
+		case "tailscale":
+			return tunnel.StartConfig{
+				Mode:      tunnel.ModeTailscale,
+				LocalPort: activePort,
+			}
+		case "cloudflare-named":
+			if cfg.CloudflareTunnelToken != "" && cfg.CloudflareTunnelHostname != "" {
+				return tunnel.StartConfig{
+					Mode:     tunnel.ModePersistent,
+					Token:    cfg.CloudflareTunnelToken,
+					Hostname: cfg.CloudflareTunnelHostname,
+				}
+			}
+		}
+	}
+	return tunnel.StartConfig{
+		Mode:      tunnel.ModeEphemeral,
+		LocalPort: activePort,
+	}
+}
+
 // ── Render API helpers ────────────────────────────────────────────────────────
 
 type renderEnvVar struct {
@@ -141,7 +168,7 @@ func handleTunnelStart(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"running": running, "url": url, "error": lastErr})
 		return
 	}
-	if err := tunnelMgr.Start(activePort, onTunnelURL); err != nil {
+	if err := tunnelMgr.Start(buildTunnelStartConfig(), onTunnelURL); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}

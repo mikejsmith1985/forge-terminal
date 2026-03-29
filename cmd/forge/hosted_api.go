@@ -13,12 +13,27 @@ type hostedStatusResponse struct {
 	AccessURL    string `json:"accessURL"`
 	Token        string `json:"token"`
 	QRCodeBase64 string `json:"qrCodeBase64,omitempty"`
+	Persistent   bool   `json:"persistent"`
 }
 
 func buildHostedStatus() hostedStatusResponse {
 	running, tunnelURL, _ := tunnelMgr.Status()
 	accessURL := tunnelURL
 	qrBase64 := ""
+	persistent := false
+
+	cfg, err := loadNotifyConfig()
+	if err == nil {
+		switch cfg.TunnelProvider {
+		case "tailscale":
+			persistent = true
+		case "cloudflare-named":
+			if cfg.CloudflareTunnelToken != "" && cfg.CloudflareTunnelHostname != "" {
+				persistent = true
+			}
+		}
+	}
+
 	if tunnelURL != "" {
 		if globalToken != "" {
 			accessURL = tunnelURL + "?token=" + globalToken
@@ -33,6 +48,7 @@ func buildHostedStatus() hostedStatusResponse {
 		AccessURL:    accessURL,
 		Token:        globalToken,
 		QRCodeBase64: qrBase64,
+		Persistent:   persistent,
 	}
 }
 
@@ -70,7 +86,7 @@ func handleHostedStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !tunnelMgr.IsRunning() {
-		if err := tunnelMgr.Start(activePort, onTunnelURL); err != nil {
+		if err := tunnelMgr.Start(buildTunnelStartConfig(), onTunnelURL); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}

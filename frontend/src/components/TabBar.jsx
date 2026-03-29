@@ -122,39 +122,59 @@ function TabBar({
  * Sends an immediate /api/notify POST. Shows a filled bell briefly on success.
  */
 function NotifyBellButton() {
-  const [sent, setSent] = useState(false);
+  const [state, setState] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'error'
   const [configured, setConfigured] = useState(null); // null=unknown, true/false
 
-  // Check on first render whether notifications are configured
+  // Only show button when an ntfyTopic is actually saved
   React.useEffect(() => {
     fetch('/api/notify/config')
       .then(r => r.json())
-      .then(cfg => setConfigured(!!(cfg.ntfyTopic || cfg.transport === 'ntfy')))
+      .then(cfg => setConfigured(!!cfg.ntfyTopic))
       .catch(() => setConfigured(false));
   }, []);
 
-  if (!configured) return null; // Hide button if not set up
+  if (!configured) return null;
 
   const handleClick = () => {
+    if (state === 'sending') return;
+    setState('sending');
     fetch('/api/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: '🔔 Forge Terminal: stepping away — ping me when you need me.' }),
     })
-      .then(r => r.ok && setSent(true))
-      .catch(() => {})
-      .finally(() => setTimeout(() => setSent(false), 3000));
+      .then(async r => {
+        if (r.ok) {
+          setState('sent');
+        } else {
+          const body = await r.json().catch(() => ({}));
+          console.error('Notify failed:', body.error || r.statusText);
+          setState('error');
+        }
+      })
+      .catch(err => {
+        console.error('Notify error:', err);
+        setState('error');
+      })
+      .finally(() => setTimeout(() => setState('idle'), 3000));
   };
+
+  const color = state === 'sent' ? '#fbbf24' : state === 'error' ? '#f87171' : undefined;
+  const label = state === 'sent' ? '✓ Notification sent' : state === 'error' ? '✗ Failed to send — check ntfy config' : 'Send notification to phone';
 
   return (
     <button
       className="dashboard-btn"
       onClick={handleClick}
-      aria-label={sent ? 'Notification sent' : 'Send notification to phone'}
-      title={sent ? '✓ Notification sent' : 'Send notification to phone'}
-      style={{ color: sent ? '#fbbf24' : undefined, transition: 'color 0.2s' }}
+      aria-label={label}
+      title={label}
+      style={{ color, transition: 'color 0.2s' }}
     >
-      {sent ? <Bell size={16} fill="currentColor" /> : <Bell size={16} />}
+      {state === 'sent'
+        ? <Bell size={16} fill="currentColor" />
+        : state === 'error'
+          ? <BellOff size={16} />
+          : <Bell size={16} />}
     </button>
   );
 }

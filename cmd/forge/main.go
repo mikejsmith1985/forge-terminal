@@ -504,7 +504,7 @@ func main() {
 		cfg, err := loadNotifyConfig()
 		shouldStartTunnel := (err == nil && cfg.TunnelAutoStart) || hostedCfg.TunnelAutoStart
 		if shouldStartTunnel {
-			if startErr := tunnelMgr.Start(activePort, onTunnelURL); startErr != nil {
+			if startErr := tunnelMgr.Start(buildTunnelStartConfig(), onTunnelURL); startErr != nil {
 				log.Printf("[Tunnel] Auto-start failed: %v", startErr)
 			} else {
 				log.Printf("[Tunnel] Auto-started cloudflared on port %d", activePort)

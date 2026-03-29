@@ -8,6 +8,8 @@ const DEFAULT_CONFIG = {
   tunnelAutoStart: false,
   renderAPIKey: '',
   renderServiceID: '',
+  cloudflareTunnelToken: '',
+  cloudflareTunnelHostname: '',
 };
 
 const NotificationsPanel = ({ onToast }) => {
@@ -215,9 +217,65 @@ const NotificationsPanel = ({ onToast }) => {
         </>
       )}
 
-      {/* ── Shared: idle detection ──────────────────────────────────────── */}
+      {/* ── Persistent tunnel (Cloudflare Named Tunnel) ─────────────────── */}
       <div style={{ borderTop: '1px solid var(--border, #333)' }} />
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+      <div>
+        <h3 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 600, color: 'var(--text-primary, #e0e0e0)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          🔗 Persistent Remote Access
+          <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-muted, #888)', background: 'var(--surface, #2a2a2a)', border: '1px solid var(--border, #444)', borderRadius: '4px', padding: '1px 6px' }}>optional</span>
+        </h3>
+        <p style={{ margin: '0 0 12px', fontSize: '12px', color: 'var(--text-muted, #888)', lineHeight: 1.6 }}>
+          By default, Remote Access uses an ephemeral Cloudflare URL that changes every session.
+          Configure a <strong style={{ color: 'var(--text-secondary, #ccc)' }}>Cloudflare Named Tunnel</strong> to get a stable, bookmarkable URL.
+          Both fields are required; leave them blank to continue using the ephemeral mode.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>
+              Tunnel Token
+            </label>
+            <input
+              type="password"
+              value={config.cloudflareTunnelToken || ''}
+              onChange={e => update('cloudflareTunnelToken', e.target.value)}
+              placeholder="eyJhIjoiM…  (from Cloudflare Zero Trust dashboard)"
+              style={inputStyle}
+              autoComplete="off"
+            />
+            <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)', lineHeight: 1.5 }}>
+              In Cloudflare Zero Trust → Networks → Tunnels → your tunnel → Configure → copy the token.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary, #ccc)' }}>
+              Public Hostname
+            </label>
+            <input
+              type="url"
+              value={config.cloudflareTunnelHostname || ''}
+              onChange={e => update('cloudflareTunnelHostname', e.target.value)}
+              placeholder="https://forge.yourdomain.com"
+              style={inputStyle}
+            />
+            <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)', lineHeight: 1.5 }}>
+              The public URL you configured for this tunnel in Cloudflare (the Service should point to{' '}
+              <code style={codeStyle}>http://localhost:3005</code> or your Forge port).
+              See <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent, #7c9ef7)' }}>setup guide</a>.
+            </span>
+          </div>
+
+          {config.cloudflareTunnelToken && config.cloudflareTunnelHostname && (
+            <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: '6px', padding: '8px 12px', fontSize: '12px', color: '#86efac', lineHeight: 1.5 }}>
+              ✅ Persistent mode active — Remote Access will use <strong>{config.cloudflareTunnelHostname}</strong> every session.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Shared: idle detection ──────────────────────────────────────── */}
+      <div style={{ borderTop: '1px solid var(--border, #333)' }} />      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
         <button
           onClick={() => updateAndSave('idleDetectionEnabled', !config.idleDetectionEnabled)}
           style={{ ...toggleStyle, background: config.idleDetectionEnabled ? 'var(--accent, #7c9ef7)' : 'var(--surface, #333)' }}

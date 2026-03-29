@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Wifi, WifiOff, X, Copy, Check, Eye, EyeOff, Loader2, Radio } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Wifi, WifiOff, X, Copy, Check, Eye, EyeOff, Loader2, Radio, ChevronDown, ChevronUp } from 'lucide-react';
 import { useHostedMode } from '../hooks/useHostedMode';
 
 function CopyButton({ text, style = {} }) {
@@ -38,15 +38,52 @@ function CopyButton({ text, style = {} }) {
   );
 }
 
+const PROVIDERS = [
+  { value: 'cloudflare', label: '⚡ Cloudflare', sublabel: 'Ephemeral — URL changes each session' },
+  { value: 'tailscale',  label: '🔗 Tailscale',  sublabel: 'Persistent — stable URL, free' },
+];
+
 export default function RemoteAccessModal({ isOpen, onClose }) {
   const { status, loading, error, start, stop } = useHostedMode(isOpen);
   const [tokenVisible, setTokenVisible] = useState(false);
 
+  // Provider config (loaded from / saved to /api/notify/config)
+  const [provider, setProvider] = useState('cloudflare');
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch('/api/notify/config')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.tunnelProvider) setProvider(data.tunnelProvider);
+        setConfigLoaded(true);
+      })
+      .catch(() => setConfigLoaded(true));
+  }, [isOpen]);
+
+  const selectProvider = useCallback(async (val) => {
+    setProvider(val);
+    setSaving(true);
+    try {
+      const existing = await fetch('/api/notify/config').then(r => r.json()).catch(() => ({}));
+      await fetch('/api/notify/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...existing, tunnelProvider: val }),
+      });
+    } catch (_) {}
+    setSaving(false);
+  }, []);
+
   if (!isOpen) return null;
 
   const isCloudflaredError = error && error.toLowerCase().includes('cloudflared');
+  const isTailscaleError = error && error.toLowerCase().includes('tailscale');
   const hasTunnel = status.running && status.tunnelURL;
   const waitingForTunnel = status.running && !status.tunnelURL;
+  const isPersistent = status.persistent === true;
 
   const displayToken = tokenVisible
     ? status.token
@@ -140,6 +177,48 @@ export default function RemoteAccessModal({ isOpen, onClose }) {
             }
           </div>
 
+          {/* Provider selector — only when not running */}
+          {!status.running && configLoaded && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Tunnel Provider {saving && <span style={{ opacity: 0.5 }}>saving…</span>}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {PROVIDERS.map(p => (
+                  <button
+                    key={p.value}
+                    onClick={() => selectProvider(p.value)}
+                    style={{
+                      flex: 1,
+                      border: `2px solid ${provider === p.value ? 'var(--accent-color)' : 'var(--border-color)'}`,
+                      borderRadius: 8,
+                      background: provider === p.value ? 'rgba(124,158,247,0.1)' : 'var(--bg-secondary)',
+                      color: provider === p.value ? 'var(--accent-color)' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      padding: '8px 10px',
+                      textAlign: 'center',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{p.label}</div>
+                    <div style={{ fontSize: 11, marginTop: 2, opacity: 0.75 }}>{p.sublabel}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Tailscale install hint */}
+              {provider === 'tailscale' && (
+                <div style={{ background: 'rgba(124,158,247,0.08)', border: '1px solid rgba(124,158,247,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>Setup (one-time):</strong>
+                  {' '}Install{' '}
+                  <a href="https://tailscale.com/download" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)' }}>Tailscale</a>
+                  {' '}on this PC and sign in with a free account. That's it —
+                  your stable URL will appear automatically when you start.
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Error */}
           {error && (
             <div
@@ -157,14 +236,18 @@ export default function RemoteAccessModal({ isOpen, onClose }) {
               {isCloudflaredError && (
                 <div style={{ marginTop: 8, color: 'var(--text-secondary)', fontSize: 12 }}>
                   Install cloudflared from{' '}
-                  <a
-                    href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: 'var(--accent-color)', textDecoration: 'underline' }}
-                  >
+                  <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline' }}>
                     developers.cloudflare.com
                   </a>
+                </div>
+              )}
+              {isTailscaleError && (
+                <div style={{ marginTop: 8, color: 'var(--text-secondary)', fontSize: 12 }}>
+                  Install Tailscale from{' '}
+                  <a href="https://tailscale.com/download" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline' }}>
+                    tailscale.com/download
+                  </a>
+                  {' '}and sign in, then try again.
                 </div>
               )}
             </div>
@@ -198,18 +281,26 @@ export default function RemoteAccessModal({ isOpen, onClose }) {
                       borderRadius: 10,
                       padding: 12,
                       display: 'flex',
-                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 10,
                     }}
                   >
                     <img
                       src={`data:image/png;base64,${status.qrCodeBase64}`}
                       alt="Scan to connect"
-                      style={{ width: 260, height: 260, borderRadius: 8, display: 'block', margin: '0 auto' }}
+                      style={{ width: 260, height: 260, borderRadius: 8, display: 'block' }}
                     />
+                    {isPersistent ? (
+                      <span style={{ fontSize: 11, color: '#166534', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 6, padding: '2px 10px', fontWeight: 600, letterSpacing: '0.04em' }}>
+                        🔗 Persistent URL — safe to bookmark
+                      </span>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: 11, color: '#888', textAlign: 'center', lineHeight: 1.5 }}>
+                        ⚠️ This URL changes every session — scan fresh each time. Don't save it as a bookmark.
+                      </p>
+                    )}
                   </div>
-                  <p style={{ margin: 0, fontSize: 11, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
-                    ⚠️ This URL changes every session — scan fresh each time. Don't save it as a bookmark.
-                  </p>
                 </div>
               )}
 
@@ -357,3 +448,4 @@ export default function RemoteAccessModal({ isOpen, onClose }) {
     </div>
   );
 }
+

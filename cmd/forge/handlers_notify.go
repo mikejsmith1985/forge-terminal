@@ -38,11 +38,24 @@ type NotifyConfig struct {
 	// reply remotely without touching the PC.
 	BaseURL string `json:"baseURL"`
 
+	// TunnelProvider selects the remote access tunnel backend.
+	// "cloudflare" (default) = ephemeral trycloudflare.com quick tunnel.
+	// "tailscale"            = Tailscale Funnel (stable persistent URL, free).
+	// "cloudflare-named"     = Cloudflare named tunnel via token (requires domain).
+	TunnelProvider string `json:"tunnelProvider"`
+
 	// Tunnel automation — auto-manage a cloudflared quick tunnel so the
 	// public URL is always kept in sync with Render's FORGE_INBOUND_URL.
 	TunnelAutoStart  bool   `json:"tunnelAutoStart"`
 	RenderAPIKey     string `json:"renderAPIKey"`
 	RenderServiceID  string `json:"renderServiceID"`
+
+	// Persistent tunnel — Cloudflare named tunnel via token.
+	// When both fields are set, Forge uses "cloudflared tunnel run --token TOKEN"
+	// instead of an ephemeral quick tunnel. The public URL (Hostname) is stable
+	// and configured by the user in the Cloudflare Zero Trust dashboard.
+	CloudflareTunnelToken    string `json:"cloudflareTunnelToken"`
+	CloudflareTunnelHostname string `json:"cloudflareTunnelHostname"`
 }
 
 func defaultNotifyConfig() NotifyConfig {
@@ -335,10 +348,13 @@ func handleNotifyConfigGet(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	// Mask secret — never send plaintext to frontend
+	// Mask secrets — never send plaintext to frontend
 	masked := cfg
 	if masked.RenderAPIKey != "" {
 		masked.RenderAPIKey = maskSecret(masked.RenderAPIKey)
+	}
+	if masked.CloudflareTunnelToken != "" {
+		masked.CloudflareTunnelToken = maskSecret(masked.CloudflareTunnelToken)
 	}
 	writeJSON(w, http.StatusOK, masked)
 }
@@ -359,6 +375,9 @@ func handleNotifyConfigPost(w http.ResponseWriter, r *http.Request) {
 	existing, _ := loadNotifyConfig()
 	if incoming.RenderAPIKey == maskSecret("x") {
 		incoming.RenderAPIKey = existing.RenderAPIKey
+	}
+	if incoming.CloudflareTunnelToken == maskSecret("x") {
+		incoming.CloudflareTunnelToken = existing.CloudflareTunnelToken
 	}
 	if incoming.IdleTimeoutSeconds <= 0 {
 		incoming.IdleTimeoutSeconds = 30

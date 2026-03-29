@@ -1084,11 +1084,29 @@ function App() {
     // v3.8.2: Terminal is the only view, no switching needed
   }, []);
 
-  // Handle directory change from terminal - auto-rename tab and save directory
+  // Handle directory change from terminal - auto-rename tab and save directory.
+  // Shows the last 2 meaningful path segments so the project context is never
+  // lost when navigating into subdirectories (e.g. "forge-terminal/frontend"
+  // instead of just "frontend").
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
-    if (folderName) {
-      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath });
-      updateTabTitle(tabId, folderName);
+    if (folderName || fullPath) {
+      let title = folderName || '';
+      if (fullPath) {
+        // Normalise separators and strip trailing slashes, then drop Windows
+        // drive letters ("C:") so they don't occupy a meaningful segment slot.
+        const parts = fullPath
+          .replace(/\\/g, '/')
+          .replace(/\/+$/, '')
+          .split('/')
+          .filter(p => p && !/^[a-zA-Z]:$/.test(p));
+        if (parts.length >= 2) {
+          title = `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+        } else if (parts.length === 1) {
+          title = parts[0];
+        }
+      }
+      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title });
+      if (title) updateTabTitle(tabId, title);
     }
     if (fullPath) {
       updateTabDirectory(tabId, fullPath);
