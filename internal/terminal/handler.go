@@ -560,9 +560,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	hubRaw, _ := h.hubs.LoadOrStore(sessionID, newSessionHub())
 	hub := hubRaw.(*sessionHub)
 	hub.add(conn)
-	defer func() {
-		hub.clearActive(conn) // prevent stale active pointer on disconnect
-	}()
 
 	var session *TerminalSession
 	var isReattach bool
@@ -579,11 +576,25 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// Replay recent PTY output so the watcher sees terminal history
 			// instead of a blank screen.
 			hub.replayTo(conn, websocket.BinaryMessage)
-			_ = conn.WriteJSON(map[string]interface{}{
-				"type":           "SESSION_JOINED",
-				"sessionId":      sessionID,
-				"isActiveDevice": false,
-			})
+
+			// If no device currently controls this PTY (previous owner disconnected),
+			// auto-promote this client to active so it can resize and interact fully.
+			// This handles the common case of the same user reconnecting after a hiccup.
+			if hub.getActive() == nil {
+				hub.setActive(conn)
+				log.Printf("[Terminal] Session %s: auto-promoted joining client to active (no previous active)", sessionID)
+				_ = conn.WriteJSON(map[string]interface{}{
+					"type":           "SESSION_JOINED",
+					"sessionId":      sessionID,
+					"isActiveDevice": true,
+				})
+			} else {
+				_ = conn.WriteJSON(map[string]interface{}{
+					"type":           "SESSION_JOINED",
+					"sessionId":      sessionID,
+					"isActiveDevice": false,
+				})
+			}
 		}
 	}
 
@@ -624,6 +635,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		conn.markClosed()
 		hub.remove(conn)
+		hub.clearActive(conn) // prevent stale active pointer after remove
 		// Only clean up the session when the last client leaves.
 		// While any client remains in the hub, the PTY goroutine keeps broadcasting to them.
 		if hub.size() == 0 {
@@ -639,9 +651,14 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// This is a documentation hint — the actual decision is in detachSession().
 
 	// Set initial terminal size using client-reported dimensions (or 80x24 fallback)
-	// Only the active device (owner) may resize the PTY — watchers leave it as-is.
+	// Only the active device may resize the PTY.
+	// For new sessions and reattaches, the client is always active.
+	// For watchers joining a live session, they're active only if auto-promoted
+	// (no other active device exists — previous owner disconnected).
 	if !isWatcher {
-		hub.setActive(conn)
+		hub.setActive(conn) // new session or reattach → this client owns the PTY
+	}
+	if hub.isActive(conn) {
 		_ = session.Resize(initialCols, initialRows)
 	}
 	sizeSource := "default"

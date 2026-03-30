@@ -259,6 +259,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '4.5.0'; // v4.3.0: Updated tabs/input tour steps with desktop features, multiline, image upload
+const TOUR_VERSION = '4.5.1'; // v4.3.0: Updated tabs/input tour steps with desktop features, multiline, image upload
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
