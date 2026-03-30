@@ -560,6 +560,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	hubRaw, _ := h.hubs.LoadOrStore(sessionID, newSessionHub())
 	hub := hubRaw.(*sessionHub)
 	hub.add(conn)
+	defer func() {
+		hub.clearActive(conn) // prevent stale active pointer on disconnect
+	}()
 
 	var session *TerminalSession
 	var isReattach bool
@@ -577,8 +580,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// instead of a blank screen.
 			hub.replayTo(conn, websocket.BinaryMessage)
 			_ = conn.WriteJSON(map[string]interface{}{
-				"type":      "SESSION_JOINED",
-				"sessionId": sessionID,
+				"type":           "SESSION_JOINED",
+				"sessionId":      sessionID,
+				"isActiveDevice": false,
 			})
 		}
 	}
@@ -635,14 +639,18 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// This is a documentation hint — the actual decision is in detachSession().
 
 	// Set initial terminal size using client-reported dimensions (or 80x24 fallback)
-	_ = session.Resize(initialCols, initialRows)
+	// Only the active device (owner) may resize the PTY — watchers leave it as-is.
+	if !isWatcher {
+		hub.setActive(conn)
+		_ = session.Resize(initialCols, initialRows)
+	}
 	sizeSource := "default"
 	if query.Get("cols") != "" {
 		sizeSource = "client"
 	}
 	switch {
 	case isWatcher:
-		log.Printf("[Terminal] Session %s: watcher resized to %dx%d (from %s)", sessionID, initialCols, initialRows, sizeSource)
+		log.Printf("[Terminal] Session %s: watcher joined (no resize, active device controls PTY)", sessionID)
 	case isReattach:
 		log.Printf("[Terminal] Reattached session resized to %dx%d (from %s)", initialCols, initialRows, sizeSource)
 	default:
@@ -969,11 +977,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			if msgType == websocket.TextMessage {
 				var msg ResizeMessage
 				if err := json.Unmarshal(data, &msg); err == nil && msg.Type == "resize" {
-					// Watchers must NOT resize — only the owner controls PTY dimensions.
-					// Without this, a mobile viewer's small screen (e.g. 40 cols) would
-					// resize the shared PTY and break word-wrapping on the desktop.
-					if isWatcher {
-						log.Printf("[Terminal] Ignoring resize from watcher (%dx%d)", msg.Cols, msg.Rows)
+					// Only the active device may resize the PTY.
+					if !hub.isActive(conn) {
+						log.Printf("[Terminal] Ignoring resize from non-active device (%dx%d)", msg.Cols, msg.Rows)
 						continue
 					}
 					// Validate dimensions to prevent nonsensical PTY sizes
@@ -985,6 +991,22 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 						log.Printf("[Terminal] Resize error: %v", err)
 					} else {
 						log.Printf("[Terminal] Resized to %dx%d", msg.Cols, msg.Rows)
+					}
+					continue
+				}
+
+				// Handle "take_control" — any client can request to become the active device.
+				// This enables the Spotify-style handoff: phone takes over from PC and vice versa.
+				if err := json.Unmarshal(data, &msg); err == nil && msg.Type == "take_control" {
+					log.Printf("[Terminal] Session %s: take_control requested (cols=%d, rows=%d)", sessionID, msg.Cols, msg.Rows)
+					hub.transferControl(conn, sessionID)
+					// Resize PTY to the new active device's dimensions
+					if msg.Cols >= 10 && msg.Cols <= 500 && msg.Rows >= 2 && msg.Rows <= 200 {
+						if err := session.Resize(msg.Cols, msg.Rows); err != nil {
+							log.Printf("[Terminal] Resize after take_control error: %v", err)
+						} else {
+							log.Printf("[Terminal] Resized to %dx%d after take_control", msg.Cols, msg.Rows)
+						}
 					}
 					continue
 				}

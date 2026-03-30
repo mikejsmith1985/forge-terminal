@@ -1,16 +1,29 @@
 package terminal
 
 import (
+	"encoding/json"
+	"log"
 	"sync"
+
+	"github.com/gorilla/websocket"
 )
 
 // sessionHub tracks all WebSocket clients watching a single PTY session.
 // It allows PTY output to be broadcast to every connected client (owner + watchers).
 // A ring buffer of recent output is kept so that new watchers receive a
 // snapshot of the terminal state when they join (scrollback replay).
+//
+// The hub also tracks the "active device" — the one connection whose terminal
+// dimensions drive the PTY size.  Only the active device may send resize.
+// Other connections are passive: they receive broadcasts and can send raw
+// input (command cards, keystrokes) but cannot resize.
 type sessionHub struct {
 	mu      sync.Mutex
 	clients map[*connWriter]struct{}
+
+	// activeConn is the connection that currently controls PTY dimensions.
+	// nil means no active device (all clients disconnected or not yet set).
+	activeConn *connWriter
 
 	// Ring buffer for scrollback replay — stores recent PTY output so that
 	// new watchers see existing terminal content instead of a blank screen.
@@ -119,4 +132,83 @@ func (h *sessionHub) has(cw *connWriter) bool {
 	defer h.mu.Unlock()
 	_, ok := h.clients[cw]
 	return ok
+}
+
+// setActive designates a connection as the active device (controls PTY dimensions).
+func (h *sessionHub) setActive(cw *connWriter) {
+	h.mu.Lock()
+	h.activeConn = cw
+	h.mu.Unlock()
+}
+
+// isActive reports whether the given connection is the active device.
+func (h *sessionHub) isActive(cw *connWriter) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.activeConn == cw
+}
+
+// getActive returns the current active connection, or nil.
+func (h *sessionHub) getActive() *connWriter {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.activeConn
+}
+
+// transferControl moves PTY ownership from the current active device to a new one.
+// It sends CONTROL_TRANSFERRED to the old active and CONTROL_GRANTED to the new one.
+// All other clients in the hub receive CONTROL_TRANSFERRED as an observer notification.
+func (h *sessionHub) transferControl(newActive *connWriter, sessionID string) {
+	h.mu.Lock()
+	oldActive := h.activeConn
+	h.activeConn = newActive
+
+	// Snapshot all clients for notification (outside lock)
+	clients := make([]*connWriter, 0, len(h.clients))
+	for cw := range h.clients {
+		clients = append(clients, cw)
+	}
+	h.mu.Unlock()
+
+	// Notify the new active device
+	_ = newActive.WriteMessage(websocket.TextMessage, mustJSON(map[string]any{
+		"type":      "CONTROL_GRANTED",
+		"sessionId": sessionID,
+	}))
+
+	// Notify all other clients (including old active)
+	transferMsg := mustJSON(map[string]any{
+		"type":      "CONTROL_TRANSFERRED",
+		"sessionId": sessionID,
+	})
+	for _, cw := range clients {
+		if cw != newActive {
+			_ = cw.WriteMessage(websocket.TextMessage, transferMsg)
+		}
+	}
+
+	if oldActive != nil && oldActive != newActive {
+		log.Printf("[Hub] Session %s: control transferred from %p to %p", sessionID, oldActive, newActive)
+	} else {
+		log.Printf("[Hub] Session %s: control granted to %p", sessionID, newActive)
+	}
+}
+
+// mustJSON marshals v to JSON bytes, panicking on error (used for known-safe maps).
+func mustJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic("hub: json.Marshal failed: " + err.Error())
+	}
+	return b
+}
+
+// clearActive removes the active device if it matches the given connection.
+// Called when a connection disconnects to avoid stale pointers.
+func (h *sessionHub) clearActive(cw *connWriter) {
+	h.mu.Lock()
+	if h.activeConn == cw {
+		h.activeConn = nil
+	}
+	h.mu.Unlock()
 }

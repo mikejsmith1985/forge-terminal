@@ -580,6 +580,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [isActiveDevice, setIsActiveDevice] = useState(true); // Handoff: this device controls PTY dimensions
+  const isActiveDeviceRef = useRef(true);
   
   // PERF FIX: Track isWaiting in ref to avoid stale closures in hot paths
   const isWaitingRef = useRef(false);
@@ -673,6 +675,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     isVisibleRef.current = isVisible;
   }, [isVisible]);
+  
+  // Keep isActiveDevice ref updated for use in closures (onResize)
+  useEffect(() => {
+    isActiveDeviceRef.current = isActiveDevice;
+  }, [isActiveDevice]);
   
   // Keep onFileOpen ref updated
   useEffect(() => {
@@ -1615,6 +1622,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         sessionReattachedRef.current = false; // Will be set to true by SESSION_REATTACHED or SESSION_JOINED message
         setReconnecting(false);
         setIsConnected(true);
+        setIsActiveDevice(true); // Assume active until SESSION_JOINED says otherwise
         
         // Send initial size (always needed — terminal may have been resized during disconnect)
         const { cols, rows } = term;
@@ -1720,11 +1728,31 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               }
 
               if (msg.type === 'SESSION_JOINED') {
-                logger.terminal('Joined live session', { tabId });
+                logger.terminal('Joined live session (passive device)', { tabId });
                 if (xtermRef.current) {
-                  xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing live terminal session.\r\n`);
+                  xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
                 }
                 sessionReattachedRef.current = true; // suppress fresh "Connected" banner
+                setIsActiveDevice(false);
+                return;
+              }
+
+              // Handoff: another device took control of this PTY
+              if (msg.type === 'CONTROL_TRANSFERRED') {
+                logger.terminal('Control transferred to another device', { tabId });
+                setIsActiveDevice(false);
+                return;
+              }
+
+              // Handoff: this device is now the active device
+              if (msg.type === 'CONTROL_GRANTED') {
+                logger.terminal('Control granted to this device', { tabId });
+                setIsActiveDevice(true);
+                // Resize PTY to match this device's terminal dimensions
+                if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+                  const { cols, rows } = xtermRef.current;
+                  wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
+                }
                 return;
               }
             } catch (e) {
@@ -1942,7 +1970,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       });
 
       // Handle terminal resize — uses wsRef.current for same reason as onData above.
+      // Only send resize when this device is active (handoff model).
       term.onResize(({ cols, rows }) => {
+        if (!isActiveDeviceRef.current) return; // passive device — don't resize PTY
         const activeWs = wsRef.current;
         if (activeWs && activeWs.readyState === WebSocket.OPEN) {
           activeWs.send(JSON.stringify({ type: 'resize', cols, rows }));
@@ -2127,6 +2157,52 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           cursor: 'text',
         }}
       />
+
+      {/* Handoff overlay: shown when another device controls this terminal */}
+      {!isActiveDevice && isConnected && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            padding: '8px 16px',
+            background: 'rgba(99, 102, 241, 0.9)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 10,
+            borderTop: '1px solid rgba(255,255,255,0.15)',
+          }}
+        >
+          <span style={{ color: '#fff', fontSize: '13px', opacity: 0.95 }}>
+            Another device controls this terminal
+          </span>
+          <button
+            onClick={() => {
+              if (wsRef.current?.readyState === WebSocket.OPEN && xtermRef.current) {
+                const { cols, rows } = xtermRef.current;
+                wsRef.current.send(JSON.stringify({ type: 'take_control', cols, rows }));
+              }
+            }}
+            style={{
+              padding: '4px 14px',
+              fontSize: '13px',
+              fontWeight: 600,
+              background: '#fff',
+              color: '#4338ca',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Take Control
+          </button>
+        </div>
+      )}
       
       {showScrollButton && isVisible && (
         <button
