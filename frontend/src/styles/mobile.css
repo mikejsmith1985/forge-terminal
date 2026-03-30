@@ -210,3 +210,18 @@
     width: 280px !important;
   }
 }
+
+/* Mobile: ensure xterm hidden textarea is accessible for virtual keyboard */
+@media (max-width: 768px), (pointer: coarse) {
+  .xterm-helper-textarea {
+    opacity: 0 !important;
+    width: 1px !important;
+    height: 1px !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    /* Override xterm's default which may push it completely off-screen */
+    transform: none !important;
+    z-index: -1 !important;
+  }
+}

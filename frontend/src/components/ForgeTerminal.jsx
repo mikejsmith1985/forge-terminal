@@ -2110,6 +2110,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             xtermRef.current.focus();
           }
         }}
+        onTouchEnd={(e) => {
+          // Mobile: focus xterm's hidden textarea so virtual keyboard appears
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+            const textarea = terminalRef.current?.querySelector('.xterm-helper-textarea');
+            if (textarea) {
+              textarea.focus({ preventScroll: true });
+            }
+          }
+        }}
         style={{
           width: '100%',
           height: '100%',
