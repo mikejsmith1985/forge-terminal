@@ -1139,26 +1139,29 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     //
     // 2. DOM "scroll" on .xterm-viewport — fires for mouse wheel scrolling. xterm's
     //    Viewport.handleWheel() updates scrollTop directly, which triggers this event.
-    //    By the time our listener runs, buffer.viewportY is already updated.
     //
-    // Using both ensures complete coverage without duplicate listeners on reconnect.
+    // DOM-based detection (scrollHeight - scrollTop - clientHeight) is used in both
+    // paths because it is synchronous with the DOM state and does not depend on
+    // buffer.viewportY / buffer.baseY timing (which can lag behind the DOM update
+    // when xterm defers syncScrollArea via requestAnimationFrame).
+    const viewport = terminalRef.current.querySelector('.xterm-viewport');
+
     let scrollRafPending = false;
     const checkScrollPosition = () => {
       if (scrollRafPending) return;
       scrollRafPending = true;
       requestAnimationFrame(() => {
         scrollRafPending = false;
-        if (!xtermRef.current) return;
-        const buffer = xtermRef.current.buffer.active;
-        const isAtBottom = buffer.viewportY >= buffer.baseY;
-        setShowScrollButton(!isAtBottom);
+        if (!xtermRef.current || !viewport) return;
+        // Use DOM dimensions — reliable across all xterm.js scroll paths.
+        const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+        setShowScrollButton(distanceFromBottom > 50);
       });
     };
 
     const scrollDisposable = term.onScroll(checkScrollPosition);
 
     // Mouse wheel scrolling bypasses term.onScroll — listen directly on the DOM viewport.
-    const viewport = terminalRef.current.querySelector('.xterm-viewport');
     if (viewport) {
       viewport.addEventListener('scroll', checkScrollPosition, { passive: true });
     }
