@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, BarChart3, Bell, BellOff, Zap } from 'lucide-react';
+import { Plus, BarChart3, Bell, BellOff, Zap, BookOpen } from 'lucide-react';
 import Tab from './Tab';
 
 /**
@@ -19,6 +19,8 @@ function TabBar({
   onOpenDashboard = null,
   onToggleForgeAssist = null,
   isForgeAssistOpen = false,
+  onToggleTutor = null,
+  isTutorOpen = false,
   disableNewTab = false,
   waitingTabs = {},
   mode = 'dark',
@@ -100,6 +102,18 @@ function TabBar({
           data-testid="forge-assist-btn"
         >
           <Zap size={16} />
+        </button>
+      )}
+      {/* Code Tutor — Learn As You Build */}
+      {onToggleTutor && (
+        <button
+          className={`dashboard-btn ${isTutorOpen ? 'active' : ''}`}
+          onClick={onToggleTutor}
+          aria-label={isTutorOpen ? 'Close Code Tutor' : 'Code Tutor (Ctrl+Shift+T)'}
+          title="Code Tutor (Ctrl+Shift+T)"
+          data-testid="tutor-btn"
+        >
+          <BookOpen size={16} />
         </button>
       )}
       {/* Manual notify bell */}

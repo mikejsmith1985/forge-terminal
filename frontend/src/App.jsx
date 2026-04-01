@@ -32,6 +32,7 @@ import FollowMeDebugger from './components/FollowMeDebugger'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
+import CodeTutorPanel from './components/CodeTutorPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -162,6 +163,9 @@ function App() {
   
   // Forge Assist state
   const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
+
+  // Code Tutor state (v3.19.0: Learn As You Build)
+  const [isTutorOpen, setIsTutorOpen] = useState(false)
 
   // Mobile detection — drives drawer sidebar and touch-optimised interactions
   const { isMobile, isTablet } = useMobileDetect();
@@ -918,6 +922,13 @@ function App() {
       if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
         e.preventDefault();
         setIsHistorySliderOpen(prev => !prev);
+        return;
+      }
+
+      // Ctrl+Shift+T: Toggle Code Tutor (desktop only)
+      if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        if (!isCompact) setIsTutorOpen(prev => !prev);
         return;
       }
       
@@ -1806,6 +1817,8 @@ function App() {
             onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
             onToggleForgeAssist={() => setIsForgeAssistOpen(prev => !prev)}
             isForgeAssistOpen={isForgeAssistOpen}
+            onToggleTutor={() => setIsTutorOpen(prev => !prev)}
+            isTutorOpen={isTutorOpen}
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
             mode={theme}
@@ -2160,6 +2173,13 @@ function App() {
         onToast={addToast}
         activeTabId={activeTabId}
         contextFiles={contextFiles}
+      />}
+
+      {/* Code Tutor Panel - Learn As You Build (v3.19.0) */}
+      {!isCompact && <CodeTutorPanel
+        isOpen={isTutorOpen}
+        onClose={() => setIsTutorOpen(false)}
+        onToast={addToast}
       />}
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}

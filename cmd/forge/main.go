@@ -237,6 +237,9 @@ func main() {
 	// Register pprof endpoints behind auth middleware
 	RegisterPprofRoutes()
 
+	// Initialize Code Tutor subsystem
+	initTutor()
+
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
@@ -476,6 +479,15 @@ func main() {
 
 	// Temp image upload API
 	http.HandleFunc("/api/temp-image", WrapWithMiddleware(handleTempImageUpload))
+
+	// Code Tutor API (v3.19.0: Learn As You Build)
+	http.HandleFunc("/api/tutor/sessions", WrapWithMiddleware(handleTutorSessions))
+	http.HandleFunc("/api/tutor/sessions/", WrapWithMiddleware(handleTutorSession))
+	http.HandleFunc("/api/tutor/navigate", WrapWithMiddleware(handleTutorNavigate))
+	http.HandleFunc("/api/tutor/explain", WrapWithMiddleware(handleTutorExplain))
+	http.HandleFunc("/api/tutor/learning-path", WrapWithMiddleware(handleTutorLearningPath))
+	http.HandleFunc("/api/tutor/settings", WrapWithMiddleware(handleTutorSettings))
+	http.HandleFunc("/api/tutor/watcher", WrapWithMiddleware(handleTutorWatcher))
 
 	// Initialize session temp directory
 	if err := initSessionTempDir(); err != nil {
