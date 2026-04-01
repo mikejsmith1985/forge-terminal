@@ -493,7 +493,7 @@ const styles = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function CodeTutorPanel({ isOpen, onClose, onToast }) {
+export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirectory }) {
   const {
     session, explanation, isLoading, isExplaining, error, notifications, sessions,
     createSession, loadSession, deleteSession, advance, goBack, goToFile,
@@ -513,6 +513,13 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast }) {
 
   const codeScrollRef = useRef(null)
   const errorTimerRef = useRef(null)
+
+  // Seed project path from active tab's working directory
+  useEffect(() => {
+    if (isOpen && activeDirectory && !session) {
+      setProjectPath(activeDirectory)
+    }
+  }, [isOpen, activeDirectory, session])
 
   // ── Derived data ───────────────────────────────────────────────
   const files = session?.learningPath?.files || []
@@ -592,7 +599,7 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast }) {
   // ── Handlers ───────────────────────────────────────────────────
   const handleCreate = useCallback(() => {
     if (!projectPath.trim()) return
-    createSession(projectPath.trim(), { liveMode })
+    createSession(projectPath.trim(), liveMode ? 'live' : 'on_demand')
   }, [projectPath, liveMode, createSession])
 
   const handleKeyDown = useCallback((e) => {
@@ -745,16 +752,25 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast }) {
         Learn any codebase file-by-file with guided explanations.
       </div>
 
-      <input
-        style={styles.input}
-        type="text"
-        placeholder="Project path (e.g. ./my-project)"
-        value={projectPath}
-        onChange={(e) => setProjectPath(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={(e) => { e.target.style.borderColor = colors.accent }}
-        onBlur={(e) => { e.target.style.borderColor = colors.borderLight }}
-      />
+      {activeDirectory ? (
+        <div style={{ ...styles.input, display: 'flex', alignItems: 'center', gap: 8, opacity: 0.9 }}>
+          <Folder size={14} color={colors.accent} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {projectPath || activeDirectory}
+          </span>
+        </div>
+      ) : (
+        <input
+          style={styles.input}
+          type="text"
+          placeholder="Project path (e.g. ./my-project)"
+          value={projectPath}
+          onChange={(e) => setProjectPath(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={(e) => { e.target.style.borderColor = colors.accent }}
+          onBlur={(e) => { e.target.style.borderColor = colors.borderLight }}
+        />
+      )}
 
       <div style={styles.modeToggle}>
         <button
@@ -825,14 +841,14 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast }) {
           style={{ ...styles.secondaryBtn, padding: '3px 10px', borderColor: 'rgba(250,204,21,0.3)', color: colors.warning }}
           onClick={() => {
             if (notif.files?.length) goToFile(0)
-            dismissNotification(notif.id)
+            dismissNotification(0)
           }}
         >
           View Changes
         </button>
         <button
           style={{ ...styles.closeBtn, color: colors.warning }}
-          onClick={() => dismissNotification(notif.id)}
+          onClick={() => dismissNotification(0)}
         >
           <X size={14} />
         </button>

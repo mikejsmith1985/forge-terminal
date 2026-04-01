@@ -2162,6 +2162,7 @@ function App() {
         isOpen={isTutorOpen}
         onClose={() => setIsTutorOpen(false)}
         onToast={addToast}
+        activeDirectory={activeTab?.currentDirectory}
       />}
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}

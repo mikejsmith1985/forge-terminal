@@ -259,8 +259,9 @@ export function useTutorSession() {
         const data = await tutorFetch(
           `/api/tutor/watcher?sessionId=${encodeURIComponent(session.id)}`
         )
-        if (data && data.files && data.files.length > 0) {
-          setNotifications((prev) => [...prev, data])
+        // Backend returns an array of WatcherNotification objects
+        if (Array.isArray(data) && data.length > 0) {
+          setNotifications((prev) => [...prev, ...data])
         }
       } catch (err) {
         console.error('[TutorSession] watcher poll error:', err)
