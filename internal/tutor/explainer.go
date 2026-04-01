@@ -159,38 +159,58 @@ How this file relates to previously reviewed files and the broader project.
 	return b.String()
 }
 
-// callLLM invokes an LLM CLI tool and returns the response, model name, and any error.
-// It tries Copilot first and falls back to Claude.
+// tutorModelChain defines the ordered model fallback for tutor explanations.
+// Cheap/fast models first to preserve premium quota for development work.
+var tutorModelChain = []struct {
+	model   string
+	label   string
+}{
+	{"gpt-4o-mini", "gpt-4o-mini"},
+	{"gpt-4.1-nano", "gpt-4.1-nano"},
+	{"gpt-4.1-mini", "gpt-4.1-mini"},
+	{"gpt-4o", "gpt-4o"},
+}
+
+// callLLM invokes an LLM with a model fallback chain and returns the response,
+// model name, and any error.  It walks the cheap-first chain via the Copilot CLI,
+// then falls back to the Claude CLI as a last resort.
 func (e *Explainer) callLLM(ctx context.Context, prompt string) (string, string, error) {
 	timeout := 180 * time.Second
 
-	// Try Copilot first.
-	response, err := runCLI(ctx, timeout, "copilot", []string{
-		"-p", prompt,
-		"-s",
-		"--no-color",
-		"--allow-all-tools",
-	})
-	if err == nil && strings.TrimSpace(response) != "" {
-		log.Printf("[Tutor Explainer] got response from copilot (%d bytes)", len(response))
-		return response, "copilot", nil
-	}
-	if err != nil {
-		log.Printf("[Tutor Explainer] copilot failed: %v, falling back to claude", err)
-	} else {
-		log.Printf("[Tutor Explainer] copilot returned empty response, falling back to claude")
+	// Walk the Copilot model chain.
+	for i, m := range tutorModelChain {
+		response, err := runCLI(ctx, timeout, "copilot", []string{
+			"--model", m.model,
+			"-p", prompt,
+			"-s",
+			"--no-color",
+			"--allow-all-tools",
+		})
+		if err == nil && strings.TrimSpace(response) != "" {
+			log.Printf("[Tutor Explainer] got response from copilot/%s (%d bytes)", m.label, len(response))
+			return response, "copilot/" + m.label, nil
+		}
+		if i < len(tutorModelChain)-1 {
+			if err != nil {
+				log.Printf("[Tutor Explainer] %s rate-limited or failed: %v, trying next model…", m.label, err)
+			} else {
+				log.Printf("[Tutor Explainer] %s returned empty response, trying next model…", m.label)
+			}
+		}
 	}
 
-	// Fall back to Claude.
-	response, err = runCLI(ctx, timeout, "claude", []string{
+	log.Printf("[Tutor Explainer] all copilot models exhausted, falling back to claude")
+
+	// Final fallback: Claude CLI (no model flag — uses user's default).
+	response, err := runCLI(ctx, timeout, "claude", []string{
 		"-p", prompt,
 		"--output-format", "text",
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("both LLM backends failed (claude: %w)", err)
+		return "", "", fmt.Errorf("all LLM backends failed (claude: %w)", err)
 	}
 	if strings.TrimSpace(response) == "" {
-		return "", "", fmt.Errorf("both LLM backends returned empty responses")
+		return "", "", fmt.Errorf("all LLM backends returned empty responses")
 	}
 
 	log.Printf("[Tutor Explainer] got response from claude (%d bytes)", len(response))
