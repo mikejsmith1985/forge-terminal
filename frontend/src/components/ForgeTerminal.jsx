@@ -10,6 +10,7 @@ import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import { diagnosticCore } from '../utils/diagnosticCore';
 import { isLLMCommand } from '../utils/llmDetection';
+import { extractProjectFolder } from '../utils/projectFolder';
 
 // Paste error logger
 const logPasteError = (error, context = {}) => {
@@ -498,25 +499,7 @@ function getFolderName(path) {
     return '~';
   }
   
-  // Normalize path separators and remove trailing slashes
-  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
-  
-  // Handle ~ paths
-  if (normalized.startsWith('~/')) {
-    const parts = normalized.split('/');
-    return parts[parts.length - 1] || '~';
-  }
-  
-  // Get the last part of the path
-  const parts = normalized.split('/');
-  const lastPart = parts[parts.length - 1];
-  
-  // For Windows root like "C:" return "C:"
-  if (/^[A-Za-z]:$/.test(lastPart)) {
-    return lastPart;
-  }
-  
-  return lastPart || normalized;
+  return extractProjectFolder(path) || '~';
 }
 
 const ForgeTerminal = forwardRef(function ForgeTerminal({
@@ -978,23 +961,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           // Normalize backslashes to forward slashes for consistency
           const normalizedPath = path.replace(/\\/g, '/');
           
-          // Extract folder name
-          const parts = normalizedPath.split('/').filter(Boolean);
-          let folderName = parts.length > 0 ? parts[parts.length - 1] : 'Terminal';
+          // Extract project-level folder name (pins to workspace root, e.g. first
+          // child of ProjectsWin, regardless of subdirectory depth)
+          let folderName = extractProjectFolder(normalizedPath) || 'Terminal';
           // Sanitize the folder name too (catches any residual decorations)
           folderName = sanitizePath(folderName);
 
-          // Guard: if the last segment looks like a filename (has a recognisable
-          // script/file extension, optionally followed by spaces and extra chars),
-          // the shell sent a process/script name rather than a real CWD.
-          // Fall back to the parent segment so the tab shows the directory instead.
+          // Guard: if the resolved name looks like a filename (script/extension),
+          // the shell sent a process name rather than a real CWD — ignore it.
           const looksLikeFile = /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(folderName);
           if (looksLikeFile) {
-            if (parts.length > 1) {
-              folderName = parts[parts.length - 2];
-            } else {
-              return true; // nothing useful to extract, ignore
-            }
+            return true; // nothing useful to extract, ignore
           }
 
           if (onDirectoryChange) {

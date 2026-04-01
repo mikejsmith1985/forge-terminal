@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
 import { logger } from '../utils/logger';
+import { extractProjectFolder } from '../utils/projectFolder';
 
 const MAX_TABS = 20;
 
@@ -236,16 +237,10 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
                title === 'forge-terminal' || 
                title === '~' ||
                !title)) {
-            const dirParts = tabState.currentDirectory.replace(/\\/g, '/').split('/').filter(Boolean);
-            let folderName = dirParts[dirParts.length - 1];
-            // Guard against saved paths ending in a filename (e.g. "build.ps1 2")
-            const looksLikeFile = /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(folderName);
-            if (looksLikeFile && dirParts.length > 1) {
-              folderName = dirParts[dirParts.length - 2];
-            } else if (looksLikeFile) {
-              folderName = '';
-            }
-            if (folderName && folderName !== '~') {
+            const folderName = extractProjectFolder(tabState.currentDirectory);
+            // Guard against saved paths ending in a filename
+            const looksLikeFile = folderName && /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(folderName);
+            if (folderName && !looksLikeFile && folderName !== '~') {
               title = folderName;
               logger.session('Derived tab title from directory', { 
                 tabId: tabState.id,

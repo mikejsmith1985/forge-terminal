@@ -41,6 +41,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
+import { extractProjectFolder } from './utils/projectFolder'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
 
@@ -1101,30 +1102,11 @@ function App() {
   }, []);
 
   // Handle directory change from terminal - auto-rename tab and save directory.
-  // Shows the last 2 meaningful path segments when 3+ segments exist, giving
-  // "workspace/subdir" context. At workspace-root depth (only 2 meaningful
-  // segments after the drive letter, e.g. "ProjectsWin/forge-terminal"), just
-  // the workspace name is shown ("forge-terminal") so the tab bar never wastes
-  // space on the parent collection folder.
+  // Always pins to the project-level folder (first child of ProjectsWin)
+  // so tabs stay stable regardless of subdirectory depth.
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
     if (folderName || fullPath) {
-      let title = folderName || '';
-      if (fullPath) {
-        // Normalise separators and strip trailing slashes, then drop Windows
-        // drive letters ("C:") so they don't occupy a meaningful segment slot.
-        const parts = fullPath
-          .replace(/\\/g, '/')
-          .replace(/\/+$/, '')
-          .split('/')
-          .filter(p => p && !/^[a-zA-Z]:$/.test(p));
-        if (parts.length >= 3) {
-          // Deep enough to show parent/child without including a container dir.
-          title = `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
-        } else if (parts.length > 0) {
-          // At workspace-root depth: just the workspace name.
-          title = parts[parts.length - 1];
-        }
-      }
+      const title = extractProjectFolder(fullPath) || folderName || '';
       logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title });
       if (title) updateTabTitle(tabId, title);
     }
