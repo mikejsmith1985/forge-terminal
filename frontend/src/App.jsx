@@ -92,7 +92,7 @@ function App() {
   const [defaultTabTheme, setDefaultTabTheme] = useState(() => {
     return localStorage.getItem('defaultTabTheme') || 'auto-cycle';
   })
-  const { namingStrategy, namingPrefix, setNamingStrategy, setNamingPrefix } = useTabNaming();
+  const { namingStrategy, namingPrefix, namingRootFolder, setNamingStrategy, setNamingPrefix, setNamingRootFolder } = useTabNaming();
   const [sidebarPosition, setSidebarPosition] = useState(() => {
     return localStorage.getItem('sidebarPosition') || 'right';
   })
@@ -210,7 +210,7 @@ function App() {
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
-  } = useTabManager(shellConfig, defaultTabTheme, namingStrategy, namingPrefix);
+  } = useTabManager(shellConfig, defaultTabTheme, namingStrategy, namingPrefix, namingRootFolder);
   
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
@@ -1113,14 +1113,14 @@ function App() {
       return;
     }
     if (folderName || fullPath) {
-      const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix }) || '';
+      const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix, rootFolder: namingRootFolder }) || '';
       logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title, namingStrategy });
       if (title) updateTabTitle(tabId, title);
     }
     if (fullPath) {
       updateTabDirectory(tabId, fullPath);
     }
-  }, [namingStrategy, namingPrefix, updateTabTitle, updateTabDirectory]);
+  }, [namingStrategy, namingPrefix, namingRootFolder, updateTabTitle, updateTabDirectory]);
 
   // Helper to get folder name from a path
   const getFolderNameFromPath = (path) => {
@@ -2084,9 +2084,10 @@ function App() {
           setDefaultTabTheme(newTheme);
           localStorage.setItem('defaultTabTheme', newTheme);
         }}
-        onNamingChange={(strategy, prefix) => {
+        onNamingChange={(strategy, prefix, rootFolder) => {
           setNamingStrategy(strategy);
           setNamingPrefix(prefix);
+          setNamingRootFolder(rootFolder ?? '');
         }}
         onRestartTour={() => {
           setIsSettingsModalOpen(false);

@@ -2,29 +2,46 @@ import { describe, it, expect } from 'vitest';
 import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel } from './projectFolder';
 
 describe('extractProjectFolder', () => {
-  it('returns project name from deep ProjectsWin path', () => {
-    expect(extractProjectFolder('C:\\ProjectsWin\\forge-terminal\\internal\\terminal'))
+  it('returns project name from deep ProjectsWin path when rootFolder is provided', () => {
+    expect(extractProjectFolder('C:\\ProjectsWin\\forge-terminal\\internal\\terminal', 'ProjectsWin'))
       .toBe('forge-terminal');
   });
 
-  it('returns project name from ProjectsWin root path', () => {
-    expect(extractProjectFolder('C:\\ProjectsWin\\forge-terminal'))
+  it('returns project name from ProjectsWin root path when rootFolder is provided', () => {
+    expect(extractProjectFolder('C:\\ProjectsWin\\forge-terminal', 'ProjectsWin'))
       .toBe('forge-terminal');
   });
 
-  it('returns project name with forward slashes', () => {
-    expect(extractProjectFolder('C:/ProjectsWin/my-app/src/components'))
+  it('returns project name with forward slashes when rootFolder is provided', () => {
+    expect(extractProjectFolder('C:/ProjectsWin/my-app/src/components', 'ProjectsWin'))
       .toBe('my-app');
   });
 
-  it('is case-insensitive for ProjectsWin', () => {
-    expect(extractProjectFolder('c:\\projectswin\\My-Project\\deep\\path'))
+  it('is case-insensitive for rootFolder', () => {
+    expect(extractProjectFolder('c:\\projectswin\\My-Project\\deep\\path', 'ProjectsWin'))
       .toBe('My-Project');
   });
 
-  it('falls back to last segment for non-ProjectsWin paths', () => {
-    expect(extractProjectFolder('/home/user/some-project/src'))
+  it('falls back to last segment when rootFolder not provided', () => {
+    expect(extractProjectFolder('C:\\ProjectsWin\\forge-terminal\\internal\\terminal'))
+      .toBe('terminal');
+  });
+
+  it('falls back to last segment when rootFolder is empty string', () => {
+    expect(extractProjectFolder('C:\\ProjectsWin\\forge-terminal\\internal\\terminal', ''))
+      .toBe('terminal');
+  });
+
+  it('falls back to last segment for paths that do not contain the rootFolder', () => {
+    expect(extractProjectFolder('/home/user/some-project/src', 'ProjectsWin'))
       .toBe('src');
+  });
+
+  it('works with custom root folder names', () => {
+    expect(extractProjectFolder('/home/user/repos/my-lib/src', 'repos'))
+      .toBe('my-lib');
+    expect(extractProjectFolder('C:\\workspace\\api-server\\cmd', 'workspace'))
+      .toBe('api-server');
   });
 
   it('returns null for empty or invalid input', () => {
@@ -33,15 +50,15 @@ describe('extractProjectFolder', () => {
     expect(extractProjectFolder(undefined)).toBeNull();
   });
 
-  it('handles path with only ProjectsWin (no child)', () => {
-    expect(extractProjectFolder('C:\\ProjectsWin'))
+  it('handles path with only the rootFolder (no child)', () => {
+    expect(extractProjectFolder('C:\\ProjectsWin', 'ProjectsWin'))
       .toBe('ProjectsWin');
   });
 
-  it('handles different projects under ProjectsWin', () => {
-    expect(extractProjectFolder('C:\\ProjectsWin\\web-dashboard\\pages\\index'))
+  it('handles different projects under rootFolder', () => {
+    expect(extractProjectFolder('C:\\ProjectsWin\\web-dashboard\\pages\\index', 'ProjectsWin'))
       .toBe('web-dashboard');
-    expect(extractProjectFolder('C:\\ProjectsWin\\api-server\\cmd\\main'))
+    expect(extractProjectFolder('C:\\ProjectsWin\\api-server\\cmd\\main', 'ProjectsWin'))
       .toBe('api-server');
   });
 });
@@ -81,12 +98,20 @@ describe('getTabTitle', () => {
   const projPath = 'C:\\ProjectsWin\\forge-terminal\\src';
   const linuxPath = '/home/user/projects/myapp/components';
 
-  it('project-root: pins to workspace root', () => {
-    expect(getTabTitle(projPath, 'project-root', { tabNumber: 1 })).toBe('forge-terminal');
+  it('project-root: pins to workspace root when rootFolder is provided', () => {
+    expect(getTabTitle(projPath, 'project-root', { tabNumber: 1, rootFolder: 'ProjectsWin' })).toBe('forge-terminal');
   });
 
-  it('project-root: falls back to last segment for non-ProjectsWin paths', () => {
-    expect(getTabTitle(linuxPath, 'project-root', { tabNumber: 1 })).toBe('components');
+  it('project-root: falls back to last segment when no rootFolder configured', () => {
+    expect(getTabTitle(projPath, 'project-root', { tabNumber: 1 })).toBe('src');
+  });
+
+  it('project-root: falls back to last segment for paths not containing rootFolder', () => {
+    expect(getTabTitle(linuxPath, 'project-root', { tabNumber: 1, rootFolder: 'ProjectsWin' })).toBe('components');
+  });
+
+  it('project-root: works with custom root folder names', () => {
+    expect(getTabTitle('/home/user/repos/my-lib/src', 'project-root', { tabNumber: 1, rootFolder: 'repos' })).toBe('my-lib');
   });
 
   it('current-dir: returns deepest directory', () => {

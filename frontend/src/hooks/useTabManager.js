@@ -74,8 +74,9 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     id: generateId(),
     title: (() => {
       if (options.title) return options.title;
-      const strategy = options.namingStrategy || 'project-root';
-      const prefix   = options.namingPrefix   || 'Dev';
+      const strategy    = options.namingStrategy    || 'project-root';
+      const prefix      = options.namingPrefix      || 'Dev';
+      const rootFolder  = options.namingRootFolder  || '';
       if (strategy === 'shell-type') {
         return `${getShellLabel(shellConfig?.shellType)} ${tabNumber}`;
       }
@@ -88,7 +89,7 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
       // Dynamic strategies (project-root, current-dir, parent-child):
       // seed from currentDirectory if available, otherwise generic placeholder
       if (currentDirectory) {
-        return getTabTitle(currentDirectory, strategy, { tabNumber, prefix, fallback: `Terminal ${tabNumber}` });
+        return getTabTitle(currentDirectory, strategy, { tabNumber, prefix, rootFolder, fallback: `Terminal ${tabNumber}` });
       }
       return `Terminal ${tabNumber}`;
     })(),
@@ -198,11 +199,12 @@ async function loadSession() {
  * Hook for managing terminal tabs
  * @param {Object} initialShellConfig       - Default shell configuration
  * @param {string} defaultThemePreference   - Default theme preference: 'auto-cycle' or specific theme name
- * @param {string} [defaultNamingStrategy]  - Tab naming strategy (see getTabTitle)
- * @param {string} [defaultNamingPrefix]    - Custom prefix for the 'custom-prefix' strategy
+ * @param {string} [defaultNamingStrategy]    - Tab naming strategy (see getTabTitle)
+ * @param {string} [defaultNamingPrefix]      - Custom prefix for the 'custom-prefix' strategy
+ * @param {string} [defaultNamingRootFolder]  - Root folder name for the 'project-root' strategy
  * @returns {Object} Tab state and actions
  */
-export function useTabManager(initialShellConfig, defaultThemePreference = 'auto-cycle', defaultNamingStrategy = 'project-root', defaultNamingPrefix = 'Dev') {
+export function useTabManager(initialShellConfig, defaultThemePreference = 'auto-cycle', defaultNamingStrategy = 'project-root', defaultNamingPrefix = 'Dev', defaultNamingRootFolder = '') {
   // Track if session has been loaded
   const sessionLoadedRef = useRef(false);
 
@@ -218,12 +220,15 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   namingStrategyRef.current = defaultNamingStrategy;
   const namingPrefixRef = useRef(defaultNamingPrefix);
   namingPrefixRef.current = defaultNamingPrefix;
+  const namingRootFolderRef = useRef(defaultNamingRootFolder);
+  namingRootFolderRef.current = defaultNamingRootFolder;
 
   // Initialize with one default tab
   const [state, setState] = useState(() => {
     const initialTab = createTab(initialShellConfig, 1, null, null, null, defaultThemePreference, {
       namingStrategy: defaultNamingStrategy,
       namingPrefix: defaultNamingPrefix,
+      namingRootFolder: defaultNamingRootFolder,
     });
     return {
       tabs: [initialTab],
@@ -258,7 +263,8 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       if (session && session.tabs && session.tabs.length > 0) {
         // Restore tabs from session
         const restoredTabs = session.tabs.map((tabState, index) => {
-          const strategy = namingStrategyRef.current || 'project-root';
+          const strategy    = namingStrategyRef.current    || 'project-root';
+          const rootFolder  = namingRootFolderRef.current  || '';
           let title = tabState.title || `Terminal ${index + 1}`;
 
           // Re-derive title from saved directory when using a dynamic strategy
@@ -267,6 +273,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
             const derived = getTabTitle(tabState.currentDirectory, strategy, {
               tabNumber: index + 1,
               prefix: namingPrefixRef.current || 'Dev',
+              rootFolder,
               fallback: `Terminal ${index + 1}`,
             });
             // Guard against saved paths ending in a filename
@@ -360,6 +367,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       const newTab = createTab(config, newTabNumber, null, null, currentDirectory, themePreferenceRef.current, {
         namingStrategy: namingStrategyRef.current,
         namingPrefix: namingPrefixRef.current,
+        namingRootFolder: namingRootFolderRef.current,
       });
       createdTab = newTab;
       

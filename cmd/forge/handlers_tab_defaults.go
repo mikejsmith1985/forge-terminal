@@ -30,7 +30,7 @@ type TabDefaults struct {
 	ControlRibbon TabDefaultConfig `json:"controlRibbon"`
 
 	// Tab naming strategy:
-	//   "project-root"  – pin to workspace root (first child of ProjectsWin)
+	//   "project-root"  – pin to workspace root (first child of the configured root folder)
 	//   "current-dir"   – deepest directory name, updates on every cd
 	//   "parent-child"  – last two path segments, e.g. "workspace/src"
 	//   "shell-type"    – shell name + number, e.g. "PowerShell 1"
@@ -40,6 +40,12 @@ type TabDefaults struct {
 
 	// Custom prefix used when NamingStrategy is "custom-prefix"
 	NamingPrefix string `json:"namingPrefix"`
+
+	// Root folder name used when NamingStrategy is "project-root".
+	// Forge looks for this directory name anywhere in the path and returns its
+	// first child as the tab title. E.g. "repos", "ProjectsWin", "workspace".
+	// Leave empty to fall back to the deepest path segment.
+	NamingRootFolder string `json:"namingRootFolder"`
 }
 
 // getTabDefaultsPath returns path to tab defaults config file
@@ -65,8 +71,9 @@ func defaultTabDefaults() *TabDefaults {
 			Theme: "molten",
 			Mode:  "dark",
 		},
-		NamingStrategy: "project-root",
-		NamingPrefix:   "Dev",
+		NamingStrategy:   "project-root",
+		NamingPrefix:     "Dev",
+		NamingRootFolder: "",
 	}
 }
 

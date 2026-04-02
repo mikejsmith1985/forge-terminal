@@ -8,8 +8,8 @@ const NAMING_STRATEGIES = [
     value: 'project-root',
     label: 'Project Root',
     icon: Layers,
-    example: 'forge-terminal',
-    desc: 'Pins to the workspace root — first child of ProjectsWin. Stays stable no matter how deep you navigate. Recommended for multi-project setups.',
+    example: 'my-project',
+    desc: 'Pins to the workspace root — the first child of your configured projects folder. Stays stable no matter how deep you navigate. Recommended for multi-project setups.',
   },
   {
     value: 'current-dir',
@@ -73,8 +73,9 @@ function TabControlsPanel({ onToast, onNamingChange }) {
         if (data.namingPrefix) {
           localStorage.setItem('forge:tabNamingPrefix', data.namingPrefix);
         }
+        localStorage.setItem('forge:tabNamingRootFolder', data.namingRootFolder || '');
         if (onNamingChange && data.namingStrategy) {
-          onNamingChange(data.namingStrategy, data.namingPrefix || 'Dev');
+          onNamingChange(data.namingStrategy, data.namingPrefix || 'Dev', data.namingRootFolder || '');
         }
       } else {
         console.error('Failed to load tab defaults');
@@ -101,8 +102,9 @@ function TabControlsPanel({ onToast, onNamingChange }) {
         // Mirror naming settings to localStorage for instant synchronous reads
         localStorage.setItem('forge:tabNamingStrategy', tabDefaults.namingStrategy || 'project-root');
         localStorage.setItem('forge:tabNamingPrefix', tabDefaults.namingPrefix || 'Dev');
+        localStorage.setItem('forge:tabNamingRootFolder', tabDefaults.namingRootFolder || '');
         if (onNamingChange) {
-          onNamingChange(tabDefaults.namingStrategy || 'project-root', tabDefaults.namingPrefix || 'Dev');
+          onNamingChange(tabDefaults.namingStrategy || 'project-root', tabDefaults.namingPrefix || 'Dev', tabDefaults.namingRootFolder || '');
         }
         if (onToast) onToast('Tab defaults saved!', 'success', 3000);
       } else {
@@ -229,6 +231,65 @@ function TabControlsPanel({ onToast, onNamingChange }) {
             );
           })}
         </div>
+
+        {/* Root folder input – only visible when project-root is selected */}
+        {(tabDefaults.namingStrategy || 'project-root') === 'project-root' && (
+          <div style={{
+            marginTop: '12px',
+            padding: '14px',
+            background: '#0d0d0d',
+            border: '1px solid #8b5cf644',
+            borderRadius: '8px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <Folder size={14} color="#8b5cf6" style={{ flexShrink: 0 }} />
+              <label style={{ fontSize: '12px', color: '#aaa', fontWeight: 500 }}>
+                Projects root folder name
+              </label>
+            </div>
+            <p style={{ margin: '0 0 10px', fontSize: '11px', color: '#666', lineHeight: '1.5' }}>
+              The name of the top-level folder that contains your projects (e.g.{' '}
+              <span style={{ fontFamily: 'monospace', color: '#888' }}>repos</span>,{' '}
+              <span style={{ fontFamily: 'monospace', color: '#888' }}>Projects</span>,{' '}
+              <span style={{ fontFamily: 'monospace', color: '#888' }}>workspace</span>).
+              Forge looks for this folder in your path and pins the tab name to its first child.
+              Leave empty to show the deepest directory name.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="text"
+                value={tabDefaults.namingRootFolder || ''}
+                onChange={(e) => setTabDefaults({ ...tabDefaults, namingRootFolder: e.target.value })}
+                placeholder="e.g. repos, Projects, workspace"
+                maxLength={64}
+                style={{
+                  flex: 1,
+                  padding: '8px 10px',
+                  background: '#1a1a1a',
+                  border: '1px solid #444',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                }}
+              />
+              {tabDefaults.namingRootFolder && (
+                <div style={{
+                  padding: '8px 14px',
+                  background: '#1e1a2e',
+                  border: '1px solid #8b5cf633',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  color: '#c4b5fd',
+                  whiteSpace: 'nowrap',
+                }}>
+                  …/{tabDefaults.namingRootFolder}/<span style={{ color: '#a78bfa', fontWeight: 700 }}>my-project</span>/…
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Custom prefix input – only visible when custom-prefix is selected */}
         {(tabDefaults.namingStrategy || 'project-root') === 'custom-prefix' && (
