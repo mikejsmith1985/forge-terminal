@@ -41,7 +41,8 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder } from './utils/projectFolder'
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy } from './utils/projectFolder'
+import { useTabNaming } from './hooks/useTabNaming'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
 
@@ -91,6 +92,7 @@ function App() {
   const [defaultTabTheme, setDefaultTabTheme] = useState(() => {
     return localStorage.getItem('defaultTabTheme') || 'auto-cycle';
   })
+  const { namingStrategy, namingPrefix, setNamingStrategy, setNamingPrefix } = useTabNaming();
   const [sidebarPosition, setSidebarPosition] = useState(() => {
     return localStorage.getItem('sidebarPosition') || 'right';
   })
@@ -208,7 +210,7 @@ function App() {
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
-  } = useTabManager(shellConfig, defaultTabTheme);
+  } = useTabManager(shellConfig, defaultTabTheme, namingStrategy, namingPrefix);
   
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
@@ -1102,18 +1104,23 @@ function App() {
   }, []);
 
   // Handle directory change from terminal - auto-rename tab and save directory.
-  // Always pins to the project-level folder (first child of ProjectsWin)
-  // so tabs stay stable regardless of subdirectory depth.
+  // Respects the user's chosen tab naming strategy: static strategies (numbered,
+  // shell-type, custom-prefix) never auto-rename; dynamic strategies update on cd.
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
+    // Static strategies: never auto-rename on directory change
+    if (isStaticNamingStrategy(namingStrategy)) {
+      if (fullPath) updateTabDirectory(tabId, fullPath);
+      return;
+    }
     if (folderName || fullPath) {
-      const title = extractProjectFolder(fullPath) || folderName || '';
-      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title });
+      const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix }) || '';
+      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title, namingStrategy });
       if (title) updateTabTitle(tabId, title);
     }
     if (fullPath) {
       updateTabDirectory(tabId, fullPath);
     }
-  }, [updateTabTitle, updateTabDirectory]);
+  }, [namingStrategy, namingPrefix, updateTabTitle, updateTabDirectory]);
 
   // Helper to get folder name from a path
   const getFolderNameFromPath = (path) => {
@@ -2076,6 +2083,10 @@ function App() {
         onDefaultTabThemeChange={(newTheme) => {
           setDefaultTabTheme(newTheme);
           localStorage.setItem('defaultTabTheme', newTheme);
+        }}
+        onNamingChange={(strategy, prefix) => {
+          setNamingStrategy(strategy);
+          setNamingPrefix(prefix);
         }}
         onRestartTour={() => {
           setIsSettingsModalOpen(false);

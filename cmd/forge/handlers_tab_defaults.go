@@ -20,14 +20,26 @@ type TabDefaultConfig struct {
 type TabDefaults struct {
 	// Per-tab explicit defaults (keys: "1" through "20")
 	PerTab map[string]TabDefaultConfig `json:"perTab"`
-	
+
 	// Global preset: 'auto-cycle', 'auto-cycle-dark', 'auto-cycle-light', or specific theme
 	GlobalPreset string `json:"globalPreset"`
-	
+
 	// Split terminal/ribbon themes
-	SplitThemes     bool             `json:"splitThemes"`
-	TerminalTheme   TabDefaultConfig `json:"terminalTheme"`
-	ControlRibbon   TabDefaultConfig `json:"controlRibbon"`
+	SplitThemes   bool             `json:"splitThemes"`
+	TerminalTheme TabDefaultConfig `json:"terminalTheme"`
+	ControlRibbon TabDefaultConfig `json:"controlRibbon"`
+
+	// Tab naming strategy:
+	//   "project-root"  – pin to workspace root (first child of ProjectsWin)
+	//   "current-dir"   – deepest directory name, updates on every cd
+	//   "parent-child"  – last two path segments, e.g. "workspace/src"
+	//   "shell-type"    – shell name + number, e.g. "PowerShell 1"
+	//   "numbered"      – classic "Terminal 1", "Terminal 2"
+	//   "custom-prefix" – user-defined prefix + number, e.g. "Dev 1"
+	NamingStrategy string `json:"namingStrategy"`
+
+	// Custom prefix used when NamingStrategy is "custom-prefix"
+	NamingPrefix string `json:"namingPrefix"`
 }
 
 // getTabDefaultsPath returns path to tab defaults config file
@@ -39,6 +51,25 @@ func getTabDefaultsPath() (string, error) {
 	return filepath.Join(configDir, "tab-defaults.json"), nil
 }
 
+// defaultTabDefaults returns a fresh TabDefaults with all fields set to sensible defaults.
+func defaultTabDefaults() *TabDefaults {
+	return &TabDefaults{
+		PerTab:       make(map[string]TabDefaultConfig),
+		GlobalPreset: "auto-cycle",
+		SplitThemes:  false,
+		TerminalTheme: TabDefaultConfig{
+			Theme: "molten",
+			Mode:  "dark",
+		},
+		ControlRibbon: TabDefaultConfig{
+			Theme: "molten",
+			Mode:  "dark",
+		},
+		NamingStrategy: "project-root",
+		NamingPrefix:   "Dev",
+	}
+}
+
 // loadTabDefaults loads tab defaults from config file
 func loadTabDefaults() (*TabDefaults, error) {
 	path, err := getTabDefaultsPath()
@@ -48,57 +79,21 @@ func loadTabDefaults() (*TabDefaults, error) {
 	
 	// Return defaults if file doesn't exist
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return &TabDefaults{
-			PerTab:       make(map[string]TabDefaultConfig),
-			GlobalPreset: "auto-cycle",
-			SplitThemes:  false,
-			TerminalTheme: TabDefaultConfig{
-				Theme: "molten",
-				Mode:  "dark",
-			},
-			ControlRibbon: TabDefaultConfig{
-				Theme: "molten",
-				Mode:  "dark",
-			},
-		}, nil
+		return defaultTabDefaults(), nil
 	}
-	
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		// If we can't read the file, return defaults instead of error
 		log.Printf("[Tab Defaults] Warning: Could not read file, returning defaults: %v", err)
-		return &TabDefaults{
-			PerTab:       make(map[string]TabDefaultConfig),
-			GlobalPreset: "auto-cycle",
-			SplitThemes:  false,
-			TerminalTheme: TabDefaultConfig{
-				Theme: "molten",
-				Mode:  "dark",
-			},
-			ControlRibbon: TabDefaultConfig{
-				Theme: "molten",
-				Mode:  "dark",
-			},
-		}, nil
+		return defaultTabDefaults(), nil
 	}
-	
+
 	var defaults TabDefaults
 	if err := json.Unmarshal(data, &defaults); err != nil {
 		// If JSON is corrupted, return defaults
 		log.Printf("[Tab Defaults] Warning: Could not parse JSON, returning defaults: %v", err)
-		return &TabDefaults{
-			PerTab:       make(map[string]TabDefaultConfig),
-			GlobalPreset: "auto-cycle",
-			SplitThemes:  false,
-			TerminalTheme: TabDefaultConfig{
-				Theme: "molten",
-				Mode:  "dark",
-			},
-			ControlRibbon: TabDefaultConfig{
-				Theme: "molten",
-				Mode:  "dark",
-			},
-		}, nil
+		return defaultTabDefaults(), nil
 	}
 	
 	// Ensure perTab map exists
@@ -115,6 +110,12 @@ func loadTabDefaults() (*TabDefaults, error) {
 	}
 	if defaults.GlobalPreset == "" {
 		defaults.GlobalPreset = "auto-cycle"
+	}
+	if defaults.NamingStrategy == "" {
+		defaults.NamingStrategy = "project-root"
+	}
+	if defaults.NamingPrefix == "" {
+		defaults.NamingPrefix = "Dev"
 	}
 	
 	return &defaults, nil
@@ -155,20 +156,7 @@ func handleGetTabDefaults(w http.ResponseWriter, r *http.Request) {
 	defaults, err := loadTabDefaults()
 	if err != nil {
 		log.Printf("[Tab Defaults] Error loading: %v", err)
-		// Still return defaults even on error
-		defaults = &TabDefaults{
-			PerTab:       make(map[string]TabDefaultConfig),
-			GlobalPreset: "auto-cycle",
-			SplitThemes:  false,
-			TerminalTheme: TabDefaultConfig{
-				Theme: "molten",
-				Mode:  "dark",
-			},
-			ControlRibbon: TabDefaultConfig{
-				Theme: "molten",
-				Mode:  "dark",
-			},
-		}
+		defaults = defaultTabDefaults()
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
@@ -196,8 +184,8 @@ func handleSaveTabDefaults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	log.Printf("[Tab Defaults] Saved: globalPreset=%s, splitThemes=%v, perTabCount=%d",
-		defaults.GlobalPreset, defaults.SplitThemes, len(defaults.PerTab))
+	log.Printf("[Tab Defaults] Saved: globalPreset=%s, namingStrategy=%s, splitThemes=%v, perTabCount=%d",
+		defaults.GlobalPreset, defaults.NamingStrategy, defaults.SplitThemes, len(defaults.PerTab))
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "saved"})

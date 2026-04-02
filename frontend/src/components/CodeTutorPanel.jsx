@@ -514,6 +514,19 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
   const codeScrollRef = useRef(null)
   const errorTimerRef = useRef(null)
 
+  // Escape key closes the panel
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleKey, { capture: true })
+    return () => document.removeEventListener('keydown', handleKey, { capture: true })
+  }, [isOpen, onClose])
+
   // Seed project path from active tab's working directory
   useEffect(() => {
     if (isOpen && activeDirectory && !session) {
@@ -618,6 +631,10 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     e.stopPropagation()
     deleteSession(sid)
   }, [deleteSession])
+
+  const handleModeToggle = useCallback(() => {
+    updateSettings({ liveMode: !isLive })
+  }, [updateSettings, isLive])
 
   // ── Render helpers ─────────────────────────────────────────────
   const renderFileTree = () => (
@@ -871,7 +888,13 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
           <div style={styles.headerLeft}>
             <span style={styles.title}>📖 Code Tutor</span>
           </div>
-          <button style={styles.closeBtn} onClick={onClose}>
+          <button
+            style={styles.closeBtn}
+            onClick={onClose}
+            title="Close (Esc)"
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = colors.textDim; e.currentTarget.style.background = 'none' }}
+          >
             <X size={18} />
           </button>
         </div>
@@ -885,7 +908,18 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
             <div style={styles.progressTrack}>
               <div style={styles.progressFill(progressPct)} />
             </div>
-            <span style={styles.modeBadge(isLive)}>{isLive ? 'Live' : 'On Demand'}</span>
+            <button
+              style={{
+                ...styles.modeBadge(isLive),
+                cursor: 'pointer',
+                border: `1px solid ${isLive ? 'rgba(34,197,94,0.4)' : 'rgba(0,212,255,0.3)'}`,
+              }}
+              onClick={handleModeToggle}
+              title={isLive ? 'Switch to On Demand mode' : 'Switch to Live mode'}
+              disabled={isLoading}
+            >
+              {isLive ? '● Live' : '○ On Demand'}
+            </button>
           </div>
         )}
 

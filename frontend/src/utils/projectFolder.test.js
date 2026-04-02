@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractProjectFolder } from './projectFolder';
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel } from './projectFolder';
 
 describe('extractProjectFolder', () => {
   it('returns project name from deep ProjectsWin path', () => {
@@ -43,5 +43,84 @@ describe('extractProjectFolder', () => {
       .toBe('web-dashboard');
     expect(extractProjectFolder('C:\\ProjectsWin\\api-server\\cmd\\main'))
       .toBe('api-server');
+  });
+});
+
+describe('getShellLabel', () => {
+  it('maps powershell to PowerShell', () => {
+    expect(getShellLabel('powershell')).toBe('PowerShell');
+    expect(getShellLabel('PowerShell')).toBe('PowerShell');
+  });
+  it('maps cmd to CMD', () => {
+    expect(getShellLabel('cmd')).toBe('CMD');
+  });
+  it('maps wsl to WSL', () => {
+    expect(getShellLabel('wsl')).toBe('WSL');
+  });
+  it('falls back to Terminal for unknown types', () => {
+    expect(getShellLabel('bash')).toBe('Terminal');
+    expect(getShellLabel('')).toBe('Terminal');
+    expect(getShellLabel(undefined)).toBe('Terminal');
+  });
+});
+
+describe('isStaticNamingStrategy', () => {
+  it('returns true for static strategies', () => {
+    expect(isStaticNamingStrategy('numbered')).toBe(true);
+    expect(isStaticNamingStrategy('shell-type')).toBe(true);
+    expect(isStaticNamingStrategy('custom-prefix')).toBe(true);
+  });
+  it('returns false for dynamic strategies', () => {
+    expect(isStaticNamingStrategy('project-root')).toBe(false);
+    expect(isStaticNamingStrategy('current-dir')).toBe(false);
+    expect(isStaticNamingStrategy('parent-child')).toBe(false);
+  });
+});
+
+describe('getTabTitle', () => {
+  const projPath = 'C:\\ProjectsWin\\forge-terminal\\src';
+  const linuxPath = '/home/user/projects/myapp/components';
+
+  it('project-root: pins to workspace root', () => {
+    expect(getTabTitle(projPath, 'project-root', { tabNumber: 1 })).toBe('forge-terminal');
+  });
+
+  it('project-root: falls back to last segment for non-ProjectsWin paths', () => {
+    expect(getTabTitle(linuxPath, 'project-root', { tabNumber: 1 })).toBe('components');
+  });
+
+  it('current-dir: returns deepest directory', () => {
+    expect(getTabTitle(projPath, 'current-dir', { tabNumber: 1 })).toBe('src');
+    expect(getTabTitle(linuxPath, 'current-dir', { tabNumber: 2 })).toBe('components');
+  });
+
+  it('parent-child: returns two segments', () => {
+    expect(getTabTitle(projPath, 'parent-child', { tabNumber: 1 })).toBe('forge-terminal/src');
+    expect(getTabTitle(linuxPath, 'parent-child', { tabNumber: 1 })).toBe('myapp/components');
+  });
+
+  it('shell-type: uses shell label + tab number', () => {
+    expect(getTabTitle(null, 'shell-type', { tabNumber: 1, shellType: 'powershell' })).toBe('PowerShell 1');
+    expect(getTabTitle(null, 'shell-type', { tabNumber: 3, shellType: 'wsl' })).toBe('WSL 3');
+  });
+
+  it('numbered: returns Terminal N', () => {
+    expect(getTabTitle(projPath, 'numbered', { tabNumber: 2 })).toBe('Terminal 2');
+    expect(getTabTitle(null, 'numbered', { tabNumber: 5 })).toBe('Terminal 5');
+  });
+
+  it('custom-prefix: uses prefix + tab number', () => {
+    expect(getTabTitle(null, 'custom-prefix', { tabNumber: 1, prefix: 'Dev' })).toBe('Dev 1');
+    expect(getTabTitle(projPath, 'custom-prefix', { tabNumber: 3, prefix: 'Prod' })).toBe('Prod 3');
+  });
+
+  it('uses fallback when path is null for dynamic strategies', () => {
+    expect(getTabTitle(null, 'current-dir', { tabNumber: 1, fallback: 'My Tab' })).toBe('My Tab');
+    expect(getTabTitle(null, 'project-root', { tabNumber: 1, fallback: 'My Tab' })).toBe('My Tab');
+  });
+
+  it('defaults tab number to 1 when not provided', () => {
+    expect(getTabTitle(null, 'numbered', {})).toBe('Terminal 1');
+    expect(getTabTitle(null, 'custom-prefix', { prefix: 'X' })).toBe('X 1');
   });
 });

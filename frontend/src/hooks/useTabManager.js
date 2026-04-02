@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
 import { logger } from '../utils/logger';
-import { extractProjectFolder } from '../utils/projectFolder';
+import { extractProjectFolder, getTabTitle, getShellLabel, isStaticNamingStrategy } from '../utils/projectFolder';
 
 const MAX_TABS = 20;
 
@@ -72,7 +72,26 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
 
   const newTab = {
     id: generateId(),
-    title: options.title || `Terminal ${tabNumber}`,
+    title: (() => {
+      if (options.title) return options.title;
+      const strategy = options.namingStrategy || 'project-root';
+      const prefix   = options.namingPrefix   || 'Dev';
+      if (strategy === 'shell-type') {
+        return `${getShellLabel(shellConfig?.shellType)} ${tabNumber}`;
+      }
+      if (strategy === 'custom-prefix') {
+        return `${prefix} ${tabNumber}`;
+      }
+      if (strategy === 'numbered') {
+        return `Terminal ${tabNumber}`;
+      }
+      // Dynamic strategies (project-root, current-dir, parent-child):
+      // seed from currentDirectory if available, otherwise generic placeholder
+      if (currentDirectory) {
+        return getTabTitle(currentDirectory, strategy, { tabNumber, prefix, fallback: `Terminal ${tabNumber}` });
+      }
+      return `Terminal ${tabNumber}`;
+    })(),
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
@@ -177,11 +196,13 @@ async function loadSession() {
 
 /**
  * Hook for managing terminal tabs
- * @param {Object} initialShellConfig - Default shell configuration
- * @param {string} defaultThemePreference - Default theme preference: 'auto-cycle' or specific theme name
+ * @param {Object} initialShellConfig       - Default shell configuration
+ * @param {string} defaultThemePreference   - Default theme preference: 'auto-cycle' or specific theme name
+ * @param {string} [defaultNamingStrategy]  - Tab naming strategy (see getTabTitle)
+ * @param {string} [defaultNamingPrefix]    - Custom prefix for the 'custom-prefix' strategy
  * @returns {Object} Tab state and actions
  */
-export function useTabManager(initialShellConfig, defaultThemePreference = 'auto-cycle') {
+export function useTabManager(initialShellConfig, defaultThemePreference = 'auto-cycle', defaultNamingStrategy = 'project-root', defaultNamingPrefix = 'Dev') {
   // Track if session has been loaded
   const sessionLoadedRef = useRef(false);
 
@@ -192,9 +213,18 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   const themePreferenceRef = useRef(defaultThemePreference);
   themePreferenceRef.current = defaultThemePreference;
 
+  // Store naming preferences in refs so createTabAction callback always reads the latest value
+  const namingStrategyRef = useRef(defaultNamingStrategy);
+  namingStrategyRef.current = defaultNamingStrategy;
+  const namingPrefixRef = useRef(defaultNamingPrefix);
+  namingPrefixRef.current = defaultNamingPrefix;
+
   // Initialize with one default tab
   const [state, setState] = useState(() => {
-    const initialTab = createTab(initialShellConfig, 1, null, null, null, defaultThemePreference);
+    const initialTab = createTab(initialShellConfig, 1, null, null, null, defaultThemePreference, {
+      namingStrategy: defaultNamingStrategy,
+      namingPrefix: defaultNamingPrefix,
+    });
     return {
       tabs: [initialTab],
       activeTabId: initialTab.id,
@@ -228,24 +258,26 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       if (session && session.tabs && session.tabs.length > 0) {
         // Restore tabs from session
         const restoredTabs = session.tabs.map((tabState, index) => {
-          // v3.14.8: Derive title from currentDirectory if available
+          const strategy = namingStrategyRef.current || 'project-root';
           let title = tabState.title || `Terminal ${index + 1}`;
-          
-          // If we have a currentDirectory but title is generic or "forge-terminal", derive from directory
-          if (tabState.currentDirectory && 
-              (title.startsWith('Terminal ') || 
-               title === 'forge-terminal' || 
-               title === '~' ||
-               !title)) {
-            const folderName = extractProjectFolder(tabState.currentDirectory);
+
+          // Re-derive title from saved directory when using a dynamic strategy
+          if (!isStaticNamingStrategy(strategy) && tabState.currentDirectory &&
+              (title.startsWith('Terminal ') || title === 'forge-terminal' || title === '~' || !title)) {
+            const derived = getTabTitle(tabState.currentDirectory, strategy, {
+              tabNumber: index + 1,
+              prefix: namingPrefixRef.current || 'Dev',
+              fallback: `Terminal ${index + 1}`,
+            });
             // Guard against saved paths ending in a filename
-            const looksLikeFile = folderName && /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(folderName);
-            if (folderName && !looksLikeFile && folderName !== '~') {
-              title = folderName;
-              logger.session('Derived tab title from directory', { 
+            const looksLikeFile = derived && /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(derived);
+            if (derived && !looksLikeFile && derived !== '~') {
+              title = derived;
+              logger.session('Derived tab title from directory', {
                 tabId: tabState.id,
                 directory: tabState.currentDirectory,
-                derivedTitle: title
+                strategy,
+                derivedTitle: title,
               });
             }
           }
@@ -325,7 +357,10 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     setState(prev => {
       const config = shellConfig || configRef.current;
       const newTabNumber = prev.tabs.length + 1;
-      const newTab = createTab(config, newTabNumber, null, null, currentDirectory, themePreferenceRef.current);
+      const newTab = createTab(config, newTabNumber, null, null, currentDirectory, themePreferenceRef.current, {
+        namingStrategy: namingStrategyRef.current,
+        namingPrefix: namingPrefixRef.current,
+      });
       createdTab = newTab;
       
       logger.tabs('Tab created successfully', { 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Plus, BarChart3, Bell, BellOff, Zap, BookOpen } from 'lucide-react';
 import Tab from './Tab';
 
@@ -40,6 +40,34 @@ function TabBar({
     }
   };
 
+  // Drag-and-drop tab reordering
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const dragSourceIndex = useRef(null);
+
+  const handleDragStart = (index) => {
+    dragSourceIndex.current = index;
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (dragSourceIndex.current !== null && dragSourceIndex.current !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (index) => {
+    if (dragSourceIndex.current !== null && dragSourceIndex.current !== index && onReorder) {
+      onReorder(dragSourceIndex.current, index);
+    }
+    dragSourceIndex.current = null;
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    dragSourceIndex.current = null;
+    setDragOverIndex(null);
+  };
+
   // v3.12.12: handleToggleAM removed- AM feature deprecated
 
   const handleToggleMode = (tabId) => {
@@ -63,7 +91,7 @@ function TabBar({
   return (
     <div className="tab-bar" role="tablist">
       <div className="tab-bar-scroll">
-        {tabs.map((tab) => (
+        {tabs.map((tab, index) => (
           <Tab
             key={tab.id}
             tab={tab}
@@ -77,6 +105,12 @@ function TabBar({
             onToggleViewMode={() => handleToggleViewMode(tab.id)}
             onChangeTheme={(themeName, themeMode) => handleChangeTheme(tab.id, themeName, themeMode)}
             devMode={devMode}
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDrop={() => handleDrop(index)}
+            onDragEnd={handleDragEnd}
+            isDragOver={dragOverIndex === index}
+            isDragging={dragSourceIndex.current === index}
           />
         ))}
       </div>

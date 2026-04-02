@@ -32,7 +32,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragOver = false, isDragging = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -170,11 +170,16 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggle
   return (
     <>
       <div
-        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''}`}
+        className={`tab ${isActive ? 'active' : ''} ${isWaiting ? 'waiting' : ''} ${isDragOver ? 'drag-over' : ''} ${isDragging ? 'dragging' : ''}`}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         onMouseDown={handleMouseDown}
+        draggable={!isEditing}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
         data-shell={shellType}
         style={tabStyle}
         role="tab"

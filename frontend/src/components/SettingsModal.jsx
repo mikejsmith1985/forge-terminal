@@ -7,7 +7,7 @@ import NotificationsPanel from './NotificationsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 import { themes, themeOrder } from '../themes';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, initialTab = 'shell', onRestartTour, defaultTabTheme = 'auto-cycle', onDefaultTabThemeChange }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, initialTab = 'shell', onRestartTour, defaultTabTheme = 'auto-cycle', onDefaultTabThemeChange, onNamingChange }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -278,7 +278,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           ) : activeTab === 'cli' ? (
             <CLISettingsPanel onToast={onToast} />
           ) : activeTab === 'tabs' ? (
-            <TabControlsPanel onToast={onToast} />
+            <TabControlsPanel onToast={onToast} onNamingChange={onNamingChange} />
           ) : activeTab === 'data' ? (
             <div>
               {/* Default Cards Section */}

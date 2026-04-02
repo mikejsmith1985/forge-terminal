@@ -1053,6 +1053,25 @@ body {
   border-right: 2px solid #10b981; /* Green for AM logging */
 }
 
+/* Tab drag-and-drop */
+.tab[draggable="true"] {
+  cursor: grab;
+}
+
+.tab[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.tab.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.tab.drag-over {
+  border-left: 2px solid var(--accent);
+  box-shadow: -2px 0 6px var(--accent);
+}
+
 
 .am-indicator {
   display: flex;
@@ -1477,21 +1496,37 @@ body {
   color: var(--text);
   cursor: pointer;
   box-shadow: var(--shadow-md);
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
   z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.85);
+}
+
+/* Reveal on hover anywhere over the terminal */
+.terminal-outer-container:hover .scroll-to-bottom-btn {
+  opacity: 0.55;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+/* Full visibility when the user has actually scrolled up */
+.scroll-to-bottom-btn.is-scrolled-up {
   opacity: 0.9;
+  pointer-events: auto;
+  transform: scale(1);
 }
 
 .scroll-to-bottom-btn:hover {
   background: var(--accent);
   border-color: var(--accent);
   color: white;
-  opacity: 1;
-  transform: scale(1.1);
+  opacity: 1 !important;
+  transform: scale(1.1) !important;
 }
 
 .scroll-to-bottom-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.95) !important;
 }
 
 /* Switch to Chat Button */

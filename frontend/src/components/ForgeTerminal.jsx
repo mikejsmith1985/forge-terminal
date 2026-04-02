@@ -2184,9 +2184,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         </div>
       )}
       
-      {showScrollButton && isVisible && (
+      {isVisible && (
         <button
-          className="scroll-to-bottom-btn"
+          className={`scroll-to-bottom-btn${showScrollButton ? ' is-scrolled-up' : ''}`}
           onClick={handleScrollToBottom}
           title="Scroll to bottom (Ctrl+End)"
           aria-label="Scroll to bottom"
