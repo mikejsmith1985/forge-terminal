@@ -506,6 +506,28 @@ func (h *Handler) RangeSessions(fn func(id string) bool) {
 	})
 }
 
+// DetachedSessionCount returns the number of PTY sessions currently in the
+// grace-period waiting room (disconnected but not yet reaped).
+func (h *Handler) DetachedSessionCount() int {
+	count := 0
+	h.detachedSessions.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
+
+// HubCount returns the number of active session hubs.
+// Each hub corresponds to one live PTY; multiple clients may share a hub.
+func (h *Handler) HubCount() int {
+	count := 0
+	h.hubs.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
+
 // HandleWebSocket upgrades the HTTP connection to WebSocket and manages PTY I/O.
 func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Upgrade to WebSocket

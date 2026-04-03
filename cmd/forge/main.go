@@ -405,8 +405,10 @@ func main() {
 	http.HandleFunc("/api/diagnostics/keyboard", WrapWithMiddleware(handleDiagnosticsKeyboard))
 	http.HandleFunc("/api/diagnostics/status", WrapWithMiddleware(handleDiagnosticsStatus))
 	http.HandleFunc("/api/diagnostics/platform", WrapWithMiddleware(handleDiagnosticsPlatform))
+	http.HandleFunc("/api/diagnostics/connection", WrapWithMiddleware(handleDiagnosticsConnection))
+	http.HandleFunc("/api/diagnostics/internal", WrapWithMiddleware(handleDiagnosticsInternal))
 
-	// Freeze detection API - comprehensive runtime monitoring
+	// Freeze detection API- comprehensive runtime monitoring
 	http.HandleFunc("/api/diagnostics/freeze/metrics", WrapWithMiddleware(diagnostic.HandleFreezeMetrics))
 	http.HandleFunc("/api/diagnostics/freeze/current", WrapWithMiddleware(diagnostic.HandleFreezeCurrent))
 	http.HandleFunc("/api/diagnostics/freeze/stats", WrapWithMiddleware(diagnostic.HandleFreezeStats))

@@ -29,6 +29,7 @@ import AgenticEditor from './components/AgenticEditor'
 import DebugPanel from './components/DebugPanel'
 import WebAppDebuggerCard from './components/WebAppDebuggerCard'
 import FollowMeDebugger from './components/FollowMeDebugger'
+import ConnectionDiagnosticCard from './components/ConnectionDiagnosticCard'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
@@ -1748,6 +1749,7 @@ function App() {
               />
             )}
             <div style={{ padding: '12px' }}>
+              <ConnectionDiagnosticCard />
               <WebAppDebuggerCard />
             </div>
           </div>
