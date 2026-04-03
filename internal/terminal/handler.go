@@ -181,7 +181,8 @@ type DetachedSession struct {
 	readerDone  chan struct{} // Close to stop the orphaned PTY reader goroutine
 }
 
-const sessionGracePeriod = 5 * time.Minute // How long a detached PTY stays alive
+const sessionGracePeriod = 5 * time.Minute  // How long a detached PTY stays alive
+const agentGracePeriod   = 8 * time.Hour   // Extended grace when an AI agent is running
 
 // detachSession keeps a PTY alive after its WebSocket disconnects.
 // If the PTY process has already exited, the session is closed immediately.
@@ -557,8 +558,21 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	sessionID := tabID // Use tabID as session ID for consistency
 
 	// ── HUB: one hub per sessionID, shared across all concurrent clients ──
-	hubRaw, _ := h.hubs.LoadOrStore(sessionID, newSessionHub())
+	freshHub := newSessionHub()
+	hubRaw, hubLoaded := h.hubs.LoadOrStore(sessionID, freshHub)
 	hub := hubRaw.(*sessionHub)
+	if !hubLoaded {
+		// Newly created hub — open the session journal and restore prior
+		// scrollback into the ring buffer so reconnecting clients don't see
+		// a blank screen even if the server was restarted.
+		hub.journal = NewSessionJournal(sessionID)
+		if prior := hub.journal.ReadAll(); len(prior) > 0 {
+			hub.mu.Lock()
+			hub.appendToRingLocked(prior)
+			hub.mu.Unlock()
+			log.Printf("[Terminal] Session %s: ring buffer seeded from journal (%d bytes)", sessionID, len(prior))
+		}
+	}
 	hub.add(conn)
 
 	var session *TerminalSession
@@ -628,6 +642,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Compute grace period before the defer closure captures it
 	gracePeriod := GracePeriodForClient(r.Header.Get("User-Agent"))
 
+	// executiveTrigger is declared here (before the defer) so the closure can
+	// read its final value at disconnect time for agent-aware grace periods.
+	// It is assigned below inside the !isWatcher block.
+	var executiveTrigger *ExecutiveTriggerHandler
+
 	// readerDone is closed on reattach to stop this handler's PTY reader goroutine,
 	// preventing two goroutines from racing on the same PTY fd after reconnection.
 	readerDone := make(chan struct{})
@@ -641,7 +660,18 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if hub.size() == 0 {
 			h.hubs.Delete(sessionID)
 			h.sessions.CompareAndDelete(sessionID, session)
-			h.detachSession(sessionID, session, gracePeriod, readerDone)
+			hub.close() // flush and close the session journal
+			// Extend the grace period when an AI agent is actively running —
+			// the agent may still be working and the user will want to return.
+			effectiveGrace := gracePeriod
+			if executiveTrigger != nil {
+				if proc := executiveTrigger.GetActiveProcess(); proc != nil {
+					effectiveGrace = agentGracePeriod
+					log.Printf("[Terminal] Session %s: agent (%s) active — extending PTY grace to %v",
+						sessionID, proc.Provider, agentGracePeriod)
+				}
+			}
+			h.detachSession(sessionID, session, effectiveGrace, readerDone)
 		}
 	}()
 
@@ -680,7 +710,6 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	var promptDetector *PromptDetector
 	var chatResponsePending atomic.Bool
 	var insightsTracker *vision.InsightsTracker
-	var executiveTrigger *ExecutiveTriggerHandler
 	var lineBuffer *LineBuffer
 	var smartRoutingEnabled atomic.Bool
 

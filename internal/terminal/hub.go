@@ -29,6 +29,10 @@ type sessionHub struct {
 	// new watchers see existing terminal content instead of a blank screen.
 	ringBuf  []byte
 	ringSize int // capacity in bytes (e.g., 64 KiB)
+
+	// journal persists PTY output to disk so scrollback survives server
+	// restarts and extended disconnections. May be nil (disabled).
+	journal *SessionJournal
 }
 
 const defaultScrollbackSize = 64 * 1024 // 64 KiB — enough for ~2000 lines of 80-col text
@@ -62,7 +66,8 @@ func (h *sessionHub) size() int {
 // broadcast sends a raw WebSocket frame to every connected client.
 // Individual write errors are expected (disconnection races) and do not stop
 // broadcasting to the remaining clients.
-// Output is also appended to the ring buffer for watcher replay.
+// Output is also appended to the ring buffer for watcher replay and written
+// to the session journal for disk-backed scrollback persistence.
 func (h *sessionHub) broadcast(msgType int, data []byte) {
 	h.mu.Lock()
 	// Append to ring buffer (under lock since clients snapshot is taken here)
@@ -71,11 +76,15 @@ func (h *sessionHub) broadcast(msgType int, data []byte) {
 	for cw := range h.clients {
 		clients = append(clients, cw)
 	}
+	j := h.journal // capture under lock; journal is set-once after hub creation
 	h.mu.Unlock()
 
 	for _, cw := range clients {
 		_ = cw.WriteMessage(msgType, data)
 	}
+
+	// Persist to disk after clients receive data so I/O doesn't block sends.
+	j.Write(data)
 }
 
 // appendToRingLocked appends data to the ring buffer, evicting oldest bytes
@@ -211,4 +220,14 @@ func (h *sessionHub) clearActive(cw *connWriter) {
 		h.activeConn = nil
 	}
 	h.mu.Unlock()
+}
+
+// close flushes and closes the session journal (if any). Call this once the
+// hub is removed from the handler's hubs map and no more broadcasts will occur.
+func (h *sessionHub) close() {
+	h.mu.Lock()
+	j := h.journal
+	h.journal = nil
+	h.mu.Unlock()
+	j.Close()
 }
