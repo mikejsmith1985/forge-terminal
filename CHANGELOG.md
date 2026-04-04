@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Enterprise workflow initialized with Forge Terminal Workflow Architect
 - 6 new Go tests for session detach/reattach lifecycle (`session_reconnect_test.go`)
-- **MCP Workflow Enforcement Server** (`internal/mcp/`): JSON-RPC 2.0 MCP server exposing 4 workflow-gated tools (`workflow_get_state`, `workflow_create_ticket`, `workflow_advance_phase`, `workflow_check_permission`) and 2 resources (`workflow://state`, `workflow://phases`) that enforce a 4-phase ticket → planning → implementation → review workflow
-- HTTP handler `cmd/forge/handlers_mcp.go` bridging the Forge HTTP server to the MCP server at `/api/mcp`
-- 17 unit tests covering protocol handling, phase transitions, permission gating, and resource serialization
+- **MCP Workflow Enforcement Server** (`internal/mcp/`): JSON-RPC 2.0 MCP server exposing 4 workflow-gated tools (`workflow_get_state`, `workflow_create_ticket`, `workflow_advance_phase`, `workflow_check_permission`) and 2 resources (`workflow://state`, `workflow://phases`) that enforce a 4-phase ticket → planning → implementation → review workflow; served at `GET/POST /api/mcp`
+- **Custom Copilot CLI Agent Profiles** (`.github/agents/`): 4 purpose-built agents — `workflow-guard` (task intake), `planner` (read-only analysis), `implementer` (source writes), `reviewer` (quality review + PR creation) — each pre-configured with the Forge MCP server and restricted to phase-appropriate tools
+- **Path-Specific Workflow Instructions** (`.github/instructions/workflow-enforcement.instructions.md`): global `applyTo: "**"` instruction file that enforces workflow state checks, agent routing table, and code quality standards across all Copilot CLI sessions in this repository
+- 17 unit tests covering MCP protocol handling, phase transitions, permission gating, and resource serialization
 
 ### Changed
 

@@ -240,6 +240,9 @@ func main() {
 	// Initialize Code Tutor subsystem
 	initTutor()
 
+	// Initialize Quality Agent for PR reviews
+	initReviewAgent()
+
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
@@ -502,6 +505,13 @@ func main() {
 	http.HandleFunc("/api/workflow/watch", WrapWithMiddleware(handleWorkflowWatchStart))
 	http.HandleFunc("/api/workflow/watch/poll", WrapWithMiddleware(handleWorkflowWatchPoll))
 	http.HandleFunc("/api/workflow/watch/stop", WrapWithMiddleware(handleWorkflowWatchStop))
+
+	// ── Quality Agent PR Review routes ───────────────────────────────────
+	http.HandleFunc("/api/review/analyze", WrapWithMiddleware(handleReviewAnalyze))
+	http.HandleFunc("/api/review/config", WrapWithMiddleware(handleReviewConfig))
+
+	// ── Workflow MCP Server (Copilot CLI agent enforcement) ───────────────
+	http.HandleFunc("/api/mcp", WrapWithMiddleware(handleMCP))
 
 	// Initialize session temp directory
 	if err := initSessionTempDir(); err != nil {
