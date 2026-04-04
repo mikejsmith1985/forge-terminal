@@ -1391,6 +1391,14 @@ function App() {
         // post-launch payload injection fires automatically (e.g. workflow enforcement).
         termRef.sendCommand(cmd.command, cmd.delay, cmd.macro_payload, cmd.macro_delay);
         termRef.focus();
+
+        // Confirm to the user that a macro payload will be auto-injected.
+        // Without this toast there is no visual distinction between a plain card
+        // execution and one that also fires a follow-up prompt into the launched process.
+        if (cmd.macro_payload && cmd.macro_payload.trim()) {
+          const cardLabel = cmd.name || cmd.description || 'Card';
+          addToast(`⚡ Macro injected: ${cardLabel}`, 'success', 3000);
+        }
       } else {
         // Focus terminal even if command is empty
         termRef.focus();

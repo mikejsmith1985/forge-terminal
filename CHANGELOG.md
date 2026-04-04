@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Toast confirmation when macro payload fires** (`App.jsx`): `handleExecute` now shows a `⚡ Macro injected: [card name]` success toast (3s auto-dismiss) whenever a command card with a `macro_payload` is executed. Previously there was no visual distinction between a plain card execution and one that auto-injected a follow-up prompt — users had no way to confirm the macro fired without scrolling to the top of the session.
+
 ### Fixed
 - **Macro injection now uses quiescence detection instead of fixed delay** (`ForgeTerminal.jsx`): `scheduleMacroInjection` watches the WebSocket stream and injects the payload as soon as terminal output stops for 800ms — reliably signalling the CLI is at its input prompt. The `macro_delay` field becomes a safety-net ceiling (not a fixed wait), so injection is fast on quick machines and reliable on slow or high-latency ones. A 500ms startup floor prevents premature injection during the initial command-echo burst. Updated fallback ceilings: `copilot-workflow-enforce` → 6000ms, `copilot-fresh` / `copilot-resume` → 5000ms.
 - **Macro payload injection (workflow enforcement via command cards)**: `sendCommand()` in `ForgeTerminal.jsx` now accepts `macroPayload` and `macroDelay` parameters. After a command launches, Forge automatically injects the payload text as the agent's first message after a configurable delay (default 2000ms). This is the mechanism that enforces the enterprise workflow end-to-end — the command card fires the injection, not the user.
