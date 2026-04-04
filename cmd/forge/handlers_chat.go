@@ -364,6 +364,7 @@ func streamViaCopilotCLI(prompt string, tabID string, modelName string) (string,
 	
 	cmd := exec.CommandContext(ctx, "copilot", args...)
 	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	hideWindow(cmd) // Prevent console window flash on Windows
 	
 	log.Printf("[Chat CLI] Using copilot with model=%s, session-id=%s, allow-all-tools=true for tab=%s", modelName, sessionID, tabID)
 	
@@ -410,6 +411,7 @@ func streamViaClaudeCLI(prompt string, modelName string) (string, error) {
 	
 	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	hideWindow(cmd) // Prevent console window flash on Windows
 	
 	log.Printf("[Chat CLI] Using claude with model=%s, permission-mode=acceptEdits", modelName)
 	

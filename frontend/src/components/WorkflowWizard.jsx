@@ -72,6 +72,11 @@ const MODULE_DISPLAY_INFO = {
     color: '#f97316',
     shortDescription: 'BEST mode orchestration, sub-agents, model routing',
   },
+  'copilot-agent-setup': {
+    icon: Bot,
+    color: '#7c3aed',
+    shortDescription: 'Pre-install dependencies for the Copilot coding agent environment',
+  },
 }
 
 const WIZARD_STEPS = [

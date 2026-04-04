@@ -1468,6 +1468,7 @@ func restartSelf() {
 		cmd := exec.Command(executable)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+		hideWindow(cmd) // Prevent console window flash during self-restart
 		cmd.Start()
 		os.Exit(0)
 	} else {

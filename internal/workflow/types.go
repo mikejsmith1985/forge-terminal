@@ -50,6 +50,10 @@ const (
 	ModuleWorkflowEnforcer    ModuleID = "workflow-enforcer"
 	ModuleGitHooks            ModuleID = "git-hooks"
 	ModulePRTemplate          ModuleID = "pr-template"
+	// ModuleCopilotAgentSetup generates .github/copilot/setup-steps.yml, which
+	// pre-installs project dependencies in the Copilot coding agent's environment
+	// before it begins writing code or running tests.
+	ModuleCopilotAgentSetup ModuleID = "copilot-agent-setup"
 )
 
 // AllModules returns every available module ID in recommended activation order.
@@ -66,6 +70,7 @@ func AllModules() []ModuleID {
 		ModuleWorkflowEnforcer,
 		ModuleGitHooks,
 		ModulePRTemplate,
+		ModuleCopilotAgentSetup,
 	}
 }
 
@@ -158,6 +163,13 @@ func ModuleCatalog() []ModuleInfo {
 			Category:    "enforcement",
 			Required:    false,
 		},
+		{
+			ID:          ModuleCopilotAgentSetup,
+			Name:        "Copilot Coding Agent Setup",
+			Description: "Generates .github/copilot/setup-steps.yml to pre-install project dependencies in the GitHub Copilot coding agent environment before it writes code or runs tests.",
+			Category:    "integration",
+			Required:    false,
+		},
 	}
 }
 
@@ -245,6 +257,7 @@ func DefaultConfig() WorkflowConfig {
 			ModuleWorkflowEnforcer,
 			ModuleGitHooks,
 			ModulePRTemplate,
+			ModuleCopilotAgentSetup,
 		},
 		ConflictStrategy: ConflictSkip,
 		TutorSettings: TutorWorkflowConfig{

@@ -113,6 +113,13 @@ func scaffoldManifest() []scaffoldEntry {
 			category: "template",
 			render:   RenderPRTemplate,
 		},
+		// Integration: Copilot coding agent environment setup
+		{
+			moduleID: ModuleCopilotAgentSetup,
+			relPath:  filepath.Join(".github", "copilot", "setup-steps.yml"),
+			category: "config",
+			render:   RenderCopilotAgentSetup,
+		},
 	}
 }
 
@@ -286,6 +293,7 @@ func configureGitHooks(projectPath string) {
 
 	gitConfigCmd := exec.Command("git", "config", "--local", "core.hooksPath", hooksPathNormalized)
 	gitConfigCmd.Dir = projectPath
+	hideExecWindow(gitConfigCmd) // Prevent CMD window flash on Windows when applying workflow
 
 	if output, err := gitConfigCmd.CombinedOutput(); err != nil {
 		log.Printf("[Workflow] Warning: failed to configure git hooks path: %s (output: %s)", err, string(output))
