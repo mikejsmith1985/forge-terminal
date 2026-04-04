@@ -23,6 +23,10 @@ import {
   ScrollText,
   Users,
   AlertTriangle,
+  GitPullRequest,
+  Bot,
+  User,
+  Sliders,
 } from 'lucide-react'
 import './WorkflowWizard.css'
 
@@ -71,10 +75,11 @@ const MODULE_DISPLAY_INFO = {
 }
 
 const WIZARD_STEPS = [
-  { id: 'detect', label: 'Detect', icon: Search, description: 'Scan project' },
-  { id: 'preset', label: 'Preset', icon: Layers, description: 'Choose template' },
-  { id: 'configure', label: 'Configure', icon: Settings, description: 'Select modules' },
-  { id: 'review', label: 'Review & Apply', icon: Rocket, description: 'Preview & deploy' },
+  { id: 'detect',    label: 'Detect',    icon: Search,         description: 'Scan project' },
+  { id: 'preset',    label: 'Preset',    icon: Layers,         description: 'Choose template' },
+  { id: 'configure', label: 'Configure', icon: Settings,       description: 'Select modules' },
+  { id: 'pr-review', label: 'PR Review', icon: GitPullRequest, description: 'Review strategy' },
+  { id: 'apply',     label: 'Apply',     icon: Rocket,         description: 'Preview & deploy' },
 ]
 
 /**
@@ -136,9 +141,9 @@ const WorkflowWizard = ({ isOpen, onClose, projectPath, workflow, onToast }) => 
     }
   }, [detection, config.projectName, updateConfig])
 
-  // Auto-generate preview when entering the review step
+  // Auto-generate preview when entering the apply step (step index 4)
   useEffect(() => {
-    if (currentStep === 3 && projectPath && !preview && !isPreviewing) {
+    if (currentStep === 4 && projectPath && !preview && !isPreviewing) {
       generatePreview(projectPath)
     }
   }, [currentStep, projectPath, preview, isPreviewing, generatePreview])
@@ -152,7 +157,6 @@ const WorkflowWizard = ({ isOpen, onClose, projectPath, workflow, onToast }) => 
   const handleNext = useCallback(() => {
     setCurrentStep(previousStep => Math.min(previousStep + 1, WIZARD_STEPS.length - 1))
   }, [])
-
   const handleBack = useCallback(() => {
     setCurrentStep(previousStep => Math.max(previousStep - 1, 0))
   }, [])
@@ -252,6 +256,12 @@ const WorkflowWizard = ({ isOpen, onClose, projectPath, workflow, onToast }) => 
             />
           )}
           {currentStep === 3 && (
+            <StepPRReview
+              config={config}
+              onUpdateConfig={updateConfig}
+            />
+          )}
+          {currentStep === 4 && (
             <StepReview
               preview={preview}
               applyResult={applyResult}
@@ -277,7 +287,7 @@ const WorkflowWizard = ({ isOpen, onClose, projectPath, workflow, onToast }) => 
             {currentStep === 0 ? 'Cancel' : <><ChevronLeft size={14} /> Back</>}
           </button>
 
-          {currentStep < 3 ? (
+          {currentStep < 4 ? (
             <button
               className="ww-btn ww-btn-primary"
               onClick={handleNext}
@@ -515,7 +525,185 @@ function StepConfigure({ config, moduleCatalog, onToggleModule, onSetQualityMode
   )
 }
 
-// ─── Step 4: Review & Apply ──────────────────────────────────────────────────
+// ─── Step 4: PR Review Strategy ─────────────────────────────────────────────
+
+/**
+ * StepPRReview lets the user choose how pull requests will be reviewed.
+ *
+ * Four strategies are available:
+ * - manual: user inspects diffs themselves
+ * - tutor: Code Tutor explains each changed file with streaming walkthroughs
+ * - agent: Quality Agent posts structured findings (naming, tests, architecture)
+ * - tutor-and-agent: both run in parallel (recommended for enterprise)
+ */
+function StepPRReview({ config, onUpdateConfig }) {
+  // Which strategy cards are currently shown as selected
+  const selectedStrategy = config.prReviewStrategy || 'tutor-and-agent'
+
+  const reviewStrategies = [
+    {
+      id: 'manual',
+      label: 'Manual Review',
+      icon: User,
+      color: '#6b7280',
+      description: 'Review diffs yourself. No AI assistance.',
+    },
+    {
+      id: 'tutor',
+      label: 'Code Tutor',
+      icon: BookOpen,
+      color: '#3b82f6',
+      description: 'Code Tutor auto-explains each changed file with toast notifications and streaming walkthroughs.',
+    },
+    {
+      id: 'agent',
+      label: 'Quality Agent',
+      icon: Bot,
+      color: '#10b981',
+      description: 'A dedicated AI reviewer analyzes the diff and posts structured findings: naming, complexity, tests, architecture, security.',
+    },
+    {
+      id: 'tutor-and-agent',
+      label: 'Tutor + Agent',
+      icon: Users,
+      color: '#8b5cf6',
+      description: 'Best of both: Code Tutor explains changes to you while the Quality Agent performs an automated review in parallel. Recommended.',
+      isRecommended: true,
+    },
+  ]
+
+  const agentFocusOptions = [
+    { id: 'naming',       label: 'Naming Conventions' },
+    { id: 'complexity',   label: 'Complexity' },
+    { id: 'tests',        label: 'Test Coverage' },
+    { id: 'architecture', label: 'Architecture' },
+    { id: 'security',     label: 'Security' },
+  ]
+
+  const selectedFocusAreas = config.prReviewAgentFocusAreas || ['naming', 'complexity', 'tests', 'architecture', 'security']
+
+  const handleToggleFocusArea = useCallback((areaId) => {
+    const isCurrentlySelected = selectedFocusAreas.includes(areaId)
+    const updatedAreas = isCurrentlySelected
+      ? selectedFocusAreas.filter(existingId => existingId !== areaId)
+      : [...selectedFocusAreas, areaId]
+    onUpdateConfig({ prReviewAgentFocusAreas: updatedAreas })
+  }, [selectedFocusAreas, onUpdateConfig])
+
+  const hasAgentComponent = selectedStrategy === 'agent' || selectedStrategy === 'tutor-and-agent'
+
+  return (
+    <div className="ww-step-content">
+      <h3 className="ww-section-title">PR Review Strategy</h3>
+      <p className="ww-section-desc">
+        Choose how pull requests are reviewed in this project. This setting is saved to your workflow configuration.
+      </p>
+
+      {/* Strategy Cards */}
+      <div className="ww-pr-strategy-grid">
+        {reviewStrategies.map((strategy) => {
+          const StrategyIcon = strategy.icon
+          const isSelected = selectedStrategy === strategy.id
+          return (
+            <div
+              key={strategy.id}
+              className={`ww-pr-strategy-card ${isSelected ? 'selected' : ''}`}
+              onClick={() => onUpdateConfig({ prReviewStrategy: strategy.id })}
+              style={{ '--strategy-color': strategy.color }}
+            >
+              {strategy.isRecommended && (
+                <span className="ww-pr-recommended-badge">Recommended</span>
+              )}
+              <div className="ww-pr-strategy-icon" style={{ color: strategy.color }}>
+                <StrategyIcon size={22} />
+              </div>
+              <div className="ww-pr-strategy-info">
+                <span className="ww-pr-strategy-name">{strategy.label}</span>
+                <span className="ww-pr-strategy-desc">{strategy.description}</span>
+              </div>
+              {isSelected && <Check size={16} className="ww-pr-strategy-check" />}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Auto-trigger toggle */}
+      <div className="ww-pr-option-row">
+        <div className="ww-pr-option-info">
+          <span className="ww-pr-option-label">Auto-trigger on PR create/update</span>
+          <span className="ww-pr-option-desc">Automatically run the review when a PR is opened or updated</span>
+        </div>
+        <div
+          className={`ww-toggle-switch ${config.prReviewAutoTrigger ? 'on' : 'off'}`}
+          onClick={() => onUpdateConfig({ prReviewAutoTrigger: !config.prReviewAutoTrigger })}
+        >
+          <div className="ww-toggle-knob" />
+        </div>
+      </div>
+
+      {/* Require changelog toggle */}
+      <div className="ww-pr-option-row">
+        <div className="ww-pr-option-info">
+          <span className="ww-pr-option-label">Require CHANGELOG update</span>
+          <span className="ww-pr-option-desc">Block PR if CHANGELOG.md was not updated alongside source changes</span>
+        </div>
+        <div
+          className={`ww-toggle-switch ${config.prReviewRequireChangelog ? 'on' : 'off'}`}
+          onClick={() => onUpdateConfig({ prReviewRequireChangelog: !config.prReviewRequireChangelog })}
+        >
+          <div className="ww-toggle-knob" />
+        </div>
+      </div>
+
+      {/* Agent-specific options — only shown when agent component is selected */}
+      {hasAgentComponent && (
+        <div className="ww-pr-agent-options">
+          <h4 className="ww-section-subtitle">
+            <Bot size={14} /> Quality Agent Settings
+          </h4>
+
+          {/* Strictness selector */}
+          <div className="ww-pr-strictness">
+            <label className="ww-pr-option-label">Review Strictness</label>
+            <div className="ww-pr-strictness-buttons">
+              {['lenient', 'standard', 'strict'].map((level) => (
+                <button
+                  key={level}
+                  className={`ww-pr-strictness-btn ${config.prReviewAgentStrictness === level ? 'active' : ''}`}
+                  onClick={() => onUpdateConfig({ prReviewAgentStrictness: level })}
+                >
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Focus area toggles */}
+          <div className="ww-pr-focus-areas">
+            <label className="ww-pr-option-label">Focus Areas</label>
+            <div className="ww-pr-focus-grid">
+              {agentFocusOptions.map((focusOption) => {
+                const isActive = selectedFocusAreas.includes(focusOption.id)
+                return (
+                  <button
+                    key={focusOption.id}
+                    className={`ww-pr-focus-chip ${isActive ? 'active' : ''}`}
+                    onClick={() => handleToggleFocusArea(focusOption.id)}
+                  >
+                    {isActive && <Check size={10} />}
+                    {focusOption.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Step 5: Review & Apply ──────────────────────────────────────────────────
 
 function StepReview({
   preview,

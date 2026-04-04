@@ -440,6 +440,195 @@
   color: var(--text);
   font-size: 0.8rem;
 }
+
+/* ─── Step 4: PR Review Strategy ─────────────────────────────────────────── */
+
+.ww-pr-strategy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ww-pr-strategy-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--card-border, #2a2a3e);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ww-pr-strategy-card:hover {
+  border-color: var(--strategy-color, var(--accent, #3b82f6));
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ww-pr-strategy-card.selected {
+  border-color: var(--strategy-color, var(--accent, #3b82f6));
+  background: rgba(var(--strategy-color, 59, 130, 246), 0.06);
+  box-shadow: 0 0 0 1px var(--strategy-color, var(--accent, #3b82f6)) inset;
+}
+
+.ww-pr-recommended-badge {
+  position: absolute;
+  top: -8px;
+  right: 12px;
+  background: #8b5cf6;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.ww-pr-strategy-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ww-pr-strategy-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.ww-pr-strategy-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #e2e8f0);
+}
+
+.ww-pr-strategy-desc {
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.4;
+}
+
+.ww-pr-strategy-check {
+  color: var(--strategy-color, var(--accent, #3b82f6));
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* ─── PR Review option rows (toggle switches) ────────────────────────────── */
+
+.ww-pr-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--card-border, #2a2a3e);
+}
+
+.ww-pr-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ww-pr-option-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text, #e2e8f0);
+}
+
+.ww-pr-option-desc {
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+}
+
+/* ─── Agent options sub-section ──────────────────────────────────────────── */
+
+.ww-pr-agent-options {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border, #2a2a3e);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.ww-pr-strictness {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ww-pr-strictness-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.ww-pr-strictness-btn {
+  flex: 1;
+  padding: 6px 0;
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--card-border, #2a2a3e);
+  border-radius: 6px;
+  color: var(--text-muted, #94a3b8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ww-pr-strictness-btn:hover {
+  border-color: var(--accent, #3b82f6);
+  color: var(--text, #e2e8f0);
+}
+
+.ww-pr-strictness-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent, #3b82f6);
+  color: var(--accent, #3b82f6);
+  font-weight: 600;
+}
+
+.ww-pr-focus-areas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ww-pr-focus-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ww-pr-focus-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--card-border, #2a2a3e);
+  border-radius: 999px;
+  color: var(--text-muted, #94a3b8);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ww-pr-focus-chip:hover {
+  border-color: var(--accent, #3b82f6);
+  color: var(--text, #e2e8f0);
+}
+
+.ww-pr-focus-chip.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent, #3b82f6);
+  color: var(--accent, #3b82f6);
+  font-weight: 500;
+}
 .ww-input:focus { outline: none; border-color: var(--accent); }
 .ww-input::placeholder { color: var(--subtext); }
 
