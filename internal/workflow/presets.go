@@ -78,6 +78,13 @@ func BuiltInPresets() []WorkflowPreset {
 			AuditNaming:  true,
 			AuditComments: false,
 		},
+		PRReviewSettings: PRReviewConfig{
+			Strategy:         PRReviewManual,
+			AutoTrigger:      false,
+			RequireChangelog: false,
+			AgentStrictness:  "lenient",
+			AgentFocusAreas:  []string{"naming", "complexity"},
+		},
 	}
 
 	return []WorkflowPreset{

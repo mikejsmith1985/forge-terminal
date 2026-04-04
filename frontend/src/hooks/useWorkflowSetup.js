@@ -487,5 +487,10 @@ function defaultConfig() {
     conflictStrategy: 'skip',
     tutorAutoNotify: true,
     tutorDefaultDepth: 'standard',
+    prReviewStrategy: 'tutor-and-agent',
+    prReviewAutoTrigger: true,
+    prReviewRequireChangelog: true,
+    prReviewAgentStrictness: 'standard',
+    prReviewAgentFocusAreas: ['naming', 'complexity', 'tests', 'architecture', 'security'],
   }
 }
