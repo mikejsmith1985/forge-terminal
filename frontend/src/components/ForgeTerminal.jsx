@@ -746,19 +746,45 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // This ensures proper execution in both regular shells and TUI applications.
         const executionDelay = (delay !== undefined && delay !== null) ? parseInt(delay, 10) : 15;
 
-        // Default macro injection delay gives the launched process time to start
-        // and reach its input prompt before we send the follow-up payload.
+        // Fallback ceiling: if the CLI never goes quiet within this window,
+        // inject anyway so the macro isn't silently dropped on slow systems.
         const DEFAULT_MACRO_INJECTION_DELAY_MS = 1500;
 
-        // Schedules the macro payload to be sent as the first "message" after the
-        // command starts. This is how command cards enforce workflow rules — the
-        // payload is injected into the AI agent's first prompt automatically.
+        // Schedules the macro payload using quiescence detection: we watch
+        // the WebSocket stream and inject as soon as output stops for
+        // QUIESCENCE_WINDOW_MS, which reliably indicates the CLI is sitting
+        // at its input prompt. The configured macro_delay becomes a safety-net
+        // maximum rather than a fixed wait, so injection is both fast on quick
+        // machines and reliable on slow or high-latency ones.
         const scheduleMacroInjection = () => {
           if (!macroPayload || !macroPayload.trim()) return;
-          const injectionDelay = (macroDelay !== undefined && macroDelay !== null)
+
+          // Maximum time before forcing injection regardless of terminal state.
+          // This guards against spinners or continuous output that never settles.
+          const maxFallbackMs = (macroDelay !== undefined && macroDelay !== null)
             ? parseInt(macroDelay, 10)
             : DEFAULT_MACRO_INJECTION_DELAY_MS;
-          setTimeout(() => {
+
+          // How long terminal output must be silent before we consider the CLI
+          // ready for input. 800ms clears natural startup gaps without being
+          // so long that it noticeably delays injection on fast machines.
+          const QUIESCENCE_WINDOW_MS = 800;
+
+          // Skip quiescence detection during the initial command-echo burst.
+          // Without this floor, a brief pre-output silence could fire too early.
+          const MINIMUM_STARTUP_WAIT_MS = 500;
+
+          let hasInjected = false;
+          let quiescenceTimer = null;
+          let fallbackTimer = null;
+          const ws = wsRef.current;
+
+          const injectPayload = () => {
+            if (hasInjected) return;
+            hasInjected = true;
+            if (quiescenceTimer) { clearTimeout(quiescenceTimer); quiescenceTimer = null; }
+            if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+            if (ws) ws.removeEventListener('message', onTerminalOutput);
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
               wsRef.current.send(macroPayload);
               // Submit the injected payload with Enter, same as a user pressing Enter
@@ -768,7 +794,30 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 }
               }, 15);
             }
-          }, injectionDelay);
+          };
+
+          // Each incoming terminal message resets the quiescence window.
+          // When output stops for QUIESCENCE_WINDOW_MS the CLI is at its prompt.
+          const onTerminalOutput = () => {
+            if (hasInjected) return;
+            if (quiescenceTimer) clearTimeout(quiescenceTimer);
+            quiescenceTimer = setTimeout(injectPayload, QUIESCENCE_WINDOW_MS);
+          };
+
+          // Begin watching for quiescence after the minimum startup wait.
+          // We also seed an initial quiescence timer in case the CLI is already
+          // showing a prompt by the time we start listening.
+          const startupWaitTimer = setTimeout(() => {
+            if (hasInjected) return;
+            if (ws) ws.addEventListener('message', onTerminalOutput);
+            quiescenceTimer = setTimeout(injectPayload, QUIESCENCE_WINDOW_MS);
+          }, MINIMUM_STARTUP_WAIT_MS);
+
+          // Safety fallback: inject after maxFallbackMs regardless of quiescence.
+          fallbackTimer = setTimeout(() => {
+            clearTimeout(startupWaitTimer);
+            injectPayload();
+          }, maxFallbackMs);
         };
 
         // For large inputs (>8KB), chunk to avoid WebSocket frame issues

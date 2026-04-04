@@ -3,7 +3,7 @@
   "name": "🤖 Copilot (Fresh)",
   "description": "Start new Copilot session with Forge awareness and workflow enforcement",
   "command": "copilot --allow-all-tools",
-  "macro_delay": 2000,
+  "macro_delay": 5000,
   "macro_payload": "You are operating inside Forge Terminal. Before we begin any task: read AGENTS.md now — it contains mandatory pre-flight rules that govern this entire session. Your first tool call on any code task MUST be `skill: workflow-enforcer`. Confirm you have read AGENTS.md and are ready to enforce the workflow.",
   "category": "ai",
   "icon": "emoji-robot",

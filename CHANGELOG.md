@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Fixed
+- **Macro injection now uses quiescence detection instead of fixed delay** (`ForgeTerminal.jsx`): `scheduleMacroInjection` watches the WebSocket stream and injects the payload as soon as terminal output stops for 800ms — reliably signalling the CLI is at its input prompt. The `macro_delay` field becomes a safety-net ceiling (not a fixed wait), so injection is fast on quick machines and reliable on slow or high-latency ones. A 500ms startup floor prevents premature injection during the initial command-echo burst. Updated fallback ceilings: `copilot-workflow-enforce` → 6000ms, `copilot-fresh` / `copilot-resume` → 5000ms.
 - **Macro payload injection (workflow enforcement via command cards)**: `sendCommand()` in `ForgeTerminal.jsx` now accepts `macroPayload` and `macroDelay` parameters. After a command launches, Forge automatically injects the payload text as the agent's first message after a configurable delay (default 2000ms). This is the mechanism that enforces the enterprise workflow end-to-end — the command card fires the injection, not the user.
 - **Copilot (Workflow Enforced) command card** (`command-cards/copilot-workflow-enforce.json`): new card with the strongest enforcement macro — explicitly names the full skill chain (`workflow-enforcer → enterprise-workflow → code-quality → branching-strategy → code-tutor-workflow`) and instructs the agent not to write any code until all skills are loaded.
 - **Updated Copilot (Fresh) and Copilot (Resume) command cards**: replaced the old comment-block payload with a real instruction prompt that directs Copilot to read `AGENTS.md` and invoke `skill: workflow-enforcer` before any code work. Macro delay increased to 2000ms for reliability.
