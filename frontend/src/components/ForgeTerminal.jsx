@@ -2186,21 +2186,27 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   }, []); // Only run once on mount, theme updates handled by other effect
 
   const handleScrollToBottom = () => {
-    if (xtermRef.current) {
-      xtermRef.current.scrollToBottom();
-    }
-    // Belt-and-suspenders: scroll the xterm DOM viewport directly.
-    // xterm's scrollToBottom() can silently no-op when its internal buffer
-    // cursor is already at the last line (common during streaming output),
-    // leaving the DOM viewport scrollTop stale. Forcing scrollTop here is
-    // always reliable regardless of xterm's internal state.
-    const viewport = terminalRef.current?.querySelector('.xterm-viewport');
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight;
-    }
-    // Do NOT call setShowScrollButton(false) here — let checkScrollPosition
-    // confirm the scroll actually reached the bottom before hiding the button.
-    // This prevents the button from disappearing when the scroll silently failed.
+    if (!xtermRef.current) return;
+
+    // Step 1: Tell xterm to update its internal buffer viewport position.
+    xtermRef.current.scrollToBottom();
+
+    // Step 2: Defer the DOM force-scroll to the NEXT animation frame.
+    //
+    // Why deferred? xterm.js queues its own syncScrollArea() via RAF whenever
+    // new output is written. That RAF recalculates scrollTop from buffer
+    // coordinates (viewportY * lineHeight), which can be a few pixels less
+    // than the true DOM bottom (scrollHeight - clientHeight). If we set
+    // scrollTop synchronously here, xterm's already-queued RAF fires
+    // immediately after and overwrites our value — leaving 1–3 lines still
+    // hidden below the visible area. Running our DOM fix in the NEXT frame
+    // guarantees it executes after xterm's frame has completed.
+    requestAnimationFrame(() => {
+      const xtermViewport = terminalRef.current?.querySelector('.xterm-viewport');
+      if (xtermViewport) {
+        xtermViewport.scrollTop = xtermViewport.scrollHeight;
+      }
+    });
   };
 
   return (
