@@ -2,10 +2,12 @@
 # This whitelist prevents documentation sprawl in the repository root
 # Update ONLY with explicit review and approval in a PR
 # 
-# These 4 files are the ONLY markdown/documentation files allowed in root
+# These files are the ONLY markdown/documentation files allowed in root (max 4 .md files enforced)
 # All other documentation must be in docs/ subdirectories
 
 README.md                           # Project entry point and main README
+CHANGELOG.md                        # Version history and release notes
+AGENTS.md                           # Copilot CLI agent instructions for this repo
 PROJECT_CHARTER.md                  # Project vision, goals, and scope
 LICENSE                             # Legal: MIT License
 .github/copilot-instructions.md     # Developer copilot rules and guidelines
