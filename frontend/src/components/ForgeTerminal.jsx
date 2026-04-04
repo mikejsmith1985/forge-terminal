@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
@@ -563,11 +563,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
-  // Tracks whether xterm.js has been re-fit after this tab became active.
-  // We hold opacity:0 on the container until fit() completes to prevent the
-  // "outline flicker" caused by the canvas being a stale size during the
-  // 50ms delay before fit() runs.
-  const [isFitReady, setIsFitReady] = useState(false);
   const [isActiveDevice, setIsActiveDevice] = useState(true); // Handoff: this device controls PTY dimensions
   const isActiveDeviceRef = useRef(true);
   // Debounce timer for SESSION_JOINED → prevents a brief phantom "another device is
@@ -694,28 +689,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     }
   }, [visionEnabled, tabId]);
 
-  // Refit terminal when becoming visible, using a hide-fit-reveal sequence.
-  // We set isFitReady=false (opacity:0) before waiting, then call fit(), then
-  // set isFitReady=true (opacity:1 with a short CSS transition). This eliminates
-  // the "outline flicker" that occurred when the xterm canvas was visible but
-  // still at its stale size during the 50ms delay before fit() ran.
-  useEffect(() => {
+  // Refit terminal when becoming visible using useLayoutEffect.
+  // useLayoutEffect fires after React commits DOM mutations but BEFORE the
+  // browser paints. Calling fit() here resizes the xterm canvas to the
+  // container's correct dimensions before the user ever sees the frame —
+  // eliminating the "outline flicker" that occurred when fit() ran after
+  // paint via setTimeout or requestAnimationFrame.
+  useLayoutEffect(() => {
     if (isVisible && fitAddonRef.current && xtermRef.current) {
-      setIsFitReady(false);
-      setTimeout(() => {
-        if (fitAddonRef.current && xtermRef.current) {
-          fitAddonRef.current.fit();
-          setIsFitReady(true);
-          queueMicrotask(() => {
-            if (xtermRef.current) {
-              xtermRef.current.focus();
-            }
-          });
-        }
-      }, 50);
-    } else if (!isVisible) {
-      // Reset so the next activation starts hidden until re-fit.
-      setIsFitReady(false);
+      fitAddonRef.current.fit();
+      xtermRef.current.focus();
     }
   }, [isVisible]);
 
@@ -2127,18 +2110,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`terminal-outer-container ${className || ''}`}
-      style={{
-        ...(style || {}),
-        // Hold opacity:0 while awaiting re-fit on tab activation, then fade
-        // in via CSS transition once xterm.js has resized its canvas. Without
-        // this, the stale-sized canvas is briefly exposed and flickers.
-        opacity: isVisible && !isFitReady ? 0 : 1,
-        transition: isFitReady ? 'opacity 0.06s ease' : 'none',
-      }}
-    >
+    <div ref={containerRef} className={`terminal-outer-container ${className || ''}`} style={style}>
       {/* Connection Status Indicator */}
       {!isConnected && (
         <div className="terminal-connection-overlay">
