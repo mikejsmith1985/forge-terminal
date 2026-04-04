@@ -7,20 +7,39 @@ description: "Integrates Code Tutor with enterprise workflow. Activates on keywo
 
 ## Behavior
 
-When Code Tutor is active in the workflow:
+When this skill is loaded as part of the pre-flight sequence, Code Tutor is active for this task.
 
-1. **File change notifications** — When files are created or modified, the system sends a notification: "N files changed — want a walkthrough?"
-2. **Explanation depth levels:**
-   - **Overview** — General, mildly technical summary suitable for project managers
-   - **Technical** — Standard developer-level explanation of logic and patterns
-   - **Line-by-Line** — Detailed walk-through of every significant line
-3. **Quality auditing** — Tutor explanations flag naming violations, missing comments, and readability concerns
+### Post-Change Walkthrough (REQUIRED)
 
-## Agent Integration
+After every set of file changes, you MUST offer a walkthrough. The format is:
 
-When creating or modifying files with Code Tutor active:
+> "**N files changed** — here's a walkthrough of what was done and why:"
+>
+> Then explain each change at the **Technical** level unless the user specifies otherwise.
 
-1. Write code that is optimized for learning — clear structure, logical flow
-2. Add brief inline comments on non-obvious logic (the "why" moments)
-3. Use architecture decision blocks for significant structural decisions
+Do not wait to be asked. The walkthrough is not optional when this skill is loaded.
+
+### Explanation Depth Levels
+
+- **Overview** — Non-technical summary suitable for project managers: what changed and why it matters
+- **Technical** — Developer-level explanation of logic, patterns, and design decisions (DEFAULT)
+- **Line-by-Line** — Detailed walk-through of every significant change, explaining the reasoning
+
+### Quality Auditing During Walkthrough
+
+While explaining, flag any of the following if present:
+- Naming violations (single-letter vars, non-verb functions, missing `is`/`has` boolean prefix)
+- Missing comments on complex logic
+- Functions over 40 lines
+- Any code that would confuse a new contributor
+
+## Writing Code for Learnability
+
+When Code Tutor is active, write code that teaches:
+
+1. Use the most readable structure, not the cleverest
+2. Add brief inline comments on non-obvious logic — the "why" moments
+3. Use architecture decision blocks for significant structural choices
 4. Ensure every public/exported symbol has a documentation comment
+5. Prefer explicit over implicit — a reader should not have to guess intent
+
