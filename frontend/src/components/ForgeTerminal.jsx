@@ -739,12 +739,36 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
-    sendCommand: (command, delay) => {
+    sendCommand: (command, delay, macroPayload, macroDelay) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Send the command and Enter key separately with a small delay.
         // This ensures proper execution in both regular shells and TUI applications.
-
         const executionDelay = (delay !== undefined && delay !== null) ? parseInt(delay, 10) : 15;
+
+        // Default macro injection delay gives the launched process time to start
+        // and reach its input prompt before we send the follow-up payload.
+        const DEFAULT_MACRO_INJECTION_DELAY_MS = 1500;
+
+        // Schedules the macro payload to be sent as the first "message" after the
+        // command starts. This is how command cards enforce workflow rules — the
+        // payload is injected into the AI agent's first prompt automatically.
+        const scheduleMacroInjection = () => {
+          if (!macroPayload || !macroPayload.trim()) return;
+          const injectionDelay = (macroDelay !== undefined && macroDelay !== null)
+            ? parseInt(macroDelay, 10)
+            : DEFAULT_MACRO_INJECTION_DELAY_MS;
+          setTimeout(() => {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(macroPayload);
+              // Submit the injected payload with Enter, same as a user pressing Enter
+              setTimeout(() => {
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  wsRef.current.send('\r');
+                }
+              }, 15);
+            }
+          }, injectionDelay);
+        };
 
         // For large inputs (>8KB), chunk to avoid WebSocket frame issues
         const CHUNK_SIZE = 8192;
@@ -752,7 +776,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           let offset = 0;
           const sendChunk = () => {
             if (offset >= command.length) {
-              // All chunks sent — send Enter
+              // All chunks sent — send Enter, then schedule macro injection
               setTimeout(() => {
                 if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                   wsRef.current.send('\r');
@@ -769,6 +793,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             setTimeout(sendChunk, 5);
           };
           sendChunk();
+          // Schedule macro injection after the chunked command launches.
+          // The macro delay (default 1500ms) far exceeds chunk send time,
+          // so the command is always fully sent before injection fires.
+          scheduleMacroInjection();
         } else {
           wsRef.current.send(command);
           setTimeout(() => {
@@ -776,6 +804,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               wsRef.current.send('\r');
             }
           }, executionDelay);
+          scheduleMacroInjection();
         }
 
         return true;

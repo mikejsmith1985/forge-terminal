@@ -431,6 +431,151 @@
 .ww-save-preset { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 .ww-save-preset-form { display: flex; gap: 8px; align-items: center; }
 
+/* ─── Agent Enforcement Explainer ─────────────────────────────────────────── */
+
+.ww-enforcement-explainer {
+  margin-top: 24px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--accent, #7c3aed) 8%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--accent, #7c3aed) 30%, var(--card-border));
+  border-radius: 10px;
+}
+
+.ww-enforcement-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ww-enforcement-header h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ww-enforcement-icon {
+  color: var(--accent, #7c3aed);
+  flex-shrink: 0;
+}
+
+.ww-enforcement-intro {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+/* Step-by-step chain layout */
+.ww-enforcement-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.ww-enforcement-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 7px;
+  font-size: 0.78rem;
+}
+
+.ww-enforcement-step svg {
+  color: var(--accent, #7c3aed);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ww-chain-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent, #7c3aed);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ww-chain-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.ww-chain-text strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ww-chain-text span {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.ww-chain-text code {
+  background: color-mix(in srgb, var(--accent, #7c3aed) 15%, transparent);
+  color: var(--accent, #7c3aed);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.ww-chain-arrow {
+  color: var(--text-muted);
+  align-self: center;
+  margin-left: 26px;
+  opacity: 0.5;
+}
+
+/* Cards reference note */
+.ww-enforcement-cards-note {
+  padding: 10px 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 7px;
+  font-size: 0.78rem;
+}
+
+.ww-enforcement-cards-note strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.ww-enforcement-cards-note ul {
+  margin: 0 0 8px 16px;
+  padding: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.ww-enforcement-cards-note ul code {
+  background: color-mix(in srgb, var(--accent, #7c3aed) 15%, transparent);
+  color: var(--accent, #7c3aed);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.ww-enforcement-note-text {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 .ww-input {
   flex: 1;
   padding: 8px 12px;

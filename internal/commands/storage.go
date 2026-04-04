@@ -102,8 +102,11 @@ var DefaultCommands = []Command{
 		PasteOnly:    false,
 		Favorite:     false,
 		Icon:         "emoji-robot",
-		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
-		MacroDelay:   1500,
+		// MacroPayload is injected as the first message after Copilot starts up.
+		// This primes the agent to read AGENTS.md and invoke the skill chain
+		// before touching any code — the core of Forge's workflow enforcement.
+		MacroPayload: "You are operating inside Forge Terminal. Before we begin any task: read AGENTS.md now — it contains mandatory pre-flight rules that govern this entire session. Your first tool call on any code task MUST be `skill: workflow-enforcer`. Confirm you have read AGENTS.md and are ready to enforce the workflow.",
+		MacroDelay:   2000,
 	},
 	{
 		ID:           7,
@@ -113,8 +116,22 @@ var DefaultCommands = []Command{
 		PasteOnly:    false,
 		Favorite:     false,
 		Icon:         "emoji-repeat",
-		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
-		MacroDelay:   1500,
+		// Same enforcement injection as the Fresh card — applies to resumed sessions too.
+		MacroPayload: "You are operating inside Forge Terminal. Before we continue: read AGENTS.md now — it contains mandatory pre-flight rules that govern this entire session. Your first tool call on any code task MUST be `skill: workflow-enforcer`. Confirm you have read AGENTS.md and are ready to enforce the workflow.",
+		MacroDelay:   2000,
+	},
+	{
+		ID:           8,
+		Description:  "🛡️ Copilot (Workflow Enforced)",
+		Command:      "copilot --allow-all-tools",
+		KeyBinding:   "",
+		PasteOnly:    false,
+		Favorite:     true,
+		Icon:         "emoji-shield",
+		// Strongest enforcement card — explicitly names every skill in the cascade
+		// and forbids any code work until the full chain is loaded.
+		MacroPayload: "You are operating inside Forge Terminal with enterprise workflow enforcement active. Begin by reading AGENTS.md — do this now as your very first action. It defines the mandatory pre-flight sequence for all code tasks in this project. After reading it, invoke `skill: workflow-enforcer` immediately. Do not analyze any code, form any plan, or write any file until the full skill chain has been loaded: workflow-enforcer → enterprise-workflow → code-quality → branching-strategy → code-tutor-workflow. Confirm you have read AGENTS.md and are ready.",
+		MacroDelay:   2000,
 	},
 }
 

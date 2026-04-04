@@ -27,6 +27,8 @@ import {
   Bot,
   User,
   Sliders,
+  ArrowRight,
+  MousePointerClick,
 } from 'lucide-react'
 import './WorkflowWizard.css'
 
@@ -750,6 +752,9 @@ function StepReview({
             ))}
           </div>
         )}
+
+        {/* Explain how AI agents are actually enforced via command cards */}
+        <AgentEnforcementExplainer />
       </div>
     )
   }
@@ -826,11 +831,103 @@ function StepReview({
           </div>
         )}
       </div>
+
+      {/* Show the enforcement explainer in preview mode too so users understand
+          how the workflow will actually be enforced before they click Apply */}
+      <AgentEnforcementExplainer />
     </div>
   )
 }
 
-// ─── Helper: File Icon ───────────────────────────────────────────────────────
+// ─── Agent Enforcement Explainer ─────────────────────────────────────────────
+
+/**
+ * AgentEnforcementExplainer — Explains how Forge enforces the workflow with
+ * AI agents end-to-end using command card macro injection.
+ *
+ * This is shown in the WorkflowWizard after workflow files are applied (or in
+ * preview) so users understand the full enforcement chain, not just the files.
+ */
+function AgentEnforcementExplainer() {
+  return (
+    <div className="ww-enforcement-explainer">
+      <div className="ww-enforcement-header">
+        <Bot size={16} className="ww-enforcement-icon" />
+        <h4>How AI Agents Are Enforced</h4>
+      </div>
+
+      <p className="ww-enforcement-intro">
+        Workflow files alone don't stop an agent from skipping steps. Forge enforces the
+        full workflow <strong>automatically</strong> through command card macro injection.
+      </p>
+
+      {/* Step-by-step enforcement chain */}
+      <div className="ww-enforcement-chain">
+        <div className="ww-enforcement-step">
+          <span className="ww-chain-number">1</span>
+          <MousePointerClick size={14} />
+          <div className="ww-chain-text">
+            <strong>Click a Copilot command card</strong>
+            <span>Use "🛡️ Copilot (Workflow Enforced)" or "🤖 Copilot (Fresh)" from the command panel</span>
+          </div>
+        </div>
+        <ArrowRight size={14} className="ww-chain-arrow" />
+
+        <div className="ww-enforcement-step">
+          <span className="ww-chain-number">2</span>
+          <Zap size={14} />
+          <div className="ww-chain-text">
+            <strong>Macro injection fires automatically</strong>
+            <span>After Copilot starts (2 second delay), Forge sends an enforcement prompt as the agent's first message — no typing required</span>
+          </div>
+        </div>
+        <ArrowRight size={14} className="ww-chain-arrow" />
+
+        <div className="ww-enforcement-step">
+          <span className="ww-chain-number">3</span>
+          <FileText size={14} />
+          <div className="ww-chain-text">
+            <strong>Agent reads AGENTS.md</strong>
+            <span>The injected prompt instructs the agent to read AGENTS.md, which contains the circuit breaker rule: first tool call on any code task must be <code>skill: workflow-enforcer</code></span>
+          </div>
+        </div>
+        <ArrowRight size={14} className="ww-chain-arrow" />
+
+        <div className="ww-enforcement-step">
+          <span className="ww-chain-number">4</span>
+          <Shield size={14} />
+          <div className="ww-chain-text">
+            <strong>Skill chain cascades</strong>
+            <span>workflow-enforcer loads and immediately triggers: enterprise-workflow → code-quality → branching-strategy → code-tutor-workflow</span>
+          </div>
+        </div>
+        <ArrowRight size={14} className="ww-chain-arrow" />
+
+        <div className="ww-enforcement-step">
+          <span className="ww-chain-number">5</span>
+          <GitBranch size={14} />
+          <div className="ww-chain-text">
+            <strong>Branch created before code</strong>
+            <span>Skills enforce: branch must exist before any file is written. Naming, comments, tests, and CHANGELOG are checked at every delivery</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="ww-enforcement-cards-note">
+        <strong>Command cards to use:</strong>
+        <ul>
+          <li><code>🛡️ Copilot (Workflow Enforced)</code> — strongest enforcement, explicitly names the full skill chain</li>
+          <li><code>🤖 Copilot (Fresh)</code> — standard fresh session with enforcement injection</li>
+          <li><code>🔄 Copilot (Resume)</code> — resumes a previous session with enforcement injection</li>
+        </ul>
+        <p className="ww-enforcement-note-text">
+          These cards are pre-configured with the correct macro payload. You can customize
+          the payload in the command card editor (click the card's edit icon in the command panel).
+        </p>
+      </div>
+    </div>
+  )
+}
 
 function FileIcon({ action }) {
   switch (action) {

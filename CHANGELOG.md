@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Macro payload injection (workflow enforcement via command cards)**: `sendCommand()` in `ForgeTerminal.jsx` now accepts `macroPayload` and `macroDelay` parameters. After a command launches, Forge automatically injects the payload text as the agent's first message after a configurable delay (default 2000ms). This is the mechanism that enforces the enterprise workflow end-to-end — the command card fires the injection, not the user.
+- **Copilot (Workflow Enforced) command card** (`command-cards/copilot-workflow-enforce.json`): new card with the strongest enforcement macro — explicitly names the full skill chain (`workflow-enforcer → enterprise-workflow → code-quality → branching-strategy → code-tutor-workflow`) and instructs the agent not to write any code until all skills are loaded.
+- **Updated Copilot (Fresh) and Copilot (Resume) command cards**: replaced the old comment-block payload with a real instruction prompt that directs Copilot to read `AGENTS.md` and invoke `skill: workflow-enforcer` before any code work. Macro delay increased to 2000ms for reliability.
+- **Agent Enforcement Explainer in WorkflowWizard**: new `AgentEnforcementExplainer` component rendered in the Review & Apply step (both preview and success states). Shows a 5-step visual chain explaining how a single command card click triggers the full workflow enforcement cascade automatically — no manual steps required.
+
 - Enterprise workflow initialized with Forge Terminal Workflow Architect
 - 6 new Go tests for session detach/reattach lifecycle (`session_reconnect_test.go`)
 - **PR Review Strategy** (`internal/review/`, `cmd/forge/handlers_review.go`): Configurable PR review system with 4 strategies — Manual, Code Tutor, Quality Agent, Tutor+Agent. Quality Agent uses LLM model chain to produce structured findings (naming, complexity, tests, architecture, security) with 0–100 quality score

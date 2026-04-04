@@ -1381,8 +1381,9 @@ function App() {
       // Chat routing is only for user input from ChatView UI, not command cards
       
       if (cmd.command && cmd.command.trim().length > 0) {
-        // Execute command directly in terminal
-        termRef.sendCommand(cmd.command, cmd.delay);
+        // Execute command directly in terminal, passing macro fields so
+        // post-launch payload injection fires automatically (e.g. workflow enforcement).
+        termRef.sendCommand(cmd.command, cmd.delay, cmd.macro_payload, cmd.macro_delay);
         termRef.focus();
       } else {
         // Focus terminal even if command is empty

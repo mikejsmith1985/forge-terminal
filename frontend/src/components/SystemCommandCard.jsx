@@ -47,6 +47,9 @@ const SystemCommandCard = ({ card, onExecuteCommand, onToast, onConfigureCard })
         command: card.command,
         description: card.name,
         triggerAM: card.triggerAM || false,
+        // Pass macro fields so the execution path can inject the post-launch payload
+        macro_payload: card.macro_payload || '',
+        macro_delay: card.macro_delay || 1500,
       });
     }
   }, [card, onExecuteCommand, onToast]);
