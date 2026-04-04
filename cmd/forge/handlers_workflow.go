@@ -7,8 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/mikejsmith1985/forge-terminal/internal/tutor"
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
+)
+
+var (
+	workflowWatchers   = make(map[string]*tutor.Watcher)
+	workflowWatchersMu sync.Mutex
 )
 
 // ─── Workflow: Project Detection ─────────────────────────────────────────────
@@ -324,4 +332,119 @@ func readWorkflowConfig(projectPath string) (workflow.WorkflowConfig, error) {
 	}
 
 	return config, nil
+}
+
+// ─── Workflow: File-Change Watcher ──────────────────────────────────────────
+
+// handleWorkflowWatchStart starts a file-change watcher for a project path.
+func handleWorkflowWatchStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var requestBody struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil || strings.TrimSpace(requestBody.Path) == "" {
+		http.Error(w, "path is required", http.StatusBadRequest)
+		return
+	}
+
+	projectPath := requestBody.Path
+
+	workflowWatchersMu.Lock()
+	defer workflowWatchersMu.Unlock()
+
+	// If a watcher already exists for this path, return success without creating a new one
+	if existingWatcher, alreadyExists := workflowWatchers[projectPath]; alreadyExists && existingWatcher.IsActive() {
+		log.Printf("[Workflow Watch API] Watcher already active for path: %s", projectPath)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"active": true,
+			"path":   projectPath,
+		})
+		return
+	}
+
+	watcher := tutor.NewWatcher(projectPath, "workflow-watcher")
+	if err := watcher.Start(); err != nil {
+		log.Printf("[Workflow Watch API] Failed to start watcher for %s: %v", projectPath, err)
+		http.Error(w, "failed to start watcher: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	workflowWatchers[projectPath] = watcher
+	log.Printf("[Workflow Watch API] Started watcher for path: %s", projectPath)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"active": true,
+		"path":   projectPath,
+	})
+}
+
+// handleWorkflowWatchStop stops and removes a file-change watcher for a project path.
+func handleWorkflowWatchStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projectPath := r.URL.Query().Get("path")
+	if projectPath == "" {
+		http.Error(w, "query parameter 'path' is required", http.StatusBadRequest)
+		return
+	}
+
+	workflowWatchersMu.Lock()
+	if existingWatcher, exists := workflowWatchers[projectPath]; exists {
+		existingWatcher.Stop()
+		delete(workflowWatchers, projectPath)
+		log.Printf("[Workflow Watch API] Stopped watcher for path: %s", projectPath)
+	}
+	workflowWatchersMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"active": false,
+	})
+}
+
+// handleWorkflowWatchPoll polls for file-change notifications from a workflow watcher.
+func handleWorkflowWatchPoll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projectPath := r.URL.Query().Get("path")
+	if projectPath == "" {
+		http.Error(w, "query parameter 'path' is required", http.StatusBadRequest)
+		return
+	}
+
+	workflowWatchersMu.Lock()
+	watcher, exists := workflowWatchers[projectPath]
+	workflowWatchersMu.Unlock()
+
+	if !exists || !watcher.IsActive() {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]tutor.WatcherNotification{})
+		return
+	}
+
+	// Non-blocking read with 100ms timeout
+	var notifications []tutor.WatcherNotification
+	pollTimeout := time.After(100 * time.Millisecond)
+	for {
+		select {
+		case notification := <-watcher.Notifications():
+			notifications = append(notifications, notification)
+		case <-pollTimeout:
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(notifications)
+			return
+		}
+	}
 }

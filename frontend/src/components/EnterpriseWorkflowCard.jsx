@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
+import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle, Copy, Eye, EyeOff } from 'lucide-react'
 import { useWorkflowSetup } from '../hooks/useWorkflowSetup'
 import WorkflowWizard from './WorkflowWizard'
 import './EnterpriseWorkflowCard.css'
@@ -18,9 +18,18 @@ import './EnterpriseWorkflowCard.css'
 const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [showFindings, setShowFindings] = useState(false)
   const workflow = useWorkflowSetup()
 
-  const { status, compliance, checkStatus, scanCompliance } = workflow
+  const {
+    status,
+    compliance,
+    checkStatus,
+    scanCompliance,
+    watcherNotifications,
+    startWatcher,
+    stopWatcher,
+  } = workflow
 
   // Auto-check status when cwd changes
   useEffect(() => {
@@ -35,6 +44,34 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
       scanCompliance(cwd)
     }
   }, [status?.configured, cwd, scanCompliance])
+
+  // Auto-start watcher when workflow is configured and Code Tutor module is active
+  useEffect(() => {
+    if (status?.configured && cwd) {
+      startWatcher(cwd)
+    }
+
+    return () => {
+      if (cwd) {
+        stopWatcher(cwd)
+      }
+    }
+  }, [status?.configured, cwd, startWatcher, stopWatcher])
+
+  // Show toast notifications when watcher detects file changes
+  useEffect(() => {
+    if (watcherNotifications.length === 0) return
+
+    watcherNotifications.forEach((notification) => {
+      if (onToast) {
+        onToast({
+          type: 'info',
+          title: '📚 Code Tutor',
+          message: notification.message,
+        })
+      }
+    })
+  }, [watcherNotifications, onToast])
 
   const handleRefresh = useCallback(() => {
     if (cwd) {
@@ -120,6 +157,27 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
                   </div>
                 )}
 
+                {/* Findings Detail Toggle */}
+                {compliance?.findings?.length > 0 && (
+                  <>
+                    <button
+                      className="ewc-btn ewc-findings-toggle"
+                      onClick={() => setShowFindings(!showFindings)}
+                    >
+                      {showFindings ? <EyeOff size={14} /> : <Eye size={14} />}
+                      {showFindings ? 'Hide Details' : 'View Details'}
+                    </button>
+
+                    {showFindings && (
+                      <FindingsDetailList
+                        findings={compliance.findings}
+                        onToast={onToast}
+                        compliance={compliance}
+                      />
+                    )}
+                  </>
+                )}
+
                 {/* Action Buttons */}
                 <div className="ewc-actions">
                   <button className="ewc-btn ewc-btn-primary" onClick={handleOpenWizard}>
@@ -185,6 +243,115 @@ function getComplianceBadge(compliance) {
     default:
       return null
   }
+}
+
+/* ─── Level Ordering & Icons ──────────────────────────────────────────────── */
+
+const LEVEL_SORT_ORDER = { violation: 0, warning: 1, passing: 2 }
+const MAX_VISIBLE_FINDINGS = 50
+
+function getLevelIcon(level) {
+  switch (level) {
+    case 'warning':   return <span className="ewc-level-icon warning" title="Warning">⚠</span>
+    case 'violation':  return <span className="ewc-level-icon violation" title="Violation">✗</span>
+    case 'passing':    return <span className="ewc-level-icon passing" title="Passing">✓</span>
+    default:           return null
+  }
+}
+
+/**
+ * Sort findings: warnings first, then violations, then passing.
+ * Within each group, preserve original order.
+ */
+function sortFindingsByLevel(findings) {
+  return [...findings].sort((findingA, findingB) => {
+    const orderA = LEVEL_SORT_ORDER[findingA.level] ?? 99
+    const orderB = LEVEL_SORT_ORDER[findingB.level] ?? 99
+    return orderA - orderB
+  })
+}
+
+/**
+ * Build a plain-text compliance report suitable for clipboard.
+ */
+function buildComplianceReport(compliance) {
+  const reportLines = [
+    `Compliance Report — ${compliance.scannedAt || 'Unknown date'}`,
+    `Status: ${compliance.status}`,
+    `Total rules: ${compliance.totalRules}  |  Passing: ${compliance.passing}  |  Warnings: ${compliance.warnings}  |  Violations: ${compliance.violations}`,
+    '',
+    '--- Findings ---',
+  ]
+
+  const sortedFindings = sortFindingsByLevel(compliance.findings || [])
+  for (const finding of sortedFindings) {
+    const locationLabel = finding.filePath ? `${finding.filePath}:${finding.line}` : ''
+    reportLines.push(
+      `[${finding.level?.toUpperCase()}] ${finding.rule}`,
+      `  ${locationLabel}`,
+      `  ${finding.message}`,
+      finding.suggestion ? `  ↳ ${finding.suggestion}` : '',
+      ''
+    )
+  }
+
+  return reportLines.join('\n')
+}
+
+/**
+ * FindingsDetailList — Scrollable list of compliance findings with copy-to-clipboard.
+ */
+function FindingsDetailList({ findings, onToast, compliance }) {
+  const sortedFindings = sortFindingsByLevel(findings)
+  const visibleFindings = sortedFindings.slice(0, MAX_VISIBLE_FINDINGS)
+  const remainingCount = sortedFindings.length - visibleFindings.length
+
+  const handleCopyReport = useCallback(async () => {
+    try {
+      const reportText = buildComplianceReport(compliance)
+      await navigator.clipboard.writeText(reportText)
+      if (onToast) {
+        onToast('Compliance report copied to clipboard', 'success')
+      }
+    } catch (clipboardError) {
+      console.error('Failed to copy compliance report:', clipboardError)
+      if (onToast) {
+        onToast('Failed to copy report', 'error')
+      }
+    }
+  }, [compliance, onToast])
+
+  return (
+    <div className="ewc-findings-section">
+      <div className="ewc-findings-list">
+        {visibleFindings.map((finding, findingIndex) => (
+          <div key={`${finding.rule}-${finding.filePath}-${finding.line}-${findingIndex}`} className={`ewc-finding-item level-${finding.level}`}>
+            <div className="ewc-finding-header">
+              {getLevelIcon(finding.level)}
+              <span className="ewc-finding-rule">{finding.rule}</span>
+            </div>
+            {finding.filePath && (
+              <div className="ewc-finding-location">
+                {finding.filePath}{finding.line != null ? `:${finding.line}` : ''}
+              </div>
+            )}
+            <div className="ewc-finding-message">{finding.message}</div>
+            {finding.suggestion && (
+              <div className="ewc-finding-suggestion">↳ {finding.suggestion}</div>
+            )}
+          </div>
+        ))}
+        {remainingCount > 0 && (
+          <div className="ewc-findings-more">
+            and {remainingCount} more…
+          </div>
+        )}
+      </div>
+      <button className="ewc-btn ewc-copy-btn" onClick={handleCopyReport} title="Copy compliance report to clipboard">
+        <Copy size={14} /> Copy Report
+      </button>
+    </div>
+  )
 }
 
 export default EnterpriseWorkflowCard

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { API_CONFIG } from '../config'
 
 const AUTH_TOKEN_KEY = 'forge-auth-token'
@@ -84,6 +84,12 @@ export function useWorkflowSetup() {
   const [isDetecting, setIsDetecting] = useState(false)
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [isApplying, setIsApplying] = useState(false)
+
+  // Watcher state
+  const [watcherNotifications, setWatcherNotifications] = useState([])
+  const [isWatcherActive, setIsWatcherActive] = useState(false)
+  const watcherPollRef = useRef(null)
+  const watcherPathRef = useRef(null)
 
   // Error handling
   const [error, setError] = useState(null)
@@ -309,6 +315,104 @@ export function useWorkflowSetup() {
     }
   }, [setErrorWithAutoDismiss])
 
+  /**
+   * Start a file-change watcher for the given project path.
+   */
+  const startWatcher = useCallback(async (projectPath) => {
+    if (!projectPath) return
+    try {
+      const watcherResponse = await workflowFetch('/api/workflow/watch', {
+        method: 'POST',
+        body: JSON.stringify({ path: projectPath }),
+      })
+      if (watcherResponse.active) {
+        setIsWatcherActive(true)
+        watcherPathRef.current = projectPath
+      }
+      return watcherResponse
+    } catch (fetchError) {
+      console.error('Failed to start workflow watcher:', fetchError)
+      return null
+    }
+  }, [])
+
+  /**
+   * Stop the file-change watcher for the given project path.
+   */
+  const stopWatcher = useCallback(async (projectPath) => {
+    if (!projectPath) return
+    try {
+      await workflowFetch(`/api/workflow/watch/stop?path=${encodeURIComponent(projectPath)}`, {
+        method: 'DELETE',
+      })
+    } catch (fetchError) {
+      console.error('Failed to stop workflow watcher:', fetchError)
+    }
+    setIsWatcherActive(false)
+    watcherPathRef.current = null
+  }, [])
+
+  /**
+   * Dismiss a specific watcher notification by its index.
+   */
+  const dismissWatcherNotification = useCallback((notificationIndex) => {
+    setWatcherNotifications(previousNotifications =>
+      previousNotifications.filter((_, currentIndex) => currentIndex !== notificationIndex)
+    )
+  }, [])
+
+  // Poll for watcher notifications every 3 seconds when watcher is active
+  useEffect(() => {
+    if (!isWatcherActive || !watcherPathRef.current) {
+      if (watcherPollRef.current) {
+        clearInterval(watcherPollRef.current)
+        watcherPollRef.current = null
+      }
+      return
+    }
+
+    const pollPath = watcherPathRef.current
+
+    const pollForNotifications = async () => {
+      try {
+        const polledNotifications = await workflowFetch(
+          `/api/workflow/watch/poll?path=${encodeURIComponent(pollPath)}`
+        )
+        if (Array.isArray(polledNotifications) && polledNotifications.length > 0) {
+          setWatcherNotifications(previousNotifications => [
+            ...previousNotifications,
+            ...polledNotifications,
+          ])
+        }
+      } catch (fetchError) {
+        console.error('Watcher poll failed:', fetchError)
+      }
+    }
+
+    watcherPollRef.current = setInterval(pollForNotifications, 3000)
+
+    return () => {
+      if (watcherPollRef.current) {
+        clearInterval(watcherPollRef.current)
+        watcherPollRef.current = null
+      }
+    }
+  }, [isWatcherActive])
+
+  // Clean up watcher on unmount
+  useEffect(() => {
+    return () => {
+      if (watcherPollRef.current) {
+        clearInterval(watcherPollRef.current)
+      }
+      if (watcherPathRef.current) {
+        workflowFetch(`/api/workflow/watch/stop?path=${encodeURIComponent(watcherPathRef.current)}`, {
+          method: 'DELETE',
+        }).catch(() => {})
+      }
+    }
+  }, [])
+
   const clearError = useCallback(() => setError(null), [])
 
   /**
@@ -339,6 +443,8 @@ export function useWorkflowSetup() {
     isPreviewing,
     isApplying,
     error,
+    watcherNotifications,
+    isWatcherActive,
     detect,
     loadPresets,
     loadModules,
@@ -354,6 +460,9 @@ export function useWorkflowSetup() {
     scanCompliance,
     clearError,
     reset,
+    startWatcher,
+    stopWatcher,
+    dismissWatcherNotification,
   }
 }
 

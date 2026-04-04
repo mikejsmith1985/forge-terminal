@@ -197,3 +197,136 @@
   margin: 0 0 12px;
   line-height: 1.5;
 }
+
+/* ─── Findings Detail View ────────────────────────────────────────────────── */
+
+.ewc-findings-toggle {
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--subtext);
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+  padding: 6px 12px;
+}
+.ewc-findings-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.ewc-findings-section {
+  margin-bottom: 10px;
+}
+
+.ewc-findings-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 6px;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Subtle scrollbar styling */
+.ewc-findings-list::-webkit-scrollbar {
+  width: 5px;
+}
+.ewc-findings-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ewc-findings-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.ewc-finding-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid transparent;
+  font-size: 0.73rem;
+  transition: background 0.12s;
+}
+.ewc-finding-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ewc-finding-item.level-warning {
+  border-left-color: #f59e0b;
+}
+.ewc-finding-item.level-violation {
+  border-left-color: #ef4444;
+}
+.ewc-finding-item.level-passing {
+  border-left-color: #10b981;
+}
+
+.ewc-finding-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.ewc-level-icon {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.ewc-level-icon.warning   { color: #f59e0b; }
+.ewc-level-icon.violation { color: #ef4444; }
+.ewc-level-icon.passing   { color: #10b981; }
+
+.ewc-finding-rule {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ewc-finding-location {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.68rem;
+  color: var(--accent, #8b5cf6);
+  margin-bottom: 2px;
+  opacity: 0.85;
+}
+
+.ewc-finding-message {
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+
+.ewc-finding-suggestion {
+  color: var(--subtext);
+  font-style: italic;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+.ewc-findings-more {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--subtext);
+  padding: 8px 0 4px;
+  font-style: italic;
+}
+
+.ewc-copy-btn {
+  width: 100%;
+  justify-content: center;
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--accent, #8b5cf6);
+  font-size: 0.73rem;
+  padding: 6px 12px;
+}
+.ewc-copy-btn:hover {
+  background: rgba(139, 92, 246, 0.2);
+}
