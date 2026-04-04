@@ -231,6 +231,7 @@ func runCLI(ctx context.Context, timeout time.Duration, command string, args []s
 
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	hideExecWindow(cmd) // Prevent CMD window flash on Windows
 
 	output, err := cmd.Output()
 	if err != nil {

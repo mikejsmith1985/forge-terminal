@@ -123,6 +123,7 @@ func runReviewCLI(ctx context.Context, timeout time.Duration, command string, ar
 
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Env = append(os.Environ(), "NO_COLOR=1")
+	hideExecWindow(cmd) // Prevent CMD window flash on Windows
 
 	output, err := cmd.Output()
 	if err != nil {

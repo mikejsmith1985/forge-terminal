@@ -1715,17 +1715,32 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               }
 
               if (msg.type === 'SESSION_JOINED') {
-                logger.terminal('Joined live session (passive device)', { tabId });
-                if (xtermRef.current) {
-                  xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
+                // Mark session as reattached so the "Connected" banner is suppressed.
+                sessionReattachedRef.current = true;
+
+                if (msg.isActiveDevice) {
+                  // Server auto-promoted us because no other device was active.
+                  // Treat this the same as CONTROL_GRANTED — no passive-device banner.
+                  logger.terminal('Joined session as active device (auto-promoted)', { tabId });
+                  clearTimeout(bannerTimerRef.current);
+                  setIsActiveDevice(true);
+                  // Resize PTY to match our current terminal dimensions.
+                  if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+                    const { cols, rows } = xtermRef.current;
+                    wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
+                  }
+                } else {
+                  // A different device is already controlling this session.
+                  // Delay the banner by 600ms: on reconnect the server may send
+                  // SESSION_JOINED before the previous connection's clearActive defer
+                  // fires. If CONTROL_GRANTED arrives in that window we cancel it.
+                  logger.terminal('Joined live session (passive device)', { tabId });
+                  if (xtermRef.current) {
+                    xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
+                  }
+                  clearTimeout(bannerTimerRef.current);
+                  bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 600);
                 }
-                sessionReattachedRef.current = true; // suppress fresh "Connected" banner
-                // Delay the passive-device banner by 600ms. On reconnect, the server may
-                // send SESSION_JOINED before the previous connection fully clears, causing
-                // a phantom banner. If CONTROL_GRANTED arrives within that window (because
-                // clearActiveAndPromote fires for us), we cancel the timer instead.
-                clearTimeout(bannerTimerRef.current);
-                bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 600);
                 return;
               }
 

@@ -187,6 +187,7 @@ func (eth *ExecutiveTriggerHandler) checkSystemProcesses() *ActiveProcessInfo {
 		// Use ps for Unix-like systems
 		cmd = exec.Command("ps", "aux")
 	}
+	hideExecWindow(cmd) // Prevent CMD window flash on Windows
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -476,6 +477,7 @@ func getCwd() string {
 // getGitBranch returns the current git branch name.
 func getGitBranch() string {
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	hideExecWindow(cmd) // Prevent CMD window flash on Windows
 	output, err := cmd.Output()
 	if err != nil {
 		return ""

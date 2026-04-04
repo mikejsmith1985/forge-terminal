@@ -178,6 +178,7 @@ func scanNamingConventions(projectPath string, report *ComplianceReport) {
 func scanBranchNaming(projectPath string, report *ComplianceReport) {
 	branchCommand := exec.Command("git", "branch", "--show-current")
 	branchCommand.Dir = projectPath
+	hideExecWindow(branchCommand) // Prevent CMD window flash on Windows
 	branchOutput, commandError := branchCommand.Output()
 	if commandError != nil {
 		report.Findings = append(report.Findings, ComplianceFinding{
@@ -252,6 +253,7 @@ func scanWorkflowConfig(projectPath string, report *ComplianceReport) {
 func scanGitHooksInstalled(projectPath string, report *ComplianceReport) {
 	hookConfigCommand := exec.Command("git", "config", "--local", "--get", "core.hooksPath")
 	hookConfigCommand.Dir = projectPath
+	hideExecWindow(hookConfigCommand) // Prevent CMD window flash on Windows
 	hookPathOutput, commandError := hookConfigCommand.Output()
 
 	if commandError != nil {
