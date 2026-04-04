@@ -85,9 +85,10 @@ class ErrorBoundary extends React.Component {
               An unexpected error occurred. Please try reloading the application.
             </p>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {/* Always show error details — production errors must be debuggable */}
+            {this.state.error && (
               <details style={styles.details}>
-                <summary style={styles.summary}>Error Details (Dev Only)</summary>
+                <summary style={styles.summary}>Error Details</summary>
                 <pre style={styles.pre}>
                   {this.state.error.toString()}
                   {'\n\n'}

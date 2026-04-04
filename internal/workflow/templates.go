@@ -192,6 +192,13 @@ var workflowJSONTemplate = `{
     "auditNaming": {{.TutorSettings.AuditNaming}},
     "auditComments": {{.TutorSettings.AuditComments}}
   },
+  "prReviewSettings": {
+    "strategy": "{{.PRReviewSettings.Strategy}}",
+    "autoTrigger": {{.PRReviewSettings.AutoTrigger}},
+    "requireChangelog": {{.PRReviewSettings.RequireChangelog}},
+    "agentStrictness": "{{.PRReviewSettings.AgentStrictness}}",
+    "agentFocusAreas": [{{range $i, $a := .PRReviewSettings.AgentFocusAreas}}{{if $i}}, {{end}}"{{$a}}"{{end}}]
+  },
   "appliedAt": "{{now}}"
 }
 `

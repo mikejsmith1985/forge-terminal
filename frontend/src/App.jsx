@@ -256,9 +256,9 @@ function App() {
     openSettings: () => setIsSettingsModalOpen(true),
     closeSettings: () => setIsSettingsModalOpen(false),
 
-    // Legacy router config(kept for compatibility)
-    openRouterConfig: () => setIsRouterConfigOpen(true),
-    closeRouterConfig: () => setIsRouterConfigOpen(false),
+    // Legacy router config — removed feature, kept as no-ops for tour compatibility
+    openRouterConfig: () => {},
+    closeRouterConfig: () => {},
   }), [tabs, createTab, closeTab]);
 
   // Guided Tour for first-run experience

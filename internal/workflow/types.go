@@ -178,6 +178,7 @@ type WorkflowConfig struct {
 	ProjectName      string               `json:"projectName"`
 	ProjectType      ProjectType          `json:"projectType"`
 	TutorSettings    TutorWorkflowConfig  `json:"tutorSettings"`
+	PRReviewSettings PRReviewConfig       `json:"prReviewSettings"`
 }
 
 // TutorWorkflowConfig holds tutor-specific settings within the workflow.
@@ -186,6 +187,35 @@ type TutorWorkflowConfig struct {
 	DefaultDepth     string `json:"defaultDepth"`     // "brief", "standard", "deep"
 	AuditNaming      bool   `json:"auditNaming"`      // Flag naming violations in explanations
 	AuditComments    bool   `json:"auditComments"`    // Flag missing comments in explanations
+}
+
+// PRReviewStrategy determines how pull requests are reviewed in this project.
+type PRReviewStrategy string
+
+const (
+	// PRReviewManual means the user reviews diffs themselves with no AI assistance.
+	PRReviewManual PRReviewStrategy = "manual"
+
+	// PRReviewTutor triggers Code Tutor to auto-explain each changed file when a PR
+	// is created or updated, with toast notifications and streaming explanations.
+	PRReviewTutor PRReviewStrategy = "tutor"
+
+	// PRReviewAgent runs a dedicated Quality Agent persona that analyzes the diff
+	// and posts structured findings (naming, complexity, test coverage, architecture).
+	PRReviewAgent PRReviewStrategy = "agent"
+
+	// PRReviewTutorAndAgent combines both: Code Tutor explains changes to the user
+	// while the Quality Agent performs an automated code review in parallel.
+	PRReviewTutorAndAgent PRReviewStrategy = "tutor-and-agent"
+)
+
+// PRReviewConfig holds settings for how PRs are reviewed in this project.
+type PRReviewConfig struct {
+	Strategy          PRReviewStrategy `json:"strategy"`          // How PRs get reviewed
+	AutoTrigger       bool             `json:"autoTrigger"`       // Trigger review automatically on PR create/update
+	RequireChangelog  bool             `json:"requireChangelog"`  // CHANGELOG must be updated in every PR
+	AgentStrictness   string           `json:"agentStrictness"`   // "lenient", "standard", "strict"
+	AgentFocusAreas   []string         `json:"agentFocusAreas"`   // e.g. ["naming", "complexity", "tests", "architecture", "security"]
 }
 
 // HasModule reports whether the given module is enabled in this config.
@@ -222,6 +252,13 @@ func DefaultConfig() WorkflowConfig {
 			DefaultDepth: "standard",
 			AuditNaming:  true,
 			AuditComments: true,
+		},
+		PRReviewSettings: PRReviewConfig{
+			Strategy:         PRReviewTutorAndAgent,
+			AutoTrigger:      true,
+			RequireChangelog: true,
+			AgentStrictness:  "standard",
+			AgentFocusAreas:  []string{"naming", "complexity", "tests", "architecture", "security"},
 		},
 	}
 }
