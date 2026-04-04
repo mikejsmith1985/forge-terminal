@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
@@ -563,13 +563,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
-  // Tracks whether xterm.js has been re-fit after this tab became active.
-  // Initialized to TRUE so brand-new terminals (isVisible=true on first mount)
-  // are immediately visible — xterm hasn't initialized yet when the effect
-  // first fires, so we must not hold them at opacity:0. The false→true
-  // hide-fit-reveal sequence only runs on tab *switches*, where xterm is
-  // already initialized and the canvas may be stale-sized.
-  const [isFitReady, setIsFitReady] = useState(true);
   const [isActiveDevice, setIsActiveDevice] = useState(true); // Handoff: this device controls PTY dimensions
   const isActiveDeviceRef = useRef(true);
   // Debounce timer for SESSION_JOINED → prevents a brief phantom "another device is
@@ -696,36 +689,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     }
   }, [visionEnabled, tabId]);
 
-  // Hide-fit-reveal sequence: when a previously-hidden tab becomes active,
-  // hold opacity:0 until xterm re-fits its canvas to the (correctly-sized)
-  // container, then fade in. This eliminates the "outline flicker" that
-  // occurred when the stale-sized canvas was exposed before fit() ran.
-  //
-  // We use requestAnimationFrame instead of setTimeout because:
-  //   - visibility:hidden keeps the container sized, so no arbitrary delay needed
-  //   - rAF fires just before the next browser paint, guaranteeing the DOM is
-  //     committed and the container is measurable before fit() runs
-  //
-  // isFitReady starts TRUE so new terminals (isVisible=true on mount, xterm not
-  // yet initialized) appear immediately without being caught in the hide phase.
-  useEffect(() => {
+  // Refit terminal when becoming visible using useLayoutEffect.
+  // useLayoutEffect fires after React commits DOM mutations but BEFORE the
+  // browser paints. Calling fit() here resizes the xterm canvas to the
+  // container's correct dimensions before the user ever sees the frame —
+  // eliminating the "outline flicker" that occurred when fit() ran after
+  // paint via setTimeout or requestAnimationFrame.
+  useLayoutEffect(() => {
     if (isVisible && fitAddonRef.current && xtermRef.current) {
-      // Tab switch: xterm IS initialized, canvas may be stale — run hide-fit-reveal.
-      setIsFitReady(false);
-      requestAnimationFrame(() => {
-        if (fitAddonRef.current && xtermRef.current) {
-          fitAddonRef.current.fit();
-          setIsFitReady(true);
-          queueMicrotask(() => {
-            if (xtermRef.current) {
-              xtermRef.current.focus();
-            }
-          });
-        }
-      });
-    } else if (!isVisible) {
-      // Reset so the next activation starts at opacity:0 until re-fit completes.
-      setIsFitReady(false);
+      fitAddonRef.current.fit();
+      xtermRef.current.focus();
     }
   }, [isVisible]);
 
@@ -2137,18 +2110,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`terminal-outer-container ${className || ''}`}
-      style={{
-        ...(style || {}),
-        // Hold opacity:0 while awaiting re-fit on tab activation, then fade
-        // in via CSS transition once xterm.js has resized its canvas. Without
-        // this, the stale-sized canvas is briefly exposed and flickers.
-        opacity: isVisible && !isFitReady ? 0 : 1,
-        transition: isFitReady ? 'opacity 0.06s ease' : 'none',
-      }}
-    >
+    <div ref={containerRef} className={`terminal-outer-container ${className || ''}`} style={style}>
       {/* Connection Status Indicator */}
       {!isConnected && (
         <div className="terminal-connection-overlay">

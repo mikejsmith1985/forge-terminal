@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Enterprise workflow initialized with Forge Terminal Workflow Architect
+- 6 new Go tests for session detach/reattach lifecycle (`session_reconnect_test.go`)
 
 ### Changed
 
 ### Fixed
-- New terminals opening blank: `isFitReady` state now initializes to `true` so brand-new terminals (visible on first mount before xterm initializes) are not held at `opacity:0` indefinitely
-- Tab-switch flicker regression: replaced `setTimeout(50ms)` with `requestAnimationFrame` in the hide-fit-reveal sequence; rAF fires just before the next browser paint ensuring the container is measured before `fit()` runs, eliminating the stale-canvas flicker
+- **Tab-switch flicker (root cause fix)**: replaced the `isFitReady` state + rAF + opacity hack with a single `useLayoutEffect` that calls `fit()` synchronously after React's DOM commit but **before** the browser paints — zero extra renders, zero opacity tricks, zero timing hacks
+- **Session recovery NEVER working (critical race condition)**: the disconnect handler was deleting the hub and session from the maps _before_ `detachSession()` stored them, so reconnecting clients always got a brand-new empty hub. Hub and session now stay in the maps during the grace period; only the grace-expiry callback cleans them up. Reconnecting clients find the _existing_ hub with its populated ring buffer and open journal
+- **Orphaned PTY reader goroutine on reconnect**: when a client reconnects to a live session (Priority 1 path), the old handler's reader goroutine was left dangling because `readerDone` was only closed in the reattach path. Now `detachedSessions` state is cleaned up in the watcher-join path too, closing `readerDone` and stopping the orphaned goroutine
+- **Dead-PTY detach cleanup bug**: `detachSession()` was calling `h.hubs.Delete()` then `h.hubs.Load()` (which always missed), silently leaking the hub. Fixed to use `h.hubs.LoadAndDelete()` in a single atomic operation
+- **Scrollback replay ordering**: moved `hub.replayTo()` before `hub.add()` so the client receives all historical output before broadcast can deliver new PTY data, preventing interleaved/out-of-order output on reconnect
 
 ### Removed
 

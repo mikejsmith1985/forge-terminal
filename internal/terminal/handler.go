@@ -193,6 +193,11 @@ func (h *Handler) detachSession(sessionID string, session *TerminalSession, grac
 	if session.IsDone() || session.IsClosed() {
 		log.Printf("[Terminal] Session %s: PTY already exited, closing (not detaching)", sessionID)
 		session.Close()
+		// Clean up maps since nothing to reconnect to
+		if hubRaw, ok := h.hubs.LoadAndDelete(sessionID); ok {
+			hubRaw.(*sessionHub).close()
+		}
+		h.sessions.Delete(sessionID)
 		return
 	}
 
@@ -207,6 +212,14 @@ func (h *Handler) detachSession(sessionID string, session *TerminalSession, grac
 		log.Printf("[Terminal] Session %s: grace period expired after %v, closing PTY",
 			sessionID, gracePeriod)
 		h.detachedSessions.Delete(sessionID)
+		// Grace expired with no reconnect — now clean up the hub and session
+		// from the maps. This is the ONLY place these should be deleted,
+		// ensuring a reconnecting client always finds the existing hub with
+		// its populated ring buffer during the grace window.
+		if hubRaw, ok := h.hubs.LoadAndDelete(sessionID); ok {
+			hubRaw.(*sessionHub).close()
+		}
+		h.sessions.Delete(sessionID)
 		// Close readerDone so the orphaned PTY reader goroutine exits cleanly
 		// instead of blocking on Read() until the PTY error propagates.
 		if readerDone != nil {
@@ -595,6 +608,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[Terminal] Session %s: ring buffer seeded from journal (%d bytes)", sessionID, len(prior))
 		}
 	}
+	// Replay scrollback BEFORE adding to the hub so the client receives all
+	// historical output before any new PTY data arrives via broadcast. Adding
+	// to the hub first would allow broadcast() to race with replayTo(),
+	// interleaving new output with the scrollback.
+	hub.replayTo(conn, websocket.BinaryMessage)
 	hub.add(conn)
 
 	var session *TerminalSession
@@ -609,9 +627,22 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			session = live
 			isWatcher = true
 			log.Printf("[Terminal] Session %s: client joining live session (hub size now %d)", sessionID, hub.size())
-			// Replay recent PTY output so the watcher sees terminal history
-			// instead of a blank screen.
-			hub.replayTo(conn, websocket.BinaryMessage)
+
+			// If this session is also in detachedSessions (the previous handler
+			// disconnected and detached it, but the session is still alive), clean
+			// up the detach state: stop the grace timer and close readerDone so
+			// the orphaned PTY reader goroutine exits. Without this, the old
+			// goroutine keeps reading from the PTY fd, racing with the new one.
+			if dsVal, dsOk := h.detachedSessions.LoadAndDelete(sessionID); dsOk {
+				ds := dsVal.(*DetachedSession)
+				ds.graceTimer.Stop()
+				if ds.readerDone != nil {
+					close(ds.readerDone)
+				}
+				log.Printf("[Terminal] Session %s: cleaned up detached state (client rejoined live session)", sessionID)
+			}
+
+			// Scrollback was already replayed before hub.add() above.
 
 			// If no device currently controls this PTY (previous owner disconnected),
 			// auto-promote this client to active so it can resize and interact fully.
@@ -677,12 +708,19 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.markClosed()
 		hub.remove(conn)
 		hub.clearActiveAndPromote(conn, sessionID) // auto-promote another client if this was the active device
-		// Only clean up the session when the last client leaves.
+		// Only detach the session when the last client leaves.
 		// While any client remains in the hub, the PTY goroutine keeps broadcasting to them.
+		//
+		// CRITICAL: Do NOT delete the hub or session from the maps here.
+		// The reconnecting client (same tabId/sessionID) needs to find the
+		// EXISTING hub with its populated ring buffer and open journal.
+		// If we delete them, the reconnecting handler creates a BRAND NEW hub
+		// with an empty ring buffer, causing the user to see a blank terminal
+		// even though the PTY was successfully reattached.
+		//
+		// Instead, we keep the hub and session in the maps and let the grace
+		// timer clean them up if no client reconnects in time.
 		if hub.size() == 0 {
-			h.hubs.Delete(sessionID)
-			h.sessions.CompareAndDelete(sessionID, session)
-			hub.close() // flush and close the session journal
 			// Extend the grace period when an AI agent is actively running —
 			// the agent may still be working and the user will want to return.
 			effectiveGrace := gracePeriod
