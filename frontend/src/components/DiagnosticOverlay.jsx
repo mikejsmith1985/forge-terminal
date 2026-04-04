@@ -146,13 +146,13 @@ const DiagnosticOverlay = ({ isOpen, onClose, position = 'right' }) => {
     const json = diagnosticCore.exportSession();
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const downloadAnchor = document.createElement('a');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    a.href = url;
-    a.download = `forge-diagnostic-${timestamp}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    downloadAnchor.href = url;
+    downloadAnchor.download = `forge-diagnostic-${timestamp}.json`;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
     URL.revokeObjectURL(url);
   }, []);
 

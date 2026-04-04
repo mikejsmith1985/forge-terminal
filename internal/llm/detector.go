@@ -51,7 +51,7 @@ type Detector struct {
 
 // NewDetector creates a new LLM detector with all supported patterns.
 func NewDetector() *Detector {
-	d := &Detector{
+	detector := &Detector{
 		patterns: []*LLMPattern{
 			// Exact command patterns (highest priority)
 			{
@@ -127,7 +127,7 @@ func NewDetector() *Detector {
 			},
 		},
 	}
-	return d
+	return detector
 }
 
 // DetectCommand analyzes input to determine if it's an LLM command.

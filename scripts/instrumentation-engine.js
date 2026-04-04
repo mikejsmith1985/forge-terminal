@@ -1,6 +1,6 @@
 const recast = require('recast');
-const b = recast.types.builders;
-const n = recast.types.namedTypes;
+const builders = recast.types.builders;
+const namedTypes = recast.types.namedTypes;
 
 class InstrumentationEngine {
     process(code) {
@@ -13,24 +13,24 @@ class InstrumentationEngine {
                 
                 // Capture arguments (only simple identifiers for now)
                 const argValues = node.params
-                    .filter(p => n.Identifier.check(p))
-                    .map(p => b.identifier(p.name));
+                    .filter(p => namedTypes.Identifier.check(p))
+                    .map(p => builders.identifier(p.name));
 
                 // Prepare probe data
-                const probeData = b.objectExpression([
-                    b.property('init', b.identifier('type'), b.literal('ENTRY')),
-                    b.property('init', b.identifier('name'), b.literal(name)),
-                    b.property('init', b.identifier('args'), b.arrayExpression(argValues))
+                const probeData = builders.objectExpression([
+                    builders.property('init', builders.identifier('type'), builders.literal('ENTRY')),
+                    builders.property('init', builders.identifier('name'), builders.literal(name)),
+                    builders.property('init', builders.identifier('args'), builders.arrayExpression(argValues))
                 ]);
 
                 // Create log statement: console.log("[FORGE_PROBE]", JSON.stringify({...}))
-                const logStmt = b.expressionStatement(
-                    b.callExpression(
-                        b.memberExpression(b.identifier('console'), b.identifier('log')),
+                const logStmt = builders.expressionStatement(
+                    builders.callExpression(
+                        builders.memberExpression(builders.identifier('console'), builders.identifier('log')),
                         [
-                            b.literal('[FORGE_PROBE]'),
-                            b.callExpression(
-                                b.memberExpression(b.identifier('JSON'), b.identifier('stringify')),
+                            builders.literal('[FORGE_PROBE]'),
+                            builders.callExpression(
+                                builders.memberExpression(builders.identifier('JSON'), builders.identifier('stringify')),
                                 [probeData]
                             )
                         ]
@@ -38,9 +38,9 @@ class InstrumentationEngine {
                 );
 
                 // Handle Arrow Functions with implicit return
-                if (!n.BlockStatement.check(node.body)) {
-                    node.body = b.blockStatement([
-                        b.returnStatement(node.body)
+                if (!namedTypes.BlockStatement.check(node.body)) {
+                    node.body = builders.blockStatement([
+                        builders.returnStatement(node.body)
                     ]);
                 }
 
@@ -55,51 +55,51 @@ class InstrumentationEngine {
                 
                 // Case 1: Return with value
                 if (node.argument) {
-                    const tempVar = b.identifier('__forge_ret');
+                    const tempVar = builders.identifier('__forge_ret');
                     
                     // const __forge_ret = <expr>;
-                    const decl = b.variableDeclaration('const', [
-                        b.variableDeclarator(tempVar, node.argument)
+                    const decl = builders.variableDeclaration('const', [
+                        builders.variableDeclarator(tempVar, node.argument)
                     ]);
                     
-                    const probeData = b.objectExpression([
-                        b.property('init', b.identifier('type'), b.literal('RETURN')),
-                        b.property('init', b.identifier('value'), tempVar)
+                    const probeData = builders.objectExpression([
+                        builders.property('init', builders.identifier('type'), builders.literal('RETURN')),
+                        builders.property('init', builders.identifier('value'), tempVar)
                     ]);
                     
-                    const logStmt = b.expressionStatement(
-                        b.callExpression(
-                            b.memberExpression(b.identifier('console'), b.identifier('log')),
+                    const logStmt = builders.expressionStatement(
+                        builders.callExpression(
+                            builders.memberExpression(builders.identifier('console'), builders.identifier('log')),
                             [
-                                b.literal('[FORGE_PROBE]'),
-                                b.callExpression(
-                                    b.memberExpression(b.identifier('JSON'), b.identifier('stringify')),
+                                builders.literal('[FORGE_PROBE]'),
+                                builders.callExpression(
+                                    builders.memberExpression(builders.identifier('JSON'), builders.identifier('stringify')),
                                     [probeData]
                                 )
                             ]
                         )
                     );
                     
-                    const newReturn = b.returnStatement(tempVar);
+                    const newReturn = builders.returnStatement(tempVar);
                     
                     // Replace with block: { decl; log; return; }
-                    const block = b.blockStatement([decl, logStmt, newReturn]);
+                    const block = builders.blockStatement([decl, logStmt, newReturn]);
                     path.replace(block);
                 } 
                 // Case 2: Return without value
                 else {
-                    const probeData = b.objectExpression([
-                        b.property('init', b.identifier('type'), b.literal('RETURN')),
-                        b.property('init', b.identifier('value'), b.identifier('undefined'))
+                    const probeData = builders.objectExpression([
+                        builders.property('init', builders.identifier('type'), builders.literal('RETURN')),
+                        builders.property('init', builders.identifier('value'), builders.identifier('undefined'))
                     ]);
                     
-                    const logStmt = b.expressionStatement(
-                        b.callExpression(
-                            b.memberExpression(b.identifier('console'), b.identifier('log')),
+                    const logStmt = builders.expressionStatement(
+                        builders.callExpression(
+                            builders.memberExpression(builders.identifier('console'), builders.identifier('log')),
                             [
-                                b.literal('[FORGE_PROBE]'),
-                                b.callExpression(
-                                    b.memberExpression(b.identifier('JSON'), b.identifier('stringify')),
+                                builders.literal('[FORGE_PROBE]'),
+                                builders.callExpression(
+                                    builders.memberExpression(builders.identifier('JSON'), builders.identifier('stringify')),
                                     [probeData]
                                 )
                             ]
@@ -108,7 +108,7 @@ class InstrumentationEngine {
                     
                     // For void return, just insert log before. 
                     // To be safe against "if(x) return;" -> "if(x) log; return;", we wrap in block too.
-                    const block = b.blockStatement([logStmt, node]);
+                    const block = builders.blockStatement([logStmt, node]);
                     path.replace(block);
                 }
 
@@ -119,34 +119,34 @@ class InstrumentationEngine {
                 const node = path.node;
 
                 // Ensure consequent is a block
-                if (!n.BlockStatement.check(node.consequent)) {
-                    node.consequent = b.blockStatement([node.consequent]);
+                if (!namedTypes.BlockStatement.check(node.consequent)) {
+                    node.consequent = builders.blockStatement([node.consequent]);
                 }
 
                 // Ensure alternate is a block (if exists)
-                if (node.alternate && !n.BlockStatement.check(node.alternate)) {
+                if (node.alternate && !namedTypes.BlockStatement.check(node.alternate)) {
                     // Handle 'else if' carefully - if alternate is IfStatement, don't wrap in block unless we want to recurse?
                     // Standard pattern: if (...) {} else { if (...) {} }
                     // But 'else if' is usually cleaner without block if it's just another If.
                     // However, we want to probe the branch.
                     if (node.alternate.type !== 'IfStatement') {
-                        node.alternate = b.blockStatement([node.alternate]);
+                        node.alternate = builders.blockStatement([node.alternate]);
                     }
                 }
 
                 // Inject probe into consequent
-                const probeData = b.objectExpression([
-                    b.property('init', b.identifier('type'), b.literal('BRANCH')),
-                    b.property('init', b.identifier('location'), b.literal('if-consequent'))
+                const probeData = builders.objectExpression([
+                    builders.property('init', builders.identifier('type'), builders.literal('BRANCH')),
+                    builders.property('init', builders.identifier('location'), builders.literal('if-consequent'))
                 ]);
                 
-                const logStmt = b.expressionStatement(
-                    b.callExpression(
-                        b.memberExpression(b.identifier('console'), b.identifier('log')),
+                const logStmt = builders.expressionStatement(
+                    builders.callExpression(
+                        builders.memberExpression(builders.identifier('console'), builders.identifier('log')),
                         [
-                            b.literal('[FORGE_PROBE]'),
-                            b.callExpression(
-                                b.memberExpression(b.identifier('JSON'), b.identifier('stringify')),
+                            builders.literal('[FORGE_PROBE]'),
+                            builders.callExpression(
+                                builders.memberExpression(builders.identifier('JSON'), builders.identifier('stringify')),
                                 [probeData]
                             )
                         ]
@@ -156,19 +156,19 @@ class InstrumentationEngine {
                 node.consequent.body.unshift(logStmt);
 
                 // Inject probe into alternate if it is a block
-                if (node.alternate && n.BlockStatement.check(node.alternate)) {
-                     const altProbeData = b.objectExpression([
-                        b.property('init', b.identifier('type'), b.literal('BRANCH')),
-                        b.property('init', b.identifier('location'), b.literal('if-alternate'))
+                if (node.alternate && namedTypes.BlockStatement.check(node.alternate)) {
+                     const altProbeData = builders.objectExpression([
+                        builders.property('init', builders.identifier('type'), builders.literal('BRANCH')),
+                        builders.property('init', builders.identifier('location'), builders.literal('if-alternate'))
                     ]);
                     
-                    const altLogStmt = b.expressionStatement(
-                        b.callExpression(
-                            b.memberExpression(b.identifier('console'), b.identifier('log')),
+                    const altLogStmt = builders.expressionStatement(
+                        builders.callExpression(
+                            builders.memberExpression(builders.identifier('console'), builders.identifier('log')),
                             [
-                                b.literal('[FORGE_PROBE]'),
-                                b.callExpression(
-                                    b.memberExpression(b.identifier('JSON'), b.identifier('stringify')),
+                                builders.literal('[FORGE_PROBE]'),
+                                builders.callExpression(
+                                    builders.memberExpression(builders.identifier('JSON'), builders.identifier('stringify')),
                                     [altProbeData]
                                 )
                             ]
@@ -191,15 +191,15 @@ class InstrumentationEngine {
 
         // Helper to identify probe logs
         function isProbeLog(node) {
-            return n.ExpressionStatement.check(node) &&
-                   n.CallExpression.check(node.expression) &&
-                   n.MemberExpression.check(node.expression.callee) &&
-                   n.Identifier.check(node.expression.callee.object) &&
+            return namedTypes.ExpressionStatement.check(node) &&
+                   namedTypes.CallExpression.check(node.expression) &&
+                   namedTypes.MemberExpression.check(node.expression.callee) &&
+                   namedTypes.Identifier.check(node.expression.callee.object) &&
                    node.expression.callee.object.name === 'console' &&
-                   n.Identifier.check(node.expression.callee.property) &&
+                   namedTypes.Identifier.check(node.expression.callee.property) &&
                    node.expression.callee.property.name === 'log' &&
                    node.expression.arguments.length > 0 &&
-                   n.Literal.check(node.expression.arguments[0]) &&
+                   namedTypes.Literal.check(node.expression.arguments[0]) &&
                    node.expression.arguments[0].value === '[FORGE_PROBE]';
         }
 
@@ -218,9 +218,9 @@ class InstrumentationEngine {
 
                     // 2. Handle Return Capture Reversion
                     // Pattern: const __forge_ret = ...; (optional logs); return __forge_ret;
-                    if (n.VariableDeclaration.check(stmt) &&
+                    if (namedTypes.VariableDeclaration.check(stmt) &&
                         stmt.declarations.length === 1 &&
-                        n.Identifier.check(stmt.declarations[0].id) &&
+                        namedTypes.Identifier.check(stmt.declarations[0].id) &&
                         stmt.declarations[0].id.name === '__forge_ret') {
                         
                         const init = stmt.declarations[0].init;
@@ -234,8 +234,8 @@ class InstrumentationEngine {
                             const next = node.body[j];
                             
                             // Found the return?
-                            if (n.ReturnStatement.check(next) &&
-                                n.Identifier.check(next.argument) &&
+                            if (namedTypes.ReturnStatement.check(next) &&
+                                namedTypes.Identifier.check(next.argument) &&
                                 next.argument.name === '__forge_ret') {
                                 foundReturn = next;
                                 break;
@@ -252,7 +252,7 @@ class InstrumentationEngine {
 
                         if (validPattern && foundReturn) {
                             // Restore original return
-                            newBody.push(b.returnStatement(init));
+                            newBody.push(builders.returnStatement(init));
                             i = j; // Advance past the return
                             continue;
                         }

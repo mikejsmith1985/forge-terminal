@@ -306,9 +306,9 @@ func (fd *FreezeDetector) checkAlerts(m FreezeMetrics) {
 }
 
 func (fd *FreezeDetector) captureAllGoroutines() string {
-	buf := make([]byte, 1024*1024) // 1MB buffer
-	n := runtime.Stack(buf, true)  // true = all goroutines
-	return string(buf[:n])
+	buf := make([]byte, 1024*1024)      // 1MB buffer
+	stackSize := runtime.Stack(buf, true) // true = all goroutines
+	return string(buf[:stackSize])
 }
 
 func (fd *FreezeDetector) logLine(format string, args ...interface{}) {
@@ -384,8 +384,8 @@ func (fd *FreezeDetector) GetCurrentMetrics() FreezeMetrics {
 // GetGoroutineProfile returns a summary of goroutine states.
 func (fd *FreezeDetector) GetGoroutineProfile() map[string]int {
 	buf := make([]byte, 1024*1024)
-	n := runtime.Stack(buf, true)
-	stacks := string(buf[:n])
+	stackSize := runtime.Stack(buf, true)
+	stacks := string(buf[:stackSize])
 
 	profile := make(map[string]int)
 

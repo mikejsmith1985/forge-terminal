@@ -78,12 +78,12 @@ export default function ImageViewer({
 
   const handleDownload = () => {
     if (imageUrl) {
-      const a = document.createElement('a');
-      a.href = imageUrl;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = imageUrl;
+      downloadAnchor.download = file.name;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
     }
   };
 

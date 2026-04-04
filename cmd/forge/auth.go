@@ -17,9 +17,9 @@ func SetAuthToken(token string) {
 
 // GenerateToken generates a cryptographically secure random token.
 func GenerateToken() string {
-	b := make([]byte, 24)
-	_, _ = rand.Read(b)
-	return base64.URLEncoding.EncodeToString(b)
+	tokenBytes := make([]byte, 24)
+	_, _ = rand.Read(tokenBytes)
+	return base64.URLEncoding.EncodeToString(tokenBytes)
 }
 
 // AuthMiddleware protects routes with token-based authentication.

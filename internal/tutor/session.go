@@ -41,8 +41,8 @@ func NewSessionManager() *SessionManager {
 
 // sessionID returns a deterministic ID for a project path (first 12 hex chars of SHA-256).
 func sessionID(projectPath string) string {
-	h := sha256.Sum256([]byte(projectPath))
-	return fmt.Sprintf("%x", h[:6]) // 6 bytes = 12 hex chars
+	hash := sha256.Sum256([]byte(projectPath))
+	return fmt.Sprintf("%x", hash[:6]) // 6 bytes = 12 hex chars
 }
 
 // CreateSession creates a new tutor session or resumes an existing one for the given project.

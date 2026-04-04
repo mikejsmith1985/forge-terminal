@@ -207,18 +207,18 @@ func (cl *ConfigLoader) BuildCommand(tier ModelTier, ctx *ExecutionContext) stri
 }
 
 // escapeForShell escapes special characters for safe shell command injection.
-func escapeForShell(s string) string {
+func escapeForShell(input string) string {
 	// Escape backslashes first
-	s = strings.ReplaceAll(s, "\\", "\\\\")
+	input = strings.ReplaceAll(input, "\\", "\\\\")
 	// Escape double quotes
-	s = strings.ReplaceAll(s, "\"", "\\\"")
+	input = strings.ReplaceAll(input, "\"", "\\\"")
 	// Escape backticks
-	s = strings.ReplaceAll(s, "`", "\\`")
+	input = strings.ReplaceAll(input, "`", "\\`")
 	// Escape dollar signs (prevent variable expansion)
-	s = strings.ReplaceAll(s, "$", "\\$")
+	input = strings.ReplaceAll(input, "$", "\\$")
 	// Escape exclamation marks (bash history expansion)
-	s = strings.ReplaceAll(s, "!", "\\!")
-	return s
+	input = strings.ReplaceAll(input, "!", "\\!")
+	return input
 }
 
 // Global config loader instance

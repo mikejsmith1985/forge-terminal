@@ -676,7 +676,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		conn.markClosed()
 		hub.remove(conn)
-		hub.clearActive(conn) // prevent stale active pointer after remove
+		hub.clearActiveAndPromote(conn, sessionID) // auto-promote another client if this was the active device
 		// Only clean up the session when the last client leaves.
 		// While any client remains in the hub, the PTY goroutine keeps broadcasting to them.
 		if hub.size() == 0 {

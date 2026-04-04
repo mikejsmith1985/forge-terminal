@@ -173,12 +173,12 @@ export const diagnosticMode = {
       try {
         const blob = new Blob([reportJSON], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = url;
+        downloadAnchor.download = filename;
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        document.body.removeChild(downloadAnchor);
         URL.revokeObjectURL(url);
         
         print(`\n✓ Spacebar debug report saved to: ${filename}`);

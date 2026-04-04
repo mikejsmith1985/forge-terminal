@@ -36,16 +36,16 @@ func humanizeTime(t time.Time) string {
 	if t.IsZero() {
 		return "unknown"
 	}
-	d := time.Since(t)
+	elapsed := time.Since(t)
 	switch {
-	case d < time.Minute:
+	case elapsed < time.Minute:
 		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	case d < 7*24*time.Hour:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	case elapsed < time.Hour:
+		return fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
+	case elapsed < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(elapsed.Hours()))
+	case elapsed < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(elapsed.Hours()/24))
 	default:
 		return t.Format("Jan 2")
 	}

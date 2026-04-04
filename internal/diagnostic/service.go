@@ -65,7 +65,7 @@ func NewService() *Service {
 	homeDir, _ := os.UserHomeDir()
 	forgeDir := filepath.Join(homeDir, ".forge")
 	
-	s := &Service{
+	svc := &Service{
 		sessionID:      generateSessionID(),
 		startTime:      time.Now(),
 		events:         make([]DiagnosticEvent, 0, 500),
@@ -76,12 +76,12 @@ func NewService() *Service {
 	}
 
 	// Ensure diagnostics directory exists
-	if err := os.MkdirAll(s.diagnosticsDir, 0755); err != nil {
+	if err := os.MkdirAll(svc.diagnosticsDir, 0755); err != nil {
 		log.Printf("[Diagnostic] Failed to create diagnostics dir: %v", err)
 	}
 
-	log.Printf("[Diagnostic] Service initialized - session: %s", s.sessionID)
-	return s
+	log.Printf("[Diagnostic] Service initialized - session: %s", svc.sessionID)
+	return svc
 }
 
 // RecordEvent records a diagnostic event.
@@ -250,12 +250,12 @@ func generateSessionID() string {
 
 func randomString(n int) string {
 	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[time.Now().UnixNano()%int64(len(letters))]
+	buf := make([]byte, n)
+	for i := range buf {
+		buf[i] = letters[time.Now().UnixNano()%int64(len(letters))]
 		time.Sleep(time.Nanosecond)
 	}
-	return string(b)
+	return string(buf)
 }
 
 func contains(s, substr string) bool {

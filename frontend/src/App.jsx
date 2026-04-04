@@ -880,11 +880,45 @@ function App() {
         }
       }
 
+      // --- App-level shortcuts (fire before the xterm early-return) ---
+      // Using { capture: true } on the listener means this handler runs in
+      // the capture phase, before xterm's own keydown listeners. Calling
+      // stopPropagation() here prevents xterm from also processing the key
+      // (which would otherwise send unwanted control codes to the PTY).
+
+      // Ctrl+Shift+H: Toggle History Slider
+      if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsHistorySliderOpen(prev => !prev);
+        return;
+      }
+
+      // Ctrl+Shift+T: Toggle Code Tutor (desktop only)
+      if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isCompact) setIsTutorOpen(prev => !prev);
+        return;
+      }
+
+      // Ctrl+End: Scroll to bottom (safe — not a shell binding)
+      if (e.ctrlKey && e.key === 'End') {
+        e.preventDefault();
+        e.stopPropagation();
+        const termRef = getActiveTerminalRef();
+        if (termRef && termRef.scrollToBottom) {
+          termRef.scrollToBottom();
+        }
+        return;
+      }
+
       // CRITICAL: Check if this is xterm's helper textarea FIRST
-      // xterm-helper-textarea must be allowed to handle ALL keys
+      // All remaining keys (typing, Ctrl+C/V, Ctrl+T, etc.) must pass
+      // through to xterm when the terminal has keyboard focus.
       const isXtermTextarea = e.target?.classList?.contains('xterm-helper-textarea');
       if (isXtermTextarea) {
-        return; // Let xterm handle ALL keys natively
+        return; // Let xterm handle ALL remaining keys natively
       }
       
       // Skip keyboard shortcuts when user is typing in input fields
@@ -919,30 +953,6 @@ function App() {
       if (e.ctrlKey && !e.shiftKey && e.key === '/') {
         e.preventDefault();
         if (!isCompact) setIsForgeAssistOpen(prev => !prev);
-        return;
-      }
-      
-      // Ctrl+Shift+H: Toggle History Slider
-      if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
-        e.preventDefault();
-        setIsHistorySliderOpen(prev => !prev);
-        return;
-      }
-
-      // Ctrl+Shift+T: Toggle Code Tutor (desktop only)
-      if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
-        e.preventDefault();
-        if (!isCompact) setIsTutorOpen(prev => !prev);
-        return;
-      }
-      
-      // Ctrl+End: Scroll to bottom
-      if (e.ctrlKey && e.key === 'End') {
-        e.preventDefault();
-        const termRef = getActiveTerminalRef();
-        if (termRef && termRef.scrollToBottom) {
-          termRef.scrollToBottom();
-        }
         return;
       }
 
@@ -998,8 +1008,11 @@ function App() {
       */
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // capture: true ensures this handler fires before xterm's listeners,
+    // which is required for app shortcuts (Ctrl+Shift+T etc.) to intercept
+    // key events before xterm processes them.
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [versionReady, commands, tabs, activeTabId, closeTab, switchTab, getActiveTerminalRef]);
 
   // Handle new tab creation

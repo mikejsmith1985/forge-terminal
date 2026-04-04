@@ -142,9 +142,9 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 
 	// Weekly commits (last 7 days, grouped by day-of-week)
 	for i := 6; i >= 0; i-- {
-		d := time.Now().AddDate(0, 0, -i)
-		dateStr := d.Format("2006-01-02")
-		label := d.Format("Mon")
+		date := time.Now().AddDate(0, 0, -i)
+		dateStr := date.Format("2006-01-02")
+		label := date.Format("Mon")
 		if out, err := gitCmd("log", "--oneline", "--after="+dateStr+" 00:00:00", "--before="+dateStr+" 23:59:59").Output(); err == nil {
 			lines := strings.TrimSpace(string(out))
 			if lines != "" {

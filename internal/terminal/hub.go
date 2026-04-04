@@ -222,6 +222,41 @@ func (h *sessionHub) clearActive(cw *connWriter) {
 	h.mu.Unlock()
 }
 
+// clearActiveAndPromote removes the active device if it matches the given
+// connection, then auto-promotes another client in the hub to active and
+// sends it CONTROL_GRANTED. This handles the common reconnect pattern where
+// the old connection hasn't closed before the new one joins: once the old
+// connection finally disconnects, the new connection receives active status
+// automatically without requiring the user to click "Take Control".
+func (h *sessionHub) clearActiveAndPromote(cw *connWriter, sessionID string) {
+	h.mu.Lock()
+	if h.activeConn != cw {
+		h.mu.Unlock()
+		return // cw was not the active device — nothing to promote
+	}
+	h.activeConn = nil
+
+	// Pick any remaining client as the new active device.
+	// cw has already been removed from h.clients via hub.remove() before this call.
+	var candidate *connWriter
+	for c := range h.clients {
+		candidate = c
+		break
+	}
+	if candidate != nil {
+		h.activeConn = candidate
+	}
+	h.mu.Unlock()
+
+	if candidate != nil {
+		_ = candidate.WriteMessage(websocket.TextMessage, mustJSON(map[string]any{
+			"type":      "CONTROL_GRANTED",
+			"sessionId": sessionID,
+		}))
+		log.Printf("[Hub] Session %s: auto-promoted %p to active after active device disconnected", sessionID, candidate)
+	}
+}
+
 // close flushes and closes the session journal (if any). Call this once the
 // hub is removed from the handler's hubs map and no more broadcasts will occur.
 func (h *sessionHub) close() {

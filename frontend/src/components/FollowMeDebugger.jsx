@@ -97,8 +97,8 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     eventsRef.current.push({
       type: 'click',
       timestamp: Date.now() - startTimeRef.current,
-      x: e.clientX,
-      y: e.clientY,
+      clientX: e.clientX,
+      clientY: e.clientY,
       button: e.button,
       target: {
         tagName: e.target.tagName,
@@ -116,8 +116,8 @@ const FollowMeDebugger = ({ onSessionComplete }) => {
     eventsRef.current.push({
       type: 'mousemove',
       timestamp: now - startTimeRef.current,
-      x: e.clientX,
-      y: e.clientY,
+      clientX: e.clientX,
+      clientY: e.clientY,
     });
   }, []);
 

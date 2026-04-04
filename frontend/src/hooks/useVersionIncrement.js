@@ -33,9 +33,9 @@ export function useVersionIncrement() {
    * @returns {string} - New version
    */
   const incrementMajor = (currentVersion) => {
-    const v = parseVersion(currentVersion);
+    const parsed = parseVersion(currentVersion);
     return formatVersion({
-      major: v.major + 1,
+      major: parsed.major + 1,
       minor: 0,
       fix: 0,
     });
@@ -47,10 +47,10 @@ export function useVersionIncrement() {
    * @returns {string} - New version
    */
   const incrementMinor = (currentVersion) => {
-    const v = parseVersion(currentVersion);
+    const parsed = parseVersion(currentVersion);
     return formatVersion({
-      major: v.major,
-      minor: v.minor + 1,
+      major: parsed.major,
+      minor: parsed.minor + 1,
       fix: 0,
     });
   };
@@ -61,11 +61,11 @@ export function useVersionIncrement() {
    * @returns {string} - New version
    */
   const incrementFix = (currentVersion) => {
-    const v = parseVersion(currentVersion);
+    const parsed = parseVersion(currentVersion);
     return formatVersion({
-      major: v.major,
-      minor: v.minor,
-      fix: v.fix + 1,
+      major: parsed.major,
+      minor: parsed.minor,
+      fix: parsed.fix + 1,
     });
   };
 
@@ -76,12 +76,12 @@ export function useVersionIncrement() {
    * @returns {string} - Release type description
    */
   const getReleaseType = (from, to) => {
-    const f = parseVersion(from);
-    const t = parseVersion(to);
+    const fromParsed = parseVersion(from);
+    const toParsed = parseVersion(to);
 
-    if (t.major > f.major) return 'MAJOR (Breaking Changes)';
-    if (t.minor > f.minor) return 'MINOR (New Features)';
-    if (t.fix > f.fix) return 'PATCH (Bug Fix)';
+    if (toParsed.major > fromParsed.major) return 'MAJOR (Breaking Changes)';
+    if (toParsed.minor > fromParsed.minor) return 'MINOR (New Features)';
+    if (toParsed.fix > fromParsed.fix) return 'PATCH (Bug Fix)';
     return 'SAME';
   };
 

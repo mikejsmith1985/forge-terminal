@@ -86,7 +86,7 @@ const SessionRecoveryBanner = ({
   }
 
   const recoverableSessions = sessions.filter(
-    s => s.status === 'crashed' || s.status === 'active'
+    session => session.status === 'crashed' || session.status === 'active'
   );
 
   if (recoverableSessions.length === 0) {

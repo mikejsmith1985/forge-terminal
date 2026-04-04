@@ -21,9 +21,9 @@ const statusColor = (s) => {
 const fmtUptime = (sec) => {
   if (sec < 60) return `${Math.round(sec)}s`;
   if (sec < 3600) return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  return `${h}h ${m}m`;
+  const hours = Math.floor(sec / 3600);
+  const minutes = Math.floor((sec % 3600) / 60);
+  return `${hours}h ${minutes}m`;
 };
 
 const fetchWithTimeout = async (url, timeoutMs = 5000) => {

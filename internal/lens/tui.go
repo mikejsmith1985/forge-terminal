@@ -111,13 +111,13 @@ func NewHeatmapTUILens(rootPath string) *HeatmapTUILens {
 	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(selectedColor)
 	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(selectedColor)
 
-	l := list.New(items, delegate, 40, 15)
-	l.SetShowTitle(false)
-	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(true)
+	fileList := list.New(items, delegate, 40, 15)
+	fileList.SetShowTitle(false)
+	fileList.SetShowStatusBar(false)
+	fileList.SetFilteringEnabled(true)
 
 	return &HeatmapTUILens{
-		list:  l,
+		list:  fileList,
 		files: files,
 	}
 }
@@ -265,13 +265,13 @@ func NewSearchTUILens(rootPath string) *SearchTUILens {
 	}
 
 	delegate := list.NewDefaultDelegate()
-	l := list.New(items, delegate, 40, 15)
-	l.SetShowTitle(false)
-	l.SetFilteringEnabled(true)
-	l.SetShowStatusBar(false)
+	fileList := list.New(items, delegate, 40, 15)
+	fileList.SetShowTitle(false)
+	fileList.SetFilteringEnabled(true)
+	fileList.SetShowStatusBar(false)
 
 	return &SearchTUILens{
-		list:  l,
+		list:  fileList,
 		files: files,
 	}
 }

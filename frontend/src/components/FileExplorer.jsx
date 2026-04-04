@@ -307,8 +307,8 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
   
   const handleContextMenu = (node, event) => {
     setContextMenu({
-      x: event.clientX,
-      y: event.clientY,
+      clientX: event.clientX,
+      clientY: event.clientY,
       node
     });
   };
@@ -413,8 +413,8 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
       
       {contextMenu && (
         <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
+          clientX={contextMenu.clientX}
+          clientY={contextMenu.clientY}
           node={contextMenu.node}
           onClose={() => setContextMenu(null)}
           onAction={handleContextAction}

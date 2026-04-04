@@ -140,8 +140,8 @@ func HandleGoroutines(w http.ResponseWriter, r *http.Request) {
 	if full {
 		// Capture full stack traces (WARNING: can be large)
 		buf := make([]byte, 1024*1024)
-		n := runtime.Stack(buf, true)
-		response["stacks"] = string(buf[:n])
+		stackSize := runtime.Stack(buf, true)
+		response["stacks"] = string(buf[:stackSize])
 	}
 
 	json.NewEncoder(w).Encode(response)

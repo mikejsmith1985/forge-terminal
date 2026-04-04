@@ -565,6 +565,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [reconnecting, setReconnecting] = useState(false);
   const [isActiveDevice, setIsActiveDevice] = useState(true); // Handoff: this device controls PTY dimensions
   const isActiveDeviceRef = useRef(true);
+  // Debounce timer for SESSION_JOINED → prevents a brief phantom "another device is
+  // controlling" banner that flashes when this tab reconnects. The server may send
+  // SESSION_JOINED (isActiveDevice: false) before the previous connection's clearActive
+  // defer has run. If CONTROL_GRANTED arrives within 600ms we cancel the timer so the
+  // banner never appears.
+  const bannerTimerRef = useRef(null);
   
   // PERF FIX: Track isWaiting in ref to avoid stale closures in hot paths
   const isWaitingRef = useRef(false);
@@ -1519,6 +1525,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         return false; // Prevent xterm from sending ^V to the PTY
       }
 
+      // App-level shortcuts are intercepted by App.jsx's capture-phase window listener.
+      // Returning false here ensures xterm doesn't also send the corresponding control
+      // characters to the PTY if the key event somehow reaches this handler.
+      if (arg.ctrlKey && arg.shiftKey && arg.type === 'keydown') {
+        if (arg.code === 'KeyT' || arg.code === 'KeyH') {
+          return false;
+        }
+      }
+
       return true; // Let all other keys pass through standard xterm processing
     });
 
@@ -1713,7 +1728,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
                 }
                 sessionReattachedRef.current = true; // suppress fresh "Connected" banner
-                setIsActiveDevice(false);
+                // Delay the passive-device banner by 600ms. On reconnect, the server may
+                // send SESSION_JOINED before the previous connection fully clears, causing
+                // a phantom banner. If CONTROL_GRANTED arrives within that window (because
+                // clearActiveAndPromote fires for us), we cancel the timer instead.
+                clearTimeout(bannerTimerRef.current);
+                bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 600);
                 return;
               }
 
@@ -1727,6 +1747,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               // Handoff: this device is now the active device
               if (msg.type === 'CONTROL_GRANTED') {
                 logger.terminal('Control granted to this device', { tabId });
+                // Cancel any pending SESSION_JOINED banner timer — we're the active
+                // device, so no passive-device overlay should appear.
+                clearTimeout(bannerTimerRef.current);
                 setIsActiveDevice(true);
                 // Resize PTY to match this device's terminal dimensions
                 if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
@@ -1921,44 +1944,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
       // Handle terminal input — uses wsRef.current to always reference the LIVE WebSocket.
       // Previously captured the `ws` closure variable, which broke after reconnection.
-      term.onData((data) => {
-        // v3.16.14: Log backspace to diagnose TUI issues
-        if (data === '\x7f' || data === '\x08') {
-          console.log('[Terminal] onData backspace:', data === '\x7f' ? '\\x7f (DEL)' : '\\x08 (BS)');
-        }
-        
-        // PERF FIX: Only record diagnostics when explicitly enabled
-        if (diagnosticCore.isEnabled()) {
-          diagnosticCore.recordTerminalData(data);
-        }
-
-        const activeWs = wsRef.current;
-        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
-          activeWs.send(data);
-          
-          // Clear waiting state when user types (they're responding to the prompt)
-          // PERF FIX: Use ref instead of state to avoid stale closure
-          if (isWaitingRef.current) {
-            isWaitingRef.current = false;
-            setIsWaiting(false);
-            if (onWaitingChange) {
-              onWaitingChange(false);
-            }
-            logger.terminal('Waiting state cleared by user input', { tabId });
-          }
-        }
-      });
-
-      // Handle terminal resize — uses wsRef.current for same reason as onData above.
-      // Only send resize when this device is active (handoff model).
-      term.onResize(({ cols, rows }) => {
-        if (!isActiveDeviceRef.current) return; // passive device — don't resize PTY
-        const activeWs = wsRef.current;
-        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
-          activeWs.send(JSON.stringify({ type: 'resize', cols, rows }));
-        }
-      });
-      
+      //
+      // NOTE: These handlers are registered OUTSIDE connectWebSocket (see below) so that
+      // reconnection calls do not stack duplicate listeners on the same xterm instance.
       return ws;
     };
 
@@ -1967,6 +1955,45 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // Initial connection
     connectWebSocket();
+
+    // Register input/resize handlers ONCE on the xterm instance.
+    // These intentionally live outside connectWebSocket so that reconnection
+    // calls do not accumulate duplicate listeners — which was the root cause
+    // of the double-typing bug (each reconnect added a new onData listener
+    // while the previous ones remained active on the same term instance).
+    // Both handlers use refs (wsRef, isActiveDeviceRef) so they always
+    // reference the current WebSocket regardless of reconnections.
+    const onDataDisposable = term.onData((data) => {
+      if (data === '\x7f' || data === '\x08') {
+        console.log('[Terminal] onData backspace:', data === '\x7f' ? '\\x7f (DEL)' : '\\x08 (BS)');
+      }
+
+      if (diagnosticCore.isEnabled()) {
+        diagnosticCore.recordTerminalData(data);
+      }
+
+      const activeWs = wsRef.current;
+      if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+        activeWs.send(data);
+
+        if (isWaitingRef.current) {
+          isWaitingRef.current = false;
+          setIsWaiting(false);
+          if (onWaitingChange) {
+            onWaitingChange(false);
+          }
+          logger.terminal('Waiting state cleared by user input', { tabId });
+        }
+      }
+    });
+
+    const onResizeDisposable = term.onResize(({ cols, rows }) => {
+      if (!isActiveDeviceRef.current) return; // passive device — don't resize PTY
+      const activeWs = wsRef.current;
+      if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+        activeWs.send(JSON.stringify({ type: 'resize', cols, rows }));
+      }
+    });
 
     // Detect tab visibility changes to catch dead connections faster.
     // When a browser tab is hidden, WebSocket connections can silently die
@@ -2051,6 +2078,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         reconnectTimeoutRef.current = null;
       }
 
+      // Dispose xterm input/resize listeners (registered once above connectWebSocket)
+      onDataDisposable.dispose();
+      onResizeDisposable.dispose();
+      clearTimeout(bannerTimerRef.current);
+
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Signal that this is an intentional unmount, not a connectivity issue.
         // The onclose handler checks this to suppress reconnection attempts.
@@ -2070,8 +2102,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const handleScrollToBottom = () => {
     if (xtermRef.current) {
       xtermRef.current.scrollToBottom();
-      setShowScrollButton(false);
     }
+    // Belt-and-suspenders: scroll the xterm DOM viewport directly.
+    // xterm's scrollToBottom() can silently no-op when its internal buffer
+    // cursor is already at the last line (common during streaming output),
+    // leaving the DOM viewport scrollTop stale. Forcing scrollTop here is
+    // always reliable regardless of xterm's internal state.
+    const viewport = terminalRef.current?.querySelector('.xterm-viewport');
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
+    // Do NOT call setShowScrollButton(false) here — let checkScrollPosition
+    // confirm the scroll actually reached the bottom before hiding the button.
+    // This prevents the button from disappearing when the scroll silently failed.
   };
 
   return (

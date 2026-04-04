@@ -46,8 +46,8 @@ const getHeatColor = (score) => {
 // Humanize time difference
 const humanizeTime = (date) => {
   if (!date) return 'unknown';
-  const d = new Date(date);
-  const diff = Date.now() - d.getTime();
+  const parsedDate = new Date(date);
+  const diff = Date.now() - parsedDate.getTime();
   const mins = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
@@ -168,10 +168,10 @@ const SearchLens = ({ files, selectedPaths, onToggle, onOpen }) => {
 
   const filteredFiles = useMemo(() => {
     if (!query.trim()) return files;
-    const q = query.toLowerCase();
+    const queryLower = query.toLowerCase();
     return files.filter(f => 
-      f.name.toLowerCase().includes(q) || 
-      f.path.toLowerCase().includes(q)
+      f.name.toLowerCase().includes(queryLower) || 
+      f.path.toLowerCase().includes(queryLower)
     );
   }, [files, query]);
 
