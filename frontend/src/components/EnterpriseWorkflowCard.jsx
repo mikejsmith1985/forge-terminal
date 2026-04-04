@@ -58,17 +58,14 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
     }
   }, [status?.configured, cwd, startWatcher, stopWatcher])
 
-  // Show toast notifications when watcher detects file changes
+  // Show toast notifications when watcher detects file changes.
+  // addToast() expects (message: string, type: string, duration: number) — NOT an object.
   useEffect(() => {
     if (watcherNotifications.length === 0) return
 
     watcherNotifications.forEach((notification) => {
       if (onToast) {
-        onToast({
-          type: 'info',
-          title: '📚 Code Tutor',
-          message: notification.message,
-        })
+        onToast(`📚 Code Tutor: ${notification.message}`, 'info', 5000)
       }
     })
   }, [watcherNotifications, onToast])
