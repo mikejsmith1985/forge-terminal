@@ -1744,6 +1744,7 @@ function App() {
               cwd={activeTab?.currentDirectory}
               directoryCardVisible={directoryCardVisible}
               onHideDirectoryCard={handleHideDirectoryCard}
+              onOpenTutor={() => setIsTutorOpen(true)}
             />
           </DndContext>
         ) : sidebarView === 'files' ? (

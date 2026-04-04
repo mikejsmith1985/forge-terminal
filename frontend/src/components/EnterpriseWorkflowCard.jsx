@@ -14,8 +14,9 @@ import './EnterpriseWorkflowCard.css'
  * @param {Function} props.onExecuteCommand - Send a command to the terminal
  * @param {Function} props.onToast - Show a toast notification
  * @param {string} props.cwd - Current working directory (project path)
+ * @param {Function} props.onOpenTutor - Opens the Code Tutor panel (called when user clicks a notification toast)
  */
-const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
+const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor }) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [showFindings, setShowFindings] = useState(false)
@@ -29,6 +30,7 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
     watcherNotifications,
     startWatcher,
     stopWatcher,
+    clearWatcherNotifications,
   } = workflow
 
   // Auto-check status when cwd changes
@@ -58,17 +60,29 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
     }
   }, [status?.configured, cwd, startWatcher, stopWatcher])
 
-  // Show toast notifications when watcher detects file changes.
-  // addToast() expects (message: string, type: string, duration: number) — NOT an object.
+  // Show toast notifications when the watcher detects file changes, then immediately
+  // clear the queue so the same notifications aren't re-shown on the next render.
+  // The "Open Tutor" action button lets the user jump directly into Code Tutor.
   useEffect(() => {
     if (watcherNotifications.length === 0) return
 
     watcherNotifications.forEach((notification) => {
       if (onToast) {
-        onToast(`📚 Code Tutor: ${notification.message}`, 'info', 5000)
+        onToast(
+          `📚 Code Tutor: ${notification.message}`,
+          'info',
+          8000, // Extended duration — user needs time to read and decide whether to click
+          {
+            action: 'Open Tutor',
+            onAction: onOpenTutor, // Opens the Code Tutor panel when clicked
+          }
+        )
       }
     })
-  }, [watcherNotifications, onToast])
+
+    // Flush the queue atomically so these notifications aren't shown again
+    clearWatcherNotifications()
+  }, [watcherNotifications, onToast, onOpenTutor, clearWatcherNotifications])
 
   const handleRefresh = useCallback(() => {
     if (cwd) {

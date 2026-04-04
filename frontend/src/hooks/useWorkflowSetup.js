@@ -361,6 +361,15 @@ export function useWorkflowSetup() {
     )
   }, [])
 
+  /**
+   * Clear all pending watcher notifications at once.
+   * Used by EnterpriseWorkflowCard after converting notifications to toasts,
+   * to prevent the same notifications from being re-shown on the next render.
+   */
+  const clearWatcherNotifications = useCallback(() => {
+    setWatcherNotifications([])
+  }, [])
+
   // Poll for watcher notifications every 3 seconds when watcher is active
   useEffect(() => {
     if (!isWatcherActive || !watcherPathRef.current) {
@@ -463,6 +472,7 @@ export function useWorkflowSetup() {
     startWatcher,
     stopWatcher,
     dismissWatcherNotification,
+    clearWatcherNotifications,
   }
 }
 

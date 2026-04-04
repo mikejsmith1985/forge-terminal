@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PRReviewPanel component** (`frontend/src/components/PRReviewPanel.jsx`): Full quality review results UI with score gauge, severity badges, collapsible finding cards, and filter tabs
 - **usePRReview hook** (`frontend/src/hooks/usePRReview.js`): React hook for submitting diffs to `/api/review/analyze` and managing report state
 - **Copilot Coding Agent Setup module** (`ModuleCopilotAgentSetup`): New workflow module that generates `.github/copilot/setup-steps.yml` — pre-installs project dependencies in the GitHub Copilot coding agent environment before it writes code or runs tests. Template is project-type-aware (Go, Node, Python, Rust, Java, .NET, generic)
+- **Code Tutor notification toast action button**: File-change notification toasts now include an **"Open Tutor"** button that opens the Code Tutor panel directly. Previously the toasts appeared but had no clickable action
 
 ### Changed
 
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Blank popup windows on ribbon tab switch and workflow apply (Windows)**: `configureGitHooks()` in `internal/workflow/scaffold.go` was calling `exec.Command("git", "config", ...)` without `CREATE_NO_WINDOW`, creating a visible CMD flash every time workflow changes were applied. Added platform-specific `hideExecWindow()` helper (`proc_windows.go` / `proc_unix.go`) to the workflow package and applied it to the git config call
 - **Blank popup windows when ForgeAssist uses Copilot/Claude CLI**: `streamViaCopilotCLI()` and `streamViaClaudeCLI()` in `handlers_chat.go` were missing `hideWindow(cmd)` calls, causing CMD window flashes on Windows whenever the chat system invoked external CLI tools
 - **Blank popup window on self-restart (Windows)**: `restartSelf()` in `main.go` Windows branch was missing `hideWindow(cmd)` before starting the new process
+- **Code Tutor notifications: clicking does nothing**: Three bugs combined — (1) `EnterpriseWorkflowCard` never passed `action`/`onAction` to `addToast()`, so there was no button to click; (2) the `useEffect` re-fired on every new notification, re-showing ALL previously received notifications again as duplicates; (3) no `clearWatcherNotifications()` function existed to atomically flush the queue. Fixed by: adding `clearWatcherNotifications()` to `useWorkflowSetup`, wiring `onOpenTutor` prop through `App → CommandCards → EnterpriseWorkflowCard`, and passing `{ action: 'Open Tutor', onAction: onOpenTutor }` to `addToast()`
 
 ### Removed
 
