@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- New terminals opening blank: `isFitReady` state now initializes to `true` so brand-new terminals (visible on first mount before xterm initializes) are not held at `opacity:0` indefinitely
+- Tab-switch flicker regression: replaced `setTimeout(50ms)` with `requestAnimationFrame` in the hide-fit-reveal sequence; rAF fires just before the next browser paint ensuring the container is measured before `fit()` runs, eliminating the stale-canvas flicker
 
 ### Removed
 

@@ -564,10 +564,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   // Tracks whether xterm.js has been re-fit after this tab became active.
-  // We hold opacity:0 on the container until fit() completes to prevent the
-  // "outline flicker" caused by the canvas being a stale size during the
-  // 50ms delay before fit() runs.
-  const [isFitReady, setIsFitReady] = useState(false);
+  // Initialized to TRUE so brand-new terminals (isVisible=true on first mount)
+  // are immediately visible — xterm hasn't initialized yet when the effect
+  // first fires, so we must not hold them at opacity:0. The false→true
+  // hide-fit-reveal sequence only runs on tab *switches*, where xterm is
+  // already initialized and the canvas may be stale-sized.
+  const [isFitReady, setIsFitReady] = useState(true);
   const [isActiveDevice, setIsActiveDevice] = useState(true); // Handoff: this device controls PTY dimensions
   const isActiveDeviceRef = useRef(true);
   // Debounce timer for SESSION_JOINED → prevents a brief phantom "another device is
@@ -694,15 +696,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     }
   }, [visionEnabled, tabId]);
 
-  // Refit terminal when becoming visible, using a hide-fit-reveal sequence.
-  // We set isFitReady=false (opacity:0) before waiting, then call fit(), then
-  // set isFitReady=true (opacity:1 with a short CSS transition). This eliminates
-  // the "outline flicker" that occurred when the xterm canvas was visible but
-  // still at its stale size during the 50ms delay before fit() ran.
+  // Hide-fit-reveal sequence: when a previously-hidden tab becomes active,
+  // hold opacity:0 until xterm re-fits its canvas to the (correctly-sized)
+  // container, then fade in. This eliminates the "outline flicker" that
+  // occurred when the stale-sized canvas was exposed before fit() ran.
+  //
+  // We use requestAnimationFrame instead of setTimeout because:
+  //   - visibility:hidden keeps the container sized, so no arbitrary delay needed
+  //   - rAF fires just before the next browser paint, guaranteeing the DOM is
+  //     committed and the container is measurable before fit() runs
+  //
+  // isFitReady starts TRUE so new terminals (isVisible=true on mount, xterm not
+  // yet initialized) appear immediately without being caught in the hide phase.
   useEffect(() => {
     if (isVisible && fitAddonRef.current && xtermRef.current) {
+      // Tab switch: xterm IS initialized, canvas may be stale — run hide-fit-reveal.
       setIsFitReady(false);
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         if (fitAddonRef.current && xtermRef.current) {
           fitAddonRef.current.fit();
           setIsFitReady(true);
@@ -712,9 +722,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           });
         }
-      }, 50);
+      });
     } else if (!isVisible) {
-      // Reset so the next activation starts hidden until re-fit.
+      // Reset so the next activation starts at opacity:0 until re-fit completes.
       setIsFitReady(false);
     }
   }, [isVisible]);
