@@ -524,6 +524,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   assistantEnabled = false, // Forge Assistant panel enabled (Dev Mode)
   isAgentMode = false, // New prop: Agent Mode (full screen chat)
   onToast = null, // Optional toast callback for user-visible errors
+  showHandoffBanner = true, // When false (desktop), suppresses the "Another device controls" overlay
 }, ref) {
   const terminalRef = useRef(null);
   const containerRef = useRef(null);
@@ -2217,8 +2218,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }}
       />
 
-      {/* Handoff overlay: shown when another device controls this terminal */}
-      {!isActiveDevice && isConnected && (
+      {/* Handoff overlay: shown when another device controls this terminal (mobile only) */}
+      {!isActiveDevice && isConnected && showHandoffBanner && (
         <div
           style={{
             position: 'absolute',

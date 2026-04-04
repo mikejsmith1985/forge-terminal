@@ -1938,6 +1938,7 @@ function App() {
                     onFeedbackClick={() => setIsFeedbackModalOpen(true)}
                     onTerminalCommand={queryModelTier}
                     onRoutingUpdate={handleRoutingUpdate}
+                    showHandoffBanner={isCompact}
                   />
                   )}
                 </div>

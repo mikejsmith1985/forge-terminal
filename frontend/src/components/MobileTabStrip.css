@@ -35,6 +35,7 @@
   min-height: 44px;
   min-width: 70px;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* ensures taps fire immediately; prevents scroll container from stealing the gesture */
 }
 
 .mobile-tab.active {
@@ -81,6 +82,7 @@
   cursor: pointer;
   flex-shrink: 0;
   font-size: 18px;
+  touch-action: manipulation; /* immediate tap response on mobile */
 }
 
 .mobile-new-tab:active {

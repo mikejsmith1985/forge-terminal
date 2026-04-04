@@ -17,6 +17,11 @@ export function MobileTabStrip({ tabs, activeTabId, onTabSelect, onTabClose, onN
     onTabSelect(tabId)
   }
 
+  const handleTabTouch = (e, tabId) => {
+    e.preventDefault() // prevents the 300ms click delay and stops scroll container from stealing the tap
+    handleTabClick(tabId)
+  }
+
   return (
     <div className="mobile-tab-strip" ref={scrollRef}>
       <div className="mobile-tab-list">
@@ -26,6 +31,7 @@ export function MobileTabStrip({ tabs, activeTabId, onTabSelect, onTabClose, onN
             <div
               key={tab.id}
               className={`mobile-tab ${isActive ? 'active' : ''}`}
+              onTouchEnd={(e) => handleTabTouch(e, tab.id)}
               onClick={() => handleTabClick(tab.id)}
             >
               <span className="mobile-tab-label">{tab.label}</span>
