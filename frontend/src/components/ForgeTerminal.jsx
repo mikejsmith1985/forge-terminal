@@ -563,6 +563,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  // Tracks whether xterm.js has been re-fit after this tab became active.
+  // We hold opacity:0 on the container until fit() completes to prevent the
+  // "outline flicker" caused by the canvas being a stale size during the
+  // 50ms delay before fit() runs.
+  const [isFitReady, setIsFitReady] = useState(false);
   const [isActiveDevice, setIsActiveDevice] = useState(true); // Handoff: this device controls PTY dimensions
   const isActiveDeviceRef = useRef(true);
   // Debounce timer for SESSION_JOINED → prevents a brief phantom "another device is
@@ -689,17 +694,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     }
   }, [visionEnabled, tabId]);
 
-  // Refit terminal when becoming visible
-  // v3.17.11: SIMPLIFIED - reverted to v3.16.6 approach
-  // The complex hide-fit-reveal logic was needed for display:none transitions
-  // but we've reverted to visibility:hidden which doesn't need that complexity
+  // Refit terminal when becoming visible, using a hide-fit-reveal sequence.
+  // We set isFitReady=false (opacity:0) before waiting, then call fit(), then
+  // set isFitReady=true (opacity:1 with a short CSS transition). This eliminates
+  // the "outline flicker" that occurred when the xterm canvas was visible but
+  // still at its stale size during the 50ms delay before fit() ran.
   useEffect(() => {
     if (isVisible && fitAddonRef.current && xtermRef.current) {
-      // Small delay to ensure the container is properly sized
+      setIsFitReady(false);
       setTimeout(() => {
         if (fitAddonRef.current && xtermRef.current) {
           fitAddonRef.current.fit();
-          // Critical fix: Re-focus after fit on visibility change
+          setIsFitReady(true);
           queueMicrotask(() => {
             if (xtermRef.current) {
               xtermRef.current.focus();
@@ -707,6 +713,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           });
         }
       }, 50);
+    } else if (!isVisible) {
+      // Reset so the next activation starts hidden until re-fit.
+      setIsFitReady(false);
     }
   }, [isVisible]);
 
@@ -2118,7 +2127,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   };
 
   return (
-    <div ref={containerRef} className={`terminal-outer-container ${className || ''}`} style={style}>
+    <div
+      ref={containerRef}
+      className={`terminal-outer-container ${className || ''}`}
+      style={{
+        ...(style || {}),
+        // Hold opacity:0 while awaiting re-fit on tab activation, then fade
+        // in via CSS transition once xterm.js has resized its canvas. Without
+        // this, the stale-sized canvas is briefly exposed and flickers.
+        opacity: isVisible && !isFitReady ? 0 : 1,
+        transition: isFitReady ? 'opacity 0.06s ease' : 'none',
+      }}
+    >
       {/* Connection Status Indicator */}
       {!isConnected && (
         <div className="terminal-connection-overlay">
