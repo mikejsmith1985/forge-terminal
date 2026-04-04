@@ -1,5 +1,58 @@
 import { describe, it, expect } from 'vitest';
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel } from './projectFolder';
+import { extractProjectFolder, extractProjectRootPath, getTabTitle, isStaticNamingStrategy, getShellLabel } from './projectFolder';
+
+describe('extractProjectRootPath', () => {
+  it('trims a deep Windows path to project-root level', () => {
+    expect(extractProjectRootPath('C:\\ProjectsWin\\forge-terminal\\internal\\commands', 'ProjectsWin'))
+      .toBe('C:\\ProjectsWin\\forge-terminal');
+  });
+
+  it('returns the project root unchanged when already at root level', () => {
+    expect(extractProjectRootPath('C:\\ProjectsWin\\forge-terminal', 'ProjectsWin'))
+      .toBe('C:\\ProjectsWin\\forge-terminal');
+  });
+
+  it('trims a deep path inside node_modules to project root', () => {
+    expect(extractProjectRootPath('C:\\ProjectsWin\\forge-terminal\\node_modules\\.bin\\invoke', 'ProjectsWin'))
+      .toBe('C:\\ProjectsWin\\forge-terminal');
+  });
+
+  it('trims a deep Unix path to project-root level', () => {
+    expect(extractProjectRootPath('/home/user/repos/my-app/src/components', 'repos'))
+      .toBe('/home/user/repos/my-app');
+  });
+
+  it('is case-insensitive for rootFolder', () => {
+    expect(extractProjectRootPath('C:\\projectswin\\My-Project\\deep\\path', 'ProjectsWin'))
+      .toBe('C:\\projectswin\\My-Project');
+  });
+
+  it('returns null when rootFolder is not configured', () => {
+    expect(extractProjectRootPath('C:\\ProjectsWin\\forge-terminal\\src', '')).toBeNull();
+    expect(extractProjectRootPath('C:\\ProjectsWin\\forge-terminal\\src', null)).toBeNull();
+    expect(extractProjectRootPath('C:\\ProjectsWin\\forge-terminal\\src')).toBeNull();
+  });
+
+  it('returns null when rootFolder is not found in the path', () => {
+    expect(extractProjectRootPath('/home/user/projects/app/src', 'ProjectsWin')).toBeNull();
+  });
+
+  it('returns null for empty or invalid rawPath', () => {
+    expect(extractProjectRootPath('', 'ProjectsWin')).toBeNull();
+    expect(extractProjectRootPath(null, 'ProjectsWin')).toBeNull();
+    expect(extractProjectRootPath(undefined, 'ProjectsWin')).toBeNull();
+  });
+
+  it('returns null when rootFolder has no child in the path', () => {
+    // Path ends at the rootFolder itself — no project child present
+    expect(extractProjectRootPath('C:\\ProjectsWin', 'ProjectsWin')).toBeNull();
+  });
+
+  it('handles mixed separators gracefully', () => {
+    expect(extractProjectRootPath('C:/ProjectsWin/forge-terminal/src/utils', 'ProjectsWin'))
+      .toBe('C:\\ProjectsWin\\forge-terminal');
+  });
+});
 
 describe('extractProjectFolder', () => {
   it('returns project name from deep ProjectsWin path when rootFolder is provided', () => {

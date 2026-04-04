@@ -42,7 +42,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy } from './utils/projectFolder'
+import { extractProjectFolder, extractProjectRootPath, getTabTitle, isStaticNamingStrategy } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
@@ -1019,11 +1019,17 @@ function App() {
   const handleNewTab = useCallback((options = {}) => {
     logger.tabs('New tab button clicked', options);
 
-    // Inherit the active tab's working directory so the new tab opens in the
-    // same workspace rather than falling back to the server's process CWD.
     const activeTab = tabs.find(t => t.id === activeTabId);
-    const inheritedDir = activeTab?.currentDirectory || null;
-    
+    const rawDir = activeTab?.currentDirectory || null;
+
+    // Trim the inherited CWD to the project-root level (first child of the
+    // configured root folder) so the new tab doesn't open inside whatever deep
+    // subdirectory the current tab happens to be in — e.g. avoid inheriting
+    // "C:\ProjectsWin\forge-terminal\node_modules\.bin\invoke".
+    // If no rootFolder is configured we pass null so the shell starts at the
+    // server's default working directory instead of a potentially stale path.
+    const inheritedDir = extractProjectRootPath(rawDir, namingRootFolder);
+
     const result = createTab({
       ...shellConfig,
       type: options.type || 'terminal' // 'terminal' or 'agent'

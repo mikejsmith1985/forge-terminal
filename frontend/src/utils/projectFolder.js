@@ -60,6 +60,47 @@ export function isStaticNamingStrategy(strategy) {
 }
 
 /**
+ * Trim a deep filesystem path down to the project-root level.
+ *
+ * When a user creates a new tab, we want it to open in the project's root
+ * directory — not whatever deep subdirectory the current tab happens to be in.
+ * For example: "C:\ProjectsWin\forge-terminal\internal\commands" → "C:\ProjectsWin\forge-terminal"
+ *
+ * Returns null when rootFolder is unconfigured or not found in the path, so
+ * the caller can fall back to the server's default working directory.
+ *
+ * @param {string}      rawPath    - A filesystem path (backslashes or forward slashes).
+ * @param {string}      rootFolder - The projects root directory name (e.g. "ProjectsWin").
+ * @returns {string|null} The project-root path, or null if it cannot be determined.
+ */
+export function extractProjectRootPath(rawPath, rootFolder) {
+  if (!rawPath || typeof rawPath !== 'string') return null;
+  if (!rootFolder || !rootFolder.trim()) return null;
+
+  // Detect Windows paths by backslash presence OR a drive-letter prefix (e.g. "C:/...")
+  const isWindowsPath = rawPath.includes('\\') || /^[A-Za-z]:/.test(rawPath);
+  const separator = isWindowsPath ? '\\' : '/';
+  const parts = rawPath.replace(/\\/g, '/').split('/').filter(Boolean);
+
+  const needle = rootFolder.trim().toLowerCase();
+  const rootFolderIndex = parts.findIndex(part => part.toLowerCase() === needle);
+
+  // rootFolder must exist in the path AND have at least one child segment after it
+  if (rootFolderIndex < 0 || rootFolderIndex + 1 >= parts.length) return null;
+
+  // Keep only up to rootFolder + its immediate child (the project name)
+  const trimmedParts = parts.slice(0, rootFolderIndex + 2);
+
+  // Windows paths start with a drive letter (e.g. "C:") — preserve that format
+  const hasDriveLetter = isWindowsPath && /^[A-Za-z]:$/.test(trimmedParts[0]);
+  if (hasDriveLetter) {
+    return trimmedParts[0] + separator + trimmedParts.slice(1).join(separator);
+  }
+
+  return separator + trimmedParts.join(separator);
+}
+
+/**
  * Derive a tab title from a filesystem path using the requested naming strategy.
  *
  * Strategies:

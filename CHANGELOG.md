@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updated Copilot (Fresh) and Copilot (Resume) command cards**: replaced the old comment-block payload with a real instruction prompt that directs Copilot to read `AGENTS.md` and invoke `skill: workflow-enforcer` before any code work. Macro delay increased to 2000ms for reliability.
 - **Agent Enforcement Explainer in WorkflowWizard**: new `AgentEnforcementExplainer` component rendered in the Review & Apply step (both preview and success states). Shows a 5-step visual chain explaining how a single command card click triggers the full workflow enforcement cascade automatically — no manual steps required.
 
+### Fixed
+- **New tab inherits deep CWD from current tab** (`App.jsx`, `projectFolder.js`): new tabs no longer inherit the active tab's full working directory path. `handleNewTab` now uses the new `extractProjectRootPath()` utility to trim the inherited path to the project-root level (first child of the configured root folder) before passing it to `createTab`. If no root folder is configured, new tabs start at the server's default working directory. Prevents tab names like "invoke" or ".bin" caused by inheriting a deep subdirectory path.
+
 - Enterprise workflow initialized with Forge Terminal Workflow Architect
 - 6 new Go tests for session detach/reattach lifecycle (`session_reconnect_test.go`)
 - **PR Review Strategy** (`internal/review/`, `cmd/forge/handlers_review.go`): Configurable PR review system with 4 strategies — Manual, Code Tutor, Quality Agent, Tutor+Agent. Quality Agent uses LLM model chain to produce structured findings (naming, complexity, tests, architecture, security) with 0–100 quality score
