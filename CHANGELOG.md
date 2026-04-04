@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **New tab inherits deep CWD from current tab** (`App.jsx`, `projectFolder.js`): new tabs no longer inherit the active tab's full working directory path. `handleNewTab` now uses the new `extractProjectRootPath()` utility to trim the inherited path to the project-root level (first child of the configured root folder) before passing it to `createTab`. If no root folder is configured, new tabs start at the server's default working directory. Prevents tab names like "invoke" or ".bin" caused by inheriting a deep subdirectory path.
+- **AI enforcement command cards missing for existing users** (`internal/commands/migration.go`): the three AI workflow enforcement cards (🤖 Copilot Fresh ID 6, 🔄 Copilot Resume ID 7, 🛡️ Copilot Workflow Enforced ID 8) were only seeded on first run. Existing users never received them. `MigrateCommands` now auto-injects any missing enforcement cards and upgrades the stale comment-block `MacroPayload` (e.g. `# SYSTEM INJECTION`) to the real natural-language enforcement prompt — all on the next `GET /api/commands` request, with no user action required.
 
 - Enterprise workflow initialized with Forge Terminal Workflow Architect
 - 6 new Go tests for session detach/reattach lifecycle (`session_reconnect_test.go`)
