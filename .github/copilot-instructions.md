@@ -168,3 +168,101 @@ Example workflow:
 2. Parse response.body for image URLs (user-images.githubusercontent.com, github.com/*/assets/*)
 3. Call web_fetch on each image URL
 4. Describe the images to the user
+
+---
+
+# 8. ENTERPRISE WORKFLOW ENFORCEMENT (Auto-Generated Rules)
+> Source: Enterprise Workflow Architect (Quality Mode: BEST, 11 modules)
+> These rules are ALWAYS ACTIVE. They are not optional. Violations should be self-corrected before delivering any output.
+
+## 8.1 Naming Conventions (MANDATORY)
+
+These are not suggestions — they are requirements. Every variable, function, class, and type name MUST be self-documenting.
+
+1. **NEVER use single-letter variable names** — The only exceptions are:
+   - `i`, `j`, `k` for loop iterators
+   - `w` and `r` for HTTP handler (http.ResponseWriter, *http.Request) parameters
+   - `_` for intentionally unused values
+   - `b` for strings.Builder in template construction
+2. **Boolean names** MUST be prefixed with `is`, `has`, `can`, `should`, or `was`
+   - ✅ `isActive`, `hasPermission`, `canRetry`, `shouldNotify`
+   - ❌ `active`, `permission`, `retry`, `notify`
+3. **Descriptive over clever** — A reader should know a variable's purpose without context:
+   - ✅ `customerLastName`, `connectionTimeout`, `retryAttemptCount`
+   - ❌ `x`, `tmp`, `val`, `data`, `str`
+4. **Function names** MUST be verb-first: `createUser`, `calculateTotal`, `validateInput`
+5. **Constants** use UPPER_SNAKE_CASE or descriptive camelCase — never abbreviated
+6. **React components** use PascalCase: `WorkflowWizard`, `EnterpriseWorkflowCard`
+7. **CSS classes** use kebab-case with component prefix: `ewc-header`, `ww-step-icon`
+
+## 8.2 Comment Standards (MANDATORY)
+
+Code comments MUST be readable by someone who is not a developer. Write for a technical project manager, not a compiler.
+
+1. **Every file** MUST have a top-level comment explaining its purpose in one sentence
+2. **Every exported/public function** MUST have a doc comment explaining what it does and why
+3. **Complex logic blocks** (conditionals, algorithms, state machines) MUST have inline comments explaining the "why," not the "what"
+4. **Do NOT comment obvious code** — `// increment counter` above `counter++` is noise
+5. **Write for comprehension** — Comments should answer "Why does this exist?" and "What business problem does this solve?"
+
+## 8.3 Code Structure (MANDATORY)
+
+1. **Small functions** — Prefer functions under 40 lines. Extract complex logic into well-named helpers.
+2. **Early returns** — Use guard clauses instead of deep nesting (max 3 levels)
+3. **No magic numbers** — Every literal number or string must be a named constant with a comment
+4. **Logical grouping** — Group related functions with section comments (`// ── Section ──`)
+5. **Import ordering** — Standard library → internal packages → external dependencies
+
+## 8.4 Branching Strategy
+
+This project uses **GitHub Flow**:
+- All work happens on feature branches: `feature/*`, `fix/*`, `chore/*`, `docs/*`
+- NEVER commit directly to `main`
+- Every merge to `main` requires a Pull Request
+- Branch names must be descriptive: `feature/add-user-authentication` not `feature/auth`
+
+## 8.5 Documentation Discipline
+
+- **CHANGELOG.md** is the single source of truth for "what changed"
+- Update CHANGELOG.md in every PR that modifies functionality
+- Do NOT create auxiliary summary documents, status files, or task logs
+- The README is maintained but never duplicated into other docs
+
+## 8.6 Multi-Agent Orchestration (BEST Mode)
+
+- For tasks spanning 3+ files, use sub-agents to parallelize work
+- Architecture decisions → premium models (Opus)
+- Feature implementation → standard models (Sonnet)
+- Documentation/simple tasks → fast models (Haiku)
+- Always verify agent output before merging
+
+## 8.7 Code Tutor Integration
+
+When modifying files in this project, Code Tutor may automatically explain your changes. Write code that teaches:
+- Clear structure with descriptive names
+- Helpful comments explaining reasoning
+- Brief overview comment before complex functions
+
+## 8.8 Skill Awareness
+
+This project has enterprise workflow skills in `.github/skills/`. When performing code modifications, you SHOULD invoke the relevant skills:
+- `workflow-enforcer` — MANDATORY for all code changes (broadest enforcement)
+- `code-quality` — For naming, comments, readability checks
+- `branching-strategy` — When creating branches, committing, pushing
+- `testing-standards` — When writing or updating tests
+- `pr-workflow` — When creating PRs or code reviews
+- `documentation` — When updating docs or CHANGELOG
+- `multi-agent` — For complex multi-file tasks
+- `code-tutor-workflow` — When Code Tutor is active
+
+## 8.9 Self-Check Before Delivering
+
+Before completing any task, verify:
+1. ✅ All variable/function names are self-documenting (no single-letter, no abbreviations)
+2. ✅ Non-obvious logic has comments readable by non-developers
+3. ✅ Tests are written or updated
+4. ✅ CHANGELOG.md updated (if behavior changed)
+5. ✅ Branch follows naming convention
+6. ✅ `go build ./cmd/forge/` succeeds
+7. ✅ `cd frontend && npx vite build` succeeds
+8. ✅ All existing tests pass
