@@ -1,0 +1,199 @@
+/* ─── Enterprise Workflow Card — Sidebar Widget ──────────────────────────── */
+
+.enterprise-workflow-card {
+  background: var(--card-bg);
+  background-image: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.enterprise-workflow-card:hover {
+  border-color: var(--accent, #8b5cf6);
+  box-shadow: var(--shadow-glow, 0 0 0 1px rgba(139,92,246,0.2)), var(--shadow-md, 0 4px 12px rgba(0,0,0,0.2));
+  transform: translateY(-1px);
+}
+
+.enterprise-workflow-card.configured {
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+
+.ewc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ewc-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ewc-shield-icon {
+  color: var(--accent, #8b5cf6);
+}
+
+.ewc-header-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.ewc-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ewc-subtitle {
+  font-size: 0.7rem;
+  color: var(--subtext);
+  margin-top: 1px;
+}
+
+.ewc-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--subtext);
+}
+
+/* ─── Compliance Badges ───────────────────────────────────────────────────── */
+
+.ewc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.ewc-badge-ok {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.ewc-badge-warn {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.ewc-badge-error {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* ─── Expanded Body ───────────────────────────────────────────────────────── */
+
+.ewc-body {
+  padding: 0 16px 14px;
+  animation: ewcSlideDown 0.15s ease;
+}
+
+@keyframes ewcSlideDown {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 300px; }
+}
+
+/* ─── Compliance Summary ──────────────────────────────────────────────────── */
+
+.ewc-compliance-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.ewc-compliance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.ewc-compliance-label {
+  color: var(--subtext);
+}
+
+.ewc-compliance-value {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.ewc-compliance-value.compliant { color: #10b981; }
+.ewc-compliance-value.warnings { color: #f59e0b; }
+.ewc-compliance-value.violations { color: #ef4444; }
+.ewc-compliance-value.passing { color: #10b981; }
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+
+.ewc-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ewc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+}
+.ewc-btn:hover { filter: brightness(1.1); }
+
+.ewc-btn-primary {
+  flex: 1;
+  background: var(--accent, #8b5cf6);
+  color: white;
+}
+
+.ewc-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+.ewc-btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+
+.ewc-btn-setup {
+  width: 100%;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: white;
+  justify-content: center;
+  padding: 10px 16px;
+}
+.ewc-btn-setup:hover {
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+}
+
+/* ─── Unconfigured State ──────────────────────────────────────────────────── */
+
+.ewc-unconfigured-body {
+  text-align: center;
+}
+
+.ewc-setup-message {
+  font-size: 0.78rem;
+  color: var(--subtext);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}

@@ -76,7 +76,14 @@ func (e *Explainer) ExplainFile(
 
 	prompt := e.buildPrompt(entry, fileContents, learningPath, depth, namingStrictness, reviewedFiles)
 
-	log.Printf("[Tutor Explainer] generating explanation for %s (depth=%s)", entry.Path, depth)
+	// Augment prompt with enterprise workflow quality audit if active
+	auditContext := DetectWorkflowContext(projectPath)
+	auditSection := BuildAuditPromptSection(auditContext)
+	if auditSection != "" {
+		prompt += auditSection
+	}
+
+	log.Printf("[Tutor Explainer] generating explanation for %s (depth=%s, audit=%v)", entry.Path, depth, auditContext.WorkflowActive)
 	response, modelUsed, err := e.callLLM(ctx, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("LLM call for %s: %w", entry.Path, err)

@@ -491,6 +491,15 @@ func main() {
 	http.HandleFunc("/api/tutor/settings", WrapWithMiddleware(handleTutorSettings))
 	http.HandleFunc("/api/tutor/watcher", WrapWithMiddleware(handleTutorWatcher))
 
+	// ── Enterprise Workflow Architect routes ─────────────────────────────
+	http.HandleFunc("/api/workflow/detect", WrapWithMiddleware(handleWorkflowDetect))
+	http.HandleFunc("/api/workflow/presets", WrapWithMiddleware(handleWorkflowPresets))
+	http.HandleFunc("/api/workflow/preview", WrapWithMiddleware(handleWorkflowPreview))
+	http.HandleFunc("/api/workflow/apply", WrapWithMiddleware(handleWorkflowApply))
+	http.HandleFunc("/api/workflow/status", WrapWithMiddleware(handleWorkflowStatus))
+	http.HandleFunc("/api/workflow/compliance", WrapWithMiddleware(handleWorkflowCompliance))
+	http.HandleFunc("/api/workflow/modules", WrapWithMiddleware(handleWorkflowModules))
+
 	// Initialize session temp directory
 	if err := initSessionTempDir(); err != nil {
 		log.Printf("[ERROR] Failed to initialize session temp dir: %v", err)
