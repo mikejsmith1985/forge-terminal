@@ -501,6 +501,7 @@ func main() {
 	http.HandleFunc("/api/workflow/status", WrapWithMiddleware(handleWorkflowStatus))
 	http.HandleFunc("/api/workflow/compliance", WrapWithMiddleware(handleWorkflowCompliance))
 	http.HandleFunc("/api/workflow/modules", WrapWithMiddleware(handleWorkflowModules))
+	http.HandleFunc("/api/workflow/release-preflight", WrapWithMiddleware(handleReleasePreflight))
 	http.HandleFunc("/api/workflow/watch", WrapWithMiddleware(handleWorkflowWatchStart))
 	http.HandleFunc("/api/workflow/watch/poll", WrapWithMiddleware(handleWorkflowWatchPoll))
 	http.HandleFunc("/api/workflow/watch/stop", WrapWithMiddleware(handleWorkflowWatchStop))

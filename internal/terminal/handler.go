@@ -164,6 +164,7 @@ type Handler struct {
 	sessions             sync.Map // map[string]*TerminalSession
 	detachedSessions     sync.Map // map[string]*DetachedSession — PTY sessions kept alive after WS disconnect
 	hubs                 sync.Map // map[string]*sessionHub — one hub per sessionID, shared across clients
+	sessionCreateLocks   sync.Map // map[string]*sync.Mutex — per-sessionID creation lock preventing duplicate PTY processes
 	visionParser         *vision.Parser
 	llmDetector          *llm.Detector
 	restartRequested     atomic.Bool // Flag to indicate session restart is in progress
@@ -666,30 +667,66 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !isWatcher {
-		// Priority 2: Detached session (PTY survived a previous disconnect).
-		if ds, ok := h.reattachSession(sessionID); ok {
-			session = ds.session
-			isReattach = true
-			log.Printf("[Terminal] Session %s reattached (shell was detached for %v)",
-				sessionID, time.Since(ds.detachedAt))
-			_ = conn.WriteJSON(map[string]interface{}{
-				"type":             "SESSION_REATTACHED",
-				"sessionId":        sessionID,
-				"detachedDuration": time.Since(ds.detachedAt).Seconds(),
-			})
-		} else {
-			// Priority 3: New session.
-			var err error
-			session, err = NewTerminalSessionWithConfig(sessionID, shellConfig)
-			if err != nil {
-				log.Printf("[Terminal] Failed to create session: %v", err)
-				_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
-				hub.remove(conn)
-				return
+		// Acquire a per-sessionID lock to prevent two simultaneous WebSocket
+		// upgrades from creating duplicate PTY processes for the same tab.
+		lockRaw, _ := h.sessionCreateLocks.LoadOrStore(sessionID, &sync.Mutex{})
+		sessionLock := lockRaw.(*sync.Mutex)
+		sessionLock.Lock()
+
+		// Re-check for a live session — another goroutine may have created
+		// one while we were waiting for the lock.
+		if liveVal, ok := h.sessions.Load(sessionID); ok {
+			live := liveVal.(*TerminalSession)
+			if !live.IsClosed() && !live.IsDone() {
+				session = live
+				isWatcher = true
+				sessionLock.Unlock()
+				log.Printf("[Terminal] Session %s: became watcher after lock (another goroutine created it)", sessionID)
+				_ = conn.WriteJSON(map[string]interface{}{
+					"type":           "SESSION_JOINED",
+					"sessionId":      sessionID,
+					"isActiveDevice": hub.getActive() == nil,
+				})
+				if hub.getActive() == nil {
+					hub.setActive(conn)
+				}
 			}
-			log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
 		}
-		h.sessions.Store(sessionID, session)
+
+		if !isWatcher {
+			// Priority 2: Detached session (PTY survived a previous disconnect).
+			if ds, ok := h.reattachSession(sessionID); ok {
+				session = ds.session
+				isReattach = true
+				sessionLock.Unlock()
+				log.Printf("[Terminal] Session %s reattached (shell was detached for %v)",
+					sessionID, time.Since(ds.detachedAt))
+				_ = conn.WriteJSON(map[string]interface{}{
+					"type":             "SESSION_REATTACHED",
+					"sessionId":        sessionID,
+					"detachedDuration": time.Since(ds.detachedAt).Seconds(),
+				})
+			} else {
+				// Priority 3: New session.
+				var err error
+				session, err = NewTerminalSessionWithConfig(sessionID, shellConfig)
+				sessionLock.Unlock()
+				if err != nil {
+					log.Printf("[Terminal] Failed to create session: %v", err)
+					_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
+					hub.remove(conn)
+					// Clean up the zombie hub if we just created it and no other
+					// clients are connected — prevents blank-screen reconnects.
+					if !hubLoaded && hub.size() == 0 {
+						h.hubs.Delete(sessionID)
+						log.Printf("[Terminal] Session %s: cleaned up orphan hub after failed session creation", sessionID)
+					}
+					return
+				}
+				log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
+			}
+			h.sessions.Store(sessionID, session)
+		}
 	}
 
 	// Compute grace period before the defer closure captures it

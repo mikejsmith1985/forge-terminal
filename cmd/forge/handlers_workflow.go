@@ -336,6 +336,37 @@ func readWorkflowConfig(projectPath string) (workflow.WorkflowConfig, error) {
 
 // ─── Workflow: File-Change Watcher ──────────────────────────────────────────
 
+// handleReleasePreflight runs the release-readiness checks and returns a
+// structured report with pass/fail status, severity, and a fix prompt the
+// user can paste to an AI agent to resolve any blocking issues.
+func handleReleasePreflight(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projectPath := r.URL.Query().Get("path")
+	if projectPath == "" {
+		http.Error(w, "query parameter 'path' is required", http.StatusBadRequest)
+		return
+	}
+
+	targetVersion := r.URL.Query().Get("version")
+
+	report, err := workflow.ScanReleasePreflight(projectPath, targetVersion)
+	if err != nil {
+		log.Printf("[Workflow API] Release preflight error: %v", err)
+		http.Error(w, "preflight scan failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[Workflow API] Release preflight: %s (%d blocking, %d warnings, %d passing, canRelease=%v)",
+		report.Status, report.BlockingCount, report.WarningCount, report.PassingCount, report.CanRelease)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(report)
+}
+
 // handleWorkflowWatchStart starts a file-change watcher for a project path.
 func handleWorkflowWatchStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

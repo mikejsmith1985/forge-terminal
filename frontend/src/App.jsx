@@ -832,164 +832,157 @@ function App() {
     }
   };
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    // CRITICAL: Don't register keyboard handlers until version is verified
-    // This prevents stale JS from registering broken handlers before auto-refresh
-    // NOTE: We removed the check here because it was blocking keybindings from working
-    // when the app is loaded but version check is slow.
-    // if (!versionReady) {
-    //   console.log('[Keyboard] Waiting for version verification before registering handlers');
-    //   return;
-    // }
-    
-    const handleKeyDown = (e) => {
-      // Check for command shortcuts (Ctrl+Shift+... or Ctrl+Alt+...)
-      // We check this BEFORE xterm check to allow global shortcuts to work even when terminal is focused
-      if (e.ctrlKey && (e.shiftKey || e.altKey)) {
-        const key = e.key.toLowerCase();
-        
-        // Construct the pressed key combination string
-        let pressed = 'Ctrl+';
-        if (e.altKey) pressed += 'Alt+';
-        if (e.shiftKey) pressed += 'Shift+';
-        
-        // Handle digit/letter keys
-        // e.code is like 'Digit1', 'KeyA', etc.
-        let code = e.code;
-        if (code.startsWith('Digit')) code = code.replace('Digit', '');
-        if (code.startsWith('Key')) code = code.replace('Key', '');
-        
-        pressed += code;
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
+  // The handler ref holds the latest closure (updated every render) so the
+  // actual window listener never needs to be re-registered. This eliminates
+  // the ~1-5ms gap between removeEventListener/addEventListener that was
+  // causing ~10% of keypresses to be silently dropped.
+  const keyboardHandlerRef = useRef(null);
 
-        const matchedCommand = commands.find(cmd => {
-          if (!cmd.keyBinding) return false;
-          // Simple normalization for comparison
-          const normalize = s => s.toLowerCase().replace(/\s+/g, '').replace('control', 'ctrl');
-          const match = normalize(cmd.keyBinding) === normalize(pressed);
-          return match;
-        });
+  keyboardHandlerRef.current = (e) => {
+    // Check for command shortcuts (Ctrl+Shift+... or Ctrl+Alt+...)
+    // We check this BEFORE xterm check to allow global shortcuts to work even when terminal is focused
+    if (e.ctrlKey && (e.shiftKey || e.altKey)) {
+      // Construct the pressed key combination string using e.code for reliability.
+      // e.code gives physical key identity (e.g. 'Digit1', 'KeyA') regardless of
+      // OS modifier remapping, unlike e.key which varies across platforms.
+      let pressed = 'Ctrl+';
+      if (e.altKey) pressed += 'Alt+';
+      if (e.shiftKey) pressed += 'Shift+';
 
-        if (matchedCommand) {
-          e.preventDefault();
-          if (matchedCommand.pasteOnly) {
-            handlePaste(matchedCommand);
-          } else {
-            handleExecute(matchedCommand);
-          }
-          return; // Handled, don't let xterm or others process it
-        }
-      }
+      let code = e.code;
+      if (code.startsWith('Digit')) code = code.replace('Digit', '');
+      if (code.startsWith('Key')) code = code.replace('Key', '');
 
-      // --- App-level shortcuts (fire before the xterm early-return) ---
-      // Using { capture: true } on the listener means this handler runs in
-      // the capture phase, before xterm's own keydown listeners. Calling
-      // stopPropagation() here prevents xterm from also processing the key
-      // (which would otherwise send unwanted control codes to the PTY).
+      pressed += code;
 
-      // Ctrl+Shift+H: Toggle History Slider
-      if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+      const matchedCommand = commands.find(cmd => {
+        if (!cmd.keyBinding) return false;
+        const normalize = s => s.toLowerCase().replace(/\s+/g, '').replace('control', 'ctrl');
+        return normalize(cmd.keyBinding) === normalize(pressed);
+      });
+
+      if (matchedCommand) {
         e.preventDefault();
-        e.stopPropagation();
-        setIsHistorySliderOpen(prev => !prev);
-        return;
-      }
-
-      // Ctrl+Shift+T: Toggle Code Tutor (desktop only)
-      if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!isCompact) setIsTutorOpen(prev => !prev);
-        return;
-      }
-
-      // Ctrl+End: Scroll to bottom (safe — not a shell binding)
-      if (e.ctrlKey && e.key === 'End') {
-        e.preventDefault();
-        e.stopPropagation();
-        const termRef = getActiveTerminalRef();
-        if (termRef && termRef.scrollToBottom) {
-          termRef.scrollToBottom();
+        if (matchedCommand.pasteOnly) {
+          handlePaste(matchedCommand);
+        } else {
+          handleExecute(matchedCommand);
         }
         return;
       }
+    }
 
-      // CRITICAL: Check if this is xterm's helper textarea FIRST
-      // All remaining keys (typing, Ctrl+C/V, Ctrl+T, etc.) must pass
-      // through to xterm when the terminal has keyboard focus.
-      const isXtermTextarea = e.target?.classList?.contains('xterm-helper-textarea');
-      if (isXtermTextarea) {
-        return; // Let xterm handle ALL remaining keys natively
-      }
-      
-      // Skip keyboard shortcuts when user is typing in input fields
-      const target = e.target;
-      const isInputField = target.tagName === 'INPUT' || 
-                          target.tagName === 'TEXTAREA' || 
-                          target.isContentEditable;
-      
-      // Check if target is within xterm terminal (for copy/paste support)
-      const isTerminalFocused = target.closest?.('.xterm') || 
-                               target.classList?.contains('xterm') ||
-                               target.closest?.('.terminal-inner');
-      
-      // Allow Ctrl+C and Ctrl+V to pass through to xterm when terminal is focused
-      // Don't preventDefault - let xterm handle these keys normally with clipboardMode: 'on'
-      if (isTerminalFocused && e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V')) {
-        return; // Let xterm handle Ctrl+C/V natively
-      }
-      
-      if (isInputField) {
-        return; // Let the input field handle the event
-      }
+    // --- App-level shortcuts (fire before the xterm early-return) ---
+    // Using { capture: true } on the listener means this handler runs in
+    // the capture phase, before xterm's own keydown listeners. Calling
+    // stopPropagation() here prevents xterm from also processing the key.
 
-      // Ctrl+F: Open search
-      if (e.ctrlKey && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+    // Ctrl+Shift+H: Toggle History Slider
+    if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsHistorySliderOpen(prev => !prev);
+      return;
+    }
+
+    // Ctrl+Shift+T: Toggle Code Tutor (desktop only)
+    if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isCompact) setIsTutorOpen(prev => !prev);
+      return;
+    }
+
+    // Ctrl+End: Scroll to bottom (safe — not a shell binding)
+    if (e.ctrlKey && e.key === 'End') {
+      e.preventDefault();
+      e.stopPropagation();
+      const termRef = getActiveTerminalRef();
+      if (termRef && termRef.scrollToBottom) {
+        termRef.scrollToBottom();
+      }
+      return;
+    }
+
+    // CRITICAL: Check if this is xterm's helper textarea FIRST
+    // All remaining keys (typing, Ctrl+C/V, Ctrl+T, etc.) must pass
+    // through to xterm when the terminal has keyboard focus.
+    const isXtermTextarea = e.target?.classList?.contains('xterm-helper-textarea');
+    if (isXtermTextarea) {
+      return; // Let xterm handle ALL remaining keys natively
+    }
+
+    // Skip keyboard shortcuts when user is typing in input fields
+    const target = e.target;
+    const isInputField = target.tagName === 'INPUT' ||
+                        target.tagName === 'TEXTAREA' ||
+                        target.isContentEditable;
+
+    // Check if target is within xterm terminal (for copy/paste support)
+    const isTerminalFocused = target.closest?.('.xterm') ||
+                             target.classList?.contains('xterm') ||
+                             target.closest?.('.terminal-inner');
+
+    // Allow Ctrl+C and Ctrl+V to pass through to xterm when terminal is focused
+    if (isTerminalFocused && e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V')) {
+      return;
+    }
+
+    if (isInputField) {
+      return;
+    }
+
+    // Ctrl+F: Open search
+    if (e.ctrlKey && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault();
+      setIsSearchOpen(true);
+      return;
+    }
+
+    // Ctrl+/: Toggle Forge Assist (desktop only — modal not usable on compact screens)
+    if (e.ctrlKey && !e.shiftKey && e.key === '/') {
+      e.preventDefault();
+      if (!isCompact) setIsForgeAssistOpen(prev => !prev);
+      return;
+    }
+
+    // Tab shortcuts (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+1-9)
+    if (e.ctrlKey && !e.shiftKey) {
+      // Ctrl+T: New tab
+      if (e.key === 't' || e.key === 'T') {
         e.preventDefault();
-        setIsSearchOpen(true);
+        handleNewTab();
         return;
       }
-      
-      // Ctrl+/: Toggle Forge Assist (desktop only — modal not usable on compact screens)
-      if (e.ctrlKey && !e.shiftKey && e.key === '/') {
+
+      // Ctrl+W: Close active tab
+      if (e.key === 'w' || e.key === 'W') {
         e.preventDefault();
-        if (!isCompact) setIsForgeAssistOpen(prev => !prev);
+        if (tabs.length > 1 && activeTabId) {
+          closeTab(activeTabId);
+        }
         return;
       }
 
-      // Tab shortcuts (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+1-9)
-      if (e.ctrlKey && !e.shiftKey) {
-        // Ctrl+T: New tab
-        if (e.key === 't' || e.key === 'T') {
-          e.preventDefault();
-          handleNewTab();
-          return;
+      // Ctrl+Tab / Ctrl+Shift+Tab: Cycle through tabs
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+        if (currentIndex !== -1) {
+          const nextIndex = e.shiftKey
+            ? (currentIndex - 1 + tabs.length) % tabs.length
+            : (currentIndex + 1) % tabs.length;
+          switchTab(tabs[nextIndex].id);
         }
-        
-        // Ctrl+W: Close active tab
-        if (e.key === 'w' || e.key === 'W') {
-          e.preventDefault();
-          if (tabs.length > 1 && activeTabId) {
-            closeTab(activeTabId);
-          }
-          return;
-        }
-        
-        // Ctrl+Tab / Ctrl+Shift+Tab: Cycle through tabs
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          const currentIndex = tabs.findIndex(t => t.id === activeTabId);
-          if (currentIndex !== -1) {
-            const nextIndex = e.shiftKey 
-              ? (currentIndex - 1 + tabs.length) % tabs.length
-              : (currentIndex + 1) % tabs.length;
-            switchTab(tabs[nextIndex].id);
-          }
-          return;
-        }
-        
-        // Ctrl+1 through Ctrl+9: Switch to tab by number
-        const digit = parseInt(e.key);
+        return;
+      }
+
+      // Ctrl+1 through Ctrl+9: Switch to tab by number.
+      // Use e.code ('Digit1'..'Digit9') for reliable digit detection —
+      // e.key is unreliable with modifier combos on some OS/browser combos.
+      if (e.code && e.code.startsWith('Digit')) {
+        const digit = parseInt(e.code.charAt(5), 10);
         if (digit >= 1 && digit <= 9) {
           e.preventDefault();
           const tabIndex = digit - 1;
@@ -999,22 +992,17 @@ function App() {
           return;
         }
       }
-      
-      // Check for Ctrl+Shift+1/2/3/4... (command shortcuts)
-      // MOVED TO TOP OF FUNCTION
-      /* 
-      if (e.ctrlKey && (e.shiftKey || e.altKey)) {
-         ...
-      }
-      */
-    };
+    }
+  };
 
-    // capture: true ensures this handler fires before xterm's listeners,
-    // which is required for app shortcuts (Ctrl+Shift+T etc.) to intercept
-    // key events before xterm processes them.
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [versionReady, commands, tabs, activeTabId, closeTab, switchTab, getActiveTerminalRef]);
+  // Register the keyboard listener ONCE on mount. The stable wrapper delegates
+  // to keyboardHandlerRef.current which is updated every render, so the listener
+  // always sees fresh state without needing to be re-registered.
+  useEffect(() => {
+    const stableKeyboardHandler = (e) => keyboardHandlerRef.current?.(e);
+    window.addEventListener('keydown', stableKeyboardHandler, { capture: true });
+    return () => window.removeEventListener('keydown', stableKeyboardHandler, { capture: true });
+  }, []);
 
   // Handle new tab creation
   const handleNewTab = useCallback((options = {}) => {

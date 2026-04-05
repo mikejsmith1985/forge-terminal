@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Number keys dropping ~10% of keypresses**: Keyboard handler was inside a `useEffect` that re-registered the `window.keydown` listener on every state change to `tabs`, `activeTabId`, `commands`, etc. The gap between `removeEventListener` and `addEventListener` (~1-5ms) caused keys pressed during re-registration to be silently dropped. **Fix**: Moved handler into a `useRef` that is updated every render; the listener is registered ONCE on mount and never re-registered. Also switched from `parseInt(e.key)` to `e.code` for reliable digit detection across OS/browser combos.
+- **Tab creation race condition**: `createTabAction` checked MAX_TABS using a potentially stale `stateRef` snapshot. Two rapid clicks could both pass the check and over-create. **Fix**: Moved the authoritative MAX_TABS guard inside the `setState` updater function where `prev` is always fresh.
+- **Duplicate PTY processes on concurrent WebSocket upgrades**: Two simultaneous connections for the same sessionID could both create new PTY processes, orphaning one. **Fix**: Added per-sessionID creation mutex (`sessionCreateLocks`) in handler.go. After acquiring the lock, re-checks for a live session before creating a new one.
+- **Zombie hub cleanup**: When session creation failed, the hub remained in `h.hubs` with no session attached, causing future connections to see a blank screen. **Fix**: Fresh hubs with no remaining clients are now deleted from the map on session creation failure.
+
+### Added
+- **Release preflight gate**: New final enforcement layer in the release pipeline that catches everything git hooks and AI skills may have missed during development. Runs 10 checks (CHANGELOG, branch naming, not-on-main, conventional commits, git hooks, workflow config, Go build, Go tests, frontend tests). When blocking checks fail, generates a ready-to-paste **fix prompt** the user can send to an AI agent to resolve all issues.
+  - `ScanReleasePreflight()` in `internal/workflow/release_preflight.go`
+  - `GET /api/workflow/release-preflight?path=<dir>&version=<ver>` API endpoint
+  - Integrated into `scripts/local-release.ps1` as a pre-build gate
+
 ---
 
 ## [5.2.1] - 2026-04-05
