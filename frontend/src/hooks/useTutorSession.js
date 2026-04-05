@@ -96,6 +96,7 @@ export function useTutorSession() {
   const [isFetchingChanges, setIsFetchingChanges] = useState(false)
   const [changeExplanation, setChangeExplanation] = useState(null)
   const [isExplainingChange, setIsExplainingChange] = useState(false)
+  const [explanationError, setExplanationError] = useState(null)
 
   const errorTimerRef = useRef(null)
   const pollingRef = useRef(null)
@@ -318,6 +319,7 @@ export function useTutorSession() {
     if (!session) return
     setIsExplainingChange(true)
     setChangeExplanation(null)
+    setExplanationError(null)
     try {
       const data = await tutorFetch('/api/tutor/explain-change', {
         method: 'POST',
@@ -326,6 +328,7 @@ export function useTutorSession() {
       setChangeExplanation(data)
     } catch (err) {
       console.error('[TutorSession] explainChange error:', err)
+      setExplanationError(err.message || 'Failed to generate explanation')
       setTimedError(err.message)
     } finally {
       setIsExplainingChange(false)
@@ -446,6 +449,7 @@ export function useTutorSession() {
     isFetchingChanges,
     changeExplanation,
     isExplainingChange,
+    explanationError,
 
     // Regular session actions
     createSession,

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   BookOpen, X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
   Play, SkipForward, Check, Folder, FileText, Loader, AlertCircle, Eye,
-  GitBranch, ArrowRight, Sparkles
+  GitBranch, ArrowRight, Sparkles, RefreshCw
 } from 'lucide-react'
 import { useAPI } from '../hooks/useAPI'
 import { useTutorSession } from '../hooks/useTutorSession'
@@ -58,9 +58,10 @@ const styles = {
   drawer: (isOpen) => ({
     position: 'fixed',
     top: 0,
+    left: 0,
     right: 0,
     height: '100vh',
-    width: 500,
+    width: '100vw',
     background: colors.base,
     color: colors.text,
     display: 'flex',
@@ -622,7 +623,7 @@ const styles = {
   diffPre: {
     margin: 0,
     padding: '0 0 8px',
-    fontSize: 11,
+    fontSize: 13,
     lineHeight: 1.55,
     fontFamily: '"Cascadia Code", "Fira Code", monospace',
   },
@@ -682,7 +683,32 @@ const styles = {
     gap: 8,
     padding: '14px',
     color: colors.textDim,
-    fontSize: 12,
+    fontSize: 14,
+  },
+  explanationError: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 10,
+    padding: '28px 14px',
+    color: colors.error,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  explanationRetryBtn: {
+    padding: '7px 18px',
+    borderRadius: 6,
+    border: `1px solid rgba(239,68,68,0.6)`,
+    background: 'rgba(239,68,68,0.1)',
+    color: colors.error,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    transition: 'background 0.15s',
+    marginTop: 4,
   },
   changeSection: {
     borderBottom: `1px solid ${colors.border}`,
@@ -691,21 +717,21 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    padding: '8px 14px',
+    padding: '10px 14px',
     cursor: 'pointer',
     border: 'none',
     background: 'transparent',
     color: colors.text,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 600,
     width: '100%',
     textAlign: 'left',
     borderBottom: `1px solid ${colors.border}`,
   },
   changeSectionBody: {
-    padding: '8px 14px 12px',
-    fontSize: 12,
-    lineHeight: 1.65,
+    padding: '10px 16px 14px',
+    fontSize: 15,
+    lineHeight: 1.7,
     color: colors.textDim,
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
@@ -743,7 +769,7 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     skipFile, explain, updateSettings, clearError, dismissNotification, listSessions,
     // Wizard
     wizardChanges, wizardStepIndex, isWizardMode, hasCheckedForChanges,
-    isFetchingChanges, changeExplanation, isExplainingChange,
+    isFetchingChanges, changeExplanation, isExplainingChange, explanationError,
     fetchRecentChanges, explainChange, exitWizardMode,
     wizardAdvance, wizardGoBack, wizardSkip,
   } = useTutorSession()
@@ -1043,10 +1069,24 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
                   )
                 })}
               </div>
+            ) : explanationError ? (
+              <div style={styles.explanationError}>
+                <AlertCircle size={18} />
+                <span>{explanationError}</span>
+                <button
+                  style={styles.explanationRetryBtn}
+                  onClick={() => explainChange(
+                    wizardChanges[wizardStepIndex]?.path,
+                    wizardChanges[wizardStepIndex]?.diff || ''
+                  )}
+                >
+                  <RefreshCw size={13} /> Retry
+                </button>
+              </div>
             ) : (
               <div style={styles.explanationLoading}>
                 <Loader size={14} style={styles.spinner} />
-                Loading explanation…
+                Waiting for explanation…
               </div>
             )}
           </div>

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Code Tutor explanation stuck on loading**: The `callLLM` function in the tutor backend passed an invalid `-s` flag to the Copilot CLI, causing all model attempts to fail immediately. The frontend swallowed the error and left the panel permanently showing a loading spinner with no way to recover.
+- **Code Tutor explanation error recovery**: When explanation generation fails, the wizard panel now shows the actual error message and a **Retry** button instead of an infinite loading spinner.
+- **Code Tutor panel too narrow to read**: The Code Tutor panel was a fixed 500px side drawer. Expanded to full-screen (100vw × 100vh) so content is actually readable. Increased body font size (12px → 15px), section headers (12px → 14px), and diff view (11px → 13px).
+
 ---
 
 ## [v5.2.2] - 2026-04-05

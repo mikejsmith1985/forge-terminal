@@ -189,7 +189,6 @@ func (e *Explainer) callLLM(ctx context.Context, prompt string) (string, string,
 		response, err := runCLI(ctx, timeout, "copilot", []string{
 			"--model", m.model,
 			"-p", prompt,
-			"-s",
 			"--no-color",
 			"--allow-all-tools",
 		})
