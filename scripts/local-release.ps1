@@ -275,6 +275,10 @@ foreach ($b in $builds) {
     $env:GOOS   = $b.GOOS
     $env:GOARCH = $b.GOARCH
     $outPath = "$BINDIR\$($b.Out)"
+
+    # Remove stale binary before building — Go refuses to overwrite non-object files.
+    if (Test-Path $outPath) { Remove-Item $outPath -Force }
+
     go build -trimpath -ldflags $b.LD -o $outPath ./cmd/forge/
     if ($LASTEXITCODE -ne 0) { Write-Fail "Build failed for $($b.Out)" }
     $size = [math]::Round((Get-Item $outPath).Length / 1MB, 1)
