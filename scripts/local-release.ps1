@@ -178,7 +178,7 @@ Remove-Item Env:\GOARCH -ErrorAction SilentlyContinue
 # ── Commit version bump ───────────────────────────────────────────────────────
 Write-Banner "Committing version bump"
 git add -A
-git commit -m "Release $TAG" --allow-empty
+git commit -m "chore: release $TAG" --allow-empty
 if ($LASTEXITCODE -ne 0) { Write-Fail "git commit failed" }
 Write-OK "Committed: Release $TAG"
 
