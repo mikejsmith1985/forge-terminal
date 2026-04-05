@@ -67,6 +67,14 @@ func ScanCompliance(projectPath string, config WorkflowConfig) (*ComplianceRepor
 		scanPRTemplatePresence(absolutePath, report)
 	}
 
+	if config.HasModule(ModuleTestingStandards) {
+		scanTestCoverage(absolutePath, report)
+	}
+
+	if config.HasModule(ModuleBranchingStrategy) {
+		scanCommitMessageFormat(absolutePath, report)
+	}
+
 	// Compute totals
 	for _, finding := range report.Findings {
 		switch finding.Level {
@@ -298,6 +306,190 @@ func scanPRTemplatePresence(projectPath string, report *ComplianceReport) {
 			Level:      ComplianceWarning,
 			Message:    "Pull request template not found",
 			Suggestion: "Enable the PR Template module in the workflow",
+		})
+	}
+}
+
+// testFileExtensionMap maps source file extensions to their expected test file
+// suffixes. Each source extension may have multiple valid test patterns.
+var testFileExtensionMap = map[string][]string{
+	".go":   {"_test.go"},
+	".js":   {".test.js", ".spec.js"},
+	".jsx":  {".test.jsx", ".spec.jsx"},
+	".ts":   {".test.ts", ".spec.ts"},
+	".tsx":  {".test.tsx", ".spec.tsx"},
+	".py":   {"_test.py", "test_"},
+	".rs":   {"_test.rs"},
+	".java": {"Test.java"},
+	".cs":   {"Tests.cs", "Test.cs"},
+}
+
+// complianceTestFileSuffixes identifies files that are themselves tests, not source
+// files that need test coverage. Used to exclude test files from the coverage check.
+var complianceTestFileSuffixes = []string{
+	"_test.go", ".test.js", ".test.jsx", ".test.ts", ".test.tsx",
+	".spec.js", ".spec.jsx", ".spec.ts", ".spec.tsx",
+	"_test.py", "_test.rs",
+}
+
+// scanTestCoverage checks that source files have corresponding test files.
+// Only scans files in the project tree, excluding vendor/node_modules/dist.
+func scanTestCoverage(projectPath string, report *ComplianceReport) {
+	sourceFilesWithoutTests := []string{}
+
+	walkError := filepath.WalkDir(projectPath, func(path string, directoryEntry os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if directoryEntry.IsDir() {
+			dirName := directoryEntry.Name()
+			// Skip directories that don't contain user-written source code
+			if dirName == ".git" || dirName == "node_modules" || dirName == "vendor" ||
+				dirName == "dist" || dirName == "build" || dirName == ".forge" ||
+				dirName == "web" || dirName == "test-data" || dirName == "dev-data" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		fileExtension := strings.ToLower(filepath.Ext(directoryEntry.Name()))
+		testSuffixes, isSourceExtension := testFileExtensionMap[fileExtension]
+		if !isSourceExtension {
+			return nil
+		}
+
+		// Skip files that are themselves test files
+		fileName := directoryEntry.Name()
+		for _, testPattern := range complianceTestFileSuffixes {
+			if strings.HasSuffix(fileName, testPattern) || strings.HasPrefix(fileName, "test_") {
+				return nil
+			}
+		}
+
+		// Check if a corresponding test file exists
+		basePath := path[:len(path)-len(fileExtension)]
+		hasTestFile := false
+		for _, testSuffix := range testSuffixes {
+			candidateTestPath := basePath + testSuffix
+			if fileExistsSimple(candidateTestPath) {
+				hasTestFile = true
+				break
+			}
+		}
+
+		if !hasTestFile {
+			relativePath, _ := filepath.Rel(projectPath, path)
+			relativePath = filepath.ToSlash(relativePath)
+			sourceFilesWithoutTests = append(sourceFilesWithoutTests, relativePath)
+		}
+
+		return nil
+	})
+
+	if walkError != nil {
+		report.Findings = append(report.Findings, ComplianceFinding{
+			Rule:    "Test Coverage",
+			Level:   ComplianceWarning,
+			Message: fmt.Sprintf("Could not complete test coverage scan: %s", walkError),
+		})
+		return
+	}
+
+	if len(sourceFilesWithoutTests) == 0 {
+		report.Findings = append(report.Findings, ComplianceFinding{
+			Rule:    "Test Coverage",
+			Level:   CompliancePassing,
+			Message: "All source files have corresponding test files",
+		})
+	} else {
+		// Report up to 10 uncovered files to avoid noise
+		maxFilesToReport := 10
+		reportedFiles := sourceFilesWithoutTests
+		if len(reportedFiles) > maxFilesToReport {
+			reportedFiles = reportedFiles[:maxFilesToReport]
+		}
+
+		for _, uncoveredFile := range reportedFiles {
+			report.Findings = append(report.Findings, ComplianceFinding{
+				Rule:       "Test Coverage",
+				Level:      ComplianceWarning,
+				FilePath:   uncoveredFile,
+				Message:    fmt.Sprintf("Source file '%s' has no corresponding test file", uncoveredFile),
+				Suggestion: "Create a test file alongside the source file",
+			})
+		}
+
+		if len(sourceFilesWithoutTests) > maxFilesToReport {
+			report.Findings = append(report.Findings, ComplianceFinding{
+				Rule:    "Test Coverage",
+				Level:   ComplianceWarning,
+				Message: fmt.Sprintf("... and %d more source files without tests", len(sourceFilesWithoutTests)-maxFilesToReport),
+			})
+		}
+	}
+}
+
+// commitMessageFormatPattern matches the conventional commit format: type: description
+var commitMessageFormatPattern = regexp.MustCompile(
+	`^(feat|fix|chore|docs|test|refactor|perf): .+`,
+)
+
+// scanCommitMessageFormat checks the last few commits for conventional format.
+// Skips merge commits and revert commits since those have their own format.
+func scanCommitMessageFormat(projectPath string, report *ComplianceReport) {
+	// Get the last 10 commit subjects
+	logCommand := exec.Command("git", "log", "--oneline", "--no-merges", "-10", "--format=%s")
+	logCommand.Dir = projectPath
+	hideExecWindow(logCommand)
+	logOutput, commandError := logCommand.Output()
+	if commandError != nil {
+		report.Findings = append(report.Findings, ComplianceFinding{
+			Rule:    "Commit Message Format",
+			Level:   ComplianceWarning,
+			Message: "Could not read git log (not a git repository?)",
+		})
+		return
+	}
+
+	commitSubjects := strings.Split(strings.TrimSpace(string(logOutput)), "\n")
+	if len(commitSubjects) == 0 || (len(commitSubjects) == 1 && commitSubjects[0] == "") {
+		report.Findings = append(report.Findings, ComplianceFinding{
+			Rule:    "Commit Message Format",
+			Level:   CompliancePassing,
+			Message: "No commits to check",
+		})
+		return
+	}
+
+	badCommitCount := 0
+	for _, subject := range commitSubjects {
+		subject = strings.TrimSpace(subject)
+		if subject == "" {
+			continue
+		}
+		// Skip revert commits — they have a different conventional format
+		if strings.HasPrefix(subject, "Revert ") {
+			continue
+		}
+		if !commitMessageFormatPattern.MatchString(subject) {
+			badCommitCount++
+		}
+	}
+
+	totalChecked := len(commitSubjects)
+	if badCommitCount == 0 {
+		report.Findings = append(report.Findings, ComplianceFinding{
+			Rule:    "Commit Message Format",
+			Level:   CompliancePassing,
+			Message: fmt.Sprintf("All %d recent commits follow conventional format", totalChecked),
+		})
+	} else {
+		report.Findings = append(report.Findings, ComplianceFinding{
+			Rule:       "Commit Message Format",
+			Level:      ComplianceWarning,
+			Message:    fmt.Sprintf("%d of %d recent commits do not follow 'type: description' format", badCommitCount, totalChecked),
+			Suggestion: "Use commit-msg hook to enforce format: feat|fix|chore|docs|test|refactor|perf: description",
 		})
 	}
 }
