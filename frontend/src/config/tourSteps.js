@@ -185,6 +185,6 @@ const TOUR_STEPS = [
 ];
 
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
-const TOUR_VERSION = '5.1.5'; // v6.0.0: Rewritten tour focused on Enterprise Workflow system
+const TOUR_VERSION = '5.1.6'; // v6.0.0: Rewritten tour focused on Enterprise Workflow system
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
