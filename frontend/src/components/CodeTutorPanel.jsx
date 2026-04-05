@@ -575,6 +575,33 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
   const lastAutoCreatedDirectoryRef = useRef(null)
   const prevNotificationsLengthRef = useRef(0)
 
+  // ── Derived data — must be declared before any hooks that reference these values ─
+  // Placing these const declarations here (before useEffect hooks) prevents the
+  // JavaScript Temporal Dead Zone (TDZ) error that occurs when a useEffect
+  // dependency array evaluates a `const` before its declaration is reached.
+  const files = session?.learningPath?.files || []
+  const progress = session?.progress || {}
+  const currentIndex = session?.currentIndex ?? -1
+  const currentFile = files[currentIndex] || null
+  const settings = session?.settings || {}
+  const isLive = settings.liveMode || false
+
+  const reviewedCount = useMemo(() => {
+    return Object.values(progress).filter((s) => s === 'reviewed').length
+  }, [progress])
+
+  const progressPct = files.length > 0 ? (reviewedCount / files.length) * 100 : 0
+
+  const groupedFiles = useMemo(() => {
+    const groups = {}
+    for (const cat of CATEGORY_ORDER) groups[cat] = []
+    files.forEach((f, idx) => {
+      const cat = CATEGORY_ORDER.includes(f.category) ? f.category : 'Docs'
+      groups[cat].push({ ...f, _idx: idx })
+    })
+    return groups
+  }, [files])
+
   // Reset to browse mode when the panel closes so manual reopens start clean
   useEffect(() => {
     if (!isOpen) {
@@ -643,31 +670,7 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     onAutoExplain?.(changedFilename)
   }, [explanation, onAutoExplain, currentFile, clearQuestionAnswer])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Derived data ───────────────────────────────────────────────
-  const files = session?.learningPath?.files || []
-  const progress = session?.progress || {}
-  const currentIndex = session?.currentIndex ?? -1
-  const currentFile = files[currentIndex] || null
-  const settings = session?.settings || {}
-  const isLive = settings.liveMode || false
-
-  const reviewedCount = useMemo(() => {
-    return Object.values(progress).filter((s) => s === 'reviewed').length
-  }, [progress])
-
-  const progressPct = files.length > 0 ? (reviewedCount / files.length) * 100 : 0
-
-  const groupedFiles = useMemo(() => {
-    const groups = {}
-    for (const cat of CATEGORY_ORDER) groups[cat] = []
-    files.forEach((f, idx) => {
-      const cat = CATEGORY_ORDER.includes(f.category) ? f.category : 'Docs'
-      groups[cat].push({ ...f, _idx: idx })
-    })
-    return groups
-  }, [files])
-
-  // ── Error auto-dismiss ─────────────────────────────────────────
+  // ── Error auto-dismiss─────────────────────────────────────────
   useEffect(() => {
     if (error) {
       setErrorVisible(true)
