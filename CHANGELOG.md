@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Forge Vault frontend**: Full-screen secret manager overlay (`VaultPanel.jsx`) with two-column layout — sidebar entry list with auto-inject pill toggles and delete confirmation, plus an Add Secret form with show/hide password, auto-derived environment variable names, and encrypted-at-rest security UX. Backed by `useVault.js` hook (mirrors `useTutorSession` pattern) with `vaultFetch` helper, optimistic updates, and 5-second timed error clearing.
+
 ### Fixed
 - **Code Tutor explanation stuck on loading**: The `callLLM` function in the tutor backend passed an invalid `-s` flag to the Copilot CLI, causing all model attempts to fail immediately. The frontend swallowed the error and left the panel permanently showing a loading spinner with no way to recover.
 - **Code Tutor explanation error recovery**: When explanation generation fails, the wizard panel now shows the actual error message and a **Retry** button instead of an infinite loading spinner.

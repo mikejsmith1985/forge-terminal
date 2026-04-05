@@ -1,0 +1,709 @@
+/* VaultPanel.css — Full-screen overlay for the Forge Vault secret manager.
+ *
+ * Uses .vp- prefix to avoid collisions with other component styles.
+ * Follows the EnterpriseWorkflowCard.css pattern: CSS variables for theming,
+ * kebab-case class names, and animation for entry.
+ */
+
+/* ─── Full-Screen Overlay ─────────────────────────────────────────────────── */
+
+.vault-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #0d1117;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  animation: vp-slide-in 0.22s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@keyframes vp-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+
+.vp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: #161b22;
+  border-bottom: 1px solid rgba(48, 54, 61, 1);
+  flex-shrink: 0;
+}
+
+.vp-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vp-header-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.vp-header-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.vp-header-subtitle {
+  font-size: 0.72rem;
+  color: #8b949e;
+  margin: 0;
+  margin-top: 2px;
+}
+
+.vp-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ─── Secured Badge ───────────────────────────────────────────────────────── */
+
+.vp-secured-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.25);
+}
+
+.vp-secured-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3fb950;
+  box-shadow: 0 0 6px rgba(63, 185, 80, 0.6);
+}
+
+/* ─── Close Button ────────────────────────────────────────────────────────── */
+
+.vp-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vp-close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6edf3;
+}
+
+/* ─── Two-Column Layout ───────────────────────────────────────────────────── */
+
+.vp-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+/* ─── Sidebar (Entry List) ────────────────────────────────────────────────── */
+
+.vp-sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.vp-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.vp-sidebar-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ─── Entry Cards ─────────────────────────────────────────────────────────── */
+
+.vp-entry-card {
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.vp-entry-card:hover {
+  border-color: rgba(88, 166, 255, 0.35);
+  background: #1c2330;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.vp-entry-card.is-selected {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.06);
+}
+
+.vp-entry-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.vp-entry-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.vp-entry-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #e6edf3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vp-entry-env-var {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.75rem;
+  color: #39d353;
+  margin-top: 2px;
+}
+
+.vp-entry-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vp-auto-inject-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.2);
+  white-space: nowrap;
+}
+
+/* ─── Auto-Inject Toggle Pill ─────────────────────────────────────────────── */
+
+.vp-auto-inject-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 8px;
+}
+
+.vp-toggle-track {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.vp-toggle-track.is-active {
+  background: #3fb950;
+}
+
+.vp-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.vp-toggle-track.is-active .vp-toggle-thumb {
+  transform: translateX(14px);
+}
+
+.vp-toggle-label {
+  font-size: 0.72rem;
+  color: #8b949e;
+}
+
+/* ─── Delete Button ───────────────────────────────────────────────────────── */
+
+.vp-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.vp-delete-btn:hover {
+  background: rgba(248, 81, 73, 0.12);
+  border-color: rgba(248, 81, 73, 0.3);
+  color: #f85149;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+
+.vp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: #58a6ff;
+  color: #0d1117;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.vp-btn-primary:hover:not(:disabled) {
+  background: #79b8ff;
+  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+}
+
+.vp-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vp-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6edf3;
+  transition: all 0.15s;
+}
+
+.vp-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.vp-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  background: rgba(248, 81, 73, 0.1);
+  color: #f85149;
+  transition: all 0.15s;
+}
+
+.vp-btn-danger:hover {
+  background: rgba(248, 81, 73, 0.2);
+}
+
+/* ─── Add Secret Button (sidebar) ─────────────────────────────────────────── */
+
+.vp-add-secret-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px dashed rgba(88, 166, 255, 0.3);
+  background: rgba(88, 166, 255, 0.05);
+  color: #58a6ff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.vp-add-secret-btn:hover {
+  background: rgba(88, 166, 255, 0.1);
+  border-color: rgba(88, 166, 255, 0.5);
+}
+
+/* ─── Right Content Pane ──────────────────────────────────────────────────── */
+
+.vp-content {
+  flex: 1;
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── Empty State ─────────────────────────────────────────────────────────── */
+
+.vp-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 32px;
+  gap: 16px;
+}
+
+.vp-empty-state-icon {
+  color: #8b949e;
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+
+.vp-empty-state-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e6edf3;
+  margin: 0;
+}
+
+.vp-empty-state-description {
+  font-size: 0.83rem;
+  color: #8b949e;
+  line-height: 1.6;
+  max-width: 320px;
+  margin: 0;
+}
+
+/* ─── Add Secret Form ─────────────────────────────────────────────────────── */
+
+.vp-form {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.vp-form-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0 0 4px;
+}
+
+.vp-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vp-form-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vp-form-label span {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #8b949e;
+  opacity: 0.7;
+}
+
+.vp-form-input {
+  padding: 9px 12px;
+  background: #21262d;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 8px;
+  color: #e6edf3;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vp-form-input:focus {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.12);
+}
+
+.vp-form-input::placeholder {
+  color: rgba(139, 148, 158, 0.5);
+}
+
+.vp-form-textarea {
+  padding: 9px 12px;
+  background: #21262d;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 8px;
+  color: #e6edf3;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+}
+
+.vp-form-textarea:focus {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.12);
+}
+
+.vp-form-textarea::placeholder {
+  color: rgba(139, 148, 158, 0.5);
+}
+
+/* ─── Password input wrapper ──────────────────────────────────────────────── */
+
+.vp-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.vp-password-wrapper .vp-form-input {
+  padding-right: 40px;
+}
+
+.vp-eye-toggle {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.vp-eye-toggle:hover {
+  color: #e6edf3;
+}
+
+/* ─── Auto-inject toggle row (form) ──────────────────────────────────────── */
+
+.vp-form-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #21262d;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.vp-form-toggle-label {
+  font-size: 0.83rem;
+  color: #e6edf3;
+  font-weight: 500;
+}
+
+/* ─── Security Note ───────────────────────────────────────────────────────── */
+
+.vp-security-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(63, 185, 80, 0.05);
+  border: 1px solid rgba(63, 185, 80, 0.15);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: #8b949e;
+  line-height: 1.5;
+}
+
+.vp-security-note-icon {
+  color: #3fb950;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ─── Error Banner ────────────────────────────────────────────────────────── */
+
+.vp-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(248, 81, 73, 0.1);
+  border-bottom: 1px solid rgba(248, 81, 73, 0.25);
+  color: #f85149;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+/* ─── Success Flash ───────────────────────────────────────────────────────── */
+
+.vp-success-flash {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(63, 185, 80, 0.1);
+  border-radius: 8px;
+  color: #3fb950;
+  font-size: 0.82rem;
+  font-weight: 500;
+  animation: vp-fade-out 3s ease forwards;
+}
+
+@keyframes vp-fade-out {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ─── Delete Confirmation Dialog ─────────────────────────────────────────── */
+
+.vp-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vp-confirm-dialog {
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 380px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vp-confirm-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0;
+}
+
+.vp-confirm-message {
+  font-size: 0.83rem;
+  color: #8b949e;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.vp-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* ─── Loading Spinner ─────────────────────────────────────────────────────── */
+
+.vp-spinner {
+  animation: vp-spin 0.7s linear infinite;
+}
+
+@keyframes vp-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ─── Scrollbar Styling ───────────────────────────────────────────────────── */
+
+.vp-sidebar::-webkit-scrollbar,
+.vp-form::-webkit-scrollbar {
+  width: 5px;
+}
+
+.vp-sidebar::-webkit-scrollbar-track,
+.vp-form::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vp-sidebar::-webkit-scrollbar-thumb,
+.vp-form::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
