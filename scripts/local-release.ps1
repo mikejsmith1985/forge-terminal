@@ -223,6 +223,28 @@ Update-FileContent "$ROOT\frontend\src\config\tourSteps.js" `
     "const TOUR_VERSION = '[^']*'" "const TOUR_VERSION = '$NEW_VERSION'" `
     "frontend/src/config/tourSteps.js"
 
+# ── Update CHANGELOG (Unreleased → versioned section) ────────────────────────
+# Inserts a fresh empty [Unreleased] above the current content, then renames
+# the existing [Unreleased] heading to [TAG] - DATE. Single replacement, no
+# line-ending fragility.
+$changelogPath = "$ROOT\CHANGELOG.md"
+if (Test-Path $changelogPath) {
+    $today = (Get-Date -Format "yyyy-MM-dd")
+    $changelogContent = [System.IO.File]::ReadAllText($changelogPath)
+    if ($changelogContent -match '## \[Unreleased\]') {
+        # One replacement: prepend a new empty [Unreleased] placeholder before
+        # the existing section, then label that section with the release version.
+        # Result: [Unreleased] (empty, for next cycle) → --- → [TAG] - DATE (content)
+        $changelogContent = $changelogContent -replace '## \[Unreleased\]', "## [Unreleased]`r`n`r`n---`r`n`r`n## [$TAG] - $today"
+        [System.IO.File]::WriteAllText($changelogPath, $changelogContent, $utf8NoBOM)
+        Write-OK "CHANGELOG.md — [Unreleased] → [$TAG] - $today"
+    } else {
+        Write-Warn "CHANGELOG.md has no [Unreleased] section — add release notes manually"
+    }
+} else {
+    Write-Warn "CHANGELOG.md not found — skipping changelog update"
+}
+
 # ── Build frontend ────────────────────────────────────────────────────────────
 Write-Banner "Building frontend"
 Write-Step "Running npm run build..."
