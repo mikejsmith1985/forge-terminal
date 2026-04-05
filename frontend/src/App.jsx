@@ -199,6 +199,7 @@ function App() {
     activeTabId,
     activeTab,
     sessionLoaded,
+    sessionLoadFailed,
     createTab,
     closeTab,
     switchTab,
@@ -1033,6 +1034,9 @@ function App() {
       if (result.error === 'max_tabs') {
         logger.tabs('Max tabs limit reached');
         addToast('Maximum tab limit reached (20)', 'warning', 3000);
+      } else if (result.error === 'not_initialized') {
+        logger.tabs('Tab creation failed - state not yet ready');
+        addToast('Terminal not ready yet. Please try again in a moment.', 'warning', 2000);
       } else {
         logger.tabs('Tab creation failed', { error: result.error });
         addToast('Failed to create new tab', 'error', 3000);
@@ -1376,18 +1380,32 @@ function App() {
 
   const handleExecute = (cmd) => {
     const termRef = getActiveTerminalRef();
-    if (termRef) {
-      // Command cards should ALWAYS execute directly in terminal, regardless of viewMode
-      // Chat routing is only for user input from ChatView UI, not command cards
-      
-      if (cmd.command && cmd.command.trim().length > 0) {
-        // Execute command directly in terminal
-        termRef.sendCommand(cmd.command, cmd.delay);
-        termRef.focus();
-      } else {
-        // Focus terminal even if command is empty
-        termRef.focus();
+    if (!termRef) return;
+
+    // Command cards always execute directly in the terminal, regardless of viewMode.
+    // Chat routing is only for user input from the ChatView UI, not command cards.
+    if (cmd.command && cmd.command.trim().length > 0) {
+      termRef.sendCommand(cmd.command, cmd.delay);
+      termRef.focus();
+
+      // If the card has a macro payload, inject it after macro_delay ms.
+      // The total wait = time for the Enter key (cmd.delay) + macro_delay so the
+      // payload arrives after the initial command has had time to start.
+      // We capture termRef here so the macro always targets the correct terminal
+      // even if the user switches tabs before the timeout fires.
+      const hasMacroPayload = cmd.macro_payload && cmd.macro_payload.trim().length > 0;
+      if (hasMacroPayload) {
+        const macroDelayMs = (cmd.macro_delay !== undefined && cmd.macro_delay !== null)
+          ? parseInt(cmd.macro_delay, 10)
+          : 1500;
+        const totalWaitMs = (parseInt(cmd.delay, 10) || 0) + macroDelayMs;
+        setTimeout(() => {
+          termRef.sendCommand(cmd.macro_payload, 15);
+        }, totalWaitMs);
       }
+    } else {
+      // Focus terminal even if the command is empty
+      termRef.focus();
     }
   }
 
@@ -1851,10 +1869,13 @@ function App() {
         />
         <div className="terminal-pane-content">
           <div className="terminal-container">
-            {/* Block terminal rendering until version is verified AND session is loaded.
-                  Rendering before session loads causes all tabs to connect with currentDirectory=null,
-                  starting every PTY in the server's CWD (e.g. Downloads) and corrupting the session. */}
-            {(!versionReady || !sessionLoaded) ? (
+            {/* Block terminal rendering until version is verified AND either:
+                  (a) session loaded successfully — tabs get their saved currentDirectory, or
+                  (b) session load failed — render anyway with default state (currentDirectory=null).
+                  Blocking on failure would permanently freeze the UI if the backend is
+                  temporarily unavailable. We keep sessionLoaded=false on failure so the
+                  save guard prevents overwriting a good session with default-only tabs. */}
+            {(!versionReady || (!sessionLoaded && !sessionLoadFailed)) ? (
               <div className="terminal-loading" style={{ 
                 display: 'flex', 
                 alignItems: 'center', 

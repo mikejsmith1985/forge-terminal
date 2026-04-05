@@ -234,6 +234,9 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       tabs: [initialTab],
       activeTabId: initialTab.id,
       sessionLoaded: false,
+      // Tracks whether a session load was attempted but failed, so the render
+      // guard can unblock terminals even when sessionLoaded stays false.
+      sessionLoadFailed: false,
     };
   });
   
@@ -253,10 +256,12 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
 
     loadSession().then(({ session, loadFailed }) => {
       if (loadFailed) {
-        // Don't set sessionLoaded to true on failure - prevents overwriting saved sessions
-        // User will start with default tab but we won't save over their existing sessions
-        logger.session('Session load failed - skipping save to preserve existing sessions');
-        setState(prev => ({ ...prev, sessionLoaded: false }));
+        // Keep sessionLoaded=false to prevent overwriting the saved session on disk.
+        // Set sessionLoadFailed=true so the render guard unblocks terminals — the
+        // default tab renders with currentDirectory=null (server CWD), which is
+        // acceptable since the saved session is already inaccessible.
+        logger.session('Session load failed - terminals will render with default state');
+        setState(prev => ({ ...prev, sessionLoaded: false, sessionLoadFailed: true }));
         return;
       }
       
@@ -348,6 +353,13 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   const createTabAction = useCallback((shellConfig, currentDirectory = null) => {
     // Check current state synchronously from ref
     const currentState = stateRef.current;
+
+    // Guard: stateRef is set by useEffect after first render; protect against
+    // edge cases where the button is clicked before the effect has run.
+    if (!currentState) {
+      logger.tabs('Tab creation skipped - state not yet initialized');
+      return { success: false, tabId: null, tab: null, error: 'not_initialized' };
+    }
     
     if (currentState.tabs.length >= MAX_TABS) {
       // Already at max - don't even call setState
@@ -754,6 +766,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     activeTabId: state.activeTabId,
     activeTab,
     sessionLoaded: state.sessionLoaded,
+    sessionLoadFailed: state.sessionLoadFailed || false,
     createTab: createTabAction,
     closeTab,
     switchTab,
