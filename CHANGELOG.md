@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v5.2.3] - 2026-04-05
+
 ### Added
 - **Forge Vault** (`v5.3.0`): AES-256-GCM encrypted secret store so developers can safely paste API tokens and credentials into Forge without ever exposing raw values to the agent or LLM.
   - **Backend** (`internal/vault/`): Two-layer security — vault data encrypted with AES-256-GCM (random nonce per write, atomic write via tmp→rename); master key wrapped by Windows DPAPI on Windows, 0600 file permissions on Unix. Secret values structurally omitted from all API responses. Sensitive bytes zeroed after use.
