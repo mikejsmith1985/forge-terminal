@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Code Tutor full automation** (`CodeTutorPanel.jsx`, `useTutorSession.js`, `App.jsx`): Code Tutor now auto-detects the active project, starts the file watcher automatically, and explains changed files without any manual interaction. Three new behaviours:
+  1. **Auto-session**: when the foreground tab's working directory changes, Code Tutor creates or resumes a live-mode session for that project (400ms debounce for rapid tab switching).
+  2. **Auto-explain**: when the watcher reports file changes, Code Tutor immediately calls the LLM explainer for the current file. A 15-second cooldown prevents call storms during rapid saves.
+  3. **Auto-open panel**: when an auto-explanation completes, the Code Tutor panel opens automatically and shows a `📚 Code Tutor: <filename> explained` toast (4s). The panel surfaces itself only when there is something to show — not on every tab switch.
+  Also: `liveMode` now defaults to `true` for new manually-created sessions, and `createSession('live')` correctly enables live mode even when resuming an existing session that had `liveMode:false`.
 - **Toast confirmation when macro payload fires** (`App.jsx`): `handleExecute` now shows a `⚡ Macro injected: [card name]` success toast (3s auto-dismiss) whenever a command card with a `macro_payload` is executed. Previously there was no visual distinction between a plain card execution and one that auto-injected a follow-up prompt — users had no way to confirm the macro fired without scrolling to the top of the session.
 
 ### Fixed
