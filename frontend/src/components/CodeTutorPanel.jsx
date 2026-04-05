@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   BookOpen, X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
-  Play, SkipForward, Check, Folder, FileText, Loader, AlertCircle, Eye
+  Play, SkipForward, Check, Folder, FileText, Loader, AlertCircle, Eye,
+  GitBranch, ArrowRight, Sparkles
 } from 'lucide-react'
 import { useAPI } from '../hooks/useAPI'
 import { useTutorSession } from '../hooks/useTutorSession'
@@ -489,6 +490,248 @@ const styles = {
     fontSize: 13,
     gap: 8,
   },
+
+  // ── Wizard mode ──────────────────────
+  wizardStepBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 16px',
+    background: 'rgba(0,212,255,0.05)',
+    borderBottom: `1px solid ${colors.border}`,
+    flexShrink: 0,
+    flexWrap: 'wrap',
+    rowGap: 6,
+  },
+  wizardLabel: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: colors.accent,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    whiteSpace: 'nowrap',
+  },
+  wizardDots: {
+    display: 'flex',
+    gap: 4,
+    alignItems: 'center',
+  },
+  wizardDot: (isCompleted, isCurrent) => ({
+    width: isCurrent ? 10 : 7,
+    height: isCurrent ? 10 : 7,
+    borderRadius: '50%',
+    background: isCurrent ? colors.accent : isCompleted ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.15)',
+    transition: 'all 0.2s ease',
+    flexShrink: 0,
+  }),
+  wizardStepCount: {
+    fontSize: 11,
+    color: colors.textDim,
+    whiteSpace: 'nowrap',
+  },
+  browseAllBtn: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '3px 10px',
+    borderRadius: 4,
+    border: `1px solid ${colors.borderLight}`,
+    background: 'transparent',
+    color: colors.textDim,
+    fontSize: 11,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'color 0.15s, border-color 0.15s',
+  },
+  wizardFileRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '8px 14px',
+    background: colors.panel,
+    borderBottom: `1px solid ${colors.border}`,
+    flexShrink: 0,
+    flexWrap: 'wrap',
+    rowGap: 4,
+  },
+  wizardFilePath: {
+    fontFamily: '"Cascadia Code", "Fira Code", monospace',
+    fontSize: 12,
+    color: colors.text,
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  additionsBadge: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#22c55e',
+    background: 'rgba(34,197,94,0.12)',
+    padding: '1px 7px',
+    borderRadius: 10,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  deletionsBadge: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#ef4444',
+    background: 'rgba(239,68,68,0.12)',
+    padding: '1px 7px',
+    borderRadius: 10,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  operationBadge: (operation) => ({
+    fontSize: 9,
+    fontWeight: 700,
+    padding: '2px 7px',
+    borderRadius: 10,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    flexShrink: 0,
+    background: operation === 'added' ? 'rgba(34,197,94,0.15)' : 'rgba(0,212,255,0.12)',
+    color: operation === 'added' ? '#22c55e' : colors.accent,
+  }),
+  wizardBody: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  diffPanel: {
+    flex: '0 0 auto',
+    maxHeight: '35%',
+    minHeight: 80,
+    overflow: 'auto',
+    background: '#0a0f1a',
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  diffSectionLabel: {
+    fontSize: 10,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.07em',
+    color: colors.textDim,
+    padding: '5px 12px 3px',
+    userSelect: 'none',
+  },
+  diffPre: {
+    margin: 0,
+    padding: '0 0 8px',
+    fontSize: 11,
+    lineHeight: 1.55,
+    fontFamily: '"Cascadia Code", "Fira Code", monospace',
+  },
+  diffLine: (lineType) => ({
+    display: 'flex',
+    padding: '0 8px',
+    background: lineType === 'add' ? 'rgba(34,197,94,0.1)' :
+                lineType === 'remove' ? 'rgba(239,68,68,0.1)' :
+                lineType === 'hunk' ? 'rgba(0,212,255,0.05)' :
+                'transparent',
+    minWidth: 'max-content',
+  }),
+  diffPrefix: (lineType) => ({
+    display: 'inline-block',
+    width: 14,
+    flexShrink: 0,
+    color: lineType === 'add' ? '#22c55e' :
+           lineType === 'remove' ? '#ef4444' :
+           lineType === 'hunk' ? colors.accent :
+           '#444',
+    userSelect: 'none',
+    fontWeight: lineType === 'add' || lineType === 'remove' ? 700 : 400,
+  }),
+  diffLineContent: {
+    whiteSpace: 'pre',
+    color: (lineType) => lineType === 'hunk' ? colors.accent :
+                         lineType === 'header' ? colors.textDim : colors.text,
+    flex: 1,
+  },
+  diffEmpty: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 80,
+    gap: 6,
+    color: colors.textDim,
+    fontSize: 12,
+  },
+  explanationPanel: {
+    flex: 1,
+    overflow: 'auto',
+    background: colors.panel,
+  },
+  explanationSectionLabel: {
+    fontSize: 10,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.07em',
+    color: colors.textDim,
+    padding: '8px 14px 0',
+    userSelect: 'none',
+  },
+  explanationLoading: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '14px',
+    color: colors.textDim,
+    fontSize: 12,
+  },
+  changeSection: {
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  changeSectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '8px 14px',
+    cursor: 'pointer',
+    border: 'none',
+    background: 'transparent',
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: 600,
+    width: '100%',
+    textAlign: 'left',
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  changeSectionBody: {
+    padding: '8px 14px 12px',
+    fontSize: 12,
+    lineHeight: 1.65,
+    color: colors.textDim,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  },
+  wizardAdvanceBtn: (isLast) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    padding: '7px 16px',
+    borderRadius: 6,
+    border: 'none',
+    background: isLast ? '#22c55e' : colors.accent,
+    color: '#000',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'opacity 0.15s',
+    marginLeft: 'auto',
+  }),
+  sourceTag: {
+    fontSize: 10,
+    color: colors.textDim,
+    fontStyle: 'italic',
+    padding: '0 14px 6px',
+  },
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -498,6 +741,11 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     session, explanation, isLoading, isExplaining, error, notifications, sessions,
     createSession, loadSession, deleteSession, advance, goBack, goToFile,
     skipFile, explain, updateSettings, clearError, dismissNotification, listSessions,
+    // Wizard
+    wizardChanges, wizardStepIndex, isWizardMode, hasCheckedForChanges,
+    isFetchingChanges, changeExplanation, isExplainingChange,
+    fetchRecentChanges, explainChange, exitWizardMode,
+    wizardAdvance, wizardGoBack, wizardSkip,
   } = useTutorSession()
 
   const { readFile } = useAPI()
@@ -609,6 +857,25 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     }
   }, [isOpen, session, listSessions])
 
+  // ── Auto-detect recent changes when panel opens with an active session ──
+  // Checks git diff and enters wizard mode if changes are found.
+  // Only runs once per session load to avoid re-triggering after the user exits wizard.
+  useEffect(() => {
+    if (isOpen && session?.projectPath && !hasCheckedForChanges && !isWizardMode) {
+      fetchRecentChanges(session.projectPath)
+    }
+  }, [isOpen, session?.projectPath, hasCheckedForChanges, isWizardMode, fetchRecentChanges])
+
+  // ── Auto-trigger explanation when the wizard step changes ──────
+  // Loads the change-focused explanation immediately without any button click.
+  useEffect(() => {
+    if (!isWizardMode || !session) return
+    const currentChange = wizardChanges[wizardStepIndex]
+    if (!currentChange || isExplainingChange) return
+    explainChange(currentChange.path, currentChange.diff || '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWizardMode, wizardStepIndex, session?.id])
+
   // ── Handlers ───────────────────────────────────────────────────
   const handleCreate = useCallback(() => {
     if (!projectPath.trim()) return
@@ -637,6 +904,184 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
   }, [updateSettings, isLive])
 
   // ── Render helpers ─────────────────────────────────────────────
+
+  // Parses unified diff text into typed line objects for colorized rendering.
+  const parseDiffLines = useCallback((diffText) => {
+    if (!diffText) return []
+    return diffText.split('\n').map((line) => {
+      if (line.startsWith('+++') || line.startsWith('---')) {
+        return { type: 'header', prefix: '', content: line }
+      } else if (line.startsWith('+')) {
+        return { type: 'add', prefix: '+', content: line.slice(1) }
+      } else if (line.startsWith('-')) {
+        return { type: 'remove', prefix: '-', content: line.slice(1) }
+      } else if (line.startsWith('@@')) {
+        return { type: 'hunk', prefix: '', content: line }
+      } else {
+        return { type: 'context', prefix: ' ', content: line.startsWith(' ') ? line.slice(1) : line }
+      }
+    })
+  }, [])
+
+  // Renders the Change Wizard — focused walkthrough of recently changed files.
+  // Replaces the file-tree view when git changes are detected.
+  const renderWizardMode = () => {
+    const currentChange = wizardChanges[wizardStepIndex]
+    if (!currentChange) return null
+
+    const totalSteps = wizardChanges.length
+    const stepNumber = wizardStepIndex + 1
+    const isLastStep = stepNumber === totalSteps
+    const diffLines = parseDiffLines(currentChange.diff)
+
+    return (
+      <>
+        {/* Step indicator bar */}
+        <div style={styles.wizardStepBar}>
+          <span style={styles.wizardLabel}>
+            <Sparkles size={13} />
+            {totalSteps} file{totalSteps !== 1 ? 's' : ''} changed
+          </span>
+          <div style={styles.wizardDots}>
+            {wizardChanges.map((_, i) => (
+              <div
+                key={i}
+                style={styles.wizardDot(i < stepNumber, i === wizardStepIndex)}
+              />
+            ))}
+          </div>
+          <span style={styles.wizardStepCount}>Step {stepNumber} of {totalSteps}</span>
+          <button
+            style={styles.browseAllBtn}
+            onClick={exitWizardMode}
+            onMouseEnter={(e) => { e.currentTarget.style.color = colors.text; e.currentTarget.style.borderColor = colors.accent }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = colors.textDim; e.currentTarget.style.borderColor = colors.borderLight }}
+          >
+            Browse all files <ArrowRight size={11} />
+          </button>
+        </div>
+
+        {/* Changed file info row */}
+        <div style={styles.wizardFileRow}>
+          <FileText size={13} color={colors.accent} />
+          <span style={styles.wizardFilePath} title={currentChange.path}>
+            {currentChange.path}
+          </span>
+          {currentChange.additions > 0 && (
+            <span style={styles.additionsBadge}>+{currentChange.additions}</span>
+          )}
+          {currentChange.deletions > 0 && (
+            <span style={styles.deletionsBadge}>−{currentChange.deletions}</span>
+          )}
+          <span style={styles.operationBadge(currentChange.operation)}>
+            {currentChange.operation}
+          </span>
+        </div>
+
+        {/* Wizard body: diff + explanation stacked */}
+        <div style={styles.wizardBody}>
+          {/* Diff view */}
+          <div style={styles.diffPanel}>
+            {diffLines.length > 0 ? (
+              <>
+                <div style={styles.diffSectionLabel}>What changed</div>
+                <pre style={styles.diffPre}>
+                  {diffLines.map((line, i) => {
+                    // Skip file header lines (--- a/file +++ b/file) — noise for the learner.
+                    if (line.type === 'header') return null
+                    return (
+                      <div key={i} style={styles.diffLine(line.type)}>
+                        <span style={styles.diffPrefix(line.type)}>{line.prefix}</span>
+                        <span style={{
+                          whiteSpace: 'pre',
+                          color: line.type === 'hunk' ? colors.accent :
+                                 line.type === 'add' ? '#d4fad4' :
+                                 line.type === 'remove' ? '#fad4d4' :
+                                 colors.text,
+                          flex: 1,
+                        }}>
+                          {line.content}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </pre>
+              </>
+            ) : (
+              <div style={styles.diffEmpty}>
+                <GitBranch size={18} strokeWidth={1.5} />
+                <span>No diff available for this file</span>
+              </div>
+            )}
+          </div>
+
+          {/* Auto-loaded explanation */}
+          <div style={styles.explanationPanel}>
+            <div style={styles.explanationSectionLabel}>Why it changed</div>
+            {isExplainingChange ? (
+              <div style={styles.explanationLoading}>
+                <Loader size={14} style={styles.spinner} />
+                Generating walkthrough…
+              </div>
+            ) : changeExplanation ? (
+              <div>
+                {changeExplanation.sections?.map((sec) => {
+                  const isOpen = expandedSections[sec.title] !== false
+                  return (
+                    <div key={sec.title} style={styles.changeSection}>
+                      <button
+                        style={styles.changeSectionHeader}
+                        onClick={() => toggleSection(sec.title)}
+                      >
+                        {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                        {sec.title}
+                      </button>
+                      {isOpen && (
+                        <div style={styles.changeSectionBody}>{sec.content}</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div style={styles.explanationLoading}>
+                <Loader size={14} style={styles.spinner} />
+                Loading explanation…
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Wizard navigation */}
+        <div style={styles.bottomBar}>
+          <button
+            style={styles.navBtn(wizardStepIndex <= 0)}
+            onClick={wizardGoBack}
+            disabled={wizardStepIndex <= 0}
+          >
+            <ChevronLeft size={14} /> Back
+          </button>
+          <button
+            style={styles.navBtn(false)}
+            onClick={wizardSkip}
+          >
+            <SkipForward size={14} /> Skip
+          </button>
+          <button
+            style={styles.wizardAdvanceBtn(isLastStep)}
+            onClick={wizardAdvance}
+          >
+            {isLastStep ? (
+              <><Check size={14} /> All done ✓</>
+            ) : (
+              <><Check size={14} /> Got it, next →</>
+            )}
+          </button>
+        </div>
+      </>
+    )
+  }
+
   const renderFileTree = () => (
     <div style={styles.fileTree}>
       {CATEGORY_ORDER.map((cat) => {
@@ -857,7 +1302,8 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
         <button
           style={{ ...styles.secondaryBtn, padding: '3px 10px', borderColor: 'rgba(250,204,21,0.3)', color: colors.warning }}
           onClick={() => {
-            if (notif.files?.length) goToFile(0)
+            // Re-fetch recent changes to enter the Change Wizard with fresh data.
+            if (session?.projectPath) fetchRecentChanges(session.projectPath)
             dismissNotification(0)
           }}
         >
@@ -899,8 +1345,8 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
           </button>
         </div>
 
-        {/* Progress bar (only when session active) */}
-        {hasSession && (
+        {/* Progress bar — shows in browse mode only; wizard has its own step bar */}
+        {hasSession && !isWizardMode && (
           <div style={styles.progressRow}>
             <span style={styles.progressLabel}>
               {reviewedCount}/{files.length} files
@@ -937,48 +1383,56 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
         {/* Notification banner */}
         {hasSession && renderNotificationBanner()}
 
-        {/* Main content */}
+        {/* Main content: wizard mode takes full priority when active */}
         {hasSession ? (
-          <>
-            <div style={styles.contentArea}>
-              {renderFileTree()}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                {renderCodeViewer()}
-                {currentFile && renderExplanation()}
+          isWizardMode ? (
+            // ── Change Wizard ─────────────────────────────────────────────────
+            // Shows only the N recently changed files with diff view + auto-explanation.
+            renderWizardMode()
+          ) : (
+            // ── Browse mode ───────────────────────────────────────────────────
+            // Full file-tree view with manual navigation and on-demand explanation.
+            <>
+              <div style={styles.contentArea}>
+                {renderFileTree()}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  {renderCodeViewer()}
+                  {currentFile && renderExplanation()}
+                </div>
               </div>
-            </div>
 
-            {/* Bottom navigation */}
-            <div style={styles.bottomBar}>
-              <button
-                style={styles.navBtn(currentIndex <= 0)}
-                onClick={goBack}
-                disabled={currentIndex <= 0}
-              >
-                <ChevronLeft size={14} /> Previous
-              </button>
-              <button
-                style={styles.navBtn(!currentFile)}
-                onClick={skipFile}
-                disabled={!currentFile}
-              >
-                <SkipForward size={14} /> Skip
-              </button>
-              <button
-                style={styles.advanceBtn(!currentFile)}
-                onClick={advance}
-                disabled={!currentFile}
-              >
-                <Check size={14} /> Next
-              </button>
-              <input
-                style={styles.questionInput}
-                type="text"
-                placeholder="Ask a question… (coming soon)"
-                disabled
-              />
-            </div>
-          </>
+              {/* Bottom navigation */}
+              <div style={styles.bottomBar}>
+                <button
+                  style={styles.navBtn(currentIndex <= 0)}
+                  onClick={goBack}
+                  disabled={currentIndex <= 0}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+                <button
+                  style={styles.navBtn(!currentFile)}
+                  onClick={skipFile}
+                  disabled={!currentFile}
+                >
+                  <SkipForward size={14} /> Skip
+                </button>
+                <button
+                  style={styles.advanceBtn(!currentFile)}
+                  onClick={advance}
+                  disabled={!currentFile}
+                >
+                  <Check size={14} /> Next
+                </button>
+                <input
+                  style={styles.questionInput}
+                  type="text"
+                  placeholder="Ask a question… (coming soon)"
+                  disabled
+                />
+              </div>
+            </>
+          )
         ) : (
           renderSessionCreation()
         )}

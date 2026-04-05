@@ -40,7 +40,8 @@ const tutorFetch = async (url, options = {}) => {
  * React hook for managing Code Tutor sessions.
  *
  * Provides full lifecycle management — creating, loading, navigating,
- * explaining files, updating settings, and polling for watcher notifications.
+ * explaining files, updating settings, polling for watcher notifications,
+ * and running the Change Wizard for post-edit walkthroughs.
  *
  * @returns {{
  *   session: object|null,
@@ -50,6 +51,13 @@ const tutorFetch = async (url, options = {}) => {
  *   error: string|null,
  *   notifications: Array,
  *   sessions: Array,
+ *   wizardChanges: Array,
+ *   wizardStepIndex: number,
+ *   isWizardMode: boolean,
+ *   hasCheckedForChanges: boolean,
+ *   isFetchingChanges: boolean,
+ *   changeExplanation: object|null,
+ *   isExplainingChange: boolean,
  *   createSession: (projectPath: string, mode?: string) => Promise<void>,
  *   loadSession: (sessionId: string) => Promise<void>,
  *   deleteSession: (sessionId: string) => Promise<void>,
@@ -62,6 +70,12 @@ const tutorFetch = async (url, options = {}) => {
  *   clearError: () => void,
  *   dismissNotification: (index: number) => void,
  *   listSessions: () => Promise<void>,
+ *   fetchRecentChanges: (projectPath: string) => Promise<void>,
+ *   explainChange: (filePath: string, diff: string) => Promise<void>,
+ *   exitWizardMode: () => void,
+ *   wizardAdvance: () => void,
+ *   wizardGoBack: () => void,
+ *   wizardSkip: () => void,
  * }}
  */
 export function useTutorSession() {
@@ -72,6 +86,16 @@ export function useTutorSession() {
   const [error, setError] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [sessions, setSessions] = useState([])
+
+  // Wizard mode — shown when recent git changes are detected.
+  // Replaces the full file-tree view with a focused step-by-step walkthrough.
+  const [wizardChanges, setWizardChanges] = useState([])
+  const [wizardStepIndex, setWizardStepIndex] = useState(0)
+  const [isWizardMode, setIsWizardMode] = useState(false)
+  const [hasCheckedForChanges, setHasCheckedForChanges] = useState(false)
+  const [isFetchingChanges, setIsFetchingChanges] = useState(false)
+  const [changeExplanation, setChangeExplanation] = useState(null)
+  const [isExplainingChange, setIsExplainingChange] = useState(false)
 
   const errorTimerRef = useRef(null)
   const pollingRef = useRef(null)
@@ -100,6 +124,13 @@ export function useTutorSession() {
 
   const loadSession = useCallback(async (sessionId) => {
     setIsLoading(true)
+    // Reset wizard state when loading a different session so the wizard
+    // re-checks for changes against the new project.
+    setHasCheckedForChanges(false)
+    setIsWizardMode(false)
+    setWizardChanges([])
+    setWizardStepIndex(0)
+    setChangeExplanation(null)
     try {
       const data = await tutorFetch(`/api/tutor/sessions/${sessionId}`)
       setSession(data)
@@ -114,6 +145,12 @@ export function useTutorSession() {
 
   const createSession = useCallback(async (projectPath, mode = 'on_demand') => {
     setIsLoading(true)
+    // Reset wizard so it runs fresh for the new project.
+    setHasCheckedForChanges(false)
+    setIsWizardMode(false)
+    setWizardChanges([])
+    setWizardStepIndex(0)
+    setChangeExplanation(null)
     try {
       const data = await tutorFetch('/api/tutor/sessions', {
         method: 'POST',
@@ -164,7 +201,7 @@ export function useTutorSession() {
   }, [setTimedError])
 
   // ---------------------------------------------------------------------------
-  // Navigation
+  // Navigation (regular file-tree mode)
   // ---------------------------------------------------------------------------
 
   const navigate = useCallback(async (action, index) => {
@@ -193,7 +230,7 @@ export function useTutorSession() {
   const skipFile = useCallback(() => navigate('skip'), [navigate])
 
   // ---------------------------------------------------------------------------
-  // Explanation
+  // Explanation (regular file mode)
   // ---------------------------------------------------------------------------
 
   const explain = useCallback(async () => {
@@ -235,12 +272,103 @@ export function useTutorSession() {
   }, [session, setTimedError])
 
   // ---------------------------------------------------------------------------
-  // Notifications
+  // Notifications (from file watcher)
   // ---------------------------------------------------------------------------
 
   const dismissNotification = useCallback((index) => {
     setNotifications((prev) => prev.filter((_, i) => i !== index))
   }, [])
+
+  // ---------------------------------------------------------------------------
+  // Wizard mode — Change Walkthrough
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Queries git for recently changed files and enters wizard mode if any are found.
+   * Marks hasCheckedForChanges=true after running so we don't re-check on every render.
+   */
+  const fetchRecentChanges = useCallback(async (projectPath) => {
+    if (!projectPath) return
+    setIsFetchingChanges(true)
+    try {
+      const data = await tutorFetch(
+        `/api/tutor/recent-changes?projectPath=${encodeURIComponent(projectPath)}`
+      )
+      if (data?.files?.length > 0) {
+        setWizardChanges(data.files)
+        setWizardStepIndex(0)
+        setIsWizardMode(true)
+        setChangeExplanation(null)
+      }
+    } catch (err) {
+      // Non-fatal — wizard simply won't activate if git is unavailable.
+      console.error('[TutorSession] fetchRecentChanges error:', err)
+    } finally {
+      setIsFetchingChanges(false)
+      setHasCheckedForChanges(true)
+    }
+  }, [])
+
+  /**
+   * Generates a diff-aware explanation for a specific changed file.
+   * Uses the /api/tutor/explain-change endpoint which focuses the LLM
+   * on what changed and why, rather than describing the file generally.
+   */
+  const explainChange = useCallback(async (filePath, diff) => {
+    if (!session) return
+    setIsExplainingChange(true)
+    setChangeExplanation(null)
+    try {
+      const data = await tutorFetch('/api/tutor/explain-change', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId: session.id, filePath, diff }),
+      })
+      setChangeExplanation(data)
+    } catch (err) {
+      console.error('[TutorSession] explainChange error:', err)
+      setTimedError(err.message)
+    } finally {
+      setIsExplainingChange(false)
+    }
+  }, [session, setTimedError])
+
+  /** Exits wizard mode and returns to the full file-tree view. */
+  const exitWizardMode = useCallback(() => {
+    setIsWizardMode(false)
+    setWizardChanges([])
+    setWizardStepIndex(0)
+    setChangeExplanation(null)
+  }, [])
+
+  /** Advances to the next wizard step, clearing the current explanation. */
+  const wizardAdvance = useCallback(() => {
+    setWizardStepIndex((prev) => {
+      const nextIndex = prev + 1
+      if (nextIndex >= wizardChanges.length) {
+        // All steps done — exit wizard and return to browse mode.
+        setIsWizardMode(false)
+        setWizardChanges([])
+        setChangeExplanation(null)
+        return 0
+      }
+      setChangeExplanation(null)
+      return nextIndex
+    })
+  }, [wizardChanges.length])
+
+  /** Goes back one wizard step, clearing the current explanation. */
+  const wizardGoBack = useCallback(() => {
+    setWizardStepIndex((prev) => {
+      if (prev <= 0) return 0
+      setChangeExplanation(null)
+      return prev - 1
+    })
+  }, [])
+
+  /** Skips the current wizard file without marking it as understood. */
+  const wizardSkip = useCallback(() => {
+    wizardAdvance()
+  }, [wizardAdvance])
 
   // ---------------------------------------------------------------------------
   // Watcher polling (active only when liveMode is enabled)
@@ -262,6 +390,11 @@ export function useTutorSession() {
         // Backend returns an array of WatcherNotification objects
         if (Array.isArray(data) && data.length > 0) {
           setNotifications((prev) => [...prev, ...data])
+          // Re-check for changes when the watcher detects edits,
+          // but only if the wizard is not already active.
+          if (!isWizardMode && session.projectPath) {
+            setHasCheckedForChanges(false)
+          }
         }
       } catch (err) {
         console.error('[TutorSession] watcher poll error:', err)
@@ -273,7 +406,7 @@ export function useTutorSession() {
       clearInterval(pollingRef.current)
       pollingRef.current = null
     }
-  }, [session?.id, session?.settings?.liveMode])
+  }, [session?.id, session?.settings?.liveMode, isWizardMode, session?.projectPath])
 
   // ---------------------------------------------------------------------------
   // Restore last active session on mount
@@ -296,7 +429,7 @@ export function useTutorSession() {
   }, [])
 
   return {
-    // State
+    // Regular session state
     session,
     explanation,
     isLoading,
@@ -305,7 +438,16 @@ export function useTutorSession() {
     notifications,
     sessions,
 
-    // Actions
+    // Wizard state
+    wizardChanges,
+    wizardStepIndex,
+    isWizardMode,
+    hasCheckedForChanges,
+    isFetchingChanges,
+    changeExplanation,
+    isExplainingChange,
+
+    // Regular session actions
     createSession,
     loadSession,
     deleteSession,
@@ -318,5 +460,13 @@ export function useTutorSession() {
     clearError,
     dismissNotification,
     listSessions,
+
+    // Wizard actions
+    fetchRecentChanges,
+    explainChange,
+    exitWizardMode,
+    wizardAdvance,
+    wizardGoBack,
+    wizardSkip,
   }
-}
+}

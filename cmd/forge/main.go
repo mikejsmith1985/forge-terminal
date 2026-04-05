@@ -490,6 +490,8 @@ func main() {
 	http.HandleFunc("/api/tutor/learning-path", WrapWithMiddleware(handleTutorLearningPath))
 	http.HandleFunc("/api/tutor/settings", WrapWithMiddleware(handleTutorSettings))
 	http.HandleFunc("/api/tutor/watcher", WrapWithMiddleware(handleTutorWatcher))
+	http.HandleFunc("/api/tutor/recent-changes", WrapWithMiddleware(handleTutorRecentChanges))
+	http.HandleFunc("/api/tutor/explain-change", WrapWithMiddleware(handleTutorExplainChange))
 
 	// ── Enterprise Workflow Architect routes ─────────────────────────────
 	http.HandleFunc("/api/workflow/detect", WrapWithMiddleware(handleWorkflowDetect))

@@ -152,6 +152,25 @@ type WatcherNotification struct {
 	Message   string            `json:"message"` // e.g., "3 files modified — want a walkthrough?"
 }
 
+// RecentChange describes a single file changed recently, detected via git diff.
+// Used by the Change Wizard to guide users through what an agent just modified.
+type RecentChange struct {
+	Path      string `json:"path"`
+	Operation string `json:"operation"` // "added", "modified", "deleted"
+	Diff      string `json:"diff"`       // Unified diff text (empty for binary/large files)
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
+}
+
+// ChangeSet groups all recent changes detected in a project directory.
+// Source describes what git range was used to find them.
+type ChangeSet struct {
+	ProjectPath string         `json:"projectPath"`
+	Files       []RecentChange `json:"files"`
+	Source      string         `json:"source"` // "uncommitted", "last-commit", "none"
+	DetectedAt  time.Time      `json:"detectedAt"`
+}
+
 // SessionProgress provides a summary of learning progress.
 type SessionProgress struct {
 	TotalFiles    int     `json:"totalFiles"`

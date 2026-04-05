@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Code Tutor Change Wizard**: When Code Tutor opens with an active session, it now auto-detects recently changed files via `git diff` and enters a focused wizard mode instead of dumping the user into a 770-file list. The wizard shows: step indicator (`Step N of M` with progress dots), the changed file with `+`/`-` diff counts, a colorized unified diff view, and an auto-generated "What changed & why" explanation — no button click required. Users can move through changed files with "Got it, next →" / "Back" / "Skip", or exit to browse mode at any time
+- **`GET /api/tutor/recent-changes`**: New endpoint returns recently changed files with unified diff text. Detection priority: uncommitted changes first (`git diff HEAD`), then last commit (`git diff HEAD~1..HEAD`). Returns `ChangeSet{files, source, detectedAt}`
+- **`POST /api/tutor/explain-change`**: New endpoint generates a diff-aware explanation focused on *what changed and why* rather than a generic file description. Sections: What Changed, Why It Changed, Key Concepts, Impact & Connections
+- **`internal/tutor/changes.go`**: New package file implementing `DetectRecentChanges()` with git subprocess integration, per-file diff extraction (capped at 8KB), and graceful fallback when git is unavailable
+- **`ExplainChange()` on `Explainer`**: New method on the tutor explainer that builds a diff-grounded prompt and caches by diff hash (not file hash), so re-explanations fire on new changes
+
 ### Fixed
 - **Macro injection for command cards**: `handleExecute` now sends `macro_payload` to the terminal after `(cmd.delay + macro_delay)` ms. Previously the `macro_payload` and `macro_delay` fields were saved in card data but never used — clicking Run never injected the macro
 - **New tab blocked when session load fails**: `useTabManager` now sets `sessionLoadFailed=true` when `/api/sessions` is unavailable, allowing the App render guard to unblock terminal rendering. Previously the guard `!sessionLoaded` permanently froze the UI (showing "Loading...") if the backend was temporarily down at startup — users saw the + button but terminals never appeared. `sessionLoaded` stays false to protect the existing saved session from being overwritten
+- **"View Changes" watcher notification**: Clicking "View Changes" in the notification banner now re-fetches git changes and enters the Change Wizard, instead of incorrectly jumping to learning-path index 0
+
 
 ### Added
 - Enterprise workflow initialized with Forge Terminal Workflow Architect
