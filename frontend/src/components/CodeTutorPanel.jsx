@@ -10,6 +10,33 @@ import { useTutorSession } from '../hooks/useTutorSession'
 // Minimum gap between automatic LLM explain calls; prevents call storms during rapid file saves.
 const AUTO_EXPLAIN_COOLDOWN_MS = 15_000
 
+// Teaching order for file categories — mirrors categoryOrder() in internal/tutor/scanner.go.
+// Files are grouped and displayed in this sequence: foundational first, advanced last.
+const CATEGORY_ORDER = ['config', 'types', 'utils', 'core', 'handlers', 'ui', 'tests', 'docs', 'assets']
+
+// Visual badge metadata for each file category. Colors are semantically meaningful:
+// yellow=config (caution/settings), purple=types, cyan=utils, red=core logic,
+// orange=handlers, green=ui, indigo=tests, slate=docs, teal=assets.
+const CATEGORY_META = {
+  config:   { bg: 'rgba(250,204,21,0.15)',  color: '#facc15' },
+  types:    { bg: 'rgba(192,132,252,0.15)', color: '#c084fc' },
+  utils:    { bg: 'rgba(0,212,255,0.15)',   color: '#00d4ff' },
+  core:     { bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+  handlers: { bg: 'rgba(249,115,22,0.15)',  color: '#f97316' },
+  ui:       { bg: 'rgba(34,197,94,0.15)',   color: '#22c55e' },
+  tests:    { bg: 'rgba(99,102,241,0.15)',  color: '#6366f1' },
+  docs:     { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
+  assets:   { bg: 'rgba(20,184,166,0.15)',  color: '#14b8a6' },
+}
+
+// Status indicator icons shown next to each file in the browse panel.
+const STATUS_ICONS = {
+  pending:  '○',
+  current:  '▶',
+  reviewed: '✓',
+  skipped:  '→',
+}
+
 // ── Color palette ──────────────────────────────────────────────────────────────
 const colors = {
   base:        '#0f1123',
@@ -513,7 +540,7 @@ const styles = {
     gap: 10,
   },
   categoryBadge: (cat) => {
-    const meta = CATEGORY_META[cat] || CATEGORY_META.Docs
+    const meta = CATEGORY_META[cat] || CATEGORY_META.docs
     return {
       fontSize: 8,
       fontWeight: 700,
@@ -596,7 +623,7 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     const groups = {}
     for (const cat of CATEGORY_ORDER) groups[cat] = []
     files.forEach((f, idx) => {
-      const cat = CATEGORY_ORDER.includes(f.category) ? f.category : 'Docs'
+      const cat = CATEGORY_ORDER.includes(f.category) ? f.category : 'docs'
       groups[cat].push({ ...f, _idx: idx })
     })
     return groups

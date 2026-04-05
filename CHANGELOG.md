@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Code Tutor launch crash** (`CodeTutorPanel.jsx`): Three module-level constants (`CATEGORY_ORDER`, `CATEGORY_META`, `STATUS_ICONS`) were referenced throughout the component but never declared, causing an immediate `ReferenceError: CATEGORY_ORDER is not defined` on every app load. Defined all three constants with values that mirror the backend's category order and file-status enums (`internal/tutor/types.go`, `internal/tutor/scanner.go`). Also fixed two related bugs where the unknown-category fallback used `'Docs'` (capitalised) instead of `'docs'`, which would have silently dropped files with unrecognised categories.
+
 ### Added
 - **Code Tutor wizard UX** (`CodeTutorPanel.jsx`, `useTutorSession.js`, `internal/tutor/explainer.go`, `cmd/forge/handlers_tutor.go`): Complete redesign of the Code Tutor panel into a fullscreen centered modal with a guided wizard experience:
   1. **Fullscreen modal**: panel opens as a centered `min(980px,96vw)` × `min(88vh,920px)` overlay — terminal keeps running behind it, backdrop click to dismiss.
