@@ -8,7 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Code Tutor full automation** (`CodeTutorPanel.jsx`, `useTutorSession.js`, `App.jsx`): Code Tutor now auto-detects the active project, starts the file watcher automatically, and explains changed files without any manual interaction. Three new behaviours:
+- **Code Tutor wizard UX** (`CodeTutorPanel.jsx`, `useTutorSession.js`, `internal/tutor/explainer.go`, `cmd/forge/handlers_tutor.go`): Complete redesign of the Code Tutor panel into a fullscreen centered modal with a guided wizard experience:
+  1. **Fullscreen modal**: panel opens as a centered `min(980px,96vw)` × `min(88vh,920px)` overlay — terminal keeps running behind it, backdrop click to dismiss.
+  2. **Wizard mode**: when auto-explain triggers, panel opens directly in wizard mode showing only the changed files as pill selectors, then immediately presents the explanation — no file tree to navigate.
+  3. **Browse mode**: manually opened panel shows a 220px file list alongside the explanation area for browsing all project files.
+  4. **Inline Q&A**: every explanation ends with a question input; user can ask any question about the current file. Backend routes `POST /api/tutor/explain` to `AnswerQuestion()` when a `question` field is present (never cached — questions are unique). Questions and answers replace the main explanation in-place.
+  5. **Section cards**: each explanation category (Why Changed, Key Concepts, etc.) renders as a full-width card — no collapsible sections, no wall of text.
+  6. **Wizard footer actions**: "Dive Deeper" re-queries LLM at `depth:deep`, "Next File" advances the wizard, "Got It / Skip" marks reviewed and advances. Changed-file pills allow jumping directly to any modified file.
+  7. **Mode toggle**: header buttons let users switch between Wizard and Browse views at any time.
+- **Code Tutor full automation**(`CodeTutorPanel.jsx`, `useTutorSession.js`, `App.jsx`): Code Tutor now auto-detects the active project, starts the file watcher automatically, and explains changed files without any manual interaction. Three new behaviours:
   1. **Auto-session**: when the foreground tab's working directory changes, Code Tutor creates or resumes a live-mode session for that project (400ms debounce for rapid tab switching).
   2. **Auto-explain**: when the watcher reports file changes, Code Tutor immediately calls the LLM explainer for the current file. A 15-second cooldown prevents call storms during rapid saves.
   3. **Auto-open panel**: when an auto-explanation completes, the Code Tutor panel opens automatically and shows a `📚 Code Tutor: <filename> explained` toast (4s). The panel surfaces itself only when there is something to show — not on every tab switch.

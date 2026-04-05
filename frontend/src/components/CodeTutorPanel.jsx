@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
-  BookOpen, X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
-  Play, SkipForward, Check, Folder, FileText, Loader, AlertCircle, Eye
+  BookOpen, X, ChevronRight, ChevronDown,
+  Play, SkipForward, Check, Folder, FileText, Loader, AlertCircle,
+  MessageSquare, Zap, ArrowRight, List, Maximize2
 } from 'lucide-react'
 import { useAPI } from '../hooks/useAPI'
 import { useTutorSession } from '../hooks/useTutorSession'
@@ -9,171 +10,410 @@ import { useTutorSession } from '../hooks/useTutorSession'
 // Minimum gap between automatic LLM explain calls; prevents call storms during rapid file saves.
 const AUTO_EXPLAIN_COOLDOWN_MS = 15_000
 
-// ── Category display metadata ──────────────────────────────────────────────────
-const CATEGORY_META = {
-  Config:   { color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
-  Types:    { color: '#a855f7', bg: 'rgba(168,85,247,0.15)' },
-  Utils:    { color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
-  Core:     { color: '#f97316', bg: 'rgba(249,115,22,0.15)' },
-  Handlers: { color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
-  UI:       { color: '#ec4899', bg: 'rgba(236,72,153,0.15)' },
-  Tests:    { color: '#facc15', bg: 'rgba(250,204,21,0.15)' },
-  Docs:     { color: '#9ca3af', bg: 'rgba(156,163,175,0.15)' },
+// ── Color palette ──────────────────────────────────────────────────────────────
+const colors = {
+  base:        '#0f1123',
+  panel:       '#16213e',
+  panelLight:  '#1c2a4a',
+  accent:      '#00d4ff',
+  accentDim:   'rgba(0,212,255,0.12)',
+  text:        '#e8e8f0',
+  textDim:     '#8892a4',
+  error:       '#ef4444',
+  warning:     '#facc15',
+  success:     '#22c55e',
+  purple:      '#c084fc',
+  purpleDim:   'rgba(192,132,252,0.12)',
+  trackBg:     '#2a2a3e',
+  border:      'rgba(255,255,255,0.07)',
+  borderLight: 'rgba(255,255,255,0.12)',
+  hoverBg:     'rgba(0,212,255,0.06)',
+  activeBg:    'rgba(0,212,255,0.12)',
 }
-
-const STATUS_ICONS = {
-  reviewed: '✅',
-  current:  '🔵',
-  pending:  '⬜',
-  skipped:  '⏭️',
-}
-
-const CATEGORY_ORDER = ['Config', 'Types', 'Utils', 'Core', 'Handlers', 'UI', 'Tests', 'Docs']
 
 // ── Inline style definitions ───────────────────────────────────────────────────
-const colors = {
-  base:       '#1a1a2e',
-  panel:      '#16213e',
-  accent:     '#00d4ff',
-  text:       '#e0e0e0',
-  textDim:    '#888',
-  error:      '#ef4444',
-  warning:    '#facc15',
-  trackBg:    '#333',
-  codeBg:     '#0d1117',
-  hoverBg:    'rgba(0,212,255,0.08)',
-  activeBg:   'rgba(0,212,255,0.15)',
-  border:     'rgba(255,255,255,0.08)',
-  borderLight:'rgba(255,255,255,0.12)',
-}
-
 const styles = {
-  overlay: {
+  // Full-screen backdrop — terminal stays fully interactive behind the modal
+  backdrop: {
     position: 'fixed',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    background: 'rgba(0,0,0,0.4)',
-    zIndex: 999,
+    inset: 0,
+    background: 'rgba(0,0,0,0.75)',
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backdropFilter: 'blur(4px)',
   },
-  drawer: (isOpen) => ({
-    position: 'fixed',
-    top: 0,
-    right: 0,
-    height: '100vh',
-    width: 500,
+  // Centered modal — feels like a focused workspace, not a side panel
+  modal: {
+    width: 'min(980px, 96vw)',
+    height: 'min(88vh, 920px)',
     background: colors.base,
-    color: colors.text,
+    borderRadius: 16,
+    border: `1px solid ${colors.borderLight}`,
+    boxShadow: '0 40px 100px rgba(0,0,0,0.8)',
     display: 'flex',
     flexDirection: 'column',
-    zIndex: 1000,
-    boxShadow: '-4px 0 24px rgba(0,0,0,0.5)',
-    transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     overflow: 'hidden',
-  }),
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    color: colors.text,
+  },
+  // ── Header ─────────────────────────────────────────────────────
   header: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px 16px',
+    gap: 10,
+    padding: '13px 20px',
     borderBottom: `1px solid ${colors.border}`,
     background: colors.panel,
     flexShrink: 0,
   },
-  headerLeft: {
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: 700,
+    letterSpacing: '0.02em',
+    flex: 1,
+  },
+  modeBadge: (isLive) => ({
+    fontSize: 10,
+    fontWeight: 700,
+    padding: '3px 9px',
+    borderRadius: 10,
+    background: isLive ? 'rgba(34,197,94,0.15)' : colors.accentDim,
+    color: isLive ? colors.success : colors.accent,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    border: `1px solid ${isLive ? 'rgba(34,197,94,0.3)' : 'rgba(0,212,255,0.25)'}`,
+  }),
+  headerBtn: {
+    background: 'none',
+    border: `1px solid ${colors.border}`,
+    color: colors.textDim,
+    cursor: 'pointer',
+    padding: '5px 12px',
+    borderRadius: 6,
+    fontSize: 12,
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: 600,
-    letterSpacing: '0.02em',
+    gap: 5,
+    transition: 'all 0.15s',
+    whiteSpace: 'nowrap',
   },
   closeBtn: {
     background: 'none',
     border: 'none',
     color: colors.textDim,
     cursor: 'pointer',
-    padding: 4,
-    borderRadius: 4,
+    padding: 6,
+    borderRadius: 6,
     display: 'flex',
     alignItems: 'center',
-    transition: 'color 0.15s',
+    transition: 'all 0.15s',
   },
+  // ── Progress row ────────────────────────────────────────────────
   progressRow: {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    padding: '6px 16px',
+    padding: '6px 20px',
     background: colors.panel,
     borderBottom: `1px solid ${colors.border}`,
     flexShrink: 0,
   },
-  progressLabel: {
-    fontSize: 12,
-    color: colors.textDim,
-    whiteSpace: 'nowrap',
-  },
-  progressTrack: {
-    flex: 1,
-    height: 3,
-    background: colors.trackBg,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
+  progressLabel: { fontSize: 11, color: colors.textDim, whiteSpace: 'nowrap' },
+  progressTrack: { flex: 1, height: 2, background: colors.trackBg, borderRadius: 2, overflow: 'hidden' },
   progressFill: (pct) => ({
     height: '100%',
     width: `${pct}%`,
-    background: colors.accent,
+    background: `linear-gradient(90deg, ${colors.accent}, ${colors.success})`,
     borderRadius: 2,
     transition: 'width 0.4s ease',
   }),
-  modeBadge: (isLive) => ({
-    fontSize: 10,
-    fontWeight: 600,
-    padding: '2px 8px',
-    borderRadius: 10,
-    background: isLive ? 'rgba(34,197,94,0.2)' : 'rgba(0,212,255,0.15)',
-    color: isLive ? '#22c55e' : colors.accent,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-  }),
-  contentArea: {
+  // ── Changed-file pill strip (wizard mode) ───────────────────────
+  filePillStrip: {
     display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '9px 20px',
+    borderBottom: `1px solid ${colors.border}`,
+    background: colors.panel,
+    overflowX: 'auto',
+    flexShrink: 0,
+    scrollbarWidth: 'none',
+  },
+  filePillLabel: {
+    fontSize: 11,
+    color: colors.textDim,
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    flexShrink: 0,
+  },
+  filePill: (isActive) => ({
+    padding: '4px 12px',
+    borderRadius: 20,
+    fontSize: 12,
+    fontWeight: isActive ? 600 : 400,
+    cursor: 'pointer',
+    background: isActive ? colors.accentDim : 'rgba(255,255,255,0.05)',
+    color: isActive ? colors.accent : colors.textDim,
+    border: `1px solid ${isActive ? 'rgba(0,212,255,0.4)' : colors.border}`,
+    whiteSpace: 'nowrap',
+    transition: 'all 0.15s',
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+  }),
+  // ── Wizard scroll area ──────────────────────────────────────────
+  wizardScrollArea: {
     flex: 1,
+    overflowY: 'auto',
+    padding: '24px 28px 12px',
+  },
+  wizardFileHeading: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: colors.text,
+    marginBottom: 4,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  wizardFileSub: {
+    fontSize: 12,
+    color: colors.textDim,
+    marginBottom: 20,
+    lineHeight: 1.5,
+  },
+  // ── Section cards (wizard mode — full-width, not collapsible) ───
+  sectionCard: {
+    marginBottom: 16,
+    borderRadius: 10,
+    border: `1px solid ${colors.border}`,
+    background: colors.panel,
     overflow: 'hidden',
   },
-  // ── Session creation ─────────────────
+  sectionCardHeader: {
+    padding: '9px 16px',
+    fontSize: 10,
+    fontWeight: 700,
+    color: colors.accent,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    background: colors.panelLight,
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  sectionCardBody: {
+    padding: '14px 16px',
+    fontSize: 13,
+    lineHeight: 1.75,
+    color: colors.text,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  },
+  // ── Q&A answer card ─────────────────────────────────────────────
+  questionAnswerCard: {
+    marginBottom: 20,
+    borderRadius: 10,
+    border: `1px solid rgba(0,212,255,0.3)`,
+    background: 'rgba(0,212,255,0.03)',
+    overflow: 'hidden',
+  },
+  questionBubble: {
+    padding: '11px 16px',
+    borderBottom: `1px solid rgba(0,212,255,0.15)`,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: 'rgba(0,212,255,0.07)',
+  },
+  questionBubbleText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: colors.accent,
+    flex: 1,
+  },
+  // ── Wizard footer ────────────────────────────────────────────────
+  wizardFooter: {
+    borderTop: `1px solid ${colors.border}`,
+    background: colors.panel,
+    padding: '12px 20px',
+    flexShrink: 0,
+  },
+  questionRow: {
+    display: 'flex',
+    gap: 8,
+    marginBottom: 10,
+  },
+  questionInput: {
+    flex: 1,
+    padding: '9px 14px',
+    borderRadius: 8,
+    border: `1px solid ${colors.border}`,
+    background: colors.panelLight,
+    color: colors.text,
+    fontSize: 13,
+    outline: 'none',
+    transition: 'border-color 0.15s',
+  },
+  sendBtn: (isEnabled) => ({
+    padding: '9px 16px',
+    borderRadius: 8,
+    border: 'none',
+    background: colors.accent,
+    color: '#000',
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: isEnabled ? 'pointer' : 'default',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    opacity: isEnabled ? 1 : 0.4,
+    transition: 'opacity 0.15s',
+  }),
+  footerActions: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+  },
+  diveDeepBtn: {
+    padding: '7px 14px',
+    borderRadius: 7,
+    border: `1px solid rgba(192,132,252,0.4)`,
+    background: colors.purpleDim,
+    color: colors.purple,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    transition: 'all 0.15s',
+    whiteSpace: 'nowrap',
+  },
+  skipBtn: {
+    padding: '7px 14px',
+    borderRadius: 7,
+    border: `1px solid ${colors.border}`,
+    background: 'transparent',
+    color: colors.textDim,
+    fontSize: 12,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    transition: 'all 0.15s',
+    whiteSpace: 'nowrap',
+  },
+  nextBtn: (isDisabled) => ({
+    padding: '7px 18px',
+    borderRadius: 7,
+    border: 'none',
+    background: isDisabled ? '#2a2a3e' : colors.accent,
+    color: isDisabled ? '#555' : '#000',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: isDisabled ? 'default' : 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    transition: 'all 0.15s',
+    marginLeft: 'auto',
+    whiteSpace: 'nowrap',
+  }),
+  // ── Browse mode ─────────────────────────────────────────────────
+  contentArea: { display: 'flex', flex: 1, overflow: 'hidden' },
+  browseFileList: {
+    width: 220,
+    borderRight: `1px solid ${colors.border}`,
+    overflowY: 'auto',
+    background: colors.panel,
+    flexShrink: 0,
+  },
+  browseCategoryHeader: {
+    padding: '8px 12px',
+    fontSize: 10,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.07em',
+    color: colors.textDim,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  browseFileEntry: (isCurrent) => ({
+    padding: '6px 12px 6px 20px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    background: isCurrent ? colors.activeBg : 'transparent',
+    borderLeft: `3px solid ${isCurrent ? colors.accent : 'transparent'}`,
+    transition: 'background 0.1s',
+  }),
+  browseFileName: {
+    fontSize: 11,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    flex: 1,
+  },
+  browseExplainArea: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  browseExplainScroll: { flex: 1, overflowY: 'auto', padding: '20px 24px' },
+  browseActions: {
+    borderTop: `1px solid ${colors.border}`,
+    padding: '10px 16px',
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+    background: colors.panel,
+    flexShrink: 0,
+  },
+  browseQuestionInput: {
+    flex: 1,
+    padding: '6px 12px',
+    borderRadius: 7,
+    border: `1px solid ${colors.border}`,
+    background: colors.panelLight,
+    color: colors.text,
+    fontSize: 12,
+    outline: 'none',
+    transition: 'border-color 0.15s',
+  },
+  // ── Session creation ─────────────────────────────────────────────
   sessionPane: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 32,
     gap: 16,
     overflowY: 'auto',
   },
-  sessionTitle: {
-    fontSize: 18,
-    fontWeight: 600,
-    marginBottom: 4,
-  },
+  sessionTitle: { fontSize: 22, fontWeight: 700, marginBottom: 4 },
   sessionSub: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textDim,
     marginBottom: 12,
     textAlign: 'center',
+    maxWidth: 420,
+    lineHeight: 1.55,
   },
   input: {
     width: '100%',
-    maxWidth: 340,
-    padding: '8px 12px',
-    borderRadius: 6,
+    maxWidth: 420,
+    padding: '10px 14px',
+    borderRadius: 8,
     border: `1px solid ${colors.borderLight}`,
     background: colors.panel,
     color: colors.text,
@@ -182,13 +422,13 @@ const styles = {
     transition: 'border-color 0.15s',
   },
   primaryBtn: {
-    padding: '8px 20px',
-    borderRadius: 6,
+    padding: '10px 24px',
+    borderRadius: 8,
     border: 'none',
     background: colors.accent,
     color: '#000',
     fontSize: 13,
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -196,8 +436,8 @@ const styles = {
     transition: 'opacity 0.15s',
   },
   secondaryBtn: {
-    padding: '6px 14px',
-    borderRadius: 6,
+    padding: '8px 16px',
+    borderRadius: 7,
     border: `1px solid ${colors.borderLight}`,
     background: 'transparent',
     color: colors.text,
@@ -206,23 +446,22 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    transition: 'background 0.15s',
   },
   modeToggle: {
     display: 'flex',
-    borderRadius: 6,
+    borderRadius: 7,
     border: `1px solid ${colors.borderLight}`,
     overflow: 'hidden',
     marginTop: 4,
   },
-  modeToggleBtn: (active) => ({
-    padding: '6px 16px',
+  modeToggleBtn: (isActive) => ({
+    padding: '7px 18px',
     fontSize: 12,
-    fontWeight: active ? 600 : 400,
+    fontWeight: isActive ? 700 : 400,
     border: 'none',
     cursor: 'pointer',
-    background: active ? colors.accent : 'transparent',
-    color: active ? '#000' : colors.textDim,
+    background: isActive ? colors.accent : 'transparent',
+    color: isActive ? '#000' : colors.textDim,
     transition: 'all 0.15s',
   }),
   sessionListLabel: {
@@ -232,14 +471,14 @@ const styles = {
     letterSpacing: '0.06em',
     marginTop: 12,
     alignSelf: 'flex-start',
-    maxWidth: 340,
+    maxWidth: 420,
     width: '100%',
   },
   sessionItem: {
     width: '100%',
-    maxWidth: 340,
-    padding: '8px 12px',
-    borderRadius: 6,
+    maxWidth: 420,
+    padding: '9px 14px',
+    borderRadius: 7,
     border: `1px solid ${colors.border}`,
     background: colors.panel,
     color: colors.text,
@@ -250,238 +489,19 @@ const styles = {
     justifyContent: 'space-between',
     transition: 'border-color 0.15s',
   },
-  // ── File tree ────────────────────────
-  fileTree: {
-    width: 180,
-    borderRight: `1px solid ${colors.border}`,
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    flexShrink: 0,
-    background: colors.panel,
-    fontSize: 11,
-  },
-  categoryHeader: {
-    padding: '6px 10px',
-    fontSize: 10,
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    color: colors.textDim,
-    userSelect: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-  },
-  fileEntry: (isCurrent) => ({
-    padding: '4px 10px 4px 18px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 5,
-    background: isCurrent ? colors.activeBg : 'transparent',
-    borderLeft: isCurrent ? `2px solid ${colors.accent}` : '2px solid transparent',
-    transition: 'background 0.12s',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  }),
-  fileStatusIcon: {
-    flexShrink: 0,
-    fontSize: 10,
-    width: 16,
-    textAlign: 'center',
-  },
-  fileName: {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    fontSize: 11,
-  },
-  categoryBadge: (cat) => {
-    const meta = CATEGORY_META[cat] || CATEGORY_META.Docs
-    return {
-      fontSize: 8,
-      fontWeight: 600,
-      padding: '1px 5px',
-      borderRadius: 8,
-      background: meta.bg,
-      color: meta.color,
-      flexShrink: 0,
-      marginLeft: 'auto',
-      textTransform: 'uppercase',
-      letterSpacing: '0.04em',
-    }
-  },
-  // ── Code viewer ──────────────────────
-  codeArea: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-  },
-  codeHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '8px 12px',
-    fontSize: 12,
-    color: colors.textDim,
-    borderBottom: `1px solid ${colors.border}`,
-    background: colors.panel,
-    flexShrink: 0,
-  },
-  codeScroll: {
-    flex: 1,
-    overflow: 'auto',
-    background: colors.codeBg,
-  },
-  codePre: {
-    margin: 0,
-    padding: '12px 0',
-    fontSize: 12,
-    lineHeight: 1.6,
-    fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", monospace',
-    minWidth: 'fit-content',
-  },
-  codeLine: (isHighlight) => ({
-    display: 'flex',
-    padding: '0 12px 0 0',
-    background: isHighlight ? 'rgba(0,212,255,0.06)' : 'transparent',
-  }),
-  lineNumber: {
-    display: 'inline-block',
-    width: 44,
-    textAlign: 'right',
-    paddingRight: 12,
-    color: '#555',
-    userSelect: 'none',
-    flexShrink: 0,
-  },
-  lineContent: {
-    whiteSpace: 'pre',
-    flex: 1,
-  },
-  // ── Explanation ──────────────────────
-  explainArea: {
-    borderTop: `1px solid ${colors.border}`,
-    maxHeight: 260,
-    overflowY: 'auto',
-    background: colors.panel,
-    flexShrink: 0,
-  },
-  explainBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '8px 14px',
-    margin: '10px 12px',
-    borderRadius: 6,
-    border: `1px solid ${colors.accent}`,
-    background: 'transparent',
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'background 0.15s',
-  },
-  sectionToggle: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '8px 12px',
-    width: '100%',
-    border: 'none',
-    background: 'transparent',
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: 'pointer',
-    borderBottom: `1px solid ${colors.border}`,
-    textAlign: 'left',
-  },
-  sectionContent: {
-    padding: '8px 12px 12px',
-    fontSize: 12,
-    lineHeight: 1.6,
-    color: colors.textDim,
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
-  },
-  // ── Bottom nav ───────────────────────
-  bottomBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '10px 12px',
-    borderTop: `1px solid ${colors.border}`,
-    background: colors.panel,
-    flexShrink: 0,
-  },
-  navBtn: (disabled) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    padding: '6px 12px',
-    borderRadius: 6,
-    border: `1px solid ${colors.borderLight}`,
-    background: 'transparent',
-    color: disabled ? '#555' : colors.text,
-    fontSize: 12,
-    cursor: disabled ? 'default' : 'pointer',
-    opacity: disabled ? 0.5 : 1,
-    transition: 'opacity 0.15s',
-  }),
-  advanceBtn: (disabled) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    padding: '6px 14px',
-    borderRadius: 6,
-    border: 'none',
-    background: disabled ? '#333' : colors.accent,
-    color: disabled ? '#666' : '#000',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: disabled ? 'default' : 'pointer',
-    transition: 'opacity 0.15s',
-  }),
-  questionInput: {
-    flex: 1,
-    padding: '6px 10px',
-    borderRadius: 6,
-    border: `1px solid ${colors.border}`,
-    background: colors.base,
-    color: colors.text,
-    fontSize: 12,
-    outline: 'none',
-    marginLeft: 'auto',
-  },
-  // ── Banners ──────────────────────────
+  // ── Shared ───────────────────────────────────────────────────────
   errorBanner: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    padding: '8px 14px',
-    background: 'rgba(239,68,68,0.12)',
-    borderBottom: '1px solid rgba(239,68,68,0.25)',
+    padding: '8px 20px',
+    background: 'rgba(239,68,68,0.1)',
+    borderBottom: '1px solid rgba(239,68,68,0.2)',
     color: colors.error,
     fontSize: 12,
     flexShrink: 0,
   },
-  notifBanner: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '8px 14px',
-    background: 'rgba(250,204,21,0.1)',
-    borderBottom: '1px solid rgba(250,204,21,0.2)',
-    color: colors.warning,
-    fontSize: 12,
-    flexShrink: 0,
-  },
-  spinner: {
-    animation: 'spin 1s linear infinite',
-  },
+  spinner: { animation: 'spin 1s linear infinite' },
   placeholder: {
     display: 'flex',
     flexDirection: 'column',
@@ -490,99 +510,138 @@ const styles = {
     flex: 1,
     color: colors.textDim,
     fontSize: 13,
-    gap: 8,
+    gap: 10,
+  },
+  categoryBadge: (cat) => {
+    const meta = CATEGORY_META[cat] || CATEGORY_META.Docs
+    return {
+      fontSize: 8,
+      fontWeight: 700,
+      padding: '2px 6px',
+      borderRadius: 8,
+      background: meta.bg,
+      color: meta.color,
+      flexShrink: 0,
+      textTransform: 'uppercase',
+      letterSpacing: '0.04em',
+    }
   },
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
+/**
+ * CodeTutorPanel — "Learn As You Build" fullscreen wizard experience.
+ *
+ * Two visual modes:
+ *   - Wizard: auto-triggered when the watcher detects file changes; opens with the
+ *     explanation already loaded, shows only the changed files as pills, and offers
+ *     an inline Q&A interface so the user can ask follow-up questions.
+ *   - Browse: manually opened; full file list on the left, explanation on the right.
+ *
+ * @param {boolean}  isOpen          — whether the panel is visible
+ * @param {function} onClose         — called when the user dismisses the panel
+ * @param {function} onToast         — called with (message, type, duration) for app toasts
+ * @param {string}   activeDirectory — CWD of the foreground terminal tab
+ * @param {function} onAutoExplain   — called with (filePath) when auto-explain completes
+ */
 export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirectory, onAutoExplain }) {
   const {
     session, explanation, isLoading, isExplaining, error, notifications, sessions,
+    questionAnswer, isAsking,
     createSession, loadSession, deleteSession, advance, goBack, goToFile,
-    skipFile, explain, updateSettings, clearError, dismissNotification, listSessions,
+    skipFile, explain, askQuestion, clearQuestionAnswer,
+    updateSettings, clearError, dismissNotification, listSessions,
   } = useTutorSession()
 
-  const { readFile } = useAPI()
+  // readFile is kept for potential future code-preview feature in browse mode
+  const { readFile } = useAPI()   // eslint-disable-line no-unused-vars
 
   // ── Local state ────────────────────────────────────────────────
   const [projectPath, setProjectPath] = useState('')
   const [liveMode, setLiveMode] = useState(true)
-  const [fileContent, setFileContent] = useState(null)
-  const [fileLoading, setFileLoading] = useState(false)
-  const [expandedSections, setExpandedSections] = useState({})
   const [collapsedCategories, setCollapsedCategories] = useState({})
   const [errorVisible, setErrorVisible] = useState(false)
+  const [questionText, setQuestionText] = useState('')
+  // 'wizard' = auto-triggered by file changes; 'browse' = manually opened
+  const [displayMode, setDisplayMode] = useState('browse')
+  // Paths of files that triggered the current wizard session
+  const [wizardChangedFiles, setWizardChangedFiles] = useState([])
 
-  const codeScrollRef = useRef(null)
   const errorTimerRef = useRef(null)
-  // Automation: track cooldown, auto-explain origin, and last auto-created project path
+  // Automation refs: cooldown, auto-explain origin, last auto-created directory
   const autoExplainCooldownRef = useRef(0)
   const wasAutoExplainRef = useRef(false)
   const lastAutoCreatedDirectoryRef = useRef(null)
   const prevNotificationsLengthRef = useRef(0)
 
+  // Reset to browse mode when the panel closes so manual reopens start clean
+  useEffect(() => {
+    if (!isOpen) {
+      setDisplayMode('browse')
+      setQuestionText('')
+    }
+  }, [isOpen])
+
   // Escape key closes the panel
   useEffect(() => {
     if (!isOpen) return
     const handleKey = (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-      }
+      if (e.key === 'Escape') { e.preventDefault(); onClose() }
     }
     document.addEventListener('keydown', handleKey, { capture: true })
     return () => document.removeEventListener('keydown', handleKey, { capture: true })
   }, [isOpen, onClose])
 
-  // Seed project path from active tab's working directory
+  // Pre-fill project path from the active tab's working directory
   useEffect(() => {
-    if (isOpen && activeDirectory && !session) {
-      setProjectPath(activeDirectory)
-    }
+    if (isOpen && activeDirectory && !session) setProjectPath(activeDirectory)
   }, [isOpen, activeDirectory, session])
 
-  // Auto-create or resume a live session whenever the active directory changes.
+  // Auto-create or resume a live session when the active directory changes.
   // Debounced 400ms to avoid redundant API calls during rapid tab switching.
   useEffect(() => {
     if (!activeDirectory) return
     if (lastAutoCreatedDirectoryRef.current === activeDirectory) return
-
     lastAutoCreatedDirectoryRef.current = activeDirectory
-    const debounceTimer = setTimeout(() => {
-      createSession(activeDirectory, 'live')
-    }, 400)
-
+    const debounceTimer = setTimeout(() => createSession(activeDirectory, 'live'), 400)
     return () => clearTimeout(debounceTimer)
   }, [activeDirectory, createSession])
 
   // Auto-explain the current file when the watcher reports new file changes.
-  // The 15-second cooldown prevents LLM call storms during rapid successive saves.
+  // A 15-second cooldown prevents LLM call storms during rapid successive saves.
   useEffect(() => {
     if (notifications.length <= prevNotificationsLengthRef.current) {
       prevNotificationsLengthRef.current = notifications.length
       return
     }
     prevNotificationsLengthRef.current = notifications.length
-
     if (!session || isExplaining) return
 
     const now = Date.now()
     if (now - autoExplainCooldownRef.current < AUTO_EXPLAIN_COOLDOWN_MS) return
+
+    // Capture which files changed so the wizard pill strip shows them
+    const latestNotification = notifications[notifications.length - 1]
+    if (latestNotification?.files?.length) {
+      setWizardChangedFiles(latestNotification.files.map((f) => f.path))
+    }
 
     autoExplainCooldownRef.current = now
     wasAutoExplainRef.current = true
     explain()
   }, [notifications, session, isExplaining, explain])
 
-  // When an auto-explain completes, notify the parent so it can open the panel
-  // and surface a toast — bringing Code Tutor to the user's attention automatically.
+  // When auto-explain completes: switch to wizard mode and notify the parent
+  // so it can open the panel and surface a toast.
   useEffect(() => {
     if (!explanation || !wasAutoExplainRef.current) return
     wasAutoExplainRef.current = false
     const changedFilename = currentFile?.path || 'changed file'
+    setDisplayMode('wizard')
+    clearQuestionAnswer?.()
     onAutoExplain?.(changedFilename)
-  }, [explanation, onAutoExplain, currentFile])
+  }, [explanation, onAutoExplain, currentFile, clearQuestionAnswer])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived data ───────────────────────────────────────────────
   const files = session?.learningPath?.files || []
@@ -608,70 +667,31 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     return groups
   }, [files])
 
-  // ── Fetch file content on navigation ──────────────────────────
-  useEffect(() => {
-    if (!currentFile || !session) return
-    let cancelled = false
-
-    const fetchFile = async () => {
-      setFileLoading(true)
-      setFileContent(null)
-      try {
-        const resp = await readFile(currentFile.path, session.projectPath || '.')
-        if (!cancelled) {
-          setFileContent(resp.content ?? resp.data ?? '')
-        }
-      } catch {
-        if (!cancelled) setFileContent('// Failed to load file contents')
-      } finally {
-        if (!cancelled) setFileLoading(false)
-      }
-    }
-
-    fetchFile()
-    return () => { cancelled = true }
-  }, [currentFile?.path, session?.projectPath, readFile, currentFile, session])
-
-  // Reset code scroll on file change
-  useEffect(() => {
-    if (codeScrollRef.current) codeScrollRef.current.scrollTop = 0
-  }, [currentFile?.path])
-
   // ── Error auto-dismiss ─────────────────────────────────────────
   useEffect(() => {
     if (error) {
       setErrorVisible(true)
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
-      errorTimerRef.current = setTimeout(() => {
-        setErrorVisible(false)
-        clearError()
-      }, 5000)
+      errorTimerRef.current = setTimeout(() => { setErrorVisible(false); clearError() }, 5000)
     }
-    return () => {
-      if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
-    }
+    return () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current) }
   }, [error, clearError])
 
-  // ── Load sessions list when panel opens with no session ────────
+  // Load session list when the panel opens with no active session
   useEffect(() => {
-    if (isOpen && !session && listSessions) {
-      listSessions()
-    }
+    if (isOpen && !session && listSessions) listSessions()
   }, [isOpen, session, listSessions])
 
   // ── Handlers ───────────────────────────────────────────────────
+
   const handleCreate = useCallback(() => {
     if (!projectPath.trim()) return
     createSession(projectPath.trim(), liveMode ? 'live' : 'on_demand')
   }, [projectPath, liveMode, createSession])
 
-  const handleKeyDown = useCallback((e) => {
+  const handlePathKeyDown = useCallback((e) => {
     if (e.key === 'Enter') handleCreate()
   }, [handleCreate])
-
-  const toggleSection = useCallback((title) => {
-    setExpandedSections((prev) => ({ ...prev, [title]: !prev[title] }))
-  }, [])
 
   const toggleCategory = useCallback((cat) => {
     setCollapsedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }))
@@ -686,41 +706,291 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     updateSettings({ liveMode: !isLive })
   }, [updateSettings, isLive])
 
-  // ── Render helpers ─────────────────────────────────────────────
-  const renderFileTree = () => (
-    <div style={styles.fileTree}>
+  /** Re-explains at maximum depth so the user gets a line-by-line walkthrough. */
+  const handleDiveDeeper = useCallback(() => {
+    clearQuestionAnswer?.()
+    updateSettings({ depth: 'deep' })
+    explain()
+  }, [updateSettings, explain, clearQuestionAnswer])
+
+  /** Posts the typed question to the backend and shows the answer in-place. */
+  const handleAskQuestion = useCallback(() => {
+    if (!questionText.trim() || !askQuestion) return
+    askQuestion(questionText.trim())
+    setQuestionText('')
+  }, [questionText, askQuestion])
+
+  const handleQuestionKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAskQuestion() }
+  }, [handleAskQuestion])
+
+  /** Marks the current file as reviewed and advances to the next one. */
+  const handleGotIt = useCallback(() => {
+    clearQuestionAnswer?.()
+    advance()
+  }, [advance, clearQuestionAnswer])
+
+  /** Finds the learning-path index for a file path from a watcher notification. */
+  const findFileIndexByPath = useCallback((changedFilePath) => {
+    const basename = changedFilePath.split(/[/\\]/).pop()
+    return files.findIndex((f) => {
+      const fBasename = f.path.split(/[/\\]/).pop()
+      return f.path === changedFilePath || fBasename === basename
+    })
+  }, [files])
+
+  const handleWizardPillClick = useCallback((changedFilePath) => {
+    const fileIndex = findFileIndexByPath(changedFilePath)
+    if (fileIndex >= 0) {
+      clearQuestionAnswer?.()
+      goToFile(fileIndex)
+    }
+  }, [findFileIndexByPath, goToFile, clearQuestionAnswer])
+
+  // ── Shared render helpers ──────────────────────────────────────
+
+  /** Renders explanation sections as full-width readable cards (not collapsible). */
+  const renderSectionCards = (sections) => (
+    <>
+      {sections.map((sec) => (
+        <div key={sec.title} style={styles.sectionCard}>
+          <div style={styles.sectionCardHeader}>{sec.title}</div>
+          <div style={styles.sectionCardBody}>{sec.content}</div>
+        </div>
+      ))}
+    </>
+  )
+
+  /** Renders the Q&A answer card with a dismiss button. */
+  const renderQuestionAnswer = () => {
+    if (!isAsking && !questionAnswer) return null
+    return (
+      <div style={styles.questionAnswerCard}>
+        <div style={styles.questionBubble}>
+          <MessageSquare size={14} color={colors.accent} />
+          <span style={styles.questionBubbleText}>
+            {isAsking ? 'Thinking…' : 'Your question'}
+          </span>
+          {questionAnswer && (
+            <button
+              style={{ ...styles.closeBtn, padding: 3 }}
+              onClick={clearQuestionAnswer}
+              title="Back to file overview"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        {isAsking ? (
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, color: colors.textDim, fontSize: 12 }}>
+            <Loader size={14} style={styles.spinner} /> Generating answer…
+          </div>
+        ) : (
+          renderSectionCards(questionAnswer?.sections || [])
+        )}
+      </div>
+    )
+  }
+
+  // ── Render: Shared header ──────────────────────────────────────
+  const renderHeader = () => (
+    <div style={styles.header}>
+      <BookOpen size={17} color={colors.accent} />
+      <span style={styles.headerTitle}>📖 Code Tutor</span>
+      {session && (
+        <button style={styles.modeBadge(isLive)} onClick={handleModeToggle} title="Toggle live/on-demand mode">
+          {isLive ? '● Live' : '○ On Demand'}
+        </button>
+      )}
+      {session && displayMode === 'wizard' && (
+        <button
+          style={styles.headerBtn}
+          onClick={() => setDisplayMode('browse')}
+          onMouseEnter={(e) => { e.currentTarget.style.background = colors.hoverBg; e.currentTarget.style.color = colors.text }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textDim }}
+        >
+          <List size={13} /> Browse All Files
+        </button>
+      )}
+      {session && displayMode === 'browse' && explanation && (
+        <button
+          style={styles.headerBtn}
+          onClick={() => setDisplayMode('wizard')}
+          onMouseEnter={(e) => { e.currentTarget.style.background = colors.hoverBg; e.currentTarget.style.color = colors.text }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textDim }}
+        >
+          <Maximize2 size={13} /> Wizard View
+        </button>
+      )}
+      <button
+        style={styles.closeBtn}
+        onClick={onClose}
+        title="Close (Esc)"
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = colors.textDim; e.currentTarget.style.background = 'none' }}
+      >
+        <X size={18} />
+      </button>
+    </div>
+  )
+
+  // ── Render: Wizard mode ─────────────────────────────────────────
+
+  const renderChangedFilePills = () => {
+    if (!wizardChangedFiles.length) return null
+    return (
+      <div style={styles.filePillStrip}>
+        <span style={styles.filePillLabel}>Changed:</span>
+        {wizardChangedFiles.map((changedPath) => {
+          const basename = changedPath.split(/[/\\]/).pop()
+          const fileIndex = findFileIndexByPath(changedPath)
+          const isCurrentPill = fileIndex === currentIndex
+          return (
+            <button
+              key={changedPath}
+              style={styles.filePill(isCurrentPill)}
+              onClick={() => handleWizardPillClick(changedPath)}
+              title={changedPath}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: isCurrentPill ? colors.accent : colors.textDim, flexShrink: 0 }} />
+              {basename}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const renderWizardFooter = () => {
+    if (!currentFile) return null
+    return (
+      <div style={styles.wizardFooter}>
+        <div style={styles.questionRow}>
+          <input
+            style={styles.questionInput}
+            type="text"
+            placeholder="Ask something about this file… (Enter to send)"
+            value={questionText}
+            onChange={(e) => setQuestionText(e.target.value)}
+            onKeyDown={handleQuestionKeyDown}
+            onFocus={(e) => { e.target.style.borderColor = colors.accent }}
+            onBlur={(e) => { e.target.style.borderColor = colors.border }}
+            disabled={isAsking}
+          />
+          <button
+            style={styles.sendBtn(questionText.trim() && !isAsking)}
+            onClick={handleAskQuestion}
+            disabled={!questionText.trim() || isAsking}
+            title="Send question"
+          >
+            {isAsking ? <Loader size={14} style={styles.spinner} /> : <ArrowRight size={14} />}
+          </button>
+        </div>
+        <div style={styles.footerActions}>
+          <button
+            style={styles.diveDeepBtn}
+            onClick={handleDiveDeeper}
+            disabled={isExplaining || isAsking}
+            title="Re-explain at maximum technical depth"
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(192,132,252,0.2)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = colors.purpleDim }}
+          >
+            <Zap size={13} /> Dive Deeper
+          </button>
+          <button
+            style={styles.skipBtn}
+            onClick={skipFile}
+            title="Mark as skipped and move to next file"
+            onMouseEnter={(e) => { e.currentTarget.style.background = colors.hoverBg }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          >
+            <SkipForward size={13} /> Skip
+          </button>
+          <button
+            style={styles.nextBtn(!currentFile)}
+            onClick={handleGotIt}
+            disabled={!currentFile}
+            title="Mark as reviewed and move to next file"
+          >
+            <Check size={13} /> Got it, Next File
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const renderWizardContent = () => {
+    const mainSections = explanation?.sections || []
+    const isInQAMode = isAsking || !!questionAnswer
+
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={styles.wizardScrollArea}>
+          {/* File identity heading */}
+          <div style={styles.wizardFileHeading}>
+            <FileText size={20} color={colors.accent} />
+            {currentFile?.path?.split(/[/\\]/).pop() || '—'}
+          </div>
+          <div style={styles.wizardFileSub}>
+            {currentFile?.path}
+            {currentFile?.lineCount ? ` · ${currentFile.lineCount} lines` : ''}
+            {currentFile?.category ? ` · ${currentFile.category}` : ''}
+          </div>
+
+          {/* Q&A mode: answer replaces main explanation */}
+          {isInQAMode && renderQuestionAnswer()}
+
+          {/* Main explanation: visible when not in Q&A mode */}
+          {!isInQAMode && (
+            isExplaining ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 0', gap: 16 }}>
+                <Loader size={28} style={styles.spinner} color={colors.accent} />
+                <span style={{ fontSize: 14, color: colors.textDim }}>Generating explanation…</span>
+              </div>
+            ) : mainSections.length > 0 ? (
+              renderSectionCards(mainSections)
+            ) : (
+              <div style={styles.placeholder}>
+                <BookOpen size={32} strokeWidth={1.5} />
+                <span>Explanation loading…</span>
+              </div>
+            )
+          )}
+        </div>
+        {renderWizardFooter()}
+      </div>
+    )
+  }
+
+  // ── Render: Browse mode ─────────────────────────────────────────
+
+  const renderBrowseFileList = () => (
+    <div style={styles.browseFileList}>
       {CATEGORY_ORDER.map((cat) => {
         const items = groupedFiles[cat]
         if (!items || items.length === 0) return null
-        const collapsed = !!collapsedCategories[cat]
+        const isCollapsed = !!collapsedCategories[cat]
         return (
           <div key={cat}>
-            <div
-              style={styles.categoryHeader}
-              onClick={() => toggleCategory(cat)}
-            >
-              {collapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
+            <div style={styles.browseCategoryHeader} onClick={() => toggleCategory(cat)}>
+              {isCollapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
               {cat}
-              <span style={{ marginLeft: 'auto', fontWeight: 400 }}>{items.length}</span>
+              <span style={{ marginLeft: 'auto', fontWeight: 400, fontSize: 10 }}>{items.length}</span>
             </div>
-            {!collapsed && items.map((f) => {
-              const status = progress[f.path] || 'pending'
-              const isCurrent = f._idx === currentIndex
+            {!isCollapsed && items.map((f) => {
+              const fileStatus = progress[f.path] || 'pending'
+              const isCurrentFile = f._idx === currentIndex
               return (
                 <div
                   key={f.path}
-                  style={styles.fileEntry(isCurrent)}
+                  style={styles.browseFileEntry(isCurrentFile)}
                   onClick={() => goToFile(f._idx)}
                   title={f.path}
-                  onMouseEnter={(e) => {
-                    if (!isCurrent) e.currentTarget.style.background = colors.hoverBg
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isCurrent) e.currentTarget.style.background = 'transparent'
-                  }}
+                  onMouseEnter={(e) => { if (!isCurrentFile) e.currentTarget.style.background = colors.hoverBg }}
+                  onMouseLeave={(e) => { if (!isCurrentFile) e.currentTarget.style.background = 'transparent' }}
                 >
-                  <span style={styles.fileStatusIcon}>{STATUS_ICONS[status]}</span>
-                  <span style={styles.fileName}>{f.path.split('/').pop()}</span>
+                  <span style={{ fontSize: 10, flexShrink: 0 }}>{STATUS_ICONS[fileStatus]}</span>
+                  <span style={styles.browseFileName}>{f.path.split(/[/\\]/).pop()}</span>
                   <span style={styles.categoryBadge(f.category)}>{f.category}</span>
                 </div>
               )
@@ -731,96 +1001,105 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     </div>
   )
 
-  const renderCodeViewer = () => {
-    const lines = typeof fileContent === 'string' ? fileContent.split('\n') : []
+  const renderBrowseExplanation = () => {
+    const mainSections = explanation?.sections || []
     return (
-      <div style={styles.codeArea}>
-        <div style={styles.codeHeader}>
-          <FileText size={13} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {currentFile ? currentFile.path : 'No file selected'}
-          </span>
+      <div style={styles.browseExplainArea}>
+        <div style={styles.browseExplainScroll}>
           {currentFile && (
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: colors.textDim }}>
-              {currentFile.lineCount ? `${currentFile.lineCount} lines` : ''}
-              {currentFile.complexity ? ` · ${currentFile.complexity}` : ''}
-            </span>
+            <>
+              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FileText size={15} color={colors.accent} />
+                {currentFile.path.split(/[/\\]/).pop()}
+              </div>
+              <div style={{ fontSize: 11, color: colors.textDim, marginBottom: 18 }}>
+                {currentFile.path}{currentFile.lineCount ? ` · ${currentFile.lineCount} lines` : ''}
+              </div>
+            </>
           )}
-        </div>
-        <div style={styles.codeScroll} ref={codeScrollRef}>
-          {fileLoading ? (
-            <div style={styles.placeholder}>
-              <Loader size={20} style={styles.spinner} />
-              <span>Loading file…</span>
+
+          {isExplaining ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: colors.textDim, fontSize: 13, padding: '16px 0' }}>
+              <Loader size={16} style={styles.spinner} /> Generating explanation…
             </div>
-          ) : !fileContent && !currentFile ? (
+          ) : mainSections.length > 0 ? (
+            renderSectionCards(mainSections)
+          ) : currentFile ? (
+            <button
+              style={{ ...styles.secondaryBtn, borderColor: colors.accent, color: colors.accent, marginTop: 8 }}
+              onClick={explain}
+              disabled={isExplaining}
+            >
+              Explain This File
+            </button>
+          ) : (
             <div style={styles.placeholder}>
               <BookOpen size={28} strokeWidth={1.5} />
-              <span>Select a file to begin</span>
+              <span>Select a file from the list</span>
             </div>
-          ) : (
-            <pre style={styles.codePre}>
-              {lines.map((line, i) => (
-                <div key={i} style={styles.codeLine(false)}>
-                  <span style={styles.lineNumber}>{i + 1}</span>
-                  <span style={styles.lineContent}>{line}</span>
-                </div>
-              ))}
-            </pre>
+          )}
+
+          {/* Q&A answer (browse mode — appended below main explanation) */}
+          {(isAsking || questionAnswer) && (
+            <div style={{ marginTop: 20 }}>
+              {renderQuestionAnswer()}
+            </div>
           )}
         </div>
-      </div>
-    )
-  }
 
-  const renderExplanation = () => {
-    const sections = explanation?.sections || []
-    return (
-      <div style={styles.explainArea}>
-        {!explanation && !isExplaining && (
-          <button
-            style={styles.explainBtn}
-            onClick={explain}
-            disabled={!currentFile || isExplaining}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,212,255,0.1)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-          >
-            <Eye size={14} />
-            Explain This File
-          </button>
-        )}
-        {isExplaining && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', color: colors.textDim, fontSize: 12 }}>
-            <Loader size={14} style={styles.spinner} />
-            Generating explanation…
+        {currentFile && (
+          <div style={styles.browseActions}>
+            <button
+              style={styles.diveDeepBtn}
+              onClick={handleDiveDeeper}
+              disabled={isExplaining}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(192,132,252,0.2)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = colors.purpleDim }}
+            >
+              <Zap size={12} /> Dive Deeper
+            </button>
+            <input
+              style={styles.browseQuestionInput}
+              type="text"
+              placeholder="Ask a question…"
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              onKeyDown={handleQuestionKeyDown}
+              onFocus={(e) => { e.target.style.borderColor = colors.accent }}
+              onBlur={(e) => { e.target.style.borderColor = colors.border }}
+              disabled={isAsking}
+            />
+            <button
+              style={{ ...styles.sendBtn(questionText.trim() && !isAsking), padding: '6px 12px' }}
+              onClick={handleAskQuestion}
+              disabled={!questionText.trim() || isAsking}
+            >
+              {isAsking ? <Loader size={13} style={styles.spinner} /> : <ArrowRight size={13} />}
+            </button>
+            <button style={styles.skipBtn} onClick={skipFile}>
+              <SkipForward size={12} /> Skip
+            </button>
+            <button style={styles.nextBtn(!currentFile)} onClick={handleGotIt}>
+              <Check size={12} /> Next
+            </button>
           </div>
         )}
-        {sections.map((sec) => {
-          const open = expandedSections[sec.title] !== false
-          return (
-            <div key={sec.title}>
-              <button style={styles.sectionToggle} onClick={() => toggleSection(sec.title)}>
-                {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                {sec.title}
-              </button>
-              {open && <div style={styles.sectionContent}>{sec.content}</div>}
-            </div>
-          )
-        })}
       </div>
     )
   }
 
+  // ── Render: Session setup ──────────────────────────────────────
   const renderSessionCreation = () => (
     <div style={styles.sessionPane}>
-      <BookOpen size={36} strokeWidth={1.5} color={colors.accent} />
+      <BookOpen size={44} strokeWidth={1.5} color={colors.accent} />
       <div style={styles.sessionTitle}>Code Tutor</div>
       <div style={styles.sessionSub}>
-        Learn any codebase file-by-file with guided explanations.
+        Your AI coding guide. It watches your project for changes and explains what's
+        happening in plain language — so you build and learn at the same time.
       </div>
 
       {activeDirectory ? (
-        <div style={{ ...styles.input, display: 'flex', alignItems: 'center', gap: 8, opacity: 0.9 }}>
+        <div style={{ ...styles.input, display: 'flex', alignItems: 'center', gap: 8, opacity: 0.9, maxWidth: 420 }}>
           <Folder size={14} color={colors.accent} />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {projectPath || activeDirectory}
@@ -830,42 +1109,32 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
         <input
           style={styles.input}
           type="text"
-          placeholder="Project path (e.g. ./my-project)"
+          placeholder="Project path (e.g. C:\Projects\my-app)"
           value={projectPath}
           onChange={(e) => setProjectPath(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={handlePathKeyDown}
           onFocus={(e) => { e.target.style.borderColor = colors.accent }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight }}
         />
       )}
 
       <div style={styles.modeToggle}>
-        <button
-          style={styles.modeToggleBtn(!liveMode)}
-          onClick={() => setLiveMode(false)}
-        >
-          On Demand
-        </button>
-        <button
-          style={styles.modeToggleBtn(liveMode)}
-          onClick={() => setLiveMode(true)}
-        >
-          Live
-        </button>
+        <button style={styles.modeToggleBtn(!liveMode)} onClick={() => setLiveMode(false)}>On Demand</button>
+        <button style={styles.modeToggleBtn(liveMode)} onClick={() => setLiveMode(true)}>Live</button>
       </div>
 
       <button
-        style={{ ...styles.primaryBtn, opacity: projectPath.trim() ? 1 : 0.5 }}
+        style={{ ...styles.primaryBtn, opacity: projectPath.trim() ? 1 : 0.45 }}
         onClick={handleCreate}
         disabled={!projectPath.trim() || isLoading}
       >
-        {isLoading ? <Loader size={14} style={styles.spinner} /> : <Play size={14} />}
+        {isLoading ? <Loader size={15} style={styles.spinner} /> : <Play size={15} />}
         Start Learning
       </button>
 
       {sessions && sessions.length > 0 && (
         <>
-          <div style={styles.sessionListLabel}>Previous Sessions</div>
+          <div style={styles.sessionListLabel}>Continue a Session</div>
           {sessions.map((s) => (
             <div
               key={s.id}
@@ -876,14 +1145,14 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
                 <Folder size={13} color={colors.textDim} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
                   {s.projectPath || s.id}
                 </span>
               </div>
               <button
-                style={{ ...styles.closeBtn, fontSize: 10 }}
+                style={{ ...styles.closeBtn, padding: 3 }}
                 onClick={(e) => handleDeleteSession(e, s.id)}
-                title="Delete session"
+                title="Remove session"
               >
                 <X size={12} />
               </button>
@@ -894,144 +1163,70 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     </div>
   )
 
-  const renderNotificationBanner = () => {
-    if (!notifications || notifications.length === 0) return null
-    const notif = notifications[0]
-    const modifiedCount = notif.files?.length || 0
-    return (
-      <div style={styles.notifBanner}>
-        <AlertCircle size={14} />
-        <span style={{ flex: 1 }}>
-          {modifiedCount} file{modifiedCount !== 1 ? 's' : ''} modified — want a walkthrough?
-        </span>
-        <button
-          style={{ ...styles.secondaryBtn, padding: '3px 10px', borderColor: 'rgba(250,204,21,0.3)', color: colors.warning }}
-          onClick={() => {
-            if (notif.files?.length) goToFile(0)
-            dismissNotification(0)
-          }}
-        >
-          View Changes
-        </button>
-        <button
-          style={{ ...styles.closeBtn, color: colors.warning }}
-          onClick={() => dismissNotification(0)}
-        >
-          <X size={14} />
-        </button>
-      </div>
-    )
-  }
-
   // ── Main render ────────────────────────────────────────────────
   const hasSession = !!session && files.length > 0
 
+  if (!isOpen) return null
+
   return (
     <>
-      {isOpen && <div style={styles.overlay} onClick={onClose} />}
-      <div style={styles.drawer(isOpen)}>
-        {/* Spinner keyframes — injected once */}
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      {/* Clicking the backdrop closes the panel */}
+      <div style={styles.backdrop} onClick={onClose}>
+        <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
 
-        {/* Header */}
-        <div style={styles.header}>
-          <div style={styles.headerLeft}>
-            <span style={styles.title}>📖 Code Tutor</span>
-          </div>
-          <button
-            style={styles.closeBtn}
-            onClick={onClose}
-            title="Close (Esc)"
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = colors.textDim; e.currentTarget.style.background = 'none' }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Progress bar (only when session active) */}
-        {hasSession && (
-          <div style={styles.progressRow}>
-            <span style={styles.progressLabel}>
-              {reviewedCount}/{files.length} files
-            </span>
-            <div style={styles.progressTrack}>
-              <div style={styles.progressFill(progressPct)} />
+          {/* Error banner */}
+          {errorVisible && error && (
+            <div style={styles.errorBanner}>
+              <AlertCircle size={14} />
+              <span style={{ flex: 1 }}>{error}</span>
+              <button style={{ ...styles.closeBtn, color: colors.error }} onClick={() => { setErrorVisible(false); clearError() }}>
+                <X size={14} />
+              </button>
             </div>
-            <button
-              style={{
-                ...styles.modeBadge(isLive),
-                cursor: 'pointer',
-                border: `1px solid ${isLive ? 'rgba(34,197,94,0.4)' : 'rgba(0,212,255,0.3)'}`,
-              }}
-              onClick={handleModeToggle}
-              title={isLive ? 'Switch to On Demand mode' : 'Switch to Live mode'}
-              disabled={isLoading}
-            >
-              {isLive ? '● Live' : '○ On Demand'}
-            </button>
-          </div>
-        )}
+          )}
 
-        {/* Error banner */}
-        {errorVisible && error && (
-          <div style={styles.errorBanner}>
-            <AlertCircle size={14} />
-            <span style={{ flex: 1 }}>{error}</span>
-            <button style={{ ...styles.closeBtn, color: colors.error }} onClick={() => { setErrorVisible(false); clearError() }}>
-              <X size={14} />
-            </button>
-          </div>
-        )}
-
-        {/* Notification banner */}
-        {hasSession && renderNotificationBanner()}
-
-        {/* Main content */}
-        {hasSession ? (
-          <>
-            <div style={styles.contentArea}>
-              {renderFileTree()}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                {renderCodeViewer()}
-                {currentFile && renderExplanation()}
+          {hasSession ? (
+            <>
+              {renderHeader()}
+              {/* Progress bar */}
+              <div style={styles.progressRow}>
+                <span style={styles.progressLabel}>{reviewedCount}/{files.length} files reviewed</span>
+                <div style={styles.progressTrack}>
+                  <div style={styles.progressFill(progressPct)} />
+                </div>
               </div>
-            </div>
 
-            {/* Bottom navigation */}
-            <div style={styles.bottomBar}>
-              <button
-                style={styles.navBtn(currentIndex <= 0)}
-                onClick={goBack}
-                disabled={currentIndex <= 0}
-              >
-                <ChevronLeft size={14} /> Previous
-              </button>
-              <button
-                style={styles.navBtn(!currentFile)}
-                onClick={skipFile}
-                disabled={!currentFile}
-              >
-                <SkipForward size={14} /> Skip
-              </button>
-              <button
-                style={styles.advanceBtn(!currentFile)}
-                onClick={advance}
-                disabled={!currentFile}
-              >
-                <Check size={14} /> Next
-              </button>
-              <input
-                style={styles.questionInput}
-                type="text"
-                placeholder="Ask a question… (coming soon)"
-                disabled
-              />
-            </div>
-          </>
-        ) : (
-          renderSessionCreation()
-        )}
+              {/* Wizard mode: changed-file pills + explanation-first layout */}
+              {displayMode === 'wizard' && (
+                <>
+                  {renderChangedFilePills()}
+                  {renderWizardContent()}
+                </>
+              )}
+
+              {/* Browse mode: file list + explanation side-by-side */}
+              {displayMode === 'browse' && (
+                <div style={styles.contentArea}>
+                  {renderBrowseFileList()}
+                  {renderBrowseExplanation()}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {renderHeader()}
+              {isLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 16 }}>
+                  <Loader size={32} style={styles.spinner} color={colors.accent} />
+                  <span style={{ fontSize: 14, color: colors.textDim }}>Scanning project…</span>
+                </div>
+              ) : (
+                renderSessionCreation()
+              )}
+            </>
+          )}
+        </div>
       </div>
     </>
   )

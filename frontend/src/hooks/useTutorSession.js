@@ -72,6 +72,8 @@ export function useTutorSession() {
   const [error, setError] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [sessions, setSessions] = useState([])
+  const [questionAnswer, setQuestionAnswer] = useState(null)
+  const [isAsking, setIsAsking] = useState(false)
 
   const errorTimerRef = useRef(null)
   const pollingRef = useRef(null)
@@ -227,6 +229,30 @@ export function useTutorSession() {
   }, [session, setTimedError])
 
   // ---------------------------------------------------------------------------
+  // Question answering
+  // ---------------------------------------------------------------------------
+
+  /** Posts a focused question about the current file; routes to AnswerQuestion on the backend. */
+  const askQuestion = useCallback(async (question) => {
+    if (!session || !question.trim()) return
+    setIsAsking(true)
+    try {
+      const answerData = await tutorFetch('/api/tutor/explain', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId: session.id, question }),
+      })
+      setQuestionAnswer(answerData)
+    } catch (err) {
+      console.error('[TutorSession] askQuestion error:', err)
+      setTimedError(err.message)
+    } finally {
+      setIsAsking(false)
+    }
+  }, [session, setTimedError])
+
+  const clearQuestionAnswer = useCallback(() => setQuestionAnswer(null), [])
+
+  // ---------------------------------------------------------------------------
   // Settings
   // ---------------------------------------------------------------------------
 
@@ -317,6 +343,8 @@ export function useTutorSession() {
     error,
     notifications,
     sessions,
+    questionAnswer,
+    isAsking,
 
     // Actions
     createSession,
@@ -327,6 +355,8 @@ export function useTutorSession() {
     goToFile,
     skipFile,
     explain,
+    askQuestion,
+    clearQuestionAnswer,
     updateSettings,
     clearError,
     dismissNotification,

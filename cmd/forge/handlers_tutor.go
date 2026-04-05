@@ -197,6 +197,8 @@ func handleTutorExplain(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		SessionID string `json:"sessionId"`
+		// Question is optional — when present, AnswerQuestion is called instead of ExplainFile.
+		Question string `json:"question"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
@@ -221,26 +223,41 @@ func handleTutorExplain(w http.ResponseWriter, r *http.Request) {
 
 	entry := session.LearningPath.Files[session.CurrentIndex]
 
-	// Collect reviewed file paths from session progress
-	var reviewedFiles []string
-	for path, status := range session.Progress {
-		if status == tutor.StatusReviewed {
-			reviewedFiles = append(reviewedFiles, path)
+	var explanation *tutor.FileExplanation
+
+	if strings.TrimSpace(req.Question) != "" {
+		// Route to focused question-answering — not cached, tailored to the specific question.
+		log.Printf("[Tutor API] Answering question about %s: %q", entry.Path, req.Question)
+		explanation, err = tutorExplainer.AnswerQuestion(
+			context.Background(),
+			session.ProjectPath,
+			entry,
+			session.LearningPath,
+			session.Settings.Depth,
+			req.Question,
+		)
+	} else {
+		// Standard file explanation — cached by content hash + depth.
+		var reviewedFiles []string
+		for path, status := range session.Progress {
+			if status == tutor.StatusReviewed {
+				reviewedFiles = append(reviewedFiles, path)
+			}
 		}
+		log.Printf("[Tutor API] Explaining file: %s (depth=%s, naming=%s)", entry.Path, session.Settings.Depth, session.Settings.NamingReview)
+		explanation, err = tutorExplainer.ExplainFile(
+			context.Background(),
+			session.ProjectPath,
+			entry,
+			session.LearningPath,
+			session.Settings.Depth,
+			session.Settings.NamingReview,
+			reviewedFiles,
+		)
 	}
 
-	log.Printf("[Tutor API] Explaining file: %s (depth=%s, naming=%s)", entry.Path, session.Settings.Depth, session.Settings.NamingReview)
-	explanation, err := tutorExplainer.ExplainFile(
-		context.Background(),
-		session.ProjectPath,
-		entry,
-		session.LearningPath,
-		session.Settings.Depth,
-		session.Settings.NamingReview,
-		reviewedFiles,
-	)
 	if err != nil {
-		log.Printf("[Tutor API] Error explaining file %s: %v", entry.Path, err)
+		log.Printf("[Tutor API] Error explaining %s: %v", entry.Path, err)
 		http.Error(w, "Failed to explain file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

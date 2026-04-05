@@ -309,6 +309,78 @@ func parseSections(text string) []ExplanationSection {
 	return sections
 }
 
+// AnswerQuestion generates a focused answer to a specific developer question about a source file.
+// Unlike ExplainFile, question responses are intentionally not cached because each question is unique.
+func (e *Explainer) AnswerQuestion(
+	ctx context.Context,
+	projectPath string,
+	entry FileEntry,
+	learningPath *LearningPath,
+	depth ExplanationDepth,
+	question string,
+) (*FileExplanation, error) {
+	fullPath := filepath.Join(projectPath, entry.Path)
+
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading file %s: %w", entry.Path, err)
+	}
+
+	hash := sha256.Sum256(content)
+	contentHash := hex.EncodeToString(hash[:])
+
+	fileContents := string(content)
+	if len(content) > maxFileContentBytes {
+		fileContents = string(content[:maxFileContentBytes]) + "\n\n[...truncated — file exceeds 100KB]"
+	}
+
+	prompt := e.buildQuestionPrompt(entry, fileContents, learningPath, question)
+
+	log.Printf("[Tutor Explainer] answering question about %s: %q", entry.Path, question)
+	response, modelUsed, err := e.callLLM(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("LLM question call for %s: %w", entry.Path, err)
+	}
+
+	return e.parseExplanation(response, entry.Path, contentHash, modelUsed, depth), nil
+}
+
+// buildQuestionPrompt constructs a prompt focused on answering a specific developer question about a file.
+func (e *Explainer) buildQuestionPrompt(
+	entry FileEntry,
+	fileContents string,
+	learningPath *LearningPath,
+	question string,
+) string {
+	var promptBuilder strings.Builder
+
+	promptBuilder.WriteString("You are an expert code tutor. A developer is reading the following source file and has a question.\n")
+	promptBuilder.WriteString("Answer it directly, clearly, and helpfully. Reference actual code where it adds clarity.\n\n")
+
+	if learningPath != nil {
+		promptBuilder.WriteString(fmt.Sprintf("PROJECT: %s (type: %s)\n", learningPath.ProjectName, learningPath.ProjectType))
+	}
+	promptBuilder.WriteString(fmt.Sprintf("FILE: %s\n", entry.Path))
+	promptBuilder.WriteString(fmt.Sprintf("CATEGORY: %s\n", entry.Category))
+	if entry.Summary != "" {
+		promptBuilder.WriteString(fmt.Sprintf("SUMMARY: %s\n", entry.Summary))
+	}
+	promptBuilder.WriteString("\n")
+
+	promptBuilder.WriteString(fmt.Sprintf("DEVELOPER'S QUESTION: %s\n\n", question))
+
+	promptBuilder.WriteString("Respond using EXACTLY these markdown sections:\n\n")
+	promptBuilder.WriteString("## Answer\nA direct answer to the question. Reference specific functions or lines where helpful.\n\n")
+	promptBuilder.WriteString("## Code Example\nA relevant snippet — only include if it genuinely helps. Write 'N/A' if not applicable.\n\n")
+	promptBuilder.WriteString("## What To Explore Next\nOne follow-up concept or related function the developer should look at next.\n\n")
+
+	promptBuilder.WriteString("---\nFILE CONTENTS:\n```\n")
+	promptBuilder.WriteString(fileContents)
+	promptBuilder.WriteString("\n```\n")
+
+	return promptBuilder.String()
+}
+
 // ClearCache removes all cached explanations.
 func (e *Explainer) ClearCache() {
 	e.mu.Lock()
