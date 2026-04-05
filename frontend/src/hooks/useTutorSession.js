@@ -115,13 +115,26 @@ export function useTutorSession() {
   const createSession = useCallback(async (projectPath, mode = 'on_demand') => {
     setIsLoading(true)
     try {
-      const data = await tutorFetch('/api/tutor/sessions', {
+      const sessionData = await tutorFetch('/api/tutor/sessions', {
         method: 'POST',
         body: JSON.stringify({ projectPath, mode }),
       })
-      setSession(data)
+
+      // When live mode is requested on a resumed session whose liveMode is still false,
+      // push the setting update so the frontend polling loop activates correctly.
+      let finalSession = sessionData
+      if (mode === 'live' && !sessionData.settings?.liveMode) {
+        const updatedSettings = { ...sessionData.settings, liveMode: true }
+        await tutorFetch('/api/tutor/settings', {
+          method: 'PUT',
+          body: JSON.stringify({ sessionId: sessionData.id, settings: updatedSettings }),
+        })
+        finalSession = { ...sessionData, settings: updatedSettings }
+      }
+
+      setSession(finalSession)
       setExplanation(null)
-      localStorage.setItem(STORAGE_KEY, data.id)
+      localStorage.setItem(STORAGE_KEY, finalSession.id)
     } catch (err) {
       console.error('[TutorSession] createSession error:', err)
       setTimedError(err.message)

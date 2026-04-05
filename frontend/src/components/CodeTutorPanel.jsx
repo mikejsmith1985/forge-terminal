@@ -6,6 +6,9 @@ import {
 import { useAPI } from '../hooks/useAPI'
 import { useTutorSession } from '../hooks/useTutorSession'
 
+// Minimum gap between automatic LLM explain calls; prevents call storms during rapid file saves.
+const AUTO_EXPLAIN_COOLDOWN_MS = 15_000
+
 // ── Category display metadata ──────────────────────────────────────────────────
 const CATEGORY_META = {
   Config:   { color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
@@ -493,7 +496,7 @@ const styles = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirectory }) {
+export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirectory, onAutoExplain }) {
   const {
     session, explanation, isLoading, isExplaining, error, notifications, sessions,
     createSession, loadSession, deleteSession, advance, goBack, goToFile,
@@ -504,7 +507,7 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
 
   // ── Local state ────────────────────────────────────────────────
   const [projectPath, setProjectPath] = useState('')
-  const [liveMode, setLiveMode] = useState(false)
+  const [liveMode, setLiveMode] = useState(true)
   const [fileContent, setFileContent] = useState(null)
   const [fileLoading, setFileLoading] = useState(false)
   const [expandedSections, setExpandedSections] = useState({})
@@ -513,6 +516,11 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
 
   const codeScrollRef = useRef(null)
   const errorTimerRef = useRef(null)
+  // Automation: track cooldown, auto-explain origin, and last auto-created project path
+  const autoExplainCooldownRef = useRef(0)
+  const wasAutoExplainRef = useRef(false)
+  const lastAutoCreatedDirectoryRef = useRef(null)
+  const prevNotificationsLengthRef = useRef(0)
 
   // Escape key closes the panel
   useEffect(() => {
@@ -533,6 +541,48 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
       setProjectPath(activeDirectory)
     }
   }, [isOpen, activeDirectory, session])
+
+  // Auto-create or resume a live session whenever the active directory changes.
+  // Debounced 400ms to avoid redundant API calls during rapid tab switching.
+  useEffect(() => {
+    if (!activeDirectory) return
+    if (lastAutoCreatedDirectoryRef.current === activeDirectory) return
+
+    lastAutoCreatedDirectoryRef.current = activeDirectory
+    const debounceTimer = setTimeout(() => {
+      createSession(activeDirectory, 'live')
+    }, 400)
+
+    return () => clearTimeout(debounceTimer)
+  }, [activeDirectory, createSession])
+
+  // Auto-explain the current file when the watcher reports new file changes.
+  // The 15-second cooldown prevents LLM call storms during rapid successive saves.
+  useEffect(() => {
+    if (notifications.length <= prevNotificationsLengthRef.current) {
+      prevNotificationsLengthRef.current = notifications.length
+      return
+    }
+    prevNotificationsLengthRef.current = notifications.length
+
+    if (!session || isExplaining) return
+
+    const now = Date.now()
+    if (now - autoExplainCooldownRef.current < AUTO_EXPLAIN_COOLDOWN_MS) return
+
+    autoExplainCooldownRef.current = now
+    wasAutoExplainRef.current = true
+    explain()
+  }, [notifications, session, isExplaining, explain])
+
+  // When an auto-explain completes, notify the parent so it can open the panel
+  // and surface a toast — bringing Code Tutor to the user's attention automatically.
+  useEffect(() => {
+    if (!explanation || !wasAutoExplainRef.current) return
+    wasAutoExplainRef.current = false
+    const changedFilename = currentFile?.path || 'changed file'
+    onAutoExplain?.(changedFilename)
+  }, [explanation, onAutoExplain, currentFile])
 
   // ── Derived data ───────────────────────────────────────────────
   const files = session?.learningPath?.files || []

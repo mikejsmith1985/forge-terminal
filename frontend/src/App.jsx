@@ -2207,6 +2207,11 @@ function App() {
         onClose={() => setIsTutorOpen(false)}
         onToast={addToast}
         activeDirectory={activeTab?.currentDirectory}
+        onAutoExplain={(filePath) => {
+          setIsTutorOpen(true)
+          const filename = filePath.split(/[/\\]/).pop()
+          addToast(`📚 Code Tutor: ${filename} explained`, 'info', 4000)
+        }}
       />}
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
