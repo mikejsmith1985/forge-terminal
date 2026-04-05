@@ -240,6 +240,9 @@ func main() {
 	// Initialize Code Tutor subsystem
 	initTutor()
 
+	// Initialize Forge Vault (AES-256-GCM encrypted secret store)
+	initVault(storage.GetVaultDir())
+
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
@@ -505,6 +508,23 @@ func main() {
 	http.HandleFunc("/api/workflow/watch", WrapWithMiddleware(handleWorkflowWatchStart))
 	http.HandleFunc("/api/workflow/watch/poll", WrapWithMiddleware(handleWorkflowWatchPoll))
 	http.HandleFunc("/api/workflow/watch/stop", WrapWithMiddleware(handleWorkflowWatchStop))
+
+	// ── Forge Vault routes (AES-256-GCM encrypted secret store) ──────────
+	http.HandleFunc("/api/vault/status", WrapWithMiddleware(handleVaultStatus))
+	http.HandleFunc("/api/vault/entries", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handleVaultListEntries(w, r)
+		case http.MethodPost:
+			handleVaultAddEntry(w, r)
+		case http.MethodDelete:
+			handleVaultDeleteEntry(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+	http.HandleFunc("/api/vault/auto-inject", WrapWithMiddleware(handleVaultToggleAutoInject))
+	http.HandleFunc("/api/vault/inject", WrapWithMiddleware(handleVaultInject))
 
 	// Initialize session temp directory
 	if err := initSessionTempDir(); err != nil {

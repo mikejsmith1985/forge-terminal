@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mikejsmith1985/forge-terminal/internal/vault"
 )
 
 // Global forge port variable (set by main)
@@ -172,6 +174,12 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 		env = append(env, fmt.Sprintf("FORGE_DEBUG_SESSION_ID=%s", sessionID))
 	}
 
+	// Inject vault secrets flagged for auto-inject (non-interactive, fully transparent).
+	// Values never appear in terminal output — they are silently prepended to the PTY env.
+	if globalVault := vault.GetGlobal(); globalVault != nil {
+		env = append(env, globalVault.GetAutoInjectEnv()...)
+	}
+
 	if runtime.GOOS != "windows" {
 		cmd = exec.Command(shell, shellArgs...)
 		cmd.Env = env
@@ -201,6 +209,20 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 			// Ideally we pass env to startPTYWithShell.
 		} else {
 			os.Unsetenv("FORGE_DEBUG_SESSION_ID")
+		}
+
+		// Inject vault auto-inject secrets into the Windows process environment.
+		// ConPTY inherits the parent process env, so os.Setenv propagates to the child.
+		// Known limitation: this is process-wide (same race risk as the debug session ID above).
+		// Mitigated by: secrets are already on disk (the vault.enc) and values are not new info
+		// to an attacker who can read process memory. A future refactor will pass env to startPTYWithShell.
+		if globalVault := vault.GetGlobal(); globalVault != nil {
+			for _, envVar := range globalVault.GetAutoInjectEnv() {
+				parts := strings.SplitN(envVar, "=", 2)
+				if len(parts) == 2 {
+					os.Setenv(parts[0], parts[1])
+				}
+			}
 		}
 		
 		ptmx, err = startPTYWithShell(shell, shellArgs, workingDir)

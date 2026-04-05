@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen, QrCode, Menu, X } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
@@ -34,6 +34,7 @@ import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
 import CodeTutorPanel from './components/CodeTutorPanel'
+import VaultPanel from './components/VaultPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -170,6 +171,9 @@ function App() {
 
   // Code Tutor state (v3.19.0: Learn As You Build)
   const [isTutorOpen, setIsTutorOpen] = useState(false)
+
+  // Forge Vault state (v5.3.0: encrypted secret store)
+  const [isVaultOpen, setIsVaultOpen] = useState(false)
 
   // Mobile detection — drives drawer sidebar and touch-optimised interactions
   const { isMobile, isTablet } = useMobileDetect();
@@ -1830,6 +1834,8 @@ function App() {
             isForgeAssistOpen={isForgeAssistOpen}
             onToggleTutor={() => setIsTutorOpen(prev => !prev)}
             isTutorOpen={isTutorOpen}
+            onToggleVault={() => setIsVaultOpen(prev => !prev)}
+            isVaultOpen={isVaultOpen}
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
             mode={theme}
@@ -2200,6 +2206,13 @@ function App() {
         onClose={() => setIsTutorOpen(false)}
         onToast={addToast}
         activeDirectory={activeTab?.currentDirectory}
+      />}
+
+      {/* Forge Vault Panel — AES-256-GCM encrypted secret store (v5.3.0) */}
+      {!isCompact && <VaultPanel
+        isOpen={isVaultOpen}
+        onClose={() => setIsVaultOpen(false)}
+        onToast={addToast}
       />}
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}

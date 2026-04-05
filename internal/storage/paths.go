@@ -89,3 +89,9 @@ func LegacySessionsDir() string {
 func LegacyWelcomePath() string {
 	return filepath.Join(GetForgeDir(), ".welcome-shown")
 }
+
+// GetVaultDir returns the directory for the encrypted Forge Vault.
+// The vault stores AES-256-GCM encrypted secrets and a DPAPI-wrapped master key.
+func GetVaultDir() string {
+	return filepath.Join(GetForgeDir(), "vault")
+}

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Forge Vault** (`v5.3.0`): AES-256-GCM encrypted secret store so developers can safely paste API tokens and credentials into Forge without ever exposing raw values to the agent or LLM.
+  - **Backend** (`internal/vault/`): Two-layer security — vault data encrypted with AES-256-GCM (random nonce per write, atomic write via tmp→rename); master key wrapped by Windows DPAPI on Windows, 0600 file permissions on Unix. Secret values structurally omitted from all API responses. Sensitive bytes zeroed after use.
+  - **PTY auto-inject**: Entries marked `autoInject=true` are silently appended to new PTY session environment — values never appear in terminal output.
+  - **Manual inject**: `POST /api/vault/inject` creates a short-lived self-deleting platform script (`.ps1` on Windows, `.sh` on Unix) that the frontend sources in the terminal. The script auto-deletes and a 60-second backstop goroutine force-removes it.
+  - **HTTP API** (7 endpoints): `GET /api/vault/status`, `GET/POST/DELETE /api/vault/entries`, `POST /api/vault/auto-inject`, `POST /api/vault/inject`. All guarded by `requireVault` middleware; vault is optional (Forge degrades gracefully if vault fails to open).
+  - **Frontend** (`VaultPanel.jsx`, `useVault.js`, `VaultPanel.css`): Full-screen overlay with two-column layout. Sidebar lists entries with `$ENV_VAR` in monospace green, CSS-only toggle pills for auto-inject, and delete confirmation modal. Right pane hosts `AddSecretForm` with show/hide password, auto-derived env var names (`OpenAI API Key` → `OPENAI_API_KEY`), and optimistic state updates. Escape closes panel. Lock icon button added to `TabBar`.
 - **Forge Vault frontend**: Full-screen secret manager overlay (`VaultPanel.jsx`) with two-column layout — sidebar entry list with auto-inject pill toggles and delete confirmation, plus an Add Secret form with show/hide password, auto-derived environment variable names, and encrypted-at-rest security UX. Backed by `useVault.js` hook (mirrors `useTutorSession` pattern) with `vaultFetch` helper, optimistic updates, and 5-second timed error clearing.
 
 ### Fixed
