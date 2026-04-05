@@ -107,6 +107,15 @@
   to { opacity: 1; max-height: 300px; }
 }
 
+@keyframes ewcSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.ewc-spin {
+  animation: ewcSpin 0.8s linear infinite;
+}
+
 /* ─── Compliance Summary ──────────────────────────────────────────────────── */
 
 .ewc-compliance-summary {

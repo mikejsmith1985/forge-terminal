@@ -220,6 +220,13 @@ func ScaffoldProject(projectPath string, config WorkflowConfig) (*ScaffoldResult
 		return nil, fmt.Errorf("resolving project path: %w", err)
 	}
 
+	// Guard: the resolved path must actually exist as a directory.
+	// This catches contaminated paths (e.g., PowerShell exe path prepended to cwd)
+	// that arrive from the frontend before sanitization catches them.
+	if stat, statErr := os.Stat(absolutePath); statErr != nil || !stat.IsDir() {
+		return nil, fmt.Errorf("project path does not exist or is not a directory: %s", absolutePath)
+	}
+
 	manifest := scaffoldManifest()
 	result := &ScaffoldResult{
 		Success:   true,

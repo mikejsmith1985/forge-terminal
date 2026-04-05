@@ -420,6 +420,20 @@ function sanitizePath(path) {
   path = path.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
   // Remove stray trailing status glyphs
   path = path.replace(/\s*[*%±↑↓⇡⇣]\s*$/, '').trim();
+  // Detect .exe contamination — PowerShell's process path can bleed into cwd
+  // detection, producing strings like "C:\...\powershell.exePS C:\ProjectsWin\foo".
+  // When that happens, extract the valid path that follows the .exe segment.
+  const exeIndex = path.toLowerCase().indexOf('.exe');
+  if (exeIndex !== -1) {
+    const afterExe = path.slice(exeIndex + 4);
+    const validPathMatch = afterExe.match(/[A-Za-z]:\\/);
+    if (validPathMatch) {
+      path = afterExe.slice(validPathMatch.index).trim();
+    } else {
+      // No valid path after the .exe segment — entire value is suspect
+      return null;
+    }
+  }
   return path.trim();
 }
 
