@@ -371,7 +371,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
  *
  * @param {{ onClose: Function }} props
  */
-export function VaultPanel({ onClose }) {
+export function VaultPanel({ isOpen, onClose, onToast }) {
   const {
     entries,
     status,
@@ -390,11 +390,12 @@ export function VaultPanel({ onClose }) {
   const [selectedEntry, setSelectedEntry] = useState(null)
   const [entryBeingDeleted, setEntryBeingDeleted] = useState(null)
 
-  // Load data on mount
+  // Load data when panel opens
   useEffect(() => {
+    if (!isOpen) return
     loadStatus()
     loadEntries()
-  }, [loadStatus, loadEntries])
+  }, [isOpen, loadStatus, loadEntries])
 
   // Close on Escape key
   useEffect(() => {
@@ -447,6 +448,9 @@ export function VaultPanel({ onClose }) {
 
   const isVaultSecured = status?.isOpen ?? false
   const entryCount = status?.entryCount ?? entries.length
+
+  // Don't render anything when closed — no hidden DOM, no accidental event capture
+  if (!isOpen) return null
 
   return (
     <div className="vault-panel" role="dialog" aria-modal="true" aria-label="Forge Vault">

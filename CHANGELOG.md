@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Forge Vault auto-opens on launch**: `VaultPanel` was ignoring the `isOpen` prop — the component signature only destructured `onClose`, so `isOpen={false}` was silently discarded and the panel rendered as a blocking full-screen overlay. Added `isOpen` to props and a `if (!isOpen) return null` guard. Data loading now only fires when the panel actually opens.
+
 ---
 
 ## [v5.2.3] - 2026-04-05
