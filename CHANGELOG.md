@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v5.2.2] - 2026-04-05
+
 ### Fixed
 - **Number keys dropping ~10% of keypresses**: Keyboard handler was inside a `useEffect` that re-registered the `window.keydown` listener on every state change to `tabs`, `activeTabId`, `commands`, etc. The gap between `removeEventListener` and `addEventListener` (~1-5ms) caused keys pressed during re-registration to be silently dropped. **Fix**: Moved handler into a `useRef` that is updated every render; the listener is registered ONCE on mount and never re-registered. Also switched from `parseInt(e.key)` to `e.code` for reliable digit detection across OS/browser combos.
 - **Tab creation race condition**: `createTabAction` checked MAX_TABS using a potentially stale `stateRef` snapshot. Two rapid clicks could both pass the check and over-create. **Fix**: Moved the authoritative MAX_TABS guard inside the `setState` updater function where `prev` is always fresh.
