@@ -585,8 +585,33 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // defer has run. If CONTROL_GRANTED arrives within 600ms we cancel the timer so the
   // banner never appears.
   const bannerTimerRef = useRef(null);
-  
-  // PERF FIX: Track isWaiting in ref to avoid stale closures in hot paths
+
+  // Tracks how far the virtual keyboard has pushed up the visible viewport on mobile.
+  // When the keyboard opens, window.visualViewport.height shrinks but window.innerHeight
+  // does not — so a banner at position:absolute bottom:0 ends up BELOW the keyboard.
+  // We offset the banner by this delta so it always floats just above the keyboard.
+  const [keyboardHeightOffset, setKeyboardHeightOffset] = useState(0);
+
+  useEffect(() => {
+    if (!window.visualViewport) return;
+
+    const updateKeyboardOffset = () => {
+      // Keyboard height = space between layout viewport bottom and visual viewport bottom.
+      const keyboardHeight =
+        window.innerHeight -
+        window.visualViewport.height -
+        window.visualViewport.offsetTop;
+      setKeyboardHeightOffset(Math.max(0, keyboardHeight));
+    };
+
+    window.visualViewport.addEventListener('resize', updateKeyboardOffset);
+    window.visualViewport.addEventListener('scroll', updateKeyboardOffset);
+
+    return () => {
+      window.visualViewport.removeEventListener('resize', updateKeyboardOffset);
+      window.visualViewport.removeEventListener('scroll', updateKeyboardOffset);
+    };
+  }, []);
   const isWaitingRef = useRef(false);
 
   // Idle notification: fires a /api/notify POST when terminal output goes silent
@@ -1738,6 +1763,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   logger.terminal('Joined session as active device (auto-promoted)', { tabId });
                   clearTimeout(bannerTimerRef.current);
                   setIsActiveDevice(true);
+                  // Fit to this device's screen before sending resize (same reasoning
+                  // as CONTROL_GRANTED — ensures mobile gets correct col/row count).
+                  if (fitAddonRef.current) {
+                    fitAddonRef.current.fit();
+                  }
                   // Resize PTY to match our current terminal dimensions.
                   if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
                     const { cols, rows } = xtermRef.current;
@@ -1772,6 +1802,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 // device, so no passive-device overlay should appear.
                 clearTimeout(bannerTimerRef.current);
                 setIsActiveDevice(true);
+                // Fit the terminal to THIS device's screen BEFORE reading cols/rows.
+                // Without this, mobile devices inherit the desktop's column count
+                // (e.g. 220 cols) and the PTY is never resized to the phone screen.
+                // fit() is synchronous — cols/rows are correct immediately after.
+                if (fitAddonRef.current) {
+                  fitAddonRef.current.fit();
+                }
                 // Resize PTY to match this device's terminal dimensions
                 if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
                   const { cols, rows } = xtermRef.current;
@@ -2202,19 +2239,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }}
       />
 
-      {/* Handoff overlay: shown when another device controls this terminal */}
+      {/* Handoff overlay: shown when another device controls this terminal.
+          Uses keyboardHeightOffset so the banner floats above the virtual keyboard
+          on mobile — without this the banner sits below the keyboard and is unreachable. */}
       {!isActiveDevice && isConnected && (
         <div
           style={{
             position: 'absolute',
-            bottom: 0,
+            bottom: keyboardHeightOffset,
             left: 0,
             right: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '12px',
-            padding: '8px 16px',
+            padding: '10px 16px',
+            // Extra bottom padding for phones with a gesture navigation bar.
+            paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
             background: 'rgba(99, 102, 241, 0.9)',
             backdropFilter: 'blur(4px)',
             zIndex: 10,

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Mobile remote access — tab bar overlaps system status bar**: Added `padding-top: env(safe-area-inset-top, 0px)` to `.mobile-tab-strip` so tabs render below the phone's clock/signal/battery row on iOS and Android.
+- **Mobile remote access — "Take Control" bar hidden under keyboard**: The banner used `position: absolute; bottom: 0` which placed it below the virtual keyboard when it opened (iOS layout viewport doesn't shrink). Now tracks `window.visualViewport.resize` events and offsets `bottom` by the keyboard height so the button is always reachable without scrolling.
+- **Mobile remote access — terminal not resized after taking control**: `fitAddon.fit()` is now called before reading `cols`/`rows` in both `CONTROL_GRANTED` and the `SESSION_JOINED` auto-promote path. Previously the PTY was resized to the previous device's (desktop) column count rather than the phone's actual screen dimensions.
+
 ---
 
 ## [v5.2.6] - 2026-04-06
