@@ -573,13 +573,14 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
 // ---------------------------------------------------------------------------
 
 /**
- * VaultPanel — The primary Forge Vault UI.
+ * VaultPanel — Forge Vault secret manager rendered as a compact centered modal.
  *
- * Renders as a full-screen overlay (z-index 1100, above Code Tutor at 1000).
- * On mount it loads both the vault status and the entries list.
- * Closing via the X button or pressing Escape calls onClose.
+ * Replaced the old full-screen two-column layout with a single focused dialog
+ * so the panel doesn't dominate the screen when secrets are already stored.
+ * The "Add Secret" form floats as its own modal overlay above this dialog,
+ * keeping the entry list visible behind it.
  *
- * @param {{ onClose: Function }} props
+ * @param {{ isOpen: boolean, onClose: Function, onToast: Function }} props
  */
 export function VaultPanel({ isOpen, onClose, onToast }) {
   const {
@@ -597,174 +598,167 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
   } = useVault()
 
   const [isAddFormVisible, setIsAddFormVisible] = useState(false)
-  const [selectedEntry, setSelectedEntry] = useState(null)
   const [entryBeingDeleted, setEntryBeingDeleted] = useState(null)
 
-  // Load data when panel opens
+  // Load data whenever the panel is opened
   useEffect(() => {
     if (!isOpen) return
     loadStatus()
     loadEntries()
   }, [isOpen, loadStatus, loadEntries])
 
-  // Close on Escape key
+  // Escape closes the add form first; if no form is open, closes the panel
   useEffect(() => {
     const handleKeyDown = (keyEvent) => {
-      if (keyEvent.key === 'Escape') onClose()
+      if (keyEvent.key !== 'Escape') return
+      if (isAddFormVisible) {
+        setIsAddFormVisible(false)
+      } else {
+        onClose()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [isAddFormVisible, onClose])
 
-  /** Opens the add form, deselecting any currently selected entry. */
-  const handleAddClick = useCallback(() => {
-    setIsAddFormVisible(true)
-    setSelectedEntry(null)
-  }, [])
-
-  /** Selects an entry for detail view, hiding the add form. */
-  const handleEntrySelect = useCallback((entry) => {
-    setSelectedEntry(entry)
-    setIsAddFormVisible(false)
-  }, [])
-
-  /**
-   * Submits the new entry to the vault hook.
-   * Returns true so the form can show its success state.
-   *
-   * @param {object} addRequest - The form data
-   * @returns {Promise<boolean>}
-   */
+  /** Passes each AddEntryRequest to the vault hook and returns success status. */
   const handleAddSubmit = useCallback(async (addRequest) => {
-    const wasSuccessful = await addEntry(addRequest)
-    if (wasSuccessful) {
-      // Keep the form open so the user can add more secrets in a flow
-    }
-    return wasSuccessful
+    return addEntry(addRequest)
   }, [addEntry])
 
-  /** Initiates the delete confirmation flow for an entry. */
+  /** Starts the delete confirmation flow for the given entry. */
   const handleDeleteRequest = useCallback((entry) => {
     setEntryBeingDeleted(entry)
   }, [])
 
-  /** Executes the confirmed delete and clears state. */
+  /** Confirms and executes the pending delete, then clears confirmation state. */
   const handleDeleteConfirm = useCallback(async () => {
     if (!entryBeingDeleted) return
     await removeEntry(entryBeingDeleted.id)
-    if (selectedEntry?.id === entryBeingDeleted.id) setSelectedEntry(null)
     setEntryBeingDeleted(null)
-  }, [entryBeingDeleted, removeEntry, selectedEntry?.id])
+  }, [entryBeingDeleted, removeEntry])
 
   const isVaultSecured = status?.isOpen ?? false
   const entryCount = status?.entryCount ?? entries.length
 
-  // Don't render anything when closed — no hidden DOM, no accidental event capture
+  // Render nothing when closed — avoids hidden DOM and accidental event capture
   if (!isOpen) return null
 
   return (
-    <div className="vault-panel" role="dialog" aria-modal="true" aria-label="Forge Vault">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="vp-header">
-        <div className="vp-header-left">
-          <Lock size={22} color="#58a6ff" />
-          <div className="vp-header-title-group">
-            <h1 className="vp-header-title">🔐 Forge Vault</h1>
-            <p className="vp-header-subtitle">
-              End-to-end encrypted · Protected by OS credential store
-            </p>
-          </div>
-        </div>
-
-        <div className="vp-header-right">
-          {isVaultSecured && (
-            <div className="vp-secured-badge" aria-label="Vault is secured">
-              <div className="vp-secured-dot" />
-              Secured
+    // Backdrop — clicking it closes the panel
+    <div
+      className="vault-panel-backdrop"
+      onClick={onClose}
+      aria-hidden="true"
+    >
+      {/* Dialog — stop clicks from bubbling to the backdrop */}
+      <div
+        className="vault-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Forge Vault"
+        onClick={(clickEvent) => clickEvent.stopPropagation()}
+      >
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <header className="vp-header">
+          <div className="vp-header-left">
+            <Lock size={18} color="#58a6ff" />
+            <div className="vp-header-title-group">
+              <h1 className="vp-header-title">🔐 Forge Vault</h1>
+              <p className="vp-header-subtitle">
+                End-to-end encrypted · OS credential store
+              </p>
             </div>
-          )}
-          <button
-            className="vp-close-btn"
-            onClick={onClose}
-            aria-label="Close vault panel"
-            title="Close (Esc)"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      </header>
-
-      {/* ── Error Banner ───────────────────────────────────────────────────── */}
-      {error && (
-        <div className="vp-error-banner" role="alert">
-          <AlertCircle size={14} />
-          <span>{error}</span>
-          <button
-            onClick={clearError}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}
-            aria-label="Dismiss error"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      )}
-
-      {/* ── Two-Column Body ────────────────────────────────────────────────── */}
-      <div className="vp-layout">
-        {/* Left sidebar — entry list */}
-        <aside className="vp-sidebar" aria-label="Stored secrets">
-          <div className="vp-sidebar-header">
-            <span className="vp-sidebar-count">
-              {entryCount > 0 ? `${entryCount} secret${entryCount === 1 ? '' : 's'} stored` : 'No secrets yet'}
-            </span>
           </div>
 
-          <button className="vp-add-secret-btn" onClick={handleAddClick}>
-            <Plus size={14} />
+          <div className="vp-header-right">
+            {isVaultSecured && (
+              <div className="vp-secured-badge" aria-label="Vault is secured">
+                <div className="vp-secured-dot" />
+                Secured
+              </div>
+            )}
+            <button
+              className="vp-close-btn"
+              onClick={onClose}
+              aria-label="Close vault"
+              title="Close (Esc)"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </header>
+
+        {/* ── Error Banner ────────────────────────────────────────────────── */}
+        {error && (
+          <div className="vp-error-banner" role="alert">
+            <AlertCircle size={14} />
+            <span>{error}</span>
+            <button
+              className="vp-error-dismiss"
+              onClick={clearError}
+              aria-label="Dismiss error"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
+        {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+        <div className="vp-toolbar">
+          <span className="vp-toolbar-count">
+            {entryCount > 0
+              ? `${entryCount} secret${entryCount === 1 ? '' : 's'} stored`
+              : 'No secrets yet'}
+          </span>
+          <button
+            className="vp-btn-primary vp-btn-sm"
+            onClick={() => setIsAddFormVisible(true)}
+          >
+            <Plus size={13} />
             Add Secret
           </button>
+        </div>
 
+        {/* ── Entry List ──────────────────────────────────────────────────── */}
+        <div className="vp-entry-list" role="list" aria-label="Stored secrets">
           {isLoading && entries.length === 0 && (
-            <div style={{ color: '#8b949e', fontSize: '0.8rem', textAlign: 'center', padding: '20px 0' }}>
-              <span className="vp-spinner" style={{ display: 'inline-block', marginRight: 6 }}>⟳</span>
+            <div className="vp-loading-row">
+              <span className="vp-spinner">⟳</span>
               Loading…
             </div>
           )}
+
+          {!isLoading && entries.length === 0 && <VaultEmptyState />}
 
           {entries.map((entry) => (
             <VaultEntryCard
               key={entry.id}
               entry={entry}
-              isSelected={selectedEntry?.id === entry.id}
-              onSelect={handleEntrySelect}
               onDelete={handleDeleteRequest}
               onToggleAutoInject={toggleAutoInject}
             />
           ))}
-        </aside>
+        </div>
 
-        {/* Right content pane */}
-        <main className="vp-content" aria-label="Vault detail pane">
-          {isAddFormVisible ? (
-            <AddSecretForm
-              isAdding={isAdding}
-              onSubmit={handleAddSubmit}
-              onCancel={() => setIsAddFormVisible(false)}
-            />
-          ) : (
-            <VaultEmptyState onAddClick={handleAddClick} />
-          )}
-        </main>
+        {/* ── Add Secret Modal ────────────────────────────────────────────── */}
+        {isAddFormVisible && (
+          <AddSecretForm
+            isAdding={isAdding}
+            onSubmit={handleAddSubmit}
+            onCancel={() => setIsAddFormVisible(false)}
+          />
+        )}
+
+        {/* ── Delete Confirmation ─────────────────────────────────────────── */}
+        {entryBeingDeleted && (
+          <DeleteConfirmDialog
+            entryBeingDeleted={entryBeingDeleted}
+            onConfirm={handleDeleteConfirm}
+            onCancel={() => setEntryBeingDeleted(null)}
+          />
+        )}
       </div>
-
-      {/* ── Delete Confirmation Overlay ────────────────────────────────────── */}
-      {entryBeingDeleted && (
-        <DeleteConfirmDialog
-          entryBeingDeleted={entryBeingDeleted}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setEntryBeingDeleted(null)}
-        />
-      )}
     </div>
   )
 }

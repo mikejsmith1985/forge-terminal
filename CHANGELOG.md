@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Forge Vault UX redesign**: Replaced the full-screen two-column layout with a compact centered modal dialog.
+  - Panel is now `max-width: 480px` over a semi-transparent backdrop — no longer a full-screen takeover
+  - Removed the always-visible empty right pane that showed "Add Your First Secret" even when secrets existed
+  - Single **Add Secret** button in the toolbar is now the only call-to-action; empty state only renders when the vault is genuinely empty
+  - Add Secret form opens as a floating modal overlay above the dialog
+  - Entry names now wrap instead of truncating
+
+### Added
+- **Vault credential type — Username & Password**: The Add Secret form now has a type selector. Choosing "Username & Password" stores two independent vault entries (`{Name} — Username` / `{Name} — Password`) with auto-derived env vars (`{NAME}_USERNAME` / `{NAME}_PASSWORD`), each editable before submit. Values are encrypted separately and can be toggled/deleted independently.
+
 ---
 
 ## [v5.2.5] - 2026-04-06

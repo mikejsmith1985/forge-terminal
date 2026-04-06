@@ -1,9 +1,781 @@
-/* VaultPanel.css — Full-screen overlay for the Forge Vault secret manager.
+/* VaultPanel.css — Compact modal dialog for the Forge Vault secret manager.
  *
- * Uses .vp- prefix to avoid collisions with other component styles.
- * Follows the EnterpriseWorkflowCard.css pattern: CSS variables for theming,
- * kebab-case class names, and animation for entry.
+ * Replaced the old full-screen two-column layout with a centered dialog so the
+ * panel doesn't dominate the screen when secrets are already stored.
+ *
+ * Uses .vp- prefix throughout to avoid collisions with other component styles.
+ * Follows the EnterpriseWorkflowCard.css pattern: kebab-case class names and
+ * animation on entry.
  */
+
+/* ─── Backdrop ────────────────────────────────────────────────────────────── */
+
+.vault-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+/* ─── Dialog ──────────────────────────────────────────────────────────────── */
+
+.vault-panel {
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  background: #0d1117;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: vp-slide-in 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes vp-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+
+.vp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #161b22;
+  border-bottom: 1px solid rgba(48, 54, 61, 1);
+  flex-shrink: 0;
+}
+
+.vp-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vp-header-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.vp-header-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.vp-header-subtitle {
+  font-size: 0.68rem;
+  color: #8b949e;
+  margin: 0;
+  margin-top: 1px;
+}
+
+.vp-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── Secured Badge ───────────────────────────────────────────────────────── */
+
+.vp-secured-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.25);
+}
+
+.vp-secured-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3fb950;
+  box-shadow: 0 0 5px rgba(63, 185, 80, 0.6);
+}
+
+/* ─── Close Button ────────────────────────────────────────────────────────── */
+
+.vp-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vp-close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6edf3;
+}
+
+/* ─── Error Banner ────────────────────────────────────────────────────────── */
+
+.vp-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: rgba(248, 81, 73, 0.1);
+  border-bottom: 1px solid rgba(248, 81, 73, 0.25);
+  color: #f85149;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.vp-error-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+/* ─── Toolbar ─────────────────────────────────────────────────────────────── */
+
+.vp-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+  flex-shrink: 0;
+}
+
+.vp-toolbar-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ─── Entry List ──────────────────────────────────────────────────────────── */
+
+.vp-entry-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vp-entry-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.vp-entry-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vp-entry-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* ─── Loading Row ─────────────────────────────────────────────────────────── */
+
+.vp-loading-row {
+  color: #8b949e;
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* ─── Empty State ─────────────────────────────────────────────────────────── */
+
+.vp-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 24px;
+  gap: 8px;
+}
+
+.vp-empty-state-icon {
+  color: #8b949e;
+  opacity: 0.4;
+  margin-bottom: 4px;
+}
+
+.vp-empty-state-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #e6edf3;
+  margin: 0;
+}
+
+.vp-empty-state-subtext {
+  font-size: 0.78rem;
+  color: #8b949e;
+  line-height: 1.55;
+  max-width: 300px;
+  margin: 0;
+}
+
+/* ─── Entry Cards ─────────────────────────────────────────────────────────── */
+
+.vp-entry-card {
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 10px;
+  padding: 11px 13px;
+  transition: border-color 0.15s;
+}
+
+.vp-entry-card:hover {
+  border-color: rgba(88, 166, 255, 0.3);
+}
+
+.vp-entry-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.vp-entry-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vp-entry-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e6edf3;
+  /* Allow full names to wrap rather than truncate */
+  word-break: break-word;
+}
+
+.vp-entry-env-var {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.72rem;
+  color: #39d353;
+  margin-top: 1px;
+}
+
+.vp-entry-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.vp-auto-inject-badge {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.2);
+  white-space: nowrap;
+}
+
+/* ─── Auto-Inject Toggle ──────────────────────────────────────────────────── */
+
+.vp-auto-inject-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 7px;
+}
+
+.vp-toggle-track {
+  width: 30px;
+  height: 17px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.vp-toggle-track.is-active {
+  background: #3fb950;
+}
+
+.vp-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.vp-toggle-track.is-active .vp-toggle-thumb {
+  transform: translateX(13px);
+}
+
+.vp-toggle-label {
+  font-size: 0.7rem;
+  color: #8b949e;
+}
+
+/* ─── Delete Button ───────────────────────────────────────────────────────── */
+
+.vp-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.vp-delete-btn:hover {
+  background: rgba(248, 81, 73, 0.12);
+  border-color: rgba(248, 81, 73, 0.3);
+  color: #f85149;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+
+.vp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: #58a6ff;
+  color: #0d1117;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.vp-btn-primary.vp-btn-sm {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
+.vp-btn-primary:hover:not(:disabled) {
+  background: #79b8ff;
+  box-shadow: 0 3px 10px rgba(88, 166, 255, 0.3);
+}
+
+.vp-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vp-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6edf3;
+  transition: all 0.15s;
+}
+
+.vp-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.vp-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  background: rgba(248, 81, 73, 0.1);
+  color: #f85149;
+  transition: all 0.15s;
+}
+
+.vp-btn-danger:hover {
+  background: rgba(248, 81, 73, 0.2);
+}
+
+/* ─── Add Secret Modal Overlay ────────────────────────────────────────────── */
+
+.vp-add-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  border-radius: 14px;
+  overflow-y: auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.vp-add-modal {
+  width: 100%;
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: vp-slide-in 0.18s ease;
+}
+
+.vp-add-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ─── Secret Type Selector ────────────────────────────────────────────────── */
+
+.vp-type-selector {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 9px;
+}
+
+.vp-type-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #8b949e;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.vp-type-btn.is-active {
+  background: #21262d;
+  color: #e6edf3;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.vp-type-btn:hover:not(.is-active) {
+  color: #c9d1d9;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ─── Form Fields ─────────────────────────────────────────────────────────── */
+
+.vp-form-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0;
+}
+
+.vp-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.vp-form-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vp-form-label span {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+.vp-form-input {
+  padding: 8px 11px;
+  background: #21262d;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 7px;
+  color: #e6edf3;
+  font-size: 0.83rem;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vp-form-input:focus {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+}
+
+.vp-form-input::placeholder {
+  color: rgba(139, 148, 158, 0.45);
+}
+
+/* Env var name input below a credential value field — slightly muted */
+.vp-env-var-input {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.75rem;
+  color: #39d353;
+  background: rgba(33, 38, 45, 0.6);
+  margin-top: 4px;
+}
+
+.vp-form-textarea {
+  padding: 8px 11px;
+  background: #21262d;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 7px;
+  color: #e6edf3;
+  font-size: 0.83rem;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+}
+
+.vp-form-textarea:focus {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+}
+
+.vp-form-textarea::placeholder {
+  color: rgba(139, 148, 158, 0.45);
+}
+
+/* ─── Password Input Wrapper ──────────────────────────────────────────────── */
+
+.vp-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.vp-password-wrapper .vp-form-input {
+  padding-right: 38px;
+}
+
+.vp-eye-toggle {
+  position: absolute;
+  right: 9px;
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.vp-eye-toggle:hover {
+  color: #e6edf3;
+}
+
+/* ─── Auto-Inject Toggle Row (Form) ──────────────────────────────────────── */
+
+.vp-form-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 11px;
+  background: #21262d;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.vp-form-toggle-label {
+  font-size: 0.82rem;
+  color: #e6edf3;
+  font-weight: 500;
+}
+
+/* ─── Security Note ───────────────────────────────────────────────────────── */
+
+.vp-security-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 9px 11px;
+  background: rgba(63, 185, 80, 0.05);
+  border: 1px solid rgba(63, 185, 80, 0.15);
+  border-radius: 7px;
+  font-size: 0.72rem;
+  color: #8b949e;
+  line-height: 1.5;
+}
+
+.vp-security-note-icon {
+  color: #3fb950;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ─── Form Actions ────────────────────────────────────────────────────────── */
+
+.vp-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ─── Success Flash ───────────────────────────────────────────────────────── */
+
+.vp-success-flash {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  background: rgba(63, 185, 80, 0.1);
+  border-radius: 7px;
+  color: #3fb950;
+  font-size: 0.8rem;
+  font-weight: 500;
+  animation: vp-fade-out 3s ease forwards;
+}
+
+@keyframes vp-fade-out {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ─── Delete Confirmation Dialog ─────────────────────────────────────────── */
+
+.vp-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.vp-confirm-dialog {
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vp-confirm-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0;
+}
+
+.vp-confirm-message {
+  font-size: 0.8rem;
+  color: #8b949e;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.vp-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ─── Loading Spinner ─────────────────────────────────────────────────────── */
+
+.vp-spinner {
+  display: inline-block;
+  animation: vp-spin 0.7s linear infinite;
+}
+
+@keyframes vp-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 
 /* ─── Full-Screen Overlay ─────────────────────────────────────────────────── */
 
