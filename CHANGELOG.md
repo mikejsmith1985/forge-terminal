@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v5.2.10] - 2026-04-06
 
+---
+
+## [v5.2.10] - 2026-04-06
+
 ### Changed
 - **Replaced feature tour with Connection Diagnostic Wizard**: The 14-step Enterprise Workflow tour has been removed and replaced with a targeted problem-solving wizard that verifies the terminal can connect on first launch (and on every PTY spawn failure). The wizard auto-runs `/api/diagnostics/internal?ptyTest=true`, classifies the error, and offers a one-click fix for the most common cause (invalid saved working directory). It cannot be accidentally dismissed by clicking the backdrop. Existing users will see the wizard once on their next launch due to the version bump.
 - **Wizard triggered automatically on close code 4005**: When a terminal fails to start (`CloseCodeSessionSpawnFailed = 4005`), ForgeTerminal now calls `onSpawnFailed`, which opens the diagnostic wizard with `triggerReason = 'spawnFailed'`. The user sees a red alert header and the exact error immediately — no manual steps required.

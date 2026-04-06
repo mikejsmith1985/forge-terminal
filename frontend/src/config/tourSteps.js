@@ -13,6 +13,6 @@ const TOUR_STEPS = [];
 const TOUR_STORAGE_KEY = 'forge_tour_completed';
 
 // Bumping the version causes the wizard to show once for users who completed the old tour.
-const TOUR_VERSION = '5.2.9';
+const TOUR_VERSION = '5.2.10';
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
