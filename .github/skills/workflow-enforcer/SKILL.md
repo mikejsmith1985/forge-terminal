@@ -53,6 +53,7 @@ when `AGENTS.md` exists — they teach the agent about project-specific systems.
 If a skill is missing, report ⚠️ and continue.
 ```
 invoke skill: forge-vault
+invoke skill: sequential-tasks
 ```
 
 ### Enterprise-Only (required in Forge Enterprise / Enterprise mode; optional in Standard)
@@ -87,6 +88,7 @@ reflects the Check 1 result from Phase 0A.
 ├─────────────────────────┼────────────────────────────────────────────┤
 │ code-quality            │ ✅ Loaded                                  │
 │ forge-vault             │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
+│ sequential-tasks        │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
 │ enterprise-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ branching-strategy      │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ code-tutor-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
