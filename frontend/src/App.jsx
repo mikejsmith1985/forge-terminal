@@ -46,7 +46,7 @@ import { performanceInstrumentation } from './utils/performanceInstrumentation'
 import { extractProjectFolder, getTabTitle, isStaticNamingStrategy } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
 import useGuidedTour from './hooks/useGuidedTour'
-import TourOverlay from './components/TourOverlay'
+import ConnectionDiagnosticWizard from './components/ConnectionDiagnosticWizard'
 
 const MAX_TABS = 20;
 
@@ -266,16 +266,25 @@ function App() {
     closeRouterConfig: () => {},
   }), [tabs, createTab, closeTab]);
 
-  // Guided Tour for first-run experience
+  // Connection diagnostic wizard — shown on first run and on PTY spawn failure.
   const {
-    isActive: isTourActive,
-    stepData: tourStepData,
-    currentStep: tourCurrentStep,
-    totalSteps: tourTotalSteps,
-    nextStep: tourNextStep,
-    skipTour,
+    isWizardVisible,
+    wizardTriggerReason,
+    triggerWizard,
+    closeWizard,
     restartTour,
   } = useGuidedTour(tourActionHandlers);
+
+  /** Called by ForgeTerminal when close code 4005 (fatal spawn failure) fires. */
+  const handleSpawnFailed = useCallback(() => {
+    triggerWizard('spawnFailed');
+  }, [triggerWizard]);
+
+  /** Opens a fresh terminal and closes the wizard. */
+  const handleWizardOpenTerminal = useCallback(() => {
+    createTab();
+    closeWizard();
+  }, [createTab, closeWizard]);
   
   // Query model tier when terminal input changes
   const queryModelTier = useCallback(async (input) => {
@@ -1947,6 +1956,7 @@ function App() {
                     tabName={tab.title}
                     currentDirectory={tab.currentDirectory || null}
                     onToast={addToast}
+                    onSpawnFailed={handleSpawnFailed}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
                     onInteractiveTUI={(tuiType) => handleInteractiveTUI(tab.id, tuiType)}
@@ -2248,16 +2258,13 @@ function App() {
         onToast={addToast}
       />}
 
-      {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
-      {isTourActive && (
-        <TourOverlay
-          step={tourStepData}
-          currentStep={tourCurrentStep}
-          totalSteps={tourTotalSteps}
-          onNext={tourNextStep}
-          onSkip={skipTour}
-        />
-      )}
+      {/* Connection Diagnostic Wizard — shown on first run and on PTY spawn failure */}
+      <ConnectionDiagnosticWizard
+        isVisible={isWizardVisible}
+        triggerReason={wizardTriggerReason}
+        onClose={closeWizard}
+        onOpenNewTerminal={handleWizardOpenTerminal}
+      />
 
     </div>
   )

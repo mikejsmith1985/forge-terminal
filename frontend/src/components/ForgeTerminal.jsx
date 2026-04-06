@@ -528,6 +528,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
   onFileOpen = null, // Callback when file path is double-clicked to open in editor
+  onSpawnFailed = null, // Callback when the server sends close code 4005 (fatal PTY spawn failure)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name
@@ -1945,10 +1946,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           case 4005:
             // Custom: PTY spawn failed — non-retriable fatal error.
             // The server could not start a shell process. Retrying will hit the
-            // same failure. Show the error and stop reconnecting.
+            // same failure. Show the error, stop reconnecting, and surface the
+            // diagnostic wizard so the user can fix the root cause with one click.
             disconnectMessage = 'Terminal failed to start. Check that your saved working directory still exists.';
             messageColor = '1;31'; // Red
             shouldReconnect = false;
+            // Open the diagnostic wizard — it will auto-run PTY tests and offer a fix.
+            if (onSpawnFailed) {
+              setTimeout(() => onSpawnFailed(), 600);
+            }
             break;
           default:
             if (event.reason) {
