@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [v5.2.6] - 2026-04-06
+
 ### Fixed
 - **Forge Vault UX redesign**: Replaced the full-screen two-column layout with a compact centered modal dialog.
   - Panel is now `max-width: 480px` over a semi-transparent backdrop — no longer a full-screen takeover
@@ -17,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Vault credential type — Username & Password**: The Add Secret form now has a type selector. Choosing "Username & Password" stores two independent vault entries (`{Name} — Username` / `{Name} — Password`) with auto-derived env vars (`{NAME}_USERNAME` / `{NAME}_PASSWORD`), each editable before submit. Values are encrypted separately and can be toggled/deleted independently.
+- **`forge-vault` Copilot skill** (`.github/skills/forge-vault/`): Teaches AI agents running inside Forge Terminal how to discover and use vault credentials instead of asking the user. Covers auto-inject detection, vault API reference, and a decision-flow tree for credential lookup.
+- **`sequential-tasks` Copilot skill** (`.github/skills/sequential-tasks/`): Enforces task completion discipline — finish the active task (build → commit → verified) before starting any new one dropped into the conversation. Overridable by the user explicitly.
+- **`workflow-enforcer` skill updated**: Now detects project mode (Forge Enterprise / Standard) and adjusts which co-skills are required vs optional. Enterprise co-skills are `⚠️ optional` in standard projects instead of hard `❌` errors. Auto-loads `forge-vault` and `sequential-tasks` when `AGENTS.md` is present.
 
 ---
 
