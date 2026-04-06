@@ -1942,6 +1942,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             disconnectMessage = 'System went to sleep. Reconnecting...';
             messageColor = '1;36'; // Cyan
             break;
+          case 4005:
+            // Custom: PTY spawn failed — non-retriable fatal error.
+            // The server could not start a shell process. Retrying will hit the
+            // same failure. Show the error and stop reconnecting.
+            disconnectMessage = 'Terminal failed to start. Check that your saved working directory still exists.';
+            messageColor = '1;31'; // Red
+            shouldReconnect = false;
+            break;
           default:
             if (event.reason) {
               disconnectMessage = event.reason;

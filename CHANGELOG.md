@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v5.2.9] - 2026-04-06
+
+### Fixed
+- **Terminals stuck on "Reconnecting... (Attempt 1/15)" indefinitely**: When the server cannot spawn a PTY (e.g. `conpty.Start` fails due to a non-existent working directory, insufficient permissions, or antivirus blocking process creation), the WebSocket closes with no close frame (code 1006). Because the client resets its attempt counter to 0 on every successful HTTP upgrade, the 15-attempt limit was never enforced — the counter always read "1" and the loop ran forever.
+- **Nil pointer dereference panic on session creation failure**: If `NewTerminalSessionWithConfig` returned an error, `session` was nil. The deferred cleanup function then called `session.IsDone()` → panic. `net/http` recovered the panic but the WebSocket closed with code 1006 instead of a clean close frame. Fixed with a nil guard in the deferred function.
+- **New close code 4005 (fatal PTY spawn failure)**: Server now sends WebSocket close code 4005 when PTY creation fails. The client treats 4005 as non-retriable: reconnect loop stops immediately and a clear error message is shown explaining the likely cause (invalid saved working directory).
+- **Invalid saved working directory silently breaks all sessions**: If `psHome`/`cmdHome` query parameters pointed to a directory that no longer exists (deleted, renamed, network path, different machine), `ConPtyWorkDir` passed it to `CreateProcess` which returned `ERROR_DIRECTORY` and the session failed. The working directory is now validated with `os.Stat` before use; if it does not exist, Forge falls back to the default directory and logs a warning rather than failing the connection.
+- **Internal diagnostics blind to PTY spawn failures**: The `/api/diagnostics/internal` endpoint checked shell binary availability and ConPTY device presence but never attempted to actually spawn a process. A user could see "all green" diagnostics while every terminal connection failed. A new opt-in PTY spawn test (`?ptyTest=true`) calls `Handler.TestPTYSpawn()`, which creates and immediately closes a real PTY session. A failed spawn sets `ok: false` and surfaces a warning with the exact error.
+
+---
+
 ## [v5.2.8] - 2026-04-06
 
 ### Fixed

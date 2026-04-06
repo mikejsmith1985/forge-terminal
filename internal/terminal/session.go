@@ -193,13 +193,17 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	var ptmx io.ReadWriteCloser
 	var err error
 	if runtime.GOOS == "windows" {
-		// Windows: ConPTY needs env vars too?
-		// Note: pty_windows.go implementation of startPTYWithShell might need updating if it doesn't inherit or set env
-		// But usually it inherits parent env. We can set process env temporarily or rely on SetEnvironmentVariable
-		// For now, let's try setting the env var in the current process before spawning (if safe)
-		// Or better, let's update pty_windows.go signature in a future refactor.
-		// For now, on Windows, we'll set the env var on the command if we were using exec.Command, but startPTYWithShell uses syscalls.
-		
+		// Validate that the working directory exists before spawning ConPTY.
+		// If the saved psHome/cmdHome path no longer exists (deleted, renamed, or on a
+		// different machine), CreateProcess returns ERROR_DIRECTORY and the session
+		// fails. Falling back to the default directory lets the terminal open cleanly.
+		if workingDir != "" {
+			if _, statErr := os.Stat(workingDir); os.IsNotExist(statErr) {
+				log.Printf("[Terminal] Working directory %q does not exist — falling back to default", workingDir)
+				workingDir = ""
+			}
+		}
+
 		// v3.12.16: Inject env var for Windows ConPTY
 		if sessionID := GetActiveDebugSession(); sessionID != "" {
 			os.Setenv("FORGE_DEBUG_SESSION_ID", sessionID)

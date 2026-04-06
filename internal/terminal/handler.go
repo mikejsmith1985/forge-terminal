@@ -21,11 +21,12 @@ import (
 
 // Custom WebSocket close codes (4000-4999 range is for application use)
 const (
-	CloseCodePTYExited       = 4000 // Shell process exited normally
-	CloseCodeTimeout         = 4001 // Session timed out
-	CloseCodePTYError        = 4002 // PTY read/write error
-	CloseCodeSessionRestart  = 4003 // All sessions restarted (server still running)
-	CloseCodeSystemSleep     = 4004 // System is suspending (sleep/hibernate)
+	CloseCodePTYExited          = 4000 // Shell process exited normally
+	CloseCodeTimeout            = 4001 // Session timed out
+	CloseCodePTYError           = 4002 // PTY read/write error (temporary — client should reconnect)
+	CloseCodeSessionRestart     = 4003 // All sessions restarted (server still running)
+	CloseCodeSystemSleep        = 4004 // System is suspending (sleep/hibernate)
+	CloseCodeSessionSpawnFailed = 4005 // PTY process could not be spawned (fatal — client should stop retrying)
 )
 
 // PTYLogEntry represents a single PTY I/O operation for debugging
@@ -542,6 +543,20 @@ func (h *Handler) HubCount() int {
 	return count
 }
 
+// TestPTYSpawn attempts to create and immediately destroy a PTY session using
+// the default shell configuration. It returns nil on success or an error that
+// explains exactly why PTY creation failed — the same error a real terminal
+// connection would hit. Used by the internal diagnostics endpoint to surface
+// spawn failures that don't show up in simpler health checks.
+func (h *Handler) TestPTYSpawn() error {
+	session, err := NewTerminalSessionWithConfig("_diag_pty_probe_", nil)
+	if err != nil {
+		return err
+	}
+	_ = session.Close()
+	return nil
+}
+
 // HandleWebSocket upgrades the HTTP connection to WebSocket and manages PTY I/O.
 func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Upgrade to WebSocket
@@ -712,8 +727,14 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				session, err = NewTerminalSessionWithConfig(sessionID, shellConfig)
 				sessionLock.Unlock()
 				if err != nil {
-					log.Printf("[Terminal] Failed to create session: %v", err)
+					log.Printf("[Terminal] Failed to create session %s: %v", sessionID, err)
 					_ = conn.WriteJSON(map[string]string{"error": "Failed to create terminal session: " + err.Error()})
+					// Send close code 4005 so the client knows this is a fatal spawn failure,
+					// not a transient disconnect. The client stops retrying and shows the error.
+					_ = conn.WriteControl(
+						websocket.CloseMessage,
+						websocket.FormatCloseMessage(CloseCodeSessionSpawnFailed, "PTY spawn failed"),
+						time.Now().Add(2*time.Second))
 					hub.remove(conn)
 					// Clean up the zombie hub if we just created it and no other
 					// clients are connected — prevents blank-screen reconnects.
@@ -758,6 +779,10 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		// Instead, we keep the hub and session in the maps and let the grace
 		// timer clean them up if no client reconnects in time.
 		if hub.size() == 0 {
+			// Guard: session is nil when PTY creation failed — nothing to detach.
+			if session == nil {
+				return
+			}
 			// Extend the grace period when an AI agent is actively running —
 			// the agent may still be working and the user will want to return.
 			effectiveGrace := gracePeriod
