@@ -937,6 +937,39 @@ function App() {
       return;
     }
 
+    // Terminal focus redirect: when a plain printable character is typed but xterm
+    // has lost focus (e.g., after clicking the scroll button, toolbar, or any non-input
+    // UI element), transparently forward the character to the active terminal and
+    // restore focus so all subsequent keypresses route correctly.
+    //
+    // Root cause of the recurring "number keys not accepted" bug: clicking ANY
+    // focusable UI element (buttons, containers, panels) transfers browser focus away
+    // from xterm's hidden textarea. Without this redirect, the first key the user
+    // types after such an interaction is silently dropped — common when Copilot CLI
+    // or other TUI apps show a numbered-selection menu immediately after a UI action.
+    const isPlainPrintable = !e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1;
+    const isAnyOverlayOpen = isSearchOpen || isForgeAssistOpen || isModalOpen ||
+      isSettingsModalOpen || isFeedbackModalOpen || isRemoteAccessOpen ||
+      isUpdateModalOpen || isDiagnosticOverlayOpen || isTutorOpen ||
+      isVaultOpen || isHistorySliderOpen || isDeveloperDashboardOpen;
+
+    if (isPlainPrintable && !isAnyOverlayOpen) {
+      const termRef = getActiveTerminalRef();
+      if (termRef?.isConnected()) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Restore focus so all subsequent keystrokes route directly to xterm
+        termRef.focus();
+        // Forward the character that triggered this redirect to the PTY directly,
+        // since the current key event can no longer be re-routed to xterm's textarea.
+        const activeSocket = termRef.getSocket();
+        if (activeSocket?.readyState === WebSocket.OPEN) {
+          activeSocket.send(e.key);
+        }
+        return;
+      }
+    }
+
     // Ctrl+F: Open search
     if (e.ctrlKey && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
       e.preventDefault();

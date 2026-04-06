@@ -2173,6 +2173,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // Do NOT call setShowScrollButton(false) here — let checkScrollPosition
     // confirm the scroll actually reached the bottom before hiding the button.
     // This prevents the button from disappearing when the scroll silently failed.
+
+    // Restore focus: clicking the scroll button moves browser focus away from
+    // xterm's hidden textarea. Refocus immediately so the next keypress goes
+    // directly to the terminal without needing the App-level capture redirect.
+    if (xtermRef.current) {
+      xtermRef.current.focus();
+    }
   };
 
   return (

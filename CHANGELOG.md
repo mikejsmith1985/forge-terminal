@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v5.2.8] - 2026-04-06
+
+### Fixed
+- **Number keys (and all printable keys) silently dropped after any UI click**: Clicking focusable UI elements (scroll-to-bottom button, toolbar, panels) transfers browser keyboard focus away from xterm's hidden textarea. Without a redirect, the first keypress typed immediately after is lost — most visible in TUI apps like Copilot CLI that prompt "Confirm with number keys". A capture-phase redirect in the global keyboard handler now transparently forwards the character directly to the terminal WebSocket and restores xterm focus, so nothing is dropped. The scroll-to-bottom button also explicitly restores focus after its click handler runs.
+
+---
+
 ## [v5.2.7] - 2026-04-06
 
 ### Fixed
