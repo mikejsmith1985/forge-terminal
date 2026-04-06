@@ -47,6 +47,14 @@ These must load successfully in every project. If missing, report ❌ and stop.
 invoke skill: code-quality
 ```
 
+### Forge Terminal Project Only (load when AGENTS.md is present)
+These skills are specific to the Forge Terminal codebase. Load them automatically
+when `AGENTS.md` exists — they teach the agent about project-specific systems.
+If a skill is missing, report ⚠️ and continue.
+```
+invoke skill: forge-vault
+```
+
 ### Enterprise-Only (required in Forge Enterprise / Enterprise mode; optional in Standard)
 Attempt to load these in every project. If the project is in **Standard mode** and
 a skill is not found, mark it ⚠️ and continue — do NOT block the task.
@@ -78,6 +86,7 @@ reflects the Check 1 result from Phase 0A.
 │ Item                    │ Status                                     │
 ├─────────────────────────┼────────────────────────────────────────────┤
 │ code-quality            │ ✅ Loaded                                  │
+│ forge-vault             │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
 │ enterprise-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ branching-strategy      │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ code-tutor-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
