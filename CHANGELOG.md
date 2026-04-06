@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v5.2.6] - 2026-04-06
 
+---
+
+## [v5.2.6] - 2026-04-06
+
 ### Fixed
 - **Forge Vault UX redesign**: Replaced the full-screen two-column layout with a compact centered modal dialog.
   - Panel is now `max-width: 480px` over a semi-transparent backdrop — no longer a full-screen takeover
