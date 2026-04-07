@@ -231,6 +231,28 @@ func (v *Vault) GetEnvVarsForIDs(entryIDs []string) map[string]string {
 	return result
 }
 
+// GetEntryValue returns the decrypted plaintext value for the entry with entryID.
+// This is the only Vault method that exposes a raw secret value to a caller
+// outside the PTY session spawner — it exists solely to support the user-initiated
+// reveal action in the Vault UI. Every call is logged for auditability.
+func (v *Vault) GetEntryValue(entryID string) (string, error) {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+
+	if !v.isOpen {
+		return "", fmt.Errorf("vault is not open")
+	}
+
+	for _, entry := range v.entries {
+		if entry.ID == entryID {
+			log.Printf("[Vault] Secret value revealed: %s (%s)", entry.SecretName, entry.EnvVarName)
+			return entry.SecretValue, nil
+		}
+	}
+
+	return "", fmt.Errorf("vault entry %q not found", entryID)
+}
+
 // GetStatus returns a snapshot of the vault's current state.
 func (v *Vault) GetStatus() VaultStatus {
 	v.mu.RLock()

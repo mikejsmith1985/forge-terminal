@@ -5,11 +5,11 @@
 // credential store: Windows DPAPI ties it to the current Windows user account;
 // on Unix systems strict file permissions (0600) restrict access.
 //
-// Design principle: secret values are NEVER returned through the HTTP API.
-// They are only used internally when building the environment for a new PTY
-// session — the agent running in the terminal sees the variable name and value
-// just like any shell env var, but the raw credential never passes through any
-// log, WebSocket message, or LLM context.
+// Design principle: secret values are never included in list or status API
+// responses, never written to logs or WebSocket messages, and never passed to
+// any LLM context. The one exception is the on-demand reveal endpoint
+// (GET /api/vault/entries/value) — this returns a single decrypted value only
+// when the user explicitly requests it, and every call is logged for auditability.
 package vault
 
 import "time"
@@ -70,6 +70,14 @@ type VaultStatus struct {
 	EntryCount      int    `json:"entryCount"`
 	AutoInjectCount int    `json:"autoInjectCount"`
 	VaultPath       string `json:"vaultPath"`
+}
+
+// RevealValueResponse is returned by GET /api/vault/entries/value.
+// It exposes the decrypted secret value for a single entry on explicit
+// user request. This type is intentionally separate from VaultEntry to make
+// it clear that returning a value is a deliberate, audited act.
+type RevealValueResponse struct {
+	Value string `json:"value"`
 }
 
 // ── Internal disk types — never serialized to the API ────────────────────────

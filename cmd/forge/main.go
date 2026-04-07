@@ -511,6 +511,9 @@ func main() {
 
 	// ── Forge Vault routes (AES-256-GCM encrypted secret store) ──────────
 	http.HandleFunc("/api/vault/status", WrapWithMiddleware(handleVaultStatus))
+	// /api/vault/entries/value is registered before /api/vault/entries so
+	// Go's ServeMux resolves the more-specific path first.
+	http.HandleFunc("/api/vault/entries/value", WrapWithMiddleware(handleVaultRevealValue))
 	http.HandleFunc("/api/vault/entries", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

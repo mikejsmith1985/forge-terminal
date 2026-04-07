@@ -14,13 +14,14 @@
  * keeps the inject logic simple — each env var is still injected individually.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Lock,
   Plus,
   Trash2,
   Eye,
   EyeOff,
+  Copy,
   X,
   Shield,
   CheckCircle,
@@ -37,6 +38,9 @@ import './VaultPanel.css'
 
 /** How long (ms) the success confirmation is shown after adding an entry. */
 const SUCCESS_DISPLAY_MS = 3000
+
+/** How long (ms) a revealed secret value stays visible before auto-hiding. */
+const REVEAL_AUTO_HIDE_MS = 30000
 
 /** Identifies the single-value API token / key secret type. */
 const SECRET_TYPE_API_TOKEN = 'apiToken'
@@ -63,13 +67,38 @@ const deriveEnvVarName = (secretName) =>
 
 /**
  * Renders a single vault entry card in the entry list.
- * Shows name, env var, auto-inject toggle, and a delete button.
+ * Shows name, env var, auto-inject toggle, and action buttons for
+ * revealing the secret value and copying it to the clipboard.
  *
- * @param {{ entry: object, onDelete: Function, onToggleAutoInject: Function }} props
+ * Reveal state is local to the card — the decrypted value never enters
+ * global or hook state, and auto-hides after REVEAL_AUTO_HIDE_MS milliseconds.
+ *
+ * @param {{ entry: object, onDelete: Function, onToggleAutoInject: Function, onReveal: Function }} props
  */
-function VaultEntryCard({ entry, onDelete, onToggleAutoInject }) {
+function VaultEntryCard({ entry, onDelete, onToggleAutoInject, onReveal }) {
+  const [revealedValue, setRevealedValue]   = useState(null)
+  const [isValueVisible, setIsValueVisible] = useState(false)
+  const [isCopied, setIsCopied]             = useState(false)
+  const [isRevealing, setIsRevealing]       = useState(false)
+  const autoHideTimerRef = useRef(null)
+
+  // Cancel the auto-hide timer on unmount so there are no dangling state updates.
+  useEffect(() => {
+    return () => {
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current)
+    }
+  }, [])
+
+  /** (Re)starts the 30-second timer that hides the revealed value. */
+  const startAutoHideTimer = useCallback(() => {
+    if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current)
+    autoHideTimerRef.current = setTimeout(() => {
+      setRevealedValue(null)
+      setIsValueVisible(false)
+    }, REVEAL_AUTO_HIDE_MS)
+  }, [])
+
   const handleDeleteClick = (clickEvent) => {
-    // Stop propagation so the row click handler doesn't also fire
     clickEvent.stopPropagation()
     onDelete(entry)
   }
@@ -78,6 +107,52 @@ function VaultEntryCard({ entry, onDelete, onToggleAutoInject }) {
     clickEvent.stopPropagation()
     onToggleAutoInject(entry.id, !entry.shouldAutoInject)
   }
+
+  /** Fetches the secret value on first click; hides it on subsequent clicks. */
+  const handleRevealClick = useCallback(async (clickEvent) => {
+    clickEvent.stopPropagation()
+
+    if (revealedValue !== null) {
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current)
+      setRevealedValue(null)
+      setIsValueVisible(false)
+      return
+    }
+
+    setIsRevealing(true)
+    const fetchedValue = await onReveal(entry.id)
+    setIsRevealing(false)
+
+    if (fetchedValue !== null) {
+      setRevealedValue(fetchedValue)
+      setIsValueVisible(false) // Start masked; user opts in to show plaintext
+      startAutoHideTimer()
+    }
+  }, [revealedValue, onReveal, entry.id, startAutoHideTimer])
+
+  /** Writes the revealed value to the clipboard and shows a brief confirmation. */
+  const handleCopyClick = useCallback(async (clickEvent) => {
+    clickEvent.stopPropagation()
+    if (!revealedValue) return
+
+    try {
+      await navigator.clipboard.writeText(revealedValue)
+      setIsCopied(true)
+      // Reset auto-hide so the user has the full window after copying
+      startAutoHideTimer()
+      setTimeout(() => setIsCopied(false), 2000)
+    } catch (copyErr) {
+      console.error('[Vault] clipboard write failed:', copyErr)
+    }
+  }, [revealedValue, startAutoHideTimer])
+
+  const handleVisibilityToggle = useCallback((clickEvent) => {
+    clickEvent.stopPropagation()
+    setIsValueVisible((prev) => !prev)
+    startAutoHideTimer()
+  }, [startAutoHideTimer])
+
+  const isRevealed = revealedValue !== null
 
   return (
     <div className="vp-entry-card" role="listitem">
@@ -117,6 +192,61 @@ function VaultEntryCard({ entry, onDelete, onToggleAutoInject }) {
           {entry.shouldAutoInject ? 'Auto-inject on' : 'Auto-inject off'}
         </span>
       </button>
+
+      {/* Reveal / Copy action row */}
+      <div className="vp-entry-reveal-actions">
+        <button
+          className={`vp-reveal-btn${isRevealed ? ' is-active' : ''}`}
+          onClick={handleRevealClick}
+          disabled={isRevealing}
+          aria-label={isRevealed ? `Hide value for ${entry.secretName}` : `Reveal value for ${entry.secretName}`}
+        >
+          {isRevealing ? (
+            <span className="vp-spinner">⟳</span>
+          ) : isRevealed ? (
+            <><EyeOff size={12} /> Hide</>
+          ) : (
+            <><Eye size={12} /> Reveal</>
+          )}
+        </button>
+
+        {isRevealed && (
+          <button
+            className={`vp-copy-btn${isCopied ? ' is-copied' : ''}`}
+            onClick={handleCopyClick}
+            aria-label={isCopied ? 'Copied!' : `Copy value for ${entry.secretName}`}
+          >
+            {isCopied ? (
+              <><CheckCircle size={12} /> Copied!</>
+            ) : (
+              <><Copy size={12} /> Copy</>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Revealed value — only rendered while active */}
+      {isRevealed && (
+        <div className="vp-entry-reveal-row">
+          <div className="vp-reveal-value-wrapper">
+            <input
+              className="vp-reveal-value"
+              type={isValueVisible ? 'text' : 'password'}
+              value={revealedValue}
+              readOnly
+              aria-label={`Secret value for ${entry.secretName}`}
+            />
+            <button
+              className="vp-eye-toggle"
+              onClick={handleVisibilityToggle}
+              aria-label={isValueVisible ? 'Mask value' : 'Show value in plaintext'}
+            >
+              {isValueVisible ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+          </div>
+          <p className="vp-reveal-auto-hide-hint">Auto-hides in 30s</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -594,6 +724,7 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
     addEntry,
     removeEntry,
     toggleAutoInject,
+    revealEntry,
     clearError,
   } = useVault()
 
@@ -737,6 +868,7 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
               entry={entry}
               onDelete={handleDeleteRequest}
               onToggleAutoInject={toggleAutoInject}
+              onReveal={revealEntry}
             />
           ))}
         </div>

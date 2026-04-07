@@ -75,6 +75,7 @@ const vaultFetch = async (path, options = {}) => {
  *   addEntry: (request: object) => Promise<boolean>,
  *   removeEntry: (id: string) => Promise<void>,
  *   toggleAutoInject: (id: string, shouldAutoInject: boolean) => Promise<void>,
+ *   revealEntry: (entryId: string) => Promise<string|null>,
  *   injectEntries: (entryIds: string[]) => Promise<object|null>,
  *   clearError: () => void,
  * }}
@@ -249,6 +250,27 @@ export function useVault() {
   }, [setTimedError])
 
   /**
+   * Retrieves the decrypted plaintext value for a single vault entry.
+   * Values are never stored in hook state — each call fetches fresh from the
+   * backend. The caller owns the value and is responsible for clearing it.
+   *
+   * @param {string} entryId - The ID of the entry to reveal
+   * @returns {Promise<string|null>} The plaintext secret value, or null on error
+   */
+  const revealEntry = useCallback(async (entryId) => {
+    try {
+      const revealResult = await vaultFetch(
+        `/api/vault/entries/value?id=${encodeURIComponent(entryId)}`
+      )
+      return revealResult?.value ?? null
+    } catch (err) {
+      console.error('[Vault] revealEntry error:', err)
+      setTimedError(err.message)
+      return null
+    }
+  }, [setTimedError])
+
+  /**
    * Requests injection of selected vault entries into a terminal session.
    * Returns a scriptPath pointing to a temporary PS1 file the terminal can source.
    *
@@ -287,6 +309,7 @@ export function useVault() {
     addEntry,
     removeEntry,
     toggleAutoInject,
+    revealEntry,
     injectEntries,
     clearError,
   }

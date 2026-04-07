@@ -251,3 +251,35 @@ func scheduleScriptCleanup(scriptPath string) {
 	time.Sleep(60 * time.Second)
 	os.Remove(scriptPath)
 }
+
+// ── GET /api/vault/entries/value ─────────────────────────────────────────────
+
+// handleVaultRevealValue returns the decrypted plaintext value for a single
+// vault entry. This is the only handler that returns a secret value — it exists
+// to support the user-initiated reveal action in the Vault UI.
+// Every call is logged. The value is never included in list or status responses.
+func handleVaultRevealValue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVault(w) {
+		return
+	}
+
+	entryID := strings.TrimSpace(r.URL.Query().Get("id"))
+	if entryID == "" {
+		http.Error(w, "query parameter 'id' is required", http.StatusBadRequest)
+		return
+	}
+
+	secretValue, revealErr := activeVault.GetEntryValue(entryID)
+	if revealErr != nil {
+		log.Printf("[Vault API] RevealValue error: %v", revealErr)
+		http.Error(w, revealErr.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(vault.RevealValueResponse{Value: secretValue})
+}
