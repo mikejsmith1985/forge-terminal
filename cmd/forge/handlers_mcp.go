@@ -1,0 +1,155 @@
+// handlers_mcp.go wires the Forge Terminal MCP server into the HTTP router.
+//
+// The MCP server is initialised once at startup (initMCPServer) and stored in
+// the package-level mcpServer variable. All requests to /api/mcp and
+// /api/mcp/tasks/* are routed here without the standard auth middleware —
+// the MCP server handles its own bearer-token authentication so that external
+// AI tools (VS Code Copilot, Cursor, EZTest) can connect without needing the
+// Forge UI session cookie.
+package main
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/mikejsmith1985/forge-terminal/internal/mcp"
+	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
+)
+
+// mcpServer is the single, shared MCP server instance for this Forge process.
+// Initialised by initMCPServer() at startup and accessed from the route handlers.
+var mcpServer *mcp.Server
+
+// initMCPServer creates the MCP server and loads (or auto-generates) the bearer token.
+// It is called once from main() before the HTTP listener starts.
+func initMCPServer() {
+	authToken, err := mcp.LoadOrCreateToken()
+	if err != nil {
+		log.Printf("[MCP] WARNING: could not load/create auth token: %v — MCP will reject all requests", err)
+		// Don't fatal — Forge still starts normally; MCP is optional.
+		authToken = ""
+	}
+
+	projectPath := resolveProjectPath()
+	workflowCfg := loadWorkflowConfigForMCP(projectPath)
+
+	deps := mcp.Dependencies{
+		TermHandler:    termHandler,
+		WorkflowConfig: workflowCfg,
+		ProjectPath:    projectPath,
+	}
+
+	mcpServer = mcp.NewServer(authToken, deps)
+	log.Printf("[MCP] Server ready — endpoint: /api/mcp | token: ~/.forge/mcp-token")
+}
+
+// handleMCP is the unified HTTP handler for POST /api/mcp and GET /api/mcp.
+// Auth is enforced by the MCP server itself, not by the standard middleware chain.
+func handleMCP(w http.ResponseWriter, r *http.Request) {
+	applyCORSHeaders(w, r)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if mcpServer == nil {
+		http.Error(w, `{"error":"MCP server not initialised"}`, http.StatusServiceUnavailable)
+		return
+	}
+	mcpServer.HandleHTTP(w, r)
+}
+
+// handleMCPTaskStatus handles GET /api/mcp/tasks/{id} — returns the current status
+// of a task previously submitted via the task_submit MCP tool.
+func handleMCPTaskStatus(w http.ResponseWriter, r *http.Request) {
+	applyCORSHeaders(w, r)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "only GET is supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Auth check — same token, same standard.
+	if mcpServer == nil {
+		http.Error(w, `{"error":"MCP server not initialised"}`, http.StatusServiceUnavailable)
+		return
+	}
+
+	taskID := extractTaskID(r.URL.Path)
+	if taskID == "" {
+		http.Error(w, `{"error":"task ID is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	task := mcpServer.Broker().Get(taskID)
+	if task == nil {
+		http.Error(w, `{"error":"task not found"}`, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(task)
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// resolveProjectPath returns the best available project directory.
+// It prefers the current working directory, falling back to the user home.
+func resolveProjectPath() string {
+	if cwd, err := os.Getwd(); err == nil {
+		return cwd
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return home
+	}
+	return "."
+}
+
+// loadWorkflowConfigForMCP reads the .forge/workflow.json from the project path,
+// returning a zero-value config (no workflow) if the file is absent or unreadable.
+func loadWorkflowConfigForMCP(projectPath string) workflow.WorkflowConfig {
+	configPath := filepath.Join(projectPath, ".forge", "workflow.json")
+	raw, err := os.ReadFile(configPath)
+	if err != nil {
+		return workflow.WorkflowConfig{}
+	}
+
+	var cfg workflow.WorkflowConfig
+	if jsonErr := json.Unmarshal(raw, &cfg); jsonErr != nil {
+		log.Printf("[MCP] Could not parse .forge/workflow.json: %v", jsonErr)
+		return workflow.WorkflowConfig{}
+	}
+	return cfg
+}
+
+// extractTaskID parses the task ID from paths like /api/mcp/tasks/some-uuid.
+func extractTaskID(urlPath string) string {
+	prefix := "/api/mcp/tasks/"
+	if !strings.HasPrefix(urlPath, prefix) {
+		return ""
+	}
+	return strings.TrimPrefix(urlPath, prefix)
+}
+
+// applyCORSHeaders adds permissive CORS headers so that browser-based MCP clients
+// (and the Forge settings UI) can call /api/mcp without cross-origin errors.
+func applyCORSHeaders(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = "*"
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Max-Age", "86400")
+}

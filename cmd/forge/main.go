@@ -503,6 +503,12 @@ func main() {
 	http.HandleFunc("/api/workflow/watch/poll", WrapWithMiddleware(handleWorkflowWatchPoll))
 	http.HandleFunc("/api/workflow/watch/stop", WrapWithMiddleware(handleWorkflowWatchStop))
 
+	// ── MCP Server routes (own auth, no standard middleware) ──────────────
+	// Must be initialised AFTER termHandler is set (line ~282 above).
+	initMCPServer()
+	http.HandleFunc("/api/mcp", handleMCP)
+	http.HandleFunc("/api/mcp/tasks/", handleMCPTaskStatus)
+
 	// Initialize session temp directory
 	if err := initSessionTempDir(); err != nil {
 		log.Printf("[ERROR] Failed to initialize session temp dir: %v", err)
