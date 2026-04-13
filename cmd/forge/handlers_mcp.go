@@ -16,9 +16,60 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/mikejsmith1985/forge-terminal/internal/mcp"
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
 )
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+// mcpTOMLConfig mirrors the [mcp] section of forge.toml.
+// Enabled is a pointer so we can distinguish "absent in TOML" (nil → default true)
+// from "explicitly disabled" (*bool = false).
+type mcpTOMLConfig struct {
+	Enabled      *bool    `toml:"enabled"`
+	AllowedTools []string `toml:"allowed_tools"`
+}
+
+// forgeTOMLPartial is a minimal parse of forge.toml that captures only the [mcp]
+// section. All other sections are intentionally ignored.
+type forgeTOMLPartial struct {
+	MCP mcpTOMLConfig `toml:"mcp"`
+}
+
+// loadMCPConfig reads forge.toml from the project root and returns the [mcp]
+// section. If the file is absent or the section is missing, safe defaults are
+// returned (enabled=true, all tools allowed).
+func loadMCPConfig() mcpTOMLConfig {
+	trueVal := true
+	defaults := mcpTOMLConfig{Enabled: &trueVal, AllowedTools: nil}
+
+	// Prefer forge.toml in the current working directory (project root).
+	configPath := "forge.toml"
+	if _, err := os.Stat(configPath); err != nil {
+		return defaults
+	}
+
+	var partial forgeTOMLPartial
+	if _, err := toml.DecodeFile(configPath, &partial); err != nil {
+		log.Printf("[MCP] Could not parse forge.toml [mcp] section: %v — using defaults", err)
+		return defaults
+	}
+
+	cfg := partial.MCP
+	// If the [mcp] section was absent, Enabled is nil — default to enabled.
+	if cfg.Enabled == nil {
+		cfg.Enabled = &trueVal
+	}
+	return cfg
+}
+
+// mcpEnabled returns true when the config has MCP enabled (nil or *true).
+func mcpEnabled(cfg mcpTOMLConfig) bool {
+	return cfg.Enabled == nil || *cfg.Enabled
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
 
 // mcpServer is the single, shared MCP server instance for this Forge process.
 // Initialised by initMCPServer() at startup and accessed from the route handlers.
@@ -27,6 +78,12 @@ var mcpServer *mcp.Server
 // initMCPServer creates the MCP server and loads (or auto-generates) the bearer token.
 // It is called once from main() before the HTTP listener starts.
 func initMCPServer() {
+	cfg := loadMCPConfig()
+	if !mcpEnabled(cfg) {
+		log.Printf("[MCP] Disabled via forge.toml — MCP endpoint will not be active")
+		return
+	}
+
 	authToken, err := mcp.LoadOrCreateToken()
 	if err != nil {
 		log.Printf("[MCP] WARNING: could not load/create auth token: %v — MCP will reject all requests", err)
@@ -41,6 +98,7 @@ func initMCPServer() {
 		TermHandler:    termHandler,
 		WorkflowConfig: workflowCfg,
 		ProjectPath:    projectPath,
+		AllowedTools:   cfg.AllowedTools,
 	}
 
 	mcpServer = mcp.NewServer(authToken, deps)

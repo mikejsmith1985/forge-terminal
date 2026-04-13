@@ -48,3 +48,29 @@ buffer_lines = 50      # Number of terminal lines to include
 # {branch}     - Git branch name
 # {vision}     - Recent Forge Vision summary (if available)
 # {file}       - Currently focused file (if detected)
+
+[mcp]
+# Forge MCP Server — allows AI tools (VS Code Copilot, Cursor, Claude Code, EZTest)
+# to call Forge capabilities via the Model Context Protocol (JSON-RPC 2.0).
+#
+# Endpoint: POST http://<host>:<port>/api/mcp
+# Auth:     Bearer token stored at ~/.forge/mcp-token (auto-generated on first start,
+#           never stored here — keep secrets out of version control)
+#
+# To get your token:  cat ~/.forge/mcp-token
+# To reset it:        rm ~/.forge/mcp-token  (a new one is generated on restart)
+
+enabled = true
+
+# Restrict which tools are exposed. Remove a tool name to disable it.
+# Leave the list empty ([]) to expose ALL built-in tools.
+allowed_tools = [
+  "terminal_sessions",
+  "terminal_execute",
+  "terminal_read",
+  "file_read",
+  "file_write",
+  "file_list",
+  "task_submit",
+  "workflow_status",
+]

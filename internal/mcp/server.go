@@ -65,6 +65,10 @@ type Dependencies struct {
 
 	// ProjectPath is the root path used by file tools and workflow compliance scans.
 	ProjectPath string
+
+	// AllowedTools restricts which built-in tools are registered.
+	// An empty/nil slice means all tools are exposed (the default).
+	AllowedTools []string
 }
 
 // NewServer creates a fully initialised MCP server.
@@ -207,16 +211,33 @@ func (srv *Server) handleToolsCall(w http.ResponseWriter, req *JSONRPCRequest) {
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 // registerBuiltInTools adds all Forge tools to the registry.
+// If deps.AllowedTools is non-empty, only the named tools are registered.
 // This is called once inside NewServer.
 func (srv *Server) registerBuiltInTools(deps Dependencies) {
-	srv.register(newTerminalSessionsTool(deps.TermHandler))
-	srv.register(newTerminalExecuteTool(deps.TermHandler))
-	srv.register(newTerminalReadTool(deps.TermHandler))
-	srv.register(newFileReadTool(deps.ProjectPath))
-	srv.register(newFileWriteTool(deps.ProjectPath))
-	srv.register(newFileListTool(deps.ProjectPath))
-	srv.register(newTaskSubmitTool(srv.broker))
-	srv.register(newWorkflowStatusTool(deps.ProjectPath, deps.WorkflowConfig))
+	allowed := make(map[string]bool, len(deps.AllowedTools))
+	filterActive := len(deps.AllowedTools) > 0
+	for _, name := range deps.AllowedTools {
+		allowed[name] = true
+	}
+
+	candidates := []ToolHandler{
+		newTerminalSessionsTool(deps.TermHandler),
+		newTerminalExecuteTool(deps.TermHandler),
+		newTerminalReadTool(deps.TermHandler),
+		newFileReadTool(deps.ProjectPath),
+		newFileWriteTool(deps.ProjectPath),
+		newFileListTool(deps.ProjectPath),
+		newTaskSubmitTool(srv.broker),
+		newWorkflowStatusTool(deps.ProjectPath, deps.WorkflowConfig),
+	}
+
+	for _, tool := range candidates {
+		if filterActive && !allowed[tool.Definition().Name] {
+			log.Printf("[MCP] Tool %q disabled by forge.toml allowed_tools", tool.Definition().Name)
+			continue
+		}
+		srv.register(tool)
+	}
 }
 
 // register adds a single ToolHandler to the registry under its declared name.

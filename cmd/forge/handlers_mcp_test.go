@@ -10,6 +10,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -99,5 +100,64 @@ func TestHandleMCPTaskStatus_ServiceUnavailableWhenNotInitialised(t *testing.T) 
 
 	if w.Code != http.StatusServiceUnavailable {
 		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
+func TestLoadMCPConfig_DefaultsWhenNoFile(t *testing.T) {
+	// Change to a temp dir so there is no forge.toml present.
+	orig, _ := os.Getwd()
+	dir := t.TempDir()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	cfg := loadMCPConfig()
+	if !mcpEnabled(cfg) {
+		t.Error("expected enabled=true when forge.toml is absent")
+	}
+	if len(cfg.AllowedTools) != 0 {
+		t.Errorf("expected empty AllowedTools when forge.toml is absent, got %v", cfg.AllowedTools)
+	}
+}
+
+func TestLoadMCPConfig_ReadsEnabledFalse(t *testing.T) {
+	orig, _ := os.Getwd()
+	dir := t.TempDir()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	tomlContent := "[mcp]\nenabled = false\nallowed_tools = []\n"
+	if err := os.WriteFile("forge.toml", []byte(tomlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := loadMCPConfig()
+	if mcpEnabled(cfg) {
+		t.Error("expected enabled=false when forge.toml has enabled=false")
+	}
+}
+
+func TestLoadMCPConfig_ReadsAllowedTools(t *testing.T) {
+	orig, _ := os.Getwd()
+	dir := t.TempDir()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	tomlContent := "[mcp]\nenabled = true\nallowed_tools = [\"file_read\", \"workflow_status\"]\n"
+	if err := os.WriteFile("forge.toml", []byte(tomlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := loadMCPConfig()
+	if !mcpEnabled(cfg) {
+		t.Error("expected enabled=true")
+	}
+	if len(cfg.AllowedTools) != 2 {
+		t.Errorf("expected 2 allowed tools, got %v", cfg.AllowedTools)
 	}
 }

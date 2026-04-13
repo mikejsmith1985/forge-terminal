@@ -194,3 +194,27 @@ func TestServer_HandleHTTP_TaskSubmit(t *testing.T) {
 		t.Error("expected non-empty taskId in task_submit response")
 	}
 }
+
+func TestServer_AllowedTools_FiltersRegistry(t *testing.T) {
+	// Build a server that only exposes file_read and workflow_status.
+	srv := mcp.NewServer("tok", mcp.Dependencies{
+		ProjectPath:    t.TempDir(),
+		WorkflowConfig: workflow.WorkflowConfig{},
+		AllowedTools:   []string{"file_read", "workflow_status"},
+	})
+
+	// file_read should work (it's in the allowed list).
+	_, err := srv.ExecuteTool("file_read", map[string]any{"path": "nonexistent.txt"})
+	if err != nil {
+		t.Errorf("file_read should be registered but ExecuteTool returned: %v", err)
+	}
+
+	// task_submit should be blocked (not in the allowed list).
+	_, err = srv.ExecuteTool("task_submit", map[string]any{
+		"type":    "bug-report",
+		"payload": "x",
+	})
+	if err == nil {
+		t.Error("expected ExecuteTool error for task_submit (not in AllowedTools), got nil")
+	}
+}
