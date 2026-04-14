@@ -29,6 +29,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
+	"github.com/mikejsmith1985/forge-terminal/internal/vault"
 )
 
 //go:embed all:web
@@ -239,6 +240,12 @@ func main() {
 
 	// Initialize Code Tutor subsystem
 	initTutor()
+
+	// Initialize Forge Vault (AES-256-GCM encrypted secret store).
+	// The vault is optional — if it fails to open, Forge continues without it
+	// and the Vault UI will display an error state.
+	initVault(storage.GetVaultDir())
+	_ = vault.GetGlobal() // Ensure the vault package is referenced
 
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
@@ -513,6 +520,26 @@ func main() {
 	http.HandleFunc("/api/mcp/status", WrapWithMiddleware(handleMCPStatus))
 	http.HandleFunc("/api/mcp/dashboard/tasks", WrapWithMiddleware(handleMCPTasks))
 	http.HandleFunc("/api/mcp/dashboard/token", WrapWithMiddleware(handleMCPToken))
+
+	// ── Forge Vault routes (AES-256-GCM encrypted secret store) ─────────
+	// /api/vault/entries/value must be registered before /api/vault/entries so
+	// Go's ServeMux resolves the more-specific path first.
+	http.HandleFunc("/api/vault/status", WrapWithMiddleware(handleVaultStatus))
+	http.HandleFunc("/api/vault/entries/value", WrapWithMiddleware(handleVaultRevealValue))
+	http.HandleFunc("/api/vault/entries", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handleVaultListEntries(w, r)
+		case http.MethodPost:
+			handleVaultAddEntry(w, r)
+		case http.MethodDelete:
+			handleVaultDeleteEntry(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+	http.HandleFunc("/api/vault/auto-inject", WrapWithMiddleware(handleVaultToggleAutoInject))
+	http.HandleFunc("/api/vault/inject", WrapWithMiddleware(handleVaultInject))
 
 	// Initialize session temp directory
 	if err := initSessionTempDir(); err != nil {

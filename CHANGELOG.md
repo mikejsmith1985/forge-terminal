@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Forge Vault** — AES-256-GCM encrypted secret storage (`~/.forge/vault/vault.enc`). Master key is protected by Windows DPAPI on Windows; file-permission-based (0600) on other platforms. Secrets (API keys, tokens) can auto-inject as environment variables into new PTY sessions. Full REST API at `/api/vault/*`.
+  - `internal/vault/` — core vault package: `Open`, `AddEntry`, `RemoveEntry`, `SetAutoInject`, `GetEntryValue`, `GetAutoInjectEnv`, `BuildInjectionScript`
+  - `cmd/forge/handlers_vault.go` — HTTP handlers: status, list, add, delete, toggle auto-inject, inject now, reveal value
+  - `frontend/src/components/VaultPanel.jsx` + `VaultPanel.css` — compact modal panel for managing secrets; supports API token and username/password credential types
+  - `frontend/src/hooks/useVault.js` — React hook for vault state management
+  - 🔐 toolbar button in App.jsx opens the vault panel
+  - `internal/storage/paths.go` — added `GetVaultDir()` helper
+
 ## [6.1.1] - 2026-04-14
 
 ### Fixed

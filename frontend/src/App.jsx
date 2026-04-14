@@ -35,6 +35,7 @@ import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
 import CodeTutorPanel from './components/CodeTutorPanel'
+import VaultPanel from './components/VaultPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -169,6 +170,9 @@ function App() {
 
   // Code Tutor state (v3.19.0: Learn As You Build)
   const [isTutorOpen, setIsTutorOpen] = useState(false)
+
+  // Forge Vault state (v6.2.0: AES-256-GCM encrypted secret storage)
+  const [isVaultPanelOpen, setIsVaultPanelOpen] = useState(false)
 
   // Mobile detection — drives drawer sidebar and touch-optimised interactions
   const { isMobile, isTablet } = useMobileDetect();
@@ -1680,6 +1684,14 @@ function App() {
         >
           <Settings size={18} />
         </button>
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={() => setIsVaultPanelOpen(true)}
+          title="Forge Vault — encrypted secret storage"
+          aria-label="Open Forge Vault"
+        >
+          🔐
+        </button>
       </div>
 
       {/* Content area - Cards, Workflows, Files, Assistant, or Debug */}
@@ -2151,6 +2163,13 @@ function App() {
         onToast={addToast}
         activeDirectory={activeTab?.currentDirectory}
       />}
+
+      {/* Forge Vault Panel - AES-256-GCM encrypted secret storage (v6.2.0) */}
+      <VaultPanel
+        isOpen={isVaultPanelOpen}
+        onClose={() => setIsVaultPanelOpen(false)}
+        onToast={addToast}
+      />
 
     </div>
   )

@@ -89,3 +89,8 @@ func LegacySessionsDir() string {
 func LegacyWelcomePath() string {
 	return filepath.Join(GetForgeDir(), ".welcome-shown")
 }
+
+// GetVaultDir returns the directory where the encrypted vault file is stored.
+func GetVaultDir() string {
+	return filepath.Join(GetForgeDir(), "vault")
+}
