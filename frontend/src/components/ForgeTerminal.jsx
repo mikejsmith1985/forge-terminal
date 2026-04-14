@@ -412,8 +412,13 @@ function sanitizePath(path) {
   // Strip double-quotes and everything after (quotes are invalid in Windows paths
   // and indicate a command argument leaked into the path detection)
   path = path.replace(/".*$/, '');
+  // Truncate at semicolon — semicolons separate commands and are never part of a
+  // valid Windows or Unix filesystem path
+  path = path.replace(/;.*$/, '');
   // Remove && (and everything after) — not valid inside a filesystem path
   path = path.replace(/\s*&&.*$/, '');
+  // Remove || (and everything after) — shell OR operator, not a path component
+  path = path.replace(/\s*\|\|.*$/, '');
   // Strip argument-like suffixes: " -flag..." or " /flag..."
   path = path.replace(/\s+[-\/][A-Za-z].*$/, '');
   // Remove trailing git-status / prompt decoration brackets, e.g. [master *%]

@@ -13,7 +13,7 @@ import RemoteAccessModal from './components/RemoteAccessModal'
 import { useMobileDetect } from './hooks/useMobileDetect'
 import UpdateModal from './components/UpdateModal'
 import DeveloperDashboard from './components/DeveloperDashboard'
-// WelcomeModal REMOVED - replaced by guided tour (user request: 20+ times)
+// WelcomeModal REMOVED
 // Workflows REMOVED - v3.9.0: Consolidating to SLM-enhanced Forge Assist
 import FileAccessPrompt from './components/FileAccessPrompt'
 import ShellToggle from './components/ShellToggle'
@@ -44,8 +44,6 @@ import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailabili
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
 import { extractProjectFolder, getTabTitle, isStaticNamingStrategy } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
-import useGuidedTour from './hooks/useGuidedTour'
-import TourOverlay from './components/TourOverlay'
 
 const MAX_TABS = 20;
 
@@ -81,7 +79,7 @@ function App() {
   const [isRemoteAccessOpen, setIsRemoteAccessOpen] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
-  // WelcomeModal state REMOVED - replaced by guided tour
+  // WelcomeModal state REMOVED
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
   // ChatView and NotebookLayout REMOVED in v3.8.2 - Terminal is the only view
   const [settingsInitialTab, setSettingsInitialTab] = useState('shell') // For opening Settings to specific tab
@@ -203,6 +201,7 @@ function App() {
     closeTab,
     switchTab,
     updateTabTitle,
+    updateTabTitleIfUnlocked,
     updateTabShellConfig,
     updateTabColorTheme,
     toggleTabMode,
@@ -218,60 +217,6 @@ function App() {
   
   // Workflow management - REMOVED v3.9.0: Consolidating to SLM-enhanced Forge Assist
 
-  // Tour action handlers for interactive steps
-  // v3.12.4: Complete interactive tour with all UI actions
-  const tourActionHandlers = useMemo(() => ({
-    // Tab management
-    createNewTab: () => {
-      if (tabs.length < MAX_TABS) {
-        createTab();
-      }
-    },
-    closeExtraTab: () => {
-      // Close the last tab if we have more than one
-      if (tabs.length > 1) {
-        const lastTab = tabs[tabs.length - 1];
-        closeTab(lastTab.id);
-      }
-    },
-
-    // Forge Assist actions
-    openForgeAssist: () => setIsForgeAssistOpen(true),
-    closeForgeAssist: () => setIsForgeAssistOpen(false),
-    switchToTaskMode: () => {
-      // ForgeAssist handles its own mode state, we just ensure it's open
-      setIsForgeAssistOpen(true);
-    },
-
-    // Sidebar tab switching
-    showCardsTab: () => setSidebarView('cards'),
-    showFilesTab: () => setSidebarView('files'),
-    showWebToolsTab: () => setSidebarView('debug'),
-
-    // History Slider (Time Travel)
-    openHistorySlider: () => setIsHistorySliderOpen(true),
-    closeHistorySlider: () => setIsHistorySliderOpen(false),
-
-    // Settings modal
-    openSettings: () => setIsSettingsModalOpen(true),
-    closeSettings: () => setIsSettingsModalOpen(false),
-
-    // Legacy router config — removed feature, kept as no-ops for tour compatibility
-    openRouterConfig: () => {},
-    closeRouterConfig: () => {},
-  }), [tabs, createTab, closeTab]);
-
-  // Guided Tour for first-run experience
-  const {
-    isActive: isTourActive,
-    stepData: tourStepData,
-    currentStep: tourCurrentStep,
-    totalSteps: tourTotalSteps,
-    nextStep: tourNextStep,
-    skipTour,
-    restartTour,
-  } = useGuidedTour(tourActionHandlers);
-  
   // Query model tier when terminal input changes
   const queryModelTier = useCallback(async (input) => {
     if (!input || input.trim().length < 10) {
@@ -766,17 +711,16 @@ function App() {
       const res = await fetch('/api/welcome');
       const data = await res.json();
       
-      // WelcomeModal was removed in favor of guided tour
-      // Just log the status, don't try to open a modal that doesn't exist
+      // Welcome check — logged but no modal displayed
       if (!data.shown) {
-        console.log('[App] Welcome not yet shown - guided tour will handle this');
+        console.log('[App] Welcome not yet shown');
       }
     } catch (err) {
       console.error('Failed to check welcome status:', err);
     }
   }
 
-  // dismissWelcome REMOVED - WelcomeModal removed in favor of guided tour
+  // dismissWelcome REMOVED
 
   // Check and prompt for file access permission if needed
   const checkFileAccessPermission = () => {
@@ -1021,8 +965,17 @@ function App() {
 
     // Inherit the active tab's working directory so the new tab opens in the
     // same workspace rather than falling back to the server's process CWD.
+    // Validate the path: reject anything containing suspicious characters
+    // (semicolons, pipes, quotes) that indicate a misdetected command string.
     const activeTab = tabs.find(t => t.id === activeTabId);
-    const inheritedDir = activeTab?.currentDirectory || null;
+    let inheritedDir = activeTab?.currentDirectory || null;
+    if (inheritedDir) {
+      const SUSPICIOUS_PATH_CHARS = /[;|"'`<>!&]/;
+      if (SUSPICIOUS_PATH_CHARS.test(inheritedDir)) {
+        logger.tabs('Inherited directory looks invalid, dropping', { inheritedDir });
+        inheritedDir = null;
+      }
+    }
     
     const result = createTab({
       ...shellConfig,
@@ -1117,24 +1070,27 @@ function App() {
     // v3.8.2: Terminal is the only view, no switching needed
   }, []);
 
-  // Handle directory change from terminal - auto-rename tab and save directory.
-  // Respects the user's chosen tab naming strategy: static strategies (numbered,
-  // shell-type, custom-prefix) never auto-rename; dynamic strategies update on cd.
+  // Handle directory change from terminal.
+  // Always updates the tracked currentDirectory (for file browser, inherited dirs, etc.).
+  // Tab title is set ONCE from the first directory detection and then locked permanently.
+  // Only manual rename (double-click) can change a locked title.
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
-    // Static strategies: never auto-rename on directory change
-    if (isStaticNamingStrategy(namingStrategy)) {
-      if (fullPath) updateTabDirectory(tabId, fullPath);
-      return;
-    }
+    // Always track the real working directory regardless of naming strategy
+    if (fullPath) updateTabDirectory(tabId, fullPath);
+
+    // Static strategies never auto-rename at all
+    if (isStaticNamingStrategy(namingStrategy)) return;
+
+    // For dynamic strategies: attempt to set the title ONCE (if still unlocked).
+    // updateTabTitleIfUnlocked is a no-op when the title has already been locked.
     if (folderName || fullPath) {
       const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix, rootFolder: namingRootFolder }) || '';
-      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title, namingStrategy });
-      if (title) updateTabTitle(tabId, title);
+      if (title) {
+        logger.tabs('Auto-setting initial tab title', { tabId, folderName, fullPath, title, namingStrategy });
+        updateTabTitleIfUnlocked(tabId, title);
+      }
     }
-    if (fullPath) {
-      updateTabDirectory(tabId, fullPath);
-    }
-  }, [namingStrategy, namingPrefix, namingRootFolder, updateTabTitle, updateTabDirectory]);
+  }, [namingStrategy, namingPrefix, namingRootFolder, updateTabTitleIfUnlocked, updateTabDirectory]);
 
   // Helper to get folder name from a path
   const getFolderNameFromPath = (path) => {
@@ -2105,10 +2061,6 @@ function App() {
           setNamingPrefix(prefix);
           setNamingRootFolder(rootFolder ?? '');
         }}
-        onRestartTour={() => {
-          setIsSettingsModalOpen(false);
-          restartTour();
-        }}
       />
 
       <UpdateModal
@@ -2119,7 +2071,7 @@ function App() {
         isDevMode={window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'}
       />
 
-      {/* WelcomeModal REMOVED per user request - replaced by guided tour */}
+      {/* WelcomeModal REMOVED */}
 
       <FileAccessPrompt
         isOpen={showFileAccessPrompt}
@@ -2192,17 +2144,6 @@ function App() {
         onToast={addToast}
         activeDirectory={activeTab?.currentDirectory}
       />}
-
-      {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
-      {isTourActive && (
-        <TourOverlay
-          step={tourStepData}
-          currentStep={tourCurrentStep}
-          totalSteps={tourTotalSteps}
-          onNext={tourNextStep}
-          onSkip={skipTour}
-        />
-      )}
 
     </div>
   )

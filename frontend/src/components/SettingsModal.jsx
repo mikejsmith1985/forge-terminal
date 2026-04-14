@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Play, Palette, Zap, RotateCcw, Database, History, Bell } from 'lucide-react';
+import { Settings, Terminal, Monitor, Monitor as DesktopIcon, Shield, Cpu, Palette, Zap, RotateCcw, Database, History, Bell } from 'lucide-react';
 import CLISettingsPanel from './CLISettingsPanel';
 import TabControlsPanel from './TabControlsPanel';
 import CardHistoryPanel from './CardHistoryPanel';
@@ -7,7 +7,7 @@ import NotificationsPanel from './NotificationsPanel';
 import { ClaudeCLICommandsTable } from './ClaudeCLICommands';
 import { themes, themeOrder } from '../themes';
 
-const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, initialTab = 'shell', onRestartTour, defaultTabTheme = 'auto-cycle', onDefaultTabThemeChange, onNamingChange }) => {
+const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode = false, onDevModeChange, initialTab = 'shell', defaultTabTheme = 'auto-cycle', onDefaultTabThemeChange, onNamingChange }) => {
   const [config, setConfig] = useState(shellConfig);
   const [wslInfo, setWslInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -573,16 +573,6 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
                 <DesktopIcon size={16} style={{ marginRight: '6px' }} />
                 {creatingShortcut ? 'Creating...' : 'Desktop Shortcut'}
               </button>
-              {onRestartTour && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={onRestartTour}
-                  style={{ flex: 1 }}
-                >
-                  <Play size={16} style={{ marginRight: '6px' }} />
-                  Replay Tour
-                </button>
-              )}
             </div>
             <small style={{
               display: 'block',
@@ -590,7 +580,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               color: '#888',
               fontSize: '0.8em'
             }}>
-              Create a desktop shortcut or replay the feature tour
+              Create a desktop shortcut for quick access
             </small>
           </div>
 

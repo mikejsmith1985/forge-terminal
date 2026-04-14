@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Tab titles now lock after first detection** — tab names are set once from the initial working directory and never auto-updated when you `cd`. Only manual rename (double-click) changes a locked title. Fixes chronic issue where tab names would follow subdirectory navigation and eventually display garbled command fragments
+- **New tab creation failing ("directory name is invalid")** — inherited working directory is now validated before passing to PTY; paths containing semicolons, pipes, or other command fragments are rejected. Also hardened `sanitizePath` to strip semicolons and `||` operators that could leak from terminal prompt detection
+
+### Removed
+- **Guided tour removed** — the first-run/new-release tour overlay has been fully removed (useGuidedTour hook, TourOverlay component, tourSteps config, WelcomeModal, and "Replay Tour" button in Settings)
+
 ## [6.0.0] - 2026-04-13
 
 ### Added

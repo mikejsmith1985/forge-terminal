@@ -70,29 +70,40 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     assignedMode = mode || 'dark';
   }
 
+  // Compute the initial tab title and whether it should be locked (never auto-updated).
+  // A title is "locked" once it has a meaningful value — either explicitly provided,
+  // derived from a known directory, or from a static naming strategy.
+  const resolvedTitle = (() => {
+    if (options.title) return options.title;
+    const strategy    = options.namingStrategy    || 'project-root';
+    const prefix      = options.namingPrefix      || 'Dev';
+    const rootFolder  = options.namingRootFolder  || '';
+    if (strategy === 'shell-type') {
+      return `${getShellLabel(shellConfig?.shellType)} ${tabNumber}`;
+    }
+    if (strategy === 'custom-prefix') {
+      return `${prefix} ${tabNumber}`;
+    }
+    if (strategy === 'numbered') {
+      return `Terminal ${tabNumber}`;
+    }
+    // Dynamic strategies (project-root, current-dir, parent-child):
+    // seed from currentDirectory if available, otherwise generic placeholder
+    if (currentDirectory) {
+      return getTabTitle(currentDirectory, strategy, { tabNumber, prefix, rootFolder, fallback: `Terminal ${tabNumber}` });
+    }
+    return `Terminal ${tabNumber}`;
+  })();
+
+  // Lock the title if we already have a meaningful name (from options, directory, or static strategy).
+  // Unlocked titles (generic "Terminal N" placeholders) get one chance to auto-set from the first
+  // directory detection, then lock permanently.
+  const hasMeaningfulTitle = !!options.title || !!currentDirectory || isStaticNamingStrategy(options.namingStrategy || 'project-root');
+
   const newTab = {
     id: generateId(),
-    title: (() => {
-      if (options.title) return options.title;
-      const strategy    = options.namingStrategy    || 'project-root';
-      const prefix      = options.namingPrefix      || 'Dev';
-      const rootFolder  = options.namingRootFolder  || '';
-      if (strategy === 'shell-type') {
-        return `${getShellLabel(shellConfig?.shellType)} ${tabNumber}`;
-      }
-      if (strategy === 'custom-prefix') {
-        return `${prefix} ${tabNumber}`;
-      }
-      if (strategy === 'numbered') {
-        return `Terminal ${tabNumber}`;
-      }
-      // Dynamic strategies (project-root, current-dir, parent-child):
-      // seed from currentDirectory if available, otherwise generic placeholder
-      if (currentDirectory) {
-        return getTabTitle(currentDirectory, strategy, { tabNumber, prefix, rootFolder, fallback: `Terminal ${tabNumber}` });
-      }
-      return `Terminal ${tabNumber}`;
-    })(),
+    title: resolvedTitle,
+    isTitleLocked: hasMeaningfulTitle,
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
@@ -138,7 +149,7 @@ function tabsToSession(tabs, activeTabId) {
       // v3.12.3: amEnabled removed
       visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
-
+      isTitleLocked: tab.isTitleLocked || false,
     })),
     activeTabId: activeTabId,
   };
@@ -266,9 +277,10 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
           const strategy    = namingStrategyRef.current    || 'project-root';
           const rootFolder  = namingRootFolderRef.current  || '';
           let title = tabState.title || `Terminal ${index + 1}`;
+          const isRestoredTitleLocked = tabState.isTitleLocked || false;
 
-          // Re-derive title from saved directory when using a dynamic strategy
-          if (!isStaticNamingStrategy(strategy) && tabState.currentDirectory &&
+          // Only re-derive title if it was never locked (still a generic placeholder)
+          if (!isRestoredTitleLocked && !isStaticNamingStrategy(strategy) && tabState.currentDirectory &&
               (title.startsWith('Terminal ') || title === 'forge-terminal' || title === '~' || !title)) {
             const derived = getTabTitle(tabState.currentDirectory, strategy, {
               tabNumber: index + 1,
@@ -292,6 +304,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
           return {
             id: tabState.id || generateId(),
             title: title,
+            isTitleLocked: isRestoredTitleLocked || !title.startsWith('Terminal '),
             shellConfig: tabState.shellConfig || configRef.current,
             colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
             mode: tabState.mode || 'dark',
@@ -299,7 +312,6 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
             // v3.12.3: amEnabled removed
             visionEnabled: tabState.visionEnabled || false,
             currentDirectory: tabState.currentDirectory || null,
-
             createdAt: Date.now(),
           };
         });
@@ -465,7 +477,8 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
-   * Update a tab's title
+   * Update a tab's title (always locks the title to prevent auto-updates).
+   * Used for manual renames and explicit title sets.
    * @param {string} tabId - ID of tab to update
    * @param {string} title - New title
    */
@@ -477,11 +490,34 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       }
 
       const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], title };
+      newTabs[tabIndex] = { ...newTabs[tabIndex], title, isTitleLocked: true };
       return {
         ...prev,
         tabs: newTabs,
       };
+    });
+  }, []);
+
+  /**
+   * Auto-set a tab's title only if it hasn't been locked yet.
+   * Called when the terminal first detects its working directory. Once a title is
+   * set this way (or via manual rename), subsequent directory changes are ignored.
+   * @param {string} tabId - ID of tab to update
+   * @param {string} title - Proposed title from directory detection
+   */
+  const updateTabTitleIfUnlocked = useCallback((tabId, title) => {
+    if (!title) return;
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) return prev;
+
+      const tab = prev.tabs[tabIndex];
+      // Title already locked — do not overwrite
+      if (tab.isTitleLocked) return prev;
+
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], title, isTitleLocked: true };
+      return { ...prev, tabs: newTabs };
     });
   }, []);
 
@@ -758,6 +794,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     closeTab,
     switchTab,
     updateTabTitle,
+    updateTabTitleIfUnlocked,
     updateTabShellConfig,
     updateTabColorTheme,
     toggleTabAM,
