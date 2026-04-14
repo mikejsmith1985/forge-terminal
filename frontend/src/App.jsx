@@ -30,6 +30,7 @@ import DebugPanel from './components/DebugPanel'
 import WebAppDebuggerCard from './components/WebAppDebuggerCard'
 import FollowMeDebugger from './components/FollowMeDebugger'
 import ConnectionDiagnosticCard from './components/ConnectionDiagnosticCard'
+import MCPPanel from './components/MCPPanel'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
@@ -1681,28 +1682,31 @@ function App() {
       {/* Content area - Cards, Workflows, Files, Assistant, or Debug */}
       <div className="sidebar-content">
         {sidebarView === 'cards' ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <CommandCards
-              commands={commands}
-              loading={commandsLoading}
-              error={commandsError}
-              onExecute={handleExecute}
-              onPaste={handlePaste}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onRetry={loadCommands}
-              onToast={addToast}
-              shellType={shellConfig.shellType}
-              cwd={activeTab?.currentDirectory}
-              directoryCardVisible={directoryCardVisible}
-              onHideDirectoryCard={handleHideDirectoryCard}
-              onOpenTutor={() => setIsTutorOpen(true)}
-            />
-          </DndContext>
+          <>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <CommandCards
+                commands={commands}
+                loading={commandsLoading}
+                error={commandsError}
+                onExecute={handleExecute}
+                onPaste={handlePaste}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onRetry={loadCommands}
+                onToast={addToast}
+                shellType={shellConfig.shellType}
+                cwd={activeTab?.currentDirectory}
+                directoryCardVisible={directoryCardVisible}
+                onHideDirectoryCard={handleHideDirectoryCard}
+                onOpenTutor={() => setIsTutorOpen(true)}
+              />
+            </DndContext>
+            <MCPPanel onToast={addToast} />
+          </>
         ) : sidebarView === 'files' ? (
           <LensFilePicker
             currentPath={activeTab?.currentDirectory}

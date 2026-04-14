@@ -122,6 +122,20 @@ func (broker *TaskBroker) UpdateStatus(taskID string, newStatus string) {
 	}
 }
 
+// ListAll returns a snapshot of every task the broker knows about, sorted by
+// submission time (newest first). The returned slice is safe for the caller to
+// modify — it does not alias the internal map.
+func (broker *TaskBroker) ListAll() []*PendingTask {
+	broker.mu.RLock()
+	defer broker.mu.RUnlock()
+
+	allTasks := make([]*PendingTask, 0, len(broker.taskMap))
+	for _, task := range broker.taskMap {
+		allTasks = append(allTasks, task)
+	}
+	return allTasks
+}
+
 // Incoming returns the read-only channel the agent loop should consume.
 // The agent calls <-broker.Incoming() to receive the next submitted task.
 func (broker *TaskBroker) Incoming() <-chan *PendingTask {

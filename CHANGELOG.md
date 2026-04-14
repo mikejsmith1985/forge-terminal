@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **MCP Dashboard Panel** — new sidebar card in the "Cards" view that exposes the MCP server's full status at a glance. Shows connection endpoint, protocol version, masked auth token with one-click copy, registered tools list, and live task queue with status badges. Includes **Quick Connect** tab with ready-to-paste config snippets for Claude Desktop, VS Code Copilot, and Cursor — just copy, paste, and add your token
+- **Backend endpoints for MCP dashboard** — `GET /api/mcp/status` (server info + tool list), `GET /api/mcp/dashboard/tasks` (full task queue), `GET /api/mcp/dashboard/token` (secure token retrieval for clipboard)
+
 ### Fixed
 - **Tab titles now lock after first detection** — tab names are set once from the initial working directory and never auto-updated when you `cd`. Only manual rename (double-click) changes a locked title. Fixes chronic issue where tab names would follow subdirectory navigation and eventually display garbled command fragments
 - **New tab creation failing ("directory name is invalid")** — inherited working directory is now validated before passing to PTY; paths containing semicolons, pipes, or other command fragments are rejected. Also hardened `sanitizePath` to strip semicolons and `||` operators that could leak from terminal prompt detection

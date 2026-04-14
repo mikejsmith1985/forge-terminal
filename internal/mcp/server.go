@@ -91,6 +91,26 @@ func (srv *Server) Broker() *TaskBroker {
 	return srv.broker
 }
 
+// ToolNames returns the sorted list of registered tool names.
+// Used by the /api/mcp/status endpoint to show which tools are active.
+func (srv *Server) ToolNames() []string {
+	toolNames := make([]string, 0, len(srv.tools))
+	for name := range srv.tools {
+		toolNames = append(toolNames, name)
+	}
+	return toolNames
+}
+
+// TokenHint returns the first 8 and last 4 characters of the auth token,
+// with the middle replaced by "…". This lets the UI confirm which token is
+// active without exposing the full secret.
+func (srv *Server) TokenHint() string {
+	if len(srv.authToken) < 16 {
+		return "****"
+	}
+	return srv.authToken[:8] + "…" + srv.authToken[len(srv.authToken)-4:]
+}
+
 // ExecuteTool calls a named tool directly, bypassing HTTP and auth.
 // Intended for unit testing only — not exposed over HTTP.
 func (srv *Server) ExecuteTool(name string, args map[string]any) (*CallToolResult, error) {
