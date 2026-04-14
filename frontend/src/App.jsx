@@ -203,6 +203,7 @@ function App() {
     switchTab,
     updateTabTitle,
     updateTabTitleIfUnlocked,
+    updateTabTitleForProject,
     updateTabShellConfig,
     updateTabColorTheme,
     toggleTabMode,
@@ -1083,15 +1084,17 @@ function App() {
     if (isStaticNamingStrategy(namingStrategy)) return;
 
     // For dynamic strategies: attempt to set the title ONCE (if still unlocked).
-    // updateTabTitleIfUnlocked is a no-op when the title has already been locked.
+    // For dynamic strategies: update the title whenever the computed project root changes.
+    // updateTabTitleForProject respects manual renames but DOES update auto-detected titles
+    // so that a tab stuck on "toolbox" correctly shows "forge-terminal" after the user cds there.
     if (folderName || fullPath) {
       const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix, rootFolder: namingRootFolder }) || '';
       if (title) {
-        logger.tabs('Auto-setting initial tab title', { tabId, folderName, fullPath, title, namingStrategy });
-        updateTabTitleIfUnlocked(tabId, title);
+        logger.tabs('Auto-updating tab title from directory', { tabId, folderName, fullPath, title, namingStrategy });
+        updateTabTitleForProject(tabId, title);
       }
     }
-  }, [namingStrategy, namingPrefix, namingRootFolder, updateTabTitleIfUnlocked, updateTabDirectory]);
+  }, [namingStrategy, namingPrefix, namingRootFolder, updateTabTitleForProject, updateTabDirectory]);
 
   // Helper to get folder name from a path
   const getFolderNameFromPath = (path) => {

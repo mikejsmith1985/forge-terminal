@@ -104,6 +104,9 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
     id: generateId(),
     title: resolvedTitle,
     isTitleLocked: hasMeaningfulTitle,
+    // True only when the user has explicitly renamed the tab (double-click).
+    // Auto-detection from directory changes will never overwrite a manually-set title.
+    isManuallyRenamed: false,
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
@@ -150,6 +153,7 @@ function tabsToSession(tabs, activeTabId) {
       visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
       isTitleLocked: tab.isTitleLocked || false,
+      isManuallyRenamed: tab.isManuallyRenamed || false,
     })),
     activeTabId: activeTabId,
   };
@@ -278,6 +282,8 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
           const rootFolder  = namingRootFolderRef.current  || '';
           let title = tabState.title || `Terminal ${index + 1}`;
           const isRestoredTitleLocked = tabState.isTitleLocked || false;
+          // Restore whether the user explicitly renamed this tab (manual rename survives page reload)
+          const wasManuallyRenamed = tabState.isManuallyRenamed || false;
 
           // Only re-derive title if it was never locked (still a generic placeholder)
           if (!isRestoredTitleLocked && !isStaticNamingStrategy(strategy) && tabState.currentDirectory &&
@@ -304,7 +310,11 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
           return {
             id: tabState.id || generateId(),
             title: title,
-            isTitleLocked: isRestoredTitleLocked || !title.startsWith('Terminal '),
+            // Lock the title only when the user explicitly renamed it (isManuallyRenamed).
+            // Tabs with auto-detected titles should remain unlocked so that
+            // updateTabTitleForProject can correct them when the project root changes.
+            isTitleLocked: wasManuallyRenamed || false,
+            isManuallyRenamed: wasManuallyRenamed,
             shellConfig: tabState.shellConfig || configRef.current,
             colorTheme: tabState.colorTheme || themeOrder[index % themeOrder.length],
             mode: tabState.mode || 'dark',
@@ -477,8 +487,8 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
-   * Update a tab's title (always locks the title to prevent auto-updates).
-   * Used for manual renames and explicit title sets.
+   * Explicitly set a tab's title (manual rename by the user).
+   * Marks the tab as manually renamed so auto-detection never overwrites it.
    * @param {string} tabId - ID of tab to update
    * @param {string} title - New title
    */
@@ -490,7 +500,13 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       }
 
       const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], title, isTitleLocked: true };
+      newTabs[tabIndex] = {
+        ...newTabs[tabIndex],
+        title,
+        isTitleLocked: true,
+        // Mark as user-renamed so project-root auto-detection never overwrites it
+        isManuallyRenamed: true,
+      };
       return {
         ...prev,
         tabs: newTabs,
@@ -514,6 +530,40 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       const tab = prev.tabs[tabIndex];
       // Title already locked — do not overwrite
       if (tab.isTitleLocked) return prev;
+
+      const newTabs = [...prev.tabs];
+      newTabs[tabIndex] = { ...newTabs[tabIndex], title, isTitleLocked: true };
+      return { ...prev, tabs: newTabs };
+    });
+  }, []);
+
+  /**
+   * Update a tab's title when the active project directory changes.
+   *
+   * Unlike updateTabTitleIfUnlocked, this CAN update previously-locked titles —
+   * but ONLY when the computed project name has actually changed (i.e., the user
+   * has opened a different top-level project in the same tab). It always no-ops
+   * for tabs the user has manually renamed (double-click rename).
+   *
+   * This fixes the "tab stuck on wrong project" bug where a saved title like
+   * "toolbox" would never correct itself after the user cds into "forge-terminal".
+   *
+   * @param {string} tabId - ID of tab to update
+   * @param {string} title - New title derived from the current directory
+   */
+  const updateTabTitleForProject = useCallback((tabId, title) => {
+    if (!title) return;
+    setState(prev => {
+      const tabIndex = prev.tabs.findIndex(t => t.id === tabId);
+      if (tabIndex === -1) return prev;
+
+      const tab = prev.tabs[tabIndex];
+
+      // Never overwrite a title the user set manually (they chose it, leave it alone)
+      if (tab.isManuallyRenamed) return prev;
+
+      // No-op when the computed project root hasn't changed (prevents flicker/re-renders)
+      if (tab.title === title) return prev;
 
       const newTabs = [...prev.tabs];
       newTabs[tabIndex] = { ...newTabs[tabIndex], title, isTitleLocked: true };
@@ -795,6 +845,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     switchTab,
     updateTabTitle,
     updateTabTitleIfUnlocked,
+    updateTabTitleForProject,
     updateTabShellConfig,
     updateTabColorTheme,
     toggleTabAM,

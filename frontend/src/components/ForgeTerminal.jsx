@@ -1199,6 +1199,32 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       e.preventDefault();
       e.stopPropagation();
 
+      // ── FAST PATH: synchronous text paste via e.clipboardData ─────────────
+      // The paste event always has e.clipboardData populated with the pasted content.
+      // We check it here FIRST to avoid the 30+ second delay that
+      // navigator.clipboard.read() causes on Windows (Chromium clipboard permission
+      // prompts block the entire async call before timing out).
+      // Only skip this fast path when the clipboard contains media (images/video),
+      // which needs the async upload flow below.
+      if (e.clipboardData) {
+        const clipboardDataItems = Array.from(e.clipboardData.items || []);
+        const hasClipboardMedia = clipboardDataItems.some(item =>
+          item.type.startsWith('image/') || item.type.startsWith('video/')
+        );
+        const quickText = e.clipboardData.getData('text/plain');
+
+        if (!hasClipboardMedia && quickText) {
+          // Pure text — paste immediately with no async overhead
+          console.log('[Terminal] Fast text paste via e.clipboardData:', quickText.length, 'chars');
+          if (xtermRef.current) {
+            xtermRef.current.paste(quickText);
+            if (onPasteRef.current) onPasteRef.current('text', { chars: quickText.length });
+          }
+          return;
+        }
+      }
+      // ── END FAST PATH ──────────────────────────────────────────────────────
+
       // Try modern clipboard API first (supports images/video)
       try {
         if (navigator.clipboard?.read) {

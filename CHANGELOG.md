@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Tab title shows wrong project** — tab names now update whenever the detected project root changes, not just on first detection. A tab locked as "toolbox" will correctly update to "forge-terminal" when you open that project. Manual renames (double-click) are always preserved and never auto-overwritten (`isManuallyRenamed` flag). Previous sessions that were over-locked on restore are now unlocked for auto-detection on reload.
+- **Paste latency (30+ seconds)** — Ctrl+V now pastes text instantly. The previous implementation always called `navigator.clipboard.read()` first, which on Windows/Chrome can block for 30+ seconds waiting for clipboard permission. The paste handler now uses the synchronous `e.clipboardData` fast-path for plain text (zero async overhead). Media paste (images/video) still routes through the full async pipeline unchanged.
+
 ## [6.1.0] - 2026-04-14
 
 ### Added
