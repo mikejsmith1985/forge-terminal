@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-04-14
+
 ### Added
 - **MCP Dashboard Panel** — new sidebar card in the "Cards" view that exposes the MCP server's full status at a glance. Shows connection endpoint, protocol version, masked auth token with one-click copy, registered tools list, and live task queue with status badges. Includes **Quick Connect** tab with ready-to-paste config snippets for Claude Desktop, VS Code Copilot, and Cursor — just copy, paste, and add your token
 - **Backend endpoints for MCP dashboard** — `GET /api/mcp/status` (server info + tool list), `GET /api/mcp/dashboard/tasks` (full task queue), `GET /api/mcp/dashboard/token` (secure token retrieval for clipboard)
