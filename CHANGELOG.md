@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.3] - 2026-04-15
+
 ### Added
 - **Code Tutor disable toggle** — persistent UI control to completely turn off the Code Tutor feature. Power button in the panel header disables the feature; dimmed BookX icon in the TabBar re-enables it. State persists to `~/.forge/tutor/config.json` via new `/api/tutor/status` endpoint. Keyboard shortcut (Ctrl+Shift+T) is also suppressed when disabled.
 
