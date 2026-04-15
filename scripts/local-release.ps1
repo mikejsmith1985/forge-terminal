@@ -155,10 +155,11 @@ $BINDIR  = "$ROOT\bin"
 New-Item -ItemType Directory -Force -Path $BINDIR | Out-Null
 
 $builds = @(
-    @{ GOOS="windows"; GOARCH="amd64"; Out="fterm.exe";          LD=$LDWIN  },
-    @{ GOOS="linux";   GOARCH="amd64"; Out="forge-linux-amd64";  LD=$LDBASE },
-    @{ GOOS="darwin";  GOARCH="amd64"; Out="forge-darwin-amd64"; LD=$LDBASE },
-    @{ GOOS="darwin";  GOARCH="arm64"; Out="forge-darwin-arm64"; LD=$LDBASE }
+    @{ GOOS="windows"; GOARCH="amd64"; Out="fterm.exe";          LD=$LDWIN;  Pkg="./cmd/forge/" },
+    @{ GOOS="linux";   GOARCH="amd64"; Out="forge-linux-amd64";  LD=$LDBASE; Pkg="./cmd/forge/" },
+    @{ GOOS="darwin";  GOARCH="amd64"; Out="forge-darwin-amd64"; LD=$LDBASE; Pkg="./cmd/forge/" },
+    @{ GOOS="darwin";  GOARCH="arm64"; Out="forge-darwin-arm64"; LD=$LDBASE; Pkg="./cmd/forge/" },
+    @{ GOOS="windows"; GOARCH="amd64"; Out="forge-debug.exe";   LD=$LDBASE; Pkg="./cmd/forge-debug/" }
 )
 
 foreach ($b in $builds) {
@@ -166,7 +167,7 @@ foreach ($b in $builds) {
     $env:GOOS   = $b.GOOS
     $env:GOARCH = $b.GOARCH
     $outPath = "$BINDIR\$($b.Out)"
-    go build -trimpath -ldflags $b.LD -o $outPath ./cmd/forge/
+    go build -trimpath -ldflags $b.LD -o $outPath $b.Pkg
     if ($LASTEXITCODE -ne 0) { Write-Fail "Build failed for $($b.Out)" }
     $size = [math]::Round((Get-Item $outPath).Length / 1MB, 1)
     Write-OK "$($b.Out) — ${size} MB"
@@ -272,6 +273,7 @@ Write-OK "Draft release created"
 Write-Step "Uploading binaries..."
 $assets = @(
     "$BINDIR\fterm.exe",
+    "$BINDIR\forge-debug.exe",
     "$BINDIR\forge-linux-amd64",
     "$BINDIR\forge-darwin-amd64",
     "$BINDIR\forge-darwin-arm64"
