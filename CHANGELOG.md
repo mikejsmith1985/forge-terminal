@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.4] - 2026-04-15
+
 ### Added
 - **forge-debug.exe — Standalone Diagnostic Tool** — new companion binary for diagnosing terminal connection failures. Users download `forge-debug.exe` to the same folder as `fterm.exe`, run it, and it walks them through a full diagnostic workflow:
   - **Pre-launch checks** — OS version, RAM, existing fterm processes, port availability, firewall status, proxy/VPN detection, antivirus processes, ~/.forge directory health

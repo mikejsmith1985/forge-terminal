@@ -1,156 +1,138 @@
-// report.go — Diagnostic report generator and auto-diagnosis engine for forge-debug.
-// Collects all pre-launch checks, monitoring timeline data, and process output
-// into a structured JSON report with a human-readable summary header. The report
-// is designed to be agent-consumable for automated root-cause analysis.
+// report.go generates the complete diagnostic report for forge-debug, assembling
+// pre-launch checks, connectivity probes, process logs, and auto-diagnosis into
+// a JSON-serializable structure with a human-readable summary. The report can be
+// copied to the system clipboard for sharing with developers.
 package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/atotto/clipboard"
 )
 
-// ── Constants ────────────────────────────────────────────────────────────────────
+// ── Constants ──
 
-// ReportFormatVersion identifies the schema version for forward compatibility.
-const ReportFormatVersion = "1.0.0"
+// NOTE: DebugToolVersion is defined in main.go and shared across the package.
+
+// MaxLogLinesInSummary limits how many process log lines appear in the human-readable summary.
+const MaxLogLinesInSummary = 50
 
 // maxProcessLogLinesInReport caps how many fterm.exe output lines are included
-// in the report to keep clipboard payloads manageable.
+// in the full JSON report to keep clipboard payloads manageable.
 const maxProcessLogLinesInReport = 500
 
-// ── Report Types ─────────────────────────────────────────────────────────────────
+// Severity levels for auto-diagnosis entries.
+const (
+	SeverityCritical = "critical"
+	SeverityWarning  = "warning"
+	SeverityInfo     = "info"
+)
 
-// DiagnosticReport is the top-level container for the full diagnostic snapshot.
+// Emoji indicators for the human-readable summary.
+const (
+	emojiPass     = "✅"
+	emojiFail     = "❌"
+	emojiWarn     = "⚠️"
+	emojiCritical = "🔴"
+	emojiInfoIcon = "ℹ️"
+)
+
+// minimumAcceptableSuccessRate is the threshold below which intermittent
+// connectivity failures are flagged as a warning (80%).
+const minimumAcceptableSuccessRate = 80.0
+
+// minimumSilentUptimeSeconds is how long a process must run with zero output
+// before we flag it as suspicious.
+const minimumSilentUptimeSeconds = 5
+
+// ── Report Types ──
+
+// DiagnosticReport is the complete report structure sent to developers for analysis.
 type DiagnosticReport struct {
-	FormatVersion     string              `json:"formatVersion"`
-	GeneratedAt       string              `json:"generatedAt"`
-	ToolVersion       string              `json:"toolVersion"`
-	System            SystemInfo          `json:"system"`
-	PreLaunchChecks   []CheckResult       `json:"preLaunchChecks"`
-	Connectivity      ConnectivitySummary `json:"connectivity"`
-	ProcessInfo       ProcessSummary      `json:"processInfo"`
-	ProcessOutput     []TimestampedLogLine `json:"processOutput"`
-	ProbeTimeline     []ProbeResult       `json:"probeTimeline"`
-	AutoDiagnosis     []DiagnosisEntry    `json:"autoDiagnosis"`
-	HumanSummary      string              `json:"humanSummary"`
+	GeneratedAt         time.Time            `json:"generatedAt"`
+	ToolVersion         string               `json:"toolVersion"`
+	ForgePort           int                  `json:"forgePort"`
+	PreLaunchChecks     []CheckResult        `json:"preLaunchChecks"`
+	MonitorTimeline     []ProbeResult        `json:"monitorTimeline"`
+	ProcessLog          []TimestampedLogLine `json:"processLog"`
+	ProcessInfo         ProcessDiagnostics   `json:"processInfo"`
+	ConnectivitySummary ConnectivitySummary  `json:"connectivitySummary"`
+	AutoDiagnosis       []DiagnosisEntry     `json:"autoDiagnosis"`
+	HumanSummary        string               `json:"humanSummary"`
 }
 
-// SystemInfo captures the environment details at report generation time.
-type SystemInfo struct {
-	OS           string `json:"os"`
-	Architecture string `json:"architecture"`
-	CPUCount     int    `json:"cpuCount"`
-	GoVersion    string `json:"goVersion"`
+// ProcessDiagnostics captures the state of the fterm.exe process.
+type ProcessDiagnostics struct {
+	IsRunning bool   `json:"isRunning"`
+	Uptime    string `json:"uptime"`
+	ExitCode  int    `json:"exitCode"`
+	ExitError string `json:"exitError,omitempty"`
 }
 
-// ConnectivitySummary distills the monitoring timeline into key metrics.
+// ConnectivitySummary captures the final state of connectivity probes.
 type ConnectivitySummary struct {
-	TargetPort         int     `json:"targetPort"`
-	IsPortOpen         bool    `json:"isPortOpen"`
-	IsHTTPHealthy      bool    `json:"isHttpHealthy"`
-	IsWebSocketConnected bool  `json:"isWebSocketConnected"`
-	HTTPSuccessRate    float64 `json:"httpSuccessRatePercent"`
-	WSSuccessRate      float64 `json:"wsSuccessRatePercent"`
-	TotalProbes        int     `json:"totalProbes"`
+	IsPortOpen            bool    `json:"isPortOpen"`
+	IsHTTPResponding      bool    `json:"isHttpResponding"`
+	IsWebSocketConnecting bool    `json:"isWebSocketConnecting"`
+	HTTPSuccessRate       float64 `json:"httpSuccessRate"`
+	WebSocketSuccessRate  float64 `json:"webSocketSuccessRate"`
+	TotalProbes           int     `json:"totalProbes"`
 }
 
-// ProcessSummary records the fterm.exe process lifecycle data.
-type ProcessSummary struct {
-	WasLaunched    bool   `json:"wasLaunched"`
-	IsStillRunning bool   `json:"isStillRunning"`
-	ExitCode       int    `json:"exitCode"`
-	ExitError      string `json:"exitError,omitempty"`
-	UptimeSeconds  int64  `json:"uptimeSeconds"`
-	TotalLogLines  int    `json:"totalLogLines"`
-}
-
-// DiagnosisEntry represents a single auto-detected issue with severity and advice.
+// DiagnosisEntry represents one auto-detected issue and recommended fix.
 type DiagnosisEntry struct {
-	Severity    string `json:"severity"` // "critical", "warning", "info"
-	Category    string `json:"category"`
-	Description string `json:"description"`
-	Suggestion  string `json:"suggestion"`
+	Severity      string `json:"severity"`
+	Issue         string `json:"issue"`
+	Explanation   string `json:"explanation"`
+	FixSuggestion string `json:"fixSuggestion"`
 }
 
-// ── Report Builder ───────────────────────────────────────────────────────────────
+// ── Report Assembly ──
 
-// buildDiagnosticReport assembles a complete diagnostic report from all available
-// data sources. Any source can be nil if that phase hasn't run yet — the report
-// gracefully handles missing data with sensible defaults.
-func buildDiagnosticReport(
-	preChecks []CheckResult,
-	timeline *MonitorTimeline,
-	launcher *ProcessLauncher,
-	port int,
-) DiagnosticReport {
-	report := DiagnosticReport{
-		FormatVersion:   ReportFormatVersion,
-		GeneratedAt:     time.Now().UTC().Format(time.RFC3339),
+// buildDiagnosticReport assembles the complete report from all data sources.
+// Calls runAutoDiagnosis and buildHumanSummary internally. If timeline or
+// launcher is nil, the report is generated with available data only (pre-launch report).
+func buildDiagnosticReport(preChecks []CheckResult, timeline *MonitorTimeline, launcher *ProcessLauncher, port int) *DiagnosticReport {
+	report := &DiagnosticReport{
+		GeneratedAt:     time.Now().UTC(),
 		ToolVersion:     DebugToolVersion,
-		System:          collectSystemInfo(),
-		PreLaunchChecks: preChecks,
-		Connectivity:    buildConnectivitySummary(timeline, port),
-		ProcessInfo:     buildProcessSummary(launcher),
-		ProcessOutput:   collectProcessOutput(launcher),
-		ProbeTimeline:   collectProbeTimeline(timeline),
+		ForgePort:       port,
+		PreLaunchChecks: ensureCheckSlice(preChecks),
 	}
 
-	report.AutoDiagnosis = runAutoDiagnosis(report)
-	report.HumanSummary = renderHumanSummary(report)
+	report.MonitorTimeline = extractProbeResults(timeline)
+	report.ProcessLog = collectProcessOutput(launcher)
+	report.ProcessInfo = extractProcessDiagnostics(launcher)
+	report.ConnectivitySummary = buildConnectivitySummary(timeline)
+	report.AutoDiagnosis = runAutoDiagnosis(preChecks, report.ConnectivitySummary, launcher)
+	report.HumanSummary = buildHumanSummary(report)
 
 	return report
 }
 
-// collectSystemInfo gathers OS, architecture, and runtime info.
-func collectSystemInfo() SystemInfo {
-	return SystemInfo{
-		OS:           runtime.GOOS,
-		Architecture: runtime.GOARCH,
-		CPUCount:     runtime.NumCPU(),
-		GoVersion:    runtime.Version(),
+// ensureCheckSlice returns the input slice or an empty slice if nil,
+// guaranteeing the JSON output always contains an array (never null).
+func ensureCheckSlice(checks []CheckResult) []CheckResult {
+	if checks == nil {
+		return []CheckResult{}
 	}
+	return checks
 }
 
-// buildConnectivitySummary extracts current status and success rates from the
-// monitor timeline. Returns zeroed summary if timeline is nil (not yet started).
-func buildConnectivitySummary(timeline *MonitorTimeline, port int) ConnectivitySummary {
-	summary := ConnectivitySummary{TargetPort: port}
-
+// extractProbeResults safely retrieves probe results from the timeline.
+// Returns an empty slice if timeline is nil.
+func extractProbeResults(timeline *MonitorTimeline) []ProbeResult {
 	if timeline == nil {
-		return summary
+		return []ProbeResult{}
 	}
-
-	summary.IsPortOpen, summary.IsHTTPHealthy, summary.IsWebSocketConnected = timeline.getLatestStatus()
-	summary.HTTPSuccessRate, summary.WSSuccessRate = timeline.getSuccessRates()
-	summary.TotalProbes = len(timeline.getProbeResults())
-
-	return summary
-}
-
-// buildProcessSummary extracts lifecycle information from the process launcher.
-// Returns a "not launched" summary if the launcher is nil.
-func buildProcessSummary(launcher *ProcessLauncher) ProcessSummary {
-	if launcher == nil {
-		return ProcessSummary{WasLaunched: false}
-	}
-
-	return ProcessSummary{
-		WasLaunched:    true,
-		IsStillRunning: launcher.isProcessRunning(),
-		ExitCode:       launcher.exitCode,
-		ExitError:      launcher.exitError,
-		UptimeSeconds:  int64(launcher.getProcessUptime().Seconds()),
-		TotalLogLines:  len(launcher.getLogLines()),
-	}
+	return timeline.getProbeResults()
 }
 
 // collectProcessOutput returns the captured fterm.exe log lines, capped at
-// maxProcessLogLinesInReport to keep the clipboard payload reasonable.
+// maxProcessLogLinesInReport. Returns an empty slice if launcher is nil.
 func collectProcessOutput(launcher *ProcessLauncher) []TimestampedLogLine {
 	if launcher == nil {
 		return []TimestampedLogLine{}
@@ -167,302 +149,538 @@ func collectProcessOutput(launcher *ProcessLauncher) []TimestampedLogLine {
 	return allLines[startIndex:]
 }
 
-// collectProbeTimeline returns all recorded probe results, or an empty slice
-// if monitoring hasn't started.
-func collectProbeTimeline(timeline *MonitorTimeline) []ProbeResult {
+// extractProcessDiagnostics gathers process state from the launcher,
+// locking the mutex to safely read unexported fields.
+func extractProcessDiagnostics(launcher *ProcessLauncher) ProcessDiagnostics {
+	if launcher == nil {
+		return ProcessDiagnostics{}
+	}
+
+	exitCode, exitError := extractExitInfo(launcher)
+
+	return ProcessDiagnostics{
+		IsRunning: launcher.isProcessRunning(),
+		Uptime:    launcher.getProcessUptime().String(),
+		ExitCode:  exitCode,
+		ExitError: exitError,
+	}
+}
+
+// extractExitInfo reads the exit code and error from the launcher under
+// its mutex, ensuring thread-safe access to unexported fields.
+func extractExitInfo(launcher *ProcessLauncher) (int, string) {
+	launcher.logMu.Lock()
+	defer launcher.logMu.Unlock()
+	return launcher.exitCode, launcher.exitError
+}
+
+// ── Connectivity Summary ──
+
+// buildConnectivitySummary extracts the latest status and success rates from the
+// monitor timeline. Returns a zeroed summary if timeline is nil or has no results.
+func buildConnectivitySummary(timeline *MonitorTimeline) ConnectivitySummary {
 	if timeline == nil {
-		return []ProbeResult{}
+		return ConnectivitySummary{}
 	}
-	return timeline.getProbeResults()
+
+	probeResults := timeline.getProbeResults()
+	if len(probeResults) == 0 {
+		return ConnectivitySummary{}
+	}
+
+	isPortOpen, isHTTPHealthy, isWSConnected := timeline.getLatestStatus()
+	httpRate, wsRate := timeline.getSuccessRates()
+
+	return ConnectivitySummary{
+		IsPortOpen:            isPortOpen,
+		IsHTTPResponding:      isHTTPHealthy,
+		IsWebSocketConnecting: isWSConnected,
+		HTTPSuccessRate:       httpRate,
+		WebSocketSuccessRate:  wsRate,
+		TotalProbes:           len(probeResults),
+	}
 }
 
-// ── Auto-Diagnosis Engine ────────────────────────────────────────────────────────
+// ── Auto-Diagnosis Engine ──
 
-// runAutoDiagnosis analyzes the report data and flags likely root causes.
-// Each diagnosis rule is an independent function that returns zero or more entries.
-func runAutoDiagnosis(report DiagnosticReport) []DiagnosisEntry {
-	var diagnoses []DiagnosisEntry
+// runAutoDiagnosis is the smart diagnosis engine that checks for common failure
+// patterns and produces actionable DiagnosisEntry items with severity, clear
+// explanation, and fix suggestions. Returns "No issues detected" when healthy.
+func runAutoDiagnosis(preChecks []CheckResult, connectivity ConnectivitySummary, launcher *ProcessLauncher) []DiagnosisEntry {
+	var entries []DiagnosisEntry
 
-	diagnoses = append(diagnoses, diagnosePreCheckFailures(report.PreLaunchChecks)...)
-	diagnoses = append(diagnoses, diagnosePortIssues(report.Connectivity)...)
-	diagnoses = append(diagnoses, diagnoseHTTPIssues(report.Connectivity)...)
-	diagnoses = append(diagnoses, diagnoseWebSocketIssues(report.Connectivity)...)
-	diagnoses = append(diagnoses, diagnoseProcessIssues(report.ProcessInfo)...)
-	diagnoses = append(diagnoses, diagnoseProcessOutputErrors(report.ProcessOutput)...)
+	entries = append(entries, diagnosePreLaunchFailures(preChecks)...)
+	entries = append(entries, diagnoseProcessState(launcher)...)
+	entries = append(entries, diagnoseConnectivityPatterns(connectivity)...)
 
-	if len(diagnoses) == 0 {
-		diagnoses = append(diagnoses, DiagnosisEntry{
-			Severity:    "info",
-			Category:    "overall",
-			Description: "No obvious issues detected from available data.",
-			Suggestion:  "If the problem persists, try running for a longer period before capturing the report.",
+	if len(entries) == 0 {
+		entries = append(entries, DiagnosisEntry{
+			Severity:      SeverityInfo,
+			Issue:         "No issues detected",
+			Explanation:   "All pre-launch checks passed and connectivity is healthy.",
+			FixSuggestion: "No action needed.",
 		})
 	}
 
-	return diagnoses
+	return entries
 }
 
-// diagnosePreCheckFailures flags any pre-launch check that returned "fail" status.
-func diagnosePreCheckFailures(checks []CheckResult) []DiagnosisEntry {
+// diagnosePreLaunchFailures scans pre-launch check results for failures and
+// produces a targeted diagnosis for each one.
+func diagnosePreLaunchFailures(preChecks []CheckResult) []DiagnosisEntry {
 	var entries []DiagnosisEntry
-	for _, check := range checks {
-		if check.Status == "fail" {
-			entries = append(entries, DiagnosisEntry{
-				Severity:    "critical",
-				Category:    "pre-launch",
-				Description: fmt.Sprintf("Pre-check '%s' FAILED: %s", check.Name, check.Detail),
-				Suggestion:  check.Suggestion,
-			})
+	for _, check := range preChecks {
+		if check.Status != "fail" {
+			continue
+		}
+		entries = append(entries, classifyPreLaunchFailure(check))
+	}
+	return entries
+}
+
+// classifyPreLaunchFailure maps a failed pre-launch check to a DiagnosisEntry
+// with a contextual explanation and actionable fix suggestion.
+func classifyPreLaunchFailure(check CheckResult) DiagnosisEntry {
+	lowerName := strings.ToLower(check.Name)
+
+	if strings.Contains(lowerName, "port") {
+		return DiagnosisEntry{
+			Severity:      SeverityCritical,
+			Issue:         "Port already in use",
+			Explanation:   fmt.Sprintf("Pre-launch check '%s' failed: %s", check.Name, check.Detail),
+			FixSuggestion: "Stop the process using this port, or choose a different port with the --port flag.",
 		}
 	}
-	return entries
+
+	if strings.Contains(lowerName, "directory") || strings.Contains(lowerName, "forge dir") {
+		return DiagnosisEntry{
+			Severity:      SeverityCritical,
+			Issue:         "Forge directory not found",
+			Explanation:   fmt.Sprintf("Pre-launch check '%s' failed: %s", check.Name, check.Detail),
+			FixSuggestion: "Verify the Forge installation directory exists and is accessible. Reinstall if necessary.",
+		}
+	}
+
+	if strings.Contains(lowerName, "process") {
+		return DiagnosisEntry{
+			Severity:      SeverityWarning,
+			Issue:         "Existing Forge process detected",
+			Explanation:   fmt.Sprintf("Pre-launch check '%s' failed: %s", check.Name, check.Detail),
+			FixSuggestion: "Stop the existing fterm.exe process before launching a new instance.",
+		}
+	}
+
+	if strings.Contains(lowerName, "firewall") {
+		return DiagnosisEntry{
+			Severity:      SeverityWarning,
+			Issue:         "Firewall may block connections",
+			Explanation:   fmt.Sprintf("Pre-launch check '%s' failed: %s", check.Name, check.Detail),
+			FixSuggestion: "Add a firewall exception for fterm.exe, or allow connections on the configured port.",
+		}
+	}
+
+	if strings.Contains(lowerName, "proxy") {
+		return DiagnosisEntry{
+			Severity:      SeverityWarning,
+			Issue:         "Proxy configuration detected",
+			Explanation:   fmt.Sprintf("Pre-launch check '%s' failed: %s", check.Name, check.Detail),
+			FixSuggestion: "Ensure your proxy settings do not intercept localhost traffic. Set NO_PROXY=localhost,127.0.0.1.",
+		}
+	}
+
+	// Generic fallback for unrecognized check names
+	return DiagnosisEntry{
+		Severity:      SeverityWarning,
+		Issue:         fmt.Sprintf("Pre-launch check failed: %s", check.Name),
+		Explanation:   check.Detail,
+		FixSuggestion: "Review the check details above and resolve the underlying issue.",
+	}
 }
 
-// diagnosePortIssues flags when the target port is not reachable after launch.
-func diagnosePortIssues(connectivity ConnectivitySummary) []DiagnosisEntry {
-	if connectivity.TotalProbes == 0 {
-		return nil
-	}
-	if !connectivity.IsPortOpen {
-		return []DiagnosisEntry{{
-			Severity:    "critical",
-			Category:    "network",
-			Description: fmt.Sprintf("Port %d is not open — fterm.exe may not be listening.", connectivity.TargetPort),
-			Suggestion:  "Check if fterm.exe started successfully. Look at process output for bind errors or crashes.",
-		}}
-	}
-	return nil
-}
-
-// diagnoseHTTPIssues flags HTTP health endpoint failures.
-func diagnoseHTTPIssues(connectivity ConnectivitySummary) []DiagnosisEntry {
-	if connectivity.TotalProbes == 0 {
-		return nil
-	}
-
-	// Port is open but HTTP fails → server is listening but not serving HTTP
-	if connectivity.IsPortOpen && !connectivity.IsHTTPHealthy {
-		return []DiagnosisEntry{{
-			Severity:    "critical",
-			Category:    "http",
-			Description: "Port is open but HTTP /api/version is not responding.",
-			Suggestion:  "The Go HTTP server may have crashed or failed to initialize routes. Check process stderr for panics.",
-		}}
-	}
-
-	// Intermittent HTTP failures (below 80% success)
-	const minimumAcceptableHTTPSuccessRate = 80.0
-	if connectivity.HTTPSuccessRate > 0 && connectivity.HTTPSuccessRate < minimumAcceptableHTTPSuccessRate {
-		return []DiagnosisEntry{{
-			Severity:    "warning",
-			Category:    "http",
-			Description: fmt.Sprintf("HTTP health check success rate is only %.0f%% — intermittent failures detected.", connectivity.HTTPSuccessRate),
-			Suggestion:  "The server may be overloaded or restarting. Check system resources and process output.",
-		}}
-	}
-
-	return nil
-}
-
-// diagnoseWebSocketIssues flags WebSocket handshake failures.
-func diagnoseWebSocketIssues(connectivity ConnectivitySummary) []DiagnosisEntry {
-	if connectivity.TotalProbes == 0 {
-		return nil
-	}
-
-	// HTTP works but WebSocket fails → likely a WS upgrade issue
-	if connectivity.IsHTTPHealthy && !connectivity.IsWebSocketConnected {
-		return []DiagnosisEntry{{
-			Severity:    "critical",
-			Category:    "websocket",
-			Description: "HTTP is healthy but WebSocket handshake fails — this is the likely root cause of terminal connection failures.",
-			Suggestion:  "Check for: (1) proxy stripping Upgrade headers, (2) antivirus/firewall blocking WS, (3) server-side WS handler errors in stderr.",
-		}}
-	}
-
-	// Intermittent WS failures
-	const minimumAcceptableWSSuccessRate = 80.0
-	if connectivity.WSSuccessRate > 0 && connectivity.WSSuccessRate < minimumAcceptableWSSuccessRate {
-		return []DiagnosisEntry{{
-			Severity:    "warning",
-			Category:    "websocket",
-			Description: fmt.Sprintf("WebSocket success rate is only %.0f%% — intermittent connection drops.", connectivity.WSSuccessRate),
-			Suggestion:  "This may indicate resource exhaustion or connection limits. Check process memory usage.",
-		}}
-	}
-
-	return nil
-}
-
-// diagnoseProcessIssues flags abnormal process lifecycle events.
-func diagnoseProcessIssues(processInfo ProcessSummary) []DiagnosisEntry {
-	if !processInfo.WasLaunched {
+// diagnoseProcessState examines the launcher state and log output to detect
+// crashes and common startup errors.
+func diagnoseProcessState(launcher *ProcessLauncher) []DiagnosisEntry {
+	if launcher == nil {
 		return nil
 	}
 
 	var entries []DiagnosisEntry
 
-	// Process crashed (non-zero exit)
-	if !processInfo.IsStillRunning && processInfo.ExitCode != 0 {
-		entries = append(entries, DiagnosisEntry{
-			Severity:    "critical",
-			Category:    "process",
-			Description: fmt.Sprintf("fterm.exe exited with code %d: %s", processInfo.ExitCode, processInfo.ExitError),
-			Suggestion:  "Check process output for error messages, panics, or unhandled exceptions.",
-		})
+	if !launcher.isProcessRunning() {
+		entries = append(entries, diagnoseCrashedProcess(launcher)...)
 	}
 
-	// No output captured at all → process may have silently failed
-	if processInfo.TotalLogLines == 0 && processInfo.UptimeSeconds > 5 {
-		entries = append(entries, DiagnosisEntry{
-			Severity:    "warning",
-			Category:    "process",
-			Description: "No stdout/stderr output captured from fterm.exe after 5+ seconds.",
-			Suggestion:  "The process may have frozen or output is being redirected. Try running fterm.exe manually in a terminal.",
-		})
-	}
+	entries = append(entries, diagnoseSilentProcess(launcher)...)
+	entries = append(entries, diagnoseCommonLogErrors(launcher.getLogLines())...)
 
 	return entries
 }
 
-// diagnoseProcessOutputErrors scans the captured process output for common
-// error patterns that indicate startup failures or runtime crashes.
-func diagnoseProcessOutputErrors(logLines []TimestampedLogLine) []DiagnosisEntry {
-	var entries []DiagnosisEntry
-
-	errorPatterns := map[string]string{
-		"panic:":                "Go runtime panic detected in fterm.exe output.",
-		"bind: address already": "Port bind failure — another process is using the same port.",
-		"permission denied":     "Permission denied error — check file/network permissions.",
-		"fatal error":           "Fatal error detected in fterm.exe output.",
-		"out of memory":         "Out of memory condition — close other applications.",
-		"tls handshake":         "TLS handshake error — check certificate configuration.",
+// diagnoseCrashedProcess produces a diagnosis entry if the process exited with an error.
+func diagnoseCrashedProcess(launcher *ProcessLauncher) []DiagnosisEntry {
+	exitCode, exitError := extractExitInfo(launcher)
+	if exitError == "" {
+		return nil
 	}
 
+	return []DiagnosisEntry{{
+		Severity:      SeverityCritical,
+		Issue:         "Process crashed on startup",
+		Explanation:   fmt.Sprintf("fterm.exe exited with code %d: %s", exitCode, exitError),
+		FixSuggestion: "Check the process output below for error details. Common causes: missing config, port conflicts, or corrupt binary.",
+	}}
+}
+
+// diagnoseSilentProcess flags when the process has run for a while without producing output.
+func diagnoseSilentProcess(launcher *ProcessLauncher) []DiagnosisEntry {
+	logLines := launcher.getLogLines()
+	uptimeSeconds := int64(launcher.getProcessUptime().Seconds())
+
+	if len(logLines) == 0 && uptimeSeconds > minimumSilentUptimeSeconds {
+		return []DiagnosisEntry{{
+			Severity:      SeverityWarning,
+			Issue:         "No output from process",
+			Explanation:   fmt.Sprintf("No stdout/stderr output captured from fterm.exe after %d+ seconds.", minimumSilentUptimeSeconds),
+			FixSuggestion: "The process may have frozen or output is being redirected. Try running fterm.exe manually in a terminal.",
+		}}
+	}
+
+	return nil
+}
+
+// diagnoseCommonLogErrors scans process log output for known error patterns
+// and returns targeted diagnosis entries for each match found.
+func diagnoseCommonLogErrors(logLines []TimestampedLogLine) []DiagnosisEntry {
+	var entries []DiagnosisEntry
 	for _, logLine := range logLines {
-		loweredText := strings.ToLower(logLine.Text)
-		for pattern, description := range errorPatterns {
-			if strings.Contains(loweredText, pattern) {
-				entries = append(entries, DiagnosisEntry{
-					Severity:    "critical",
-					Category:    "process_output",
-					Description: fmt.Sprintf("%s Found in %s at %s", description, logLine.Stream, logLine.Timestamp.Format(time.RFC3339)),
-					Suggestion:  fmt.Sprintf("Relevant log line: %s", truncateString(logLine.Text, 200)),
-				})
-			}
+		lowerText := strings.ToLower(logLine.Text)
+		if entry, hasMatch := matchLogErrorPattern(lowerText, logLine); hasMatch {
+			entries = append(entries, entry)
 		}
+	}
+	return entries
+}
+
+// matchLogErrorPattern checks a single log line against known error patterns.
+// Returns a diagnosis entry and true if a pattern matched, or zero value and false.
+func matchLogErrorPattern(lowerText string, logLine TimestampedLogLine) (DiagnosisEntry, bool) {
+	if strings.Contains(lowerText, "panic:") || strings.Contains(lowerText, "fatal error") {
+		return DiagnosisEntry{
+			Severity:      SeverityCritical,
+			Issue:         "Runtime panic or fatal error detected in logs",
+			Explanation:   fmt.Sprintf("Found in %s at %s: %s", logLine.Stream, logLine.Timestamp.Format(time.RFC3339), truncateString(logLine.Text, 200)),
+			FixSuggestion: "This is a crash in fterm.exe. Report this to the Forge team with the full diagnostic output.",
+		}, true
+	}
+
+	if strings.Contains(lowerText, "address already in use") || strings.Contains(lowerText, "bind: address already") {
+		return DiagnosisEntry{
+			Severity:      SeverityCritical,
+			Issue:         "Port bind conflict detected in logs",
+			Explanation:   "The process log shows an 'address already in use' error, confirming a port conflict.",
+			FixSuggestion: "Find and stop the process occupying the port, or configure a different port.",
+		}, true
+	}
+
+	if strings.Contains(lowerText, "permission denied") || strings.Contains(lowerText, "access is denied") {
+		return DiagnosisEntry{
+			Severity:      SeverityCritical,
+			Issue:         "Permission denied error in logs",
+			Explanation:   "The process encountered a permission error, possibly when binding to a port or accessing files.",
+			FixSuggestion: "Run the tool with elevated privileges, or check file/directory permissions.",
+		}, true
+	}
+
+	if strings.Contains(lowerText, "tls") && strings.Contains(lowerText, "certificate") {
+		return DiagnosisEntry{
+			Severity:      SeverityWarning,
+			Issue:         "TLS certificate error in logs",
+			Explanation:   "The process log indicates a TLS/certificate issue that may prevent HTTPS or WSS connections.",
+			FixSuggestion: "Verify TLS certificate configuration. Regenerate certificates if they are expired or invalid.",
+		}, true
+	}
+
+	if strings.Contains(lowerText, "out of memory") {
+		return DiagnosisEntry{
+			Severity:      SeverityCritical,
+			Issue:         "Out of memory condition",
+			Explanation:   "The process ran out of available memory during operation.",
+			FixSuggestion: "Close other applications to free memory, or increase system RAM.",
+		}, true
+	}
+
+	return DiagnosisEntry{}, false
+}
+
+// diagnoseConnectivityPatterns examines the connectivity summary for common
+// failure patterns and produces targeted diagnosis entries.
+func diagnoseConnectivityPatterns(connectivity ConnectivitySummary) []DiagnosisEntry {
+	if connectivity.TotalProbes == 0 {
+		return nil
+	}
+
+	var entries []DiagnosisEntry
+
+	entries = appendIfNotEmpty(entries, diagnoseNoConnectivity(connectivity))
+	entries = appendIfNotEmpty(entries, diagnosePortOpenHTTPFailing(connectivity))
+	entries = appendIfNotEmpty(entries, diagnoseHTTPUpWebSocketDown(connectivity))
+	entries = append(entries, diagnoseIntermittentFailures(connectivity)...)
+
+	return entries
+}
+
+// appendIfNotEmpty appends a diagnosis entry to the slice only if it has a non-empty Issue.
+func appendIfNotEmpty(entries []DiagnosisEntry, entry DiagnosisEntry) []DiagnosisEntry {
+	if entry.Issue != "" {
+		return append(entries, entry)
+	}
+	return entries
+}
+
+// diagnoseNoConnectivity returns a diagnosis when all probes are failing.
+func diagnoseNoConnectivity(connectivity ConnectivitySummary) DiagnosisEntry {
+	isCompletelyDown := !connectivity.IsPortOpen && !connectivity.IsHTTPResponding && !connectivity.IsWebSocketConnecting
+	if !isCompletelyDown {
+		return DiagnosisEntry{}
+	}
+
+	return DiagnosisEntry{
+		Severity:      SeverityCritical,
+		Issue:         "No connectivity on target port",
+		Explanation:   fmt.Sprintf("None of the %d probes succeeded. The process may not have started or is listening on a different port.", connectivity.TotalProbes),
+		FixSuggestion: "Verify the port number is correct and the process started successfully. Check firewall settings for localhost.",
+	}
+}
+
+// diagnosePortOpenHTTPFailing returns a diagnosis when TCP connects but HTTP fails.
+func diagnosePortOpenHTTPFailing(connectivity ConnectivitySummary) DiagnosisEntry {
+	if !connectivity.IsPortOpen || connectivity.IsHTTPResponding {
+		return DiagnosisEntry{}
+	}
+
+	return DiagnosisEntry{
+		Severity:      SeverityCritical,
+		Issue:         "Port open but HTTP not responding",
+		Explanation:   "The process bound to the port but the HTTP server failed to initialize or is not serving the health endpoint.",
+		FixSuggestion: "Check process logs for HTTP server startup errors. The binary may have started but failed during route initialization.",
+	}
+}
+
+// diagnoseHTTPUpWebSocketDown returns a diagnosis when HTTP works but WebSocket fails.
+func diagnoseHTTPUpWebSocketDown(connectivity ConnectivitySummary) DiagnosisEntry {
+	if !connectivity.IsHTTPResponding || connectivity.IsWebSocketConnecting {
+		return DiagnosisEntry{}
+	}
+
+	return DiagnosisEntry{
+		Severity:      SeverityCritical,
+		Issue:         "WebSocket upgrade blocked",
+		Explanation:   "HTTP health checks succeed but WebSocket connections are being refused. A proxy or firewall may be intercepting WebSocket upgrade requests.",
+		FixSuggestion: "Check if a corporate proxy is intercepting localhost traffic. Verify no firewall rule blocks WebSocket (HTTP Upgrade) connections on this port.",
+	}
+}
+
+// diagnoseIntermittentFailures flags HTTP or WebSocket success rates below acceptable thresholds.
+func diagnoseIntermittentFailures(connectivity ConnectivitySummary) []DiagnosisEntry {
+	var entries []DiagnosisEntry
+
+	if connectivity.HTTPSuccessRate > 0 && connectivity.HTTPSuccessRate < minimumAcceptableSuccessRate {
+		entries = append(entries, DiagnosisEntry{
+			Severity:      SeverityWarning,
+			Issue:         "Intermittent HTTP failures",
+			Explanation:   fmt.Sprintf("HTTP health check success rate is only %.0f%% — intermittent failures detected.", connectivity.HTTPSuccessRate),
+			FixSuggestion: "The server may be overloaded or restarting. Check system resources and process output.",
+		})
+	}
+
+	if connectivity.WebSocketSuccessRate > 0 && connectivity.WebSocketSuccessRate < minimumAcceptableSuccessRate {
+		entries = append(entries, DiagnosisEntry{
+			Severity:      SeverityWarning,
+			Issue:         "Intermittent WebSocket failures",
+			Explanation:   fmt.Sprintf("WebSocket success rate is only %.0f%% — intermittent connection drops.", connectivity.WebSocketSuccessRate),
+			FixSuggestion: "This may indicate resource exhaustion or connection limits. Check process memory usage.",
+		})
 	}
 
 	return entries
 }
 
-// ── Human-Readable Summary ───────────────────────────────────────────────────────
+// ── Human-Readable Summary ──
 
-// renderHumanSummary generates a text overview at the top of the report that
-// a support person can read without parsing JSON. Includes pass/fail badges
-// and the auto-diagnosis results.
-func renderHumanSummary(report DiagnosticReport) string {
+// buildHumanSummary generates a plain-text diagnostic summary with pass/fail
+// emoji indicators, suitable for quick visual triage by developers.
+func buildHumanSummary(report *DiagnosticReport) string {
 	var summaryBuilder strings.Builder
 
-	summaryBuilder.WriteString("═══════════════════════════════════════════════════\n")
-	summaryBuilder.WriteString("  FORGE TERMINAL DIAGNOSTIC REPORT\n")
-	summaryBuilder.WriteString(fmt.Sprintf("  Generated: %s\n", report.GeneratedAt))
-	summaryBuilder.WriteString(fmt.Sprintf("  Tool Version: %s\n", report.ToolVersion))
-	summaryBuilder.WriteString("═══════════════════════════════════════════════════\n\n")
-
-	// Pre-launch check summary
-	summaryBuilder.WriteString("── Pre-Launch Checks ──\n")
-	for _, check := range report.PreLaunchChecks {
-		badge := formatSummaryBadge(check.Status)
-		summaryBuilder.WriteString(fmt.Sprintf("  %s %s: %s\n", badge, check.Name, check.Detail))
-	}
-
-	// Connectivity summary
-	summaryBuilder.WriteString("\n── Connectivity ──\n")
-	summaryBuilder.WriteString(fmt.Sprintf("  Port %d:   %s\n", report.Connectivity.TargetPort, formatBoolBadge(report.Connectivity.IsPortOpen)))
-	summaryBuilder.WriteString(fmt.Sprintf("  HTTP:      %s (%.0f%% success)\n", formatBoolBadge(report.Connectivity.IsHTTPHealthy), report.Connectivity.HTTPSuccessRate))
-	summaryBuilder.WriteString(fmt.Sprintf("  WebSocket: %s (%.0f%% success)\n", formatBoolBadge(report.Connectivity.IsWebSocketConnected), report.Connectivity.WSSuccessRate))
-	summaryBuilder.WriteString(fmt.Sprintf("  Total probes: %d\n", report.Connectivity.TotalProbes))
-
-	// Process summary
-	summaryBuilder.WriteString("\n── Process ──\n")
-	if report.ProcessInfo.WasLaunched {
-		summaryBuilder.WriteString(fmt.Sprintf("  Running: %v | Exit code: %d | Uptime: %ds | Log lines: %d\n",
-			report.ProcessInfo.IsStillRunning, report.ProcessInfo.ExitCode,
-			report.ProcessInfo.UptimeSeconds, report.ProcessInfo.TotalLogLines))
-	} else {
-		summaryBuilder.WriteString("  fterm.exe was not launched\n")
-	}
-
-	// Auto-diagnosis
-	summaryBuilder.WriteString("\n── Auto-Diagnosis ──\n")
-	for _, diagnosis := range report.AutoDiagnosis {
-		severityBadge := formatSeverityBadge(diagnosis.Severity)
-		summaryBuilder.WriteString(fmt.Sprintf("  %s [%s] %s\n", severityBadge, diagnosis.Category, diagnosis.Description))
-		if diagnosis.Suggestion != "" {
-			summaryBuilder.WriteString(fmt.Sprintf("    → %s\n", diagnosis.Suggestion))
-		}
-	}
-
-	summaryBuilder.WriteString("\n═══════════════════════════════════════════════════\n")
-	summaryBuilder.WriteString("  END OF SUMMARY — Full JSON data follows below\n")
-	summaryBuilder.WriteString("═══════════════════════════════════════════════════\n")
+	writeReportHeader(&summaryBuilder, report)
+	writePreLaunchSection(&summaryBuilder, report.PreLaunchChecks)
+	writeConnectivitySection(&summaryBuilder, report.ConnectivitySummary)
+	writeAutoDiagnosisSection(&summaryBuilder, report.AutoDiagnosis)
+	writeProcessLogSection(&summaryBuilder, report.ProcessLog)
 
 	return summaryBuilder.String()
 }
 
-// formatSummaryBadge returns a text badge for check status (pass/fail/warn).
-func formatSummaryBadge(status string) string {
+// writeReportHeader writes the top-level banner and metadata to the summary.
+func writeReportHeader(builder *strings.Builder, report *DiagnosticReport) {
+	builder.WriteString("═══ FORGE TERMINAL DIAGNOSTIC REPORT ═══\n")
+	formattedTime := report.GeneratedAt.Format("2006-01-02 15:04:05 UTC")
+	builder.WriteString(fmt.Sprintf("Generated: %s\n", formattedTime))
+	builder.WriteString(fmt.Sprintf("Tool Version: %s | Port: %d\n\n", report.ToolVersion, report.ForgePort))
+}
+
+// writePreLaunchSection writes the pre-launch check results with status emojis.
+func writePreLaunchSection(builder *strings.Builder, checks []CheckResult) {
+	builder.WriteString("── Pre-Launch Checks ──\n")
+	if len(checks) == 0 {
+		builder.WriteString("  (no checks recorded)\n")
+	}
+	for _, check := range checks {
+		statusEmoji := mapCheckStatusToEmoji(check.Status)
+		builder.WriteString(fmt.Sprintf("  %s %s: %s\n", statusEmoji, check.Name, check.Detail))
+	}
+	builder.WriteString("\n")
+}
+
+// mapCheckStatusToEmoji converts a check status string to the corresponding emoji.
+func mapCheckStatusToEmoji(status string) string {
 	switch status {
 	case "pass":
-		return "[PASS]"
+		return emojiPass
 	case "fail":
-		return "[FAIL]"
+		return emojiFail
 	case "warn":
-		return "[WARN]"
+		return emojiWarn
 	default:
-		return "[----]"
+		return emojiWarn
 	}
 }
 
-// formatBoolBadge returns PASS or FAIL based on a boolean value.
-func formatBoolBadge(isHealthy bool) string {
+// writeConnectivitySection writes the connectivity probe status to the summary.
+func writeConnectivitySection(builder *strings.Builder, summary ConnectivitySummary) {
+	builder.WriteString("── Connectivity Status ──\n")
+	builder.WriteString(fmt.Sprintf("  %s Port Listening: %s\n",
+		formatBoolEmoji(summary.IsPortOpen), formatYesNo(summary.IsPortOpen)))
+	builder.WriteString(fmt.Sprintf("  %s HTTP Health: %s\n",
+		formatBoolEmoji(summary.IsHTTPResponding), formatHTTPStatusText(summary.IsHTTPResponding)))
+	builder.WriteString(fmt.Sprintf("  %s WebSocket: %s\n",
+		formatBoolEmoji(summary.IsWebSocketConnecting), formatWebSocketStatusText(summary.IsWebSocketConnecting)))
+
+	if summary.TotalProbes > 0 {
+		builder.WriteString(fmt.Sprintf("  HTTP Success Rate: %.1f%% | WebSocket Success Rate: %.1f%% | Total Probes: %d\n",
+			summary.HTTPSuccessRate, summary.WebSocketSuccessRate, summary.TotalProbes))
+	}
+	builder.WriteString("\n")
+}
+
+// formatBoolEmoji returns a pass or fail emoji based on a boolean value.
+func formatBoolEmoji(isHealthy bool) string {
 	if isHealthy {
-		return "[PASS]"
+		return emojiPass
 	}
-	return "[FAIL]"
+	return emojiFail
 }
 
-// formatSeverityBadge returns a severity indicator for diagnosis entries.
-func formatSeverityBadge(severity string) string {
+// formatYesNo returns "Yes" or "No" for boolean status display.
+func formatYesNo(value bool) string {
+	if value {
+		return "Yes"
+	}
+	return "No"
+}
+
+// formatHTTPStatusText returns a descriptive string for HTTP health status.
+func formatHTTPStatusText(isResponding bool) string {
+	if isResponding {
+		return "Responding (200 OK)"
+	}
+	return "Not responding"
+}
+
+// formatWebSocketStatusText returns a descriptive string for WebSocket status.
+func formatWebSocketStatusText(isConnecting bool) string {
+	if isConnecting {
+		return "Connected"
+	}
+	return "Connection refused"
+}
+
+// writeAutoDiagnosisSection writes the auto-diagnosis results with severity emojis.
+func writeAutoDiagnosisSection(builder *strings.Builder, entries []DiagnosisEntry) {
+	builder.WriteString("── Auto-Diagnosis ──\n")
+	for _, entry := range entries {
+		severityEmoji := mapSeverityToEmoji(entry.Severity)
+		severityLabel := strings.ToUpper(entry.Severity)
+		builder.WriteString(fmt.Sprintf("  %s %s: %s\n", severityEmoji, severityLabel, entry.Issue))
+		builder.WriteString(fmt.Sprintf("     → %s\n", entry.Explanation))
+		builder.WriteString(fmt.Sprintf("     → Fix: %s\n", entry.FixSuggestion))
+	}
+	builder.WriteString("\n")
+}
+
+// mapSeverityToEmoji converts a severity level string to the corresponding emoji.
+func mapSeverityToEmoji(severity string) string {
 	switch severity {
-	case "critical":
-		return "[!!]"
-	case "warning":
-		return "[! ]"
-	case "info":
-		return "[i ]"
+	case SeverityCritical:
+		return emojiCritical
+	case SeverityWarning:
+		return emojiWarn
+	case SeverityInfo:
+		return emojiInfoIcon
 	default:
-		return "[  ]"
+		return emojiInfoIcon
 	}
 }
 
-// ── Clipboard Export ─────────────────────────────────────────────────────────────
+// writeProcessLogSection writes the last N lines of process output to the summary.
+func writeProcessLogSection(builder *strings.Builder, logLines []TimestampedLogLine) {
+	builder.WriteString(fmt.Sprintf("── Process Output (last %d lines) ──\n", MaxLogLinesInSummary))
 
-// copyReportToClipboard serializes the report as the human-readable summary
-// followed by the full JSON payload, then copies it to the system clipboard.
-func copyReportToClipboard(report DiagnosticReport) error {
-	jsonBytes, marshalError := json.MarshalIndent(report, "", "  ")
-	if marshalError != nil {
-		return fmt.Errorf("failed to serialize report: %w", marshalError)
+	if len(logLines) == 0 {
+		builder.WriteString("  (no process output captured)\n")
+		return
 	}
 
-	// Combine human summary + JSON for maximum utility
-	fullReport := report.HumanSummary + "\n" + string(jsonBytes)
+	displayLines := tailLogLines(logLines, MaxLogLinesInSummary)
+	for _, line := range displayLines {
+		formattedTimestamp := line.Timestamp.Format("2006-01-02 15:04:05")
+		builder.WriteString(fmt.Sprintf("  [%s] [%s] %s\n", formattedTimestamp, line.Stream, line.Text))
+	}
+}
 
-	if clipboardError := clipboard.WriteAll(fullReport); clipboardError != nil {
-		return fmt.Errorf("failed to write to clipboard: %w", clipboardError)
+// tailLogLines returns the last maxLines entries from the log, or all entries
+// if fewer than maxLines exist.
+func tailLogLines(logLines []TimestampedLogLine, maxLines int) []TimestampedLogLine {
+	if len(logLines) <= maxLines {
+		return logLines
+	}
+	startIndex := len(logLines) - maxLines
+	return logLines[startIndex:]
+}
+
+// ── Serialisation & Clipboard ──
+
+// copyReportToClipboard marshals the report to indented JSON and copies it to
+// the system clipboard. Returns an error if marshalling or clipboard access fails.
+func copyReportToClipboard(report *DiagnosticReport) error {
+	jsonContent, marshalError := formatReportAsJSON(report)
+	if marshalError != nil {
+		return fmt.Errorf("failed to marshal report to JSON: %w", marshalError)
+	}
+
+	clipboardError := clipboard.WriteAll(jsonContent)
+	if clipboardError != nil {
+		return fmt.Errorf("failed to write report to clipboard: %w", clipboardError)
 	}
 
 	return nil
+}
+
+// formatReportAsJSON marshals the diagnostic report to a pretty-printed JSON string.
+func formatReportAsJSON(report *DiagnosticReport) (string, error) {
+	jsonBytes, marshalError := json.MarshalIndent(report, "", "  ")
+	if marshalError != nil {
+		return "", fmt.Errorf("failed to marshal diagnostic report: %w", marshalError)
+	}
+	return string(jsonBytes), nil
 }
