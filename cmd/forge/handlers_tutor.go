@@ -5,23 +5,115 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/tutor"
 )
 
 var (
-	tutorSessionMgr *tutor.SessionManager
-	tutorExplainer  *tutor.Explainer
-	tutorWatchers   = make(map[string]*tutor.Watcher) // sessionID → watcher
-	tutorMu         sync.Mutex
+	tutorSessionMgr       *tutor.SessionManager
+	tutorExplainer        *tutor.Explainer
+	tutorWatchers         = make(map[string]*tutor.Watcher) // sessionID → watcher
+	tutorMu               sync.Mutex
+	isTutorFeatureEnabled = true // in-memory cache of the persistent enabled state
 )
+
+// tutorFeatureConfig represents the on-disk tutor feature configuration.
+type tutorFeatureConfig struct {
+	Enabled bool `json:"enabled"`
+}
+
+// getTutorConfigPath returns the path to the tutor feature config file.
+func getTutorConfigPath() string {
+	return filepath.Join(storage.GetTutorDir(), "config.json")
+}
+
+// loadTutorFeatureConfig reads the persistent enabled/disabled state from disk.
+// If the file doesn't exist, the feature defaults to enabled (true).
+func loadTutorFeatureConfig() bool {
+	configPath := getTutorConfigPath()
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		// File doesn't exist yet — feature is enabled by default
+		return true
+	}
+
+	var cfg tutorFeatureConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		log.Printf("[Tutor] Warning: failed to parse config at %s: %v", configPath, err)
+		return true
+	}
+
+	return cfg.Enabled
+}
+
+// saveTutorFeatureConfig persists the enabled/disabled state to disk.
+func saveTutorFeatureConfig(isEnabled bool) error {
+	tutorDir := storage.GetTutorDir()
+	if err := os.MkdirAll(tutorDir, 0755); err != nil {
+		return err
+	}
+
+	cfg := tutorFeatureConfig{Enabled: isEnabled}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(getTutorConfigPath(), data, 0644)
+}
 
 func initTutor() {
 	tutorSessionMgr = tutor.NewSessionManager()
 	tutorExplainer = tutor.NewExplainer()
+
+	// Load persistent feature toggle from ~/.forge/tutor/config.json
+	isTutorFeatureEnabled = loadTutorFeatureConfig()
+	log.Printf("[Tutor] Feature enabled: %v", isTutorFeatureEnabled)
+}
+
+// handleTutorStatus returns or updates the global tutor feature toggle.
+// GET  → {"enabled": true/false}
+// POST {"enabled": true/false} → persists and returns updated state
+func handleTutorStatus(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"enabled": isTutorFeatureEnabled,
+		})
+
+	case http.MethodPost:
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+			return
+		}
+
+		if err := saveTutorFeatureConfig(req.Enabled); err != nil {
+			log.Printf("[Tutor] Error persisting feature config: %v", err)
+			http.Error(w, "Failed to save tutor config", http.StatusInternalServerError)
+			return
+		}
+
+		isTutorFeatureEnabled = req.Enabled
+		log.Printf("[Tutor] Feature toggled: enabled=%v", req.Enabled)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"enabled": isTutorFeatureEnabled,
+		})
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // handleTutorSessions handles POST (create), GET (list), DELETE (remove) for tutor sessions.

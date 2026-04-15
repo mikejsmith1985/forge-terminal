@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, BarChart3, Bell, BellOff, Zap, BookOpen } from 'lucide-react';
+import { Plus, BarChart3, Bell, BellOff, Zap, BookOpen, BookX } from 'lucide-react';
 import Tab from './Tab';
 
 /**
@@ -21,6 +21,8 @@ function TabBar({
   isForgeAssistOpen = false,
   onToggleTutor = null,
   isTutorOpen = false,
+  isTutorFeatureEnabled = true,
+  onReEnableTutor = null,
   disableNewTab = false,
   waitingTabs = {},
   mode = 'dark',
@@ -148,6 +150,19 @@ function TabBar({
           data-testid="tutor-btn"
         >
           <BookOpen size={16} />
+        </button>
+      )}
+      {/* Re-enable Code Tutor when feature is disabled */}
+      {!onToggleTutor && !isTutorFeatureEnabled && onReEnableTutor && (
+        <button
+          className="dashboard-btn"
+          onClick={onReEnableTutor}
+          aria-label="Re-enable Code Tutor"
+          title="Code Tutor is disabled — click to re-enable"
+          data-testid="tutor-reenable-btn"
+          style={{ opacity: 0.4 }}
+        >
+          <BookX size={16} />
         </button>
       )}
       {/* Manual notify bell */}

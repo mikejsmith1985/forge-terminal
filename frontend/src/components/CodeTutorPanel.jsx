@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   BookOpen, X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
-  Play, SkipForward, Check, Folder, FileText, Loader, AlertCircle, Eye
+  Play, SkipForward, Check, Folder, FileText, Loader, AlertCircle, Eye, Power
 } from 'lucide-react'
 import { useAPI } from '../hooks/useAPI'
 import { useTutorSession } from '../hooks/useTutorSession'
@@ -493,7 +493,7 @@ const styles = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirectory }) {
+export default function CodeTutorPanel({ isOpen, onClose, onDisableFeature, onToast, activeDirectory }) {
   const {
     session, explanation, isLoading, isExplaining, error, notifications, sessions,
     createSession, loadSession, deleteSession, advance, goBack, goToFile,
@@ -888,15 +888,28 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
           <div style={styles.headerLeft}>
             <span style={styles.title}>📖 Code Tutor</span>
           </div>
-          <button
-            style={styles.closeBtn}
-            onClick={onClose}
-            title="Close (Esc)"
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = colors.textDim; e.currentTarget.style.background = 'none' }}
-          >
-            <X size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {onDisableFeature && (
+              <button
+                style={styles.closeBtn}
+                onClick={onDisableFeature}
+                title="Disable Code Tutor"
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = colors.textDim; e.currentTarget.style.background = 'none' }}
+              >
+                <Power size={16} />
+              </button>
+            )}
+            <button
+              style={styles.closeBtn}
+              onClick={onClose}
+              title="Close (Esc)"
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = colors.textDim; e.currentTarget.style.background = 'none' }}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Progress bar (only when session active) */}

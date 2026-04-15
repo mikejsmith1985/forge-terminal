@@ -170,6 +170,32 @@ function App() {
 
   // Code Tutor state (v3.19.0: Learn As You Build)
   const [isTutorOpen, setIsTutorOpen] = useState(false)
+  const [isTutorFeatureEnabled, setIsTutorFeatureEnabled] = useState(true)
+
+  // Fetch tutor feature toggle on mount — persisted in ~/.forge/tutor/config.json
+  useEffect(() => {
+    fetch('/api/tutor/status')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setIsTutorFeatureEnabled(data.enabled) })
+      .catch(() => { /* Tutor status unavailable — leave enabled by default */ })
+  }, [])
+
+  // Toggle the tutor feature on or off and persist via API
+  const handleToggleTutorFeature = useCallback((isEnabled) => {
+    fetch('/api/tutor/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: isEnabled }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setIsTutorFeatureEnabled(data.enabled)
+          if (!data.enabled) setIsTutorOpen(false)
+        }
+      })
+      .catch(() => { /* Silently fail — state unchanged */ })
+  }, [])
 
   // Forge Vault state (v6.2.0: AES-256-GCM encrypted secret storage)
   const [isVaultPanelOpen, setIsVaultPanelOpen] = useState(false)
@@ -844,11 +870,11 @@ function App() {
         return;
       }
 
-      // Ctrl+Shift+T: Toggle Code Tutor (desktop only)
+      // Ctrl+Shift+T: Toggle Code Tutor (desktop only, when feature is enabled)
       if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
         e.preventDefault();
         e.stopPropagation();
-        if (!isCompact) setIsTutorOpen(prev => !prev);
+        if (!isCompact && isTutorFeatureEnabled) setIsTutorOpen(prev => !prev);
         return;
       }
 
@@ -1797,8 +1823,10 @@ function App() {
             onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
             onToggleForgeAssist={() => setIsForgeAssistOpen(prev => !prev)}
             isForgeAssistOpen={isForgeAssistOpen}
-            onToggleTutor={() => setIsTutorOpen(prev => !prev)}
+            onToggleTutor={isTutorFeatureEnabled ? () => setIsTutorOpen(prev => !prev) : null}
             isTutorOpen={isTutorOpen}
+            isTutorFeatureEnabled={isTutorFeatureEnabled}
+            onReEnableTutor={() => handleToggleTutorFeature(true)}
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
             mode={theme}
@@ -2157,9 +2185,10 @@ function App() {
       />}
 
       {/* Code Tutor Panel - Learn As You Build (v3.19.0) */}
-      {!isCompact && <CodeTutorPanel
+      {!isCompact && isTutorFeatureEnabled && <CodeTutorPanel
         isOpen={isTutorOpen}
         onClose={() => setIsTutorOpen(false)}
+        onDisableFeature={() => handleToggleTutorFeature(false)}
         onToast={addToast}
         activeDirectory={activeTab?.currentDirectory}
       />}

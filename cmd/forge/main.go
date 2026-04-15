@@ -490,6 +490,7 @@ func main() {
 	http.HandleFunc("/api/temp-image", WrapWithMiddleware(handleTempImageUpload))
 
 	// Code Tutor API (v3.19.0: Learn As You Build)
+	http.HandleFunc("/api/tutor/status", WrapWithMiddleware(handleTutorStatus))
 	http.HandleFunc("/api/tutor/sessions", WrapWithMiddleware(handleTutorSessions))
 	http.HandleFunc("/api/tutor/sessions/", WrapWithMiddleware(handleTutorSession))
 	http.HandleFunc("/api/tutor/navigate", WrapWithMiddleware(handleTutorNavigate))

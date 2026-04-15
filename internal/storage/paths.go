@@ -90,6 +90,11 @@ func LegacyWelcomePath() string {
 	return filepath.Join(GetForgeDir(), ".welcome-shown")
 }
 
+// GetTutorDir returns the directory for Code Tutor configuration and sessions.
+func GetTutorDir() string {
+	return filepath.Join(GetForgeDir(), "tutor")
+}
+
 // GetVaultDir returns the directory where the encrypted vault file is stored.
 func GetVaultDir() string {
 	return filepath.Join(GetForgeDir(), "vault")
