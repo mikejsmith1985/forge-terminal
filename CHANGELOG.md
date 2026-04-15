@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **forge-debug.exe — Standalone Diagnostic Tool** — new companion binary for diagnosing terminal connection failures. Users download `forge-debug.exe` to the same folder as `fterm.exe`, run it, and it walks them through a full diagnostic workflow:
+  - **Pre-launch checks** — OS version, RAM, existing fterm processes, port availability, firewall status, proxy/VPN detection, antivirus processes, ~/.forge directory health
+  - **Process launcher** — starts fterm.exe as a child process, captures all stdout/stderr with timestamps, monitors lifecycle with explicit PID-based tree kill (never wildcard)
+  - **Live connectivity monitor** — polls TCP port, HTTP `/api/version`, and WebSocket `/ws` handshake every 2 seconds with latency tracking and success rate stats
+  - **Auto-diagnosis engine** — analyzes all collected data to flag likely root causes: port conflicts, HTTP failures, WS upgrade issues, process crashes, panic detection in output
+  - **Clipboard report** — press `C` to copy a structured JSON report with human-readable summary header, full probe timeline, and process output. Report is agent-consumable for automated troubleshooting
+  - Built with bubbletea TUI — interactive console UI with phase transitions (consent → pre-checks → launch → monitoring → report)
+
 ## [6.1.3] - 2026-04-15
 
 ### Added
