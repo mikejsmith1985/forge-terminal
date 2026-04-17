@@ -393,3 +393,208 @@ func TestGetStatusReturnsCorrectCounts(t *testing.T) {
 		t.Error("expected IsOpen to be true")
 	}
 }
+
+// ── UpdateEntry tests ─────────────────────────────────────────────────────────
+
+// TestUpdateEntryChangesNameAndValue verifies that updating both the secretName
+// and secretValue of an existing entry changes them correctly and that the
+// listed entry reflects the new name.
+func TestUpdateEntryChangesNameAndValue(t *testing.T) {
+	testVault, cleanup := openTestVault(t)
+	defer cleanup()
+
+	createdEntry, addErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "Original Name",
+		EnvVarName:  "ORIGINAL_ENV",
+		SecretValue: "original-secret",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	updatedEntry, updateErr := testVault.UpdateEntry(UpdateEntryRequest{
+		ID:          createdEntry.ID,
+		SecretName:  "Updated Name",
+		SecretValue: "updated-secret",
+	})
+	if updateErr != nil {
+		t.Fatalf("UpdateEntry returned unexpected error: %v", updateErr)
+	}
+
+	if updatedEntry.SecretName != "Updated Name" {
+		t.Errorf("expected SecretName %q, got %q", "Updated Name", updatedEntry.SecretName)
+	}
+
+	// Verify the change is reflected when listing entries.
+	allEntries := testVault.ListEntries()
+	if len(allEntries) != 1 {
+		t.Fatalf("expected 1 entry after update, got %d", len(allEntries))
+	}
+	if allEntries[0].SecretName != "Updated Name" {
+		t.Errorf("listed SecretName expected %q, got %q", "Updated Name", allEntries[0].SecretName)
+	}
+}
+
+// TestUpdateEntryValueOnly verifies that updating only the secretValue leaves
+// the secretName and envVarName unchanged.
+func TestUpdateEntryValueOnly(t *testing.T) {
+	testVault, cleanup := openTestVault(t)
+	defer cleanup()
+
+	createdEntry, addErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "Keep This Name",
+		EnvVarName:  "KEEP_THIS_ENV",
+		SecretValue: "old-secret",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	// Only supply the secret value — all other fields are intentionally empty.
+	_, updateErr := testVault.UpdateEntry(UpdateEntryRequest{
+		ID:          createdEntry.ID,
+		SecretValue: "new-secret",
+	})
+	if updateErr != nil {
+		t.Fatalf("UpdateEntry returned unexpected error: %v", updateErr)
+	}
+
+	allEntries := testVault.ListEntries()
+	if len(allEntries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(allEntries))
+	}
+	if allEntries[0].SecretName != "Keep This Name" {
+		t.Errorf("SecretName should be unchanged; expected %q, got %q", "Keep This Name", allEntries[0].SecretName)
+	}
+	if allEntries[0].EnvVarName != "KEEP_THIS_ENV" {
+		t.Errorf("EnvVarName should be unchanged; expected %q, got %q", "KEEP_THIS_ENV", allEntries[0].EnvVarName)
+	}
+}
+
+// TestUpdateEntryRejectsNonExistentID verifies that calling UpdateEntry with an
+// ID that does not exist in the vault returns an error.
+func TestUpdateEntryRejectsNonExistentID(t *testing.T) {
+	testVault, cleanup := openTestVault(t)
+	defer cleanup()
+
+	_, updateErr := testVault.UpdateEntry(UpdateEntryRequest{
+		ID:         "non-existent-id-12345",
+		SecretName: "Should Fail",
+	})
+	if updateErr == nil {
+		t.Error("expected an error updating a non-existent entry, but got nil")
+	}
+}
+
+// TestUpdateEntryRejectsDuplicateEnvVar verifies that changing an entry's
+// envVarName to one already used by another entry is rejected.
+func TestUpdateEntryRejectsDuplicateEnvVar(t *testing.T) {
+	testVault, cleanup := openTestVault(t)
+	defer cleanup()
+
+	firstEntry, addErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "First Secret",
+		EnvVarName:  "FIRST_ENV",
+		SecretValue: "first-value",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry (first) returned unexpected error: %v", addErr)
+	}
+
+	_, secondAddErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "Second Secret",
+		EnvVarName:  "SECOND_ENV",
+		SecretValue: "second-value",
+	})
+	if secondAddErr != nil {
+		t.Fatalf("AddEntry (second) returned unexpected error: %v", secondAddErr)
+	}
+
+	// Try to change the first entry's env var to match the second entry's.
+	_, updateErr := testVault.UpdateEntry(UpdateEntryRequest{
+		ID:         firstEntry.ID,
+		EnvVarName: "SECOND_ENV",
+	})
+	if updateErr == nil {
+		t.Error("expected an error when updating envVarName to a duplicate, but got nil")
+	}
+}
+
+// TestUpdateEntryAllowsSameEnvVarOnSelf verifies that submitting an update with
+// the same envVarName the entry already has (a "self-duplicate") does not cause
+// a uniqueness violation — it should succeed and apply any other changed fields.
+func TestUpdateEntryAllowsSameEnvVarOnSelf(t *testing.T) {
+	testVault, cleanup := openTestVault(t)
+	defer cleanup()
+
+	createdEntry, addErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "Self Env Test",
+		EnvVarName:  "SELF_ENV",
+		SecretValue: "self-value",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	// Re-submit the same envVarName while changing the secretName.
+	updatedEntry, updateErr := testVault.UpdateEntry(UpdateEntryRequest{
+		ID:         createdEntry.ID,
+		SecretName: "Renamed Self",
+		EnvVarName: "SELF_ENV",
+	})
+	if updateErr != nil {
+		t.Fatalf("UpdateEntry should allow same envVarName on self, but got error: %v", updateErr)
+	}
+	if updatedEntry.SecretName != "Renamed Self" {
+		t.Errorf("expected SecretName %q, got %q", "Renamed Self", updatedEntry.SecretName)
+	}
+}
+
+// TestUpdateEntryPersistsAcrossReopen verifies that an updated secret value
+// survives a vault close/reopen cycle (i.e. the update was saved to disk).
+func TestUpdateEntryPersistsAcrossReopen(t *testing.T) {
+	tempDir, mkdirErr := os.MkdirTemp("", "forge-vault-update-persist-*")
+	if mkdirErr != nil {
+		t.Fatalf("creating temp dir: %v", mkdirErr)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Open the vault and add an entry with an initial secret value.
+	firstVault, openErr := Open(tempDir)
+	if openErr != nil {
+		t.Fatalf("opening first vault: %v", openErr)
+	}
+
+	createdEntry, addErr := firstVault.AddEntry(AddEntryRequest{
+		SecretName:  "Persist Update Key",
+		EnvVarName:  "PERSIST_UPDATE_KEY",
+		SecretValue: "before-update",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	// Update the secret value while the vault is still open.
+	_, updateErr := firstVault.UpdateEntry(UpdateEntryRequest{
+		ID:          createdEntry.ID,
+		SecretValue: "after-update",
+	})
+	if updateErr != nil {
+		t.Fatalf("UpdateEntry returned unexpected error: %v", updateErr)
+	}
+
+	// Reopen the vault from the same directory (simulates app restart).
+	secondVault, reopenErr := Open(tempDir)
+	if reopenErr != nil {
+		t.Fatalf("reopening vault: %v", reopenErr)
+	}
+
+	// Retrieve the secret value via the reopened vault and verify it persisted.
+	revealedValue, revealErr := secondVault.GetEntryValue(createdEntry.ID)
+	if revealErr != nil {
+		t.Fatalf("GetEntryValue returned unexpected error: %v", revealErr)
+	}
+	if revealedValue != "after-update" {
+		t.Errorf("expected persisted value %q, got %q", "after-update", revealedValue)
+	}
+}
