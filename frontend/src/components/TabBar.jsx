@@ -139,8 +139,8 @@ function TabBar({
         </button>
       )}
       {/* Code Tutor — HIDDEN for subscription release (feature not yet vetted) */}
-      {/* Manual notify bell */}
-      <NotifyBellButton />
+      {/* Notifications bell — HIDDEN for subscription release (ntfy.sh integration not vetted) */}
+      {/* <NotifyBellButton /> */}
       <button
         className="new-tab-btn"
         onClick={onNewTab}

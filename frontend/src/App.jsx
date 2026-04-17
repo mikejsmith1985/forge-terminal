@@ -887,13 +887,13 @@ function App() {
       // stopPropagation() here prevents xterm from also processing the key
       // (which would otherwise send unwanted control codes to the PTY).
 
-      // Ctrl+Shift+H: Toggle History Slider
-      if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsHistorySliderOpen(prev => !prev);
-        return;
-      }
+      // Ctrl+Shift+H: History Slider — HIDDEN for subscription release
+      // if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+      //   e.preventDefault();
+      //   e.stopPropagation();
+      //   setIsHistorySliderOpen(prev => !prev);
+      //   return;
+      // }
 
       // Ctrl+Shift+T: Code Tutor — HIDDEN for subscription release
       // if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
@@ -1628,14 +1628,14 @@ function App() {
         <button className="btn btn-ghost btn-icon" onClick={toggleSidebarPosition} title={`Move sidebar to ${sidebarPosition === 'right' ? 'left' : 'right'}`}>
           {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
         </button>
-        {/* Time-Travel button */}
-        <button 
+        {/* Time Travel — HIDDEN for subscription release (feature not yet vetted) */}
+        {/* <button 
           className={`btn btn-ghost btn-icon ${isHistorySliderOpen ? 'active' : ''}`}
           onClick={() => setIsHistorySliderOpen(prev => !prev)} 
           title="Time Travel (Ctrl+Shift+H)"
         >
           <Clock size={18} />
-        </button>
+        </button> */}
         {/* Feedback button */}
         <button 
           className="btn btn-ghost btn-icon"
@@ -2106,8 +2106,8 @@ function App() {
       
       {/* v3.8.2: ChatSidebar and NotebookLayout REMOVED - Terminal is the only view */}
       
-      {/* History Slider - Time-Travel Scrubber */}
-      {activeTabId && (
+      {/* History Slider (Time Travel) — HIDDEN for subscription release (feature not yet vetted) */}
+      {/* {activeTabId && (
         <HistorySlider
           tabId={activeTabId}
           isOpen={isHistorySliderOpen}
@@ -2118,13 +2118,12 @@ function App() {
             }
           }}
           onChatAboutHistory={(content, timestamp) => {
-            // v3.8.2: Just show toast, terminal is the only view
             setIsHistorySliderOpen(false);
             addToast(`Terminal state from ${timestamp.toLocaleTimeString()} available in history`, 'info', 4000);
           }}
           position="bottom"
         />
-      )}
+      )} */}
 
       {/* Forge Assist - desktop only; not rendered on mobile/tablet */}
       {/* v3.9.0: Enhanced with Task Mode + SLM Integration */}

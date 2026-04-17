@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Code Tutor hidden** — panel, TabBar button, and Ctrl+Shift+T shortcut disabled (backend intact for future re-enablement)
   - **Remote Access hidden** — QR code button and modal removed from sidebar controls
   - **Web Tools → Web App Debugger** — section reduced to WebAppDebuggerCard only; removed ConnectionDiagnosticCard, FollowMeDebugger, DebugPanel, and diagnostics overlay toggle
+  - **Notifications hidden** — Settings tab, TabBar bell button, and ntfy.sh integration all disabled (backend + component intact for future re-enablement)
+  - **Time Travel hidden** — sidebar Clock button, Ctrl+Shift+H shortcut, and HistorySlider panel all disabled (component intact for future re-enablement)
 
 ### Fixed
 - **Developer Dashboard shows 0 commits** — git log queries now use `--all` flag to count commits across all branches (not just the current branch), and `--since=midnight` for reliable timezone-aware "today" boundaries. Weekly commit chart and last-commit display also fixed with `--all`
