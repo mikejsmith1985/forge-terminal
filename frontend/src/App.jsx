@@ -168,8 +168,9 @@ function App() {
   // Forge Assist state
   const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
 
-  // Code Tutor state (v3.19.0: Learn As You Build)
-  const [isTutorOpen, setIsTutorOpen] = useState(false)
+  // Code Tutor state — HIDDEN for subscription release (feature not yet vetted)
+  // const [isTutorOpen, setIsTutorOpen] = useState(false)
+  const [isTutorOpen] = useState(false)
 
   // Mobile detection — drives drawer sidebar and touch-optimised interactions
   const { isMobile, isTablet } = useMobileDetect();
@@ -894,13 +895,13 @@ function App() {
         return;
       }
 
-      // Ctrl+Shift+T: Toggle Code Tutor (desktop only)
-      if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!isCompact) setIsTutorOpen(prev => !prev);
-        return;
-      }
+      // Ctrl+Shift+T: Code Tutor — HIDDEN for subscription release
+      // if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+      //   e.preventDefault();
+      //   e.stopPropagation();
+      //   if (!isCompact) setIsTutorOpen(prev => !prev);
+      //   return;
+      // }
 
       // Ctrl+End: Scroll to bottom (safe — not a shell binding)
       if (e.ctrlKey && e.key === 'End') {
@@ -1564,10 +1565,10 @@ function App() {
         <button
           className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
           onClick={() => setSidebarView('debug')}
-          title="Debug web applications with session recording"
+          title="Web App Debugger"
         >
           <Bug size={16} />
-          Web Tools
+          Debugger
         </button>
       </div>
 
@@ -1611,18 +1612,7 @@ function App() {
           </>
         ) : sidebarView === 'debug' ? (
           <>
-            <h3>🌐 Web Tools</h3>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {devMode && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
-                  style={{ fontSize: '11px', padding: '4px 8px' }}
-                >
-                  {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
-                </button>
-              )}
-            </div>
+            <h3>🔍 Web App Debugger</h3>
           </>
         ) : null}
       </div>
@@ -1706,13 +1696,7 @@ function App() {
           </button>
         </div>
         {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}
-        <button
-          className="btn btn-ghost btn-icon"
-          onClick={() => setIsRemoteAccessOpen(true)}
-          title="Remote Access"
-        >
-          <QrCode size={18} />
-        </button>
+        {/* Remote Access — HIDDEN for subscription release (feature not yet vetted) */}
         <button 
           className="btn btn-ghost btn-icon" 
           onClick={() => setIsSettingsModalOpen(true)} 
@@ -1744,7 +1728,7 @@ function App() {
               cwd={activeTab?.currentDirectory}
               directoryCardVisible={directoryCardVisible}
               onHideDirectoryCard={handleHideDirectoryCard}
-              onOpenTutor={() => setIsTutorOpen(true)}
+              // onOpenTutor — HIDDEN for subscription release
             />
           </DndContext>
         ) : sidebarView === 'files' ? (
@@ -1756,28 +1740,14 @@ function App() {
           />
         ) : sidebarView === 'debug' ? (
           <div style={{ overflowY: 'auto', height: '100%' }}>
-            {devMode && (
-              <DebugPanel
-                terminalRef={getActiveTerminalRef()}
-                tabId={activeTabId}
-              />
-            )}
             <div style={{ padding: '12px' }}>
-              <ConnectionDiagnosticCard />
               <WebAppDebuggerCard />
             </div>
           </div>
         ) : null}
       </div>
 
-      {/* v3.16.14: FollowMe Debugger - always mounted outside conditional rendering */}
-      <div style={{ 
-        display: sidebarView === 'debug' ? 'block' : 'none',
-        padding: '12px',
-        overflowY: 'auto'
-      }}>
-        <FollowMeDebugger />
-      </div>
+      {/* FollowMeDebugger — HIDDEN for subscription release */}
     </div>
   );
 
@@ -1822,8 +1792,8 @@ function App() {
             onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
             onToggleForgeAssist={() => setIsForgeAssistOpen(prev => !prev)}
             isForgeAssistOpen={isForgeAssistOpen}
-            onToggleTutor={() => setIsTutorOpen(prev => !prev)}
-            isTutorOpen={isTutorOpen}
+            // onToggleTutor — HIDDEN for subscription release
+            // isTutorOpen — HIDDEN for subscription release
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
             mode={theme}
@@ -2078,10 +2048,7 @@ function App() {
         tabCount={tabs.length}
       />
 
-      <RemoteAccessModal
-        isOpen={isRemoteAccessOpen}
-        onClose={() => setIsRemoteAccessOpen(false)}
-      />
+      {/* RemoteAccessModal — HIDDEN for subscription release */}
 
       <SettingsModal
         isOpen={isSettingsModalOpen}
@@ -2185,13 +2152,7 @@ function App() {
         contextFiles={contextFiles}
       />}
 
-      {/* Code Tutor Panel - Learn As You Build (v3.19.0) */}
-      {!isCompact && <CodeTutorPanel
-        isOpen={isTutorOpen}
-        onClose={() => setIsTutorOpen(false)}
-        onToast={addToast}
-        activeDirectory={activeTab?.currentDirectory}
-      />}
+      {/* Code Tutor Panel — HIDDEN for subscription release (feature not yet vetted) */}
 
       {/* Guided Tour Overlay - First Run Experience (v3.3.0) */}
       {isTourActive && (

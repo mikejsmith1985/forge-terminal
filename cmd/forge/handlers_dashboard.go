@@ -118,9 +118,9 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 		stats.GitBranch = strings.TrimSpace(string(out))
 	}
 
-	// Git commits today (author-date, local timezone)
-	today := time.Now().Format("2006-01-02")
-	if out, err := gitCmd("log", "--oneline", "--after="+today+" 00:00:00", "--before="+today+" 23:59:59").Output(); err == nil {
+	// Git commits today — use --all to include commits across all branches,
+	// and --since=midnight for a reliable "today" boundary that respects local timezone.
+	if out, err := gitCmd("log", "--oneline", "--all", "--since=midnight").Output(); err == nil {
 		lines := strings.TrimSpace(string(out))
 		if lines != "" {
 			stats.GitCommits = len(strings.Split(lines, "\n"))
@@ -135,17 +135,18 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Last commit message + relative time
-	if out, err := gitCmd("log", "-1", "--format=%s (%ar)").Output(); err == nil {
+	// Last commit message + relative time (across all branches)
+	if out, err := gitCmd("log", "-1", "--all", "--format=%s (%ar)").Output(); err == nil {
 		stats.GitLastCommit = strings.TrimSpace(string(out))
 	}
 
-	// Weekly commits (last 7 days, grouped by day-of-week)
+	// Weekly commits (last 7 days, grouped by day-of-week, across all branches)
 	for i := 6; i >= 0; i-- {
 		date := time.Now().AddDate(0, 0, -i)
-		dateStr := date.Format("2006-01-02")
+		dayStart := date.Format("2006-01-02") + "T00:00:00"
+		dayEnd := date.Format("2006-01-02") + "T23:59:59"
 		label := date.Format("Mon")
-		if out, err := gitCmd("log", "--oneline", "--after="+dateStr+" 00:00:00", "--before="+dateStr+" 23:59:59").Output(); err == nil {
+		if out, err := gitCmd("log", "--oneline", "--all", "--since="+dayStart, "--until="+dayEnd).Output(); err == nil {
 			lines := strings.TrimSpace(string(out))
 			if lines != "" {
 				stats.GitWeekly[label] = len(strings.Split(lines, "\n"))
