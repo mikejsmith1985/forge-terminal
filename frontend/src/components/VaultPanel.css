@@ -362,6 +362,24 @@
   color: #8b949e;
 }
 
+/* ─── Edit Button ────────────────────────────────────────────────────────── */
+
+.vp-edit-btn {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.vp-edit-btn:hover {
+  color: #58a6ff;
+  background: rgba(88, 166, 255, 0.1);
+}
+
 /* ─── Delete Button ───────────────────────────────────────────────────────── */
 
 .vp-delete-btn {
@@ -1154,6 +1172,24 @@
 .vp-toggle-label {
   font-size: 0.72rem;
   color: #8b949e;
+}
+
+/* ─── Edit Button ────────────────────────────────────────────────────────── */
+
+.vp-edit-btn {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.vp-edit-btn:hover {
+  color: #58a6ff;
+  background: rgba(88, 166, 255, 0.1);
 }
 
 /* ─── Delete Button ───────────────────────────────────────────────────────── */

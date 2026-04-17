@@ -193,6 +193,38 @@ export function useVault() {
   }, [setTimedError])
 
   /**
+   * Updates an existing vault entry's metadata or secret value.
+   * Only non-empty fields in the request are sent to the backend.
+   * Updates local state optimistically for instant UI feedback.
+   *
+   * @param {string} entryId - The ID of the entry to update
+   * @param {{ secretName?: string, envVarName?: string, secretValue?: string, description?: string }} fieldsToUpdate
+   * @returns {Promise<boolean>} True if the update was applied successfully
+   */
+  const updateEntry = useCallback(async (entryId, fieldsToUpdate) => {
+    setIsLoading(true)
+    try {
+      const updatedEntry = await vaultFetch('/api/vault/entries', {
+        method: 'PUT',
+        body: JSON.stringify({ id: entryId, ...fieldsToUpdate }),
+      })
+      // Replace the entry in local state with the server's response
+      setEntries((previousEntries) =>
+        previousEntries.map((entry) =>
+          entry.id === entryId ? { ...entry, ...updatedEntry } : entry
+        )
+      )
+      return true
+    } catch (err) {
+      console.error('[Vault] updateEntry error:', err)
+      setTimedError(err.message)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [setTimedError])
+
+  /**
    * Permanently deletes a vault entry by its ID.
    * Updates local state immediately on success to keep the UI responsive.
    *
@@ -307,6 +339,7 @@ export function useVault() {
     loadEntries,
     loadStatus,
     addEntry,
+    updateEntry,
     removeEntry,
     toggleAutoInject,
     revealEntry,

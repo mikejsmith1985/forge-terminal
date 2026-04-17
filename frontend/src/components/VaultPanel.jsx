@@ -19,6 +19,7 @@ import {
   Lock,
   Plus,
   Trash2,
+  Pencil,
   Eye,
   EyeOff,
   Copy,
@@ -73,9 +74,9 @@ const deriveEnvVarName = (secretName) =>
  * Reveal state is local to the card — the decrypted value never enters
  * global or hook state, and auto-hides after REVEAL_AUTO_HIDE_MS milliseconds.
  *
- * @param {{ entry: object, onDelete: Function, onToggleAutoInject: Function, onReveal: Function }} props
+ * @param {{ entry: object, onEdit: Function, onDelete: Function, onToggleAutoInject: Function, onReveal: Function }} props
  */
-function VaultEntryCard({ entry, onDelete, onToggleAutoInject, onReveal }) {
+function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal }) {
   const [revealedValue, setRevealedValue]   = useState(null)
   const [isValueVisible, setIsValueVisible] = useState(false)
   const [isCopied, setIsCopied]             = useState(false)
@@ -97,6 +98,11 @@ function VaultEntryCard({ entry, onDelete, onToggleAutoInject, onReveal }) {
       setIsValueVisible(false)
     }, REVEAL_AUTO_HIDE_MS)
   }, [])
+
+  const handleEditClick = (clickEvent) => {
+    clickEvent.stopPropagation()
+    onEdit(entry)
+  }
 
   const handleDeleteClick = (clickEvent) => {
     clickEvent.stopPropagation()
@@ -165,6 +171,14 @@ function VaultEntryCard({ entry, onDelete, onToggleAutoInject, onReveal }) {
           {entry.shouldAutoInject && (
             <span className="vp-auto-inject-badge">Auto · Active</span>
           )}
+          <button
+            className="vp-edit-btn"
+            onClick={handleEditClick}
+            title="Edit secret"
+            aria-label={`Edit ${entry.secretName}`}
+          >
+            <Pencil size={13} />
+          </button>
           <button
             className="vp-delete-btn"
             onClick={handleDeleteClick}
@@ -698,6 +712,173 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
   )
 }
 
+/**
+ * Edit form for modifying an existing vault entry.
+ * Pre-populates metadata fields from the entry being edited.
+ * Secret value field starts empty — only sent if the user enters a new value.
+ *
+ * @param {{ entryToEdit: object, isLoading: boolean, onSubmit: Function, onCancel: Function }} props
+ */
+function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
+  const [secretName, setSecretName]   = useState(entryToEdit.secretName)
+  const [envVarName, setEnvVarName]   = useState(entryToEdit.envVarName)
+  const [secretValue, setSecretValue] = useState('')
+  const [description, setDescription] = useState(entryToEdit.description || '')
+  const [isValueVisible, setIsValueVisible] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
+
+  const handleFormSubmit = useCallback(async (submitEvent) => {
+    submitEvent.preventDefault()
+    if (!secretName.trim()) return
+
+    // Build the update payload — only include fields that actually changed.
+    const fieldsToUpdate = {}
+    if (secretName.trim() !== entryToEdit.secretName) {
+      fieldsToUpdate.secretName = secretName.trim()
+    }
+    if (envVarName.trim() !== entryToEdit.envVarName) {
+      fieldsToUpdate.envVarName = envVarName.trim()
+    }
+    if (secretValue) {
+      fieldsToUpdate.secretValue = secretValue
+    }
+    if (description.trim() !== (entryToEdit.description || '')) {
+      fieldsToUpdate.description = description.trim()
+    }
+
+    // Nothing changed — close the form
+    if (Object.keys(fieldsToUpdate).length === 0) {
+      onCancel()
+      return
+    }
+
+    const wasSuccessful = await onSubmit(entryToEdit.id, fieldsToUpdate)
+    if (wasSuccessful) {
+      setSecretValue('')
+      setIsValueVisible(false)
+      setIsSuccess(true)
+      setTimeout(() => {
+        setIsSuccess(false)
+        onCancel()
+      }, SUCCESS_DISPLAY_MS)
+    }
+  }, [secretName, envVarName, secretValue, description, entryToEdit, onSubmit, onCancel])
+
+  const isFormSubmittable = secretName.trim() && !isLoading
+
+  return (
+    <div className="vp-add-modal-overlay" role="dialog" aria-modal="true" aria-label="Edit secret">
+      <form className="vp-add-modal" onSubmit={handleFormSubmit} autoComplete="off">
+        <div className="vp-add-modal-header">
+          <h3 className="vp-form-title">Edit Secret</h3>
+          <button
+            type="button"
+            className="vp-close-btn"
+            onClick={onCancel}
+            aria-label="Cancel"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {isSuccess && (
+          <div className="vp-success-flash">
+            <CheckCircle size={15} />
+            Secret updated successfully!
+          </div>
+        )}
+
+        <div className="vp-form-field">
+          <label className="vp-form-label" htmlFor="vault-edit-name">Secret Name</label>
+          <input
+            id="vault-edit-name"
+            className="vp-form-input"
+            type="text"
+            value={secretName}
+            onChange={(changeEvent) => setSecretName(changeEvent.target.value)}
+            autoFocus
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="vp-form-field">
+          <label className="vp-form-label" htmlFor="vault-edit-env-var">Environment Variable</label>
+          <input
+            id="vault-edit-env-var"
+            className="vp-form-input"
+            type="text"
+            value={envVarName}
+            onChange={(changeEvent) => setEnvVarName(changeEvent.target.value.toUpperCase())}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="vp-form-field">
+          <label className="vp-form-label" htmlFor="vault-edit-value">
+            New Value <span>(leave empty to keep current)</span>
+          </label>
+          <div className="vp-password-wrapper">
+            <input
+              id="vault-edit-value"
+              className="vp-form-input"
+              type={isValueVisible ? 'text' : 'password'}
+              value={secretValue}
+              onChange={(changeEvent) => setSecretValue(changeEvent.target.value)}
+              placeholder="Enter new value to change"
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              className="vp-eye-toggle"
+              onClick={() => setIsValueVisible((prev) => !prev)}
+              aria-label={isValueVisible ? 'Hide value' : 'Show value'}
+            >
+              {isValueVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="vp-form-field">
+          <label className="vp-form-label" htmlFor="vault-edit-description">
+            Description <span>(optional)</span>
+          </label>
+          <textarea
+            id="vault-edit-description"
+            className="vp-form-textarea"
+            value={description}
+            onChange={(changeEvent) => setDescription(changeEvent.target.value)}
+            placeholder="Used for code generation tasks"
+          />
+        </div>
+
+        <div className="vp-form-actions">
+          <button
+            type="submit"
+            className="vp-btn-primary"
+            disabled={!isFormSubmittable}
+            style={{ flex: 1 }}
+          >
+            {isLoading ? (
+              <>
+                <span className="vp-spinner">⟳</span>
+                Saving…
+              </>
+            ) : (
+              <>
+                <Pencil size={14} />
+                Save Changes
+              </>
+            )}
+          </button>
+          <button type="button" className="vp-btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -722,6 +903,7 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
     loadEntries,
     loadStatus,
     addEntry,
+    updateEntry,
     removeEntry,
     toggleAutoInject,
     revealEntry,
@@ -730,6 +912,7 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
 
   const [isAddFormVisible, setIsAddFormVisible] = useState(false)
   const [entryBeingDeleted, setEntryBeingDeleted] = useState(null)
+  const [entryBeingEdited, setEntryBeingEdited] = useState(null)
 
   // Load data whenever the panel is opened
   useEffect(() => {
@@ -744,18 +927,30 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
       if (keyEvent.key !== 'Escape') return
       if (isAddFormVisible) {
         setIsAddFormVisible(false)
+      } else if (entryBeingEdited) {
+        setEntryBeingEdited(null)
       } else {
         onClose()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isAddFormVisible, onClose])
+  }, [isAddFormVisible, entryBeingEdited, onClose])
 
   /** Passes each AddEntryRequest to the vault hook and returns success status. */
   const handleAddSubmit = useCallback(async (addRequest) => {
     return addEntry(addRequest)
   }, [addEntry])
+
+  /** Opens the edit form pre-populated with the selected entry's data. */
+  const handleEditRequest = useCallback((entry) => {
+    setEntryBeingEdited(entry)
+  }, [])
+
+  /** Forwards the edit form submission to the vault hook's updateEntry. */
+  const handleEditSubmit = useCallback(async (entryId, fieldsToUpdate) => {
+    return updateEntry(entryId, fieldsToUpdate)
+  }, [updateEntry])
 
   /** Starts the delete confirmation flow for the given entry. */
   const handleDeleteRequest = useCallback((entry) => {
@@ -866,6 +1061,7 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
             <VaultEntryCard
               key={entry.id}
               entry={entry}
+              onEdit={handleEditRequest}
               onDelete={handleDeleteRequest}
               onToggleAutoInject={toggleAutoInject}
               onReveal={revealEntry}
@@ -879,6 +1075,16 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
             isAdding={isAdding}
             onSubmit={handleAddSubmit}
             onCancel={() => setIsAddFormVisible(false)}
+          />
+        )}
+
+        {/* ── Edit Secret Modal ─────────────────────────────────────────── */}
+        {entryBeingEdited && (
+          <EditSecretForm
+            entryToEdit={entryBeingEdited}
+            isLoading={isLoading}
+            onSubmit={handleEditSubmit}
+            onCancel={() => setEntryBeingEdited(null)}
           />
         )}
 
