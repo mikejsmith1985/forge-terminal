@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.8] - 2026-04-17
+
+### Fixed
+- **First-time workflow bootstrap no longer blocks on missing AGENTS.md** — the Copilot macro prompt now uses numbered STEP instructions with skill invocation as the unconditional first action. When AGENTS.md is absent (normal for first-time setup), the agent proceeds instead of searching for the file or asking the user where it is.
+- **v2 prompt upgrade via self-heal** — the migration engine now detects both v1 (original) and v2 (AGENTS.md-first) macro payloads and upgrades them to the v3 skill-first format.
+
 ## [6.1.7] - 2026-04-17
 
 ### Fixed
-- **Stale Copilot workflow macros now self-heal** — built-in Copilot cards now replace older saved macro payloads with the current Forge bootstrap instructions, so previously saved cards do not keep replaying brittle pre-flight text after an update.
-- **Unavailable companion skills no longer block workflow bootstrap** — the Copilot bootstrap prompt now tells the agent to continue with `workflow-enforcer` plus any available companion skills when a repo does not expose every Forge-specific skill.
+- **Stale Copilot workflow macros now self-heal** — built-in Copilot cards replace older saved macro payloads with the current bootstrap prompt, so previously saved cards always use the latest recovery-resilient instructions.
+- **Unavailable companion skills no longer block workflow bootstrap** — the prompt explicitly tells the agent to silently skip any companion skills that are not found in the current environment.
 
 ## [6.1.6] - 2026-04-17
 

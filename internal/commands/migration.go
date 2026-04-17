@@ -73,13 +73,13 @@ func isBuiltInCopilotCommand(commandCard Command) bool {
 }
 
 func hasCurrentCopilotMacroPayload(macroPayload string) bool {
-	requiredMarkers := []string{
-		"create the missing workflow files",
-		"Do not stop to ask the user where AGENTS.md",
-		"If any named companion skills are unavailable",
+	currentMarkers := []string{
+		"STEP 1:",
+		"silently skip any that are not found",
+		"this is normal for first-time setup",
 	}
 
-	for _, requiredMarker := range requiredMarkers {
+	for _, requiredMarker := range currentMarkers {
 		if !strings.Contains(macroPayload, requiredMarker) {
 			return false
 		}
@@ -97,13 +97,13 @@ func shouldRefreshBuiltInCopilotMacro(macroPayload string) bool {
 		return false
 	}
 
-	legacyMarkers := []string{
-		"AGENTS.md",
+	// Any previous Forge bootstrap prompt contains both of these markers.
+	forgeBootstrapMarkers := []string{
+		"Forge Terminal",
 		"workflow-enforcer",
-		"Load the full skill chain",
 	}
 
-	for _, legacyMarker := range legacyMarkers {
+	for _, legacyMarker := range forgeBootstrapMarkers {
 		if !strings.Contains(trimmedMacroPayload, legacyMarker) {
 			return false
 		}

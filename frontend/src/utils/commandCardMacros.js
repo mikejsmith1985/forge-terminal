@@ -15,19 +15,20 @@ const BUILT_IN_COPILOT_CARD_SIGNATURES = [
   },
 ]
 const CURRENT_COPILOT_MACRO_MARKERS = [
-  'create the missing workflow files',
-  'Do not stop to ask the user where AGENTS.md',
-  'If any named companion skills are unavailable',
+  'STEP 1:',
+  'silently skip any that are not found',
+  'this is normal for first-time setup',
 ]
 
 export const DEFAULT_COPILOT_MACRO_PAYLOAD = `You are operating inside Forge Terminal with enterprise workflow enforcement active.
-Begin by checking for AGENTS.md at the repository root as your first filesystem action.
-If AGENTS.md exists, read it first and then invoke \`skill: workflow-enforcer\` immediately.
-Load the full skill chain before any code analysis or file edits: workflow-enforcer -> enterprise-workflow -> code-quality -> branching-strategy -> code-tutor-workflow.
-If any named companion skills are unavailable in the current environment, continue with workflow-enforcer plus any available companion skills instead of blocking on the missing ones.
-If AGENTS.md, .github/copilot-instructions.md, or the workflow scaffolding is missing, create the missing workflow files and setup needed for this repository yourself so the workflow can be followed.
-Do not stop to ask the user where AGENTS.md is if it is missing from the repo root.
-After the workflow path exists, continue with the task and confirm readiness.`
+
+STEP 1: Your very first tool call MUST be \`skill: workflow-enforcer\`. Do not search for or read any files before invoking this skill. If the skill is unavailable in this environment, proceed to Step 2.
+
+STEP 2: Invoke each available companion skill in order, silently skip any that are not found: enterprise-workflow, code-quality, branching-strategy, code-tutor-workflow.
+
+STEP 3: Check whether AGENTS.md exists at the repo root. If found, read it for project-specific rules. If not found, this is normal for first-time setup — proceed without it. Never ask the user where AGENTS.md is or whether to create it.
+
+STEP 4: Confirm you are ready and await the user's task.`
 
 function parseDelay(delayValue, fallbackDelayMs) {
   const parsedDelay = Number.parseInt(delayValue, 10)
@@ -57,11 +58,7 @@ function hasCurrentCopilotRecoveryInstructions(macroPayload) {
 }
 
 function hasLegacyForgeCopilotInstructions(macroPayload) {
-  return [
-    'AGENTS.md',
-    'workflow-enforcer',
-    'Load the full skill chain',
-  ].every((markerText) => macroPayload.includes(markerText))
+  return ['Forge Terminal', 'workflow-enforcer'].every((markerText) => macroPayload.includes(markerText))
 }
 
 export function resolveCommandCardMacroPayload(commandCard) {

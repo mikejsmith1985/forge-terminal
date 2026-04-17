@@ -23,7 +23,7 @@ describe('commandCardMacros', () => {
     expect(macroPayload).toBe(DEFAULT_COPILOT_MACRO_PAYLOAD)
     expect(macroPayload).toContain('AGENTS.md')
     expect(macroPayload).toContain('workflow-enforcer')
-    expect(macroPayload).toContain('create the missing workflow files')
+    expect(macroPayload).toContain('this is normal for first-time setup')
   })
 
   it('replaces stale copilot macro payloads with the current recovery instructions', () => {
@@ -38,7 +38,7 @@ Confirm you have read AGENTS.md and are ready.`,
     })
 
     expect(macroPayload).toBe(DEFAULT_COPILOT_MACRO_PAYLOAD)
-    expect(macroPayload).toContain('If any named companion skills are unavailable')
+    expect(macroPayload).toContain('silently skip any that are not found')
   })
 
   it('does not inject a fallback macro for non-copilot cards', () => {
