@@ -67,6 +67,7 @@ func TestMigrateCommandsUpgradesV2CopilotMacroPayload(t *testing.T) {
 }
 
 func TestMigrateCommandsPreservesCustomCopilotMacroPayload(t *testing.T) {
+	// Card 42 has random text that happens to mention AGENTS.md — NOT a Forge bootstrap prompt.
 	customCopilotCommands := []Command{
 		{
 			ID:           42,
@@ -87,5 +88,30 @@ func TestMigrateCommandsPreservesCustomCopilotMacroPayload(t *testing.T) {
 	}
 	if migratedCommands[0].MacroDelay != customCopilotCommands[0].MacroDelay {
 		t.Fatal("expected custom Copilot macro delay to be preserved")
+	}
+}
+
+func TestMigrateCommandsUpgradesUserCreatedCopilotCardWithStaleForgePayload(t *testing.T) {
+	// User-created card (ID 8) with a stale Forge bootstrap payload should be upgraded.
+	userCreatedCopilotCards := []Command{
+		{
+			ID:           8,
+			Description:  "🛡️ Copilot (Workflow Enforced)",
+			Command:      "copilot --allow-all-tools",
+			MacroPayload: "You are operating inside Forge Terminal with enterprise workflow enforcement active. Begin by reading AGENTS.md. Invoke skill: workflow-enforcer immediately.",
+			MacroDelay:   3500,
+		},
+	}
+
+	migratedCommands, wasChanged := MigrateCommands(userCreatedCopilotCards)
+	if !wasChanged {
+		t.Fatal("expected user-created Copilot card with stale Forge payload to be upgraded")
+	}
+
+	if migratedCommands[0].MacroPayload != defaultCopilotMacroPayload {
+		t.Fatal("stale Forge payload on user-created card should be upgraded to current version")
+	}
+	if migratedCommands[0].MacroDelay != defaultCopilotMacroDelayMs {
+		t.Fatal("macro delay on upgraded user-created card should be reset to default")
 	}
 }

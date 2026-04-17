@@ -38,9 +38,9 @@ func MigrateCommands(commands []Command) ([]Command, bool) {
 			log.Printf("[Commands] Migration: Set default type 'chat' for command '%s'", cmd.Description)
 		}
 
-		// Built-in Copilot cards must carry the latest workflow bootstrap prompt so stale
-		// user configs do not keep replaying brittle pre-flight instructions forever.
-		if isBuiltInCopilotCommand(cmd) && shouldRefreshBuiltInCopilotMacro(cmd.MacroPayload) {
+		// Any Copilot card (built-in OR user-created) carrying a stale Forge bootstrap
+		// prompt must be upgraded. The payload is OUR text regardless of who created the card.
+		if shouldRefreshCopilotMacro(cmd.MacroPayload) {
 			if updated.MacroPayload != defaultCopilotMacroPayload {
 				updated.MacroPayload = defaultCopilotMacroPayload
 				anyChanged = true
@@ -88,16 +88,17 @@ func hasCurrentCopilotMacroPayload(macroPayload string) bool {
 	return true
 }
 
-func shouldRefreshBuiltInCopilotMacro(macroPayload string) bool {
+func shouldRefreshCopilotMacro(macroPayload string) bool {
 	trimmedMacroPayload := strings.TrimSpace(macroPayload)
 	if trimmedMacroPayload == "" {
-		return true
+		return false
 	}
 	if hasCurrentCopilotMacroPayload(trimmedMacroPayload) {
 		return false
 	}
 
-	// Any previous Forge bootstrap prompt contains both of these markers.
+	// Any card carrying a previous Forge bootstrap prompt contains both of these markers.
+	// This matches built-in cards AND user-created Copilot cards with our legacy text.
 	forgeBootstrapMarkers := []string{
 		"Forge Terminal",
 		"workflow-enforcer",

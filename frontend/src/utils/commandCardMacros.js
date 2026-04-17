@@ -63,18 +63,16 @@ function hasLegacyForgeCopilotInstructions(macroPayload) {
 
 export function resolveCommandCardMacroPayload(commandCard) {
   const explicitMacroPayload = commandCard?.macro_payload?.trim() || ''
-  if (isBuiltInCopilotCommandCard(commandCard)) {
-    if (!explicitMacroPayload) {
-      return DEFAULT_COPILOT_MACRO_PAYLOAD
-    }
 
-    if (hasCurrentCopilotRecoveryInstructions(explicitMacroPayload)) {
-      return explicitMacroPayload
-    }
+  // Any card (built-in or user-created) carrying a stale Forge bootstrap payload
+  // gets upgraded to the current version. The payload is our text regardless of origin.
+  if (explicitMacroPayload && hasLegacyForgeCopilotInstructions(explicitMacroPayload) && !hasCurrentCopilotRecoveryInstructions(explicitMacroPayload)) {
+    return DEFAULT_COPILOT_MACRO_PAYLOAD
+  }
 
-    if (hasLegacyForgeCopilotInstructions(explicitMacroPayload)) {
-      return DEFAULT_COPILOT_MACRO_PAYLOAD
-    }
+  // Built-in Copilot cards always get the default payload when blank
+  if (isBuiltInCopilotCommandCard(commandCard) && !explicitMacroPayload) {
+    return DEFAULT_COPILOT_MACRO_PAYLOAD
   }
 
   if (explicitMacroPayload) {

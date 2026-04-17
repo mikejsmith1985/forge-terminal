@@ -62,6 +62,17 @@ Confirm you have read AGENTS.md and are ready.`,
     expect(macroPayload).toBe('Custom instructions for my repo workflow')
   })
 
+  it('upgrades stale Forge payload on user-created copilot cards', () => {
+    const macroPayload = resolveCommandCardMacroPayload({
+      id: 8,
+      description: '🛡️ Copilot (Workflow Enforced)',
+      command: 'copilot --allow-all-tools',
+      macro_payload: 'You are operating inside Forge Terminal with enterprise workflow enforcement active. Begin by reading AGENTS.md. Invoke skill: workflow-enforcer immediately.',
+    })
+
+    expect(macroPayload).toBe(DEFAULT_COPILOT_MACRO_PAYLOAD)
+  })
+
   it('builds a normalized execution plan with default macro delay', () => {
     const executionPlan = buildCommandCardExecutionPlan({
       description: '🔄 Copilot (Resume)',
