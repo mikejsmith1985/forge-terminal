@@ -422,20 +422,47 @@ const MCPPanel = ({ onToast }) => {
                 </div>
                 {isHelpVisible && (
                   <div className="mcp-explainer">
+                    {/* ── Plain-language definition ── */}
                     <p className="mcp-explainer-text">
-                      <strong>MCP</strong> (Model Context Protocol) turns Forge into a tool that
-                      <em> other AI apps can use</em>. Think of it as a drive-through window on
-                      your workshop — Claude, Copilot, Cursor, Gemini and others can pull up and
-                      ask Forge to read files, run commands, or check your code.
+                      <strong>MCP</strong> (Model Context Protocol) turns Forge into a
+                      <em> tool server that other AI apps can use</em>. Think of it as a
+                      drive-through window on your workshop — Claude, Copilot, Cursor,
+                      Gemini and others can pull up and ask Forge to read files, run
+                      commands, or check your code — all without you copy-pasting anything.
                     </p>
+
+                    {/* ── Why it matters — concrete benefits ── */}
+                    <p className="mcp-explainer-subtitle">Why does this make Forge better?</p>
+                    <ul className="mcp-explainer-benefits">
+                      <li>
+                        <strong>Your AI tools get superpowers</strong> — Instead of just
+                        chatting, Claude or Gemini can actually <em>do things</em> on your
+                        machine: read source files, run terminal commands, write code.
+                      </li>
+                      <li>
+                        <strong>One terminal, many brains</strong> — Multiple AI tools can
+                        share the same Forge sessions, files, and workspace at the same time.
+                      </li>
+                      <li>
+                        <strong>You stay in control</strong> — Every request goes through
+                        Forge's auth token, so nothing happens without your permission.
+                      </li>
+                      <li>
+                        <strong>No extra setup per project</strong> — Connect once, and every
+                        project you open in Forge is automatically available to your AI tools.
+                      </li>
+                    </ul>
+
+                    {/* ── 4-step quick-start guide ── */}
+                    <p className="mcp-explainer-subtitle">How to connect (4 steps)</p>
                     <div className="mcp-explainer-steps">
                       <div className="mcp-step">
                         <span className="mcp-step-number">1</span>
-                        <span>Copy your <strong>token</strong> (above)</span>
+                        <span>Copy your <strong>token</strong> from the Connection section above</span>
                       </div>
                       <div className="mcp-step">
                         <span className="mcp-step-number">2</span>
-                        <span>Pick your AI tool tab and <strong>copy the config</strong></span>
+                        <span>Pick your AI tool tab under Quick Connect and <strong>copy the config</strong></span>
                       </div>
                       <div className="mcp-step">
                         <span className="mcp-step-number">3</span>
@@ -443,7 +470,7 @@ const MCPPanel = ({ onToast }) => {
                       </div>
                       <div className="mcp-step">
                         <span className="mcp-step-number">4</span>
-                        <span>Restart the AI tool — it can now <strong>use Forge's capabilities</strong></span>
+                        <span>Restart the AI tool — it can now <strong>talk to Forge directly</strong></span>
                       </div>
                     </div>
                   </div>
