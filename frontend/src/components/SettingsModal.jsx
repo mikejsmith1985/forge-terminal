@@ -252,7 +252,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
             <Database size={16} />
             Data & History
           </button>
-          <button
+          {/* Notifications tab — HIDDEN for subscription release (ntfy.sh integration not vetted) */}
+          {/* <button
             onClick={() => setActiveTab('notifications')}
             style={{
               padding: '12px 20px',
@@ -268,7 +269,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           >
             <Bell size={16} />
             Notifications
-          </button>
+          </button> */}
 
         </div>
 
@@ -345,7 +346,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           ) : activeTab === 'backups' ? (
             <BackupsPanel onToast={onToast} />
           ) : activeTab === 'notifications' ? (
-            <NotificationsPanel onToast={onToast} />
+            /* Notifications panel — HIDDEN for subscription release */
+            null
           ) : (
             <>
               <div style={{

@@ -169,8 +169,9 @@ function App() {
   // Forge Assist state
   const [isForgeAssistOpen, setIsForgeAssistOpen] = useState(false)
 
-  // Code Tutor state (v3.19.0: Learn As You Build)
-  const [isTutorOpen, setIsTutorOpen] = useState(false)
+  // Code Tutor state — HIDDEN for subscription release (feature not yet vetted)
+  // const [isTutorOpen, setIsTutorOpen] = useState(false)
+  const [isTutorOpen] = useState(false)
 
   // Forge Vault state (v5.3.0: encrypted secret store)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
@@ -891,21 +892,21 @@ function App() {
     // the capture phase, before xterm's own keydown listeners. Calling
     // stopPropagation() here prevents xterm from also processing the key.
 
-    // Ctrl+Shift+H: Toggle History Slider
-    if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsHistorySliderOpen(prev => !prev);
-      return;
-    }
+      // Ctrl+Shift+H: History Slider — HIDDEN for subscription release
+      // if (e.ctrlKey && e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+      //   e.preventDefault();
+      //   e.stopPropagation();
+      //   setIsHistorySliderOpen(prev => !prev);
+      //   return;
+      // }
 
-    // Ctrl+Shift+T: Toggle Code Tutor (desktop only)
-    if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!isCompact) setIsTutorOpen(prev => !prev);
-      return;
-    }
+      // Ctrl+Shift+T: Code Tutor — HIDDEN for subscription release
+      // if (e.ctrlKey && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+      //   e.preventDefault();
+      //   e.stopPropagation();
+      //   if (!isCompact) setIsTutorOpen(prev => !prev);
+      //   return;
+      // }
 
     // Ctrl+End: Scroll to bottom (safe — not a shell binding)
     if (e.ctrlKey && e.key === 'End') {
@@ -1616,10 +1617,10 @@ function App() {
         <button
           className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
           onClick={() => setSidebarView('debug')}
-          title="Debug web applications with session recording"
+          title="Web App Debugger"
         >
           <Bug size={16} />
-          Web Tools
+          Debugger
         </button>
       </div>
 
@@ -1663,18 +1664,7 @@ function App() {
           </>
         ) : sidebarView === 'debug' ? (
           <>
-            <h3>🌐 Web Tools</h3>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {devMode && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setIsDiagnosticOverlayOpen(!isDiagnosticOverlayOpen)}
-                  style={{ fontSize: '11px', padding: '4px 8px' }}
-                >
-                  {isDiagnosticOverlayOpen ? 'Hide' : 'Show'} Diagnostics
-                </button>
-              )}
-            </div>
+            <h3>🔍 Web App Debugger</h3>
           </>
         ) : null}
       </div>
@@ -1690,14 +1680,14 @@ function App() {
         <button className="btn btn-ghost btn-icon" onClick={toggleSidebarPosition} title={`Move sidebar to ${sidebarPosition === 'right' ? 'left' : 'right'}`}>
           {sidebarPosition === 'right' ? <PanelLeft size={18} /> : <PanelRight size={18} />}
         </button>
-        {/* Time-Travel button */}
-        <button 
+        {/* Time Travel — HIDDEN for subscription release (feature not yet vetted) */}
+        {/* <button 
           className={`btn btn-ghost btn-icon ${isHistorySliderOpen ? 'active' : ''}`}
           onClick={() => setIsHistorySliderOpen(prev => !prev)} 
           title="Time Travel (Ctrl+Shift+H)"
         >
           <Clock size={18} />
-        </button>
+        </button> */}
         {/* Feedback button */}
         <button 
           className="btn btn-ghost btn-icon"
@@ -1758,13 +1748,7 @@ function App() {
           </button>
         </div>
         {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}
-        <button
-          className="btn btn-ghost btn-icon"
-          onClick={() => setIsRemoteAccessOpen(true)}
-          title="Remote Access"
-        >
-          <QrCode size={18} />
-        </button>
+        {/* Remote Access — HIDDEN for subscription release (feature not yet vetted) */}
         <button 
           className="btn btn-ghost btn-icon" 
           onClick={() => setIsSettingsModalOpen(true)} 
@@ -1796,7 +1780,7 @@ function App() {
               cwd={activeTab?.currentDirectory}
               directoryCardVisible={directoryCardVisible}
               onHideDirectoryCard={handleHideDirectoryCard}
-              onOpenTutor={() => setIsTutorOpen(true)}
+              // onOpenTutor — HIDDEN for subscription release
             />
           </DndContext>
         ) : sidebarView === 'files' ? (
@@ -1808,28 +1792,14 @@ function App() {
           />
         ) : sidebarView === 'debug' ? (
           <div style={{ overflowY: 'auto', height: '100%' }}>
-            {devMode && (
-              <DebugPanel
-                terminalRef={getActiveTerminalRef()}
-                tabId={activeTabId}
-              />
-            )}
             <div style={{ padding: '12px' }}>
-              <ConnectionDiagnosticCard />
               <WebAppDebuggerCard />
             </div>
           </div>
         ) : null}
       </div>
 
-      {/* v3.16.14: FollowMe Debugger - always mounted outside conditional rendering */}
-      <div style={{ 
-        display: sidebarView === 'debug' ? 'block' : 'none',
-        padding: '12px',
-        overflowY: 'auto'
-      }}>
-        <FollowMeDebugger />
-      </div>
+      {/* FollowMeDebugger — HIDDEN for subscription release */}
     </div>
   );
 
@@ -1874,8 +1844,8 @@ function App() {
             onOpenDashboard={() => setIsDeveloperDashboardOpen(true)}
             onToggleForgeAssist={() => setIsForgeAssistOpen(prev => !prev)}
             isForgeAssistOpen={isForgeAssistOpen}
-            onToggleTutor={() => setIsTutorOpen(prev => !prev)}
-            isTutorOpen={isTutorOpen}
+            // onToggleTutor — HIDDEN for subscription release
+            // isTutorOpen — HIDDEN for subscription release
             onToggleVault={() => setIsVaultOpen(prev => !prev)}
             isVaultOpen={isVaultOpen}
             disableNewTab={tabs.length >= MAX_TABS}
@@ -2136,10 +2106,7 @@ function App() {
         tabCount={tabs.length}
       />
 
-      <RemoteAccessModal
-        isOpen={isRemoteAccessOpen}
-        onClose={() => setIsRemoteAccessOpen(false)}
-      />
+      {/* RemoteAccessModal — HIDDEN for subscription release */}
 
       <SettingsModal
         isOpen={isSettingsModalOpen}
@@ -2197,8 +2164,8 @@ function App() {
       
       {/* v3.8.2: ChatSidebar and NotebookLayout REMOVED - Terminal is the only view */}
       
-      {/* History Slider - Time-Travel Scrubber */}
-      {activeTabId && (
+      {/* History Slider (Time Travel) — HIDDEN for subscription release (feature not yet vetted) */}
+      {/* {activeTabId && (
         <HistorySlider
           tabId={activeTabId}
           isOpen={isHistorySliderOpen}
@@ -2209,13 +2176,12 @@ function App() {
             }
           }}
           onChatAboutHistory={(content, timestamp) => {
-            // v3.8.2: Just show toast, terminal is the only view
             setIsHistorySliderOpen(false);
             addToast(`Terminal state from ${timestamp.toLocaleTimeString()} available in history`, 'info', 4000);
           }}
           position="bottom"
         />
-      )}
+      )} */}
 
       {/* Forge Assist - desktop only; not rendered on mobile/tablet */}
       {/* v3.9.0: Enhanced with Task Mode + SLM Integration */}
@@ -2243,13 +2209,7 @@ function App() {
         contextFiles={contextFiles}
       />}
 
-      {/* Code Tutor Panel - Learn As You Build (v3.19.0) */}
-      {!isCompact && <CodeTutorPanel
-        isOpen={isTutorOpen}
-        onClose={() => setIsTutorOpen(false)}
-        onToast={addToast}
-        activeDirectory={activeTab?.currentDirectory}
-      />}
+      {/* Code Tutor Panel — HIDDEN for subscription release (feature not yet vetted) */}
 
       {/* Forge Vault Panel — AES-256-GCM encrypted secret store (v5.3.0) */}
       {!isCompact && <VaultPanel

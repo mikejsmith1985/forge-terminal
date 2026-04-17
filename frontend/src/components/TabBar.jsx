@@ -140,18 +140,7 @@ function TabBar({
           <Zap size={16} />
         </button>
       )}
-      {/* Code Tutor — Learn As You Build */}
-      {onToggleTutor && (
-        <button
-          className={`dashboard-btn ${isTutorOpen ? 'active' : ''}`}
-          onClick={onToggleTutor}
-          aria-label={isTutorOpen ? 'Close Code Tutor' : 'Code Tutor (Ctrl+Shift+T)'}
-          title="Code Tutor (Ctrl+Shift+T)"
-          data-testid="tutor-btn"
-        >
-          <BookOpen size={16} />
-        </button>
-      )}
+      {/* Code Tutor — HIDDEN for subscription release (feature not yet vetted) */}
       {/* Forge Vault — encrypted secret store */}
       {onToggleVault && (
         <button
@@ -164,8 +153,8 @@ function TabBar({
           <Lock size={16} />
         </button>
       )}
-      {/* Manual notify bell */}
-      <NotifyBellButton />
+      {/* Notifications bell — HIDDEN for subscription release (ntfy.sh integration not vetted) */}
+      {/* <NotifyBellButton /> */}
       <button
         className="new-tab-btn"
         onClick={onNewTab}
