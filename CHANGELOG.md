@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **MCP Dashboard Panel** (`MCPPanel.jsx`): The MCP server now has a visible dashboard card in the sidebar (Cards view). Shows connection status, endpoint, token (with clipboard copy), available tools, task queue, and one-click config snippets for 6 AI tools: Claude Desktop, VS Code Copilot, Cursor, Google Gemini/AI Studio, Windsurf, and Cline
 - **MCP Dashboard API routes**: `/api/mcp/status`, `/api/mcp/dashboard/tasks`, `/api/mcp/dashboard/token` endpoints serve the frontend dashboard with server state, task history, and secure token retrieval
-- **"What is MCP?" explainer**: Collapsible help section in the MCP Panel explains what MCP does in plain language and walks through the 4-step setup process
+- **"What is MCP?" explainer**: Collapsible help section in the MCP Panel explains what MCP does in plain language, when adding Gemini or another MCP client helps a Copilot-first workflow, and walks through the 4-step setup process
 - **Server helper methods**: `TokenHint()`, `ToolNames()`, and `ListAll()` on the MCP server/broker for dashboard data
 
 ## [6.0.0] - 2026-04-13

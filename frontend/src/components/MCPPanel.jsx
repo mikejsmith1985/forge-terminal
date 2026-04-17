@@ -88,6 +88,40 @@ const MCP_CLIENT_CONFIGS = [
   },
 ]
 
+// ── Copilot-first explainer copy ──────────────────────────────────────────────
+
+const MCP_COPILOT_FIRST_BENEFITS = [
+  {
+    title: 'Different models, different strengths',
+    description: 'Copilot can stay your main builder while Gemini gives you a second opinion on the same code. That matters most when one model misses a bug pattern, edge case, or architecture smell.',
+  },
+  {
+    title: 'Parallel thinking in the same workspace',
+    description: 'Instead of copy-pasting code into another tool, Gemini can inspect the same Forge files and terminal context directly through MCP while you keep working with Copilot.',
+  },
+  {
+    title: 'Faster debugging when you are stuck',
+    description: 'You can ask Copilot to propose the fix and ask Gemini to explain the root cause at the same time. Two perspectives usually beat one when a failure is slippery.',
+  },
+  {
+    title: 'An honest second reviewer before you commit',
+    description: 'A second model connected through Forge is useful for review, explanation, and challenge-testing — not because it replaces Copilot, but because it can disagree with it.',
+  },
+]
+
+const MCP_COPILOT_FIRST_SCENARIOS = [
+  {
+    title: 'Before: Copilot only',
+    description: 'You ask Copilot to inspect a failing React flow, propose the fix, and explain the bug. If the first answer is shallow, you keep re-prompting the same model.',
+  },
+  {
+    title: 'After: Copilot + Gemini through Forge',
+    description: 'Copilot keeps driving implementation in Forge while Gemini connects through MCP to inspect the same repo, read the same files, and give an independent debugging or review pass.',
+  },
+]
+
+const MCP_COPILOT_FIRST_CAVEAT = 'If Copilot is already getting you to done quickly and you rarely want a second opinion, connecting another AI may add more setup and cognitive overhead than value.'
+
 /**
  * Builds ready-to-paste MCP client configuration JSON for popular AI tools.
  * Each returns a prettified JSON string the user can copy into their config.
@@ -452,6 +486,31 @@ const MCPPanel = ({ onToast }) => {
                         project you open in Forge is automatically available to your AI tools.
                       </li>
                     </ul>
+
+                    <p className="mcp-explainer-subtitle">
+                      Why add Gemini (or another AI) if you already use Copilot?
+                    </p>
+                    <ul className="mcp-explainer-benefits">
+                      {MCP_COPILOT_FIRST_BENEFITS.map((benefit) => (
+                        <li key={benefit.title}>
+                          <strong>{benefit.title}</strong> — {benefit.description}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <p className="mcp-explainer-subtitle">Concrete Forge example</p>
+                    <div className="mcp-explainer-example-grid">
+                      {MCP_COPILOT_FIRST_SCENARIOS.map((scenario) => (
+                        <div key={scenario.title} className="mcp-explainer-example-card">
+                          <p className="mcp-explainer-example-title">{scenario.title}</p>
+                          <p className="mcp-explainer-example-text">{scenario.description}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="mcp-explainer-caveat">
+                      <strong>When not to bother:</strong> {MCP_COPILOT_FIRST_CAVEAT}
+                    </p>
 
                     {/* ── 4-step quick-start guide ── */}
                     <p className="mcp-explainer-subtitle">How to connect (4 steps)</p>
