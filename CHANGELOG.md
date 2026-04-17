@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [6.1.8] - 2026-04-17
 
+## [6.1.8] - 2026-04-17
+
 ### Fixed
 - **First-time workflow bootstrap no longer blocks on missing AGENTS.md** — the Copilot macro prompt now uses numbered STEP instructions with skill invocation as the unconditional first action. When AGENTS.md is absent (normal for first-time setup), the agent proceeds instead of searching for the file or asking the user where it is.
 - **v2 prompt upgrade via self-heal** — the migration engine now detects both v1 (original) and v2 (AGENTS.md-first) macro payloads and upgrades them to the v3 skill-first format.
