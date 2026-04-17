@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.0] - 2026-04-17
+
+---
+
+## [v7.0.0] - 2026-04-17
+
 ### Added
 - **Vault: Edit Secret** — Vault entries can now be edited in-place via a new Pencil button on each entry card. Clicking it opens a modal form pre-populated with the entry's current name, env var, and description. The secret value field starts empty — a new value is only sent if the user types one. Only changed fields are submitted to the new `PUT /api/vault/entries` backend endpoint with partial-update semantics and disk-write rollback safety. A success flash confirms the update before the form auto-closes.
 - **Vault: Reveal & Copy secrets** — Each secret in the Forge Vault can now be viewed and copied directly from the Vault panel. A "Reveal" button fetches the decrypted value on demand, shows it as a masked field with an eye-toggle for plaintext, and a "Copy" button writes it to the clipboard with a 2-second "Copied!" confirmation. Values auto-hide after 30 seconds and are never cached in global state. A new audited `GET /api/vault/entries/value?id=` endpoint backs the feature; every reveal call is logged server-side.
