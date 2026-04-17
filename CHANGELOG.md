@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [6.1.9] - 2026-04-17
 
+## [6.1.9] - 2026-04-17
+
 ### Fixed
 - **Stale Forge bootstrap payloads on ALL Copilot cards are now upgraded** — the migration previously only upgraded built-in cards (IDs 6 and 7). User-created Copilot cards (e.g., "Copilot Workflow Enforced") carrying old Forge bootstrap text were silently left behind, causing agents to still receive "Begin by reading AGENTS.md" as their first instruction.
 
