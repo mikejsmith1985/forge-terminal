@@ -548,6 +548,48 @@
   text-underline-offset: 2px;
 }
 
+.mcp-explainer-example-grid {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.mcp-explainer-example-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+}
+
+.mcp-explainer-example-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.mcp-explainer-example-text {
+  font-size: 0.69rem;
+  color: var(--subtext);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.mcp-explainer-caveat {
+  font-size: 0.69rem;
+  color: var(--subtext);
+  line-height: 1.5;
+  margin: 0 0 12px;
+  padding: 10px;
+  border-left: 3px solid rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.06);
+  border-radius: 0 8px 8px 0;
+}
+
+.mcp-explainer-caveat strong {
+  color: var(--text);
+}
+
 .mcp-explainer-steps {
   display: flex;
   flex-direction: column;

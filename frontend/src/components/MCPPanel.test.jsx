@@ -237,6 +237,13 @@ describe('MCPPanel', () => {
     expect(screen.getByText(/You stay in control/)).toBeInTheDocument()
     expect(screen.getByText(/No extra setup per project/)).toBeInTheDocument()
 
+    // Copilot-first guidance should be explicit
+    expect(screen.getByText(/Why add Gemini .* already use Copilot/i)).toBeInTheDocument()
+    expect(screen.getByText(/Different models, different strengths/i)).toBeInTheDocument()
+    expect(screen.getByText(/Before: Copilot only/i)).toBeInTheDocument()
+    expect(screen.getByText(/After: Copilot \+ Gemini through Forge/i)).toBeInTheDocument()
+    expect(screen.getByText(/When not to bother/i)).toBeInTheDocument()
+
     // 4-step setup guide should be visible
     expect(screen.getByText(/How to connect/)).toBeInTheDocument()
   })

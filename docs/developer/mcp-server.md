@@ -2,6 +2,33 @@
 
 Forge Terminal exposes its terminal, file, and workflow capabilities as an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server. This lets any MCP-capable AI client — VS Code GitHub Copilot, Cursor, Claude Code, or EZTest — call Forge tools directly.
 
+## Why this matters if you already use Copilot
+
+If Copilot is already your main builder, MCP is not about replacing it. It is about letting a second AI tool work through the **same live Forge workspace** instead of forcing you to copy files and terminal output into another app by hand.
+
+In practice, that means:
+
+- **Copilot can stay your primary implementation partner** inside Forge or VS Code
+- **Gemini, Claude, or another MCP client can inspect the same repo** through Forge when you want a second opinion
+- **You can split roles across models** — for example, let Copilot drive the fix while Gemini gives an independent debugging pass or architecture review
+- **You avoid copy-paste context loss** because both tools are reading the same workspace through Forge
+
+### Concrete example: Copilot + Gemini
+
+**Before MCP**
+
+You ask Copilot to debug a flaky React flow. If the answer is incomplete, your fallback is usually to re-prompt Copilot or manually paste files, logs, and terminal output into Gemini.
+
+**After MCP**
+
+You still use Copilot as the main builder. At the same time, Gemini connects to Forge through MCP, reads the same files, and inspects the same project context. Now you can ask Gemini for a second-pass explanation like:
+
+> "Review the same failing flow Forge is working on. Do you see a root cause or edge case Copilot might be missing?"
+
+This is where the "superpower" shows up: not in magic new features, but in giving multiple models access to the same live workspace so they can complement each other instead of working from stale copy-pasted snippets.
+
+> **When not to bother:** If Copilot already gets you to done quickly and you rarely need a second opinion, adding another AI client may create more setup and context-switching than value.
+
 ## Transport
 
 **Streamable HTTP** at `POST /api/mcp`  
