@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.11] - 2026-04-17
+
 ### Added
 - **Forge Vault skill** (`.github/skills/forge-vault/SKILL.md`) — teaches Copilot agents how to use the Forge Vault API to list, retrieve, and inject secrets. Agents no longer need to guess endpoints, try to decrypt vault files, or ask the user how to access secrets.
 
