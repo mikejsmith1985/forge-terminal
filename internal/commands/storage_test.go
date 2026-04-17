@@ -35,6 +35,9 @@ func TestDefaultCopilotCommandsIncludeWorkflowBootstrapMacro(t *testing.T) {
 		if !strings.Contains(defaultCommand.MacroPayload, "create the missing workflow files") {
 			t.Fatalf("%s macro payload should instruct Forge to create missing workflow files", defaultCommand.Description)
 		}
+		if !strings.Contains(defaultCommand.MacroPayload, "If any named companion skills are unavailable") {
+			t.Fatalf("%s macro payload should explain how to proceed when companion skills are unavailable", defaultCommand.Description)
+		}
 	}
 
 	for description, wasFound := range copilotCardDescriptions {

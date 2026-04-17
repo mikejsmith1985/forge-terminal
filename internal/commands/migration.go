@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+const defaultCopilotMacroDelayMs = 1500
+
+var builtInCopilotCommandSignatures = []Command{
+	{ID: 6, Description: "🤖 Copilot (Fresh)", Command: "copilot --allow-all-tools"},
+	{ID: 7, Description: "🔄 Copilot (Resume)", Command: "copilot --allow-all-tools --continue"},
+}
+
 // MigrateCommands upgrades legacy command cards to include new LLM metadata fields.
 // This ensures backward compatibility during updates.
 func MigrateCommands(commands []Command) ([]Command, bool) {
@@ -31,10 +38,78 @@ func MigrateCommands(commands []Command) ([]Command, bool) {
 			log.Printf("[Commands] Migration: Set default type 'chat' for command '%s'", cmd.Description)
 		}
 
+		// Built-in Copilot cards must carry the latest workflow bootstrap prompt so stale
+		// user configs do not keep replaying brittle pre-flight instructions forever.
+		if isBuiltInCopilotCommand(cmd) && shouldRefreshBuiltInCopilotMacro(cmd.MacroPayload) {
+			if updated.MacroPayload != defaultCopilotMacroPayload {
+				updated.MacroPayload = defaultCopilotMacroPayload
+				anyChanged = true
+				log.Printf("[Commands] Migration: Refreshed Copilot workflow macro for command '%s'", cmd.Description)
+			}
+			if cmd.MacroDelay != defaultCopilotMacroDelayMs {
+				updated.MacroDelay = defaultCopilotMacroDelayMs
+				anyChanged = true
+				log.Printf("[Commands] Migration: Reset Copilot macro delay for command '%s' to %dms", cmd.Description, defaultCopilotMacroDelayMs)
+			}
+		}
+
 		migrated = append(migrated, updated)
 	}
 
 	return migrated, anyChanged
+}
+
+func isBuiltInCopilotCommand(commandCard Command) bool {
+	for _, builtInCopilotCommand := range builtInCopilotCommandSignatures {
+		if commandCard.ID == builtInCopilotCommand.ID {
+			return true
+		}
+		if commandCard.Description == builtInCopilotCommand.Description && commandCard.Command == builtInCopilotCommand.Command {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasCurrentCopilotMacroPayload(macroPayload string) bool {
+	requiredMarkers := []string{
+		"create the missing workflow files",
+		"Do not stop to ask the user where AGENTS.md",
+		"If any named companion skills are unavailable",
+	}
+
+	for _, requiredMarker := range requiredMarkers {
+		if !strings.Contains(macroPayload, requiredMarker) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func shouldRefreshBuiltInCopilotMacro(macroPayload string) bool {
+	trimmedMacroPayload := strings.TrimSpace(macroPayload)
+	if trimmedMacroPayload == "" {
+		return true
+	}
+	if hasCurrentCopilotMacroPayload(trimmedMacroPayload) {
+		return false
+	}
+
+	legacyMarkers := []string{
+		"AGENTS.md",
+		"workflow-enforcer",
+		"Load the full skill chain",
+	}
+
+	for _, legacyMarker := range legacyMarkers {
+		if !strings.Contains(trimmedMacroPayload, legacyMarker) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // inferProviderFromCommand attempts to detect LLM provider from command text

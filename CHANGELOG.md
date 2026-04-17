@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.7] - 2026-04-17
+
+### Fixed
+- **Stale Copilot workflow macros now self-heal** — built-in Copilot cards now replace older saved macro payloads with the current Forge bootstrap instructions, so previously saved cards do not keep replaying brittle pre-flight text after an update.
+- **Unavailable companion skills no longer block workflow bootstrap** — the Copilot bootstrap prompt now tells the agent to continue with `workflow-enforcer` plus any available companion skills when a repo does not expose every Forge-specific skill.
+
 ## [6.1.6] - 2026-04-17
 
 ### Fixed

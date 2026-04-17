@@ -26,6 +26,21 @@ describe('commandCardMacros', () => {
     expect(macroPayload).toContain('create the missing workflow files')
   })
 
+  it('replaces stale copilot macro payloads with the current recovery instructions', () => {
+    const macroPayload = resolveCommandCardMacroPayload({
+      description: '🤖 Copilot (Fresh)',
+      command: 'copilot --allow-all-tools',
+      macro_payload: `You are operating inside Forge Terminal with enterprise workflow enforcement active.
+Begin by reading AGENTS.md — do this now as your very first action.
+After reading it, invoke \`skill: workflow-enforcer\` immediately.
+Load the full skill chain before any code analysis or file edits: workflow-enforcer -> enterprise-workflow -> code-quality -> branching-strategy -> code-tutor-workflow.
+Confirm you have read AGENTS.md and are ready.`,
+    })
+
+    expect(macroPayload).toBe(DEFAULT_COPILOT_MACRO_PAYLOAD)
+    expect(macroPayload).toContain('If any named companion skills are unavailable')
+  })
+
   it('does not inject a fallback macro for non-copilot cards', () => {
     const macroPayload = resolveCommandCardMacroPayload({
       description: 'Plain command',
@@ -34,6 +49,17 @@ describe('commandCardMacros', () => {
     })
 
     expect(macroPayload).toBe('')
+  })
+
+  it('preserves custom macros for user-created copilot cards', () => {
+    const macroPayload = resolveCommandCardMacroPayload({
+      id: 42,
+      description: 'My Custom Copilot Setup',
+      command: 'copilot --allow-all-tools --sandbox',
+      macro_payload: 'Custom instructions for my repo workflow',
+    })
+
+    expect(macroPayload).toBe('Custom instructions for my repo workflow')
   })
 
   it('builds a normalized execution plan with default macro delay', () => {
