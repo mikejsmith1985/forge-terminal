@@ -509,6 +509,11 @@ func main() {
 	http.HandleFunc("/api/mcp", handleMCP)
 	http.HandleFunc("/api/mcp/tasks/", handleMCPTaskStatus)
 
+	// ── MCP Dashboard routes (standard auth, for the Forge UI) ────────────
+	http.HandleFunc("/api/mcp/status", WrapWithMiddleware(handleMCPStatus))
+	http.HandleFunc("/api/mcp/dashboard/tasks", WrapWithMiddleware(handleMCPTasks))
+	http.HandleFunc("/api/mcp/dashboard/token", WrapWithMiddleware(handleMCPToken))
+
 	// Initialize session temp directory
 	if err := initSessionTempDir(); err != nil {
 		log.Printf("[ERROR] Failed to initialize session temp dir: %v", err)

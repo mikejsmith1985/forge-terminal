@@ -159,6 +159,95 @@ func handleMCPTaskStatus(w http.ResponseWriter, r *http.Request) {
 	_ = enc.Encode(task)
 }
 
+// ── MCP Dashboard Endpoints ──────────────────────────────────────────────────
+
+// mcpStatusResponse is the JSON shape returned by GET /api/mcp/status.
+// It provides all the information the frontend MCP dashboard panel needs.
+type mcpStatusResponse struct {
+	Enabled   bool     `json:"enabled"`
+	TokenHint string   `json:"tokenHint"`
+	Endpoint  string   `json:"endpoint"`
+	Protocol  string   `json:"protocol"`
+	Tools     []string `json:"tools"`
+	TaskCount int      `json:"taskCount"`
+}
+
+// handleMCPStatus returns the MCP server status for the frontend dashboard.
+// This uses the standard auth middleware (session cookie), not the MCP bearer token,
+// because it is called by the Forge UI itself.
+func handleMCPStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "only GET is supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	isEnabled := mcpServer != nil
+	response := mcpStatusResponse{
+		Enabled:  isEnabled,
+		Protocol: "MCP 2024-11-05 (JSON-RPC 2.0)",
+		Endpoint: "/api/mcp",
+	}
+
+	if isEnabled {
+		response.TokenHint = mcpServer.TokenHint()
+		response.Tools = mcpServer.ToolNames()
+		response.TaskCount = len(mcpServer.Broker().ListAll())
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(response)
+}
+
+// handleMCPTasks returns the full task list for the frontend dashboard.
+// Uses standard auth middleware (session cookie), not MCP bearer token.
+func handleMCPTasks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "only GET is supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if mcpServer == nil {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("[]"))
+		return
+	}
+
+	allTasks := mcpServer.Broker().ListAll()
+
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(allTasks)
+}
+
+// handleMCPToken returns the full MCP bearer token for clipboard copy.
+// This endpoint is protected by the standard session auth middleware, so only
+// authenticated Forge UI users can read the token.
+func handleMCPToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "only GET is supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if mcpServer == nil {
+		http.Error(w, `{"error":"MCP server not initialised"}`, http.StatusServiceUnavailable)
+		return
+	}
+
+	token, err := mcp.LoadOrCreateToken()
+	if err != nil {
+		http.Error(w, `{"error":"could not read token"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(map[string]string{"token": token})
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // resolveProjectPath returns the best available project directory.

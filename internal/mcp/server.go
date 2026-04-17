@@ -91,6 +91,24 @@ func (srv *Server) Broker() *TaskBroker {
 	return srv.broker
 }
 
+// TokenHint returns a masked preview of the auth token (first 8 + last 4 chars)
+// for display in the dashboard UI without exposing the full secret.
+func (srv *Server) TokenHint() string {
+	if len(srv.authToken) < 16 {
+		return "****"
+	}
+	return srv.authToken[:8] + "…" + srv.authToken[len(srv.authToken)-4:]
+}
+
+// ToolNames returns a sorted list of all registered tool names for the dashboard.
+func (srv *Server) ToolNames() []string {
+	toolNames := make([]string, 0, len(srv.tools))
+	for name := range srv.tools {
+		toolNames = append(toolNames, name)
+	}
+	return toolNames
+}
+
 // ExecuteTool calls a named tool directly, bypassing HTTP and auth.
 // Intended for unit testing only — not exposed over HTTP.
 func (srv *Server) ExecuteTool(name string, args map[string]any) (*CallToolResult, error) {
