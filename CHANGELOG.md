@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **MCP Dashboard Panel enhancements** (`MCPPanel.jsx`) — the sidebar card now shows a richer connection summary, endpoint, token copy action, available tools, task queue, and one-click config snippets for six AI tools: Claude Desktop, VS Code Copilot, Cursor, Google Gemini/AI Studio, Windsurf, and Cline.
+- **MCP dashboard API helpers** — `/api/mcp/status`, `/api/mcp/dashboard/tasks`, and `/api/mcp/dashboard/token` continue to power the Forge UI, with server helper methods exposing token hints and tool names for the expanded dashboard.
+- **"What is MCP?" explainer** — the MCP panel now includes a collapsible plain-language guide that explains the workflow value and setup steps for connecting external MCP clients.
+
 ## [6.1.4] - 2026-04-15
 
 ### Added

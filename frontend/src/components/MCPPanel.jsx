@@ -1,7 +1,9 @@
 // MCPPanel.jsx — Sidebar card for the Forge Terminal MCP server dashboard.
 //
 // Shows connection status, registered tools, task queue, and generates
-// one-click config snippets for Claude Desktop, VS Code, and Cursor.
+// one-click config snippets for popular AI tools (Claude, VS Code, Cursor,
+// Google AI Studio/Gemini, Windsurf, Cline). Also includes a beginner-friendly
+// "What is MCP?" explainer section.
 // Lives in the "Cards" sidebar view alongside CommandCards and DirectoryCard.
 import React, { useState, useCallback, useMemo } from 'react'
 import {
@@ -15,6 +17,7 @@ import {
   ClipboardList,
   Plug,
   Circle,
+  HelpCircle,
 } from 'lucide-react'
 import { useMCPStatus } from '../hooks/useMCPStatus'
 import './MCPPanel.css'
@@ -47,6 +50,43 @@ const TASK_STATUS_CLASS = {
 }
 
 // ── Config snippet generators ───────────────────────────────────────────────
+
+/**
+ * Metadata for each supported MCP client — label shown in the tab, file path
+ * hint displayed below the snippet, and the snippet generator function.
+ */
+const MCP_CLIENT_CONFIGS = [
+  {
+    id: 'claudeDesktop',
+    label: 'Claude',
+    configPath: 'claude_desktop_config.json',
+  },
+  {
+    id: 'vscodeCopilot',
+    label: 'VS Code',
+    configPath: '.vscode/mcp.json (or settings.json)',
+  },
+  {
+    id: 'cursor',
+    label: 'Cursor',
+    configPath: '.cursor/mcp.json',
+  },
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    configPath: '~/.gemini/settings.json',
+  },
+  {
+    id: 'windsurf',
+    label: 'Windsurf',
+    configPath: '~/.codeium/windsurf/mcp_config.json',
+  },
+  {
+    id: 'cline',
+    label: 'Cline',
+    configPath: 'cline_mcp_settings.json',
+  },
+]
 
 /**
  * Builds ready-to-paste MCP client configuration JSON for popular AI tools.
@@ -90,6 +130,43 @@ const generateConfigSnippets = (baseUrl) => {
         },
       },
     }, null, 2),
+
+    // Google Gemini CLI / AI Studio uses the same mcpServers structure
+    gemini: JSON.stringify({
+      mcpServers: {
+        'forge-terminal': {
+          url: endpoint,
+          headers: {
+            Authorization: 'Bearer <paste-token-here>',
+          },
+        },
+      },
+    }, null, 2),
+
+    // Windsurf (Codeium) MCP configuration
+    windsurf: JSON.stringify({
+      mcpServers: {
+        'forge-terminal': {
+          serverUrl: endpoint,
+          headers: {
+            Authorization: 'Bearer <paste-token-here>',
+          },
+        },
+      },
+    }, null, 2),
+
+    // Cline (VS Code extension) MCP configuration
+    cline: JSON.stringify({
+      mcpServers: {
+        'forge-terminal': {
+          url: endpoint,
+          transport: 'streamable-http',
+          headers: {
+            Authorization: 'Bearer <paste-token-here>',
+          },
+        },
+      },
+    }, null, 2),
   }
 }
 
@@ -99,6 +176,7 @@ const MCPPanel = ({ onToast }) => {
   const { serverStatus, tasks, isLoading, error, refresh, copyToken } = useMCPStatus()
 
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isHelpVisible, setIsHelpVisible] = useState(false)
   const [activeConfigTab, setActiveConfigTab] = useState('claudeDesktop')
   const [isTokenCopied, setIsTokenCopied] = useState(false)
   const [isConfigCopied, setIsConfigCopied] = useState(false)
@@ -300,24 +378,15 @@ const MCPPanel = ({ onToast }) => {
                   <span>Quick Connect</span>
                 </div>
                 <div className="mcp-config-tabs">
-                  <button
-                    className={`mcp-config-tab ${activeConfigTab === 'claudeDesktop' ? 'active' : ''}`}
-                    onClick={(event) => { event.stopPropagation(); setActiveConfigTab('claudeDesktop') }}
-                  >
-                    Claude
-                  </button>
-                  <button
-                    className={`mcp-config-tab ${activeConfigTab === 'vscodeCopilot' ? 'active' : ''}`}
-                    onClick={(event) => { event.stopPropagation(); setActiveConfigTab('vscodeCopilot') }}
-                  >
-                    VS Code
-                  </button>
-                  <button
-                    className={`mcp-config-tab ${activeConfigTab === 'cursor' ? 'active' : ''}`}
-                    onClick={(event) => { event.stopPropagation(); setActiveConfigTab('cursor') }}
-                  >
-                    Cursor
-                  </button>
+                  {MCP_CLIENT_CONFIGS.map((clientConfig) => (
+                    <button
+                      key={clientConfig.id}
+                      className={`mcp-config-tab ${activeConfigTab === clientConfig.id ? 'active' : ''}`}
+                      onClick={(event) => { event.stopPropagation(); setActiveConfigTab(clientConfig.id) }}
+                    >
+                      {clientConfig.label}
+                    </button>
+                  ))}
                 </div>
                 <div className="mcp-config-snippet-wrapper">
                   <pre className="mcp-config-snippet">
@@ -331,9 +400,54 @@ const MCPPanel = ({ onToast }) => {
                     {isConfigCopied ? <Check size={14} /> : <Copy size={14} />}
                   </button>
                 </div>
+                {/* Show the config file path for the selected client */}
                 <p className="mcp-config-hint">
-                  Replace <code>&lt;paste-token-here&gt;</code> with the copied token above.
+                  Paste into <code>{MCP_CLIENT_CONFIGS.find((clientCfg) => clientCfg.id === activeConfigTab)?.configPath}</code>
+                  {' '}— replace <code>&lt;paste-token-here&gt;</code> with the token above.
                 </p>
+              </div>
+
+              {/* ── "What is MCP?" Explainer Section ───────────────────── */}
+              <div className="mcp-section">
+                <div className="mcp-section-header">
+                  <HelpCircle size={14} />
+                  <span>What is MCP?</span>
+                  <button
+                    className="mcp-refresh-btn"
+                    onClick={(event) => { event.stopPropagation(); setIsHelpVisible(!isHelpVisible) }}
+                    title={isHelpVisible ? 'Hide explanation' : 'Show explanation'}
+                  >
+                    {isHelpVisible ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
+                </div>
+                {isHelpVisible && (
+                  <div className="mcp-explainer">
+                    <p className="mcp-explainer-text">
+                      <strong>MCP</strong> (Model Context Protocol) turns Forge into a tool that
+                      <em> other AI apps can use</em>. Think of it as a drive-through window on
+                      your workshop — Claude, Copilot, Cursor, Gemini and others can pull up and
+                      ask Forge to read files, run commands, or check your code.
+                    </p>
+                    <div className="mcp-explainer-steps">
+                      <div className="mcp-step">
+                        <span className="mcp-step-number">1</span>
+                        <span>Copy your <strong>token</strong> (above)</span>
+                      </div>
+                      <div className="mcp-step">
+                        <span className="mcp-step-number">2</span>
+                        <span>Pick your AI tool tab and <strong>copy the config</strong></span>
+                      </div>
+                      <div className="mcp-step">
+                        <span className="mcp-step-number">3</span>
+                        <span>Paste it into that tool's config file and <strong>replace the token placeholder</strong></span>
+                      </div>
+                      <div className="mcp-step">
+                        <span className="mcp-step-number">4</span>
+                        <span>Restart the AI tool — it can now <strong>use Forge's capabilities</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           ) : (

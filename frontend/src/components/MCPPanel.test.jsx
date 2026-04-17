@@ -167,7 +167,7 @@ describe('MCPPanel', () => {
     expect(screen.getByText(/forge.toml/)).toBeInTheDocument()
   })
 
-  it('renders config tab buttons for all three tools', () => {
+  it('renders config tab buttons for all supported AI tools', () => {
     mockHookReturn = {
       serverStatus: {
         enabled: true,
@@ -187,8 +187,41 @@ describe('MCPPanel', () => {
     render(<MCPPanel onToast={vi.fn()} />)
     fireEvent.click(screen.getByText('MCP Server'))
 
+    // Original three clients
     expect(screen.getByText('Claude')).toBeInTheDocument()
     expect(screen.getByText('VS Code')).toBeInTheDocument()
     expect(screen.getByText('Cursor')).toBeInTheDocument()
+
+    // Newly added clients
+    expect(screen.getByText('Gemini')).toBeInTheDocument()
+    expect(screen.getByText('Windsurf')).toBeInTheDocument()
+    expect(screen.getByText('Cline')).toBeInTheDocument()
+  })
+
+  it('shows "What is MCP?" section that expands with explainer content', () => {
+    mockHookReturn = {
+      serverStatus: {
+        enabled: true,
+        tokenHint: 'abc12345…wxyz',
+        endpoint: '/api/mcp',
+        protocol: 'MCP 2024-11-05',
+        tools: ['file_read'],
+        taskCount: 0,
+      },
+      tasks: [],
+      isLoading: false,
+      error: null,
+      refresh: mockRefresh,
+      copyToken: mockCopyToken,
+    }
+
+    render(<MCPPanel onToast={vi.fn()} />)
+    fireEvent.click(screen.getByText('MCP Server'))
+
+    // Explainer section header should be visible
+    expect(screen.getByText('What is MCP?')).toBeInTheDocument()
+
+    // Explainer body should NOT be visible initially
+    expect(screen.queryByText(/drive-through window/)).not.toBeInTheDocument()
   })
 })
