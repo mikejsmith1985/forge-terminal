@@ -4,7 +4,7 @@
   "description": "Continue previous Copilot session with Forge awareness",
   "command": "copilot --allow-all-tools --continue",
   "macro_delay": 1500,
-  "macro_payload": "",
+  "macro_payload": "You are operating inside Forge Terminal with enterprise workflow enforcement active.\nBegin by checking for AGENTS.md at the repository root as your first filesystem action.\nIf AGENTS.md exists, read it first and then invoke `skill: workflow-enforcer` immediately.\nLoad the full skill chain before any code analysis or file edits: workflow-enforcer -> enterprise-workflow -> code-quality -> branching-strategy -> code-tutor-workflow.\nIf AGENTS.md, .github/copilot-instructions.md, or the workflow scaffolding is missing, create the missing workflow files and setup needed for this repository yourself so the workflow can be followed.\nDo not stop to ask the user where AGENTS.md is if it is missing from the repo root.\nAfter the workflow path exists, continue with the task and confirm readiness.",
   "category": "ai",
   "icon": "emoji-repeat",
   "favorite": false,

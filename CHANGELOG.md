@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Copilot command-card zero-click macros now run again** — command cards once again forward `macro_payload` and `macro_delay` during execution, so the Copilot bootstrap prompt is injected automatically instead of forcing a manual paste.
+- **Missing workflow scaffolding is handled more gracefully** — the seeded Copilot macro instructions now tell the agent to create missing `AGENTS.md` and workflow files when they are absent, rather than stopping to ask where they are.
+
 ## [6.1.5] - 2026-04-17
 
 ### Added

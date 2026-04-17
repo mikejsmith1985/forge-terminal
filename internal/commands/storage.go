@@ -31,6 +31,14 @@ type Command struct {
 	MacroDelay   int    `json:"macro_delay,omitempty"`   // Zero-Click: Delay in ms before macro injection (default 1500)
 }
 
+const defaultCopilotMacroPayload = "You are operating inside Forge Terminal with enterprise workflow enforcement active.\n" +
+	"Begin by checking for AGENTS.md at the repository root as your first filesystem action.\n" +
+	"If AGENTS.md exists, read it first and then invoke `skill: workflow-enforcer` immediately.\n" +
+	"Load the full skill chain before any code analysis or file edits: workflow-enforcer -> enterprise-workflow -> code-quality -> branching-strategy -> code-tutor-workflow.\n" +
+	"If AGENTS.md, .github/copilot-instructions.md, or the workflow scaffolding is missing, create the missing workflow files and setup needed for this repository yourself so the workflow can be followed.\n" +
+	"Do not stop to ask the user where AGENTS.md is if it is missing from the repo root.\n" +
+	"After the workflow path exists, continue with the task and confirm readiness."
+
 // CommandVersion represents a versioned snapshot of a command
 type CommandVersion struct {
 	Command   Command   `json:"command"`
@@ -102,7 +110,7 @@ var DefaultCommands = []Command{
 		PasteOnly:    false,
 		Favorite:     false,
 		Icon:         "emoji-robot",
-		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
+		MacroPayload: defaultCopilotMacroPayload,
 		MacroDelay:   1500,
 	},
 	{
@@ -113,7 +121,7 @@ var DefaultCommands = []Command{
 		PasteOnly:    false,
 		Favorite:     false,
 		Icon:         "emoji-repeat",
-		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
+		MacroPayload: defaultCopilotMacroPayload,
 		MacroDelay:   1500,
 	},
 }

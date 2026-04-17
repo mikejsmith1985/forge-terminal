@@ -43,6 +43,7 @@ import { useDevMode } from './hooks/useDevMode'
 // useWorkflowManager REMOVED - v3.9.0: Workflows deleted
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
+import { buildCommandCardExecutionPlan } from './utils/commandCardMacros'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
 import { extractProjectFolder, getTabTitle, isStaticNamingStrategy } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
@@ -1364,30 +1365,44 @@ function App() {
     }
   }
 
-  const handleExecute = (cmd) => {
-    const termRef = getActiveTerminalRef();
-    if (termRef) {
-      // Command cards should ALWAYS execute directly in terminal, regardless of viewMode
-      // Chat routing is only for user input from ChatView UI, not command cards
-      
-      if (cmd.command && cmd.command.trim().length > 0) {
-        // Execute command directly in terminal
-        termRef.sendCommand(cmd.command, cmd.delay);
-        termRef.focus();
-      } else {
-        // Focus terminal even if command is empty
-        termRef.focus();
-      }
+  const scheduleCommandCardMacro = useCallback((terminalRefHandle, executionPlan) => {
+    if (!terminalRefHandle || !executionPlan.macroPayload) {
+      return
     }
-  }
 
-  const handlePaste = (cmd) => {
-    const termRef = getActiveTerminalRef();
-    if (termRef) {
-      termRef.pasteCommand(cmd.command)
-      termRef.focus()
+    const totalWaitBeforeMacroMs = executionPlan.commandDelayMs + executionPlan.macroDelayMs
+    window.setTimeout(() => {
+      terminalRefHandle.sendCommand(executionPlan.macroPayload, executionPlan.macroExecutionDelayMs)
+    }, totalWaitBeforeMacroMs)
+  }, [])
+
+  const handleExecute = useCallback((commandCard) => {
+    const terminalRefHandle = getActiveTerminalRef()
+    if (!terminalRefHandle) {
+      return
     }
-  }
+
+    // Command cards should ALWAYS execute directly in the terminal, regardless of view mode.
+    // The macro is scheduled here because it is card-level orchestration, not raw terminal transport.
+    const executionPlan = buildCommandCardExecutionPlan(commandCard)
+
+    if (executionPlan.commandText.trim().length > 0) {
+      terminalRefHandle.sendCommand(executionPlan.commandText, executionPlan.commandDelayMs)
+    }
+
+    scheduleCommandCardMacro(terminalRefHandle, executionPlan)
+    terminalRefHandle.focus()
+  }, [getActiveTerminalRef, scheduleCommandCardMacro])
+
+  const handlePaste = useCallback((commandCard) => {
+    const terminalRefHandle = getActiveTerminalRef()
+    if (!terminalRefHandle) {
+      return
+    }
+
+    terminalRefHandle.pasteCommand(commandCard.command)
+    terminalRefHandle.focus()
+  }, [getActiveTerminalRef])
 
   // Search handlers
   const handleSearch = useCallback((query) => {
