@@ -498,6 +498,56 @@
   text-underline-offset: 2px;
 }
 
+/* ── "Why does this make Forge better?" subsection ───────────────────────── */
+
+.mcp-explainer-subtitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 12px 0 6px;
+}
+
+.mcp-explainer-benefits {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mcp-explainer-benefits li {
+  font-size: 0.7rem;
+  color: var(--subtext);
+  line-height: 1.5;
+  padding-left: 14px;
+  position: relative;
+}
+
+/* Bullet replaced with a small accent dot */
+.mcp-explainer-benefits li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.4);
+}
+
+.mcp-explainer-benefits li strong {
+  color: var(--text);
+}
+
+.mcp-explainer-benefits li em {
+  color: var(--text);
+  font-style: normal;
+  text-decoration: underline;
+  text-decoration-color: rgba(56, 189, 248, 0.3);
+  text-underline-offset: 2px;
+}
+
 .mcp-explainer-steps {
   display: flex;
   flex-direction: column;
