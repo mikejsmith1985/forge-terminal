@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.5] - 2026-04-17
+
 ### Added
 - **MCP Dashboard Panel enhancements** (`MCPPanel.jsx`) — the sidebar card now shows a richer connection summary, endpoint, token copy action, available tools, task queue, and one-click config snippets for six AI tools: Claude Desktop, VS Code Copilot, Cursor, Google Gemini/AI Studio, Windsurf, and Cline.
 - **MCP dashboard API helpers** — `/api/mcp/status`, `/api/mcp/dashboard/tasks`, and `/api/mcp/dashboard/token` continue to power the Forge UI, with server helper methods exposing token hints and tool names for the expanded dashboard.
@@ -62,12 +64,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - **Guided tour removed** — the first-run/new-release tour overlay has been fully removed (useGuidedTour hook, TourOverlay component, tourSteps config, WelcomeModal, and "Replay Tour" button in Settings)
-=======
-- **MCP Dashboard Panel** (`MCPPanel.jsx`): The MCP server now has a visible dashboard card in the sidebar (Cards view). Shows connection status, endpoint, token (with clipboard copy), available tools, task queue, and one-click config snippets for 6 AI tools: Claude Desktop, VS Code Copilot, Cursor, Google Gemini/AI Studio, Windsurf, and Cline
-- **MCP Dashboard API routes**: `/api/mcp/status`, `/api/mcp/dashboard/tasks`, `/api/mcp/dashboard/token` endpoints serve the frontend dashboard with server state, task history, and secure token retrieval
-- **"What is MCP?" explainer**: Collapsible help section in the MCP Panel explains what MCP does in plain language, when adding Gemini or another MCP client helps a Copilot-first workflow, and walks through the 4-step setup process
-- **Server helper methods**: `TokenHint()`, `ToolNames()`, and `ListAll()` on the MCP server/broker for dashboard data
->>>>>>> 7ffc036 (feat: explain Copilot-first MCP value in UI and docs)
 
 ## [6.0.0] - 2026-04-13
 

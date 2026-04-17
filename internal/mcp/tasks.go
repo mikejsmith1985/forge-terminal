@@ -142,15 +142,3 @@ func (broker *TaskBroker) Incoming() <-chan *PendingTask {
 	return broker.incoming
 }
 
-// ListAll returns a snapshot of every task in the broker, ordered by submission time.
-// Used by the dashboard to show the full task history.
-func (broker *TaskBroker) ListAll() []*PendingTask {
-	broker.mu.RLock()
-	defer broker.mu.RUnlock()
-
-	allTasks := make([]*PendingTask, 0, len(broker.taskMap))
-	for _, task := range broker.taskMap {
-		allTasks = append(allTasks, task)
-	}
-	return allTasks
-}
