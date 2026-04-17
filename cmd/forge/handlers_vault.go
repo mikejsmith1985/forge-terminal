@@ -128,6 +128,63 @@ func handleVaultAddEntry(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(createdEntry)
 }
 
+// ── PUT /api/vault/entries ────────────────────────────────────────────────────
+
+// handleVaultUpdateEntry modifies an existing vault entry's metadata or secret value.
+// Only non-empty fields in the request body are applied — omitted fields stay unchanged.
+// The entry ID is required; at least one field to update must be provided.
+func handleVaultUpdateEntry(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVault(w) {
+		return
+	}
+
+	var updateRequest vault.UpdateEntryRequest
+	if decodeErr := json.NewDecoder(r.Body).Decode(&updateRequest); decodeErr != nil {
+		http.Error(w, "invalid request body: "+decodeErr.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(updateRequest.ID) == "" {
+		http.Error(w, "'id' is required", http.StatusBadRequest)
+		return
+	}
+
+	// Trim whitespace from name fields while preserving empty-means-no-change semantics.
+	updateRequest.SecretName = strings.TrimSpace(updateRequest.SecretName)
+	updateRequest.EnvVarName = strings.TrimSpace(updateRequest.EnvVarName)
+	updateRequest.Description = strings.TrimSpace(updateRequest.Description)
+
+	// Require at least one field to actually update.
+	hasNoFieldsToUpdate := updateRequest.SecretName == "" &&
+		updateRequest.EnvVarName == "" &&
+		updateRequest.SecretValue == "" &&
+		updateRequest.Description == ""
+	if hasNoFieldsToUpdate {
+		http.Error(w, "at least one field (secretName, envVarName, secretValue, description) must be provided", http.StatusBadRequest)
+		return
+	}
+
+	updatedEntry, updateErr := activeVault.UpdateEntry(updateRequest)
+	if updateErr != nil {
+		log.Printf("[Vault API] UpdateEntry error: %v", updateErr)
+		// Distinguish "not found" from validation errors.
+		if strings.Contains(updateErr.Error(), "not found") {
+			http.Error(w, updateErr.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, updateErr.Error(), http.StatusBadRequest)
+		}
+		return
+	}
+
+	log.Printf("[Vault API] Updated entry: %s (%s)", updatedEntry.SecretName, updatedEntry.EnvVarName)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updatedEntry)
+}
+
 // ── DELETE /api/vault/entries?id=<entryID> ────────────────────────────────────
 
 // handleVaultDeleteEntry permanently removes a vault entry by ID.

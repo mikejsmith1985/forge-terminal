@@ -42,6 +42,18 @@ type AddEntryRequest struct {
 	ShouldAutoInject bool   `json:"shouldAutoInject"`
 }
 
+// UpdateEntryRequest is the body of PUT /api/vault/entries.
+// All fields are optional — only non-empty fields are applied to the existing entry.
+// This lets callers update just the secret value without touching the name or env var,
+// or rename an entry without re-entering the secret.
+type UpdateEntryRequest struct {
+	ID          string `json:"id"`
+	SecretName  string `json:"secretName,omitempty"`
+	EnvVarName  string `json:"envVarName,omitempty"`
+	SecretValue string `json:"secretValue,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
 // AutoInjectToggleRequest is the body of POST /api/vault/auto-inject.
 type AutoInjectToggleRequest struct {
 	ID               string `json:"id"`

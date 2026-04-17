@@ -520,6 +520,8 @@ func main() {
 			handleVaultListEntries(w, r)
 		case http.MethodPost:
 			handleVaultAddEntry(w, r)
+		case http.MethodPut:
+			handleVaultUpdateEntry(w, r)
 		case http.MethodDelete:
 			handleVaultDeleteEntry(w, r)
 		default:

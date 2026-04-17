@@ -148,6 +148,69 @@ func (v *Vault) RemoveEntry(entryID string) error {
 	return nil
 }
 
+// UpdateEntry modifies an existing vault entry's metadata and/or secret value.
+// Only non-empty fields in the request are applied — omitted fields are left unchanged.
+// If the env var name is being changed, the new name is checked for uniqueness
+// against all other entries (excluding the entry being updated).
+// Returns the updated public entry metadata (without the secret value).
+func (v *Vault) UpdateEntry(request UpdateEntryRequest) (*VaultEntry, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	if !v.isOpen {
+		return nil, fmt.Errorf("vault is not open")
+	}
+
+	entryIndex := v.findEntryIndexLocked(request.ID)
+	if entryIndex < 0 {
+		return nil, fmt.Errorf("vault entry %q not found", request.ID)
+	}
+
+	targetEntry := v.entries[entryIndex]
+
+	// Snapshot the original values so we can roll back if the disk write fails.
+	originalSecretName := targetEntry.SecretName
+	originalEnvVarName := targetEntry.EnvVarName
+	originalSecretValue := targetEntry.SecretValue
+	originalDescription := targetEntry.Description
+
+	// If the caller is changing the env var name, reject duplicates against other entries.
+	if request.EnvVarName != "" && request.EnvVarName != targetEntry.EnvVarName {
+		for idx, existingEntry := range v.entries {
+			if idx == entryIndex {
+				continue // skip the entry being updated
+			}
+			if existingEntry.EnvVarName == request.EnvVarName {
+				return nil, fmt.Errorf("env var %q already exists in the vault — choose a different name", request.EnvVarName)
+			}
+		}
+		targetEntry.EnvVarName = request.EnvVarName
+	}
+
+	// Apply non-empty fields from the request.
+	if request.SecretName != "" {
+		targetEntry.SecretName = request.SecretName
+	}
+	if request.SecretValue != "" {
+		targetEntry.SecretValue = request.SecretValue
+	}
+	if request.Description != "" {
+		targetEntry.Description = request.Description
+	}
+
+	if saveErr := v.saveToFileLocked(); saveErr != nil {
+		// Roll back in-memory changes on disk write failure.
+		targetEntry.SecretName = originalSecretName
+		targetEntry.EnvVarName = originalEnvVarName
+		targetEntry.SecretValue = originalSecretValue
+		targetEntry.Description = originalDescription
+		return nil, fmt.Errorf("saving vault after update: %w", saveErr)
+	}
+
+	log.Printf("[Vault] Updated entry: %s (%s)", targetEntry.SecretName, targetEntry.EnvVarName)
+	return diskEntryToPublic(targetEntry), nil
+}
+
 // SetAutoInject updates the auto-inject flag for the entry with the given ID.
 func (v *Vault) SetAutoInject(entryID string, shouldAutoInject bool) error {
 	v.mu.Lock()
