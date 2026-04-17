@@ -240,6 +240,9 @@ func main() {
 	// Initialize Code Tutor subsystem
 	initTutor()
 
+	// Initialize Forge Vault (AES-256-GCM encrypted secret store)
+	initVault(storage.GetVaultDir())
+
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
@@ -490,6 +493,8 @@ func main() {
 	http.HandleFunc("/api/tutor/learning-path", WrapWithMiddleware(handleTutorLearningPath))
 	http.HandleFunc("/api/tutor/settings", WrapWithMiddleware(handleTutorSettings))
 	http.HandleFunc("/api/tutor/watcher", WrapWithMiddleware(handleTutorWatcher))
+	http.HandleFunc("/api/tutor/recent-changes", WrapWithMiddleware(handleTutorRecentChanges))
+	http.HandleFunc("/api/tutor/explain-change", WrapWithMiddleware(handleTutorExplainChange))
 
 	// ── Enterprise Workflow Architect routes ─────────────────────────────
 	http.HandleFunc("/api/workflow/detect", WrapWithMiddleware(handleWorkflowDetect))
@@ -499,6 +504,7 @@ func main() {
 	http.HandleFunc("/api/workflow/status", WrapWithMiddleware(handleWorkflowStatus))
 	http.HandleFunc("/api/workflow/compliance", WrapWithMiddleware(handleWorkflowCompliance))
 	http.HandleFunc("/api/workflow/modules", WrapWithMiddleware(handleWorkflowModules))
+	http.HandleFunc("/api/workflow/release-preflight", WrapWithMiddleware(handleReleasePreflight))
 	http.HandleFunc("/api/workflow/watch", WrapWithMiddleware(handleWorkflowWatchStart))
 	http.HandleFunc("/api/workflow/watch/poll", WrapWithMiddleware(handleWorkflowWatchPoll))
 	http.HandleFunc("/api/workflow/watch/stop", WrapWithMiddleware(handleWorkflowWatchStop))
@@ -508,6 +514,28 @@ func main() {
 	initMCPServer()
 	http.HandleFunc("/api/mcp", handleMCP)
 	http.HandleFunc("/api/mcp/tasks/", handleMCPTaskStatus)
+
+	// ── Forge Vault routes (AES-256-GCM encrypted secret store) ──────────
+	http.HandleFunc("/api/vault/status", WrapWithMiddleware(handleVaultStatus))
+	// /api/vault/entries/value is registered before /api/vault/entries so
+	// Go's ServeMux resolves the more-specific path first.
+	http.HandleFunc("/api/vault/entries/value", WrapWithMiddleware(handleVaultRevealValue))
+	http.HandleFunc("/api/vault/entries", WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handleVaultListEntries(w, r)
+		case http.MethodPost:
+			handleVaultAddEntry(w, r)
+		case http.MethodPut:
+			handleVaultUpdateEntry(w, r)
+		case http.MethodDelete:
+			handleVaultDeleteEntry(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+	http.HandleFunc("/api/vault/auto-inject", WrapWithMiddleware(handleVaultToggleAutoInject))
+	http.HandleFunc("/api/vault/inject", WrapWithMiddleware(handleVaultInject))
 
 	// Initialize session temp directory
 	if err := initSessionTempDir(); err != nil {

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mikejsmith1985/forge-terminal/internal/vault"
 )
 
 // Global forge port variable (set by main)
@@ -172,6 +174,12 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 		env = append(env, fmt.Sprintf("FORGE_DEBUG_SESSION_ID=%s", sessionID))
 	}
 
+	// Inject vault secrets flagged for auto-inject (non-interactive, fully transparent).
+	// Values never appear in terminal output — they are silently prepended to the PTY env.
+	if globalVault := vault.GetGlobal(); globalVault != nil {
+		env = append(env, globalVault.GetAutoInjectEnv()...)
+	}
+
 	if runtime.GOOS != "windows" {
 		cmd = exec.Command(shell, shellArgs...)
 		cmd.Env = env
@@ -185,13 +193,17 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	var ptmx io.ReadWriteCloser
 	var err error
 	if runtime.GOOS == "windows" {
-		// Windows: ConPTY needs env vars too?
-		// Note: pty_windows.go implementation of startPTYWithShell might need updating if it doesn't inherit or set env
-		// But usually it inherits parent env. We can set process env temporarily or rely on SetEnvironmentVariable
-		// For now, let's try setting the env var in the current process before spawning (if safe)
-		// Or better, let's update pty_windows.go signature in a future refactor.
-		// For now, on Windows, we'll set the env var on the command if we were using exec.Command, but startPTYWithShell uses syscalls.
-		
+		// Validate that the working directory exists before spawning ConPTY.
+		// If the saved psHome/cmdHome path no longer exists (deleted, renamed, or on a
+		// different machine), CreateProcess returns ERROR_DIRECTORY and the session
+		// fails. Falling back to the default directory lets the terminal open cleanly.
+		if workingDir != "" {
+			if _, statErr := os.Stat(workingDir); os.IsNotExist(statErr) {
+				log.Printf("[Terminal] Working directory %q does not exist — falling back to default", workingDir)
+				workingDir = ""
+			}
+		}
+
 		// v3.12.16: Inject env var for Windows ConPTY
 		if sessionID := GetActiveDebugSession(); sessionID != "" {
 			os.Setenv("FORGE_DEBUG_SESSION_ID", sessionID)
@@ -201,6 +213,20 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 			// Ideally we pass env to startPTYWithShell.
 		} else {
 			os.Unsetenv("FORGE_DEBUG_SESSION_ID")
+		}
+
+		// Inject vault auto-inject secrets into the Windows process environment.
+		// ConPTY inherits the parent process env, so os.Setenv propagates to the child.
+		// Known limitation: this is process-wide (same race risk as the debug session ID above).
+		// Mitigated by: secrets are already on disk (the vault.enc) and values are not new info
+		// to an attacker who can read process memory. A future refactor will pass env to startPTYWithShell.
+		if globalVault := vault.GetGlobal(); globalVault != nil {
+			for _, envVar := range globalVault.GetAutoInjectEnv() {
+				parts := strings.SplitN(envVar, "=", 2)
+				if len(parts) == 2 {
+					os.Setenv(parts[0], parts[1])
+				}
+			}
 		}
 		
 		ptmx, err = startPTYWithShell(shell, shellArgs, workingDir)

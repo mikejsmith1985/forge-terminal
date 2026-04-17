@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, BarChart3, Bell, BellOff, Zap, BookOpen } from 'lucide-react';
+import { Plus, BarChart3, Bell, BellOff, Zap, BookOpen, Lock } from 'lucide-react';
 import Tab from './Tab';
 
 /**
@@ -21,6 +21,8 @@ function TabBar({
   isForgeAssistOpen = false,
   onToggleTutor = null,
   isTutorOpen = false,
+  onToggleVault = null,
+  isVaultOpen = false,
   disableNewTab = false,
   waitingTabs = {},
   mode = 'dark',
@@ -148,6 +150,18 @@ function TabBar({
           data-testid="tutor-btn"
         >
           <BookOpen size={16} />
+        </button>
+      )}
+      {/* Forge Vault — encrypted secret store */}
+      {onToggleVault && (
+        <button
+          className={`dashboard-btn ${isVaultOpen ? 'active' : ''}`}
+          onClick={onToggleVault}
+          aria-label={isVaultOpen ? 'Close Forge Vault' : 'Forge Vault'}
+          title="Forge Vault"
+          data-testid="vault-btn"
+        >
+          <Lock size={16} />
         </button>
       )}
       {/* Manual notify bell */}

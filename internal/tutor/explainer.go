@@ -189,7 +189,6 @@ func (e *Explainer) callLLM(ctx context.Context, prompt string) (string, string,
 		response, err := runCLI(ctx, timeout, "copilot", []string{
 			"--model", m.model,
 			"-p", prompt,
-			"-s",
 			"--no-color",
 			"--allow-all-tools",
 		})
@@ -307,6 +306,118 @@ func parseSections(text string) []ExplanationSection {
 	}
 
 	return sections
+}
+
+// ExplainChange generates a diff-aware explanation focused on what changed and why.
+//
+// Unlike ExplainFile (which explains a file in general), ExplainChange grounds
+// the explanation in the specific lines that were added or removed — making the
+// walkthrough immediately relevant after a coding session.
+//
+// The cache key is derived from the diff content hash, so re-explanations are
+// triggered by new changes rather than by unrelated file edits.
+func (e *Explainer) ExplainChange(
+	ctx context.Context,
+	projectPath string,
+	entry FileEntry,
+	diff string,
+	learningPath *LearningPath,
+	depth ExplanationDepth,
+	namingStrictness NamingStrictness,
+) (*FileExplanation, error) {
+	// Key on the diff hash so cache invalidates when the change itself changes.
+	diffHash := sha256.Sum256([]byte(diff))
+	diffHashStr := hex.EncodeToString(diffHash[:])
+	key := "change:" + cacheKey(diffHashStr, depth)
+
+	e.mu.RLock()
+	if cached, ok := e.cache[key]; ok {
+		e.mu.RUnlock()
+		log.Printf("[Tutor Explainer] cache hit for change in %s", entry.Path)
+		return cached, nil
+	}
+	e.mu.RUnlock()
+
+	// Load current file content for context alongside the diff.
+	var fileContents string
+	if content, err := os.ReadFile(filepath.Join(projectPath, entry.Path)); err == nil {
+		if len(content) > maxFileContentBytes {
+			content = content[:maxFileContentBytes]
+		}
+		fileContents = string(content)
+	}
+
+	prompt := e.buildChangePrompt(entry, diff, fileContents, learningPath, depth, namingStrictness)
+
+	auditContext := DetectWorkflowContext(projectPath)
+	if section := BuildAuditPromptSection(auditContext); section != "" {
+		prompt += section
+	}
+
+	log.Printf("[Tutor Explainer] generating change explanation for %s (depth=%s)", entry.Path, depth)
+	response, modelUsed, err := e.callLLM(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("LLM call for change in %s: %w", entry.Path, err)
+	}
+
+	explanation := e.parseExplanation(response, entry.Path, "change:"+diffHashStr, modelUsed, depth)
+
+	e.mu.Lock()
+	e.cache[key] = explanation
+	e.mu.Unlock()
+
+	log.Printf("[Tutor Explainer] cached change explanation for %s (model=%s, sections=%d)", entry.Path, modelUsed, len(explanation.Sections))
+	return explanation, nil
+}
+
+// buildChangePrompt constructs a diff-focused teaching prompt.
+// Sections are oriented around "what changed and why" rather than generic file explanation.
+func (e *Explainer) buildChangePrompt(
+	entry FileEntry,
+	diff string,
+	fileContents string,
+	learningPath *LearningPath,
+	depth ExplanationDepth,
+	namingStrictness NamingStrictness,
+) string {
+	var b strings.Builder
+
+	b.WriteString("You are an expert code tutor running a Change Walkthrough session. ")
+	b.WriteString("A developer's AI assistant just modified this file. ")
+	b.WriteString("Explain what changed and why — making the developer smarter about their own codebase.\n\n")
+
+	if learningPath != nil {
+		b.WriteString(fmt.Sprintf("PROJECT: %s (type: %s)\n", learningPath.ProjectName, learningPath.ProjectType))
+	}
+	b.WriteString(fmt.Sprintf("FILE: %s\n", entry.Path))
+	b.WriteString(fmt.Sprintf("CATEGORY: %s\n", entry.Category))
+	b.WriteString(fmt.Sprintf("COMPLEXITY: %d/5\n\n", entry.Complexity))
+
+	if diff != "" {
+		b.WriteString("GIT DIFF (lines starting with + were added, - were removed):\n")
+		b.WriteString("```diff\n")
+		b.WriteString(diff)
+		b.WriteString("\n```\n\n")
+	}
+
+	if fileContents != "" {
+		b.WriteString("CURRENT FILE STATE (after the change):\n```\n")
+		b.WriteString(fileContents)
+		b.WriteString("\n```\n\n")
+	}
+
+	b.WriteString("Respond using EXACTLY these markdown sections:\n\n")
+	b.WriteString("## What Changed\n")
+	b.WriteString("Describe the specific additions and removals in plain English. Be concrete.\n\n")
+	b.WriteString("## Why It Changed\n")
+	b.WriteString("Explain the likely reason. What problem does this solve? What feature does it enable?\n\n")
+	b.WriteString("## Key Concepts\n")
+	b.WriteString("Explain any new functions, types, or patterns introduced. " + depthInstruction(depth) + "\n\n")
+	b.WriteString("## Impact & Connections\n")
+	b.WriteString("How do these changes affect the rest of the codebase? What else might need updating?\n\n")
+	b.WriteString(namingInstruction(namingStrictness) + "\n")
+
+	return b.String()
 }
 
 // ClearCache removes all cached explanations.

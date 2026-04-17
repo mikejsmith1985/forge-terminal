@@ -420,6 +420,20 @@ function sanitizePath(path) {
   path = path.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
   // Remove stray trailing status glyphs
   path = path.replace(/\s*[*%±↑↓⇡⇣]\s*$/, '').trim();
+  // Detect .exe contamination — PowerShell's process path can bleed into cwd
+  // detection, producing strings like "C:\...\powershell.exePS C:\ProjectsWin\foo".
+  // When that happens, extract the valid path that follows the .exe segment.
+  const exeIndex = path.toLowerCase().indexOf('.exe');
+  if (exeIndex !== -1) {
+    const afterExe = path.slice(exeIndex + 4);
+    const validPathMatch = afterExe.match(/[A-Za-z]:\\/);
+    if (validPathMatch) {
+      path = afterExe.slice(validPathMatch.index).trim();
+    } else {
+      // No valid path after the .exe segment — entire value is suspect
+      return null;
+    }
+  }
   return path.trim();
 }
 
@@ -514,6 +528,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
   onFileOpen = null, // Callback when file path is double-clicked to open in editor
+  onSpawnFailed = null, // Callback when the server sends close code 4005 (fatal PTY spawn failure)
   shellConfig = null, // { shellType: 'powershell'|'cmd'|'wsl', wslDistro: string, wslHomePath: string }
   tabId = null, // Unique identifier for this terminal tab
   tabName = null, // Tab display name
@@ -571,8 +586,33 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // defer has run. If CONTROL_GRANTED arrives within 600ms we cancel the timer so the
   // banner never appears.
   const bannerTimerRef = useRef(null);
-  
-  // PERF FIX: Track isWaiting in ref to avoid stale closures in hot paths
+
+  // Tracks how far the virtual keyboard has pushed up the visible viewport on mobile.
+  // When the keyboard opens, window.visualViewport.height shrinks but window.innerHeight
+  // does not — so a banner at position:absolute bottom:0 ends up BELOW the keyboard.
+  // We offset the banner by this delta so it always floats just above the keyboard.
+  const [keyboardHeightOffset, setKeyboardHeightOffset] = useState(0);
+
+  useEffect(() => {
+    if (!window.visualViewport) return;
+
+    const updateKeyboardOffset = () => {
+      // Keyboard height = space between layout viewport bottom and visual viewport bottom.
+      const keyboardHeight =
+        window.innerHeight -
+        window.visualViewport.height -
+        window.visualViewport.offsetTop;
+      setKeyboardHeightOffset(Math.max(0, keyboardHeight));
+    };
+
+    window.visualViewport.addEventListener('resize', updateKeyboardOffset);
+    window.visualViewport.addEventListener('scroll', updateKeyboardOffset);
+
+    return () => {
+      window.visualViewport.removeEventListener('resize', updateKeyboardOffset);
+      window.visualViewport.removeEventListener('scroll', updateKeyboardOffset);
+    };
+  }, []);
   const isWaitingRef = useRef(false);
 
   // Idle notification: fires a /api/notify POST when terminal output goes silent
@@ -1724,6 +1764,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   logger.terminal('Joined session as active device (auto-promoted)', { tabId });
                   clearTimeout(bannerTimerRef.current);
                   setIsActiveDevice(true);
+                  // Fit to this device's screen before sending resize (same reasoning
+                  // as CONTROL_GRANTED — ensures mobile gets correct col/row count).
+                  if (fitAddonRef.current) {
+                    fitAddonRef.current.fit();
+                  }
                   // Resize PTY to match our current terminal dimensions.
                   if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
                     const { cols, rows } = xtermRef.current;
@@ -1758,6 +1803,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                 // device, so no passive-device overlay should appear.
                 clearTimeout(bannerTimerRef.current);
                 setIsActiveDevice(true);
+                // Fit the terminal to THIS device's screen BEFORE reading cols/rows.
+                // Without this, mobile devices inherit the desktop's column count
+                // (e.g. 220 cols) and the PTY is never resized to the phone screen.
+                // fit() is synchronous — cols/rows are correct immediately after.
+                if (fitAddonRef.current) {
+                  fitAddonRef.current.fit();
+                }
                 // Resize PTY to match this device's terminal dimensions
                 if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
                   const { cols, rows } = xtermRef.current;
@@ -1890,6 +1942,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             // Custom: System sleep/hibernate - reconnect with extra patience
             disconnectMessage = 'System went to sleep. Reconnecting...';
             messageColor = '1;36'; // Cyan
+            break;
+          case 4005:
+            // Custom: PTY spawn failed — non-retriable fatal error.
+            // The server could not start a shell process. Retrying will hit the
+            // same failure. Show the error, stop reconnecting, and surface the
+            // diagnostic wizard so the user can fix the root cause with one click.
+            disconnectMessage = 'Terminal failed to start. Check that your saved working directory still exists.';
+            messageColor = '1;31'; // Red
+            shouldReconnect = false;
+            // Open the diagnostic wizard — it will auto-run PTY tests and offer a fix.
+            if (onSpawnFailed) {
+              setTimeout(() => onSpawnFailed(), 600);
+            }
             break;
           default:
             if (event.reason) {
@@ -2122,6 +2187,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // Do NOT call setShowScrollButton(false) here — let checkScrollPosition
     // confirm the scroll actually reached the bottom before hiding the button.
     // This prevents the button from disappearing when the scroll silently failed.
+
+    // Restore focus: clicking the scroll button moves browser focus away from
+    // xterm's hidden textarea. Refocus immediately so the next keypress goes
+    // directly to the terminal without needing the App-level capture redirect.
+    if (xtermRef.current) {
+      xtermRef.current.focus();
+    }
   };
 
   return (
@@ -2188,19 +2260,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }}
       />
 
-      {/* Handoff overlay: shown when another device controls this terminal */}
+      {/* Handoff overlay: shown when another device controls this terminal.
+          Uses keyboardHeightOffset so the banner floats above the virtual keyboard
+          on mobile — without this the banner sits below the keyboard and is unreachable. */}
       {!isActiveDevice && isConnected && (
         <div
           style={{
             position: 'absolute',
-            bottom: 0,
+            bottom: keyboardHeightOffset,
             left: 0,
             right: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '12px',
-            padding: '8px 16px',
+            padding: '10px 16px',
+            // Extra bottom padding for phones with a gesture navigation bar.
+            paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
             background: 'rgba(99, 102, 241, 0.9)',
             backdropFilter: 'blur(4px)',
             zIndex: 10,

@@ -65,6 +65,115 @@ if ($dirty) {
 }
 Write-OK "Git status checked"
 
+# ── Compliance preflight gate ─────────────────────────────────────────────────
+# This is the final enforcement layer. It catches everything that git hooks,
+# skills, and AI agents may have missed during development. If any blocking
+# check fails, the script displays a fix prompt the user can paste to the agent.
+Write-Banner "Release preflight checks"
+
+$preflightPassed = $true
+$preflightWarnings = @()
+$preflightBlockers = @()
+$fixPromptLines = @()
+
+# Check 1: Not on main/master — development should happen on feature branches
+$currentBranch = git branch --show-current 2>$null
+if ($currentBranch -eq "main" -or $currentBranch -eq "master") {
+    $preflightBlockers += "Currently on '$currentBranch' — development should happen on feature branches"
+    $fixPromptLines += "1. Create a feature branch: git checkout -b feature/<name>"
+    $preflightPassed = $false
+} else {
+    Write-OK "On branch '$currentBranch' (not main)"
+}
+
+# Check 2: CHANGELOG.md exists
+if (-not (Test-Path "$ROOT\CHANGELOG.md")) {
+    $preflightBlockers += "CHANGELOG.md not found — release notes require a changelog"
+    $fixPromptLines += "$(($fixPromptLines.Count + 1)). Create CHANGELOG.md with an entry for this release"
+    $preflightPassed = $false
+} else {
+    Write-OK "CHANGELOG.md exists"
+}
+
+# Check 3: Branch naming convention
+$validBranchPattern = '^(main|master|develop|feature/.+|fix/.+|chore/.+|docs/.+|hotfix/.+|release/.+)$'
+if ($currentBranch -and $currentBranch -notmatch $validBranchPattern) {
+    $preflightWarnings += "Branch '$currentBranch' does not follow naming convention (feature/*, fix/*, chore/*)"
+}
+
+# Check 4: Recent commit format (conventional commits)
+$recentCommits = git log --oneline --no-merges -10 --format="%s" 2>$null
+$badCommitCount = 0
+$conventionalPattern = '^(feat|fix|chore|docs|test|refactor|perf): .+'
+if ($recentCommits) {
+    foreach ($subject in $recentCommits) {
+        $subject = $subject.Trim()
+        if ($subject -and -not $subject.StartsWith("Revert ") -and -not $subject.StartsWith("Merge ") -and $subject -notmatch $conventionalPattern) {
+            $badCommitCount++
+        }
+    }
+    if ($badCommitCount -gt 0) {
+        $preflightWarnings += "$badCommitCount of $($recentCommits.Count) recent commits don't follow conventional format (type: description)"
+    } else {
+        Write-OK "All recent commits follow conventional format"
+    }
+}
+
+# Check 5: Git hooks configured
+$hooksPath = git config --local --get core.hooksPath 2>$null
+if (-not $hooksPath -or ($hooksPath -ne ".forge/hooks" -and $hooksPath -ne ".forge\hooks")) {
+    $preflightWarnings += "Git hooks not configured to .forge/hooks"
+}
+
+# Report results
+if ($preflightBlockers.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  BLOCKING VIOLATIONS:" -ForegroundColor Red
+    foreach ($blocker in $preflightBlockers) {
+        Write-Host "    * $blocker" -ForegroundColor Red
+    }
+}
+
+if ($preflightWarnings.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  WARNINGS:" -ForegroundColor Yellow
+    foreach ($warning in $preflightWarnings) {
+        Write-Host "    * $warning" -ForegroundColor Yellow
+    }
+}
+
+if ($preflightBlockers.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  ╔══════════════════════════════════════════════════╗" -ForegroundColor Magenta
+    Write-Host "  ║  COPY THIS PROMPT AND SEND IT TO YOUR AGENT:    ║" -ForegroundColor Magenta
+    Write-Host "  ╚══════════════════════════════════════════════════╝" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "  Fix these release preflight violations:" -ForegroundColor White
+    foreach ($line in $fixPromptLines) {
+        Write-Host "  $line" -ForegroundColor White
+    }
+    if ($preflightWarnings.Count -gt 0) {
+        Write-Host "  Also address these warnings:" -ForegroundColor White
+        $warnNum = $fixPromptLines.Count + 1
+        foreach ($w in $preflightWarnings) {
+            Write-Host "  $warnNum. $w" -ForegroundColor White
+            $warnNum++
+        }
+    }
+    Write-Host "  After fixing, re-run the release." -ForegroundColor White
+    Write-Host ""
+    Write-Fail "Release blocked by preflight violations"
+}
+
+if ($preflightWarnings.Count -gt 0 -and $preflightBlockers.Count -eq 0) {
+    $proceed = Read-Host "`n  Proceed with warnings? (y/N)"
+    if ($proceed -notmatch '^[Yy]$') { Write-Fail "Release cancelled by user" }
+}
+
+if ($preflightPassed -and $preflightWarnings.Count -eq 0) {
+    Write-OK "All preflight checks passed"
+}
+
 # ── Version calculation ───────────────────────────────────────────────────────
 Write-Banner "Version"
 
@@ -113,6 +222,28 @@ Update-FileContent "$ROOT\frontend\package.json" `
 Update-FileContent "$ROOT\frontend\src\config\tourSteps.js" `
     "const TOUR_VERSION = '[^']*'" "const TOUR_VERSION = '$NEW_VERSION'" `
     "frontend/src/config/tourSteps.js"
+
+# ── Update CHANGELOG (Unreleased → versioned section) ────────────────────────
+# Inserts a fresh empty [Unreleased] above the current content, then renames
+# the existing [Unreleased] heading to [TAG] - DATE. Single replacement, no
+# line-ending fragility.
+$changelogPath = "$ROOT\CHANGELOG.md"
+if (Test-Path $changelogPath) {
+    $today = (Get-Date -Format "yyyy-MM-dd")
+    $changelogContent = [System.IO.File]::ReadAllText($changelogPath)
+    if ($changelogContent -match '## \[Unreleased\]') {
+        # One replacement: prepend a new empty [Unreleased] placeholder before
+        # the existing section, then label that section with the release version.
+        # Result: [Unreleased] (empty, for next cycle) → --- → [TAG] - DATE (content)
+        $changelogContent = $changelogContent -replace '## \[Unreleased\]', "## [Unreleased]`r`n`r`n---`r`n`r`n## [$TAG] - $today"
+        [System.IO.File]::WriteAllText($changelogPath, $changelogContent, $utf8NoBOM)
+        Write-OK "CHANGELOG.md — [Unreleased] → [$TAG] - $today"
+    } else {
+        Write-Warn "CHANGELOG.md has no [Unreleased] section — add release notes manually"
+    }
+} else {
+    Write-Warn "CHANGELOG.md not found — skipping changelog update"
+}
 
 # ── Build frontend ────────────────────────────────────────────────────────────
 Write-Banner "Building frontend"
@@ -166,6 +297,10 @@ foreach ($b in $builds) {
     $env:GOOS   = $b.GOOS
     $env:GOARCH = $b.GOARCH
     $outPath = "$BINDIR\$($b.Out)"
+
+    # Remove stale binary before building — Go refuses to overwrite non-object files.
+    if (Test-Path $outPath) { Remove-Item $outPath -Force }
+
     go build -trimpath -ldflags $b.LD -o $outPath ./cmd/forge/
     if ($LASTEXITCODE -ne 0) { Write-Fail "Build failed for $($b.Out)" }
     $size = [math]::Round((Get-Item $outPath).Length / 1MB, 1)

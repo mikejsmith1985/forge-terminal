@@ -21,6 +21,8 @@ type internalDiagResponse struct {
 	ShellAvailable   bool     `json:"shellAvailable"`
 	PTYDevice        string   `json:"ptyDevice"`
 	PTYAvailable     bool     `json:"ptyAvailable"`
+	PTYSpawnOK       *bool    `json:"ptySpawnOk,omitempty"`    // nil when test was not requested
+	PTYSpawnError    string   `json:"ptySpawnError,omitempty"` // set when spawn test fails
 	JournalDirOK     bool     `json:"journalDirOK"`
 	JournalDirPath   string   `json:"journalDirPath"`
 	LiveSessions     int      `json:"liveSessions"`
@@ -108,6 +110,21 @@ func handleDiagnosticsInternal(w http.ResponseWriter, r *http.Request) {
 	}
 	absJournalDir, _ := filepath.Abs(journalDir)
 
+	// ── Optional PTY spawn test ──────────────────────────────────────────────
+	// Pass ?ptyTest=true to actually attempt spawning (and immediately closing)
+	// a PTY. This verifies the full CreateProcess / ConPTY pipeline, which the
+	// other checks above cannot test. Opt-in because it briefly starts a shell.
+	var ptySpawnOKPtr *bool
+	ptySpawnErrMsg := ""
+	if r.URL.Query().Get("ptyTest") == "true" && termHandler != nil {
+		ptySpawnResult := true
+		ptySpawnOKPtr = &ptySpawnResult
+		if spawnErr := termHandler.TestPTYSpawn(); spawnErr != nil {
+			*ptySpawnOKPtr = false
+			ptySpawnErrMsg = spawnErr.Error()
+		}
+	}
+
 	// ── Session counts ────────────────────────────────────────────────────────
 	liveSessions, detachedSessions, liveHubs := 0, 0, 0
 	if termHandler != nil {
@@ -168,6 +185,13 @@ func handleDiagnosticsInternal(w http.ResponseWriter, r *http.Request) {
 			"Session recovery after disconnect will not work. Check file permissions.")
 	}
 
+	if ptySpawnOKPtr != nil && !*ptySpawnOKPtr {
+		ok = false
+		warnings = append(warnings, "PTY spawn test FAILED: "+ptySpawnErrMsg+". "+
+			"Terminal connections will fail. Common causes: saved working directory no longer exists, "+
+			"antivirus blocking process creation, or insufficient permissions.")
+	}
+
 	if detachedSessions > 20 {
 		warnings = append(warnings, fmt.Sprintf(
 			"%d sessions are in the grace-period queue (disconnected but PTY still alive). "+
@@ -194,6 +218,8 @@ func handleDiagnosticsInternal(w http.ResponseWriter, r *http.Request) {
 		ShellAvailable:   shellAvailable,
 		PTYDevice:        ptyDevice,
 		PTYAvailable:     ptyAvailable,
+		PTYSpawnOK:       ptySpawnOKPtr,
+		PTYSpawnError:    ptySpawnErrMsg,
 		JournalDirOK:     journalDirOK,
 		JournalDirPath:   absJournalDir,
 		LiveSessions:     liveSessions,

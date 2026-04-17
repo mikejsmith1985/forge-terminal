@@ -20,6 +20,7 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
   const [isExpanded, setIsExpanded] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [showFindings, setShowFindings] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const workflow = useWorkflowSetup()
 
   const {
@@ -84,14 +85,20 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
     clearWatcherNotifications()
   }, [watcherNotifications, onToast, onOpenTutor, clearWatcherNotifications])
 
-  const handleRefresh = useCallback(() => {
-    if (cwd) {
-      checkStatus(cwd)
-      if (status?.configured) {
-        scanCompliance(cwd)
+  const handleRefresh = useCallback(async () => {
+    if (!cwd || isRefreshing) return
+    setIsRefreshing(true)
+    try {
+      // checkStatus returns the fresh status — use it directly instead of relying
+      // on the stale closure value of status?.configured
+      const freshStatus = await checkStatus(cwd)
+      if (freshStatus?.configured) {
+        await scanCompliance(cwd)
       }
+    } finally {
+      setIsRefreshing(false)
     }
-  }, [cwd, status?.configured, checkStatus, scanCompliance])
+  }, [cwd, isRefreshing, checkStatus, scanCompliance])
 
   const handleOpenWizard = useCallback(() => {
     setWizardOpen(true)
@@ -194,8 +201,13 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
                   <button className="ewc-btn ewc-btn-primary" onClick={handleOpenWizard}>
                     <Settings size={14} /> Edit Workflow
                   </button>
-                  <button className="ewc-btn ewc-btn-secondary" onClick={handleRefresh} title="Refresh compliance">
-                    <RefreshCw size={14} />
+                  <button
+                    className="ewc-btn ewc-btn-secondary"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    title="Refresh compliance"
+                  >
+                    <RefreshCw size={14} className={isRefreshing ? 'ewc-spin' : ''} />
                   </button>
                 </div>
               </>

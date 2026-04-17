@@ -1,10 +1,10 @@
 {
   "id": "copilot-fresh",
   "name": "🤖 Copilot (Fresh)",
-  "description": "Start new Copilot session with Forge awareness",
+  "description": "Start new Copilot session with Forge workflow pre-flight",
   "command": "copilot --allow-all-tools",
-  "macro_delay": 1500,
-  "macro_payload": "",
+  "macro_delay": 3000,
+  "macro_payload": "You are operating inside Forge Terminal with enterprise workflow enforcement active. Read AGENTS.md now — this is your first required action before anything else. It defines the mandatory pre-flight skill sequence. After reading it, invoke skill: workflow-enforcer and complete the full chain: workflow-enforcer → enterprise-workflow → code-quality → branching-strategy → code-tutor-workflow. Do not analyze code, form a plan, or write any file until all skills confirm loaded. When ready, confirm and wait for my task.",
   "category": "ai",
   "icon": "emoji-robot",
   "favorite": false,

@@ -3,6 +3,10 @@
   background: var(--bg-secondary, #1e1e1e);
   border-bottom: 1px solid var(--border-color, #333);
   flex-shrink: 0;
+  /* Push tabs below the phone's system status bar (signal, time, battery).
+     env(safe-area-inset-top) is set by the browser to the height of the
+     system UI notch/status bar when viewport-fit=cover is active. */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .mobile-tab-list {

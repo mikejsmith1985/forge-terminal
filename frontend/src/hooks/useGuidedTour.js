@@ -1,13 +1,13 @@
 /**
- * useGuidedTour.js - Tour Engine Hook for Forge Terminal v3.4.0
+ * useGuidedTour.js - Connection Diagnostic Wizard controller for Forge Terminal
  *
- * Manages the guided tour state and provides methods for navigation.
- * Features:
- * - Persistence via localStorage (tour runs only once per version)
- * - Dynamic element positioning via getBoundingClientRect
- * - Fallback selectors for robustness
- * - Action triggers (onAdvance) for opening modals, etc.
- * - getRect helper for spotlight positioning
+ * Controls when the connection diagnostic wizard is shown:
+ *   - First run: shown automatically if never completed for this version
+ *   - Manual: triggerWizard('manual') from Settings
+ *   - Spawn failed: triggerWizard('spawnFailed') from ForgeTerminal on close code 4005
+ *
+ * The old feature-tour logic is preserved for backward compat but the wizard
+ * replaces the step-based overlay in the UI.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -43,6 +43,11 @@ const useGuidedTour = (actionHandlers = {}) => {
   const [isActive, setIsActive] = useState(false);
   const [targetRect, setTargetRect] = useState(null);
   const [isReady, setIsReady] = useState(false);
+
+  // Wizard-specific state — drives ConnectionDiagnosticWizard.
+  const [isWizardVisible, setIsWizardVisible] = useState(false);
+  const [wizardTriggerReason, setWizardTriggerReason] = useState('firstRun');
+
   const resizeObserverRef = useRef(null);
   const targetElementRef = useRef(null);
   const actionHandlersRef = useRef(actionHandlers);
@@ -66,9 +71,10 @@ const useGuidedTour = (actionHandlers = {}) => {
       const storedData = localStorage.getItem(TOUR_STORAGE_KEY);
 
       if (!storedData) {
-        // First run - start tour after a short delay to let UI settle
+        // First run — show the diagnostic wizard after a short delay to let the UI settle.
         setTimeout(() => {
-          setIsActive(true);
+          setWizardTriggerReason('firstRun');
+          setIsWizardVisible(true);
           setIsReady(true);
         }, 1500);
         return;
@@ -76,19 +82,21 @@ const useGuidedTour = (actionHandlers = {}) => {
 
       try {
         const { version } = JSON.parse(storedData);
-        // Show tour if version is different (new features)
+        // Show wizard again if the version changed (new features / new defaults).
         if (version !== TOUR_VERSION) {
           setTimeout(() => {
-            setIsActive(true);
+            setWizardTriggerReason('firstRun');
+            setIsWizardVisible(true);
             setIsReady(true);
           }, 1500);
         } else {
           setIsReady(true);
         }
-      } catch (e) {
-        // Invalid stored data, start tour
+      } catch (parseError) {
+        // Corrupt stored data — treat as first run.
         setTimeout(() => {
-          setIsActive(true);
+          setWizardTriggerReason('firstRun');
+          setIsWizardVisible(true);
           setIsReady(true);
         }, 1500);
       }
@@ -246,6 +254,7 @@ const useGuidedTour = (actionHandlers = {}) => {
     setIsActive(false);
     setCurrentStep(0);
     setTargetRect(null);
+    setIsWizardVisible(false);
 
     localStorage.setItem(
       TOUR_STORAGE_KEY,
@@ -263,26 +272,49 @@ const useGuidedTour = (actionHandlers = {}) => {
     setIsActive(true);
   }, []);
 
-  // Get current step data
-  const stepData = isActive ? TOUR_STEPS[currentStep] : null;
+  /**
+   * Opens the diagnostic wizard programmatically.
+   * Called by ForgeTerminal when close code 4005 fires, or from Settings.
+   *
+   * @param {'firstRun'|'spawnFailed'|'manual'} reason - Why the wizard is being shown
+   */
+  const triggerWizard = useCallback((reason = 'manual') => {
+    setWizardTriggerReason(reason);
+    setIsWizardVisible(true);
+  }, []);
+
+  /** Closes the diagnostic wizard and marks the tour/wizard as completed. */
+  const closeWizard = useCallback(() => {
+    setIsWizardVisible(false);
+    // Persist completion so we don't show on next startup.
+    localStorage.setItem(
+      TOUR_STORAGE_KEY,
+      JSON.stringify({
+        version: TOUR_VERSION,
+        completedAt: new Date().toISOString(),
+      })
+    );
+  }, []);
 
   return {
-    // State
+    // Legacy tour state (kept for backward compat; no longer rendered)
     isActive,
     isReady,
     currentStep,
     totalSteps: TOUR_STEPS.length,
-    stepData,
+    stepData: isActive ? TOUR_STEPS[currentStep] : null,
     targetRect,
-
-    // Actions
     nextStep,
     prevStep,
     skipTour,
     restartTour,
-
-    // Helpers
     getRect,
+
+    // Diagnostic wizard state
+    isWizardVisible,
+    wizardTriggerReason,
+    triggerWizard,
+    closeWizard,
   };
 };
 

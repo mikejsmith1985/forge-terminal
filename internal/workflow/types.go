@@ -382,3 +382,48 @@ type WorkflowStatus struct {
 	Compliance   *ComplianceReport `json:"compliance"`   // Latest compliance scan (nil if not scanned)
 	AppliedAt    *time.Time        `json:"appliedAt"`    // When the workflow was last applied
 }
+
+// ─── Release Preflight Types ─────────────────────────────────────────────────
+
+// PreflightSeverity indicates whether a failed check blocks the release.
+type PreflightSeverity string
+
+const (
+	// PreflightBlocking means the release CANNOT proceed until this is fixed.
+	PreflightBlocking PreflightSeverity = "blocking"
+	// PreflightWarning means the release CAN proceed but the issue should be addressed.
+	PreflightWarning PreflightSeverity = "warning"
+)
+
+// PreflightCheckStatus indicates whether an individual check passed or failed.
+type PreflightCheckStatus string
+
+const (
+	PreflightPass PreflightCheckStatus = "pass"
+	PreflightFail PreflightCheckStatus = "fail"
+)
+
+// PreflightCheck represents one release-readiness check with a fix suggestion.
+type PreflightCheck struct {
+	ID         string               `json:"id"`         // Machine-readable ID (e.g. "changelog-exists")
+	Name       string               `json:"name"`       // Human-readable name
+	Severity   PreflightSeverity    `json:"severity"`   // blocking or warning
+	Status     PreflightCheckStatus `json:"status"`     // pass or fail
+	Message    string               `json:"message"`    // What happened
+	Suggestion string               `json:"suggestion"` // How to fix it
+	FilePath   string               `json:"filePath,omitempty"` // Relevant file if applicable
+}
+
+// PreflightReport is the complete result of a release preflight scan.
+// When CanRelease is false, the FixPrompt field contains a ready-to-paste
+// message the user can send to an AI agent to resolve all blocking issues.
+type PreflightReport struct {
+	Status       string            `json:"status"`       // "pass", "fail", or "warning"
+	Checks       []PreflightCheck  `json:"checks"`
+	BlockingCount int              `json:"blockingCount"`
+	WarningCount int               `json:"warningCount"`
+	PassingCount int               `json:"passingCount"`
+	CanRelease   bool              `json:"canRelease"`   // true only when blockingCount == 0
+	FixPrompt    string            `json:"fixPrompt"`    // Ready-to-paste agent prompt for fixing violations
+	CheckedAt    time.Time         `json:"checkedAt"`
+}

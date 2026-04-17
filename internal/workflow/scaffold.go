@@ -106,6 +106,30 @@ func scaffoldManifest() []scaffoldEntry {
 			category: "hook",
 			render:   RenderPreCommitPS1,
 		},
+		{
+			moduleID: ModuleGitHooks,
+			relPath:  filepath.Join(".forge", "hooks", "commit-msg"),
+			category: "hook",
+			render:   RenderCommitMsgSH,
+		},
+		{
+			moduleID: ModuleGitHooks,
+			relPath:  filepath.Join(".forge", "hooks", "commit-msg.ps1"),
+			category: "hook",
+			render:   RenderCommitMsgPS1,
+		},
+		{
+			moduleID: ModuleGitHooks,
+			relPath:  filepath.Join(".forge", "hooks", "pre-push"),
+			category: "hook",
+			render:   RenderPrePushSH,
+		},
+		{
+			moduleID: ModuleGitHooks,
+			relPath:  filepath.Join(".forge", "hooks", "pre-push.ps1"),
+			category: "hook",
+			render:   RenderPrePushPS1,
+		},
 		// Enforcement: PR template
 		{
 			moduleID: ModulePRTemplate,
@@ -194,6 +218,13 @@ func ScaffoldProject(projectPath string, config WorkflowConfig) (*ScaffoldResult
 	absolutePath, err := filepath.Abs(projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("resolving project path: %w", err)
+	}
+
+	// Guard: the resolved path must actually exist as a directory.
+	// This catches contaminated paths (e.g., PowerShell exe path prepended to cwd)
+	// that arrive from the frontend before sanitization catches them.
+	if stat, statErr := os.Stat(absolutePath); statErr != nil || !stat.IsDir() {
+		return nil, fmt.Errorf("project path does not exist or is not a directory: %s", absolutePath)
 	}
 
 	manifest := scaffoldManifest()
@@ -301,11 +332,14 @@ func configureGitHooks(projectPath string) {
 		log.Printf("[Workflow] Configured git hooks path: %s", hooksPathNormalized)
 	}
 
-	// On Unix systems, ensure the hook scripts are executable
+	// On Unix systems, ensure all hook scripts are executable
 	if runtime.GOOS != "windows" {
-		hookFile := filepath.Join(projectPath, ".forge", "hooks", "pre-commit")
-		if err := os.Chmod(hookFile, 0o755); err != nil {
-			log.Printf("[Workflow] Warning: could not chmod hook: %s", err)
+		hookNames := []string{"pre-commit", "commit-msg", "pre-push"}
+		for _, hookName := range hookNames {
+			hookFile := filepath.Join(projectPath, ".forge", "hooks", hookName)
+			if err := os.Chmod(hookFile, 0o755); err != nil {
+				log.Printf("[Workflow] Warning: could not chmod hook %s: %s", hookName, err)
+			}
 		}
 	}
 }

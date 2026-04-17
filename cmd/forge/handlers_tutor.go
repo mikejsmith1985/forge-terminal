@@ -362,7 +362,107 @@ func handleTutorSettings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleTutorWatcher polls for file-change notifications from a session watcher.
+// handleTutorRecentChanges serves GET /api/tutor/recent-changes.
+//
+// Uses git diff to find files changed since the last commit (or in the last commit
+// if the working tree is clean). This powers the Change Wizard — the focused
+// walkthrough that shows only what an agent just touched, not 770 project files.
+//
+// Query param: projectPath (required) — absolute path to the project root.
+func handleTutorRecentChanges(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	projectPath := r.URL.Query().Get("projectPath")
+	if strings.TrimSpace(projectPath) == "" {
+		http.Error(w, "Query parameter 'projectPath' is required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[Tutor API] Detecting recent changes for: %s", projectPath)
+	changeSet, err := tutor.DetectRecentChanges(projectPath)
+	if err != nil {
+		log.Printf("[Tutor API] Error detecting recent changes: %v", err)
+		http.Error(w, "Failed to detect changes: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[Tutor API] Found %d changed files (source: %s) for %s", len(changeSet.Files), changeSet.Source, projectPath)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(changeSet)
+}
+
+// handleTutorExplainChange generates a diff-aware explanation for a specific changed file.
+//
+// Unlike /api/tutor/explain (which describes a file in general), this endpoint
+// explains what specifically changed and why — grounding the explanation in the diff.
+//
+// POST body: { sessionId, filePath, diff }
+func handleTutorExplainChange(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		SessionID string `json:"sessionId"`
+		FilePath  string `json:"filePath"`
+		Diff      string `json:"diff"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
+		return
+	}
+	if req.SessionID == "" || req.FilePath == "" {
+		http.Error(w, "sessionId and filePath are required", http.StatusBadRequest)
+		return
+	}
+
+	session, err := tutorSessionMgr.GetSession(req.SessionID)
+	if err != nil {
+		log.Printf("[Tutor API] Session not found for explain-change: %v", err)
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	// Look up the file in the learning path for metadata (complexity, category).
+	// Fall back to a minimal entry for files not yet in the learning path (e.g. newly created).
+	var entry tutor.FileEntry
+	for _, f := range session.LearningPath.Files {
+		if f.Path == req.FilePath {
+			entry = f
+			break
+		}
+	}
+	if entry.Path == "" {
+		entry = tutor.FileEntry{
+			Path:     req.FilePath,
+			Category: "core",
+		}
+	}
+
+	log.Printf("[Tutor API] Explaining change in: %s (session=%s)", req.FilePath, req.SessionID)
+	explanation, err := tutorExplainer.ExplainChange(
+		context.Background(),
+		session.ProjectPath,
+		entry,
+		req.Diff,
+		session.LearningPath,
+		session.Settings.Depth,
+		session.Settings.NamingReview,
+	)
+	if err != nil {
+		log.Printf("[Tutor API] Error explaining change in %s: %v", req.FilePath, err)
+		http.Error(w, "Failed to explain change: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(explanation)
+}
+
 func handleTutorWatcher(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

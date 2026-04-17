@@ -543,6 +543,303 @@ func TestScanCompliance_MissingWorkflowConfig(t *testing.T) {
 	}
 }
 
+// ─── Enhanced Pre-Commit Hook Tests ─────────────────────────────────────────
+
+func TestRenderPreCommitPS1_ContainsMainBranchBlock(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderPreCommitPS1(config)
+	if err != nil {
+		t.Fatalf("RenderPreCommitPS1() error: %v", err)
+	}
+
+	// The enhanced pre-commit must block commits directly to main
+	if !containsString(result, "MAIN BRANCH") {
+		t.Error("Pre-commit PS1 missing main branch block check")
+	}
+	if !containsString(result, "Cannot commit directly to main") {
+		t.Error("Pre-commit PS1 missing main branch violation message")
+	}
+}
+
+func TestRenderPreCommitSH_ContainsMainBranchBlock(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderPreCommitSH(config)
+	if err != nil {
+		t.Fatalf("RenderPreCommitSH() error: %v", err)
+	}
+
+	if !containsString(result, "MAIN BRANCH") {
+		t.Error("Pre-commit SH missing main branch block check")
+	}
+	if !containsString(result, "Cannot commit directly to main") {
+		t.Error("Pre-commit SH missing main branch violation message")
+	}
+}
+
+func TestRenderPreCommitPS1_ContainsTestFileGate(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderPreCommitPS1(config)
+	if err != nil {
+		t.Fatalf("RenderPreCommitPS1() error: %v", err)
+	}
+
+	// The enhanced pre-commit must check for corresponding test files
+	if !containsString(result, "TEST FILE") {
+		t.Error("Pre-commit PS1 missing test file gate check")
+	}
+	if !containsString(result, "_test.go") {
+		t.Error("Pre-commit PS1 missing Go test file pattern")
+	}
+}
+
+func TestRenderPreCommitSH_ContainsTestFileGate(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderPreCommitSH(config)
+	if err != nil {
+		t.Fatalf("RenderPreCommitSH() error: %v", err)
+	}
+
+	if !containsString(result, "TEST FILE") {
+		t.Error("Pre-commit SH missing test file gate check")
+	}
+	if !containsString(result, "_test.go") {
+		t.Error("Pre-commit SH missing Go test file pattern")
+	}
+}
+
+func TestRenderPreCommitPS1_ChangelogIsViolation(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderPreCommitPS1(config)
+	if err != nil {
+		t.Fatalf("RenderPreCommitPS1() error: %v", err)
+	}
+
+	// CHANGELOG missing should be a violation (blocking), not a warning
+	if !containsString(result, "$violations += \"CHANGELOG") {
+		t.Error("Pre-commit PS1 should treat missing CHANGELOG as a violation, not a warning")
+	}
+}
+
+func TestRenderPreCommitSH_ChangelogIsViolation(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderPreCommitSH(config)
+	if err != nil {
+		t.Fatalf("RenderPreCommitSH() error: %v", err)
+	}
+
+	// CHANGELOG missing should be a violation (blocking), not a warning
+	if !containsString(result, "violations+=(\"CHANGELOG") {
+		t.Error("Pre-commit SH should treat missing CHANGELOG as a violation, not a warning")
+	}
+}
+
+// ─── Commit-Msg Hook Tests ──────────────────────────────────────────────────
+
+func TestRenderCommitMsgPS1(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderCommitMsgPS1(config)
+	if err != nil {
+		t.Fatalf("RenderCommitMsgPS1() error: %v", err)
+	}
+
+	if result == "" {
+		t.Error("RenderCommitMsgPS1() returned empty string")
+	}
+	if !containsString(result, "pwsh") {
+		t.Error("Commit-msg PS1 missing pwsh shebang")
+	}
+
+	// Must validate commit message format: type: description
+	expectedPatterns := []string{
+		"feat", "fix", "chore", "docs", "test", "refactor", "perf",
+	}
+	for _, commitType := range expectedPatterns {
+		if !containsString(result, commitType) {
+			t.Errorf("Commit-msg PS1 missing valid type %q", commitType)
+		}
+	}
+}
+
+func TestRenderCommitMsgSH(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderCommitMsgSH(config)
+	if err != nil {
+		t.Fatalf("RenderCommitMsgSH() error: %v", err)
+	}
+
+	if !containsString(result, "#!/usr/bin/env bash") {
+		t.Error("Commit-msg SH missing bash shebang")
+	}
+
+	// Must validate commit message format
+	if !containsString(result, "feat") {
+		t.Error("Commit-msg SH missing valid commit types")
+	}
+}
+
+// ─── Pre-Push Hook Tests ────────────────────────────────────────────────────
+
+func TestRenderPrePushPS1(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderPrePushPS1(config)
+	if err != nil {
+		t.Fatalf("RenderPrePushPS1() error: %v", err)
+	}
+
+	if result == "" {
+		t.Error("RenderPrePushPS1() returned empty string")
+	}
+	if !containsString(result, "pwsh") {
+		t.Error("Pre-push PS1 missing pwsh shebang")
+	}
+	// Must run build and test commands
+	if !containsString(result, "go build") {
+		t.Error("Pre-push PS1 missing Go build command")
+	}
+	if !containsString(result, "go test") {
+		t.Error("Pre-push PS1 missing Go test command")
+	}
+}
+
+func TestRenderPrePushSH(t *testing.T) {
+	config := DefaultConfig()
+	result, err := RenderPrePushSH(config)
+	if err != nil {
+		t.Fatalf("RenderPrePushSH() error: %v", err)
+	}
+
+	if !containsString(result, "#!/usr/bin/env bash") {
+		t.Error("Pre-push SH missing bash shebang")
+	}
+	if !containsString(result, "go build") {
+		t.Error("Pre-push SH missing Go build command")
+	}
+	if !containsString(result, "go test") {
+		t.Error("Pre-push SH missing Go test command")
+	}
+}
+
+// ─── Scaffold Manifest Tests ────────────────────────────────────────────────
+
+func TestScaffoldManifest_ContainsAllHookTypes(t *testing.T) {
+	manifest := scaffoldManifest()
+
+	// Track which hook files appear in the manifest
+	expectedHookPaths := map[string]bool{
+		".forge/hooks/pre-commit":     false,
+		".forge/hooks/pre-commit.ps1": false,
+		".forge/hooks/commit-msg":     false,
+		".forge/hooks/commit-msg.ps1": false,
+		".forge/hooks/pre-push":       false,
+		".forge/hooks/pre-push.ps1":   false,
+	}
+
+	for _, entry := range manifest {
+		normalizedPath := filepath.ToSlash(entry.relPath)
+		if _, isExpected := expectedHookPaths[normalizedPath]; isExpected {
+			expectedHookPaths[normalizedPath] = true
+		}
+	}
+
+	for hookPath, wasFound := range expectedHookPaths {
+		if !wasFound {
+			t.Errorf("scaffoldManifest() missing hook entry: %s", hookPath)
+		}
+	}
+}
+
+// ─── Compliance Scanner Tests ───────────────────────────────────────────────
+
+func TestScanCompliance_TestCoverage(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create a source file without a corresponding test file
+	sourceDir := filepath.Join(tempDir, "internal", "service")
+	if err := os.MkdirAll(sourceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(sourceDir, "handler.go"),
+		[]byte("package service\n\nfunc HandleRequest() {}\n"),
+		0644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	config := DefaultConfig()
+	report, err := ScanCompliance(tempDir, config)
+	if err != nil {
+		t.Fatalf("ScanCompliance() error: %v", err)
+	}
+
+	// Should report a warning about missing test file
+	foundTestCoverageFinding := false
+	for _, finding := range report.Findings {
+		if finding.Rule == "Test Coverage" {
+			foundTestCoverageFinding = true
+			break
+		}
+	}
+	if !foundTestCoverageFinding {
+		t.Error("ScanCompliance() should report 'Test Coverage' finding for source file without tests")
+	}
+}
+
+func TestScanCompliance_TestCoverage_WithTestFile(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create a source file WITH a corresponding test file
+	sourceDir := filepath.Join(tempDir, "internal", "service")
+	if err := os.MkdirAll(sourceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(sourceDir, "handler.go"),
+		[]byte("package service\n\nfunc HandleRequest() {}\n"),
+		0644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(sourceDir, "handler_test.go"),
+		[]byte("package service\n\nfunc TestHandleRequest(t *testing.T) {}\n"),
+		0644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	config := DefaultConfig()
+	report, err := ScanCompliance(tempDir, config)
+	if err != nil {
+		t.Fatalf("ScanCompliance() error: %v", err)
+	}
+
+	// Should pass — source file has a test file
+	for _, finding := range report.Findings {
+		if finding.Rule == "Test Coverage" && finding.Level == ComplianceWarning {
+			if containsString(finding.Message, "handler.go") {
+				t.Error("handler.go has a test file but was flagged as missing tests")
+			}
+		}
+	}
+}
+
+func TestScanCompliance_CommitMessageFormat(t *testing.T) {
+	// This test verifies the scan function exists and runs without error.
+	// Actual git history scanning depends on the git repo state,
+	// so we test it in a temp dir with no git (should produce a warning).
+	tempDir := t.TempDir()
+
+	config := DefaultConfig()
+	report, err := ScanCompliance(tempDir, config)
+	if err != nil {
+		t.Fatalf("ScanCompliance() error: %v", err)
+	}
+
+	// Without git, commit message scan should produce a warning or be skipped
+	_ = report // The function should not panic
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 func containsString(haystack, needle string) bool {
