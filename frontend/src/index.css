@@ -403,24 +403,29 @@ body {
   color: var(--red);
 }
 
-/* Card Styles */
+/* ── Card: horizontal layout — large icon left, content column right ── */
 .card {
   background: var(--card-bg);
   background-image: var(--gradient-card);
   border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 11px 12px;
+  margin-bottom: 8px;
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  /* Side-by-side: icon block | content column */
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 11px;
 }
 
 .card:hover {
   border-color: var(--card-hover-border);
   box-shadow: var(--shadow-glow), var(--shadow-md);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 /* Dragging state */
@@ -436,47 +441,89 @@ body {
 }
 
 .always-append-badge {
-  font-size: 14px;
-  margin-right: 4px;
+  font-size: 12px;
+}
+
+/* ── Large icon block — the prominent visual anchor on the left ── */
+.card-icon-block {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.45rem;
+  flex-shrink: 0;
+  /* Use overlay background so it reads in all 6 themes */
+  background: var(--overlay);
+  border: 1px solid var(--card-border);
+  color: var(--accent);
+  /* Nudge icon block down slightly to align with title text baseline */
+  margin-top: 1px;
+}
+
+/* ── Content column: title row → command text → action buttons ── */
+.card-content-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
+  align-items: center;
+  /* No bottom margin — the column gap handles spacing */
 }
 
+/* Title row: name + optional keybinding badge + favorite star */
 .card-title-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
 }
 
 .keybinding-badge {
   background: var(--gradient-primary);
   color: #fff;
-  font-size: 0.85rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 2px 5px;
+  border-radius: 5px;
   display: inline-block;
-  align-self: flex-start;
+  flex-shrink: 0;
   box-shadow: var(--shadow-glow);
 }
 
 .card-title {
-  font-weight: 700;
-  font-size: 1.3rem;
+  font-weight: 600;
+  font-size: 0.85rem;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Favorite star — shown inline when the command is starred */
+.card-favorite-star {
+  color: var(--accent);
+  font-size: 0.65rem;
+  flex-shrink: 0;
+  opacity: 0.9;
 }
 
 .card-actions-top {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   opacity: 0;
-  /* Hide by default, show on hover */
+  /* Hidden by default, revealed on card hover */
   transition: opacity 0.2s;
+  flex-shrink: 0;
 }
 
 .card:hover .card-actions-top {
@@ -486,7 +533,7 @@ body {
 .action-icon {
   color: var(--subtext);
   cursor: pointer;
-  padding: 4px;
+  padding: 3px;
   border-radius: 4px;
   transition: color 0.2s, background 0.2s;
 }
@@ -501,41 +548,41 @@ body {
   background: rgba(243, 139, 168, 0.1);
 }
 
+/* ── Command preview text ── */
 .card-body {
-  margin-bottom: 16px;
+  /* No extra margin needed — gap on .card-content-column handles spacing */
 }
 
 .command-preview {
   display: block;
   font-family: 'JetBrains Mono', monospace;
-  /* Assuming font availability or fallback */
-  font-size: 1.1rem;
+  font-size: 0.72rem;
   font-weight: 500;
   color: var(--subtext);
   background: rgba(0, 0, 0, 0.2);
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 5px 8px;
+  border-radius: 5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* ── Paste / Run button row ── */
 .card-footer {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .card-footer.paste-only .btn-action {
   flex: 1;
-  /* Full width if only one button */
 }
 
 .btn-action {
-  padding: 8px;
+  padding: 5px 10px;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   cursor: pointer;
   border: 1px solid var(--overlay);
   background: transparent;
@@ -544,25 +591,24 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
 }
 
+/* Paste: outlined accent — secondary action */
 .btn-paste {
-  flex: 2;
-  /* 20% roughly, relative to flex: 8 */
+  flex: 1;
   border-color: var(--accent);
-  box-shadow: 0 0 8px rgba(249, 115, 22, 0.2);
-  /* Subtle glow */
+  box-shadow: 0 0 6px rgba(249, 115, 22, 0.15);
 }
 
 .btn-paste:hover {
   background: rgba(249, 115, 22, 0.1);
-  box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.35);
 }
 
+/* Run: filled gradient — primary CTA */
 .btn-run {
-  flex: 8;
-  /* 80% */
+  flex: 3;
   background: var(--gradient-primary);
   color: #fff;
   border: none;

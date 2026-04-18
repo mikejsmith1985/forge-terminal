@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Command Cards: icon-forward layout** — Each command card now displays a large 42×42px icon block on the left (showing the card's emoji or lucide icon), with the title, command text, and Paste/Run buttons in a compact column to the right. The title size is reduced to better balance the prominent icon. Favorites now show an inline star indicator. The card height is reduced — more cards fit on screen at once.
+
 ## [7.0.0] - 2026-04-17
 
 ---
