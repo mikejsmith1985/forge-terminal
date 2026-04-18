@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Guided tour re-implemented** — Populated 7-step feature tour covering Command Cards, Release Manager, Vault, Multi-Tab Themes, and the Dev Dashboard. Tour activates via **Settings → Replay Tour**. `TOUR_VERSION` bumped to `7.1.0` so existing users see the new tour on next launch. `TourOverlay` re-wired into `App.jsx`.
+- **Enterprise Workflow: AI compliance disclaimer** — Added a small but honest notice at the bottom of the Enterprise Workflow card explaining that workflow rules are strong guidance, not hard enforcement, and that compliance may vary in long sessions due to how large language models manage context. Framed as an industry-wide characteristic, not a product limitation. Also added a full explanatory section to README.md under a new `## 🧭 Enterprise Workflow — Understanding AI Compliance` heading.
+- **Command Cards: icon-forward layout** — Each command card now displays a large 42×42px icon block on the left with title, command text, and Paste/Run buttons in a compact column to the right. Cards are more compact — more fit on screen at once.
 
 ## [7.0.0] - 2026-04-17
 

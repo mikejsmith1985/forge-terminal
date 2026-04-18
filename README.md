@@ -75,6 +75,25 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
   - **Ctrl+V**: Pastes from clipboard seamlessly
   - Uses xterm's `attachCustomKeyEventHandler` for reliable, native-like behavior
 
+## 🧭 Enterprise Workflow — Understanding AI Compliance
+
+The Enterprise Workflow system provides structured instructions that guide AI behavior in your development sessions — enforcing branching rules, naming conventions, quality gates, and skill cascades as active context the model references when making decisions.
+
+### What "guidance" means in practice
+
+Workflow compliance in Forge is **probabilistic, not deterministic**. The AI interprets your workflow rules as strongly weighted instructions, which is fundamentally different from how a linter or CI gate enforces rules. In most sessions — especially at the start — compliance is high and the workflow meaningfully shapes output quality.
+
+In extended or deeply complex sessions, earlier context (including workflow rules) can be deprioritized as the model's attention shifts toward more recent input. This is an inherent characteristic of how large language models currently manage context, and is not specific to Forge or any particular AI provider.
+
+**In short:**
+- Short-to-medium sessions → workflow rules followed reliably
+- Long, multi-file, or multi-tool sessions → occasional deviation is possible
+- Pre-commit hooks and the compliance checker provide a deterministic backstop for the most critical rules
+
+### Our commitment
+
+We are continuously advancing the workflow enforcement system alongside improvements in AI context management. As models improve their ability to maintain instruction fidelity across longer sessions, compliance will improve accordingly. Our goal is to make the system progressively tighter with each major release.
+
 ## Installation
 
 Choose your setup method below. **All options are FREE** (Codespaces includes 120 free hours/month).
