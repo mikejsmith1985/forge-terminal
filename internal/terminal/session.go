@@ -194,12 +194,21 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	var err error
 	if runtime.GOOS == "windows" {
 		// Validate that the working directory exists before spawning ConPTY.
-		// If the saved psHome/cmdHome path no longer exists (deleted, renamed, or on a
-		// different machine), CreateProcess returns ERROR_DIRECTORY and the session
-		// fails. Falling back to the default directory lets the terminal open cleanly.
+		// If the saved psHome/cmdHome path no longer exists (deleted, renamed, on a
+		// different machine, permission denied, or network unavailable), CreateProcess
+		// returns ERROR_DIRECTORY and the session fails. Falling back to the default
+		// directory lets the terminal open cleanly.
 		if workingDir != "" {
-			if _, statErr := os.Stat(workingDir); os.IsNotExist(statErr) {
-				log.Printf("[Terminal] Working directory %q does not exist — falling back to default", workingDir)
+			info, statErr := os.Stat(workingDir)
+			if statErr != nil {
+				// ANY error (not just IsNotExist) means we can't use this directory.
+				// Common errors: path not found, permission denied, network unavailable,
+				// path too long, invalid characters, etc.
+				log.Printf("[Terminal] Working directory %q is invalid (%v) — falling back to default", workingDir, statErr)
+				workingDir = ""
+			} else if !info.IsDir() {
+				// Path exists but is a file, not a directory
+				log.Printf("[Terminal] Working directory %q is a file, not a directory — falling back to default", workingDir)
 				workingDir = ""
 			}
 		}

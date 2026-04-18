@@ -1803,6 +1803,9 @@ function App() {
           <div style={{ overflowY: 'auto', height: '100%' }}>
             <div style={{ padding: '12px' }}>
               <WebAppDebuggerCard />
+              <div style={{ marginTop: '16px' }}>
+                <FollowMeDebugger />
+              </div>
             </div>
           </div>
         ) : null}

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.1.1] - 2026-04-18
+
+### Fixed
+- **Tab recovery with deep directory paths** — Fixed critical session.go directory validation that only caught `os.IsNotExist` errors. Now validates ALL `os.Stat()` errors (permission denied, network unavailable, path too long, etc.) and checks `IsDir()` before passing directory to ConPTY. Tabs saved with deep paths like `C:\ProjectsWin\Waypoint\packages\forge-app` now reconnect successfully after server restart instead of showing "Cannot Reach Session" error (ConPTY ERROR_DIRECTORY spawn failure).
+- **Web App Debugger "Follow Me" button restored** — Re-enabled `FollowMeDebugger` component in Debug sidebar. Was hidden with comment "HIDDEN for subscription release". Users can now click "Follow Me" to capture screen recording, keystrokes, clicks, console logs, and network requests for bug reporting and issue diagnosis.
+
 ## [7.1.0] - 2026-04-18
 
 ---
