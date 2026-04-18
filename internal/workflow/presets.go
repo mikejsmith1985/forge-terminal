@@ -91,7 +91,7 @@ func BuiltInPresets() []WorkflowPreset {
 		{
 			ID:          "enterprise-standard",
 			Name:        "Enterprise Standard",
-			Description: "Full enterprise workflow: all modules enabled, BEST quality mode, Code Tutor integration, all enforcement layers.",
+			Description: "Full enterprise workflow: all modules enabled, BEST quality mode, multi-agent review, all enforcement layers.",
 			BuiltIn:     true,
 			Config:      enterpriseStandardConfig,
 			CreatedAt:   time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),

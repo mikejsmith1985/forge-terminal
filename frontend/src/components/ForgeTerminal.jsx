@@ -1650,6 +1650,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         setReconnecting(false);
         setIsConnected(true);
         setIsActiveDevice(true); // Assume active until SESSION_JOINED says otherwise
+
+        // Re-focus the terminal so keyboard input works immediately after connect/reconnect.
+        // xterm.js loses focus when the WebSocket is closed and the reconnect overlay appears.
+        if (xtermRef.current) {
+          xtermRef.current.focus();
+        }
         
         // Send initial size (always needed — terminal may have been resized during disconnect)
         const { cols, rows } = term;

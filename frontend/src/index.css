@@ -446,20 +446,25 @@ body {
 
 /* ── Large icon block — the prominent visual anchor on the left ── */
 .card-icon-block {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.45rem;
+  font-size: 1.7rem;
   flex-shrink: 0;
-  /* Use overlay background so it reads in all 6 themes */
-  background: var(--overlay);
-  border: 1px solid var(--card-border);
+  background: linear-gradient(135deg, var(--overlay) 0%, rgba(249, 115, 22, 0.12) 100%);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.15), inset 0 1px 0 rgba(255,255,255,0.05);
   color: var(--accent);
-  /* Nudge icon block down slightly to align with title text baseline */
   margin-top: 1px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.card-icon-block:hover,
+.command-card:hover .card-icon-block {
+  border-color: rgba(249, 115, 22, 0.6);
+  box-shadow: 0 0 18px rgba(249, 115, 22, 0.35), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 /* ── Content column: title row → command text → action buttons ── */

@@ -2116,6 +2116,7 @@ function App() {
         onClose={() => setIsDeveloperDashboardOpen(false)}
         devMode={devMode}
         tabCount={tabs.length}
+        projectDir={activeTab?.currentDirectory || ''}
       />
 
       {/* RemoteAccessModal — HIDDEN for subscription release */}

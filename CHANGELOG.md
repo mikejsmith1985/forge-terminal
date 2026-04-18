@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.2.0] - 2026-04-18
+
+---
+
+## [v7.2.0] - 2026-04-18
+
+## [7.2.0] - 2026-04-18
+
+### Fixed
+- **Keyboard input after update** — Terminal no longer requires a browser refresh to accept keyboard input after installing an update. Added `term.focus()` call in the WebSocket `onopen` handler so focus is restored immediately on connect and reconnect.
+- **Files tab crash** — `LensFilePicker.jsx` `humanizeTime()` referenced undefined variable `d` instead of `parsedDate`, causing a render exception whenever a file older than 7 days appeared in the file list. Fixed the variable reference.
+- **Workflow preset checkmark vanishes** — The "Selected" checkmark on Enterprise Standard and Lean Startup presets disappeared immediately after clicking. Root cause: the project-detection `useEffect` called `updateConfig()` after preset selection, which internally calls `setSelectedPreset(null)`. Fixed by adding a `!selectedPreset` guard to the effect so it skips auto-population when a preset is already chosen.
+
+### Changed
+- **Code Tutor removed from Enterprise Workflow** — Code Tutor is no longer listed in the Enterprise Standard preset description or Quality Mode "BEST" label. Removed `code-tutor` from `DefaultConfig()` enabled modules and the frontend default config.
+- **Send Feedback → email** — The feedback button now opens the user's email client pre-filled with feedback, screenshots note, and environment info addressed to `info@rootlevellabs.tech`. Removed GitHub PAT requirement entirely.
+- **Command card emoji revamp** — Emoji icon blocks are now 48×48px (was 42×42px), font size 1.7rem (was 1.45rem), with an orange gradient background, subtle border glow, and hover animation for a more polished, flashier look.
+
+### Fixed (Dashboard)
+- **Developer Dashboard always shows 0 commits** — The dashboard now passes the active terminal's current directory to the backend as a `?dir=` query parameter. The backend resolves the git root from that directory, so commit counts, changed files, and the weekly chart reflect the user's actual project instead of the forge binary's working directory.
+
 ## [7.1.0] - 2026-04-18
 
 ---
