@@ -14,36 +14,44 @@ import (
 )
 
 var (
-	gitRootOnce sync.Once
-	gitRoot     string
+	gitRootMu sync.Mutex
+	gitRoot   string
 )
 
-// detectGitRoot finds the git repository root, caching the result.
-// It tries os.Getwd() first, then falls back to the executable's directory.
+// detectGitRoot finds the git repository root.
+// Unlike a sync.Once approach, this retries on each call until a root is found,
+// because the working directory may change after the binary starts (e.g., when
+// double-clicked from Explorer vs launched from a project directory in the shell).
 func detectGitRoot() string {
-	gitRootOnce.Do(func() {
-		tryDir := func(dir string) string {
-			cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-			cmd.Dir = dir
-			hideWindow(cmd)
-			if out, err := cmd.Output(); err == nil {
-				return strings.TrimSpace(string(out))
-			}
-			return ""
-		}
+	gitRootMu.Lock()
+	defer gitRootMu.Unlock()
 
-		if cwd, err := os.Getwd(); err == nil {
-			if root := tryDir(cwd); root != "" {
-				gitRoot = root
-				return
-			}
+	// Return the cached value if we already found it.
+	if gitRoot != "" {
+		return gitRoot
+	}
+
+	tryDir := func(dir string) string {
+		cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+		cmd.Dir = dir
+		hideWindow(cmd)
+		if out, err := cmd.Output(); err == nil {
+			return strings.TrimSpace(string(out))
 		}
-		if exe, err := os.Executable(); err == nil {
-			if root := tryDir(filepath.Dir(exe)); root != "" {
-				gitRoot = root
-			}
+		return ""
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		if root := tryDir(cwd); root != "" {
+			gitRoot = root
+			return gitRoot
 		}
-	})
+	}
+	if exe, err := os.Executable(); err == nil {
+		if root := tryDir(filepath.Dir(exe)); root != "" {
+			gitRoot = root
+		}
+	}
 	return gitRoot
 }
 
@@ -118,9 +126,12 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 		stats.GitBranch = strings.TrimSpace(string(out))
 	}
 
-	// Git commits today — use --all to include commits across all branches,
-	// and --since=midnight for a reliable "today" boundary that respects local timezone.
-	if out, err := gitCmd("log", "--oneline", "--all", "--since=midnight").Output(); err == nil {
+	// Git commits today — use an explicit ISO 8601 date+time instead of --since=midnight
+	// because "midnight" is locale-dependent and fails in some Git distributions on Windows.
+	// We build the boundary as "YYYY-MM-DDT00:00:00" in local time, matching the same format
+	// already used by the weekly chart below.
+	todayStart := time.Now().Format("2006-01-02") + "T00:00:00"
+	if out, err := gitCmd("log", "--oneline", "--all", "--since="+todayStart).Output(); err == nil {
 		lines := strings.TrimSpace(string(out))
 		if lines != "" {
 			stats.GitCommits = len(strings.Split(lines, "\n"))
