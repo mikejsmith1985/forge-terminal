@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.2.1] - 2026-04-18
+
+---
+
+## [v7.2.1] - 2026-04-18
+
+## [7.2.1] - 2026-04-18
+
+### Fixed
+- **"Cannot Reach the Forge Server" dialog on every launch** — The connection diagnostic wizard was auto-triggered on every version upgrade because `TOUR_VERSION` changed with each release. The wizard would fetch `/api/diagnostics/internal` 1.5 seconds after load — before the backend was fully initialized — producing a false "server unreachable" error for all users. Fixed: wizard no longer auto-triggers on version changes or first run; it only appears when a terminal explicitly fails to spawn (close code 4005).
+
 ## [7.2.0] - 2026-04-18
 
 ---
