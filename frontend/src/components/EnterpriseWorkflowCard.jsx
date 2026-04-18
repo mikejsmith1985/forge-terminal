@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle, Copy, Eye, EyeOff } from 'lucide-react'
+import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle, Copy, Eye, EyeOff, Info } from 'lucide-react'
 import { useWorkflowSetup } from '../hooks/useWorkflowSetup'
 import WorkflowWizard from './WorkflowWizard'
 import './EnterpriseWorkflowCard.css'
@@ -210,6 +210,9 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
                     <RefreshCw size={14} className={isRefreshing ? 'ewc-spin' : ''} />
                   </button>
                 </div>
+
+                {/* AI compliance notice — always visible when card is expanded */}
+                <AiComplianceNotice />
               </>
             ) : (
               <div className="ewc-unconfigured-body">
@@ -220,6 +223,7 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
                 <button className="ewc-btn ewc-btn-setup" onClick={handleOpenWizard}>
                   <Shield size={14} /> Setup Workflow
                 </button>
+                <AiComplianceNotice />
               </div>
             )}
           </div>
@@ -235,6 +239,27 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
         onToast={onToast}
       />
     </>
+  )
+}
+
+/**
+ * AiComplianceNotice — Small persistent callout shown at the bottom of the
+ * Enterprise Workflow card. Sets honest expectations about AI compliance:
+ * workflow rules are strong guidance, not hard enforcement, because of how
+ * large language models prioritize context. Framed as a known industry
+ * characteristic, not a product limitation.
+ */
+function AiComplianceNotice() {
+  return (
+    <div className="ewc-ai-notice">
+      <Info size={12} className="ewc-ai-notice-icon" />
+      <p className="ewc-ai-notice-text">
+        Workflow rules guide AI behavior — they are not hard enforced like a linter.
+        Compliance is high in most sessions but may vary in long or complex ones.
+        This reflects how large language models work today.{' '}
+        <span className="ewc-ai-notice-emphasis">We are continually improving as AI capabilities advance.</span>
+      </p>
+    </div>
   )
 }
 
