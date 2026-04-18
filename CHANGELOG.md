@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- **Command Cards: icon-forward layout** — Each command card now displays a large 42×42px icon block on the left (showing the card's emoji or lucide icon), with the title, command text, and Paste/Run buttons in a compact column to the right. The title size is reduced to better balance the prominent icon. Favorites now show an inline star indicator. The card height is reduced — more cards fit on screen at once.
+### Fixed
+- **Dev Dashboard: commit count always 0** — Replaced `--since=midnight` (locale-dependent, fails on some Windows Git builds) with an explicit `YYYY-MM-DDT00:00:00` boundary matching the format already used by the weekly chart. Also replaced `sync.Once` caching of `gitRoot` with a mutex-guarded retry — previously a failed first detection (e.g., when double-clicking the binary from Explorer) would cache an empty root forever and return 0 commits for the entire session.
+
+### Added
+- **Guided tour re-implemented** — Populated 7-step feature tour covering Command Cards, Release Manager, Vault, Multi-Tab Themes, and the Dev Dashboard. Tour activates via **Settings → Replay Tour**. `TOUR_VERSION` bumped to `7.1.0` so existing users see the new tour on next launch. `TourOverlay` re-wired into `App.jsx`.
 
 ## [7.0.0] - 2026-04-17
 

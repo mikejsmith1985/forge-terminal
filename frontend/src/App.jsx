@@ -46,6 +46,8 @@ import { performanceInstrumentation } from './utils/performanceInstrumentation'
 import { extractProjectFolder, getTabTitle, isStaticNamingStrategy } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
 import useGuidedTour from './hooks/useGuidedTour'
+import TourOverlay from './components/TourOverlay'
+import { TOUR_STEPS } from './config/tourSteps'
 import ConnectionDiagnosticWizard from './components/ConnectionDiagnosticWizard'
 
 const MAX_TABS = 20;
@@ -268,7 +270,14 @@ function App() {
   }), [tabs, createTab, closeTab]);
 
   // Connection diagnostic wizard — shown on first run and on PTY spawn failure.
+  // isActive/stepData drive the feature tour overlay (TourOverlay).
   const {
+    isActive: isTourActive,
+    currentStep: tourCurrentStep,
+    totalSteps: tourTotalSteps,
+    stepData: tourStepData,
+    nextStep: tourNextStep,
+    skipTour,
     isWizardVisible,
     wizardTriggerReason,
     triggerWizard,
@@ -2225,6 +2234,19 @@ function App() {
         onClose={closeWizard}
         onOpenNewTerminal={handleWizardOpenTerminal}
       />
+
+      {/* Feature tour overlay — shown when restartTour() is called from Settings,
+          or on first run if TOUR_STEPS has content for a new version. Only renders
+          when the tour is active and there are steps to show. */}
+      {isTourActive && TOUR_STEPS.length > 0 && (
+        <TourOverlay
+          step={tourStepData}
+          currentStep={tourCurrentStep}
+          totalSteps={tourTotalSteps}
+          onNext={tourNextStep}
+          onSkip={skipTour}
+        />
+      )}
 
     </div>
   )
