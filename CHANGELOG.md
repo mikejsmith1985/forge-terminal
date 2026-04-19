@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.2.3] - 2026-04-19
+
+---
+
+## [v7.2.3] - 2026-04-19
+
+## [7.2.3] - 2026-04-19
+
+### Fixed
+- **Command card emoji top-aligned** — Icon block was pinned to the top of the card because the card flex container used `align-items: flex-start`. Changed to `align-items: center` so the emoji is vertically centered relative to the title and buttons.
+
 ## [7.2.2] - 2026-04-19
 
 ---
