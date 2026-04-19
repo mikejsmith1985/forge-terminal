@@ -397,7 +397,10 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
 
   if (!isOpen) return null;
 
-  const hasUpdate = updateInfo?.available;
+  // After a manual "Check Now", freshUpdateInfo overrides the background-check prop
+  // so that both the status banner and the "Available Update" section stay in sync.
+  const effectiveUpdateInfo = freshUpdateInfo ?? updateInfo;
+  const hasUpdate = effectiveUpdateInfo?.available;
 
   return (
     <>
@@ -504,23 +507,6 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
             </div>
           )}
 
-          {freshUpdateInfo?.available && freshUpdateInfo.latestVersion !== updateInfo?.latestVersion && (
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '20px',
-              padding: '12px',
-              background: '#1e1b4b',
-              borderRadius: '8px',
-              border: '1px solid #8b5cf6'
-            }}>
-              <span style={{ color: '#a78bfa' }}>Latest Update Found</span>
-              <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#c4b5fd' }}>
-                {freshUpdateInfo.latestVersion}
-              </span>
-            </div>
-          )}
 
           {hasUpdate ? (
             <>
@@ -537,7 +523,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
               }}>
                 <span style={{ color: '#a78bfa' }}>Available Update</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#c4b5fd' }}>
-                  {updateInfo.latestVersion}
+                  {effectiveUpdateInfo.latestVersion}
                 </span>
               </div>
 
@@ -561,7 +547,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
               </div>
 
               {/* Release Notes */}
-              {updateInfo.releaseNotes && (
+              {effectiveUpdateInfo.releaseNotes && (
                 <div style={{ marginBottom: '20px' }}>
                   <h4 style={{ marginBottom: '8px', fontSize: '0.9em', color: '#888' }}>Release Notes</h4>
                   <div style={{ 
@@ -575,7 +561,7 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
                     whiteSpace: 'pre-wrap',
                     color: '#ccc'
                   }}>
-                    {updateInfo.releaseNotes}
+                    {effectiveUpdateInfo.releaseNotes}
                   </div>
                 </div>
               )}

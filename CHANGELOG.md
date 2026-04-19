@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.2.2] - 2026-04-19
+
+---
+
+## [v7.2.2] - 2026-04-19
+
+## [7.2.2] - 2026-04-19
+
+### Fixed
+- **Update modal shows "You're up to date!" and "Available Update" simultaneously** — `hasUpdate` was derived solely from the background-check prop (`updateInfo`), while the "Check Now" result was stored in separate `freshUpdateInfo` state. After a manual check the two sections rendered from different sources, producing contradictory UI. Fixed by introducing `effectiveUpdateInfo = freshUpdateInfo ?? updateInfo` so the fresh check overrides the background result and both sections stay in sync.
+
 ## [7.2.1] - 2026-04-18
 
 ---
