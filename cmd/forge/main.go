@@ -19,6 +19,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
@@ -1265,6 +1266,16 @@ func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 func handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	// Return cached result if still fresh (avoids burning the 60 req/hour GitHub rate limit)
+	cachedUpdateInfoMu.Lock()
+	if cachedUpdateInfo != nil && time.Since(cachedUpdateInfoTime) < updateCacheTTL {
+		info := cachedUpdateInfo
+		cachedUpdateInfoMu.Unlock()
+		json.NewEncoder(w).Encode(info)
+		return
+	}
+	cachedUpdateInfoMu.Unlock()
+
 	info, err := updater.CheckForUpdate()
 	if err != nil {
 		log.Printf("[Updater] Check failed: %v", err)
@@ -1276,11 +1287,23 @@ func handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cachedUpdateInfoMu.Lock()
+	cachedUpdateInfo = info
+	cachedUpdateInfoTime = time.Now()
+	cachedUpdateInfoMu.Unlock()
+
 	json.NewEncoder(w).Encode(info)
 }
 
-// Stored update info for apply
-var pendingUpdate *updater.UpdateInfo
+// cachedUpdateInfo holds the last successful CheckForUpdate result and its timestamp.
+// Shared between handleUpdateCheck and handleUpdateApply to avoid redundant GitHub API calls
+// that quickly exhaust the 60 req/hour unauthenticated rate limit (returning 403).
+var (
+	cachedUpdateInfo      *updater.UpdateInfo
+	cachedUpdateInfoTime  time.Time
+	cachedUpdateInfoMu    sync.Mutex
+	updateCacheTTL        = 5 * time.Minute
+)
 
 func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1290,14 +1313,27 @@ func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	// Check for update first
-	info, err := updater.CheckForUpdate()
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
+	// Use cached update info to avoid a second GitHub API call on apply
+	// (the check already ran when the modal opened or "Check Now" was clicked).
+	cachedUpdateInfoMu.Lock()
+	info := cachedUpdateInfo
+	cachedUpdateInfoMu.Unlock()
+
+	if info == nil || !info.Available {
+		// Cache miss or stale — fall back to a fresh check
+		var err error
+		info, err = updater.CheckForUpdate()
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+		cachedUpdateInfoMu.Lock()
+		cachedUpdateInfo = info
+		cachedUpdateInfoTime = time.Now()
+		cachedUpdateInfoMu.Unlock()
 	}
 
 	if !info.Available {

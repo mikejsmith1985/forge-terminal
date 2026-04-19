@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.2.4] - 2026-04-19
+
+---
+
+## [v7.2.4] - 2026-04-19
+
+## [7.2.4] - 2026-04-19
+
+### Fixed
+- **"GitHub API returned status 403" when clicking Update Now** — `handleUpdateApply` called `CheckForUpdate()` a second time on every "Update Now" click, burning a second GitHub API request and failing with 403 when the unauthenticated rate limit (60 req/hour) was reached. Fixed by caching the last successful check result (5-minute TTL) and reusing it in the apply handler. The check handler also returns the cached result on rapid re-checks for the same reason.
+
 ## [7.2.3] - 2026-04-19
 
 ---
