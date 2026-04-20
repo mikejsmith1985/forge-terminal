@@ -49,6 +49,7 @@ import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
 import { TOUR_STEPS } from './config/tourSteps'
 import ConnectionDiagnosticWizard from './components/ConnectionDiagnosticWizard'
+import LicenseGate from './components/LicenseGate'
 
 const MAX_TABS = 20;
 
@@ -72,6 +73,7 @@ const formatTaskType = (taskType) => {
 };
 
 function App() {
+  const [licenseStatus, setLicenseStatus] = useState(null)
   const [commands, setCommands] = useState([])
   const [commandsLoading, setCommandsLoading] = useState(true)
   const [commandsError, setCommandsError] = useState(null)
@@ -405,6 +407,11 @@ function App() {
   );
 
   useEffect(() => {
+    fetch('/api/license/status')
+      .then(r => r.json())
+      .then(d => setLicenseStatus(d.status))
+      .catch(() => setLicenseStatus('ok'))
+
     loadCommands()
     loadConfig()
     checkWSL()
@@ -1836,6 +1843,10 @@ function App() {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
+
+  if (licenseStatus === 'required' || licenseStatus === 'expired') {
+    return <LicenseGate status={licenseStatus} />
+  }
 
   return (
     <div className={`app ${sidebarPosition === 'left' ? 'sidebar-left' : ''} ${showEditor ? 'with-editor' : ''}`}>

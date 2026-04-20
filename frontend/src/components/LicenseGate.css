@@ -1,0 +1,145 @@
+.license-gate {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary, #0d0d0d);
+  z-index: 9999;
+}
+
+.license-gate__card {
+  width: 100%;
+  max-width: 420px;
+  padding: 2.5rem 2rem;
+  background: var(--bg-secondary, #141414);
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.license-gate__logo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.75rem;
+  color: var(--accent, #e07b39);
+}
+
+.license-gate__logo svg {
+  flex-shrink: 0;
+}
+
+.license-gate__logo-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #e8e8e8);
+  letter-spacing: 0.01em;
+}
+
+.license-gate__heading {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text-primary, #e8e8e8);
+  margin: 0 0 0.4rem;
+}
+
+.license-gate__sub {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  margin: 0 0 1.75rem;
+  line-height: 1.5;
+}
+
+.license-gate__sub--expired {
+  color: #e07b39;
+}
+
+.license-gate__label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary, #aaa);
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.license-gate__input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.9rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  background: var(--bg-tertiary, #1c1c1c);
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 6px;
+  color: var(--text-primary, #e8e8e8);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.license-gate__input:focus {
+  border-color: var(--accent, #e07b39);
+}
+
+.license-gate__input::placeholder {
+  color: var(--text-muted, #555);
+  font-size: 0.8rem;
+}
+
+.license-gate__error {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #e05c5c;
+  min-height: 1.2em;
+}
+
+.license-gate__actions {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.license-gate__btn-activate {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: var(--accent, #e07b39);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.license-gate__btn-activate:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.license-gate__btn-activate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.license-gate__buy-link {
+  display: block;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted, #888);
+  text-decoration: none;
+  padding: 0.35rem;
+  transition: color 0.15s;
+}
+
+.license-gate__buy-link:hover {
+  color: var(--accent, #e07b39);
+}
+
+.license-gate__divider {
+  border: none;
+  border-top: 1px solid var(--border-color, #2a2a2a);
+  margin: 1.2rem 0 1rem;
+}

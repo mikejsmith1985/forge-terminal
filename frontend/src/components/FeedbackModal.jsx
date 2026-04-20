@@ -3,7 +3,7 @@ import { Camera, Mail, X, Minus, Image as ImageIcon, Video, StopCircle, Trash2 }
 import html2canvas from 'html2canvas';
 import { getRecentLogs } from '../utils/logger';
 
-const FEEDBACK_EMAIL = 'info@rootlevellabs.tech';
+const FEEDBACK_EMAIL = 'team@rootlevellabs.tech';
 
 const FeedbackModal = ({ isOpen, onClose }) => {
     const [comment, setComment] = useState('');

@@ -1,0 +1,23 @@
+name = "forge-license"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+# Step 14: Enable your custom domain
+routes = [{ pattern = "license.rootlevellabs.tech", custom_domain = true }]
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "cb7212ce093844edb9c40c25bc6c27d8"
+
+[[kv_namespaces]]
+binding = "MACHINES"
+id = "6152e853b12e4f76acdf6e7c75d7d3ff"
+
+[[r2_buckets]]
+binding = "FORGE_RELEASES"
+bucket_name = "forge-releases"
+
+# Secrets — set via: wrangler secret put <NAME>
+# STRIPE_WEBHOOK_SECRET
+# HMAC_SECRET            (openssl rand -hex 32)
+# EMAIL_API_KEY          (Resend API key)
+# EMAIL_FROM             (e.g. "team@rootlevellabs.tech")

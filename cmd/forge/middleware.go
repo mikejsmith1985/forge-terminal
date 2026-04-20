@@ -6,25 +6,38 @@ import (
 	"strings"
 )
 
-// CORSMiddleware adds CORS headers to support GitHub Pages frontend
+// rootlevellabsOrigin returns true when origin is https://rootlevellabs.tech
+// or any subdomain (e.g. https://license.rootlevellabs.tech).
+func rootlevellabsOrigin(origin string) bool {
+	return origin == "https://rootlevellabs.tech" ||
+		strings.HasSuffix(origin, ".rootlevellabs.tech") &&
+			strings.HasPrefix(origin, "https://")
+}
+
+// CORSMiddleware adds CORS headers to support GitHub Pages and rootlevellabs.tech frontends.
 func CORSMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get allowed origins from environment or default to localhost
+		// Get allowed origins from environment or default to localhost + rootlevellabs.tech
 		allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 		if allowedOrigins == "" {
-			// Default: allow localhost and current origin
 			allowedOrigins = "http://localhost:3000,http://localhost:8333,http://127.0.0.1:8333"
 		}
 
-		// Check if origin is allowed
 		origin := r.Header.Get("Origin")
 		isAllowed := false
-		
-		for _, allowed := range strings.Split(allowedOrigins, ",") {
-			allowed = strings.TrimSpace(allowed)
-			if allowed == "*" || origin == allowed {
-				isAllowed = true
-				break
+
+		// Always allow rootlevellabs.tech and its subdomains
+		if rootlevellabsOrigin(origin) {
+			isAllowed = true
+		}
+
+		if !isAllowed {
+			for _, allowed := range strings.Split(allowedOrigins, ",") {
+				allowed = strings.TrimSpace(allowed)
+				if allowed == "*" || origin == allowed {
+					isAllowed = true
+					break
+				}
 			}
 		}
 
@@ -59,14 +72,34 @@ func SecureHeaders(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 
-		// Content Security Policy - allow external resources but prevent inline scripts
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss: https://*.trycloudflare.com;")
+		// Content Security Policy
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss: https://*.trycloudflare.com https://rootlevellabs.tech https://*.rootlevellabs.tech;")
 
 		next(w, r)
 	}
 }
 
-// WrapWithMiddleware wraps a handler with CORS, security, and auth middleware
+// LicenseMiddleware returns 402 Payment Required when the server started without
+// a valid license. licenseGated is set in main.go after CheckLicense().
+func LicenseMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if licenseGated {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			_, _ = w.Write([]byte(`{"error":"license required","code":"license_required"}`))
+			return
+		}
+		next(w, r)
+	}
+}
+
+// WrapWithMiddleware wraps a handler with CORS, security, auth, and license middleware.
 func WrapWithMiddleware(handler http.HandlerFunc) http.HandlerFunc {
+	return CORSMiddleware(SecureHeaders(AuthMiddleware(LicenseMiddleware(handler))))
+}
+
+// WrapLicenseHandler wraps a handler with CORS, security, and auth — but NOT the
+// license check. Used for /api/license/* endpoints that must work pre-activation.
+func WrapLicenseHandler(handler http.HandlerFunc) http.HandlerFunc {
 	return CORSMiddleware(SecureHeaders(AuthMiddleware(handler)))
 }

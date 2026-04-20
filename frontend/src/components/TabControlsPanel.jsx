@@ -253,8 +253,28 @@ function TabControlsPanel({ onToast, onNamingChange }) {
               <span style={{ fontFamily: 'monospace', color: '#888' }}>Projects</span>,{' '}
               <span style={{ fontFamily: 'monospace', color: '#888' }}>workspace</span>).
               Forge looks for this folder in your path and pins the tab name to its first child.
-              Leave empty to show the deepest directory name.
             </p>
+            {(tabDefaults.namingStrategy || 'project-root') === 'project-root' && !tabDefaults.namingRootFolder && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                padding: '8px 12px',
+                marginBottom: '10px',
+                background: '#2a1f00',
+                border: '1px solid #f59e0b55',
+                borderRadius: '6px',
+                fontSize: '11px',
+                color: '#fbbf24',
+                lineHeight: '1.5',
+              }}>
+                <span style={{ flexShrink: 0, marginTop: '1px' }}>⚠</span>
+                <span>
+                  No root folder configured — tabs will update on every <code style={{ fontFamily: 'monospace', background: '#ffffff11', padding: '0 3px', borderRadius: '3px' }}>cd</code>, same as <strong>Current Directory</strong> mode.
+                  Enter the folder name that contains your projects to pin tab names.
+                </span>
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="text"
