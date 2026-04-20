@@ -1,9 +1,9 @@
 /**
  * Forge Terminal License Server
- * Cloudflare Worker — ~150 lines
+ * Cloudflare Worker
  *
  * Endpoints:
- *   POST /webhook/stripe         Stripe webhook (create / suspend licenses)
+ *   POST /webhook/stripe         Stripe webhook (create / suspend / renew licenses)
  *   POST /license/activate       Register a machine, return HMAC token
  *   POST /license/validate       Check status, update lastSeen
  *   POST /license/deactivate     Remove machine registration
@@ -12,6 +12,7 @@
  *
  * KV namespaces (set in wrangler.toml):
  *   LICENSES  — key: "license:{key}"        value: LicenseRecord JSON
+ *               key: "sub:{subscriptionId}" value: license key string (reverse lookup)
  *   MACHINES  — key: "machine:{key}:{mid}"  value: MachineRecord JSON
  *               key: "count:{key}"          value: numeric string
  *
@@ -21,8 +22,14 @@
  * Secrets (wrangler secret put):
  *   STRIPE_WEBHOOK_SECRET
  *   HMAC_SECRET          (openssl rand -hex 32)
- *   EMAIL_API_KEY        (Resend or SendGrid)
- *   EMAIL_FROM           (e.g. "team@rootlevellabs.tech")
+ *   EMAIL_API_KEY        (Resend API key)
+ *   EMAIL_FROM           (e.g. "Forge Terminal <team@rootlevellabs.tech>")
+ *
+ * Stripe events handled:
+ *   checkout.session.completed    — create license, send email
+ *   invoice.payment_succeeded     — extend expiry (monthly renewal)
+ *   customer.subscription.deleted — suspend license
+ *   invoice.payment_failed        — suspend license
  */
 
 interface Env {
@@ -31,7 +38,7 @@ interface Env {
   FORGE_RELEASES: R2Bucket
   STRIPE_WEBHOOK_SECRET: string
   HMAC_SECRET: string
-  EMAIL_API_KEY: string
+  RESEND_API_KEY: string
   EMAIL_FROM: string
 }
 
@@ -85,45 +92,88 @@ async function verifyStripe(payload: string, header: string, secret: string): Pr
 }
 
 async function handleStripeWebhook(req: Request, env: Env): Promise<Response> {
+  if (!env.STRIPE_WEBHOOK_SECRET) return new Response('Webhook secret not configured', { status: 503 })
+
   const payload = await req.text()
   const sig = req.headers.get('Stripe-Signature') ?? ''
   if (!await verifyStripe(payload, sig, env.STRIPE_WEBHOOK_SECRET)) return new Response('Bad signature', { status: 400 })
 
   const event = JSON.parse(payload)
+
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object
-    const licenseKey = crypto.randomUUID()
-    const record: LicenseRecord = {
-      email: session.customer_details?.email ?? '',
-      status: 'active',
-      expiresAt: new Date(Date.now() + 365 * 86400000).toISOString(),
-      createdAt: new Date().toISOString(),
-      stripeSubscriptionId: session.subscription ?? '',
-    }
-    await env.LICENSES.put(`license:${licenseKey}`, JSON.stringify(record))
-    await sendLicenseEmail(record.email, licenseKey, env)
+    await handleCheckoutCompleted(event.data.object, env)
+
+  } else if (event.type === 'invoice.payment_succeeded') {
+    // Extend the license expiry on each successful monthly renewal.
+    const subId: string = event.data.object.subscription
+    if (subId) await extendLicenseExpiry(subId, env)
+
   } else if (event.type === 'customer.subscription.deleted' || event.type === 'invoice.payment_failed') {
-    const subId = event.data.object.id ?? event.data.object.subscription
-    // Scan is not ideal at scale — use metadata to store key in Stripe for O(1) lookup
-    const list = await env.LICENSES.list({ prefix: 'license:' })
-    for (const key of list.keys) {
-      const raw = await env.LICENSES.get(key.name)
-      if (!raw) continue
-      const rec: LicenseRecord = JSON.parse(raw)
-      if (rec.stripeSubscriptionId === subId) {
-        rec.status = 'suspended'
-        await env.LICENSES.put(key.name, JSON.stringify(rec))
-        break
-      }
-    }
+    const subId: string = event.data.object.id ?? event.data.object.subscription
+    if (subId) await suspendLicenseBySubscription(subId, env)
   }
+
   return new Response('ok')
+}
+
+// ── Monthly billing: 30 days + 5 grace days ───────────────────────────────────
+const MONTHLY_EXPIRY_MS = 35 * 86400000
+
+async function handleCheckoutCompleted(session: Record<string, unknown>, env: Env): Promise<void> {
+  const licenseKey = crypto.randomUUID()
+  const subscriptionId = (session.subscription as string) ?? ''
+  const record: LicenseRecord = {
+    email: (session.customer_details as Record<string, string>)?.email ?? '',
+    status: 'active',
+    expiresAt: new Date(Date.now() + MONTHLY_EXPIRY_MS).toISOString(),
+    createdAt: new Date().toISOString(),
+    stripeSubscriptionId: subscriptionId,
+  }
+
+  // Primary record
+  await env.LICENSES.put(`license:${licenseKey}`, JSON.stringify(record))
+
+  // Reverse-lookup so we can find the key in O(1) on subscription events
+  if (subscriptionId) {
+    await env.LICENSES.put(`sub:${subscriptionId}`, licenseKey)
+  }
+
+  await sendLicenseEmail(record.email, licenseKey, env)
+}
+
+// extendLicenseExpiry adds MONTHLY_EXPIRY_MS to the current time, keeping the
+// license active after Stripe successfully charges the next billing cycle.
+async function extendLicenseExpiry(subscriptionId: string, env: Env): Promise<void> {
+  const licenseKey = await env.LICENSES.get(`sub:${subscriptionId}`)
+  if (!licenseKey) return
+
+  const raw = await env.LICENSES.get(`license:${licenseKey}`)
+  if (!raw) return
+
+  const rec: LicenseRecord = JSON.parse(raw)
+  rec.expiresAt = new Date(Date.now() + MONTHLY_EXPIRY_MS).toISOString()
+  rec.status = 'active' // Reactivate if it was suspended due to payment failure
+  await env.LICENSES.put(`license:${licenseKey}`, JSON.stringify(rec))
+}
+
+// suspendLicenseBySubscription uses the O(1) reverse-lookup to find and suspend
+// a license when a subscription is cancelled or a payment fails.
+async function suspendLicenseBySubscription(subscriptionId: string, env: Env): Promise<void> {
+  const licenseKey = await env.LICENSES.get(`sub:${subscriptionId}`)
+  if (!licenseKey) return
+
+  const raw = await env.LICENSES.get(`license:${licenseKey}`)
+  if (!raw) return
+
+  const rec: LicenseRecord = JSON.parse(raw)
+  rec.status = 'suspended'
+  await env.LICENSES.put(`license:${licenseKey}`, JSON.stringify(rec))
 }
 
 async function sendLicenseEmail(email: string, key: string, env: Env): Promise<void> {
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${env.EMAIL_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: env.EMAIL_FROM,
       to: email,
@@ -136,6 +186,8 @@ async function sendLicenseEmail(email: string, key: string, env: Env): Promise<v
 // ── License endpoints ─────────────────────────────────────────────────────────
 
 async function handleActivate(req: Request, env: Env): Promise<Response> {
+  if (!env.HMAC_SECRET) return new Response('License service not yet configured', { status: 503 })
+
   const { key, machineId, machineName } = await req.json() as { key: string, machineId: string, machineName: string }
   const raw = await env.LICENSES.get(`license:${key}`)
   if (!raw) return new Response('License not found', { status: 404 })
@@ -154,6 +206,8 @@ async function handleActivate(req: Request, env: Env): Promise<Response> {
 }
 
 async function handleValidate(req: Request, env: Env): Promise<Response> {
+  if (!env.HMAC_SECRET) return new Response('License service not yet configured', { status: 503 })
+
   const token = req.headers.get('Authorization')?.replace('Bearer ', '')
   const payload = await verifyToken(token ?? '', env.HMAC_SECRET)
   if (!payload) return Response.json({ status: 'expired', expiresAt: '' })
@@ -171,6 +225,8 @@ async function handleValidate(req: Request, env: Env): Promise<Response> {
 }
 
 async function handleDeactivate(req: Request, env: Env): Promise<Response> {
+  if (!env.HMAC_SECRET) return new Response('License service not yet configured', { status: 503 })
+
   const token = req.headers.get('Authorization')?.replace('Bearer ', '')
   const payload = await verifyToken(token ?? '', env.HMAC_SECRET)
   if (!payload) return new Response('Invalid token', { status: 401 })

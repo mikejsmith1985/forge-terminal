@@ -310,7 +310,38 @@ foreach ($b in $builds) {
 Remove-Item Env:\GOOS  -ErrorAction SilentlyContinue
 Remove-Item Env:\GOARCH -ErrorAction SilentlyContinue
 
-# ── Stamp CHANGELOG ───────────────────────────────────────────────────────────
+# ── Upload binaries to R2 ─────────────────────────────────────────────────────
+Write-Banner "Uploading binaries to R2 (forge-releases)"
+
+$wranglerAvailable = Get-Command wrangler -ErrorAction SilentlyContinue
+if (-not $wranglerAvailable) {
+    Write-Warn "wrangler not found — skipping R2 upload. Run: npm install -g wrangler"
+} else {
+    # Map local binary names to the R2 key pattern: v{version}/forge-{platform}[.exe]
+    $r2Uploads = @(
+        @{ Local = "$BINDIR\fterm.exe";          R2Key = "v$NEW_VERSION/forge-windows-amd64.exe" },
+        @{ Local = "$BINDIR\forge-linux-amd64";  R2Key = "v$NEW_VERSION/forge-linux-amd64"       },
+        @{ Local = "$BINDIR\forge-darwin-amd64"; R2Key = "v$NEW_VERSION/forge-darwin-amd64"      },
+        @{ Local = "$BINDIR\forge-darwin-arm64"; R2Key = "v$NEW_VERSION/forge-darwin-arm64"      }
+    )
+    $r2Config = "$ROOT\cloudflare-worker\wrangler.toml"
+
+    foreach ($upload in $r2Uploads) {
+        if (-not (Test-Path $upload.Local)) {
+            Write-Warn "Binary not found, skipping R2: $($upload.Local)"
+            continue
+        }
+        Write-Step "Uploading to R2: $($upload.R2Key)..."
+        wrangler r2 object put "forge-releases/$($upload.R2Key)" --file $upload.Local --config $r2Config
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "R2 upload failed for $($upload.R2Key) — continuing (GitHub release will still be created)"
+        } else {
+            Write-OK "R2: $($upload.R2Key)"
+        }
+    }
+}
+
+
 Write-Banner "Stamping CHANGELOG"
 $changelogPath = "$ROOT\CHANGELOG.md"
 if (Test-Path $changelogPath) {
