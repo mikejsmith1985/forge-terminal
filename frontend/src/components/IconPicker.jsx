@@ -486,7 +486,7 @@ const CATEGORIES = {
       { name: 'si_Planetscale',      Icon: SiPlanetscale,      label: 'PlanetScale' },
       { name: 'si_Rabbitmq',         Icon: SiRabbitmq,         label: 'RabbitMQ' },
       { name: 'si_Kafka',            Icon: SiApachekafka,      label: 'Kafka' },
-      { name: 'si_Nats',             Icon: SiNats,             label: 'NATS' },
+      { name: 'si_Natsdotio',          Icon: SiNatsdotio,          label: 'NATS' },
     ],
   },
 
