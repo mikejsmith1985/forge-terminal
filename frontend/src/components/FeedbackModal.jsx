@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Camera, Mail, X, Minus, Image as ImageIcon, Video, StopCircle, Trash2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { Camera, Github, Copy, Check, Settings, ExternalLink, Image as ImageIcon, Minus, X, Trash2, Video, StopCircle } from 'lucide-react';
-import { getLogs, getRecentLogs } from '../utils/logger';
+import { getRecentLogs } from '../utils/logger';
 
-// ----------------------------------------------------------------------
-// CONFIGURATION
-// ----------------------------------------------------------------------
-// Replace this with your Application's Client ID from https://api.imgur.com/oauth2/addclient
-// Select "Anonymous usage without user authorization" when registering.
-const IMGUR_CLIENT_ID = '';
-// ----------------------------------------------------------------------
+const FEEDBACK_EMAIL = 'team@rootlevellabs.tech';
 
 const FeedbackModal = ({ isOpen, onClose }) => {
     const [comment, setComment] = useState('');
@@ -19,254 +13,84 @@ const FeedbackModal = ({ isOpen, onClose }) => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingStream, setRecordingStream] = useState(null);
     const [isCapturing, setIsCapturing] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [createdIssueUrl, setCreatedIssueUrl] = useState(null);
-
-    // Auth State
-    const [githubToken, setGithubToken] = useState('');
-    const [showSetup, setShowSetup] = useState(false);
     const [status, setStatus] = useState({ type: '', msg: '' });
+    const [submitted, setSubmitted] = useState(false);
 
     useEffect(() => {
-        if (!isOpen) return;
-        
-        const savedToken = localStorage.getItem('forge_github_token');
-        if (savedToken) {
-            setGithubToken(savedToken);
-            setShowSetup(false);
-        } else {
-            setShowSetup(true);
+        if (!isOpen) {
+            setComment('');
+            setScreenshots([]);
+            setVideoBlob(null);
+            setVideoUrl(null);
+            setStatus({ type: '', msg: '' });
+            setSubmitted(false);
         }
     }, [isOpen]);
 
-    // Setup paste event listener for Ctrl+V functionality
+    // Paste image from clipboard via Ctrl+V
     useEffect(() => {
         if (!isOpen) return;
-
         const handlePaste = async (e) => {
-            // Only handle paste when modal is open and we're not in the text input
-            const isTextInput = e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT';
-            if (isTextInput) return; // Let default paste behavior work in text inputs
-
-            // Don't intercept paste if target is outside the modal (e.g., terminal)
             const modal = document.querySelector('.modal-overlay');
-            if (modal && !modal.contains(e.target)) {
-                return; // Let terminal or other components handle it
-            }
+            if (modal && !modal.contains(e.target)) return;
+            const isText = e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT';
+            if (isText) return;
 
             const items = e.clipboardData?.items;
-            if (!items || items.length === 0) return;
-
-            e.preventDefault(); // Prevent default paste behavior for media
-
-            let foundMedia = false;
-
-            // Handle images and videos
+            if (!items) return;
             for (const item of items) {
                 if (item.type.startsWith('image/')) {
-                    foundMedia = true;
+                    e.preventDefault();
                     const blob = item.getAsFile();
                     if (blob) {
                         const reader = new FileReader();
-                        reader.onload = (e) => {
-                            setScreenshots(prev => [...prev, e.target.result]);
-                            setStatus({ type: 'success', msg: 'Image pasted!' });
+                        reader.onload = (ev) => {
+                            setScreenshots(prev => [...prev, ev.target.result]);
+                            setStatus({ type: 'success', msg: 'Screenshot pasted!' });
                             setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
                         };
                         reader.readAsDataURL(blob);
                     }
-                } else if (item.type.startsWith('video/')) {
-                    foundMedia = true;
-                    const blob = item.getAsFile();
-                    if (blob) {
-                        const url = URL.createObjectURL(blob);
-                        setVideoBlob(blob);
-                        setVideoUrl(url);
-                        setStatus({ type: 'success', msg: 'Video pasted!' });
-                        setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
-                    }
-                }
-            }
-
-            if (!foundMedia) {
-                // Check for text
-                const text = e.clipboardData.getData('text/plain');
-                if (text && !isTextInput) {
-                    // Paste text into comment field if it's not already focused
-                    setComment(prev => prev + text);
-                    setStatus({ type: 'info', msg: 'Text pasted into description' });
-                    setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
+                    return;
                 }
             }
         };
-
         document.addEventListener('paste', handlePaste);
-
-        return () => {
-            document.removeEventListener('paste', handlePaste);
-        };
+        return () => document.removeEventListener('paste', handlePaste);
     }, [isOpen]);
 
     if (!isOpen) return null;
-
-    const validateGithubToken = async (token) => {
-        const authHeader = token.startsWith('github_pat_') ? `Bearer ${token}` : `token ${token}`;
-        
-        try {
-            const res = await fetch('https://api.github.com/user', {
-                headers: {
-                    'Authorization': authHeader,
-                    'X-GitHub-Api-Version': '2022-11-28',
-                }
-            });
-            
-            if (res.status === 401) {
-                return { valid: false, error: 'Invalid token. Please check your PAT.' };
-            }
-            if (res.status === 403) {
-                return { valid: false, error: 'Token lacks permissions. Needs "public_repo" scope.' };
-            }
-            if (!res.ok) {
-                return { valid: false, error: 'Failed to validate token. Please try again.' };
-            }
-            
-            return { valid: true };
-        } catch (err) {
-            return { valid: false, error: 'Network error. Check your connection.' };
-        }
-    };
-
-    const handleSaveSettings = async () => {
-        if (!githubToken.trim()) {
-            setStatus({ type: 'error', msg: 'GitHub Token is required' });
-            return;
-        }
-        
-        setStatus({ type: 'info', msg: 'Validating token...' });
-        
-        const validation = await validateGithubToken(githubToken.trim());
-        
-        if (!validation.valid) {
-            setStatus({ type: 'error', msg: validation.error });
-            return;
-        }
-        
-        localStorage.setItem('forge_github_token', githubToken.trim());
-        setShowSetup(false);
-        setStatus({ type: 'success', msg: 'Token validated successfully!' });
-        setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
-    };
-
-    const handleStartRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            const chunks = [];
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) chunks.push(e.data);
-            };
-
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                setVideoBlob(blob);
-                setVideoUrl(url);
-                setIsRecording(false);
-                setRecordingStream(null);
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            mediaRecorder.start();
-            setIsRecording(true);
-            setRecordingStream(stream);
-
-            // Auto-stop after 30 seconds
-            setTimeout(() => {
-                if (mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
-                }
-            }, 30000);
-
-        } catch (err) {
-            console.error('Recording failed:', err);
-            setStatus({ type: 'error', msg: 'Failed to start recording' });
-        }
-    };
-
-    const handleStopRecording = () => {
-        if (recordingStream) {
-            recordingStream.getTracks().forEach(track => track.stop());
-            // This will trigger mediaRecorder.onstop
-        }
-    };
-
-    const handleRemoveVideo = () => {
-        setVideoBlob(null);
-        setVideoUrl(null);
-    };
 
     const handleCapture = async () => {
         setIsCapturing(true);
         try {
             const modal = document.querySelector('.modal-overlay');
             if (modal) modal.style.visibility = 'hidden';
-
-            const canvas = await html2canvas(document.body, {
-                allowTaint: true,
-                useCORS: true,
-                logging: false,
-            });
-
+            const canvas = await html2canvas(document.body, { allowTaint: true, useCORS: true, logging: false });
             if (modal) modal.style.visibility = 'visible';
-
-            const dataUrl = canvas.toDataURL('image/png');
-            setScreenshots(prev => [...prev, dataUrl]);
-
-            // Backup copy to clipboard
-            canvas.toBlob(async (blob) => {
-                try {
-                    await navigator.clipboard.write([
-                        new ClipboardItem({ 'image/png': blob })
-                    ]);
-                } catch (err) {
-                    console.error('Clipboard copy failed:', err);
-                }
-            });
-
+            setScreenshots(prev => [...prev, canvas.toDataURL('image/png')]);
         } catch (err) {
             console.error('Screenshot failed:', err);
             const modal = document.querySelector('.modal-overlay');
             if (modal) modal.style.visibility = 'visible';
+            setStatus({ type: 'error', msg: 'Screenshot failed' });
+            setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
         } finally {
             setIsCapturing(false);
         }
     };
 
-    const handleRemoveScreenshot = (index) => {
-        setScreenshots(prev => prev.filter((_, i) => i !== index));
-    };
-
     const handlePasteFromClipboard = async () => {
         try {
-            // Check permission first to provide better UX
-            const permissionStatus = await navigator.permissions.query({ name: 'clipboard-read' });
-            
-            if (permissionStatus.state === 'denied') {
-                setStatus({ type: 'error', msg: 'Clipboard access denied. Please allow in browser settings.' });
-                setTimeout(() => setStatus({ type: '', msg: '' }), 3000);
-                return;
-            }
-
-            const clipboardItems = await navigator.clipboard.read();
-            for (const item of clipboardItems) {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
                 for (const type of item.types) {
                     if (type.startsWith('image/')) {
                         const blob = await item.getType(type);
                         const reader = new FileReader();
                         reader.onload = (e) => {
                             setScreenshots(prev => [...prev, e.target.result]);
-                            setStatus({ type: 'success', msg: 'Image pasted from clipboard!' });
+                            setStatus({ type: 'success', msg: 'Image pasted!' });
                             setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
                         };
                         reader.readAsDataURL(blob);
@@ -277,470 +101,241 @@ const FeedbackModal = ({ isOpen, onClose }) => {
             setStatus({ type: 'warning', msg: 'No image found in clipboard' });
             setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
         } catch (err) {
-            console.error('Paste failed:', err);
-            setStatus({ type: 'error', msg: 'Failed to paste. Try Ctrl+v instead.' });
+            setStatus({ type: 'error', msg: 'Try Ctrl+V to paste instead' });
             setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
         }
     };
 
-    const uploadToImgur = async (base64Image) => {
-        if (!IMGUR_CLIENT_ID) throw new Error('NO_IMGUR_ID');
-
-        const content = base64Image.split(',')[1];
-        const formData = new FormData();
-        formData.append('image', content);
-        formData.append('type', 'base64');
-
-        const res = await fetch('https://api.imgur.com/3/image', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Client-ID ${IMGUR_CLIENT_ID}`
-            },
-            body: formData
-        });
-
-        if (!res.ok) throw new Error('IMGUR_UPLOAD_FAILED');
-        const data = await res.json();
-        return data.data.link;
-    };
-
-    const uploadToGithub = async (base64Image) => {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `feedback-${timestamp}.png`;
-        const content = base64Image.split(',')[1];
-
-        // Try Bearer first (for fine-grained PATs), then fall back to token (for classic PATs)
-        const authHeader = githubToken.startsWith('github_pat_') ? `Bearer ${githubToken}` : `token ${githubToken}`;
-        
-        const res = await fetch(`https://api.github.com/repos/mikejsmith1985/forge-terminal-2/contents/feedback-screenshots/${filename}`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': authHeader,
-                'Content-Type': 'application/json',
-                'X-GitHub-Api-Version': '2022-11-28',
-            },
-            body: JSON.stringify({
-                message: 'upload feedback screenshot',
-                content: content,
-            })
-        });
-
-        if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            console.error('[Feedback] GitHub upload failed:', res.status, errorData);
-            if (res.status === 401) throw new Error('INVALID_TOKEN');
-            if (res.status === 403 || res.status === 404) throw new Error('PERMISSION_DENIED');
-            throw new Error('GITHUB_UPLOAD_FAILED');
-        }
-
-        const data = await res.json();
-        return data.content.download_url;
-    };
-
-    const uploadVideoToGithub = async (blob) => {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `feedback-video-${timestamp}.webm`;
-        
-        // Try Bearer first (for fine-grained PATs), then fall back to token (for classic PATs)
-        const authHeader = githubToken.startsWith('github_pat_') ? `Bearer ${githubToken}` : `token ${githubToken}`;
-        
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64data = reader.result.split(',')[1];
-                try {
-                    const res = await fetch(`https://api.github.com/repos/mikejsmith1985/forge-terminal-2/contents/feedback-screenshots/${filename}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': authHeader,
-                            'Content-Type': 'application/json',
-                            'X-GitHub-Api-Version': '2022-11-28',
-                        },
-                        body: JSON.stringify({
-                            message: 'upload feedback video',
-                            content: base64data,
-                        })
-                    });
-                    
-                    if (!res.ok) {
-                        const errorData = await res.json().catch(() => ({}));
-                        console.error('[Feedback] Video upload failed:', res.status, errorData);
-                        throw new Error('GITHUB_UPLOAD_FAILED');
-                    }
-                    const data = await res.json();
-                    resolve(data.content.download_url);
-                } catch (e) {
-                    reject(e);
-                }
-            };
-            reader.readAsDataURL(blob);
-        });
-    };
-
-    const createIssue = async (imageUrls, videoUrl) => {
-        const title = `Feedback: ${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}`;
-        let body = `**Description**\n${comment}\n\n`;
-
-        if (imageUrls && imageUrls.length > 0) {
-            body += `**Screenshot${imageUrls.length > 1 ? 's' : ''}**\n`;
-            imageUrls.forEach((url, idx) => {
-                body += `<img src="${url}">\n\n`;
-            });
-        } else {
-            body += `**Screenshot**\n> 📋 **Paste Screenshot Here**\n> The screenshot is in your clipboard. Please press **Ctrl+v** (or Cmd+V) to attach it.\n\n`;
-        }
-
-        if (videoUrl) {
-            body += `**Screen Recording**\n[Watch Video](${videoUrl})\n\n`;
-        }
-
-        body += `**Environment**\n- User Agent: ${navigator.userAgent}\n- Time: ${new Date().toISOString()}\n\n`;
-
-        // Get logs from last 3 minutes
-        const recentLogs = getRecentLogs(3);
-        if (recentLogs) {
-            body += `<details>\n<summary>Application Logs (Last 3 Minutes)</summary>\n\n\`\`\`\n${recentLogs}\n\`\`\`\n</details>`;
-        }
-
-        // Try Bearer first (for fine-grained PATs), then fall back to token (for classic PATs)
-        const authHeader = githubToken.startsWith('github_pat_') ? `Bearer ${githubToken}` : `token ${githubToken}`;
-        
-        const res = await fetch(`https://api.github.com/repos/mikejsmith1985/forge-terminal-2/issues`, {
-            method: 'POST',
-            headers: {
-                'Authorization': authHeader,
-                'Content-Type': 'application/json',
-                'X-GitHub-Api-Version': '2022-11-28',
-            },
-            body: JSON.stringify({ title, body })
-        });
-
-        if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            console.error('[Feedback] Issue creation failed:', res.status, errorData);
-            if (res.status === 401) throw new Error('INVALID_TOKEN');
-            throw new Error('ISSUE_FAILED');
-        }
-        return await res.json();
-    };
-
-    const handleSubmit = async () => {
-        if (!comment) return;
-        setIsSubmitting(true);
-        setStatus({ type: 'info', msg: 'Processing...' });
-
+    const handleStartRecording = async () => {
         try {
-            let imageUrls = [];
-
-            if (screenshots.length > 0) {
-                for (let i = 0; i < screenshots.length; i++) {
-                    const screenshot = screenshots[i];
-                    let imageUrl = null;
-                    
-                    // Strategy: Imgur -> GitHub Repo -> Fail
-                    if (IMGUR_CLIENT_ID) {
-                        setStatus({ type: 'info', msg: `Uploading screenshot ${i + 1}/${screenshots.length} to Imgur...` });
-                        try {
-                            imageUrl = await uploadToImgur(screenshot);
-                        } catch (err) {
-                            console.warn('Imgur failed, trying GitHub...', err);
-                        }
-                    }
-
-                    if (!imageUrl) {
-                        setStatus({ type: 'info', msg: `Uploading screenshot ${i + 1}/${screenshots.length} to Repo...` });
-                        try {
-                            imageUrl = await uploadToGithub(screenshot);
-                        } catch (err) {
-                            console.warn('GitHub upload failed:', err);
-                            setStatus({ type: 'warning', msg: 'Upload failed. Creating issue...' });
-                        }
-                    }
-                    
-                    if (imageUrl) {
-                        imageUrls.push(imageUrl);
-                    }
-                }
-            }
-
-            let uploadedVideoUrl = null;
-            if (videoBlob) {
-                setStatus({ type: 'info', msg: 'Uploading video...' });
-                try {
-                    uploadedVideoUrl = await uploadVideoToGithub(videoBlob);
-                } catch (err) {
-                    console.warn('Video upload failed:', err);
-                    setStatus({ type: 'warning', msg: 'Video upload failed. Continuing...' });
-                }
-            }
-
-            setStatus({ type: 'info', msg: 'Creating GitHub issue...' });
-            const issue = await createIssue(imageUrls, uploadedVideoUrl);
-
-            setCreatedIssueUrl(issue.html_url);
-            setStatus({ type: 'success', msg: `Issue #${issue.number} created!` });
-            setTimeout(() => {
-                onClose();
-                setComment('');
-                setScreenshots([]);
-                setVideoBlob(null);
-                setVideoUrl(null);
-                setStatus({ type: '', msg: '' });
-                setCreatedIssueUrl(null);
-            }, 2000);
-
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            const chunks = [];
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                setVideoBlob(blob);
+                setVideoUrl(URL.createObjectURL(blob));
+                setIsRecording(false);
+                setRecordingStream(null);
+                stream.getTracks().forEach(t => t.stop());
+            };
+            mediaRecorder.start();
+            setIsRecording(true);
+            setRecordingStream(stream);
+            setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); }, 30000);
         } catch (err) {
-            console.error(err);
-            let errorMsg = 'Failed to create issue.';
-            if (err.message === 'INVALID_TOKEN') {
-                errorMsg = 'Invalid PAT. Please update your token in settings.';
-            } else if (err.message === 'PERMISSION_DENIED') {
-                errorMsg = 'PAT lacks permissions. Needs "public_repo" scope.';
-            } else if (err.message === 'ISSUE_FAILED') {
-                errorMsg = 'Failed to create issue. Check your PAT permissions.';
-            }
-            setStatus({ type: 'error', msg: errorMsg });
-        } finally {
-            setIsSubmitting(false);
+            setStatus({ type: 'error', msg: 'Recording failed' });
+            setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
         }
     };
+
+    const handleStopRecording = () => {
+        if (recordingStream) recordingStream.getTracks().forEach(t => t.stop());
+    };
+
+    const handleSend = () => {
+        if (!comment.trim()) {
+            setStatus({ type: 'error', msg: 'Please describe your feedback first' });
+            setTimeout(() => setStatus({ type: '', msg: '' }), 2000);
+            return;
+        }
+
+        const logs = getRecentLogs ? getRecentLogs(3) : '';
+        const env = `OS: ${navigator.platform} | Browser: ${navigator.userAgent.split(' ').pop()} | Time: ${new Date().toISOString()}`;
+
+        let body = comment + '\n\n';
+        body += '---\n';
+        body += env + '\n';
+        if (logs) body += '\nRecent logs:\n' + logs;
+        if (screenshots.length > 0) {
+            body += `\n\n[${screenshots.length} screenshot(s) captured — please attach from the Forge Terminal window]`;
+        }
+        if (videoBlob) {
+            body += '\n[Screen recording captured — please attach manually]';
+        }
+
+        const subject = `Forge Terminal Feedback: ${comment.substring(0, 60)}`;
+        const mailtoUrl = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailtoUrl, '_blank');
+        setSubmitted(true);
+    };
+
+    const statusColors = { success: '#22c55e', error: '#ef4444', warning: '#f59e0b', info: '#60a5fa' };
 
     return (
         <div className="modal-overlay">
-            <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal" style={{ maxWidth: '560px' }}>
                 <div className="modal-header">
-                    <h3><Github size={20} style={{ marginRight: '8px', verticalAlign: 'bottom' }} /> Send Feedback</h3>
-                    <button 
-                        className="btn-close" 
-                        onClick={onClose}
-                        title={screenshots.length > 0 ? "Minimize (screenshots saved)" : "Close"}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Mail size={18} />
+                        Send Feedback
+                    </h3>
+                    <button className="btn-close" onClick={onClose}>
                         {screenshots.length > 0 ? <Minus size={20} strokeWidth={3} /> : <X size={20} />}
                     </button>
                 </div>
 
                 <div className="modal-body">
-                    {showSetup ? (
-                        <div className="setup-view">
-                            <div className="alert alert-info" style={{ marginBottom: '20px', padding: '15px', background: '#1e293b', borderRadius: '6px', border: '1px solid #334155' }}>
-                                <h4 style={{ margin: '0 0 10px 0', display: 'flex', alignItems: 'center' }}>
-                                    <Settings size={16} style={{ marginRight: '8px' }} />
-                                    Setup Required
-                                </h4>
-                                <p style={{ fontSize: '0.9em', color: '#cbd5e1' }}>
-                                    To submit feedback directly, you need a GitHub Personal Access Token (PAT).
-                                </p>
-                            </div>
-
-                            <div className="form-group">
-                                <label>GitHub Token (Required)</label>
-                                <div style={{ fontSize: '0.8em', color: '#888', marginBottom: '5px' }}>
-                                    Needed to create issues. <a href="https://github.com/settings/tokens/new?scopes=public_repo&description=Forge+Terminal+Feedback" target="_blank" rel="noreferrer" style={{ color: '#60a5fa' }}>Generate Token</a>
-                                </div>
-                                <input
-                                    type="password"
-                                    value={githubToken}
-                                    onChange={(e) => setGithubToken(e.target.value)}
-                                    placeholder="ghp_xxxxxxxxxxxx"
-                                    className="form-control"
-                                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #333', background: '#1a1a1a', color: '#fff' }}
-                                />
-                            </div>
-
-                            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-                                <button className="btn btn-primary" onClick={handleSaveSettings}>Save Settings</button>
-                            </div>
+                    {submitted ? (
+                        <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+                            <Mail size={40} style={{ color: '#22c55e', marginBottom: '12px' }} />
+                            <h4 style={{ color: '#e5e5e5', marginBottom: '8px' }}>Your email client should have opened!</h4>
+                            <p style={{ color: '#a3a3a3', fontSize: '0.85rem' }}>
+                                Send the pre-filled email to <strong style={{ color: '#f97316' }}>{FEEDBACK_EMAIL}</strong>.
+                                {screenshots.length > 0 && ' Attach your screenshots before sending.'}
+                            </p>
+                            <button
+                                className="btn btn-secondary"
+                                style={{ marginTop: '20px' }}
+                                onClick={() => setSubmitted(false)}
+                            >
+                                Send More Feedback
+                            </button>
                         </div>
                     ) : (
-                        <div className="feedback-form">
+                        <>
                             <div className="form-group">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                    <label>Issue Description</label>
-                                    <button
-                                        className="btn-link"
-                                        onClick={() => setShowSetup(true)}
-                                        style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '0.8em' }}
-                                    >
-                                        Update Settings
-                                    </button>
-                                </div>
+                                <label style={{ display: 'block', marginBottom: '6px', color: '#a3a3a3', fontSize: '0.85rem' }}>
+                                    Describe your feedback or issue
+                                </label>
                                 <textarea
                                     value={comment}
                                     onChange={(e) => setComment(e.target.value)}
-                                    placeholder="Describe the issue or suggestion..."
-                                    rows={4}
-                                    className="form-control"
-                                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #333', background: '#1a1a1a', color: '#fff' }}
+                                    placeholder="What happened? What did you expect? Steps to reproduce..."
+                                    rows={5}
+                                    style={{
+                                        width: '100%', padding: '10px', borderRadius: '8px',
+                                        border: '1px solid #333', background: '#1a1a1a',
+                                        color: '#e5e5e5', resize: 'vertical', fontSize: '0.9rem',
+                                        boxSizing: 'border-box'
+                                    }}
                                 />
                             </div>
 
-                            <div className="screenshot-section" style={{ marginTop: '20px', marginBottom: '20px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                    <label>Screenshots {screenshots.length > 0 && `(${screenshots.length})`}</label>
+                            {/* Screenshot tools */}
+                            <div style={{ marginTop: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                    <span style={{ color: '#a3a3a3', fontSize: '0.85rem' }}>
+                                        Screenshots {screenshots.length > 0 && `(${screenshots.length})`}
+                                    </span>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                         <button
-                                            type="button"
                                             className="btn btn-secondary btn-sm"
                                             onClick={handlePasteFromClipboard}
                                             title="Paste image from clipboard"
                                         >
-                                            <ImageIcon size={16} style={{ marginRight: '6px' }} />
+                                            <ImageIcon size={14} style={{ marginRight: '4px' }} />
                                             Paste
                                         </button>
                                         <button
-                                            type="button"
                                             className="btn btn-secondary btn-sm"
                                             onClick={handleCapture}
                                             disabled={isCapturing || isRecording}
                                         >
-                                            <Camera size={16} style={{ marginRight: '6px' }} />
-                                            {isCapturing ? 'Capturing...' : screenshots.length > 0 ? 'Add Another' : 'Capture'}
+                                            <Camera size={14} style={{ marginRight: '4px' }} />
+                                            {isCapturing ? 'Capturing...' : 'Capture'}
                                         </button>
-                                        {!isRecording && !videoBlob && (
+                                        {!isRecording ? (
                                             <button
-                                                type="button"
                                                 className="btn btn-secondary btn-sm"
                                                 onClick={handleStartRecording}
-                                                disabled={isCapturing}
+                                                disabled={isCapturing || !!videoBlob}
                                             >
-                                                <Video size={16} style={{ marginRight: '6px' }} />
-                                                Record Screen (30s)
+                                                <Video size={14} style={{ marginRight: '4px' }} />
+                                                Record
                                             </button>
-                                        )}
-                                        {isRecording && (
+                                        ) : (
                                             <button
-                                                type="button"
-                                                className="btn btn-danger btn-sm"
+                                                className="btn btn-secondary btn-sm"
                                                 onClick={handleStopRecording}
-                                                style={{ background: '#ef4444', color: 'white', border: 'none' }}
+                                                style={{ color: '#ef4444' }}
                                             >
-                                                <StopCircle size={16} style={{ marginRight: '6px' }} />
-                                                Stop Recording
+                                                <StopCircle size={14} style={{ marginRight: '4px' }} />
+                                                Stop
                                             </button>
                                         )}
                                     </div>
                                 </div>
 
-                                {screenshots.length === 0 && !videoBlob && !isRecording && (
-                                    <div style={{ 
-                                        padding: '30px', 
-                                        border: '2px dashed #333', 
-                                        borderRadius: '8px', 
-                                        textAlign: 'center',
-                                        background: '#0a0a0a',
-                                        color: '#888'
-                                    }}>
-                                        <ImageIcon size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
-                                        <p style={{ margin: '0 0 8px 0', fontSize: '0.9em' }}>
-                                            Press <kbd>Ctrl+v</kbd> to paste screenshot
-                                        </p>
-                                        <p style={{ margin: 0, fontSize: '0.85em', color: '#666' }}>
-                                            or use the buttons above
-                                        </p>
+                                {/* Screenshot thumbnails */}
+                                {screenshots.length > 0 && (
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                                        {screenshots.map((src, i) => (
+                                            <div key={i} style={{ position: 'relative' }}>
+                                                <img
+                                                    src={src}
+                                                    alt={`Screenshot ${i + 1}`}
+                                                    style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #333' }}
+                                                />
+                                                <button
+                                                    onClick={() => setScreenshots(prev => prev.filter((_, idx) => idx !== i))}
+                                                    style={{
+                                                        position: 'absolute', top: '-6px', right: '-6px',
+                                                        background: '#ef4444', border: 'none', borderRadius: '50%',
+                                                        width: '18px', height: '18px', cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        color: 'white', padding: 0
+                                                    }}
+                                                >
+                                                    <X size={10} />
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 
                                 {videoUrl && (
-                                    <div className="video-preview" style={{ marginBottom: '10px', border: '1px solid #333', borderRadius: '6px', padding: '10px', background: '#111', position: 'relative' }}>
-                                        <video src={videoUrl} controls style={{ maxWidth: '100%', borderRadius: '4px' }} />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                        <video src={videoUrl} style={{ height: '48px', borderRadius: '6px' }} controls />
                                         <button
-                                            type="button"
-                                            onClick={handleRemoveVideo}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '5px',
-                                                right: '5px',
-                                                background: 'rgba(239, 68, 68, 0.9)',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                padding: '4px 6px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                color: '#fff',
-                                                fontSize: '0.75em'
-                                            }}
-                                            title="Remove video"
+                                            onClick={() => { setVideoBlob(null); setVideoUrl(null); }}
+                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
                                         >
-                                            <Trash2 size={12} /> Remove
+                                            <Trash2 size={14} />
                                         </button>
                                     </div>
                                 )}
 
-                                {screenshots.length > 0 && (
-                                    <div className="screenshots-preview" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        {screenshots.map((screenshot, index) => (
-                                            <div key={index} className="screenshot-preview" style={{ border: '1px solid #333', borderRadius: '6px', padding: '10px', background: '#111', position: 'relative' }}>
-                                                <img src={screenshot} alt={`Screenshot ${index + 1}`} style={{ maxWidth: '100%', borderRadius: '4px' }} />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveScreenshot(index)}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '5px',
-                                                        right: '5px',
-                                                        background: 'rgba(239, 68, 68, 0.9)',
-                                                        border: 'none',
-                                                        borderRadius: '4px',
-                                                        padding: '4px 6px',
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '4px',
-                                                        color: '#fff',
-                                                        fontSize: '0.75em'
-                                                    }}
-                                                    title="Remove screenshot"
-                                                >
-                                                    <Trash2 size={12} /> Remove
-                                                </button>
-                                            </div>
-                                        ))}
-                                        <div style={{ fontSize: '0.9em', color: '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Check size={14} color="#4ade80" /> {screenshots.length} screenshot{screenshots.length > 1 ? 's' : ''} ready to submit
-                                        </div>
+                                {isRecording && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
+                                        Recording screen (max 30s)...
                                     </div>
                                 )}
                             </div>
 
                             {status.msg && (
-                                <div className={`alert alert-${status.type}`} style={{
-                                    marginBottom: '15px',
-                                    padding: '10px',
-                                    borderRadius: '4px',
-                                    background: status.type === 'error' ? '#450a0a' : status.type === 'success' ? '#052e16' : '#172554',
-                                    color: status.type === 'error' ? '#fca5a5' : status.type === 'success' ? '#86efac' : '#bfdbfe',
-                                    fontSize: '0.9em'
+                                <div style={{
+                                    marginTop: '12px', padding: '8px 12px', borderRadius: '6px',
+                                    background: 'rgba(0,0,0,0.3)', border: `1px solid ${statusColors[status.type] || '#555'}`,
+                                    color: statusColors[status.type] || '#e5e5e5', fontSize: '0.85rem'
                                 }}>
-                                    {createdIssueUrl ? (
-                                        <a 
-                                            href={createdIssueUrl} 
-                                            target="_blank" 
-                                            rel="noreferrer"
-                                            style={{ color: 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                        >
-                                            {status.msg} <ExternalLink size={14} />
-                                        </a>
-                                    ) : status.msg}
+                                    {status.msg}
                                 </div>
                             )}
 
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                                <button
-                                    type="button"
-                                    className="btn btn-primary"
-                                    onClick={handleSubmit}
-                                    disabled={!comment || isSubmitting}
-                                >
-                                    {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
-                                </button>
-                            </div>
-                        </div>
+                            <p style={{ color: '#555', fontSize: '0.75rem', marginTop: '12px', marginBottom: 0 }}>
+                                Opens your email client pre-filled with your feedback to {FEEDBACK_EMAIL}
+                            </p>
+                        </>
                     )}
                 </div>
+
+                {!submitted && (
+                    <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleSend}
+                            disabled={!comment.trim()}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                            <Mail size={15} />
+                            Open Email Client
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

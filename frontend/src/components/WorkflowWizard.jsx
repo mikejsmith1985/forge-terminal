@@ -139,12 +139,13 @@ const WorkflowWizard = ({ isOpen, onClose, projectPath, workflow, onToast }) => 
     }
   }, [isOpen, projectPath, detect, loadPresets, loadModules])
 
-  // Set project name from detection
+  // Set project name from detection — skip if user already selected a preset
+  // (updateConfig clears selectedPreset, which would make the checkmark vanish)
   useEffect(() => {
-    if (detection?.projectName && !config.projectName) {
+    if (detection?.projectName && !config.projectName && !selectedPreset) {
       updateConfig({ projectName: detection.projectName })
     }
-  }, [detection, config.projectName, updateConfig])
+  }, [detection, config.projectName, updateConfig, selectedPreset])
 
   // Auto-generate preview when entering the apply step (step index 4)
   useEffect(() => {
@@ -461,7 +462,7 @@ function StepConfigure({ config, moduleCatalog, onToggleModule, onSetQualityMode
             <Shield size={16} />
             <div>
               <strong>BEST</strong>
-              <span>Multi-agent, thorough, Code Tutor</span>
+              <span>Multi-agent, thorough, full review</span>
             </div>
           </button>
           <button

@@ -29,7 +29,24 @@ export function extractProjectFolder(rawPath, rootFolder) {
     }
   }
 
-  // Fallback: deepest segment (previous default behaviour)
+  // Smarter fallback when no rootFolder is configured:
+  // On Windows absolute paths (C:/...) skip the drive letter and use the
+  // second segment (the direct child of the drive root, e.g. "ProjectsWin\forge-terminal" → "forge-terminal").
+  // On Unix absolute paths skip the leading empty segment and pick the second real segment.
+  // This keeps the tab more stable than always showing the deepest directory.
+  const isDrivePath = /^[a-zA-Z]:$/.test(parts[0]); // e.g. "C:"
+  const isUnixAbsolute = rawPath.startsWith('/');
+
+  if (isDrivePath && parts.length >= 3) {
+    // C: / ProjectsWin / forge-terminal / ... → return parts[2] (the project)
+    return parts[2];
+  }
+  if (isUnixAbsolute && parts.length >= 2) {
+    // /home/user/repos/project/... → return parts[1] isn't great; prefer deepest if shallow
+    return parts.length >= 3 ? parts[2] : parts[parts.length - 1];
+  }
+
+  // Last resort: deepest segment
   return parts[parts.length - 1];
 }
 

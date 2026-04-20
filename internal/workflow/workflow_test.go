@@ -26,7 +26,6 @@ func TestDefaultConfig(t *testing.T) {
 		ModuleTestingStandards,
 		ModulePRWorkflow,
 		ModuleDocumentation,
-		ModuleCodeTutor,
 		ModuleMultiAgent,
 	}
 

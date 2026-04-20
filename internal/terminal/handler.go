@@ -380,11 +380,15 @@ func NewHandlerDirect(amSys interface{}, visionP *vision.Parser, llmDet *llm.Det
 	return &Handler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				// Check allowed origins for GitHub Pages deployment support
 				origin := r.Header.Get("Origin")
 
 				// Allow localhost for local development
 				if strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") {
+					return true
+				}
+
+				// Allow rootlevellabs.tech and all subdomains (Cloudflare ecosystem)
+				if origin == "https://rootlevellabs.tech" || (strings.HasPrefix(origin, "https://") && strings.HasSuffix(origin, ".rootlevellabs.tech")) {
 					return true
 				}
 

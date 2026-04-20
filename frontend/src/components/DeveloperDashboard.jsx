@@ -8,7 +8,7 @@ import './DeveloperDashboard.css';
 
 const DAY_ORDER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const DeveloperDashboard = ({ isOpen, onClose, devMode = false, tabCount = 0 }) => {
+const DeveloperDashboard = ({ isOpen, onClose, devMode = false, tabCount = 0, projectDir = '' }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
@@ -18,11 +18,14 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false, tabCount = 0 }) 
 
   const fetchStats = useCallback(async () => {
     if (!isOpen) return;
-    
+
     setRefreshing(true);
     setError(null);
     try {
-      const res = await fetch('/api/dashboard/stats');
+      const url = projectDir
+        ? `/api/dashboard/stats?dir=${encodeURIComponent(projectDir)}`
+        : '/api/dashboard/stats';
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const data = await res.json();
       setStats(data);

@@ -88,10 +88,35 @@ type dashboardStats struct {
 	NumCPU       int     `json:"numCPU"`
 }
 
+// gitCmdInDir builds a hidden git command rooted at dir (or falls back to detectGitRoot).
+func gitCmdInDir(dir string, args ...string) *exec.Cmd {
+	if dir == "" {
+		dir = detectGitRoot()
+	}
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	hideWindow(cmd)
+	return cmd
+}
+
 func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
+	}
+
+	// Allow frontend to specify the project directory so git commands run in
+	// the user's active project, not the forge binary's own working directory.
+	projectDir := r.URL.Query().Get("dir")
+	if projectDir != "" {
+		// Resolve git root from the provided directory
+		cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+		cmd.Dir = projectDir
+		hideWindow(cmd)
+		if out, err := cmd.Output(); err == nil {
+			projectDir = strings.TrimSpace(string(out))
+		}
+		// If git rev-parse fails, use the raw dir as-is (may not be a git repo)
 	}
 
 	stats := dashboardStats{
@@ -122,16 +147,14 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Git branch
-	if out, err := gitCmd("rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
+	if out, err := gitCmdInDir(projectDir, "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
 		stats.GitBranch = strings.TrimSpace(string(out))
 	}
 
 	// Git commits today — use an explicit ISO 8601 date+time instead of --since=midnight
 	// because "midnight" is locale-dependent and fails in some Git distributions on Windows.
-	// We build the boundary as "YYYY-MM-DDT00:00:00" in local time, matching the same format
-	// already used by the weekly chart below.
 	todayStart := time.Now().Format("2006-01-02") + "T00:00:00"
-	if out, err := gitCmd("log", "--oneline", "--all", "--since="+todayStart).Output(); err == nil {
+	if out, err := gitCmdInDir(projectDir, "log", "--oneline", "--all", "--since="+todayStart).Output(); err == nil {
 		lines := strings.TrimSpace(string(out))
 		if lines != "" {
 			stats.GitCommits = len(strings.Split(lines, "\n"))
@@ -139,7 +162,7 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Git changed files (unstaged + staged)
-	if out, err := gitCmd("status", "--porcelain").Output(); err == nil {
+	if out, err := gitCmdInDir(projectDir, "status", "--porcelain").Output(); err == nil {
 		lines := strings.TrimSpace(string(out))
 		if lines != "" {
 			stats.GitChanged = len(strings.Split(lines, "\n"))
@@ -147,7 +170,7 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Last commit message + relative time (across all branches)
-	if out, err := gitCmd("log", "-1", "--all", "--format=%s (%ar)").Output(); err == nil {
+	if out, err := gitCmdInDir(projectDir, "log", "-1", "--all", "--format=%s (%ar)").Output(); err == nil {
 		stats.GitLastCommit = strings.TrimSpace(string(out))
 	}
 
@@ -157,7 +180,7 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 		dayStart := date.Format("2006-01-02") + "T00:00:00"
 		dayEnd := date.Format("2006-01-02") + "T23:59:59"
 		label := date.Format("Mon")
-		if out, err := gitCmd("log", "--oneline", "--all", "--since="+dayStart, "--until="+dayEnd).Output(); err == nil {
+		if out, err := gitCmdInDir(projectDir, "log", "--oneline", "--all", "--since="+dayStart, "--until="+dayEnd).Output(); err == nil {
 			lines := strings.TrimSpace(string(out))
 			if lines != "" {
 				stats.GitWeekly[label] = len(strings.Split(lines, "\n"))

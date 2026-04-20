@@ -56,7 +56,7 @@ const humanizeTime = (date) => {
   if (mins < 60) return `${mins}m ago`;
   if (hours < 24) return `${hours}h ago`;
   if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString();
+  return parsedDate.toLocaleDateString();
 };
 
 // File item component

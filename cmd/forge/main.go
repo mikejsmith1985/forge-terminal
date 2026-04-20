@@ -19,11 +19,13 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
+	"github.com/mikejsmith1985/forge-terminal/internal/license"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
@@ -45,6 +47,17 @@ var devMode string
 
 // Terminal handler (set at startup for session management)
 var termHandler *terminal.Handler
+
+// licenseGated is true when no valid license was found at startup.
+// LicenseMiddleware reads this to return 402 on all gated API routes.
+var licenseGated bool
+
+// activeLicenseStatus and activeLicenseInfo hold the startup license check result.
+// handlers_license.go updates these after a successful in-process activation.
+var (
+	activeLicenseStatus license.Status
+	activeLicenseInfo   *license.Info
+)
 
 // headerFixingResponseWriter wraps http.ResponseWriter to fix MIME types for embedded assets
 type headerFixingResponseWriter struct {
@@ -243,6 +256,17 @@ func main() {
 	// Initialize Forge Vault (AES-256-GCM encrypted secret store)
 	initVault(storage.GetVaultDir())
 
+	// Check license at startup — gates all /api/* routes via LicenseMiddleware.
+	activeLicenseStatus, activeLicenseInfo = license.CheckLicense()
+	licenseGated = activeLicenseStatus != license.StatusOK && activeLicenseStatus != license.StatusGrace
+	log.Printf("[License] Startup: status=%s gated=%v", activeLicenseStatus, licenseGated)
+	if !licenseGated {
+		updater.DownloadURLResolver = func(ver, platform string) (string, error) {
+			return license.SignedDownloadURL(activeLicenseInfo, ver, platform)
+		}
+		go license.StartHeartbeat(activeLicenseInfo)
+	}
+
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
@@ -283,7 +307,7 @@ func main() {
 
 	// Create terminal handler with direct dependencies
 	termHandler = terminal.NewHandlerDirect(nil, visionParser, llmDetector)
-	http.HandleFunc("/ws", AuthMiddleware(termHandler.HandleWebSocket))
+	http.HandleFunc("/ws", AuthMiddleware(LicenseMiddleware(termHandler.HandleWebSocket)))
 
 	// Commands API
 	http.HandleFunc("/api/commands", WrapWithMiddleware(handleCommands))
@@ -514,6 +538,11 @@ func main() {
 	initMCPServer()
 	http.HandleFunc("/api/mcp", handleMCP)
 	http.HandleFunc("/api/mcp/tasks/", handleMCPTaskStatus)
+
+	// ── License routes (always available — bypass LicenseMiddleware) ──────
+	http.HandleFunc("/api/license/activate", WrapLicenseHandler(handleLicenseActivate))
+	http.HandleFunc("/api/license/status", WrapLicenseHandler(handleLicenseStatus))
+	http.HandleFunc("/api/license/deactivate", WrapLicenseHandler(handleLicenseDeactivate))
 
 	// ── Forge Vault routes (AES-256-GCM encrypted secret store) ──────────
 	http.HandleFunc("/api/vault/status", WrapWithMiddleware(handleVaultStatus))
@@ -1265,6 +1294,16 @@ func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 func handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	// Return cached result if still fresh (avoids burning the 60 req/hour GitHub rate limit)
+	cachedUpdateInfoMu.Lock()
+	if cachedUpdateInfo != nil && time.Since(cachedUpdateInfoTime) < updateCacheTTL {
+		info := cachedUpdateInfo
+		cachedUpdateInfoMu.Unlock()
+		json.NewEncoder(w).Encode(info)
+		return
+	}
+	cachedUpdateInfoMu.Unlock()
+
 	info, err := updater.CheckForUpdate()
 	if err != nil {
 		log.Printf("[Updater] Check failed: %v", err)
@@ -1276,11 +1315,23 @@ func handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cachedUpdateInfoMu.Lock()
+	cachedUpdateInfo = info
+	cachedUpdateInfoTime = time.Now()
+	cachedUpdateInfoMu.Unlock()
+
 	json.NewEncoder(w).Encode(info)
 }
 
-// Stored update info for apply
-var pendingUpdate *updater.UpdateInfo
+// cachedUpdateInfo holds the last successful CheckForUpdate result and its timestamp.
+// Shared between handleUpdateCheck and handleUpdateApply to avoid redundant GitHub API calls
+// that quickly exhaust the 60 req/hour unauthenticated rate limit (returning 403).
+var (
+	cachedUpdateInfo      *updater.UpdateInfo
+	cachedUpdateInfoTime  time.Time
+	cachedUpdateInfoMu    sync.Mutex
+	updateCacheTTL        = 5 * time.Minute
+)
 
 func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1290,14 +1341,27 @@ func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	// Check for update first
-	info, err := updater.CheckForUpdate()
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
-		return
+	// Use cached update info to avoid a second GitHub API call on apply
+	// (the check already ran when the modal opened or "Check Now" was clicked).
+	cachedUpdateInfoMu.Lock()
+	info := cachedUpdateInfo
+	cachedUpdateInfoMu.Unlock()
+
+	if info == nil || !info.Available {
+		// Cache miss or stale — fall back to a fresh check
+		var err error
+		info, err = updater.CheckForUpdate()
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+		cachedUpdateInfoMu.Lock()
+		cachedUpdateInfo = info
+		cachedUpdateInfoTime = time.Now()
+		cachedUpdateInfoMu.Unlock()
 	}
 
 	if !info.Available {

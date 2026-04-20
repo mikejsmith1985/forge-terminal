@@ -253,7 +253,6 @@ func DefaultConfig() WorkflowConfig {
 			ModulePRWorkflow,
 			ModuleDocumentation,
 			ModuleMultiAgent,
-			ModuleCodeTutor,
 			ModuleWorkflowEnforcer,
 			ModuleGitHooks,
 			ModulePRTemplate,

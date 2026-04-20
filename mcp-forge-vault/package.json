@@ -1,0 +1,13 @@
+{
+  "name": "mcp-forge-vault",
+  "version": "1.0.0",
+  "description": "MCP server exposing Forge Vault secrets to Claude Code",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  }
+}

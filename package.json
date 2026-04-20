@@ -1,11 +1,16 @@
 {
-  "dependencies": {},
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.19.1",
     "cypress": "^15.8.1",
     "cypress-real-events": "^1.15.0",
     "js-yaml": "^4.1.1",
     "recast": "^0.23.11",
-    "to-ico": "^1.1.5"
+    "to-ico": "^1.1.5",
+    "wrangler": "^4.83.0"
   },
-  "version": "3.18.11"
+  "version": "3.18.11",
+  "scripts": {
+    "deploy": "npx bundle exec jekyll build && wrangler deploy",
+    "preview": "npx bundle exec jekyll build && wrangler dev"
+  }
 }

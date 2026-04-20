@@ -67,39 +67,16 @@ const useGuidedTour = (actionHandlers = {}) => {
     }
 
     const checkTourStatus = () => {
-      // Check localStorage for tour completion
+      // Never auto-show the diagnostic wizard — it only fires on PTY spawn failure
+      // (close code 4005 → triggerWizard('spawnFailed')). Auto-showing it on first
+      // run or version changes causes a false "Cannot Reach Server" error because
+      // the backend may still be initializing when the fetch fires.
       const storedData = localStorage.getItem(TOUR_STORAGE_KEY);
-
-      if (!storedData) {
-        // First run — show the diagnostic wizard after a short delay to let the UI settle.
-        setTimeout(() => {
-          setWizardTriggerReason('firstRun');
-          setIsWizardVisible(true);
-          setIsReady(true);
-        }, 1500);
-        return;
+      if (!storedData || (() => { try { return JSON.parse(storedData).version !== TOUR_VERSION; } catch { return true; } })()) {
+        // Silently stamp the current version so future checks pass without triggering.
+        localStorage.setItem(TOUR_STORAGE_KEY, JSON.stringify({ version: TOUR_VERSION, completedAt: new Date().toISOString() }));
       }
-
-      try {
-        const { version } = JSON.parse(storedData);
-        // Show wizard again if the version changed (new features / new defaults).
-        if (version !== TOUR_VERSION) {
-          setTimeout(() => {
-            setWizardTriggerReason('firstRun');
-            setIsWizardVisible(true);
-            setIsReady(true);
-          }, 1500);
-        } else {
-          setIsReady(true);
-        }
-      } catch (parseError) {
-        // Corrupt stored data — treat as first run.
-        setTimeout(() => {
-          setWizardTriggerReason('firstRun');
-          setIsWizardVisible(true);
-          setIsReady(true);
-        }, 1500);
-      }
+      setIsReady(true);
     };
 
     checkTourStatus();
