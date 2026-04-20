@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **License API handlers** — `/api/license/status`, `/api/license/activate`, `/api/license/deactivate` endpoints. `LicenseMiddleware` returns 402 Payment Required when no valid license is present.
 - **Cloudflare Worker backend** — Stripe webhook receiver, per-machine KV activation store, R2 signed download URL generation. Deployed at `license.rootlevellabs.tech`.
 - **LicenseGate component** — React activation UI that gates the terminal behind a license key form.
-- **MCP Vault adapter** — Node.js stdio MCP server (`mcp-forge-vault/`) exposing 8 vault tools to Claude Code. Registered in `.mcp.json` for this project.
+- **MCP stdio proxy** — `mcp-forge-vault/index.js` rewritten as a transparent stdio→HTTP bridge to Forge's built-in MCP server (`/api/mcp`). Reads `~/.forge/mcp-token` at startup, probes localhost for the Forge port, and dynamically proxies all built-in tools (`terminal_execute`, `terminal_read`, `file_read`, `file_write`, `file_list`, `workflow_status`, `task_submit`) to Claude Code. Registered in `.mcp.json`.
 - **CORS expansion** — `rootlevellabs.tech` and all subdomains are now always-allowed origins.
 
 ## [7.2.4] - 2026-04-19
