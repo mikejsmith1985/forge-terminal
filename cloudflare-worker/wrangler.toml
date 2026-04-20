@@ -19,5 +19,5 @@ bucket_name = "forge-releases"
 # Secrets — set via: wrangler secret put <NAME>
 # STRIPE_WEBHOOK_SECRET
 # HMAC_SECRET            (openssl rand -hex 32)
-# EMAIL_API_KEY          (Resend API key)
-# EMAIL_FROM             (e.g. "team@rootlevellabs.tech")
+# RESEND_API_KEY         (Resend API key — already set)
+# EMAIL_FROM             (already set — e.g. "Forge Terminal <team@rootlevellabs.tech>")

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **R2 binary upload in release pipeline** — `scripts/local-release.ps1` now uploads all platform binaries to `forge-releases` R2 bucket (key pattern: `v{version}/forge-{platform}[.exe]`) after each build, enabling the in-app auto-update download flow.
+- **Monthly license subscription model** — Cloudflare Worker now sets `expiresAt` to 35 days (30 days + 5-day grace) and extends on each `invoice.payment_succeeded` event instead of hardcoded 365-day expiry. Supports monthly Stripe subscriptions.
+- **O(1) subscription lookup** — Worker stores `sub:{subscriptionId}` → license key reverse mapping in KV, eliminating the O(n) full KV scan on cancellation/payment failure.
+- **Subscription renewal handler** — Worker now handles `invoice.payment_succeeded` events to extend license expiry on each monthly billing cycle.
+
+### Fixed
+- **Worker secret name mismatch** — Worker was referencing `EMAIL_API_KEY` but the deployed secret is named `RESEND_API_KEY`; corrected interface and email function.
+- **Worker 500 on missing secrets** — Worker now returns 503 (Service Unavailable) with a clear message when `HMAC_SECRET` or `STRIPE_WEBHOOK_SECRET` are not configured, instead of crashing with an unhandled 500.
+- **HMAC_SECRET deployed** — Secret generated and uploaded to `forge-license` Cloudflare Worker; stored in Forge Vault.
+- **workflow.json cosmetic fix** — Removed `"code-tutor"` from `enabledModules` in `.forge/workflow.json` (Code Tutor was already fully removed from all code).
+
 ## [7.2.7] - 2026-04-20
 
 ---
