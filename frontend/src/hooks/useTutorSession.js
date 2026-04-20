@@ -1,17 +1,17 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { API_CONFIG } from '../config'
 
-const STORAGE_KEY = 'forge-tutor-session'
+// Code Tutor session logic removed — Code Tutor fully disabled
 const AUTH_TOKEN_KEY = 'forge-auth-token'
 const WATCHER_POLL_MS = 3000
 const ERROR_DISMISS_MS = 5000
 
 /**
- * Fetch wrapper for tutor API calls.
+// Code Tutor API logic removed — Code Tutor fully disabled
  * Prepends the configured API base, sets JSON content type,
  * and attaches the auth token when available.
  */
-const tutorFetch = async (url, options = {}) => {
+// tutorFetch removed — Code Tutor fully disabled
   const base = API_CONFIG.base
   const token = localStorage.getItem(AUTH_TOKEN_KEY)
 
@@ -37,7 +37,7 @@ const tutorFetch = async (url, options = {}) => {
 }
 
 /**
- * React hook for managing Code Tutor sessions.
+// useTutorSession removed — Code Tutor fully disabled
  *
  * Provides full lifecycle management — creating, loading, navigating,
  * explaining files, updating settings, polling for watcher notifications,
@@ -78,7 +78,7 @@ const tutorFetch = async (url, options = {}) => {
  *   wizardSkip: () => void,
  * }}
  */
-export function useTutorSession() {
+// useTutorSession removed — Code Tutor fully disabled
   const [session, setSession] = useState(null)
   const [explanation, setExplanation] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -133,7 +133,7 @@ export function useTutorSession() {
     setWizardStepIndex(0)
     setChangeExplanation(null)
     try {
-      const data = await tutorFetch(`/api/tutor/sessions/${sessionId}`)
+      // Code Tutor fully disabled — logic removed
       setSession(data)
       localStorage.setItem(STORAGE_KEY, sessionId)
     } catch (err) {
@@ -153,7 +153,7 @@ export function useTutorSession() {
     setWizardStepIndex(0)
     setChangeExplanation(null)
     try {
-      const data = await tutorFetch('/api/tutor/sessions', {
+      // Code Tutor fully disabled — logic removed
         method: 'POST',
         body: JSON.stringify({ projectPath, mode }),
       })
@@ -171,7 +171,7 @@ export function useTutorSession() {
   const deleteSession = useCallback(async (sessionId) => {
     setIsLoading(true)
     try {
-      await tutorFetch(`/api/tutor/sessions?id=${encodeURIComponent(sessionId)}`, {
+      // Code Tutor fully disabled — logic removed
         method: 'DELETE',
       })
       setSessions((prev) => prev.filter((s) => s.id !== sessionId))
@@ -191,7 +191,7 @@ export function useTutorSession() {
   const listSessions = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await tutorFetch('/api/tutor/sessions')
+      // Code Tutor fully disabled — logic removed
       setSessions(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('[TutorSession] listSessions error:', err)
@@ -211,7 +211,7 @@ export function useTutorSession() {
     try {
       const body = { sessionId: session.id, action }
       if (index !== undefined) body.index = index
-      const data = await tutorFetch('/api/tutor/navigate', {
+      // Code Tutor fully disabled — logic removed
         method: 'POST',
         body: JSON.stringify(body),
       })
@@ -238,7 +238,7 @@ export function useTutorSession() {
     if (!session) return
     setIsExplaining(true)
     try {
-      const data = await tutorFetch('/api/tutor/explain', {
+      // Code Tutor fully disabled — logic removed
         method: 'POST',
         body: JSON.stringify({ sessionId: session.id }),
       })
@@ -259,7 +259,7 @@ export function useTutorSession() {
     if (!session) return
     setIsLoading(true)
     try {
-      await tutorFetch('/api/tutor/settings', {
+      // Code Tutor fully disabled — logic removed
         method: 'PUT',
         body: JSON.stringify({ sessionId: session.id, settings }),
       })
@@ -321,7 +321,7 @@ export function useTutorSession() {
     setChangeExplanation(null)
     setExplanationError(null)
     try {
-      const data = await tutorFetch('/api/tutor/explain-change', {
+      // Code Tutor fully disabled — logic removed
         method: 'POST',
         body: JSON.stringify({ sessionId: session.id, filePath, diff }),
       })
@@ -387,7 +387,7 @@ export function useTutorSession() {
 
     const poll = async () => {
       try {
-        const data = await tutorFetch(
+        // Code Tutor fully disabled — logic removed
           `/api/tutor/watcher?sessionId=${encodeURIComponent(session.id)}`
         )
         // Backend returns an array of WatcherNotification objects

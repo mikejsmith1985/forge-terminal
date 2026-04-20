@@ -46,7 +46,7 @@ const (
 	ModulePRWorkflow          ModuleID = "pr-workflow"
 	ModuleDocumentation       ModuleID = "documentation"
 	ModuleMultiAgent          ModuleID = "multi-agent"
-	ModuleCodeTutor           ModuleID = "code-tutor"
+// ModuleCodeTutor removed — Code Tutor fully disabled
 	ModuleWorkflowEnforcer    ModuleID = "workflow-enforcer"
 	ModuleGitHooks            ModuleID = "git-hooks"
 	ModulePRTemplate          ModuleID = "pr-template"
@@ -66,7 +66,7 @@ func AllModules() []ModuleID {
 		ModulePRWorkflow,
 		ModuleDocumentation,
 		ModuleMultiAgent,
-		ModuleCodeTutor,
+
 		ModuleWorkflowEnforcer,
 		ModuleGitHooks,
 		ModulePRTemplate,
@@ -135,13 +135,7 @@ func ModuleCatalog() []ModuleInfo {
 			Category:    "integration",
 			Required:    false,
 		},
-		{
-			ID:          ModuleCodeTutor,
-			Name:        "Code Tutor Integration",
-			Description: "Notification-first file change detection. Multi-depth explanations (Overview → Technical → Line-by-Line).",
-			Category:    "integration",
-			Required:    false,
-		},
+
 		{
 			ID:          ModuleWorkflowEnforcer,
 			Name:        "Workflow Enforcer Skill",
@@ -189,7 +183,7 @@ type WorkflowConfig struct {
 	ConflictStrategy FileConflictStrategy `json:"conflictStrategy"`
 	ProjectName      string               `json:"projectName"`
 	ProjectType      ProjectType          `json:"projectType"`
-	TutorSettings    TutorWorkflowConfig  `json:"tutorSettings"`
+
 	PRReviewSettings PRReviewConfig       `json:"prReviewSettings"`
 }
 
@@ -259,12 +253,7 @@ func DefaultConfig() WorkflowConfig {
 			ModuleCopilotAgentSetup,
 		},
 		ConflictStrategy: ConflictSkip,
-		TutorSettings: TutorWorkflowConfig{
-			AutoNotify:   true,
-			DefaultDepth: "standard",
-			AuditNaming:  true,
-			AuditComments: true,
-		},
+
 		PRReviewSettings: PRReviewConfig{
 			Strategy:         PRReviewTutorAndAgent,
 			AutoTrigger:      true,

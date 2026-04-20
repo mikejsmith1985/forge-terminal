@@ -62,11 +62,8 @@ const MODULE_DISPLAY_INFO = {
     color: '#06b6d4',
     shortDescription: 'Living CHANGELOG, no doc sprawl, README discipline',
   },
-  'code-tutor': {
-    icon: BookOpen,
-    color: '#ec4899',
-    shortDescription: 'Auto-notify on changes, multi-depth explanations',
-  },
+  // 'code-tutor' removed — Code Tutor fully disabled
+
   'multi-agent': {
     icon: Users,
     color: '#f97316',
@@ -544,7 +541,7 @@ function StepConfigure({ config, moduleCatalog, onToggleModule, onSetQualityMode
  */
 function StepPRReview({ config, onUpdateConfig }) {
   // Which strategy cards are currently shown as selected
-  const selectedStrategy = config.prReviewStrategy || 'tutor-and-agent'
+  const selectedStrategy = config.prReviewStrategy || 'agent' // Code Tutor strategies removed
 
   const reviewStrategies = [
     {
@@ -596,7 +593,7 @@ function StepPRReview({ config, onUpdateConfig }) {
     onUpdateConfig({ prReviewAgentFocusAreas: updatedAreas })
   }, [selectedFocusAreas, onUpdateConfig])
 
-  const hasAgentComponent = selectedStrategy === 'agent' || selectedStrategy === 'tutor-and-agent'
+  const hasAgentComponent = selectedStrategy === 'agent' // Code Tutor strategies removed
 
   return (
     <div className="ww-step-content">

@@ -72,12 +72,7 @@ func BuiltInPresets() []WorkflowPreset {
 			ModuleWorkflowEnforcer,
 		},
 		ConflictStrategy: ConflictSkip,
-		TutorSettings: TutorWorkflowConfig{
-			AutoNotify:   false,
-			DefaultDepth: "brief",
-			AuditNaming:  true,
-			AuditComments: false,
-		},
+
 		PRReviewSettings: PRReviewConfig{
 			Strategy:         PRReviewManual,
 			AutoTrigger:      false,

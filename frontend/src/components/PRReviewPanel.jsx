@@ -3,8 +3,7 @@
  *
  * Displays the output of a Quality Agent review: an overall score, a summary
  * paragraph, and a categorized list of findings with severity badges.
- * Used alongside Code Tutor to give the user both a human-readable walkthrough
- * (tutor) and structured machine findings (agent) in the same session.
+// Code Tutor references removed — Code Tutor fully disabled
  */
 import React, { useState, useCallback } from 'react'
 import {

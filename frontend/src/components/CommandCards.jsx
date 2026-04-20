@@ -7,7 +7,7 @@ import OwnerReleaseCard from './OwnerReleaseCard';
 import DirectoryCard from './DirectoryCard';
 import EnterpriseWorkflowCard from './EnterpriseWorkflowCard';
 
-const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd, directoryCardVisible = true, onHideDirectoryCard, onOpenTutor }) => {
+const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd, directoryCardVisible = true, onHideDirectoryCard }) => { // onOpenTutor removed — Code Tutor fully disabled
   if (loading) {
     return (
       <div className="command-cards-container">
@@ -19,7 +19,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           shellType={shellType}
           cwd={cwd}
         />
-        <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} onOpenTutor={onOpenTutor} />
+        <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
         <div className="command-cards-loading">
           <div className="spinner"></div>
           <p>Loading command cards...</p>
@@ -39,7 +39,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           shellType={shellType}
           cwd={cwd}
         />
-        <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} onOpenTutor={onOpenTutor} />
+        <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
         <div className="command-cards-error">
           <p className="error-message">⚠️ Failed to load command cards</p>
           <p className="error-details">{error}</p>
@@ -106,7 +106,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
         </div>
       )}
       {/* Enterprise Workflow Architect card — always visible */}
-      <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} onOpenTutor={onOpenTutor} />
+      <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
     </div>
   );
 };

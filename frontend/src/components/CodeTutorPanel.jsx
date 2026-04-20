@@ -5,7 +5,7 @@ import {
   GitBranch, ArrowRight, Sparkles, RefreshCw
 } from 'lucide-react'
 import { useAPI } from '../hooks/useAPI'
-import { useTutorSession } from '../hooks/useTutorSession'
+// Code Tutor fully disabled — import removed
 
 // ── Category display metadata ──────────────────────────────────────────────────
 const CATEGORY_META = {
@@ -762,7 +762,7 @@ const styles = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirectory }) {
+// Code Tutor fully disabled — component removed
   const {
     session, explanation, isLoading, isExplaining, error, notifications, sessions,
     createSession, loadSession, deleteSession, advance, goBack, goToFile,
@@ -772,7 +772,7 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
     isFetchingChanges, changeExplanation, isExplainingChange, explanationError,
     fetchRecentChanges, explainChange, exitWizardMode,
     wizardAdvance, wizardGoBack, wizardSkip,
-  } = useTutorSession()
+  // useTutorSession removed — Code Tutor fully disabled
 
   const { readFile } = useAPI()
 
@@ -1249,7 +1249,7 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
   const renderSessionCreation = () => (
     <div style={styles.sessionPane}>
       <BookOpen size={36} strokeWidth={1.5} color={colors.accent} />
-      <div style={styles.sessionTitle}>Code Tutor</div>
+      {/* Code Tutor fully disabled — UI removed */}
       <div style={styles.sessionSub}>
         Learn any codebase file-by-file with guided explanations.
       </div>
@@ -1372,7 +1372,7 @@ export default function CodeTutorPanel({ isOpen, onClose, onToast, activeDirecto
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.headerLeft}>
-            <span style={styles.title}>📖 Code Tutor</span>
+            {/* Code Tutor fully disabled — UI removed */}
           </div>
           <button
             style={styles.closeBtn}

@@ -79,7 +79,6 @@ func TestAllModules(t *testing.T) {
 		ModuleTestingStandards,
 		ModulePRWorkflow,
 		ModuleDocumentation,
-		ModuleCodeTutor,
 		ModuleMultiAgent,
 	}
 
@@ -343,7 +342,6 @@ func TestRenderSkill_AllSkillIDs(t *testing.T) {
 		ModuleTestingStandards,
 		ModulePRWorkflow,
 		ModuleDocumentation,
-		ModuleCodeTutor,
 		ModuleMultiAgent,
 	}
 

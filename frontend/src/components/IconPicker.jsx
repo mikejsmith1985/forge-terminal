@@ -261,7 +261,7 @@ import {
   PiReceipt, PiCreditCard, PiMoney, PiCurrencyDollar,
   PiScissors, PiEraserBold,
   PiEyeBold, PiEyeSlash,
-  PiLockKey, PiPasswordBold,
+  PiLockKey, PiPasswordBold, PiFingerprint,
   PiDesktop, PiLaptop, PiDeviceMobile,
   PiPrinter, PiScanBold,
   PiPlug, PiPlugsConnected, PiUsb,

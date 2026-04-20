@@ -14,9 +14,9 @@ import './EnterpriseWorkflowCard.css'
  * @param {Function} props.onExecuteCommand - Send a command to the terminal
  * @param {Function} props.onToast - Show a toast notification
  * @param {string} props.cwd - Current working directory (project path)
- * @param {Function} props.onOpenTutor - Opens the Code Tutor panel (called when user clicks a notification toast)
+// onOpenTutor removed — Code Tutor fully disabled
  */
-const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor }) => {
+const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => { // onOpenTutor removed — Code Tutor fully disabled
   const [isExpanded, setIsExpanded] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [showFindings, setShowFindings] = useState(false)
@@ -48,7 +48,7 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
     }
   }, [status?.configured, cwd, scanCompliance])
 
-  // Auto-start watcher when workflow is configured and Code Tutor module is active
+  // Code Tutor watcher logic removed — Code Tutor fully disabled
   useEffect(() => {
     if (status?.configured && cwd) {
       startWatcher(cwd)
@@ -63,19 +63,19 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
 
   // Show toast notifications when the watcher detects file changes, then immediately
   // clear the queue so the same notifications aren't re-shown on the next render.
-  // The "Open Tutor" action button lets the user jump directly into Code Tutor.
+  // Code Tutor action button removed — Code Tutor fully disabled
   useEffect(() => {
     if (watcherNotifications.length === 0) return
 
     watcherNotifications.forEach((notification) => {
       if (onToast) {
         onToast(
-          `📚 Code Tutor: ${notification.message}`,
+          // Code Tutor notification removed — Code Tutor fully disabled
           'info',
           8000, // Extended duration — user needs time to read and decide whether to click
           {
-            action: 'Open Tutor',
-            onAction: onOpenTutor, // Opens the Code Tutor panel when clicked
+            // Code Tutor action removed — Code Tutor fully disabled
+            // onOpenTutor removed — Code Tutor fully disabled
           }
         )
       }
@@ -83,7 +83,7 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
 
     // Flush the queue atomically so these notifications aren't shown again
     clearWatcherNotifications()
-  }, [watcherNotifications, onToast, onOpenTutor, clearWatcherNotifications])
+  }, [watcherNotifications, onToast, clearWatcherNotifications]) // onOpenTutor removed — Code Tutor fully disabled
 
   const handleRefresh = useCallback(async () => {
     if (!cwd || isRefreshing) return
@@ -218,7 +218,7 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd, onOpenTutor })
               <div className="ewc-unconfigured-body">
                 <p className="ewc-setup-message">
                   Set up an enterprise-grade workflow with copilot instructions,
-                  skills, branching rules, and Code Tutor integration.
+                  skills and branching rules. // Code Tutor integration removed
                 </p>
                 <button className="ewc-btn ewc-btn-setup" onClick={handleOpenWizard}>
                   <Shield size={14} /> Setup Workflow
