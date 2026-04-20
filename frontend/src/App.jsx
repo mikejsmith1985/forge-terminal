@@ -33,7 +33,7 @@ import ConnectionDiagnosticCard from './components/ConnectionDiagnosticCard'
 import DiagnosticOverlay from './components/DiagnosticOverlay'
 import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
-import CodeTutorPanel from './components/CodeTutorPanel'
+// CodeTutorPanel import removed — Code Tutor fully disabled
 import VaultPanel from './components/VaultPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'

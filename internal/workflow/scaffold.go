@@ -75,10 +75,10 @@ func scaffoldManifest() []scaffoldEntry {
 			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleMultiAgent, c) },
 		},
 		{
-			moduleID: ModuleCodeTutor,
+// ModuleCodeTutor entry removed — Code Tutor fully disabled
 			relPath:  filepath.Join(".github", "skills", "code-tutor-workflow", "SKILL.md"),
 			category: "skill",
-			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleCodeTutor, c) },
+		
 		},
 		{
 			moduleID: ModuleWorkflowEnforcer,

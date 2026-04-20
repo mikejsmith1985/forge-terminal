@@ -190,7 +190,6 @@ func buildRecommendations(detection *ProjectDetection) []ModuleID {
 	}
 
 	// Code Tutor integration is always recommended for learning
-	recommended = append(recommended, ModuleCodeTutor)
 
 	// Enforcement layers
 	if detection.HasGit {

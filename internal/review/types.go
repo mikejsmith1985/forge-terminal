@@ -13,9 +13,7 @@ type ReviewStrategy string
 
 const (
 	StrategyManual       ReviewStrategy = "manual"
-	StrategyTutor        ReviewStrategy = "tutor"
-	StrategyAgent        ReviewStrategy = "agent"
-	StrategyTutorAndAgent ReviewStrategy = "tutor-and-agent"
+	StrategyAgent        ReviewStrategy = "agent" // Tutor strategies removed — Code Tutor fully disabled
 )
 
 // Strictness controls how aggressively the Quality Agent flags issues.

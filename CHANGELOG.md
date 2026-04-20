@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.2.7] - 2026-04-20
+
+### Fixed
+- **App crash on launch** — Added missing `PiFingerprint` import to `IconPicker.jsx`; a `ReferenceError: PiFingerprint is not defined` was crashing the React tree and leaving a blank screen.
+- **Code Tutor fully disabled** — Removed all `ModuleCodeTutor` references from `workflow_test.go` and the orphaned empty struct from `ModuleCatalog()` in `types.go`; all backend tests now pass cleanly.
+
+
+---
+
+## [v7.2.6] - 2026-04-20
+
+## [7.2.5] - 2026-04-20
+
+---
+
+## [v7.2.5] - 2026-04-20
+
+## [7.2.5] - 2026-04-20
+
+---
+
+## [v7.2.5] - 2026-04-20
+
 ### Added
 - **License system** — AES-256-GCM encrypted local cache with DPAPI key wrapping (Windows) or 0600 file permissions (Unix). Machine fingerprinting via `MachineID()`/`MachineName()`. 72-hour grace period on network failure; 60-minute background heartbeat. Full test suite: 22 tests across cache crypto, HTTP client, machine ID, and decision-tree logic.
 - **License API handlers** — `/api/license/status`, `/api/license/activate`, `/api/license/deactivate` endpoints. `LicenseMiddleware` returns 402 Payment Required when no valid license is present.

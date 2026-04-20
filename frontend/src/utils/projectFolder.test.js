@@ -22,19 +22,22 @@ describe('extractProjectFolder', () => {
       .toBe('My-Project');
   });
 
-  it('falls back to last segment when rootFolder not provided', () => {
+  it('falls back to second-level child of drive root when rootFolder not provided', () => {
+    // Smarter fallback: for Windows drive paths returns parts[2] (project level)
+    // rather than the deepest segment, keeping tab names stable on cd.
     expect(extractProjectFolder('C:\\ProjectsWin\\forge-terminal\\internal\\terminal'))
-      .toBe('terminal');
+      .toBe('forge-terminal');
   });
 
-  it('falls back to last segment when rootFolder is empty string', () => {
+  it('falls back to second-level child when rootFolder is empty string', () => {
     expect(extractProjectFolder('C:\\ProjectsWin\\forge-terminal\\internal\\terminal', ''))
-      .toBe('terminal');
+      .toBe('forge-terminal');
   });
 
-  it('falls back to last segment for paths that do not contain the rootFolder', () => {
+  it('falls back to third segment of Unix path when rootFolder not found', () => {
+    // /home/user/some-project/src → parts[2] = 'some-project' (stable project name)
     expect(extractProjectFolder('/home/user/some-project/src', 'ProjectsWin'))
-      .toBe('src');
+      .toBe('some-project');
   });
 
   it('works with custom root folder names', () => {
@@ -102,12 +105,14 @@ describe('getTabTitle', () => {
     expect(getTabTitle(projPath, 'project-root', { tabNumber: 1, rootFolder: 'ProjectsWin' })).toBe('forge-terminal');
   });
 
-  it('project-root: falls back to last segment when no rootFolder configured', () => {
-    expect(getTabTitle(projPath, 'project-root', { tabNumber: 1 })).toBe('src');
+  it('project-root: falls back to second-level child of drive root when no rootFolder', () => {
+    // projPath = 'C:\\ProjectsWin\\forge-terminal\\src' → parts[2] = 'forge-terminal'
+    expect(getTabTitle(projPath, 'project-root', { tabNumber: 1 })).toBe('forge-terminal');
   });
 
-  it('project-root: falls back to last segment for paths not containing rootFolder', () => {
-    expect(getTabTitle(linuxPath, 'project-root', { tabNumber: 1, rootFolder: 'ProjectsWin' })).toBe('components');
+  it('project-root: falls back to third Unix segment when rootFolder not found in path', () => {
+    // linuxPath = '/home/user/projects/myapp/components' → parts[2] = 'projects'
+    expect(getTabTitle(linuxPath, 'project-root', { tabNumber: 1, rootFolder: 'ProjectsWin' })).toBe('projects');
   });
 
   it('project-root: works with custom root folder names', () => {

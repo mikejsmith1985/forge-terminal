@@ -19,8 +19,8 @@ function TabBar({
   onOpenDashboard = null,
   onToggleForgeAssist = null,
   isForgeAssistOpen = false,
-  onToggleTutor = null,
-  isTutorOpen = false,
+  // onToggleTutor removed — Code Tutor fully disabled
+  // isTutorOpen removed — Code Tutor fully disabled
   onToggleVault = null,
   isVaultOpen = false,
   disableNewTab = false,
@@ -140,7 +140,7 @@ function TabBar({
           <Zap size={16} />
         </button>
       )}
-      {/* Code Tutor — HIDDEN for subscription release (feature not yet vetted) */}
+      {/* Code Tutor fully disabled and removed */}
       {/* Forge Vault — encrypted secret store */}
       {onToggleVault && (
         <button

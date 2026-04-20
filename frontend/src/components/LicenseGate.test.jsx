@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import LicenseGate from "./LicenseGate";
 
-// Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
@@ -11,71 +10,76 @@ beforeEach(() => {
 });
 
 describe("LicenseGate", () => {
-  it("renders children when license status is ok", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ status: "ok", email: "test@example.com" }),
-    });
+  it("renders activation heading for 'required' status", () => {
+    render(<LicenseGate status="required" />);
+    expect(screen.getByRole("heading")).toHaveTextContent("Activate your license");
+  });
 
-    render(
-      <LicenseGate>
-        <div data-testid="protected-content">Protected</div>
-      </LicenseGate>
-    );
+  it("renders expired heading for 'expired' status", () => {
+    render(<LicenseGate status="expired" />);
+    expect(screen.getByRole("heading")).toHaveTextContent("Subscription ended");
+  });
 
+  it("renders the license key input", () => {
+    render(<LicenseGate status="required" />);
+    const input = screen.getByPlaceholderText("XXXX-XXXX-XXXX-XXXX");
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveAttribute("type", "text");
+  });
+
+  it("renders Activate button", () => {
+    render(<LicenseGate status="required" />);
+    expect(screen.getByRole("button", { name: /activate/i })).toBeInTheDocument();
+  });
+
+  it("shows error when submitting empty key", async () => {
+    render(<LicenseGate status="required" />);
+    fireEvent.submit(screen.getByRole("button", { name: /activate/i }));
     await waitFor(() =>
-      expect(screen.getByTestId("protected-content")).toBeInTheDocument()
+      expect(screen.getByText(/please enter your license key/i)).toBeInTheDocument()
     );
   });
 
-  it("renders activation form when license status is required", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ status: "required" }),
+  it("calls /api/license/activate with the entered key", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true });
+
+    const reloadMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { reload: reloadMock },
+      writable: true,
     });
 
-    render(
-      <LicenseGate>
-        <div>Protected</div>
-      </LicenseGate>
-    );
+    render(<LicenseGate status="required" />);
+    fireEvent.change(screen.getByPlaceholderText("XXXX-XXXX-XXXX-XXXX"), {
+      target: { value: "FORGE-TEST-KEY" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: /activate/i }));
 
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/license/activate");
+    expect(JSON.parse(opts.body)).toEqual({ key: "FORGE-TEST-KEY" });
+  });
+
+  it("shows machine-limit error on 402 response", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 402, text: async () => "" });
+    render(<LicenseGate status="required" />);
+    fireEvent.change(screen.getByPlaceholderText("XXXX-XXXX-XXXX-XXXX"), {
+      target: { value: "FORGE-KEY" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: /activate/i }));
     await waitFor(() =>
-      expect(
-        screen.getByPlaceholderText(/license key/i) ||
-          screen.getByRole("textbox")
-      ).toBeInTheDocument()
+      expect(screen.getByText(/machine limit reached/i)).toBeInTheDocument()
     );
   });
 
-  it("calls activate endpoint on form submit", async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: "required" }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: "ok", email: "user@example.com" }),
-      });
+  it("shows renewal link for expired status", () => {
+    render(<LicenseGate status="expired" />);
+    expect(screen.getByRole("link", { name: /renew/i })).toBeInTheDocument();
+  });
 
-    render(
-      <LicenseGate>
-        <div>Protected</div>
-      </LicenseGate>
-    );
-
-    await waitFor(() => screen.getByRole("textbox"));
-
-    const input = screen.getByRole("textbox");
-    fireEvent.change(input, { target: { value: "FORGE-TEST-KEY" } });
-    fireEvent.submit(input.closest("form") || screen.getByRole("button"));
-
-    await waitFor(() => {
-      const activateCall = mockFetch.mock.calls.find((call) =>
-        call[0]?.includes?.("activate")
-      );
-      expect(activateCall).toBeTruthy();
-    });
+  it("shows buy link for required status", () => {
+    render(<LicenseGate status="required" />);
+    expect(screen.getByRole("link", { name: /buy a license/i })).toBeInTheDocument();
   });
 });

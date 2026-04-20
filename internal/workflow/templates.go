@@ -218,10 +218,7 @@ var workflowJSONTemplate = `{
   "qualityMode": "{{.QualityMode}}",
   "enabledModules": [{{range $i, $m := .EnabledModules}}{{if $i}}, {{end}}"{{$m}}"{{end}}],
   "tutorSettings": {
-    "autoNotify": {{.TutorSettings.AutoNotify}},
-    "defaultDepth": "{{.TutorSettings.DefaultDepth}}",
-    "auditNaming": {{.TutorSettings.AuditNaming}},
-    "auditComments": {{.TutorSettings.AuditComments}}
+
   },
   "prReviewSettings": {
     "strategy": "{{.PRReviewSettings.Strategy}}",
@@ -245,7 +242,7 @@ var skillTemplates = map[ModuleID]string{
 	ModulePRWorkflow:        prWorkflowSkill,
 	ModuleDocumentation:     documentationSkill,
 	ModuleMultiAgent:        multiAgentSkill,
-	ModuleCodeTutor:         codeTutorWorkflowSkill,
+
 	ModuleWorkflowEnforcer:  workflowEnforcerSkill,
 }
 
