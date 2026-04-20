@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.2.5] - 2026-04-20
+
+---
+
+## [v7.2.5] - 2026-04-20
+
 ### Added
 - **License system** — AES-256-GCM encrypted local cache with DPAPI key wrapping (Windows) or 0600 file permissions (Unix). Machine fingerprinting via `MachineID()`/`MachineName()`. 72-hour grace period on network failure; 60-minute background heartbeat. Full test suite: 22 tests across cache crypto, HTTP client, machine ID, and decision-tree logic.
 - **License API handlers** — `/api/license/status`, `/api/license/activate`, `/api/license/deactivate` endpoints. `LicenseMiddleware` returns 402 Payment Required when no valid license is present.
