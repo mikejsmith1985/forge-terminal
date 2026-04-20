@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Terminal } from 'lucide-react'
 import './LicenseGate.css'
 
-// Stripe checkout URL — replace with actual Stripe Payment Link
-const CHECKOUT_URL = 'https://buy.stripe.com/forge-terminal'
+// Purchase URL — sends user to the product page on rootlevellabs.tech
+const CHECKOUT_URL = 'https://rootlevellabs.tech/#products'
 
 /**
  * LicenseGate — full-screen overlay shown when no valid license is found.
