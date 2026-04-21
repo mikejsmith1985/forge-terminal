@@ -14,9 +14,8 @@ import './EnterpriseWorkflowCard.css'
  * @param {Function} props.onExecuteCommand - Send a command to the terminal
  * @param {Function} props.onToast - Show a toast notification
  * @param {string} props.cwd - Current working directory (project path)
-// onOpenTutor removed — Code Tutor fully disabled
  */
-const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => { // onOpenTutor removed — Code Tutor fully disabled
+const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [showFindings, setShowFindings] = useState(false)
@@ -28,10 +27,6 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => { // onOp
     compliance,
     checkStatus,
     scanCompliance,
-    watcherNotifications,
-    startWatcher,
-    stopWatcher,
-    clearWatcherNotifications,
   } = workflow
 
   // Auto-check status when cwd changes
@@ -48,44 +43,8 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => { // onOp
     }
   }, [status?.configured, cwd, scanCompliance])
 
-  // Code Tutor watcher logic removed — Code Tutor fully disabled
-  useEffect(() => {
-    if (status?.configured && cwd) {
-      startWatcher(cwd)
-    }
 
-    return () => {
-      if (cwd) {
-        stopWatcher(cwd)
-      }
-    }
-  }, [status?.configured, cwd, startWatcher, stopWatcher])
-
-  // Show toast notifications when the watcher detects file changes, then immediately
-  // clear the queue so the same notifications aren't re-shown on the next render.
-  // Code Tutor action button removed — Code Tutor fully disabled
-  useEffect(() => {
-    if (watcherNotifications.length === 0) return
-
-    watcherNotifications.forEach((notification) => {
-      if (onToast) {
-        onToast(
-          // Code Tutor notification removed — Code Tutor fully disabled
-          'info',
-          8000, // Extended duration — user needs time to read and decide whether to click
-          {
-            // Code Tutor action removed — Code Tutor fully disabled
-            // onOpenTutor removed — Code Tutor fully disabled
-          }
-        )
-      }
-    })
-
-    // Flush the queue atomically so these notifications aren't shown again
-    clearWatcherNotifications()
-  }, [watcherNotifications, onToast, clearWatcherNotifications]) // onOpenTutor removed — Code Tutor fully disabled
-
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh= useCallback(async () => {
     if (!cwd || isRefreshing) return
     setIsRefreshing(true)
     try {

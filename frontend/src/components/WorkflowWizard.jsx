@@ -16,7 +16,6 @@ import {
   SkipForward,
   Shield,
   Zap,
-  BookOpen,
   GitBranch,
   TestTube,
   FileCheck,
@@ -533,15 +532,16 @@ function StepConfigure({ config, moduleCatalog, onToggleModule, onSetQualityMode
 /**
  * StepPRReview lets the user choose how pull requests will be reviewed.
  *
- * Four strategies are available:
+ * Two strategies are available:
  * - manual: user inspects diffs themselves
- * - tutor: Code Tutor explains each changed file with streaming walkthroughs
  * - agent: Quality Agent posts structured findings (naming, tests, architecture)
- * - tutor-and-agent: both run in parallel (recommended for enterprise)
  */
 function StepPRReview({ config, onUpdateConfig }) {
-  // Which strategy cards are currently shown as selected
-  const selectedStrategy = config.prReviewStrategy || 'agent' // Code Tutor strategies removed
+  // Coerce legacy tutor strategies (saved before Code Tutor was removed) to 'agent'.
+  const rawStrategy = config.prReviewStrategy || 'agent'
+  const selectedStrategy = (rawStrategy === 'tutor' || rawStrategy === 'tutor-and-agent')
+    ? 'agent'
+    : rawStrategy
 
   const reviewStrategies = [
     {
@@ -552,25 +552,11 @@ function StepPRReview({ config, onUpdateConfig }) {
       description: 'Review diffs yourself. No AI assistance.',
     },
     {
-      id: 'tutor',
-      label: 'Code Tutor',
-      icon: BookOpen,
-      color: '#3b82f6',
-      description: 'Code Tutor auto-explains each changed file with toast notifications and streaming walkthroughs.',
-    },
-    {
       id: 'agent',
       label: 'Quality Agent',
       icon: Bot,
       color: '#10b981',
       description: 'A dedicated AI reviewer analyzes the diff and posts structured findings: naming, complexity, tests, architecture, security.',
-    },
-    {
-      id: 'tutor-and-agent',
-      label: 'Tutor + Agent',
-      icon: Users,
-      color: '#8b5cf6',
-      description: 'Best of both: Code Tutor explains changes to you while the Quality Agent performs an automated review in parallel. Recommended.',
       isRecommended: true,
     },
   ]
@@ -593,7 +579,7 @@ function StepPRReview({ config, onUpdateConfig }) {
     onUpdateConfig({ prReviewAgentFocusAreas: updatedAreas })
   }, [selectedFocusAreas, onUpdateConfig])
 
-  const hasAgentComponent = selectedStrategy === 'agent' // Code Tutor strategies removed
+  const hasAgentComponent = selectedStrategy === 'agent'
 
   return (
     <div className="ww-step-content">
