@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.3.0] - 2026-04-21
+
+---
+
+## [v7.3.0] - 2026-04-21
+
 ### Fixed
 - **Code Tutor toast leak** — `EnterpriseWorkflowCard` was firing blank toast notifications via a leftover file-watcher effect even though Code Tutor is disabled. The watcher start/stop lifecycle and the broken notification effect have been removed entirely; the polling loop no longer runs.
 - **Code Tutor options in Workflow Wizard** — `tutor` and `tutor-and-agent` PR review strategy cards have been removed from the Enterprise Workflow Wizard. Users who had those strategies saved will be automatically migrated to `agent` on next open. Quality Agent is now the recommended strategy.
