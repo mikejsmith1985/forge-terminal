@@ -194,6 +194,48 @@ func handleMCPTaskStatus(w http.ResponseWriter, r *http.Request) {
 	_ = enc.Encode(task)
 }
 
+// handleMCPUIStatus handles GET /api/mcp/ui-status — returns a lightweight,
+// UI-friendly snapshot of the MCP server state for display in the Adaptive
+// Build Environments command card. Unlike /api/mcp itself, this endpoint is
+// protected by the standard Forge auth middleware (NOT the MCP bearer token)
+// so the Forge frontend can read it without ever seeing or forwarding the secret.
+func handleMCPUIStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	homeDir, homeErr := os.UserHomeDir()
+	tokenPath := ".forge/mcp-token"
+	if homeErr == nil {
+		tokenPath = filepath.Join(homeDir, ".forge", "mcp-token")
+	}
+
+	// MCP is disabled or failed to start — report gracefully so the card
+	// can show an "Inactive" state instead of a broken error.
+	if mcpServer == nil {
+		enc := json.NewEncoder(w)
+		_ = enc.Encode(map[string]any{
+			"is_enabled":   false,
+			"active_tools": []string{},
+			"tool_count":   0,
+			"token_path":   tokenPath,
+		})
+		return
+	}
+
+	uiStatus := mcpServer.GetUIStatus()
+	enc := json.NewEncoder(w)
+	_ = enc.Encode(map[string]any{
+		"is_enabled":   uiStatus.IsEnabled,
+		"active_tools": uiStatus.ActiveTools,
+		"tool_count":   uiStatus.ToolCount,
+		"token_path":   tokenPath,
+	})
+}
+
 // handleMCPReload handles POST /api/mcp/reload — re-reads the [mcp] section of
 // forge.toml and applies a fresh allowed_tools filter without restarting Forge.
 // This endpoint requires the same bearer token as /api/mcp.

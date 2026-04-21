@@ -14,11 +14,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
 )
+
+// sortStrings sorts a string slice in place.
+// Extracted as a named helper so call sites are self-documenting.
+func sortStrings(slice []string) { sort.Strings(slice) }
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -123,6 +128,41 @@ func (srv *Server) ValidateHTTPRequest(r *http.Request) bool {
 // Broker returns the task broker so the Forge agent loop can consume submitted tasks.
 func (srv *Server) Broker() *TaskBroker {
 	return srv.broker
+}
+
+// UIStatus holds the MCP information surfaced to the Forge UI status endpoint.
+// It is intentionally separate from MCP protocol types — it is a plain HTTP
+// response for the Forge frontend, not an MCP message.
+type UIStatus struct {
+	// IsEnabled reports whether the MCP server was started with a valid token.
+	IsEnabled bool `json:"is_enabled"`
+
+	// ActiveTools is the ordered list of tool names currently registered.
+	ActiveTools []string `json:"active_tools"`
+
+	// ToolCount is the number of active tools (convenience field for the UI).
+	ToolCount int `json:"tool_count"`
+}
+
+// GetUIStatus returns a snapshot of the server's current state for display in
+// the Forge command card panel. It does not require the MCP bearer token —
+// callers are expected to use Forge's own auth middleware instead.
+func (srv *Server) GetUIStatus() UIStatus {
+	srv.toolsMu.RLock()
+	toolNames := make([]string, 0, len(srv.tools))
+	for name := range srv.tools {
+		toolNames = append(toolNames, name)
+	}
+	srv.toolsMu.RUnlock()
+
+	// Sort for stable, predictable ordering in the UI.
+	sortStrings(toolNames)
+
+	return UIStatus{
+		IsEnabled:   true,
+		ActiveTools: toolNames,
+		ToolCount:   len(toolNames),
+	}
 }
 
 // ExecuteTool calls a named tool directly, bypassing HTTP and auth.
