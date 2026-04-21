@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.2] - 2026-04-21
+
+---
+
+## [v7.6.2] - 2026-04-21
+
 ### Fixed
 - **TUI apps in light-mode terminals now render correctly** — TUI applications (Copilot CLI, lazygit, vim, gh dash, etc.) that use the terminal's alternate screen buffer (`?1049h` / `?1047h` / `?47h`) now automatically switch to the dark palette for the current color theme while they are active. Previously, light-mode tabs showed the lavender/light background bleeding through between TUI UI regions, making session pickers and interactive dialogs look broken. The original theme is restored when the app exits the alternate screen.
 - **Default tab theme changed to `auto-cycle-dark`** — New installations no longer alternate between dark and light mode on each new tab. Terminals default to dark-only cycling, which is compatible with all TUI applications. Users who explicitly selected `auto-cycle` keep their saved preference.
