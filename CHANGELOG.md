@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **MCPSetupCard** — New command-panel sidebar card (`frontend/src/components/MCPSetupCard.jsx`) for the Adaptive Build Environments MCP feature. Shows live MCP server status (fetched from `GET /api/mcp/ui-status`), token path with copy button, per-client connection guides (Copilot CLI, VS Code, Claude Code), a Windows build issue callout, and a highlighted list of active tools with `environment_detect` and `environment_run` starred at the top.
+
 ### Fixed
-- **Release script R2 upload** — `local-release.ps1` now passes `--remote` to `wrangler r2 object put` so binaries are uploaded to Cloudflare R2 rather than the local wrangler dev instance. Missing `wrangler` is now a hard error (exit 1) instead of a silent skip, preventing 404 download failures for licensed users.
+- **Release script R2 upload**— `local-release.ps1` now passes `--remote` to `wrangler r2 object put` so binaries are uploaded to Cloudflare R2 rather than the local wrangler dev instance. Missing `wrangler` is now a hard error (exit 1) instead of a silent skip, preventing 404 download failures for licensed users.
 
 ## [7.5.0] - 2026-04-21
 

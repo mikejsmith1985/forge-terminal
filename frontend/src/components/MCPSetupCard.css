@@ -1,0 +1,428 @@
+/* MCPSetupCard.css — Styles for the Adaptive Build Environments command-panel card.
+   Uses teal (#06b6d4) as the accent colour to visually distinguish this card from the
+   EnterpriseWorkflowCard which uses purple (#8b5cf6). CSS class prefix: msc- */
+
+/* ── Card Container ──────────────────────────────────────────────────────────── */
+
+.mcp-setup-card {
+  background: var(--card-bg);
+  /* Subtle teal wash — mirrors the EWC purple wash pattern */
+  background-image: linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.mcp-setup-card:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.15), var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.2));
+  transform: translateY(-1px);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────────── */
+
+.msc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.msc-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Teal icon replaces the purple shield used by EnterpriseWorkflowCard */
+.msc-icon {
+  color: #06b6d4;
+  flex-shrink: 0;
+}
+
+.msc-header-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.msc-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.msc-subtitle {
+  font-size: 0.7rem;
+  color: var(--subtext);
+  margin-top: 1px;
+}
+
+.msc-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--subtext);
+}
+
+/* ── Status Badges ───────────────────────────────────────────────────────────── */
+
+.msc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Green badge — MCP server is running and serving tools */
+.msc-badge-active {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+}
+
+/* Gray badge — MCP server is disabled or unreachable */
+.msc-badge-inactive {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+}
+
+/* ── Expanded Body ───────────────────────────────────────────────────────────── */
+
+.msc-body {
+  padding: 0 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: mscSlideDown 0.15s ease;
+}
+
+@keyframes mscSlideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ── Status Row ──────────────────────────────────────────────────────────────── */
+
+.msc-status-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+
+.msc-status-icon {
+  flex-shrink: 0;
+}
+
+.msc-status-icon-active {
+  color: #10b981;
+}
+
+.msc-status-icon-inactive {
+  color: #94a3b8;
+}
+
+.msc-status-text {
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+/* ── Generic Section ─────────────────────────────────────────────────────────── */
+
+/* Wraps a labelled group of content (token, tabs, tools, etc.) */
+.msc-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.msc-section-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--subtext);
+  opacity: 0.7;
+}
+
+/* ── Token Section ───────────────────────────────────────────────────────────── */
+
+.msc-token-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--card-border);
+  border-radius: 7px;
+  padding: 7px 10px;
+}
+
+.msc-token-path {
+  flex: 1;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.73rem;
+  color: #06b6d4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msc-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.msc-copy-btn:hover {
+  background: rgba(6, 182, 212, 0.2);
+}
+
+/* ── Tab Switcher ────────────────────────────────────────────────────────────── */
+
+.msc-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.msc-tab {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  /* Two-pixel bottom border animates in when tab is active */
+  border-bottom: 2px solid transparent;
+  color: var(--subtext);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px; /* overlap the section's border-bottom */
+}
+
+.msc-tab:hover {
+  color: var(--text);
+}
+
+/* Active tab underlined with teal */
+.msc-tab-active {
+  color: #06b6d4;
+  border-bottom-color: #06b6d4;
+}
+
+/* ── Tab Content ─────────────────────────────────────────────────────────────── */
+
+.msc-tab-content {
+  padding: 8px 0 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+/* "Already connected" heading row for the Copilot CLI tab */
+.msc-tab-intro {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.msc-tab-already-connected {
+  color: #10b981;
+}
+
+.msc-tab-description {
+  margin: 0 0 6px;
+  color: var(--subtext);
+}
+
+/* Inline code snippets within tab descriptions */
+.msc-tab-description code,
+.msc-tab-content p code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.72rem;
+  color: #06b6d4;
+  background: rgba(6, 182, 212, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* ── Code Block ──────────────────────────────────────────────────────────────── */
+
+/* Dark container for multi-line JSON snippets with an overlaid copy button */
+.msc-code-block {
+  position: relative;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.msc-code-block pre {
+  margin: 0;
+  padding: 10px 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.7rem;
+  color: var(--text);
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+/* Scrollbar styling to match EWC pattern */
+.msc-code-block pre::-webkit-scrollbar       { height: 4px; }
+.msc-code-block pre::-webkit-scrollbar-track { background: transparent; }
+.msc-code-block pre::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
+
+/* Absolute-positioned copy button sitting in the top-right of the code block */
+.msc-code-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.msc-code-copy-btn:hover {
+  background: rgba(6, 182, 212, 0.25);
+}
+
+/* ── Build Callout ───────────────────────────────────────────────────────────── */
+
+/* Teal-accented info box — explains when to use environment_run on Windows.
+   Left border is thicker to reinforce the teal brand and draw the eye. */
+.msc-callout {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(6, 182, 212, 0.06);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-left: 3px solid #06b6d4;
+  border-radius: 8px;
+}
+
+.msc-callout-icon {
+  flex-shrink: 0;
+  color: #06b6d4;
+  margin-top: 1px;
+}
+
+.msc-callout-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.msc-callout-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.msc-callout-text {
+  margin: 0;
+  font-size: 0.73rem;
+  color: var(--subtext);
+  line-height: 1.4;
+}
+
+/* Styled as a monospace quote to look like something the user would type */
+.msc-callout-quote {
+  display: block;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.7rem;
+  color: #06b6d4;
+  background: rgba(6, 182, 212, 0.08);
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-style: italic;
+}
+
+/* ── Tools List ──────────────────────────────────────────────────────────────── */
+
+.msc-tools-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.msc-tool-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 0.73rem;
+  color: var(--subtext);
+  transition: background 0.1s;
+}
+
+.msc-tool-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Featured tools use full text colour and a teal tool name to stand out */
+.msc-tool-item-featured {
+  color: var(--text);
+}
+
+.msc-tool-name {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.msc-tool-item-featured .msc-tool-name {
+  color: #06b6d4;
+}
+
+/* Amber star — visually distinct from the teal tool name */
+.msc-tool-star {
+  color: #f59e0b;
+  font-size: 0.75rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.msc-tool-description {
+  font-size: 0.7rem;
+  color: var(--subtext);
+  font-style: italic;
+  opacity: 0.75;
+}
