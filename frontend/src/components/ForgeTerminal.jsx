@@ -1610,9 +1610,25 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       return true; // Let all other keys pass through standard xterm processing
     });
 
-    // Initial fit — run after the next paint so the container has its final
-    // dimensions.  Immediate fit() during mount can measure before absolute-
-    // positioned ancestors have resolved their layout.
+    // Synchronous initial fit: useEffect runs AFTER the browser has painted, so
+    // getBoundingClientRect() already reflects the true container dimensions.
+    // Calling fit() here immediately updates term.cols/rows before the WebSocket
+    // URL is built and before ws.onopen sends the initial resize message.
+    //
+    // Without this, the WebSocket URL carries ?cols=80&rows=24 (xterm defaults),
+    // and ws.onopen sends resize(80, 24). The PTY is created at 80 cols.
+    // The RAF below then corrects to the real width — but that ~16ms window is
+    // enough for the Copilot CLI (or any TUI app) to render content at the wrong
+    // width, and on reconnect it produces a SIGWINCH(80) → SIGWINCH(real) double-
+    // reflow that leaves garbled output in the scrollback.
+    if (fitAddonRef.current) {
+      fitAddonRef.current.fit();
+    }
+
+    // Second fit in the next animation frame: catches any deferred layout shifts
+    // (e.g. React state updates that alter sidebar/panel widths) that occur
+    // after this effect runs. Belt-and-suspenders — the sync fit above is the
+    // critical one for PTY sizing correctness.
     requestAnimationFrame(() => {
       if (fitAddonRef.current) {
         fitAddonRef.current.fit();
