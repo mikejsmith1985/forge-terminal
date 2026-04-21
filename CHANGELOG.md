@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Release script R2 upload** — `local-release.ps1` now passes `--remote` to `wrangler r2 object put` so binaries are uploaded to Cloudflare R2 rather than the local wrangler dev instance. Missing `wrangler` is now a hard error (exit 1) instead of a silent skip, preventing 404 download failures for licensed users.
+
 ## [7.5.0] - 2026-04-21
 
 ---
