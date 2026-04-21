@@ -24,7 +24,9 @@ const (
 	defaultExecuteTimeoutSec = 3
 
 	// maxExecuteTimeoutSec is the hard upper limit for terminal_execute waits.
-	maxExecuteTimeoutSec = 30
+	// 600 seconds (10 minutes) matches environment_run so agents can use
+	// terminal_execute for long-running builds that stream live in the Forge tab.
+	maxExecuteTimeoutSec = 600
 
 	// executeOutputPollInterval is how often terminal_execute checks for new output.
 	executeOutputPollInterval = 100 * time.Millisecond
@@ -98,7 +100,7 @@ func (t *terminalExecuteTool) Definition() ToolDefinition {
 				},
 				"timeout_seconds": {
 					"type": "number",
-					"description": "How long to wait for output (1-30). Defaults to 3 seconds."
+					"description": "How long to wait for output (1-600). Defaults to 3 seconds. Use 300-600 for builds."
 				}
 			},
 			"required": ["session_id", "command"]

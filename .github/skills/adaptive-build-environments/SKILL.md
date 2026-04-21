@@ -30,6 +30,38 @@ description: "Teaches agents to use Forge's environment_detect and environment_r
 
 ---
 
+## Preferred Approach: Run in the Active Forge Tab
+
+**Forge IS a terminal app.** Before using `environment_run`, try the PTY-first approach:
+
+1. Call `terminal_sessions` to list active Forge sessions
+2. Pick the session that is already in (or closest to) the project directory
+3. Call `terminal_execute` with the WSL command directly — the user sees output live in their tab
+
+```json
+// Step 1 — find the active session
+{ "tool": "terminal_sessions", "arguments": {} }
+
+// Step 2 — cd and build inside the existing Forge terminal
+{
+  "tool": "terminal_execute",
+  "arguments": {
+    "session_id": "<id from step 1>",
+    "command": "wsl -e bash -c 'cd /mnt/c/ProjectsWin/RLL/website && npm install && npm run build'",
+    "timeout_seconds": 480
+  }
+}
+```
+
+**Why this is better:** Output streams live in the user's terminal tab. No hidden background process. No external window. The user sees progress in real time, exactly as if they ran it themselves.
+
+**Fall back to `environment_run`** only when:
+- No active Forge PTY session exists
+- The session is on the wrong machine (remote session)
+- You need structured JSON output with `exit_code`, `environment_used`, and `duration_seconds`
+
+---
+
 ## What This Feature Is
 
 Forge Terminal ships two MCP tools that let AI agents run Linux-compatible builds
