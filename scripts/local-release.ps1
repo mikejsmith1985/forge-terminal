@@ -315,7 +315,10 @@ Write-Banner "Uploading binaries to R2 (forge-releases)"
 
 $wranglerAvailable = Get-Command wrangler -ErrorAction SilentlyContinue
 if (-not $wranglerAvailable) {
-    Write-Warn "wrangler not found — skipping R2 upload. Run: npm install -g wrangler"
+    # Wrangler is required: without it licensed users download from R2 and get a 404.
+    # Install it with: npm install -g wrangler
+    Write-Error "wrangler not found — R2 upload is required for licensed downloads. Run: npm install -g wrangler"
+    exit 1
 } else {
     # Map local binary names to the R2 key pattern: v{version}/forge-{platform}[.exe]
     $r2Uploads = @(
@@ -332,7 +335,8 @@ if (-not $wranglerAvailable) {
             continue
         }
         Write-Step "Uploading to R2: $($upload.R2Key)..."
-        wrangler r2 object put "forge-releases/$($upload.R2Key)" --file $upload.Local --config $r2Config
+        # --remote uploads to Cloudflare R2 (without it wrangler targets the local dev instance)
+        wrangler r2 object put "forge-releases/$($upload.R2Key)" --file $upload.Local --config $r2Config --remote
         if ($LASTEXITCODE -ne 0) {
             Write-Warn "R2 upload failed for $($upload.R2Key) — continuing (GitHub release will still be created)"
         } else {
