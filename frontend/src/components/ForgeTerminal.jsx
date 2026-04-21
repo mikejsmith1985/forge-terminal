@@ -578,41 +578,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
-  const [isActiveDevice, setIsActiveDevice] = useState(true); // Handoff: this device controls PTY dimensions
-  const isActiveDeviceRef = useRef(true);
-  // Debounce timer for SESSION_JOINED → prevents a brief phantom "another device is
-  // controlling" banner that flashes when this tab reconnects. The server may send
-  // SESSION_JOINED (isActiveDevice: false) before the previous connection's clearActive
-  // defer has run. If CONTROL_GRANTED arrives within 600ms we cancel the timer so the
-  // banner never appears.
-  const bannerTimerRef = useRef(null);
 
-  // Tracks how far the virtual keyboard has pushed up the visible viewport on mobile.
-  // When the keyboard opens, window.visualViewport.height shrinks but window.innerHeight
-  // does not — so a banner at position:absolute bottom:0 ends up BELOW the keyboard.
-  // We offset the banner by this delta so it always floats just above the keyboard.
-  const [keyboardHeightOffset, setKeyboardHeightOffset] = useState(0);
-
-  useEffect(() => {
-    if (!window.visualViewport) return;
-
-    const updateKeyboardOffset = () => {
-      // Keyboard height = space between layout viewport bottom and visual viewport bottom.
-      const keyboardHeight =
-        window.innerHeight -
-        window.visualViewport.height -
-        window.visualViewport.offsetTop;
-      setKeyboardHeightOffset(Math.max(0, keyboardHeight));
-    };
-
-    window.visualViewport.addEventListener('resize', updateKeyboardOffset);
-    window.visualViewport.addEventListener('scroll', updateKeyboardOffset);
-
-    return () => {
-      window.visualViewport.removeEventListener('resize', updateKeyboardOffset);
-      window.visualViewport.removeEventListener('scroll', updateKeyboardOffset);
-    };
-  }, []);
   const isWaitingRef = useRef(false);
 
   // Idle notification: fires a /api/notify POST when terminal output goes silent
@@ -705,10 +671,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     isVisibleRef.current = isVisible;
   }, [isVisible]);
   
-  // Keep isActiveDevice ref updated for use in closures (onResize)
-  useEffect(() => {
-    isActiveDeviceRef.current = isActiveDevice;
-  }, [isActiveDevice]);
   
   // Keep onFileOpen ref updated
   useEffect(() => {
@@ -1763,60 +1725,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               if (msg.type === 'SESSION_JOINED') {
                 // Mark session as reattached so the "Connected" banner is suppressed.
                 sessionReattachedRef.current = true;
-
-                if (msg.isActiveDevice) {
-                  // Server auto-promoted us because no other device was active.
-                  // Treat this the same as CONTROL_GRANTED — no passive-device banner.
-                  logger.terminal('Joined session as active device (auto-promoted)', { tabId });
-                  clearTimeout(bannerTimerRef.current);
-                  setIsActiveDevice(true);
-                  // Fit to this device's screen before sending resize (same reasoning
-                  // as CONTROL_GRANTED — ensures mobile gets correct col/row count).
-                  if (fitAddonRef.current) {
-                    fitAddonRef.current.fit();
-                  }
-                  // Resize PTY to match our current terminal dimensions.
-                  if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
-                    const { cols, rows } = xtermRef.current;
-                    wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
-                  }
-                } else {
-                  // A different device is already controlling this session.
-                  // Delay the banner by 600ms: on reconnect the server may send
-                  // SESSION_JOINED before the previous connection's clearActive defer
-                  // fires. If CONTROL_GRANTED arrives in that window we cancel it.
-                  logger.terminal('Joined live session (passive device)', { tabId });
-                  if (xtermRef.current) {
-                    xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
-                  }
-                  clearTimeout(bannerTimerRef.current);
-                  bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 600);
-                }
-                return;
-              }
-
-              // Handoff: another device took control of this PTY
-              if (msg.type === 'CONTROL_TRANSFERRED') {
-                logger.terminal('Control transferred to another device', { tabId });
-                setIsActiveDevice(false);
-                return;
-              }
-
-              // Handoff: this device is now the active device
-              if (msg.type === 'CONTROL_GRANTED') {
-                logger.terminal('Control granted to this device', { tabId });
-                // Cancel any pending SESSION_JOINED banner timer — we're the active
-                // device, so no passive-device overlay should appear.
-                clearTimeout(bannerTimerRef.current);
-                setIsActiveDevice(true);
-                // Fit the terminal to THIS device's screen BEFORE reading cols/rows.
-                // Without this, mobile devices inherit the desktop's column count
-                // (e.g. 220 cols) and the PTY is never resized to the phone screen.
-                // fit() is synchronous — cols/rows are correct immediately after.
+                logger.terminal('Session joined', { tabId });
+                // Fit terminal to this device's screen dimensions and sync PTY size.
                 if (fitAddonRef.current) {
                   fitAddonRef.current.fit();
                 }
-                // Resize PTY to match this device's terminal dimensions
                 if (xtermRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
                   const { cols, rows } = xtermRef.current;
                   wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
@@ -2039,7 +1952,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     // calls do not accumulate duplicate listeners — which was the root cause
     // of the double-typing bug (each reconnect added a new onData listener
     // while the previous ones remained active on the same term instance).
-    // Both handlers use refs (wsRef, isActiveDeviceRef) so they always
+    // Both handlers use refs (wsRef) so they always
     // reference the current WebSocket regardless of reconnections.
     const onDataDisposable = term.onData((data) => {
       if (data === '\x7f' || data === '\x08') {
@@ -2066,7 +1979,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     });
 
     const onResizeDisposable = term.onResize(({ cols, rows }) => {
-      if (!isActiveDeviceRef.current) return; // passive device — don't resize PTY
       const activeWs = wsRef.current;
       if (activeWs && activeWs.readyState === WebSocket.OPEN) {
         activeWs.send(JSON.stringify({ type: 'resize', cols, rows }));
@@ -2159,7 +2071,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // Dispose xterm input/resize listeners (registered once above connectWebSocket)
       onDataDisposable.dispose();
       onResizeDisposable.dispose();
-      clearTimeout(bannerTimerRef.current);
 
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Signal that this is an intentional unmount, not a connectivity issue.
@@ -2266,55 +2177,6 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }}
       />
 
-      {/* Handoff overlay: shown when another device controls this terminal.
-          Uses keyboardHeightOffset so the banner floats above the virtual keyboard
-          on mobile — without this the banner sits below the keyboard and is unreachable. */}
-      {!isActiveDevice && isConnected && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: keyboardHeightOffset,
-            left: 0,
-            right: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '12px',
-            padding: '10px 16px',
-            // Extra bottom padding for phones with a gesture navigation bar.
-            paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
-            background: 'rgba(99, 102, 241, 0.9)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 10,
-            borderTop: '1px solid rgba(255,255,255,0.15)',
-          }}
-        >
-          <span style={{ color: '#fff', fontSize: '13px', opacity: 0.95 }}>
-            Another device controls this terminal
-          </span>
-          <button
-            onClick={() => {
-              if (wsRef.current?.readyState === WebSocket.OPEN && xtermRef.current) {
-                const { cols, rows } = xtermRef.current;
-                wsRef.current.send(JSON.stringify({ type: 'take_control', cols, rows }));
-              }
-            }}
-            style={{
-              padding: '4px 14px',
-              fontSize: '13px',
-              fontWeight: 600,
-              background: '#fff',
-              color: '#4338ca',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Take Control
-          </button>
-        </div>
-      )}
       
       {isVisible && (
         <button
