@@ -73,4 +73,6 @@ allowed_tools = [
   "file_list",
   "task_submit",
   "workflow_status",
+  "environment_detect",
+  "environment_run",
 ]
