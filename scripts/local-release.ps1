@@ -456,6 +456,21 @@ foreach ($asset in $assets) {
     }
 }
 
+# Zip and upload the Forge Companion PWA alongside the binaries.
+$companionDir  = "$ROOT\forge-companion"
+$companionZip  = "$BINDIR\forge-companion.zip"
+if (Test-Path $companionDir) {
+    Write-Step "Zipping Forge Companion PWA..."
+    if (Test-Path $companionZip) { Remove-Item $companionZip -Force }
+    Compress-Archive -Path "$companionDir\*" -DestinationPath $companionZip -Force
+    Write-Step "Uploading forge-companion.zip..."
+    gh release upload $TAG $companionZip
+    if ($LASTEXITCODE -ne 0) { Write-Fail "Upload failed for forge-companion.zip" }
+    Write-OK "Uploaded forge-companion.zip"
+} else {
+    Write-Warn "forge-companion/ not found — skipping companion zip upload"
+}
+
 Write-Step "Publishing release..."
 gh release edit $TAG --draft=false
 if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to publish release" }

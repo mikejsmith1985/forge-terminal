@@ -543,6 +543,17 @@ func main() {
 	// the command card panel can poll it without exposing the MCP secret.
 	http.HandleFunc("/api/mcp/ui-status", AuthMiddleware(handleMCPUIStatus))
 
+	// ── Mobile Companion routes (scoped mobile-token auth + CORS) ─────────
+	// The mobile token is separate from the MCP token — it scopes to terminal
+	// read/write only and is safe to share with the companion PWA.
+	// /api/mobile/settings uses Forge session auth (desktop UI only; no CORS).
+	initMobileToken()
+	http.HandleFunc("/api/mobile/info", handleMobileInfo)
+	http.HandleFunc("/api/mobile/sessions", handleMobileSessions)
+	http.HandleFunc("/api/mobile/exec", handleMobileExec)
+	http.HandleFunc("/api/mobile/read", handleMobileRead)
+	http.HandleFunc("/api/mobile/settings", WrapWithMiddleware(handleMobileSettings))
+
 	// ── License routes (always available — bypass LicenseMiddleware) ──────
 	http.HandleFunc("/api/license/activate", WrapLicenseHandler(handleLicenseActivate))
 	http.HandleFunc("/api/license/status", WrapLicenseHandler(handleLicenseStatus))

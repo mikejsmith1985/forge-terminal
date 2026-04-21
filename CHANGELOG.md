@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.1] - 2026-04-21
+
+### Added
+- **Forge Companion PWA** (`forge-companion/`) — Standalone mobile companion app that lets users view and interact with Forge Terminal sessions from any iOS or Android browser. No native app required. Single-file vanilla JS PWA with 4 screens: Setup, Upgrade Required, Sessions list, and Terminal view. Distributed as `forge-companion.zip` in releases.
+- **Mobile Access API** (`/api/mobile/*`) — Five new HTTP endpoints with CORS headers and a dedicated scoped mobile bearer token (`~/.forge/mobile-token`). The mobile token grants terminal read/write access only — it cannot invoke MCP tools like `environment_run`. Endpoints: `GET /api/mobile/info`, `GET /api/mobile/sessions`, `POST /api/mobile/exec`, `GET /api/mobile/read`, `GET+POST /api/mobile/settings`.
+- **Subscription feature flags** (`internal/license/features.go`) — Infrastructure for per-feature gating tied to license plan. `HasFeature(info, featureName)` resolves: license server → local override file → false. `SetLocalFeatureOverride()` writes `~/.forge/feature-overrides.json` for dev and admin use. First gated feature: `mobile_access`.
+- **`Features []string` on `license.Info`** — Additive JSON field for the license server to return plan-tier features. When the license Worker is updated to return plan features, mobile access (and future add-ons) will gate automatically without a Forge binary update.
+- **ANSI stripping server-side** — `handleMobileRead` strips VT100/ANSI escape codes before returning terminal output so the companion PWA renders plain readable text without extra libraries.
+- **Deep-link QR flow** — The desktop "Connect Mobile" share URL uses the URL fragment (`#forge=URL&token=TOKEN`) so the mobile token is never logged by servers, proxies, or referrer headers. The companion reads and clears the fragment on load.
+
+### Changed
+- **Mobile access is a subscription add-on** — `/api/mobile/*` endpoints return HTTP 403 with an upgrade URL when `mobile_access` is not in the license feature set.
+
 ### Fixed
 - **Tab titles no longer show filenames like `index.html`** — `extractProjectFolder` now strips a trailing document/web/image/archive file segment from the path before deriving the project name, so tools that report the file being edited rather than the CWD produce the correct project-level tab title. Language extensions (`.js`, `.ts`, `.py`, etc.) are intentionally excluded from stripping to avoid false positives on project directories like `node.js`. The fix covers all three naming strategies: `project-root`, `current-dir`, and `parent-child`.
 - **Auto-detection of project root without explicit configuration** — When the user has not configured a root folder in Settings, `extractProjectFolder` now auto-detects a narrow set of known project-collection folder names (`ProjectsWin`, `repos`, `workspace`, `workspaces`) and pins the tab title to their first child, eliminating the need to manually configure the root folder in most cases.
