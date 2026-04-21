@@ -36,6 +36,12 @@ type Info struct {
 	ExpiresAt          time.Time  `json:"expiresAt"`
 	LastCheck          time.Time  `json:"lastCheck"`
 	GracePeriodExpires *time.Time `json:"gracePeriodExpires,omitempty"`
+
+	// Features is the list of add-on feature flags enabled for this license.
+	// Populated by the license server based on the user's subscription plan.
+	// An empty slice means no add-on features are active.
+	// Future: the license Worker will populate this field when plan-based gating is live.
+	Features []string `json:"features,omitempty"`
 }
 
 // CheckLicense reads the encrypted cache and decides license status.
