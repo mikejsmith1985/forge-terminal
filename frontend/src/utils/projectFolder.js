@@ -1,3 +1,31 @@
+// File extensions that unambiguously identify a path segment as a FILE rather
+// than a directory. Language extensions (.js, .ts, .py, .go, etc.) are
+// intentionally excluded because they can appear as project directory names
+// (e.g. the folder "node.js" or a project named "create-react-app.ts").
+const KNOWN_DOCUMENT_FILE_EXTENSIONS = /\.(html?|css|json|md|markdown|txt|xml|ya?ml|toml|ini|cfg|env|log|csv|sql|pdf|zip|tar|gz|bz2|7z|rar|png|jpe?g|gif|ico|svg|webp|bmp|ps1|bat|exe|msi|dll|so|dylib|lock|sh|cmd)$/i;
+
+// Narrow set of common project-collection folder names.
+// Intentionally kept small — generic names like "code", "dev", "work" are
+// also common INSIDE projects, so anchoring on them causes false positives.
+const KNOWN_ROOT_FOLDER_NAMES = new Set(['projectswin', 'repos', 'workspace', 'workspaces']);
+
+/**
+ * Returns true if the segment looks like a document, web, image, archive,
+ * or binary file — NOT a directory and NOT a source code file.
+ *
+ * Use this to guard against file paths leaking into tab titles.
+ * Exported so all callers can share one consistent definition.
+ *
+ * @param {string} segment - A single path component (no slashes).
+ * @returns {boolean}
+ */
+export function isFileLikeName(segment) {
+  if (!segment || typeof segment !== 'string') return false;
+  // Dotfiles (.git, .env, .gitignore) are directories/config files, not "files" in this sense.
+  if (segment.startsWith('.') && !segment.slice(1).includes('.')) return false;
+  return KNOWN_DOCUMENT_FILE_EXTENSIONS.test(segment);
+}
+
 /**
  * Extract the project-level folder name from a path.
  *
@@ -5,22 +33,40 @@
  * returns its first child (the project name). This keeps tab names pinned
  * to the workspace-root level instead of changing with every `cd`.
  *
- * If no matching root folder is found, falls back to the deepest segment.
+ * Automatically strips a trailing file segment (e.g. "index.html") before
+ * extraction so that tools which report the file being edited — rather than
+ * the containing directory — still produce a correct project-level name.
  *
- * @param {string}      rawPath    - A filesystem path (backslashes or forward slashes).
- * @param {string}      [rootFolder] - The name of the projects root directory to anchor on
- *                                    (e.g. "ProjectsWin", "repos", "workspace"). Case-insensitive.
- *                                    If omitted or empty, falls back to the deepest segment.
+ * Resolution order:
+ *  1. Explicitly configured rootFolder (highest priority)
+ *  2. Auto-detected known root folder name in the path (ProjectsWin, repos, …)
+ *  3. Third path segment for Windows drive paths (C:\X\project\…)
+ *  4. Third path segment for Unix absolute paths (/home/user/project/…)
+ *  5. Last segment as final fallback
+ *
+ * @param {string}  rawPath    - A filesystem path (backslashes or forward slashes).
+ * @param {string}  [rootFolder] - Name of the projects root directory to anchor on
+ *                                 (e.g. "ProjectsWin", "repos"). Case-insensitive.
+ *                                 Auto-detected from KNOWN_ROOT_FOLDER_NAMES when omitted.
  * @returns {string|null} The folder name to use as a tab title, or null if
  *   the path is empty / unparseable.
  */
 export function extractProjectFolder(rawPath, rootFolder) {
   if (!rawPath || typeof rawPath !== 'string') return null;
 
-  const parts = rawPath.replace(/\\/g, '/').split('/').filter(Boolean);
+  let parts = rawPath.replace(/\\/g, '/').split('/').filter(Boolean);
   if (parts.length === 0) return null;
 
-  // Pin to the first child of the configured root folder ancestor
+  // Strip a trailing file segment so that a path like
+  // "C:/ProjectsWin/forge-terminal/forge-companion/index.html" is treated
+  // as if it were "C:/ProjectsWin/forge-terminal/forge-companion".
+  // We only strip when there is a parent directory left to anchor on.
+  if (parts.length > 1 && isFileLikeName(parts[parts.length - 1])) {
+    parts = parts.slice(0, -1);
+    if (parts.length === 0) return null;
+  }
+
+  // 1. Explicitly configured root folder takes highest priority.
   if (rootFolder && rootFolder.trim()) {
     const needle = rootFolder.trim().toLowerCase();
     const idx = parts.findIndex(p => p.toLowerCase() === needle);
@@ -29,24 +75,33 @@ export function extractProjectFolder(rawPath, rootFolder) {
     }
   }
 
-  // Smarter fallback when no rootFolder is configured:
-  // On Windows absolute paths (C:/...) skip the drive letter and use the
-  // second segment (the direct child of the drive root, e.g. "ProjectsWin\forge-terminal" → "forge-terminal").
-  // On Unix absolute paths skip the leading empty segment and pick the second real segment.
-  // This keeps the tab more stable than always showing the deepest directory.
-  const isDrivePath = /^[a-zA-Z]:$/.test(parts[0]); // e.g. "C:"
+  // 2. Auto-detect from the narrow set of known root folder names.
+  //    Only search the first half of the path to avoid anchoring inside a project.
+  const searchLimit = Math.ceil(parts.length / 2);
+  for (let i = 0; i < searchLimit; i++) {
+    if (KNOWN_ROOT_FOLDER_NAMES.has(parts[i].toLowerCase()) && i + 1 < parts.length) {
+      return parts[i + 1];
+    }
+  }
+
+  // 3. Windows drive-rooted path: C:\ProjectsWin\forge-terminal\…
+  const isDrivePath = /^[a-zA-Z]:$/.test(parts[0]);
   const isUnixAbsolute = rawPath.startsWith('/');
 
   if (isDrivePath && parts.length >= 3) {
-    // C: / ProjectsWin / forge-terminal / ... → return parts[2] (the project)
+    // C: / something / project / ... → return "project" (parts[2])
+    return parts[2];
+  }
+
+  // 4. Unix absolute path: /home/user/project/…
+  if (isUnixAbsolute && parts.length >= 3) {
     return parts[2];
   }
   if (isUnixAbsolute && parts.length >= 2) {
-    // /home/user/repos/project/... → return parts[1] isn't great; prefer deepest if shallow
-    return parts.length >= 3 ? parts[2] : parts[parts.length - 1];
+    return parts[1];
   }
 
-  // Last resort: deepest segment
+  // 5. Last resort: deepest segment
   return parts[parts.length - 1];
 }
 
@@ -104,13 +159,21 @@ export function getTabTitle(rawPath, strategy, opts = {}) {
   switch (strategy) {
     case 'current-dir': {
       if (!rawPath) return defaultFallback;
-      const parts = rawPath.replace(/\\/g, '/').split('/').filter(Boolean);
+      let parts = rawPath.replace(/\\/g, '/').split('/').filter(Boolean);
+      // Strip a trailing file segment to avoid returning "index.html" as the directory name.
+      if (parts.length > 1 && isFileLikeName(parts[parts.length - 1])) {
+        parts = parts.slice(0, -1);
+      }
       return parts[parts.length - 1] || defaultFallback;
     }
 
     case 'parent-child': {
       if (!rawPath) return defaultFallback;
-      const parts = rawPath.replace(/\\/g, '/').split('/').filter(Boolean);
+      let parts = rawPath.replace(/\\/g, '/').split('/').filter(Boolean);
+      // Strip a trailing file segment so the pair shows two directory names.
+      if (parts.length > 1 && isFileLikeName(parts[parts.length - 1])) {
+        parts = parts.slice(0, -1);
+      }
       if (parts.length >= 2) {
         return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
       }

@@ -43,7 +43,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy } from './utils/projectFolder'
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
@@ -1184,7 +1184,11 @@ function App() {
     if (folderName || fullPath) {
       const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix, rootFolder: namingRootFolder }) || '';
       logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title, namingStrategy });
-      if (title) updateTabTitle(tabId, title);
+      // Guard: skip rename if title looks like a file or fell back to a generic "Terminal N".
+      // Overwriting a real project name with "Terminal 1" is worse than leaving it unchanged.
+      if (title && !title.startsWith('Terminal ') && !isFileLikeName(title)) {
+        updateTabTitle(tabId, title);
+      }
     }
     if (fullPath) {
       updateTabDirectory(tabId, fullPath);

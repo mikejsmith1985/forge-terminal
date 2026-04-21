@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
 import { logger } from '../utils/logger';
-import { extractProjectFolder, getTabTitle, getShellLabel, isStaticNamingStrategy } from '../utils/projectFolder';
+import { extractProjectFolder, getTabTitle, getShellLabel, isStaticNamingStrategy, isFileLikeName } from '../utils/projectFolder';
 
 const MAX_TABS = 20;
 
@@ -272,18 +272,19 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
           const rootFolder  = namingRootFolderRef.current  || '';
           let title = tabState.title || `Terminal ${index + 1}`;
 
-          // Re-derive title from saved directory when using a dynamic strategy
+          // Re-derive title from saved directory when using a dynamic strategy.
+          // Also re-derive if the saved title is a filename that leaked in from a prior session.
           if (!isStaticNamingStrategy(strategy) && tabState.currentDirectory &&
-              (title.startsWith('Terminal ') || title === 'forge-terminal' || title === '~' || !title)) {
+              (title.startsWith('Terminal ') || title === 'forge-terminal' || title === '~' || !title || isFileLikeName(title))) {
             const derived = getTabTitle(tabState.currentDirectory, strategy, {
               tabNumber: index + 1,
               prefix: namingPrefixRef.current || 'Dev',
               rootFolder,
               fallback: `Terminal ${index + 1}`,
             });
-            // Guard against saved paths ending in a filename
-            const looksLikeFile = derived && /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(derived);
-            if (derived && !looksLikeFile && derived !== '~') {
+            // Guard against saved paths ending in a document or binary filename.
+            // Uses the centralized isFileLikeName check from projectFolder.js.
+            if (derived && !isFileLikeName(derived) && derived !== '~') {
               title = derived;
               logger.session('Derived tab title from directory', {
                 tabId: tabState.id,

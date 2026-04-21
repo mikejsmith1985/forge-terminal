@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Tab titles no longer show filenames like `index.html`** — `extractProjectFolder` now strips a trailing document/web/image/archive file segment from the path before deriving the project name, so tools that report the file being edited rather than the CWD produce the correct project-level tab title. Language extensions (`.js`, `.ts`, `.py`, etc.) are intentionally excluded from stripping to avoid false positives on project directories like `node.js`. The fix covers all three naming strategies: `project-root`, `current-dir`, and `parent-child`.
+- **Auto-detection of project root without explicit configuration** — When the user has not configured a root folder in Settings, `extractProjectFolder` now auto-detects a narrow set of known project-collection folder names (`ProjectsWin`, `repos`, `workspace`, `workspaces`) and pins the tab title to their first child, eliminating the need to manually configure the root folder in most cases.
+- **Filename guards centralized** — The `isFileLikeName` helper is now exported from `projectFolder.js` and used by all callers (`ForgeTerminal.jsx` OSC handler, `useTabManager.js` session restore, `App.jsx` directory-change handler) instead of duplicating an incomplete regex in each file. The shared definition now includes HTML, CSS, JSON, YAML, images, archives, and binaries that were missing from the old inline regex.
+- **Session restore no longer preserves bad file-title tabs** — If a session was saved with a filename as the tab title (e.g. `index.html` from a previous bug), session restore now re-derives the title from the saved directory path.
+- **`handleDirectoryChange` will not overwrite a good title with `Terminal N`** — The fallback no longer silently renames a tab to `Terminal 1` when path parsing fails; it leaves the existing title unchanged.
+
 ## [7.5.2] - 2026-04-21
 
 ---
