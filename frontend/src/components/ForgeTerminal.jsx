@@ -634,6 +634,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // Vision state
   const visionEnabledRef = useRef(visionEnabled);
 
+  // Tracks whether a TUI app (vim, lazygit, Copilot CLI, gh dash, etc.) is currently
+  // holding the xterm.js alternate screen buffer. When true, the theme-update effect
+  // is paused to avoid fighting with the temporary dark-mode override applied below.
+  const isAltScreenRef = useRef(false);
+
+  // Mirrors the latest `theme` and `colorTheme` props so that the alt-screen CSI
+  // handlers (registered once during init) always read the current user preference,
+  // not the stale value captured at mount time.
+  const themeRef = useRef(theme);
+  const colorThemeRef = useRef(colorTheme);
+
   // v3.12.12: AM feature removed- amEnabled effect deleted
 
   // Keep tabName ref updated
@@ -677,6 +688,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     onFileOpenRef.current = onFileOpen;
   }, [onFileOpen]);
   
+  // Keep theme/colorTheme refs current so alt-screen CSI handlers (registered
+  // once at mount inside the init effect) always see the user's latest preference.
+  useEffect(() => {
+    themeRef.current = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    colorThemeRef.current = colorTheme;
+  }, [colorTheme]);
+
   // Keep visionEnabled ref updated and send control message to backend
   useEffect(() => {
     visionEnabledRef.current = visionEnabled;
@@ -894,9 +915,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     }
   }, [tabId]);
   
-  // Update terminal theme when theme or colorTheme prop changes
+  // Update terminal theme when theme or colorTheme prop changes.
+  // Skipped while a TUI app holds the alternate screen buffer — the alt-screen
+  // CSI handlers manage the temporary dark override during that window and will
+  // restore the correct user theme when the app exits the alternate screen.
   useEffect(() => {
-    if (xtermRef.current) {
+    if (xtermRef.current && !isAltScreenRef.current) {
       const term = xtermRef.current;
       const newTheme = getTerminalTheme(colorTheme, theme);
       
@@ -1099,6 +1123,61 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
       });
     }
+
+    // ── Alt-screen detection for TUI compatibility ────────────────────────────
+    //
+    // TUI applications (vim, lazygit, Copilot CLI, gh dash) enter the terminal's
+    // alternate screen buffer when they start and exit it when they quit. The
+    // alternate screen is activated by one of three CSI private-mode codes:
+    //   47   — original alternate screen (simple/legacy apps)
+    //   1047 — alternate screen with saved cursor position
+    //   1049 — alternate screen + save cursor + save terminal attributes (most common)
+    //
+    // Problem: on a light-mode terminal tab the light background bleeds through
+    // between the TUI's own colored UI regions, making the output look broken.
+    // We intercept the CSI ? ... h (SET) and ? ... l (RESET) sequences to apply
+    // the dark variant of the current color theme while the TUI is active, then
+    // restore the user's original theme when the TUI exits.
+    const ALT_SCREEN_CODES = new Set([47, 1047, 1049]);
+
+    // Applies a full terminal theme object (palette + background) to the xterm
+    // instance and its container element.
+    const applyTerminalTheme = (targetTerm, containerEl, termTheme) => {
+      targetTerm.options.theme = termTheme;
+      if (containerEl) containerEl.style.backgroundColor = termTheme.background;
+    };
+
+    // CSI ? ... h — entering alternate screen
+    term.parser.registerCsiHandler({ intermediates: '?', final: 'h' }, (params) => {
+      const isAltScreenEntry = params.toArray().some((code) => {
+        const numericCode = Array.isArray(code) ? code[0] : code;
+        return ALT_SCREEN_CODES.has(numericCode);
+      });
+      if (isAltScreenEntry) {
+        isAltScreenRef.current = true;
+        // Apply full dark palette only on light-mode tabs — dark tabs are already correct.
+        if (themeRef.current !== 'dark') {
+          applyTerminalTheme(term, terminalRef.current, getTerminalTheme(colorThemeRef.current, 'dark'));
+        }
+      }
+      return false; // Let xterm.js complete its own alt-screen setup normally
+    });
+
+    // CSI ? ... l — exiting alternate screen
+    term.parser.registerCsiHandler({ intermediates: '?', final: 'l' }, (params) => {
+      const isAltScreenExit = params.toArray().some((code) => {
+        const numericCode = Array.isArray(code) ? code[0] : code;
+        return ALT_SCREEN_CODES.has(numericCode);
+      });
+      if (isAltScreenExit) {
+        isAltScreenRef.current = false;
+        if (themeRef.current !== 'dark') {
+          // Restore the full user-chosen theme (may be light or dark, depending on preference).
+          applyTerminalTheme(term, terminalRef.current, getTerminalTheme(colorThemeRef.current, themeRef.current));
+        }
+      }
+      return false; // Let xterm.js complete its own alt-screen teardown normally
+    });
 
     // Open terminal
     term.open(terminalRef.current);

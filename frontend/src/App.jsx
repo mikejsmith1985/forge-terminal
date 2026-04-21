@@ -96,7 +96,7 @@ function App() {
     return localStorage.getItem('colorTheme') || 'molten';
   })
   const [defaultTabTheme, setDefaultTabTheme] = useState(() => {
-    return localStorage.getItem('defaultTabTheme') || 'auto-cycle';
+    return localStorage.getItem('defaultTabTheme') || 'auto-cycle-dark';
   })
   const { namingStrategy, namingPrefix, namingRootFolder, setNamingStrategy, setNamingPrefix, setNamingRootFolder } = useTabNaming();
   const [sidebarPosition, setSidebarPosition] = useState(() => {
@@ -1165,13 +1165,6 @@ function App() {
     }));
   }, []);
 
-  // Handle interactive TUI detection - auto-switch to terminal view
-  // This is triggered when Claude Code or similar shows a multi-question wizard
-  const handleInteractiveTUI = useCallback((tabId, tuiType) => {
-    logger.terminal('Interactive TUI detected', { tabId, tuiType });
-    // v3.8.2: Terminal is the only view, no switching needed
-  }, []);
-
   // Handle directory change from terminal - auto-rename tab and save directory.
   // Respects the user's chosen tab naming strategy: static strategies (numbered,
   // shell-type, custom-prefix) never auto-rename; dynamic strategies update on cd.
@@ -1956,7 +1949,6 @@ function App() {
                     onSpawnFailed={handleSpawnFailed}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
-                    onInteractiveTUI={(tuiType) => handleInteractiveTUI(tab.id, tuiType)}
                     onCopy={() => addToast('✓ Copied to clipboard', 'success', 1500)}
                     onFileOpen={handleFileOpen}
                     onPaste={(type, metadata) => {
