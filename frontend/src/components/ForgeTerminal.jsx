@@ -10,7 +10,7 @@ import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import { diagnosticCore } from '../utils/diagnosticCore';
 import { isLLMCommand } from '../utils/llmDetection';
-import { extractProjectFolder } from '../utils/projectFolder';
+import { extractProjectFolder, isFileLikeName } from '../utils/projectFolder';
 
 // Paste error logger
 const logPasteError = (error, context = {}) => {
@@ -967,10 +967,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           // Sanitize the folder name too (catches any residual decorations)
           folderName = sanitizePath(folderName);
 
-          // Guard: if the resolved name looks like a filename (script/extension),
-          // the shell sent a process name rather than a real CWD — ignore it.
-          const looksLikeFile = /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(folderName);
-          if (looksLikeFile) {
+          // Guard: if the resolved name looks like a document or binary file,
+          // the shell sent a process name or an editor path instead of a CWD — ignore it.
+          // Uses the centralized isFileLikeName check from projectFolder.js.
+          if (isFileLikeName(folderName)) {
             return true; // nothing useful to extract, ignore
           }
 
