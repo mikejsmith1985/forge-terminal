@@ -6,6 +6,7 @@ import { RefreshCw } from 'lucide-react';
 import OwnerReleaseCard from './OwnerReleaseCard';
 import DirectoryCard from './DirectoryCard';
 import EnterpriseWorkflowCard from './EnterpriseWorkflowCard';
+import MCPSetupCard from './MCPSetupCard';
 
 const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd, directoryCardVisible = true, onHideDirectoryCard }) => { // onOpenTutor removed — Code Tutor fully disabled
   if (loading) {
@@ -20,6 +21,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           cwd={cwd}
         />
         <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
+        <MCPSetupCard />
         <div className="command-cards-loading">
           <div className="spinner"></div>
           <p>Loading command cards...</p>
@@ -40,6 +42,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           cwd={cwd}
         />
         <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
+        <MCPSetupCard />
         <div className="command-cards-error">
           <p className="error-message">⚠️ Failed to load command cards</p>
           <p className="error-details">{error}</p>
@@ -107,6 +110,8 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
       )}
       {/* Enterprise Workflow Architect card — always visible */}
       <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
+      {/* Adaptive Build Environments card — always visible */}
+      <MCPSetupCard />
     </div>
   );
 };

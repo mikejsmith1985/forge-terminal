@@ -539,6 +539,9 @@ func main() {
 	http.HandleFunc("/api/mcp", handleMCP)
 	http.HandleFunc("/api/mcp/reload", handleMCPReload)
 	http.HandleFunc("/api/mcp/tasks/", handleMCPTaskStatus)
+	// /api/mcp/ui-status uses standard Forge auth (not MCP bearer token) so
+	// the command card panel can poll it without exposing the MCP secret.
+	http.HandleFunc("/api/mcp/ui-status", AuthMiddleware(handleMCPUIStatus))
 
 	// ── License routes (always available — bypass LicenseMiddleware) ──────
 	http.HandleFunc("/api/license/activate", WrapLicenseHandler(handleLicenseActivate))
