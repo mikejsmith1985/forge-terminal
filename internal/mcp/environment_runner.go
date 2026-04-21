@@ -91,8 +91,12 @@ type realCommandRunner struct{}
 
 // RunCommand forks a child process, captures stdout and stderr separately,
 // and returns them along with the exit code.
+//
+// suppressConsoleWindow is called before Start so that wsl.exe and cmd.exe
+// do not pop a visible terminal window when Forge itself is the terminal.
 func (r *realCommandRunner) RunCommand(ctx context.Context, name string, args []string) (RunOutput, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	suppressConsoleWindow(cmd) // platform-specific; no-op on non-Windows
 
 	var stdoutBuffer, stderrBuffer bytes.Buffer
 	cmd.Stdout = &stdoutBuffer

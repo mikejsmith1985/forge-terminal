@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`adaptive-build-environments` Copilot skill** — Deployed to all Forge-managed repos. Teaches agents when and how to call `environment_detect` and `environment_run` when builds fail on Windows (OpenNext, Turbopack, chunk path issues). Includes the RLL/OpenNext specific diagnosis and correct command pattern.
 
 ### Fixed
+- **`environment_run` no longer opens an external terminal window** — Added `CREATE_NO_WINDOW` process creation flag on Windows so `wsl.exe` and `cmd.exe` run headlessly. Since Forge is a terminal, spawning a separate console window was always wrong.
+- **`terminal_execute` timeout raised 30s → 600s** — Agents can now use `terminal_execute` (which streams output live in the active Forge tab) for long-running builds, not just quick commands.
+- **`adaptive-build-environments` skill updated** — Agents now prefer `terminal_sessions` + `terminal_execute` (PTY-first, user sees live output) over `environment_run` for builds. Skill redeployed to 13 sibling repos.
+
+### Fixed
 - **Release script R2 upload**— `local-release.ps1` now passes `--remote` to `wrangler r2 object put` so binaries are uploaded to Cloudflare R2 rather than the local wrangler dev instance. Missing `wrangler` is now a hard error (exit 1) instead of a silent skip, preventing 404 download failures for licensed users.
 
 ## [7.5.0] - 2026-04-21
