@@ -537,6 +537,7 @@ func main() {
 	// Must be initialised AFTER termHandler is set (line ~282 above).
 	initMCPServer()
 	http.HandleFunc("/api/mcp", handleMCP)
+	http.HandleFunc("/api/mcp/reload", handleMCPReload)
 	http.HandleFunc("/api/mcp/tasks/", handleMCPTaskStatus)
 
 	// ── License routes (always available — bypass LicenseMiddleware) ──────
