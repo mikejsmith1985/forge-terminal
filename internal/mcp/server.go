@@ -69,6 +69,11 @@ type Dependencies struct {
 	// AllowedTools restricts which built-in tools are registered.
 	// An empty/nil slice means all tools are exposed (the default).
 	AllowedTools []string
+
+	// EnvironmentCommandRunner overrides the default OS process runner used by the
+	// environment_detect and environment_run tools. Set this in tests to inject a
+	// mock without spawning real WSL or Docker processes. Nil means use the real runner.
+	EnvironmentCommandRunner CommandRunner
 }
 
 // NewServer creates a fully initialised MCP server.
@@ -220,6 +225,13 @@ func (srv *Server) registerBuiltInTools(deps Dependencies) {
 		allowed[name] = true
 	}
 
+	// Use the injected runner if provided (for tests), otherwise fall back to the
+	// real OS process runner that shells out to wsl.exe / docker / cmd.exe.
+	environmentRunner := deps.EnvironmentCommandRunner
+	if environmentRunner == nil {
+		environmentRunner = &realCommandRunner{}
+	}
+
 	candidates := []ToolHandler{
 		newTerminalSessionsTool(deps.TermHandler),
 		newTerminalExecuteTool(deps.TermHandler),
@@ -229,6 +241,8 @@ func (srv *Server) registerBuiltInTools(deps Dependencies) {
 		newFileListTool(deps.ProjectPath),
 		newTaskSubmitTool(srv.broker),
 		newWorkflowStatusTool(deps.ProjectPath, deps.WorkflowConfig),
+		newEnvironmentDetectTool(environmentRunner),
+		newEnvironmentRunTool(environmentRunner),
 	}
 
 	for _, tool := range candidates {

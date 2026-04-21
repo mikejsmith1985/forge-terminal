@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`environment_detect` MCP tool** — agents can probe the host for WSL2 and Docker availability before choosing an execution strategy. Returns `wsl2_available`, `docker_available`, `docker_installed_but_not_running`, `recommended` strategy, and an `install_hint` when neither is configured.
+- **`environment_run` MCP tool** — agents can run shell commands in `native`, `linux-wsl`, `linux-docker`, or `auto` environments. Solves Windows build incompatibilities (Turbopack/OpenNext chunk filename issues) without requiring GitHub Actions workflows or CI secrets. Supports configurable timeouts up to 10 minutes for long builds. Returns `exit_code`, `stdout`, `stderr`, `environment_used`, and `duration_seconds`.
+
 ## [7.2.8] - 2026-04-20
 
 ---
