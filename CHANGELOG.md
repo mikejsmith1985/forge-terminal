@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **MCP config hot-reload** — Forge now watches `forge.toml` for changes every 5 seconds and automatically applies a new `allowed_tools` list without restarting. A `POST /api/mcp/reload` endpoint is also available for instant manual reload. Parse failures are logged and safely ignored — the previous tool list is preserved to prevent accidental permission changes.
+
+### Fixed
+- **Task status endpoint auth** — `GET /api/mcp/tasks/{id}` now requires the bearer token (previously had no auth check despite the misleading comment).
+
 ## [7.3.0] - 2026-04-21
 
 ---

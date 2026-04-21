@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
@@ -48,8 +49,12 @@ type ToolHandler interface {
 
 // Server is the Forge Terminal MCP server. It holds the tool registry,
 // auth token, and the dependencies each tool needs to do its work.
+// The tool registry is hot-reloadable: call ReloadAllowedTools to apply a
+// new forge.toml allowed_tools list without restarting the process.
 type Server struct {
 	authToken string
+	deps      Dependencies  // retained so ReloadAllowedTools can rebuild handlers
+	toolsMu   sync.RWMutex // guards the tools map for concurrent reload safety
 	tools     map[string]ToolHandler
 	broker    *TaskBroker
 }
@@ -83,12 +88,36 @@ func NewServer(authToken string, deps Dependencies) *Server {
 
 	srv := &Server{
 		authToken: authToken,
+		deps:      deps,
 		tools:     make(map[string]ToolHandler),
 		broker:    broker,
 	}
 
-	srv.registerBuiltInTools(deps)
+	srv.tools = srv.buildToolRegistry(deps.AllowedTools)
 	return srv
+}
+
+// ReloadAllowedTools applies a new allowed_tools list from forge.toml without
+// restarting Forge. Existing in-flight tool calls complete normally — the lock
+// is held only long enough to swap the map pointer. Passing an empty slice
+// restores the default behaviour (all built-in tools are exposed).
+func (srv *Server) ReloadAllowedTools(allowedTools []string) {
+	freshTools := srv.buildToolRegistry(allowedTools)
+
+	srv.toolsMu.Lock()
+	previousTools := srv.tools
+	srv.tools = freshTools
+	srv.toolsMu.Unlock()
+
+	// Log which tools were added or removed so the operator can verify the reload.
+	logToolDiff(previousTools, freshTools)
+}
+
+// ValidateHTTPRequest returns true when the request carries the correct bearer
+// token. Used by handlers that live outside the MCP server's HandleHTTP path
+// (e.g. /api/mcp/tasks, /api/mcp/reload) but need the same auth guarantee.
+func (srv *Server) ValidateHTTPRequest(r *http.Request) bool {
+	return ValidateRequestToken(r, srv.authToken)
 }
 
 // Broker returns the task broker so the Forge agent loop can consume submitted tasks.
@@ -99,7 +128,10 @@ func (srv *Server) Broker() *TaskBroker {
 // ExecuteTool calls a named tool directly, bypassing HTTP and auth.
 // Intended for unit testing only — not exposed over HTTP.
 func (srv *Server) ExecuteTool(name string, args map[string]any) (*CallToolResult, error) {
+	srv.toolsMu.RLock()
 	handler, found := srv.tools[name]
+	srv.toolsMu.RUnlock()
+
 	if !found {
 		return nil, fmt.Errorf("tool %q not registered", name)
 	}
@@ -160,12 +192,13 @@ func (srv *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
 // ── RPC Method Handlers ──────────────────────────────────────────────────────
 
 // handleInitialize responds to the MCP handshake with server capabilities.
+// listChanged is true because forge.toml hot-reload can change the tool set at runtime.
 func (srv *Server) handleInitialize(w http.ResponseWriter, req *JSONRPCRequest) {
 	result := InitializeResult{
 		ProtocolVersion: mcpProtocolVersion,
 		ServerInfo:      MCPServerInfo{Name: serverName},
 		Capabilities: MCPCapabilities{
-			Tools: map[string]any{"listChanged": false},
+			Tools: map[string]any{"listChanged": true},
 		},
 	}
 	encodeJSON(w, JSONRPCResponse{
@@ -185,6 +218,8 @@ func (srv *Server) handleToolsList(w http.ResponseWriter, req *JSONRPCRequest) {
 }
 
 // handleToolsCall dispatches a tools/call request to the matching ToolHandler.
+// The tools map lock is held only for the initial lookup, not during Execute,
+// so long-running tools (environment_run, terminal ops) do not block reloads.
 func (srv *Server) handleToolsCall(w http.ResponseWriter, req *JSONRPCRequest) {
 	callReq, err := decodeCallRequest(req.Params)
 	if err != nil {
@@ -193,7 +228,11 @@ func (srv *Server) handleToolsCall(w http.ResponseWriter, req *JSONRPCRequest) {
 		return
 	}
 
+	// Snapshot the handler under a short read lock, then release before Execute.
+	srv.toolsMu.RLock()
 	handler, found := srv.tools[callReq.Name]
+	srv.toolsMu.RUnlock()
+
 	if !found {
 		srv.writeRPCError(w, req.ID, ErrorCodeMethodNotFound,
 			fmt.Sprintf("unknown tool %q", callReq.Name))
@@ -215,55 +254,72 @@ func (srv *Server) handleToolsCall(w http.ResponseWriter, req *JSONRPCRequest) {
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 
-// registerBuiltInTools adds all Forge tools to the registry.
-// If deps.AllowedTools is non-empty, only the named tools are registered.
-// This is called once inside NewServer.
-func (srv *Server) registerBuiltInTools(deps Dependencies) {
-	allowed := make(map[string]bool, len(deps.AllowedTools))
-	filterActive := len(deps.AllowedTools) > 0
-	for _, name := range deps.AllowedTools {
-		allowed[name] = true
+// buildToolRegistry constructs a fresh tools map filtered by allowedTools.
+// An empty or nil allowedTools slice means all built-in tools are exposed.
+// This is called both at startup (inside NewServer) and on each hot-reload.
+func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandler {
+	// Build the allowed-name set for O(1) lookup.
+	isFilterActive := len(allowedTools) > 0
+	allowedByName := make(map[string]bool, len(allowedTools))
+	for _, toolName := range allowedTools {
+		allowedByName[toolName] = true
 	}
 
-	// Use the injected runner if provided (for tests), otherwise fall back to the
-	// real OS process runner that shells out to wsl.exe / docker / cmd.exe.
-	environmentRunner := deps.EnvironmentCommandRunner
+	// Use the injected runner if provided (for tests), otherwise use the real
+	// OS process runner that shells out to wsl.exe / docker / cmd.exe.
+	environmentRunner := srv.deps.EnvironmentCommandRunner
 	if environmentRunner == nil {
 		environmentRunner = &realCommandRunner{}
 	}
 
 	candidates := []ToolHandler{
-		newTerminalSessionsTool(deps.TermHandler),
-		newTerminalExecuteTool(deps.TermHandler),
-		newTerminalReadTool(deps.TermHandler),
-		newFileReadTool(deps.ProjectPath),
-		newFileWriteTool(deps.ProjectPath),
-		newFileListTool(deps.ProjectPath),
+		newTerminalSessionsTool(srv.deps.TermHandler),
+		newTerminalExecuteTool(srv.deps.TermHandler),
+		newTerminalReadTool(srv.deps.TermHandler),
+		newFileReadTool(srv.deps.ProjectPath),
+		newFileWriteTool(srv.deps.ProjectPath),
+		newFileListTool(srv.deps.ProjectPath),
 		newTaskSubmitTool(srv.broker),
-		newWorkflowStatusTool(deps.ProjectPath, deps.WorkflowConfig),
+		newWorkflowStatusTool(srv.deps.ProjectPath, srv.deps.WorkflowConfig),
 		newEnvironmentDetectTool(environmentRunner),
 		newEnvironmentRunTool(environmentRunner),
 	}
 
+	registry := make(map[string]ToolHandler, len(candidates))
 	for _, tool := range candidates {
-		if filterActive && !allowed[tool.Definition().Name] {
-			log.Printf("[MCP] Tool %q disabled by forge.toml allowed_tools", tool.Definition().Name)
+		toolName := tool.Definition().Name
+		if isFilterActive && !allowedByName[toolName] {
+			log.Printf("[MCP] Tool %q disabled by forge.toml allowed_tools", toolName)
 			continue
 		}
-		srv.register(tool)
+		registry[toolName] = tool
 	}
+	return registry
 }
 
-// register adds a single ToolHandler to the registry under its declared name.
-func (srv *Server) register(tool ToolHandler) {
-	name := tool.Definition().Name
-	srv.tools[name] = tool
+// logToolDiff emits a log line for each tool added or removed between reloads,
+// so operators can confirm that hot-reload applied the expected changes.
+func logToolDiff(previousTools, freshTools map[string]ToolHandler) {
+	for toolName := range freshTools {
+		if _, wasPresent := previousTools[toolName]; !wasPresent {
+			log.Printf("[MCP] Hot-reload: tool %q is now enabled", toolName)
+		}
+	}
+	for toolName := range previousTools {
+		if _, isPresent := freshTools[toolName]; !isPresent {
+			log.Printf("[MCP] Hot-reload: tool %q is now disabled", toolName)
+		}
+	}
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // buildToolList constructs a ListToolsResult from the current registry.
+// The read lock ensures this is safe to call concurrently with ReloadAllowedTools.
 func (srv *Server) buildToolList() ListToolsResult {
+	srv.toolsMu.RLock()
+	defer srv.toolsMu.RUnlock()
+
 	definitions := make([]ToolDefinition, 0, len(srv.tools))
 	for _, handler := range srv.tools {
 		definitions = append(definitions, handler.Definition())
