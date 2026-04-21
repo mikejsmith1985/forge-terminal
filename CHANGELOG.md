@@ -16,9 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`environment_run` no longer opens an external terminal window** — Added `CREATE_NO_WINDOW` process creation flag on Windows so `wsl.exe` and `cmd.exe` run headlessly. Since Forge is a terminal, spawning a separate console window was always wrong.
 - **`terminal_execute` timeout raised 30s → 600s** — Agents can now use `terminal_execute` (which streams output live in the active Forge tab) for long-running builds, not just quick commands.
 - **`adaptive-build-environments` skill updated** — Agents now prefer `terminal_sessions` + `terminal_execute` (PTY-first, user sees live output) over `environment_run` for builds. Skill redeployed to 13 sibling repos.
-
-### Fixed
-- **Release script R2 upload**— `local-release.ps1` now passes `--remote` to `wrangler r2 object put` so binaries are uploaded to Cloudflare R2 rather than the local wrangler dev instance. Missing `wrangler` is now a hard error (exit 1) instead of a silent skip, preventing 404 download failures for licensed users.
+- **Removed "Another device controls this terminal" mobile handoff banner** — The purple overlay and "Take Control" button no longer appear under any circumstances. The banner was designed for an unfinished mobile-link feature but incorrectly fired whenever a second browser tab opened the same Forge instance. Removed all related state (`isActiveDevice`, `bannerTimerRef`, `keyboardHeightOffset`), the `CONTROL_TRANSFERRED`/`CONTROL_GRANTED` WebSocket message handlers, and the `visualViewport` keyboard-height listener from `ForgeTerminal.jsx`. The underlying Go handoff logic in `hub.go` is preserved for future use.
+- **Release script R2 upload**
 
 ## [7.5.0] - 2026-04-21
 
