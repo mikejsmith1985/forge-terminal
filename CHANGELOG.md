@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.6.1] - 2026-04-21
 
+---
+
+## [v7.6.0] - 2026-04-21
+
+## [7.6.0] - 2026-04-21
+
 ### Added
 - **Forge Companion PWA** (`forge-companion/`) — Standalone mobile companion app that lets users view and interact with Forge Terminal sessions from any iOS or Android browser. No native app required. Single-file vanilla JS PWA with 4 screens: Setup, Upgrade Required, Sessions list, and Terminal view. Distributed as `forge-companion.zip` in releases.
 - **Mobile Access API** (`/api/mobile/*`) — Five new HTTP endpoints with CORS headers and a dedicated scoped mobile bearer token (`~/.forge/mobile-token`). The mobile token grants terminal read/write access only — it cannot invoke MCP tools like `environment_run`. Endpoints: `GET /api/mobile/info`, `GET /api/mobile/sessions`, `POST /api/mobile/exec`, `GET /api/mobile/read`, `GET+POST /api/mobile/settings`.
