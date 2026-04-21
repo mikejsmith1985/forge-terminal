@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.5.2] - 2026-04-21
+
+---
+
+## [v7.5.2] - 2026-04-21
+
 ### Added
 - **MCPSetupCard** — New command-panel sidebar card (`frontend/src/components/MCPSetupCard.jsx`) for the Adaptive Build Environments MCP feature. Shows live MCP server status (fetched from `GET /api/mcp/ui-status`), token path with copy button, per-client connection guides (Copilot CLI, VS Code, Claude Code), a Windows build issue callout, and a highlighted list of active tools with `environment_detect` and `environment_run` starred at the top.
 - **`GET /api/mcp/ui-status` endpoint** — New Forge-auth-protected endpoint that returns `{is_enabled, active_tools, tool_count, token_path}` for the sidebar card. Unlike `/api/mcp`, this uses the standard Forge session auth so the UI never needs to handle the MCP bearer token.
