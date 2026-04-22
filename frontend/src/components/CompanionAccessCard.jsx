@@ -36,10 +36,11 @@ const COPY_RESET_DELAY_MS = 2000
 const UPGRADE_URL = 'https://rootlevellabs.tech/upgrade'
 const COMPANION_DOCS_URL = 'https://github.com/mikejsmith1985/forge-terminal/tree/main/forge-companion'
 
-// The companion PWA is served directly by the Forge Terminal binary at /companion/.
-// This eliminates any external hosting dependency — the QR code works as long
-// as Forge Terminal is running, regardless of internet connectivity.
-const DEFAULT_COMPANION_HOST = `${window.location.origin}/companion/`
+// Derives the companion PWA base URL from a given Forge server URL.
+// The companion is embedded in the Forge binary at /companion/, so the QR code
+// base MUST use the same URL the phone uses to reach Forge — never localhost.
+const getDefaultCompanionHost = (forgeUrl) =>
+  (forgeUrl || window.location.origin).replace(/\/$/, '') + '/companion/'
 
 // Legacy hosted URLs from older versions of Forge Terminal. If a user has one
 // of these saved in localStorage, they are silently migrated to the new
@@ -71,21 +72,39 @@ const CompanionAccessCard = () => {
   const [hasCopiedToken, setHasCopiedToken]   = useState(false)
   const [hasCopiedLink, setHasCopiedLink]     = useState(false)
 
-  const [tunnelUrl, setTunnelUrl]           = useState(
+  const [tunnelUrl, setTunnelUrl] = useState(
     () => localStorage.getItem(STORAGE_TUNNEL_URL) || window.location.origin
   )
-  const [companionHost, setCompanionHost]   = useState(() => {
+  const [companionHost, setCompanionHost] = useState(() => {
+    const storedTunnelUrl = localStorage.getItem(STORAGE_TUNNEL_URL) || window.location.origin
     const storedHost = localStorage.getItem(STORAGE_COMPANION_HOST)
-    // Silently migrate users away from legacy external URLs that no longer work.
-    if (!storedHost || LEGACY_COMPANION_HOST_URLS.has(storedHost)) {
-      return DEFAULT_COMPANION_HOST
-    }
-    return storedHost
+    // Migrate from legacy external URLs or any stale localhost value.
+    // The QR code base must always be reachable by the phone — localhost is not.
+    const isStaleOrLegacy =
+      !storedHost ||
+      LEGACY_COMPANION_HOST_URLS.has(storedHost) ||
+      /^https?:\/\/localhost(:\d+)?/.test(storedHost) ||
+      /^https?:\/\/127\.0\.0\.1(:\d+)?/.test(storedHost)
+    return isStaleOrLegacy ? getDefaultCompanionHost(storedTunnelUrl) : storedHost
   })
 
   // Persist input fields so the user does not retype them every session.
   useEffect(() => { localStorage.setItem(STORAGE_TUNNEL_URL, tunnelUrl) }, [tunnelUrl])
   useEffect(() => { localStorage.setItem(STORAGE_COMPANION_HOST, companionHost) }, [companionHost])
+
+  // When the user edits the Forge URL, keep companionHost in sync unless it has
+  // been manually overridden to a custom value. This ensures the QR code base
+  // URL always matches the URL the phone will actually use to reach Forge.
+  const handleTunnelUrlChange = useCallback((newUrl) => {
+    setCompanionHost(prevHost => {
+      const isAutoValue =
+        prevHost === getDefaultCompanionHost(tunnelUrl) ||
+        /^https?:\/\/localhost(:\d+)?/.test(prevHost) ||
+        /^https?:\/\/127\.0\.0\.1(:\d+)?/.test(prevHost)
+      return isAutoValue ? getDefaultCompanionHost(newUrl) : prevHost
+    })
+    setTunnelUrl(newUrl)
+  }, [tunnelUrl])
 
   // Fetch current mobile settings on mount so the header badge is accurate.
   useEffect(() => {
@@ -181,7 +200,7 @@ const CompanionAccessCard = () => {
               ? <EnabledView
                   settings={settings}
                   tunnelUrl={tunnelUrl}
-                  setTunnelUrl={setTunnelUrl}
+                  setTunnelUrl={handleTunnelUrlChange}
                   companionHost={companionHost}
                   setCompanionHost={setCompanionHost}
                   hasCopiedToken={hasCopiedToken}
@@ -389,9 +408,8 @@ const EnabledView = ({
               placeholder="https://your-companion-host/"
             />
             <p className="cac-hint">
-              Only change this if you self-host the PWA from the{' '}
-              <code>forge-companion/</code> directory.
-              The default is the official hosted build.
+              Auto-set from your Forge URL above. Only change this if you host
+              the companion PWA at a custom location outside of Forge.
             </p>
           </div>
 
@@ -507,19 +525,27 @@ const InstructionsBlock = () => (
  * buildDeepLink — assembles the <host>#forge=<url>&token=<tok> URL that the
  * companion PWA reads on load (see forge-companion/index.html:readAndClearDeepLink).
  *
- * If any part is missing, returns the host unchanged so the QR still renders
- * something scannable rather than an empty canvas.
+ * The QR code base URL must point to the companion PWA at the Forge server the
+ * phone can reach. If companionHost is a localhost value (e.g., stale localStorage
+ * from before v7.6.17), it is ignored and derived from forgeUrl automatically.
  */
 function buildDeepLink(companionHost, forgeUrl, mobileToken) {
-  const trimmedHost = (companionHost || '').replace(/#.*$/, '')
-  if (!forgeUrl || !mobileToken) return trimmedHost
+  const isLocalhostHost =
+    !companionHost ||
+    /^https?:\/\/localhost(:\d+)?/.test(companionHost) ||
+    /^https?:\/\/127\.0\.0\.1(:\d+)?/.test(companionHost)
+
+  const derivedBase = (forgeUrl || '').replace(/\/$/, '') + '/companion/'
+  const base = (isLocalhostHost ? derivedBase : companionHost).replace(/#.*$/, '')
+
+  if (!forgeUrl || !mobileToken) return base
 
   const fragment = new URLSearchParams({
     forge: forgeUrl,
     token: mobileToken,
   }).toString()
 
-  return `${trimmedHost}#${fragment}`
+  return `${base}#${fragment}`
 }
 
 /**

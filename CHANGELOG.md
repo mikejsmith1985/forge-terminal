@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.17] - 2026-04-22
+
+---
+
+## [v7.6.17] - 2026-04-22
+
+### Fixed
+- **Companion PWA QR code now generates a reachable URL** — the QR code base URL is now derived from the user's Forge URL (Step 2) rather than `window.location.origin` (which is always `localhost` on the desktop). Scanning the QR code now points the phone directly to `http://<tailscale-ip>:3005/companion/` instead of the unreachable `http://localhost:3005/companion/`.
+- **Stale localStorage companion host auto-migrated** — any previously saved `companionHost` value pointing to `localhost` is silently replaced with the correct derived URL on next load.
+
 ## [7.6.16] - 2026-04-22
 
 ---
