@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.6] - 2026-04-22
+
+### Fixed
+- **Terminal rendering regression fully resolved** — Reverted `ForgeTerminal.jsx` to the v7.5.0 known-good rendering code. The incremental fixes applied in v7.6.0 through v7.6.5 (double RAF, container-width gates, synchronous pre-connect fit, alt-screen theme override) introduced cumulative regressions that caused massive vertical line spacing, broken character layout, and unusable TUI rendering. This wholesale restoration of the v7.5.0 terminal component eliminates those regressions in one step. Per user directive, the mobile-responsive changes that triggered the regression cycle are rolled back at the terminal-component level.
+
 ## [7.6.5] - 2026-04-22
 
 ### Fixed
