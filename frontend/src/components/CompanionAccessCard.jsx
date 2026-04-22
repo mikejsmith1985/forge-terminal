@@ -34,8 +34,9 @@ const COPY_RESET_DELAY_MS = 2000
 const UPGRADE_URL = 'https://rootlevellabs.tech/upgrade'
 const COMPANION_DOCS_URL = 'https://github.com/mikejsmith1985/forge-terminal/tree/main/forge-companion'
 
-// Default host for the companion PWA. Users can override if they self-host.
-const DEFAULT_COMPANION_HOST = 'https://mikejsmith1985.github.io/forge-companion/'
+// Default host for the companion PWA — deployed to Cloudflare Pages.
+// Users can override this field if they self-host the companion.
+const DEFAULT_COMPANION_HOST = 'https://forge-companion-1b3.pages.dev/'
 
 // localStorage keys used to remember the user's tunnel URL and companion host.
 const STORAGE_TUNNEL_URL = 'forge.companion.tunnelUrl'
@@ -367,34 +368,63 @@ const QRBlock = ({ deepLink }) => {
 }
 
 /**
- * InstructionsBlock — numbered walkthrough for the user.
+ * InstructionsBlock — simple numbered walkthrough for the user.
  *
- * The compact variant shows on the disabled screen and lists only the
- * prerequisites. The full variant shows on the enabled screen and walks
- * through the scanning flow.
+ * compact=true  → shown on the disabled screen (steps to get started)
+ * compact=false → shown on the enabled screen (steps to connect a phone)
+ *
+ * Written at a level anyone can follow — no networking background required.
  */
 const InstructionsBlock = ({ compact }) => (
   <div className="cac-section cac-instructions">
     <h4>
-      <Info size={14} /> How it works
+      <Info size={14} /> How to connect your phone
     </h4>
     <ol>
       {compact ? (
         <>
-          <li>Enable the feature (requires an active Companion subscription).</li>
-          <li>Expose Forge on a URL your phone can reach (Cloudflare Tunnel, ngrok, or Tailscale).</li>
-          <li>Host the companion PWA (GitHub Pages works great) or use the default host.</li>
-          <li>Scan the QR code on your phone, tap Connect.</li>
+          <li>
+            <strong>Get a tunnel link.</strong> Download{' '}
+            <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">
+              Cloudflare Tunnel (free)
+            </a>{' '}
+            and run <code>cloudflared tunnel --url http://localhost:3005</code>.
+            It gives you a link like <code>https://abc123.trycloudflare.com</code>.
+          </li>
+          <li>
+            <strong>Enable mobile access.</strong> Click <strong>Enable Mobile Access</strong> on
+            this card.
+          </li>
+          <li>
+            <strong>Paste your tunnel link</strong> into the "Your public Forge URL" box.
+          </li>
+          <li>
+            <strong>Scan the QR code</strong> that appears with your phone camera.
+          </li>
+          <li>
+            <strong>Tap Connect</strong> — you're in! 🎉
+          </li>
         </>
       ) : (
         <>
           <li>
-            Ensure Forge is reachable on the <strong>public Forge URL</strong> above.
-            On localhost the URL is only valid for same-device testing.
+            <strong>Get a tunnel link</strong> so your phone can reach this computer.
+            Run <code>cloudflared tunnel --url http://localhost:3005</code> and copy the
+            link it gives you (e.g. <code>https://abc123.trycloudflare.com</code>).{' '}
+            <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">
+              Download cloudflared ↗
+            </a>
           </li>
-          <li>Open the Forge Companion PWA on your phone (or scan the QR).</li>
-          <li>Tap <strong>Connect</strong>. Your phone stores the token locally.</li>
-          <li>Sessions auto-refresh every second — tap one to view live output.</li>
+          <li>
+            <strong>Paste that link</strong> into the "Your public Forge URL" box above.
+          </li>
+          <li>
+            <strong>Scan the QR code</strong> below with your phone camera.
+            It opens the Forge Companion app on your phone automatically.
+          </li>
+          <li>
+            <strong>Tap Connect</strong> in the app. Your terminal sessions appear instantly. 🎉
+          </li>
         </>
       )}
     </ol>
@@ -404,7 +434,7 @@ const InstructionsBlock = ({ compact }) => (
       target="_blank"
       rel="noopener noreferrer"
     >
-      Full Companion documentation <ExternalLink size={12} />
+      Full setup guide <ExternalLink size={12} />
     </a>
   </div>
 )

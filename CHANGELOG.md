@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.13] - 2026-04-22
+
+---
+
+## [v7.6.13] - 2026-04-22
+
+### Fixed
+- **Settings tabs no longer cut off** — Tab bar now wraps to a second row on narrow modal views instead of clipping. Removed hidden scrollbar in favour of `flexWrap: wrap` with reduced padding.
+- **Forge Companion QR code was 404** — Deployed the companion PWA to Cloudflare Pages (`forge-companion-1b3.pages.dev`). Updated `DEFAULT_COMPANION_HOST` constant to point to the live deployment. QR scans now open the working companion app.
+- **Companion instructions referenced non-existent Settings tab** — "Settings → Mobile Access" does not exist as a tab. Instructions in `CompanionAccessCard` and `forge-companion/README.md` updated to correctly say "Click the Forge Companion card in the sidebar".
+- **Companion instructions too technical** — Rewrote all setup steps to plain language with explicit cloudflared commands, numbered steps, and emoji waypoints. A non-technical user can follow without knowing what a "PWA" or "tunnel" is.
+
 ## [7.6.12] - 2026-04-22
 
 ---

@@ -176,18 +176,18 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           <button className="btn-close" onClick={onClose}>×</button>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation — flexWrap ensures tabs never overflow off-screen on narrow modal views */}
         <div style={{
           display: 'flex',
+          flexWrap: 'wrap',
           borderBottom: '1px solid #333',
-          padding: '0 16px',
-          overflowX: 'auto',
-          scrollbarWidth: 'none',
+          padding: '0 8px',
+          gap: '0',
         }}>
           <button
             onClick={() => setActiveTab('shell')}
             style={{
-              padding: '12px 20px',
+              padding: '10px 16px',
               background: 'transparent',
               border: 'none',
               color: activeTab === 'shell' ? '#fff' : '#888',
@@ -195,7 +195,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
             <Terminal size={16} />
@@ -204,7 +205,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           <button
             onClick={() => setActiveTab('cli')}
             style={{
-              padding: '12px 20px',
+              padding: '10px 16px',
               background: 'transparent',
               border: 'none',
               color: activeTab === 'cli' ? '#fff' : '#888',
@@ -212,7 +213,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
             <Cpu size={16} />
@@ -221,7 +223,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           <button
             onClick={() => setActiveTab('tabs')}
             style={{
-              padding: '12px 20px',
+              padding: '10px 16px',
               background: 'transparent',
               border: 'none',
               color: activeTab === 'tabs' ? '#fff' : '#888',
@@ -229,7 +231,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
             <Palette size={16} />
@@ -238,7 +241,7 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
           <button
             onClick={() => setActiveTab('data')}
             style={{
-              padding: '12px 20px',
+              padding: '10px 16px',
               background: 'transparent',
               border: 'none',
               color: activeTab === 'data' ? '#fff' : '#888',
@@ -246,7 +249,8 @@ const SettingsModal = ({ isOpen, onClose, shellConfig, onSave, onToast, devMode 
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
             <Database size={16} />
