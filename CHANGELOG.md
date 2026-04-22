@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.8] - 2026-04-22
+
+### Fixed
+- **TUI apps unreadable on light-mode terminals** — Applications that use xterm's alternate screen buffer (vim, lazygit, Copilot CLI, gh dash, htop) now receive a dark palette while active, regardless of the tab's base theme. When the app exits the alt-screen the user's original theme is restored. Detection uses CSI private-mode codes 47, 1047, and 1049 via a properly-registered DEC private prefix (`prefix: '?'`, not `intermediates: '?'`) — the latter throws "intermediate must be in range 0x20..0x2f" at terminal construction. Combines fixes originally in commits `4f87c28` and `b5b121b` (lost in the v7.6.6 revert).
+
 ## [7.6.7] - 2026-04-22
 
 ### Fixed
