@@ -29,26 +29,17 @@ import {
   Settings,
 } from 'lucide-react'
 import './CompanionAccessCard.css'
+import {
+  getDefaultCompanionHost,
+  isStaleCompanionHost,
+  buildDeepLink,
+} from '../utils/companionUrl.js'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const COPY_RESET_DELAY_MS = 2000
 const UPGRADE_URL = 'https://rootlevellabs.tech/upgrade'
 const COMPANION_DOCS_URL = 'https://github.com/mikejsmith1985/forge-terminal/tree/main/forge-companion'
-
-// Derives the companion PWA base URL from a given Forge server URL.
-// The companion is embedded in the Forge binary at /companion/, so the QR code
-// base MUST use the same URL the phone uses to reach Forge — never localhost.
-const getDefaultCompanionHost = (forgeUrl) =>
-  (forgeUrl || window.location.origin).replace(/\/$/, '') + '/companion/'
-
-// Legacy hosted URLs from older versions of Forge Terminal. If a user has one
-// of these saved in localStorage, they are silently migrated to the new
-// self-hosted default on next load so their QR code stops returning 404.
-const LEGACY_COMPANION_HOST_URLS = new Set([
-  'https://forge-companion-1b3.pages.dev/',
-  'https://mikejsmith1985.github.io/forge-companion/',
-])
 
 // localStorage keys used to remember the user's tunnel URL and companion host.
 const STORAGE_TUNNEL_URL = 'forge.companion.tunnelUrl'
@@ -78,14 +69,11 @@ const CompanionAccessCard = () => {
   const [companionHost, setCompanionHost] = useState(() => {
     const storedTunnelUrl = localStorage.getItem(STORAGE_TUNNEL_URL) || window.location.origin
     const storedHost = localStorage.getItem(STORAGE_COMPANION_HOST)
-    // Migrate from legacy external URLs or any stale localhost value.
-    // The QR code base must always be reachable by the phone — localhost is not.
-    const isStaleOrLegacy =
-      !storedHost ||
-      LEGACY_COMPANION_HOST_URLS.has(storedHost) ||
-      /^https?:\/\/localhost(:\d+)?/.test(storedHost) ||
-      /^https?:\/\/127\.0\.0\.1(:\d+)?/.test(storedHost)
-    return isStaleOrLegacy ? getDefaultCompanionHost(storedTunnelUrl) : storedHost
+    // Migrate any stale value — legacy URLs, localhost, and protocol-less URLs
+    // are all replaced so the QR code always generates a phone-reachable link.
+    return isStaleCompanionHost(storedHost)
+      ? getDefaultCompanionHost(storedTunnelUrl)
+      : storedHost
   })
 
   // Persist input fields so the user does not retype them every session.
@@ -97,10 +85,10 @@ const CompanionAccessCard = () => {
   // URL always matches the URL the phone will actually use to reach Forge.
   const handleTunnelUrlChange = useCallback((newUrl) => {
     setCompanionHost(prevHost => {
+      // Re-sync companionHost only if it hasn't been manually overridden.
+      // A stale host (localhost, protocol-less, legacy URL) is always replaced.
       const isAutoValue =
-        prevHost === getDefaultCompanionHost(tunnelUrl) ||
-        /^https?:\/\/localhost(:\d+)?/.test(prevHost) ||
-        /^https?:\/\/127\.0\.0\.1(:\d+)?/.test(prevHost)
+        prevHost === getDefaultCompanionHost(tunnelUrl) || isStaleCompanionHost(prevHost)
       return isAutoValue ? getDefaultCompanionHost(newUrl) : prevHost
     })
     setTunnelUrl(newUrl)
@@ -521,32 +509,9 @@ const InstructionsBlock = () => (
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * buildDeepLink — assembles the <host>#forge=<url>&token=<tok> URL that the
- * companion PWA reads on load (see forge-companion/index.html:readAndClearDeepLink).
- *
- * The QR code base URL must point to the companion PWA at the Forge server the
- * phone can reach. If companionHost is a localhost value (e.g., stale localStorage
- * from before v7.6.17), it is ignored and derived from forgeUrl automatically.
- */
-function buildDeepLink(companionHost, forgeUrl, mobileToken) {
-  const isLocalhostHost =
-    !companionHost ||
-    /^https?:\/\/localhost(:\d+)?/.test(companionHost) ||
-    /^https?:\/\/127\.0\.0\.1(:\d+)?/.test(companionHost)
-
-  const derivedBase = (forgeUrl || '').replace(/\/$/, '') + '/companion/'
-  const base = (isLocalhostHost ? derivedBase : companionHost).replace(/#.*$/, '')
-
-  if (!forgeUrl || !mobileToken) return base
-
-  const fragment = new URLSearchParams({
-    forge: forgeUrl,
-    token: mobileToken,
-  }).toString()
-
-  return `${base}#${fragment}`
-}
+// buildDeepLink, getDefaultCompanionHost, isStaleCompanionHost, and
+// normalizeHttpUrl live in ../utils/companionUrl.js so they can be unit-tested
+// independently of React.  Do not duplicate them here.
 
 /**
  * maskToken — shows only the first 8 characters of the token, then "…".
