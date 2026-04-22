@@ -7,6 +7,8 @@ import OwnerReleaseCard from './OwnerReleaseCard';
 import DirectoryCard from './DirectoryCard';
 import EnterpriseWorkflowCard from './EnterpriseWorkflowCard';
 import MCPSetupCard from './MCPSetupCard';
+import MCPDiscoveryCard from './MCPDiscoveryCard';
+import CompanionAccessCard from './CompanionAccessCard';
 
 const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd, directoryCardVisible = true, onHideDirectoryCard }) => { // onOpenTutor removed — Code Tutor fully disabled
   if (loading) {
@@ -22,6 +24,8 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
         />
         <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
         <MCPSetupCard />
+        <MCPDiscoveryCard />
+        <CompanionAccessCard />
         <div className="command-cards-loading">
           <div className="spinner"></div>
           <p>Loading command cards...</p>
@@ -43,6 +47,8 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
         />
         <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
         <MCPSetupCard />
+        <MCPDiscoveryCard />
+        <CompanionAccessCard />
         <div className="command-cards-error">
           <p className="error-message">⚠️ Failed to load command cards</p>
           <p className="error-details">{error}</p>
@@ -112,6 +118,10 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
       <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
       {/* Adaptive Build Environments card — always visible */}
       <MCPSetupCard />
+      {/* MCP Discovery — catalog of external MCP servers with copy-config */}
+      <MCPDiscoveryCard />
+      {/* Companion Access — license-gated QR pairing for the Forge Companion PWA */}
+      <CompanionAccessCard />
     </div>
   );
 };
