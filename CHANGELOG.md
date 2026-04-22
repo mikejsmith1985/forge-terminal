@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.16] - 2026-04-22
+
+### Fixed
+- **Companion PWA `/companion/` route now always works** — `cmd/forge/web/companion/` is no longer gitignored. The three PWA files are committed alongside the main frontend so `//go:embed all:web` always includes them in the binary regardless of whether a local build has been run.
+- **Companion PWA icons no longer 404** — `vite.config.js:copyCompanionPlugin` now copies `icon-192.png` and `icon-512.png` from the Vite public output into `web/companion/` so the PWA manifest icon paths resolve correctly at `/companion/`.
+- **`/companion` without trailing slash** — Requests to `/companion` (no trailing slash) now redirect to `/companion/` with a 301 instead of silently dropping.
+- **Pre-commit hook no longer blocks release commits** — Both the PowerShell and bash hook templates now exclude `cmd/forge/web/`, `frontend/dist/`, and `bin/` from the test-file gate. The PowerShell template also gains the version-bump CHANGELOG exemption that the bash template already had.
+
+### Added
+- **Companion embed regression test** — `cmd/forge/companion_embed_test.go` asserts all three PWA files are present in the embedded FS at compile + test time, catching any future accidental gitignore regression.
+
 ## [7.6.15] - 2026-04-22
 
 ### Fixed

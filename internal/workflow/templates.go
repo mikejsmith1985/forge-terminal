@@ -668,9 +668,16 @@ var preCommitPS1Template = "#!/usr/bin/env pwsh\n" +
 	"\n" +
 	"# ── TEST FILE GATE (Gate 4) ─────────────────────────────────────────────\n" +
 	"# Every new source file must have a corresponding test file staged or on disk.\n" +
+	"# Build output directories are excluded — they contain compiled artifacts, not\n" +
+	"# authored source code, and must never be flagged for missing test coverage.\n" +
+	"$buildOutputDirs = @(\"cmd/forge/web/\", \"frontend/dist/\", \"bin/\")\n" +
 	"$newSourceFiles = git diff --cached --name-only --diff-filter=A 2>$null | Where-Object {\n" +
 	"    $extension = [System.IO.Path]::GetExtension($_)\n" +
-	"    $sourceExtensions -contains $extension\n" +
+	"    if (-not ($sourceExtensions -contains $extension)) { return $false }\n" +
+	"    foreach ($buildDir in $buildOutputDirs) {\n" +
+	"        if ($_ -like \"$buildDir*\") { return $false }\n" +
+	"    }\n" +
+	"    return $true\n" +
 	"}\n" +
 	"# Exclude files that are themselves test files\n" +
 	"$isTestFile = { param($f)\n" +
@@ -700,9 +707,16 @@ var preCommitPS1Template = "#!/usr/bin/env pwsh\n" +
 	"\n" +
 	"# ── CHANGELOG CHECK (Gate 7 — upgraded to violation) ────────────────────\n" +
 	"# Source files changed but CHANGELOG.md not updated = blocking violation.\n" +
+	"# Version-bump commits (only build artifacts / config staged) are exempt\n" +
+	"# because the release script manages CHANGELOG in the same commit.\n" +
+	"$versionOnlyPattern = '^(internal/updater/updater\\.go|frontend/package\\.json|frontend/src/config/tourSteps\\.js|cmd/forge/web/|resource\\.syso|version\\.json|go\\.sum)$'\n" +
+	"$isVersionBump = $true\n" +
+	"foreach ($staged in $stagedFiles) {\n" +
+	"    if ($staged -notmatch $versionOnlyPattern) { $isVersionBump = $false; break }\n" +
+	"}\n" +
 	"$hasSourceChanges = ($sourceFiles | Measure-Object).Count -gt 0\n" +
 	"$changelogUpdated = $stagedFiles | Where-Object { $_ -match \"CHANGELOG\\.md$\" }\n" +
-	"if ($hasSourceChanges -and -not $changelogUpdated) {\n" +
+	"if ($hasSourceChanges -and -not $changelogUpdated -and -not $isVersionBump) {\n" +
 	"    $violations += \"CHANGELOG: Source files changed but CHANGELOG.md was not updated\"\n" +
 	"}\n" +
 	"\n" +
@@ -764,7 +778,9 @@ var preCommitSHTemplate = "#!/usr/bin/env bash\n" +
 	"\n" +
 	"# ── TEST FILE GATE (Gate 4) ─────────────────────────────────────────────\n" +
 	"# Every new source file must have a corresponding test file staged or on disk.\n" +
-	"new_source_files=$(git diff --cached --name-only --diff-filter=A 2>/dev/null | grep -E '\\.(go|js|jsx|ts|tsx|py|rs|java|cs)$')\n" +
+	"# Build output directories are excluded — they contain compiled artifacts, not\n" +
+	"# authored source code, and must never be flagged for missing test coverage.\n" +
+	"new_source_files=$(git diff --cached --name-only --diff-filter=A 2>/dev/null | grep -E '\\.(go|js|jsx|ts|tsx|py|rs|java|cs)$' | grep -vE '^(cmd/forge/web/|frontend/dist/|bin/)')\n" +
 	"if [[ -n \"$new_source_files\" ]]; then\n" +
 	"    while IFS= read -r new_file; do\n" +
 	"        # Skip files that are themselves test files\n" +

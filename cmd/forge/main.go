@@ -275,13 +275,24 @@ func main() {
 
 	// Serve the companion PWA at /companion/ without authentication.
 	//
+	// Redirect /companion (no trailing slash) to /companion/ so browsers that
+	// omit the slash still land on the PWA rather than a 301-loop or 404.
+	http.HandleFunc("/companion", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/companion/", http.StatusMovedPermanently)
+	})
+
+	// The Forge Companion PWA is a lightweight mobile interface for Forge Terminal.
 	// The phone loads this static app before any token is established, so it
 	// must be publicly accessible. The companion directory is copied into
 	// cmd/forge/web/companion/ by the Vite build plugin, then embedded here
 	// alongside the main frontend via the all:web directive.
 	//
 	// Actual API calls (/api/mobile/*) remain behind their own auth layer.
-	if companionSubFS, companionSubErr := fs.Sub(webFS, "companion"); companionSubErr == nil {
+	companionSubFS, companionSubErr := fs.Sub(webFS, "companion")
+	if companionSubErr != nil {
+		log.Printf("[companion] WARNING: companion PWA files missing from embedded FS — " +
+			"run 'cd frontend && npm run build' to regenerate them: %v", companionSubErr)
+	} else {
 		companionFileServer := http.FileServer(http.FS(companionSubFS))
 		http.Handle("/companion/", http.StripPrefix("/companion", companionFileServer))
 	}

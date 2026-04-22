@@ -22,10 +22,9 @@ frontend/node_modules/
 frontend/dist/
 web/assets/
 cmd/forge/web/index.html
-# Companion PWA files are copied into web/companion/ by the Vite build plugin
-# and embedded in the binary via //go:embed all:web. They are generated on each
-# build and must not be committed to git to avoid false-positive test-gate failures.
-cmd/forge/web/companion/
+# cmd/forge/web/companion/ is intentionally tracked so //go:embed all:web always
+# includes the companion PWA files. The pre-commit hook exempts cmd/forge/web/
+# from the test-file gate so releases don't generate false-positive violations.
 
 # IDE
 .idea/

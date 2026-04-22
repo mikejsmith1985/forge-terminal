@@ -16,6 +16,10 @@ const companionOutputDir = resolve(configDir, '../cmd/forge/web/companion')
  * ends up inside the binary and is served at /companion/ with no external
  * hosting required.
  *
+ * Icons (icon-192.png, icon-512.png) are also copied from the Vite public/
+ * output into companion/ so the PWA manifest can reference them relative to
+ * the /companion/ URL prefix without a 404.
+ *
  * README.md is intentionally skipped — only deployable assets are copied.
  */
 function copyCompanionPlugin() {
@@ -23,6 +27,8 @@ function copyCompanionPlugin() {
     name: 'copy-companion-pwa',
     closeBundle() {
       mkdirSync(companionOutputDir, { recursive: true })
+
+      // Copy all source files from forge-companion/ (excluding README.md)
       const entries = readdirSync(companionSourceDir)
       let copiedCount = 0
       for (const entry of entries) {
@@ -30,6 +36,23 @@ function copyCompanionPlugin() {
         copyFileSync(join(companionSourceDir, entry), join(companionOutputDir, entry))
         copiedCount++
       }
+
+      // Copy PWA icons from the root web output so they are reachable at
+      // /companion/icon-192.png and /companion/icon-512.png as the manifest
+      // expects (relative paths resolve against the PWA start_url).
+      const iconFiles = ['icon-192.png', 'icon-512.png']
+      const webOutputDir = resolve(configDir, '../cmd/forge/web')
+      for (const iconFile of iconFiles) {
+        const sourcePath = join(webOutputDir, iconFile)
+        const destPath = join(companionOutputDir, iconFile)
+        try {
+          copyFileSync(sourcePath, destPath)
+          copiedCount++
+        } catch {
+          console.warn(`⚠ Could not copy ${iconFile} to companion dir — icon may be missing`)
+        }
+      }
+
       console.log(`✓ Companion PWA copied to web/companion/ (${copiedCount} files)`)
     },
   }

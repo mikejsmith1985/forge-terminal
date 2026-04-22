@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>Forge Companion</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <style>
+    /* ── Reset + Base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d1117;
+      --surface:     #161b22;
+      --border:      #30363d;
+      --text:        #e6edf3;
+      --text-muted:  #8b949e;
+      --accent:      #388bfd;
+      --accent-hover:#58a6ff;
+      --green:       #3fb950;
+      --red:         #f85149;
+      --orange:      #d29922;
+      --font-mono:   "SF Mono", Consolas, "Cascadia Code", monospace;
+      --font-ui:     -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --radius:      8px;
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 15px;
+      line-height: 1.5;
+      overflow: hidden;
+    }
+
+    /* ── Screen Container ───────────────────────────────────────────────── */
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 100svh;
+      height: 100vh; /* fallback */
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+    }
+    .screen.active { display: flex; }
+
+    /* ── Header Bar ─────────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .header-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+    .header-logo {
+      font-size: 20px;
+      margin-right: 8px;
+    }
+    .header-action {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: var(--radius);
+    }
+    .header-action:hover { background: rgba(56,139,253,0.12); }
+
+    /* ── Scrollable Content ─────────────────────────────────────────────── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── Form Elements ──────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 15px;
+      font-family: var(--font-ui);
+      padding: 10px 12px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(56,139,253,0.2); }
+    .form-input::placeholder { color: var(--text-muted); }
+    .form-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 5px;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      text-align: center;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .btn:active { opacity: 0.7; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: rgba(248,81,73,0.12); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+    .btn + .btn { margin-top: 10px; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Card ───────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .card:hover { border-color: var(--accent); }
+    .card:active { opacity: 0.75; }
+    .card-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+    .card-meta { font-size: 13px; color: var(--text-muted); }
+
+    /* ── Status Badge ───────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-orange { background: rgba(210,153,34,0.15); color: var(--orange); }
+    .badge::before { content: "●"; font-size: 9px; }
+
+    /* ── Terminal Output ────────────────────────────────────────────────── */
+    #terminal-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      background: #010409;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #c9d1d9;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── Command Bar ────────────────────────────────────────────────────── */
+    .command-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+      padding-bottom: calc(10px + var(--safe-bottom));
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .command-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font-mono);
+      padding: 9px 12px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .command-input:focus { border-color: var(--accent); }
+    .send-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-size: 18px;
+      padding: 0 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .send-btn:active { opacity: 0.7; }
+
+    /* ── Toast Notification ─────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: calc(80px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #2d333b;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 18px;
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 1000;
+      white-space: nowrap;
+    }
+    #toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Upgrade Screen ─────────────────────────────────────────────────── */
+    .upgrade-hero {
+      text-align: center;
+      padding: 48px 16px 24px;
+    }
+    .upgrade-icon { font-size: 56px; margin-bottom: 16px; }
+    .upgrade-title { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+    .upgrade-body { color: var(--text-muted); line-height: 1.7; margin-bottom: 28px; }
+
+    /* ── Setup Screen Extras ────────────────────────────────────────────── */
+    .setup-logo {
+      text-align: center;
+      padding: 32px 0 20px;
+      font-size: 48px;
+    }
+    .setup-tagline {
+      text-align: center;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      font-size: 14px;
+    }
+    .divider {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin: 20px 0;
+      position: relative;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: var(--border);
+    }
+    .divider::before { left: 0; }
+    .divider::after { right: 0; }
+
+    /* ── Empty State ────────────────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--text-muted);
+    }
+    .empty-state-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+
+    /* ── Spinner ────────────────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- ── Screen: Setup ────────────────────────────────────────────────────────── -->
+<div id="screen-setup" class="screen active">
+  <div class="content">
+    <div class="setup-logo">⚡</div>
+    <p class="setup-tagline">Connect to your Forge Terminal instance</p>
+
+    <div class="form-group">
+      <label class="form-label" for="input-forge-url">Forge URL</label>
+      <input
+        id="input-forge-url"
+        class="form-input"
+        type="url"
+        placeholder="https://xyz.trycloudflare.com"
+        autocomplete="url"
+        autocorrect="off"
+        autocapitalize="none"
+        spellcheck="false"
+      />
+      <p class="form-hint">The public tunnel URL pointing to your running Forge instance.</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="input-mobile-token">Mobile Token</label>
+      <input
+        id="input-mobile-token"
+        class="form-input"
+        type="password"
+        placeholder="Paste your mobile token here"
+        autocomplete="current-password"
+        autocorrect="off"
+        autocapitalize="none"
+        spellcheck="false"
+      />
+      <p class="form-hint">Found in Forge → Settings → Mobile Access. Different from the MCP token.</p>
+    </div>
+
+    <button class="btn btn-primary" id="btn-connect">Connect</button>
+
+    <div class="divider">or scan QR code from Forge Settings</div>
+
+    <p style="font-size:13px;color:var(--text-muted);text-align:center;">
+      Your credentials are stored only in this browser's localStorage
+      and never leave your device.
+    </p>
+  </div>
+</div>
+
+<!-- ── Screen: Upgrade Required ─────────────────────────────────────────────── -->
+<div id="screen-upgrade" class="screen">
+  <div class="header">
+    <span class="header-title"><span class="header-logo">⚡</span>Forge Companion</span>
+    <button class="header-action" id="btn-upgrade-back">← Back</button>
+  </div>
+  <div class="content">
+    <div class="upgrade-hero">
+      <div class="upgrade-icon">🔒</div>
+      <h1 class="upgrade-title">Mobile Access Required</h1>
+      <p class="upgrade-body">
+        Mobile access is a premium feature. Upgrade your Forge plan
+        to connect this companion app to your terminal sessions from
+        anywhere.
+      </p>
+      <button class="btn btn-primary" id="btn-upgrade-cta">Upgrade at rootlevellabs.tech →</button>
+      <br />
+      <button class="btn btn-secondary" id="btn-upgrade-retry">Check Again</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Screen: Sessions ──────────────────────────────────────────────────────── -->
+<div id="screen-sessions" class="screen">
+  <div class="header">
+    <span class="header-title"><span class="header-logo">⚡</span>Sessions</span>
+    <button class="header-action" id="btn-disconnect">Disconnect</button>
+  </div>
+  <div class="content" id="sessions-list-container">
+    <!-- Populated by JS -->
+  </div>
+  <div style="padding: 12px 16px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;">
+    <button class="btn btn-secondary" id="btn-refresh-sessions">↻ Refresh</button>
+  </div>
+</div>
+
+<!-- ── Screen: Terminal ──────────────────────────────────────────────────────── -->
+<div id="screen-terminal" class="screen">
+  <div class="header">
+    <button class="header-action" id="btn-back-to-sessions">← Sessions</button>
+    <span class="header-title" id="terminal-session-title">Terminal</span>
+    <button class="header-action" id="btn-clear-terminal">Clear</button>
+  </div>
+  <div id="terminal-output"></div>
+  <div class="command-bar">
+    <input
+      id="command-input"
+      class="command-input"
+      type="text"
+      placeholder="Enter command…"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="none"
+      spellcheck="false"
+      enterkeyhint="send"
+    />
+    <button class="send-btn" id="btn-send-command" aria-label="Send command">↑</button>
+  </div>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+  // ── State ───────────────────────────────────────────────────────────────────
+  const STORAGE_KEY_URL   = 'forge_url';
+  const STORAGE_KEY_TOKEN = 'forge_mobile_token';
+
+  let forgeUrl     = localStorage.getItem(STORAGE_KEY_URL)   || '';
+  let mobileToken  = localStorage.getItem(STORAGE_KEY_TOKEN) || '';
+  let activeSession = null;   // { sessionId, isDetached, connectedClients }
+  let pollTimerId   = null;   // setInterval ID for terminal polling
+
+  // ── Screen Navigation ────────────────────────────────────────────────────────
+  function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+  }
+
+  // ── Toast ────────────────────────────────────────────────────────────────────
+  function showToast(message, durationMs = 3000) {
+    const toastEl = document.getElementById('toast');
+    toastEl.textContent = message;
+    toastEl.classList.add('visible');
+    setTimeout(() => toastEl.classList.remove('visible'), durationMs);
+  }
+
+  // ── API Helpers ──────────────────────────────────────────────────────────────
+  // normaliseForgeUrl strips any trailing slash from the user-supplied URL.
+  function normaliseForgeUrl(rawUrl) {
+    return rawUrl.replace(/\/+$/, '');
+  }
+
+  async function apiGet(path) {
+    const response = await fetch(forgeUrl + path, {
+      headers: { 'Authorization': 'Bearer ' + mobileToken }
+    });
+    return response;
+  }
+
+  async function apiPost(path, body) {
+    const response = await fetch(forgeUrl + path, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + mobileToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    return response;
+  }
+
+  // ── Deep-Link Fragment Parsing ────────────────────────────────────────────────
+  // The desktop "Connect Mobile" button generates a link like:
+  //   https://companion.example.com/#forge=https://xyz.trycloudflare.com&token=abc123
+  //
+  // Reading from the fragment (not query string) means the token is never sent
+  // as part of an HTTP request or logged by servers/proxies.
+  function readAndClearDeepLink() {
+    const fragment = window.location.hash.slice(1); // strip leading '#'
+    if (!fragment) return;
+
+    const params = new URLSearchParams(fragment);
+    const linkedForgeUrl  = params.get('forge');
+    const linkedToken     = params.get('token');
+
+    if (linkedForgeUrl && linkedToken) {
+      forgeUrl    = normaliseForgeUrl(linkedForgeUrl);
+      mobileToken = linkedToken;
+      localStorage.setItem(STORAGE_KEY_URL,   forgeUrl);
+      localStorage.setItem(STORAGE_KEY_TOKEN, mobileToken);
+    }
+
+    // Remove the fragment from history so the token isn't visible in the URL bar
+    // or accidentally shared via "Copy URL".
+    history.replaceState(null, '', window.location.pathname);
+  }
+
+  // ── Connect Flow ─────────────────────────────────────────────────────────────
+  async function connect() {
+    const connectBtn = document.getElementById('btn-connect');
+    connectBtn.disabled = true;
+    connectBtn.innerHTML = '<span class="spinner"></span>Connecting…';
+
+    try {
+      const response = await apiGet('/api/mobile/info');
+
+      if (response.status === 401) {
+        showToast('❌ Invalid token — check your mobile token in Forge Settings');
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'Connect';
+        return;
+      }
+
+      if (!response.ok) {
+        showToast(`❌ Connection error: ${response.status}`);
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'Connect';
+        return;
+      }
+
+      const info = await response.json();
+
+      if (!info.mobile_access_enabled) {
+        showScreen('screen-upgrade');
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'Connect';
+        return;
+      }
+
+      // Connected and mobile access is on — load sessions.
+      showScreen('screen-sessions');
+      connectBtn.disabled = false;
+      connectBtn.textContent = 'Connect';
+      loadSessions();
+
+    } catch (networkError) {
+      showToast('❌ Could not reach Forge — check the URL and your connection');
+      connectBtn.disabled = false;
+      connectBtn.textContent = 'Connect';
+    }
+  }
+
+  // ── Sessions Screen ───────────────────────────────────────────────────────────
+  async function loadSessions() {
+    const container = document.getElementById('sessions-list-container');
+    container.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading sessions…</div>';
+
+    try {
+      const response = await apiGet('/api/mobile/sessions');
+
+      if (!response.ok) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Could not load sessions</div><p>HTTP ${response.status}</p></div>`;
+        return;
+      }
+
+      const data = await response.json();
+      const sessions = data.sessions || [];
+
+      if (sessions.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">💤</div>
+            <div class="empty-state-title">No active sessions</div>
+            <p>Open a terminal in Forge and refresh here.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = sessions.map(session => `
+        <div class="card" data-session-id="${session.sessionId}">
+          <div class="card-title">Session: ${escapeHtml(session.sessionId.slice(0, 16))}…</div>
+          <div class="card-meta">
+            <span class="${session.isDetached ? 'badge badge-orange' : 'badge badge-green'}">
+              ${session.isDetached ? 'Detached' : 'Active'}
+            </span>
+            <span style="margin-left:8px;">${session.connectedClients} client${session.connectedClients !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      `).join('');
+
+      // Attach click handlers to each session card.
+      container.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('click', () => {
+          const sessionData = sessions.find(s => s.sessionId === card.dataset.sessionId);
+          openTerminal(sessionData);
+        });
+      });
+
+    } catch (networkError) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Network error</div><p>${escapeHtml(networkError.message)}</p></div>`;
+    }
+  }
+
+  // ── Terminal Screen ───────────────────────────────────────────────────────────
+  function openTerminal(session) {
+    activeSession = session;
+    document.getElementById('terminal-session-title').textContent =
+      'Terminal · ' + session.sessionId.slice(0, 12);
+    document.getElementById('terminal-output').textContent = '';
+    showScreen('screen-terminal');
+    startPolling();
+  }
+
+  function closeTerminal() {
+    stopPolling();
+    activeSession = null;
+    showScreen('screen-sessions');
+    loadSessions();
+  }
+
+  // pollTerminalOutput fetches the current scrollback and updates the display.
+  // Polling every second keeps the companion reasonably responsive without
+  // requiring a persistent WebSocket connection from the mobile browser.
+  async function pollTerminalOutput() {
+    if (!activeSession) return;
+
+    try {
+      const response = await apiGet('/api/mobile/read?session_id=' + encodeURIComponent(activeSession.sessionId));
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const outputEl = document.getElementById('terminal-output');
+      const wasAtBottom = outputEl.scrollHeight - outputEl.scrollTop <= outputEl.clientHeight + 50;
+
+      outputEl.textContent = data.output || '';
+
+      // Auto-scroll to bottom only when the user hasn't scrolled up to review output.
+      if (wasAtBottom) {
+        outputEl.scrollTop = outputEl.scrollHeight;
+      }
+    } catch {
+      // Silently ignore polling errors — the next poll will retry.
+    }
+  }
+
+  function startPolling() {
+    stopPolling(); // ensure no duplicate intervals
+    pollTerminalOutput(); // immediate first fetch
+    pollTimerId = setInterval(pollTerminalOutput, 1000);
+  }
+
+  function stopPolling() {
+    if (pollTimerId !== null) {
+      clearInterval(pollTimerId);
+      pollTimerId = null;
+    }
+  }
+
+  // sendCommand sends the typed command to the active session via POST /api/mobile/exec.
+  async function sendCommand() {
+    const commandInput = document.getElementById('command-input');
+    const commandText = commandInput.value.trim();
+    if (!commandText || !activeSession) return;
+
+    commandInput.value = '';
+    commandInput.disabled = true;
+
+    try {
+      const response = await apiPost('/api/mobile/exec', {
+        session_id: activeSession.sessionId,
+        command: commandText
+      });
+
+      if (!response.ok) {
+        showToast('❌ Command failed — session may have ended');
+      }
+    } catch {
+      showToast('❌ Network error — could not send command');
+    } finally {
+      commandInput.disabled = false;
+      commandInput.focus();
+    }
+  }
+
+  // ── Utility ──────────────────────────────────────────────────────────────────
+  // escapeHtml prevents XSS when rendering session IDs or error messages into HTML.
+  function escapeHtml(unsafeText) {
+    return String(unsafeText)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Event Wiring ──────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    // Populate setup form from stored credentials.
+    document.getElementById('input-forge-url').value   = forgeUrl;
+    document.getElementById('input-mobile-token').value = mobileToken;
+
+    // Setup screen — Connect button.
+    document.getElementById('btn-connect').addEventListener('click', () => {
+      const rawUrl = document.getElementById('input-forge-url').value.trim();
+      const token  = document.getElementById('input-mobile-token').value.trim();
+
+      if (!rawUrl) { showToast('Please enter your Forge URL'); return; }
+      if (!token)  { showToast('Please enter your mobile token'); return; }
+
+      forgeUrl    = normaliseForgeUrl(rawUrl);
+      mobileToken = token;
+      localStorage.setItem(STORAGE_KEY_URL,   forgeUrl);
+      localStorage.setItem(STORAGE_KEY_TOKEN, mobileToken);
+      connect();
+    });
+
+    // Upgrade screen.
+    document.getElementById('btn-upgrade-back').addEventListener('click', () => showScreen('screen-setup'));
+    document.getElementById('btn-upgrade-cta').addEventListener('click', () => {
+      window.open('https://rootlevellabs.tech/upgrade', '_blank', 'noopener');
+    });
+    document.getElementById('btn-upgrade-retry').addEventListener('click', connect);
+
+    // Sessions screen.
+    document.getElementById('btn-disconnect').addEventListener('click', () => {
+      localStorage.removeItem(STORAGE_KEY_URL);
+      localStorage.removeItem(STORAGE_KEY_TOKEN);
+      forgeUrl = mobileToken = '';
+      document.getElementById('input-forge-url').value    = '';
+      document.getElementById('input-mobile-token').value = '';
+      showScreen('screen-setup');
+    });
+    document.getElementById('btn-refresh-sessions').addEventListener('click', loadSessions);
+
+    // Terminal screen.
+    document.getElementById('btn-back-to-sessions').addEventListener('click', closeTerminal);
+    document.getElementById('btn-clear-terminal').addEventListener('click', () => {
+      document.getElementById('terminal-output').textContent = '';
+    });
+    document.getElementById('btn-send-command').addEventListener('click', sendCommand);
+    document.getElementById('command-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') sendCommand();
+    });
+
+    // Read deep link fragment (from QR code / desktop share button).
+    readAndClearDeepLink();
+
+    // If credentials are already stored, attempt auto-connect.
+    if (forgeUrl && mobileToken) {
+      connect();
+    }
+  });
+</script>
+</body>
+</html>
