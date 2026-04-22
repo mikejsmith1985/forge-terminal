@@ -9,8 +9,6 @@ import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
 import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
-import RemoteAccessModal from './components/RemoteAccessModal'
-import { useMobileDetect } from './hooks/useMobileDetect'
 import UpdateModal from './components/UpdateModal'
 import DeveloperDashboard from './components/DeveloperDashboard'
 // WelcomeModal REMOVED - replaced by guided tour (user request: 20+ times)
@@ -18,8 +16,6 @@ import DeveloperDashboard from './components/DeveloperDashboard'
 import FileAccessPrompt from './components/FileAccessPrompt'
 import ShellToggle from './components/ShellToggle'
 import TabBar from './components/TabBar'
-import { MobileTabStrip } from './components/MobileTabStrip'
-import { MobileInputBar } from './components/MobileInputBar'
 import SearchBar from './components/SearchBar'
 import FileExplorer from './components/FileExplorer'
 import LensFilePicker from './components/LensFilePicker'
@@ -83,8 +79,6 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
-  const [isRemoteAccessOpen, setIsRemoteAccessOpen] = useState(false)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
   // WelcomeModal state REMOVED - replaced by guided tour
   const [isDiagnosticOverlayOpen, setIsDiagnosticOverlayOpen] = useState(false)
@@ -180,9 +174,10 @@ function App() {
   // Forge Vault state (v5.3.0: encrypted secret store)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
 
-  // Mobile detection — drives drawer sidebar and touch-optimised interactions
-  const { isMobile, isTablet } = useMobileDetect();
-  const isCompact = isMobile || isTablet;
+  // Mobile companion app is a separate PWA (forge-companion/) — the desktop
+  // UI does not adapt its layout to small viewports. `isCompact` is kept as
+  // a constant so mobile-conditional code paths become dead and tree-shake out.
+  const isCompact = false;
   
   // Workflow UI state - REMOVED v3.9.0: Workflows deleted, using Task Dashboard instead
   // Task Dashboard state - REMOVED v3.12.3: Was unimplemented scaffolding
@@ -975,7 +970,7 @@ function App() {
     // or other TUI apps show a numbered-selection menu immediately after a UI action.
     const isPlainPrintable = !e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1;
     const isAnyOverlayOpen = isSearchOpen || isForgeAssistOpen || isModalOpen ||
-      isSettingsModalOpen || isFeedbackModalOpen || isRemoteAccessOpen ||
+      isSettingsModalOpen || isFeedbackModalOpen ||
       isUpdateModalOpen || isDiagnosticOverlayOpen || isTutorOpen ||
       isVaultOpen || isHistorySliderOpen || isDeveloperDashboardOpen;
 
@@ -1874,15 +1869,7 @@ function App() {
             devMode={devMode}
           />
         )}
-        {isCompact && (
-          <MobileTabStrip
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onTabSelect={handleTabSwitch}
-            onTabClose={handleTabClose}
-            onNewTab={handleNewTab}
-          />
-        )}
+        {/* isCompact always false — mobile companion is a separate PWA */}
 
         <SearchBar
           isOpen={isSearchOpen}
@@ -2042,65 +2029,7 @@ function App() {
       )}
       {!isCompact && sidebarPosition === 'right' && (<><div className="sidebar-resizer" onMouseDown={startDrag} />{sidebar}</>)}
 
-      {/* Mobile: slide-in sidebar drawer with backdrop and hamburger FAB */}
-      {isCompact && (
-        <>
-          {mobileSidebarOpen && (
-            <div className="mobile-sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />
-          )}
-          <div className={`mobile-sidebar-drawer${mobileSidebarOpen ? ' open' : ''}`}>
-            <div className="mobile-drawer-close-row">
-              <button className="mobile-drawer-close-btn" onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu">
-                <X size={20} />
-              </button>
-            </div>
-            {sidebar}
-          </div>
-          <button
-            className="mobile-sidebar-fab"
-            onClick={() => setMobileSidebarOpen(o => !o)}
-            aria-label={mobileSidebarOpen ? 'Close menu' : 'Open menu'}
-          >
-            {mobileSidebarOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-        </>
-      )}
-
-      {/* Mobile key bar — Tab, Esc, arrows, Ctrl+C/D, text input */}
-      {isCompact && (
-        <MobileInputBar
-          onSubmit={(text) => {
-            const termRef = getActiveTerminalRef();
-            termRef?.sendCommand(text);
-          }}
-          onSpecialKey={(key) => {
-            const termRef = getActiveTerminalRef();
-            if (!termRef?.sendRaw) return;
-            const sequences = {
-              'Tab':        '\t',
-              'Escape':     '\x1b',
-              'ArrowUp':    '\x1b[A',
-              'ArrowDown':  '\x1b[B',
-              'ArrowRight': '\x1b[C',
-              'ArrowLeft':  '\x1b[D',
-              'Ctrl+c':     '\x03',
-              'Ctrl+d':     '\x04',
-            };
-            if (sequences[key]) {
-              termRef.sendRaw(sequences[key]);
-            } else if (key.startsWith('Ctrl+') && key.length === 6) {
-              // Generic Ctrl+<letter>
-              const char = key[5].toLowerCase();
-              const code = char.charCodeAt(0) - 96;
-              if (code >= 1 && code <= 26) termRef.sendRaw(String.fromCharCode(code));
-            }
-          }}
-          onImageUpload={(filePath) => {
-            const termRef = getActiveTerminalRef();
-            termRef?.sendCommand(`see file at ${filePath}`);
-          }}
-        />
-      )}
+      {/* Mobile companion lives in forge-companion/ — no in-app mobile layout. */}
 
       <CommandModal
         isOpen={isModalOpen}
@@ -2126,7 +2055,7 @@ function App() {
         projectDir={activeTab?.currentDirectory || ''}
       />
 
-      {/* RemoteAccessModal — HIDDEN for subscription release */}
+      {/* RemoteAccessModal removed — companion access will live in Settings > Companion Access card (future). */}
 
       <SettingsModal
         isOpen={isSettingsModalOpen}

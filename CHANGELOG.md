@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.9] - 2026-04-22
+
+### Changed
+- **Desktop bundle fully decoupled from mobile code** — The mobile-responsive changes introduced in v7.6.0 (and partially reverted in v7.6.6) pulled mobile CSS and layout code into the desktop frontend, which is what caused the v7.6.0–v7.6.5 terminal rendering regression cycle. Those files are now removed from the desktop build entirely: `MobileTabStrip`, `MobileInputBar`, `MobileLayout`, `MobileFileUpload`, `RemoteAccessModal`, `useMobileDetect`, `mobile.css`, `mobile-input.css`, `touch-controls.css`, and the orphaned `mobileReconnect`/`serviceWorker` utilities. `App.jsx` no longer imports or renders any of them. The desktop app is desktop-only going forward. The separate `forge-companion/` PWA remains the sole mobile experience and is unaffected by this change (it talks to `/api/mobile/*` and has always been architecturally isolated). This eliminates an entire class of regressions where mobile media queries or touch code could bleed into desktop rendering.
+
 ## [7.6.8] - 2026-04-22
 
 ### Fixed
