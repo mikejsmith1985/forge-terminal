@@ -1,0 +1,277 @@
+/* CompanionAccessCard.css — styles for the Forge Companion sidebar card.
+ * Uses the same visual idiom as MCPSetupCard (msc-*) with a cac-* prefix. */
+
+.companion-access-card {
+  background: var(--card-bg, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.cac-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  gap: 8px;
+}
+.cac-header:hover { background: rgba(255,255,255,0.03); }
+
+.cac-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.cac-icon { color: var(--accent, #58a6ff); flex-shrink: 0; }
+
+.cac-header-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cac-title { font-weight: 600; color: var(--text, #e6edf3); }
+.cac-subtitle { font-size: 11px; color: var(--text-muted, #8b949e); }
+
+.cac-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Status Badge ───────────────────────────────────────────────────────── */
+
+.cac-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cac-badge-active   { background: rgba(63,185,80,0.15);  color: #3fb950; }
+.cac-badge-inactive { background: rgba(139,148,158,0.15); color: #8b949e; }
+.cac-badge-loading  { background: rgba(88,166,255,0.15); color: #58a6ff; }
+
+/* ── Body ───────────────────────────────────────────────────────────────── */
+
+.cac-body {
+  padding: 12px;
+  border-top: 1px solid var(--border, #30363d);
+  background: rgba(0,0,0,0.15);
+}
+
+.cac-loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted, #8b949e);
+  font-size: 12px;
+}
+
+/* ── Section blocks ─────────────────────────────────────────────────────── */
+
+.cac-section { margin-bottom: 14px; }
+.cac-section:last-child { margin-bottom: 0; }
+
+.cac-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #8b949e);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.cac-lead {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  background: rgba(210,153,34,0.08);
+  border: 1px solid rgba(210,153,34,0.3);
+  border-radius: 6px;
+}
+.cac-lead strong { color: var(--text, #e6edf3); }
+.cac-muted {
+  font-size: 12px;
+  color: var(--text-muted, #8b949e);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.cac-hint {
+  font-size: 11px;
+  color: var(--text-muted, #8b949e);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cac-hint code {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+
+.cac-input {
+  width: 100%;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+  color: var(--text, #e6edf3);
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  padding: 7px 9px;
+}
+.cac-input:focus {
+  outline: none;
+  border-color: var(--accent, #58a6ff);
+}
+
+/* ── Token row ──────────────────────────────────────────────────────────── */
+
+.cac-token-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cac-token {
+  flex: 1;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  color: #58a6ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── QR ─────────────────────────────────────────────────────────────────── */
+
+.cac-qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+}
+.cac-qr-section .cac-label { align-self: stretch; }
+.cac-qr {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+}
+.cac-qr-error {
+  padding: 12px;
+  color: #f85149;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+.cac-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.cac-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #30363d);
+  background: rgba(255,255,255,0.04);
+  color: var(--text, #e6edf3);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s;
+  text-decoration: none;
+}
+.cac-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+.cac-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cac-btn-primary {
+  background: var(--accent, #388bfd);
+  border-color: var(--accent, #388bfd);
+  color: white;
+}
+.cac-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover, #58a6ff);
+}
+
+.cac-btn-secondary {
+  background: rgba(56,139,253,0.1);
+  border-color: rgba(56,139,253,0.4);
+  color: var(--accent-hover, #58a6ff);
+}
+
+.cac-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border, #30363d);
+}
+
+.cac-btn-danger {
+  background: rgba(248,81,73,0.1);
+  border-color: rgba(248,81,73,0.4);
+  color: #f85149;
+}
+.cac-btn-danger:hover:not(:disabled) {
+  background: rgba(248,81,73,0.2);
+}
+
+/* ── Instructions ───────────────────────────────────────────────────────── */
+
+.cac-instructions {
+  background: rgba(56,139,253,0.06);
+  border: 1px solid rgba(56,139,253,0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.cac-instructions h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: var(--text, #e6edf3);
+  font-weight: 600;
+}
+.cac-instructions ol {
+  margin: 0 0 8px 20px;
+  padding: 0;
+  color: var(--text-muted, #8b949e);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cac-instructions ol li { margin-bottom: 4px; }
+.cac-instructions ol li strong { color: var(--text, #e6edf3); }
+
+.cac-docs-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--accent-hover, #58a6ff);
+  text-decoration: none;
+}
+.cac-docs-link:hover { text-decoration: underline; }

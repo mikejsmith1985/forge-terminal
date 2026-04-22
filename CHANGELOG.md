@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.11] - 2026-04-22
+
+### Added
+- **MCP Discovery card** — A new sidebar card that catalogs popular external MCP servers (Filesystem, GitHub, Fetch, Memory, Playwright, Time, PostgreSQL, Brave Search) with a one-click "Copy config" button for Copilot CLI, VS Code, and Claude Code. Includes a collapsible "What is MCP?" primer for users unfamiliar with the protocol, a search/filter box, and a link to the full upstream registry. Addresses the long-standing ask for easier MCP discovery that the Adaptive Build Environments card did not cover — that card continues to expose Forge's own MCP server; the new Discovery card is for adding third-party servers alongside it.
+- **Companion Access card** — A license-gated sidebar card that lets entitled users pair the Forge Companion PWA with their desktop. Reads `/api/mobile/settings`, renders a QR code containing the deep-link (`<companion-host>#forge=<url>&token=<token>`), provides copy buttons for URL/token/deep-link, and shows step-by-step pairing instructions. When the `mobile_access` feature flag is off, the card shows a clear "Companion Access — upgrade required" state with a link to the upgrade page. Tunnel URL and companion host are remembered in localStorage.
+
+### Dependencies
+- Added `qrcode` npm package for rendering the companion pairing QR.
+
 ## [7.6.10] - 2026-04-22
 
 ### Fixed
