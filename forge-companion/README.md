@@ -15,7 +15,25 @@ sessions from any phone — no app store required, just scan a QR code.
 
 ## Quick Start — 5 easy steps
 
-### Step 1 — Get a free tunnel link
+### Step 1 — Connect your phone to your PC
+
+Pick whichever option applies to you:
+
+**Option A — Tailscale (recommended if you already have it)**
+
+Both your PC and phone must be on the same Tailscale network (tailnet).
+
+1. Open the Tailscale app on your PC and copy your machine's IP address — it looks like `100.x.x.x`.
+2. Your Forge URL will be: `http://100.x.x.x:3005`
+
+That's it. No extra software needed — skip to Step 2.
+
+> **Tip:** If you have Tailscale MagicDNS enabled, you can also use your hostname:
+> `http://your-machine-name:3005`
+
+---
+
+**Option B — Cloudflare Tunnel (free, works without Tailscale)**
 
 Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) and run:
 
@@ -25,7 +43,7 @@ cloudflared tunnel --url http://localhost:3005
 
 It prints a link like `https://abc123.trycloudflare.com`. **Copy that link.**
 
-> **Why?** Your phone needs a public web address to reach your computer. The tunnel creates one in seconds.
+> **Note:** This URL changes every time you restart cloudflared.
 
 ---
 
@@ -65,11 +83,11 @@ For the best experience, save it like a real app:
 
 ## Troubleshooting
 
-**"Could not reach Forge"** — Make sure your tunnel is still running (`cloudflared tunnel --url ...`)
-and paste the current tunnel URL. Tunnel URLs change each time you restart cloudflared.
+**"Could not reach Forge" (Tailscale)** — Make sure both your PC and phone are on the same tailnet and Tailscale is running on both. Try opening `http://100.x.x.x:3005` in your phone's browser to confirm connectivity before scanning the QR.
 
-**"Invalid token"** — Click the Forge Companion card in the sidebar and tap **Copy** next to
-the Mobile Token. Paste it manually in the app's token field.
+**"Could not reach Forge" (Cloudflare Tunnel)** — Make sure your tunnel is still running (`cloudflared tunnel --url ...`) and paste the current tunnel URL. Tunnel URLs change each time you restart cloudflared.
+
+**"Invalid token"** — Click the Forge Companion card in the sidebar and tap **Copy** next to the Mobile Token. Paste it manually in the app's token field.
 
 **Blank screen after connecting** — Go back to the Sessions list and tap Refresh.
 
