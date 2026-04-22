@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.6.16] - 2026-04-22
 
+---
+
+## [v7.6.16] - 2026-04-22
+
+## [7.6.16] - 2026-04-22
+
 ### Fixed
 - **Companion PWA `/companion/` route now always works** — `cmd/forge/web/companion/` is no longer gitignored. The three PWA files are committed alongside the main frontend so `//go:embed all:web` always includes them in the binary regardless of whether a local build has been run.
 - **Companion PWA icons no longer 404** — `vite.config.js:copyCompanionPlugin` now copies `icon-192.png` and `icon-512.png` from the Vite public output into `web/companion/` so the PWA manifest icon paths resolve correctly at `/companion/`.
