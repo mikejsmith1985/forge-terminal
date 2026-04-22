@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.13] - 2026-04-22
+
+---
+
+## [v7.6.13] - 2026-04-22
+
 ### Fixed
 - **Settings tabs no longer cut off** — Tab bar now wraps to a second row on narrow modal views instead of clipping. Removed hidden scrollbar in favour of `flexWrap: wrap` with reduced padding.
 - **Forge Companion QR code was 404** — Deployed the companion PWA to Cloudflare Pages (`forge-companion-1b3.pages.dev`). Updated `DEFAULT_COMPANION_HOST` constant to point to the live deployment. QR scans now open the working companion app.
