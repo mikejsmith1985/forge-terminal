@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.7] - 2026-04-22
+
+### Fixed
+- **Stale TUI viewport after session reattach** — When reconnecting to a detached PTY (page reload, network blip), the server replays the ring buffer before sending `SESSION_REATTACHED`. For TUI apps like Copilot CLI this replay contains absolute cursor-position codes that leave the terminal visually broken (content at wrong positions, cursor floating mid-screen). The handler now writes `ESC[2J ESC[H` to clear the viewport before the "[Session Restored]" banner, then calls `fit()` so `term.onResize` sends updated dimensions to the PTY (SIGWINCH) and the running process redraws cleanly. Scrollback history is preserved.
+
 ## [7.6.6] - 2026-04-22
 
 ### Fixed
