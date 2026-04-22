@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.6.18] - 2026-04-22
 
+---
+
+## [v7.6.18] - 2026-04-22
+
+## [7.6.18] - 2026-04-22
+
 ### Fixed
 - **Companion QR code base URL now always includes `http://`** — Safari and most mobile browsers reject protocol-less URLs such as `100.x.x.x:3005/companion/`. A `normalizeHttpUrl()` helper now prepends `http://` to any URL that lacks a scheme, applied in `getDefaultCompanionHost`, `buildDeepLink`, and the stale-host migration on startup.
 - **Stale localStorage detection now catches protocol-less values** — the `isStaleCompanionHost()` check previously only migrated `localhost` / legacy Pages URLs. Any stored value without `http://` or `https://` is now treated as stale and automatically replaced with a correctly-formed default on next load.
