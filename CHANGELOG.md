@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.14] - 2026-04-22
+
+---
+
+## [v7.6.14] - 2026-04-22
+
+### Fixed
+- **Forge Companion now supports Tailscale** — URL hint, instructions card, and README updated to present Tailscale as the recommended connection method when already installed. Cloudflare Tunnel remains the alternative for non-Tailscale users. Tailscale troubleshooting steps added to README.
+
 ## [7.6.13] - 2026-04-22
 
 ---

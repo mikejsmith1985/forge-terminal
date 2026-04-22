@@ -264,8 +264,10 @@ const EnabledView = ({
           placeholder="https://xyz.trycloudflare.com"
         />
         <p className="cac-hint">
-          <Info size={12} /> Your phone must be able to reach this URL. Use
-          Cloudflare Tunnel, ngrok, or Tailscale for off-LAN access.
+          <Info size={12} />{' '}
+          <strong>Tailscale users:</strong> use your PC's Tailscale IP —{' '}
+          <code>http://100.x.x.x:3005</code>. Your phone must be on the same tailnet.{' '}
+          No Tailscale? Run <code>cloudflared tunnel --url http://localhost:3005</code> for a free public link.
         </p>
       </div>
 
@@ -373,7 +375,8 @@ const QRBlock = ({ deepLink }) => {
  * compact=true  → shown on the disabled screen (steps to get started)
  * compact=false → shown on the enabled screen (steps to connect a phone)
  *
- * Written at a level anyone can follow — no networking background required.
+ * Tailscale is presented as the easiest path (zero extra software if already
+ * installed). Cloudflare Tunnel is offered as the no-Tailscale alternative.
  */
 const InstructionsBlock = ({ compact }) => (
   <div className="cac-section cac-instructions">
@@ -384,22 +387,32 @@ const InstructionsBlock = ({ compact }) => (
       {compact ? (
         <>
           <li>
-            <strong>Get a tunnel link.</strong> Download{' '}
-            <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">
-              Cloudflare Tunnel (free)
-            </a>{' '}
-            and run <code>cloudflared tunnel --url http://localhost:3005</code>.
-            It gives you a link like <code>https://abc123.trycloudflare.com</code>.
+            <strong>Get a link your phone can use to reach this PC.</strong>
+            <ul style={{ marginTop: '6px', paddingLeft: '16px' }}>
+              <li>
+                <strong>Have Tailscale?</strong> Open the Tailscale app on your
+                PC and copy your machine's IP or hostname — it looks like{' '}
+                <code>http://100.x.x.x:3005</code>.
+              </li>
+              <li>
+                <strong>No Tailscale?</strong> Run{' '}
+                <code>cloudflared tunnel --url http://localhost:3005</code> — it
+                gives you a free link like{' '}
+                <code>https://abc123.trycloudflare.com</code>.{' '}
+                <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">
+                  Download cloudflared ↗
+                </a>
+              </li>
+            </ul>
           </li>
           <li>
-            <strong>Enable mobile access.</strong> Click <strong>Enable Mobile Access</strong> on
-            this card.
+            <strong>Enable mobile access</strong> by clicking <strong>Enable Mobile Access</strong> on this card.
           </li>
           <li>
-            <strong>Paste your tunnel link</strong> into the "Your public Forge URL" box.
+            <strong>Paste your link</strong> into the "Your public Forge URL" box.
           </li>
           <li>
-            <strong>Scan the QR code</strong> that appears with your phone camera.
+            <strong>Scan the QR code</strong> with your phone camera.
           </li>
           <li>
             <strong>Tap Connect</strong> — you're in! 🎉
@@ -408,22 +421,33 @@ const InstructionsBlock = ({ compact }) => (
       ) : (
         <>
           <li>
-            <strong>Get a tunnel link</strong> so your phone can reach this computer.
-            Run <code>cloudflared tunnel --url http://localhost:3005</code> and copy the
-            link it gives you (e.g. <code>https://abc123.trycloudflare.com</code>).{' '}
-            <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">
-              Download cloudflared ↗
-            </a>
+            <strong>Your phone needs a link to reach this PC.</strong>
+            <ul style={{ marginTop: '6px', paddingLeft: '16px' }}>
+              <li>
+                <strong>Tailscale (easiest if you have it):</strong> Both devices
+                must be on your tailnet. Find your PC's Tailscale IP in the
+                Tailscale app (looks like <code>100.x.x.x</code>) and use{' '}
+                <code>http://100.x.x.x:3005</code> as the URL.
+              </li>
+              <li>
+                <strong>Cloudflare Tunnel (no Tailscale needed):</strong> Run{' '}
+                <code>cloudflared tunnel --url http://localhost:3005</code> and
+                copy the link it prints.{' '}
+                <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">
+                  Download cloudflared ↗
+                </a>
+              </li>
+            </ul>
           </li>
           <li>
             <strong>Paste that link</strong> into the "Your public Forge URL" box above.
           </li>
           <li>
             <strong>Scan the QR code</strong> below with your phone camera.
-            It opens the Forge Companion app on your phone automatically.
+            It opens Forge Companion automatically.
           </li>
           <li>
-            <strong>Tap Connect</strong> in the app. Your terminal sessions appear instantly. 🎉
+            <strong>Tap Connect</strong> — your sessions appear instantly. 🎉
           </li>
         </>
       )}
