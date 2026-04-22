@@ -273,6 +273,19 @@ func main() {
 		log.Fatal("Failed to load embedded web files:", err)
 	}
 
+	// Serve the companion PWA at /companion/ without authentication.
+	//
+	// The phone loads this static app before any token is established, so it
+	// must be publicly accessible. The companion directory is copied into
+	// cmd/forge/web/companion/ by the Vite build plugin, then embedded here
+	// alongside the main frontend via the all:web directive.
+	//
+	// Actual API calls (/api/mobile/*) remain behind their own auth layer.
+	if companionSubFS, companionSubErr := fs.Sub(webFS, "companion"); companionSubErr == nil {
+		companionFileServer := http.FileServer(http.FS(companionSubFS))
+		http.Handle("/companion/", http.StripPrefix("/companion", companionFileServer))
+	}
+
 	// Wrap file server with cache-control headers and explicit MIME types
 	fileServer := http.FileServer(http.FS(webFS))
 	http.HandleFunc("/", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {

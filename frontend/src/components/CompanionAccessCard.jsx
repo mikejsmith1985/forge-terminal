@@ -3,7 +3,7 @@
 // Gates the mobile companion feature behind the `mobile_access` license flag
 // and, when entitled, surfaces everything a user needs to connect their phone:
 // a QR-code deep link (forgeUrl + mobileToken), copy-to-clipboard helpers,
-// step-by-step instructions, and a disable/revoke button.
+// a guided step-by-step connection flow, and a disable/revoke button.
 //
 // Backend contract:
 //   GET  /api/mobile/settings  → { mobile_access_enabled, mobile_token, token_path }
@@ -23,8 +23,10 @@ import {
   Check,
   ExternalLink,
   Lock,
-  RefreshCw,
   Info,
+  Wifi,
+  Globe,
+  Settings,
 } from 'lucide-react'
 import './CompanionAccessCard.css'
 
@@ -34,9 +36,18 @@ const COPY_RESET_DELAY_MS = 2000
 const UPGRADE_URL = 'https://rootlevellabs.tech/upgrade'
 const COMPANION_DOCS_URL = 'https://github.com/mikejsmith1985/forge-terminal/tree/main/forge-companion'
 
-// Default host for the companion PWA — deployed to Cloudflare Pages.
-// Users can override this field if they self-host the companion.
-const DEFAULT_COMPANION_HOST = 'https://forge-companion-1b3.pages.dev/'
+// The companion PWA is served directly by the Forge Terminal binary at /companion/.
+// This eliminates any external hosting dependency — the QR code works as long
+// as Forge Terminal is running, regardless of internet connectivity.
+const DEFAULT_COMPANION_HOST = `${window.location.origin}/companion/`
+
+// Legacy hosted URLs from older versions of Forge Terminal. If a user has one
+// of these saved in localStorage, they are silently migrated to the new
+// self-hosted default on next load so their QR code stops returning 404.
+const LEGACY_COMPANION_HOST_URLS = new Set([
+  'https://forge-companion-1b3.pages.dev/',
+  'https://mikejsmith1985.github.io/forge-companion/',
+])
 
 // localStorage keys used to remember the user's tunnel URL and companion host.
 const STORAGE_TUNNEL_URL = 'forge.companion.tunnelUrl'
@@ -63,9 +74,14 @@ const CompanionAccessCard = () => {
   const [tunnelUrl, setTunnelUrl]           = useState(
     () => localStorage.getItem(STORAGE_TUNNEL_URL) || window.location.origin
   )
-  const [companionHost, setCompanionHost]   = useState(
-    () => localStorage.getItem(STORAGE_COMPANION_HOST) || DEFAULT_COMPANION_HOST
-  )
+  const [companionHost, setCompanionHost]   = useState(() => {
+    const storedHost = localStorage.getItem(STORAGE_COMPANION_HOST)
+    // Silently migrate users away from legacy external URLs that no longer work.
+    if (!storedHost || LEGACY_COMPANION_HOST_URLS.has(storedHost)) {
+      return DEFAULT_COMPANION_HOST
+    }
+    return storedHost
+  })
 
   // Persist input fields so the user does not retype them every session.
   useEffect(() => { localStorage.setItem(STORAGE_TUNNEL_URL, tunnelUrl) }, [tunnelUrl])
@@ -230,12 +246,20 @@ const DisabledView = ({ onEnable, isTogglePending }) => (
       </a>
     </div>
 
-    <InstructionsBlock compact />
+    <InstructionsBlock />
   </>
 )
 
 /**
- * EnabledView — QR code + token + instructions + disable button.
+ * EnabledView — guided step-by-step connection flow.
+ *
+ * The user flow is intentionally simple:
+ *   Step 1 — Pick how to expose Forge (Tailscale IP or Cloudflare Tunnel)
+ *   Step 2 — Confirm / edit the URL that was pre-filled
+ *   Step 3 — Scan the QR code and tap Connect
+ *
+ * Advanced options (PWA host override, raw token copy) are collapsed by default
+ * so they don't clutter the main flow for first-time users.
  */
 const EnabledView = ({
   settings,
@@ -250,74 +274,88 @@ const EnabledView = ({
   onDisable,
   isTogglePending,
 }) => {
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const deepLink = buildDeepLink(companionHost, tunnelUrl, settings?.mobile_token || '')
 
   return (
     <>
+      {/* ── Step 1: Connection method ───────────────────────────────────── */}
       <div className="cac-section">
-        <label className="cac-label">Your public Forge URL</label>
+        <div className="cac-step-header">
+          <span className="cac-step-number">1</span>
+          <span className="cac-step-title">How is your phone reaching this PC?</span>
+        </div>
+        <div className="cac-method-cards">
+          <ConnectionMethodCard
+            icon={<Wifi size={16} />}
+            title="Tailscale"
+            description="Both devices on the same tailnet"
+            hint={
+              <>
+                Open the Tailscale app on this PC and copy your machine IP —{' '}
+                it looks like <code>100.x.x.x</code>.{' '}
+                Then use <code>http://100.x.x.x:3005</code> below.
+              </>
+            }
+          />
+          <ConnectionMethodCard
+            icon={<Globe size={16} />}
+            title="No Tailscale"
+            description="Free public tunnel via Cloudflare"
+            hint={
+              <>
+                Run this command in a new terminal, then copy the link it prints:
+                <code className="cac-method-command">
+                  cloudflared tunnel --url http://localhost:3005
+                </code>
+                <a
+                  href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cac-inline-link"
+                >
+                  Download cloudflared ↗
+                </a>
+              </>
+            }
+          />
+        </div>
+      </div>
+
+      {/* ── Step 2: Paste the URL ───────────────────────────────────────── */}
+      <div className="cac-section">
+        <div className="cac-step-header">
+          <span className="cac-step-number">2</span>
+          <span className="cac-step-title">Paste your Forge URL here</span>
+        </div>
         <input
           className="cac-input"
           type="text"
           value={tunnelUrl}
           onChange={evt => setTunnelUrl(evt.target.value)}
-          placeholder="https://xyz.trycloudflare.com"
+          placeholder="e.g. http://100.x.x.x:3005 or https://abc123.trycloudflare.com"
         />
-        <p className="cac-hint">
-          <Info size={12} />{' '}
-          <strong>Tailscale users:</strong> use your PC's Tailscale IP —{' '}
-          <code>http://100.x.x.x:3005</code>. Your phone must be on the same tailnet.{' '}
-          No Tailscale? Run <code>cloudflared tunnel --url http://localhost:3005</code> for a free public link.
-        </p>
       </div>
 
+      {/* ── Step 3: QR code ────────────────────────────────────────────── */}
       <div className="cac-section">
-        <label className="cac-label">Companion PWA host</label>
-        <input
-          className="cac-input"
-          type="text"
-          value={companionHost}
-          onChange={evt => setCompanionHost(evt.target.value)}
-          placeholder="https://your-companion-host/"
-        />
-        <p className="cac-hint">
-          <Info size={12} /> The URL where the Forge Companion PWA is served.
-          You can self-host from the <code>forge-companion/</code> directory or
-          use the default hosted build.
-        </p>
-      </div>
-
-      <QRBlock deepLink={deepLink} />
-
-      <div className="cac-section">
-        <label className="cac-label">Mobile token</label>
-        <div className="cac-token-row">
-          <code className="cac-token">{maskToken(settings?.mobile_token)}</code>
-          <button
-            className="cac-btn cac-btn-ghost"
-            onClick={onCopyToken}
-            title="Copy full token to clipboard"
-          >
-            {hasCopiedToken
-              ? <><Check size={14} /> Copied</>
-              : <><Copy size={14} /> Copy</>
-            }
-          </button>
+        <div className="cac-step-header">
+          <span className="cac-step-number">3</span>
+          <span className="cac-step-title">Scan with your phone — then tap Connect</span>
         </div>
-        <p className="cac-hint">
-          Stored at <code>{settings?.token_path || '~/.forge/mobile-token'}</code>
-        </p>
+        <QRBlock deepLink={deepLink} />
       </div>
 
+      {/* ── Actions ────────────────────────────────────────────────────── */}
       <div className="cac-actions">
         <button
           className="cac-btn cac-btn-secondary"
           onClick={onCopyLink}
-          title="Copy deep-link URL"
+          title="Copy the deep-link URL to send to your phone another way"
         >
           {hasCopiedLink
             ? <><Check size={14} /> Copied</>
-            : <><Copy size={14} /> Copy Deep Link</>
+            : <><Copy size={14} /> Copy Link</>
           }
         </button>
         <button
@@ -325,14 +363,80 @@ const EnabledView = ({
           onClick={onDisable}
           disabled={isTogglePending}
         >
-          {isTogglePending ? 'Disabling…' : 'Disable Mobile Access'}
+          {isTogglePending ? 'Disabling…' : 'Disable'}
         </button>
       </div>
 
-      <InstructionsBlock />
+      {/* ── Advanced (collapsed by default) ────────────────────────────── */}
+      <button
+        className="cac-advanced-toggle"
+        onClick={() => setIsAdvancedOpen(prev => !prev)}
+      >
+        <Settings size={12} />
+        {isAdvancedOpen ? 'Hide advanced' : 'Advanced settings'}
+        {isAdvancedOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+      </button>
+
+      {isAdvancedOpen && (
+        <div className="cac-advanced-body">
+          <div className="cac-section">
+            <label className="cac-label">Companion PWA host</label>
+            <input
+              className="cac-input"
+              type="text"
+              value={companionHost}
+              onChange={evt => setCompanionHost(evt.target.value)}
+              placeholder="https://your-companion-host/"
+            />
+            <p className="cac-hint">
+              Only change this if you self-host the PWA from the{' '}
+              <code>forge-companion/</code> directory.
+              The default is the official hosted build.
+            </p>
+          </div>
+
+          <div className="cac-section">
+            <label className="cac-label">Mobile token</label>
+            <div className="cac-token-row">
+              <code className="cac-token">{maskToken(settings?.mobile_token)}</code>
+              <button
+                className="cac-btn cac-btn-ghost"
+                onClick={onCopyToken}
+                title="Copy full token to clipboard"
+              >
+                {hasCopiedToken
+                  ? <><Check size={14} /> Copied</>
+                  : <><Copy size={14} /> Copy</>
+                }
+              </button>
+            </div>
+            <p className="cac-hint">
+              Stored at <code>{settings?.token_path || '~/.forge/mobile-token'}</code>
+            </p>
+          </div>
+        </div>
+      )}
     </>
   )
 }
+
+/**
+ * ConnectionMethodCard — one of two option cards shown in Step 1 of the
+ * enabled view. Purely informational — shows the user what each tunnel path
+ * looks like so they know which URL to paste in Step 2.
+ */
+const ConnectionMethodCard = ({ icon, title, description, hint }) => (
+  <div className="cac-method-card">
+    <div className="cac-method-card-header">
+      <span className="cac-method-icon">{icon}</span>
+      <div>
+        <strong className="cac-method-title">{title}</strong>
+        <span className="cac-method-desc">{description}</span>
+      </div>
+    </div>
+    <p className="cac-method-hint">{hint}</p>
+  </div>
+)
 
 /**
  * QRBlock — renders the deep-link URL as a QR code canvas.
@@ -370,87 +474,21 @@ const QRBlock = ({ deepLink }) => {
 }
 
 /**
- * InstructionsBlock — simple numbered walkthrough for the user.
+ * InstructionsBlock — compact teaser shown on the disabled screen so users
+ * know what to expect before they click Enable.
  *
- * compact=true  → shown on the disabled screen (steps to get started)
- * compact=false → shown on the enabled screen (steps to connect a phone)
- *
- * Tailscale is presented as the easiest path (zero extra software if already
- * installed). Cloudflare Tunnel is offered as the no-Tailscale alternative.
+ * The enabled screen now has inline step cards, so this block is only used
+ * when mobile access is off.
  */
-const InstructionsBlock = ({ compact }) => (
+const InstructionsBlock = () => (
   <div className="cac-section cac-instructions">
     <h4>
-      <Info size={14} /> How to connect your phone
+      <Info size={14} /> What you'll need
     </h4>
     <ol>
-      {compact ? (
-        <>
-          <li>
-            <strong>Get a link your phone can use to reach this PC.</strong>
-            <ul style={{ marginTop: '6px', paddingLeft: '16px' }}>
-              <li>
-                <strong>Have Tailscale?</strong> Open the Tailscale app on your
-                PC and copy your machine's IP or hostname — it looks like{' '}
-                <code>http://100.x.x.x:3005</code>.
-              </li>
-              <li>
-                <strong>No Tailscale?</strong> Run{' '}
-                <code>cloudflared tunnel --url http://localhost:3005</code> — it
-                gives you a free link like{' '}
-                <code>https://abc123.trycloudflare.com</code>.{' '}
-                <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">
-                  Download cloudflared ↗
-                </a>
-              </li>
-            </ul>
-          </li>
-          <li>
-            <strong>Enable mobile access</strong> by clicking <strong>Enable Mobile Access</strong> on this card.
-          </li>
-          <li>
-            <strong>Paste your link</strong> into the "Your public Forge URL" box.
-          </li>
-          <li>
-            <strong>Scan the QR code</strong> with your phone camera.
-          </li>
-          <li>
-            <strong>Tap Connect</strong> — you're in! 🎉
-          </li>
-        </>
-      ) : (
-        <>
-          <li>
-            <strong>Your phone needs a link to reach this PC.</strong>
-            <ul style={{ marginTop: '6px', paddingLeft: '16px' }}>
-              <li>
-                <strong>Tailscale (easiest if you have it):</strong> Both devices
-                must be on your tailnet. Find your PC's Tailscale IP in the
-                Tailscale app (looks like <code>100.x.x.x</code>) and use{' '}
-                <code>http://100.x.x.x:3005</code> as the URL.
-              </li>
-              <li>
-                <strong>Cloudflare Tunnel (no Tailscale needed):</strong> Run{' '}
-                <code>cloudflared tunnel --url http://localhost:3005</code> and
-                copy the link it prints.{' '}
-                <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">
-                  Download cloudflared ↗
-                </a>
-              </li>
-            </ul>
-          </li>
-          <li>
-            <strong>Paste that link</strong> into the "Your public Forge URL" box above.
-          </li>
-          <li>
-            <strong>Scan the QR code</strong> below with your phone camera.
-            It opens Forge Companion automatically.
-          </li>
-          <li>
-            <strong>Tap Connect</strong> — your sessions appear instantly. 🎉
-          </li>
-        </>
-      )}
+      <li>A way to reach this PC from your phone — Tailscale IP or a free Cloudflare tunnel</li>
+      <li>Enable mobile access on this card</li>
+      <li>Scan the QR code that appears — done!</li>
     </ol>
     <a
       className="cac-docs-link"

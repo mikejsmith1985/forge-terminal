@@ -109,10 +109,14 @@
 .cac-hint {
   font-size: 11px;
   color: var(--text-muted, #8b949e);
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  margin-top: 6px;
+  line-height: 1.5;
+  /* block layout so text + code elements wrap naturally like prose */
+}
+.cac-hint svg {
+  display: inline;
+  vertical-align: middle;
+  margin-right: 3px;
 }
 .cac-hint code {
   background: rgba(255,255,255,0.06);
@@ -275,3 +279,134 @@
   text-decoration: none;
 }
 .cac-docs-link:hover { text-decoration: underline; }
+
+/* ── Step headers ───────────────────────────────────────────────────────── */
+
+.cac-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cac-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent, #388bfd);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.cac-step-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text, #e6edf3);
+}
+
+/* ── Connection method cards ────────────────────────────────────────────── */
+
+.cac-method-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cac-method-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.cac-method-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cac-method-icon {
+  color: var(--accent, #58a6ff);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.cac-method-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text, #e6edf3);
+  line-height: 1.3;
+}
+
+.cac-method-desc {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.3;
+}
+
+.cac-method-hint {
+  font-size: 11px;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.5;
+  /* block layout so embedded <code> and <a> wrap naturally */
+}
+
+.cac-method-hint code {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+/* A block-level code snippet for the cloudflared command */
+.cac-method-command {
+  display: block;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 4px;
+  padding: 5px 8px;
+  margin: 5px 0 4px;
+  font-size: 11px;
+  color: var(--accent-hover, #58a6ff);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.cac-inline-link {
+  display: inline;
+  font-size: 11px;
+  color: var(--accent-hover, #58a6ff);
+  text-decoration: none;
+}
+.cac-inline-link:hover { text-decoration: underline; }
+
+/* ── Advanced settings toggle ───────────────────────────────────────────── */
+
+.cac-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #8b949e);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  transition: color 0.1s;
+}
+.cac-advanced-toggle:hover { color: var(--text, #e6edf3); }
+
+.cac-advanced-body {
+  border-top: 1px solid var(--border, #30363d);
+  padding-top: 12px;
+  margin-top: 4px;
+}

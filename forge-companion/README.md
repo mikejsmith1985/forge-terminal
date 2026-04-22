@@ -95,12 +95,13 @@ For the best experience, save it like a real app:
 
 ## Self-hosting the companion app
 
-The companion is a single HTML file with no build step. The default hosted version lives at
-[forge-companion-1b3.pages.dev](https://forge-companion-1b3.pages.dev/).
+The companion is a single HTML file with no build step. Starting with Forge Terminal v7.6.15,
+the companion is **bundled inside the Forge Terminal binary** and served automatically at
+`http://<your-forge-url>/companion/` — no external hosting required.
 
-To self-host, copy `index.html`, `manifest.json`, and `sw.js` to any static web host (GitHub
-Pages, Netlify, Cloudflare Pages, etc.) and enter that URL in the **Companion PWA host** field
-in the Forge Companion card.
+To self-host on a separate server, copy `index.html`, `manifest.json`, and `sw.js` to any
+static web host (GitHub Pages, Netlify, Cloudflare Pages, etc.) and enter that URL in the
+**Advanced settings** section of the Forge Companion card.
 
 ---
 

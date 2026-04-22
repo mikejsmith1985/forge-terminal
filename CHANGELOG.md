@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Forge Companion QR code 404 resolved** — The companion PWA is now bundled inside the Forge Terminal binary and served at `<your-forge-url>/companion/`. No external hosting required. Users with stale legacy URLs (Cloudflare Pages or GitHub Pages) in localStorage are auto-migrated on load.
+- **Companion card text layout** — Fixed broken `display: flex` on hint text that caused words to fragment into columns when wrapping alongside inline `<code>` elements.
+
+### Changed
+- **Companion card redesigned as a step-by-step wizard** — The enabled view now shows numbered steps (1 → pick Tailscale or Cloudflare, 2 → paste URL, 3 → scan QR). Tailscale and "No Tailscale" paths are each shown as a clearly labelled card. PWA host override and raw token copy are moved to a collapsible "Advanced settings" section so they don't clutter the primary flow.
+
 ## [7.6.14] - 2026-04-22
 
 ---
