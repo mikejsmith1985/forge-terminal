@@ -1817,11 +1817,28 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               // Handle session reattachment (PTY was kept alive during disconnect)
               if (msg.type === 'SESSION_REATTACHED') {
                 logger.terminal('Session reattached', { tabId, detachedDuration: msg.detachedDuration });
-                if (xtermRef.current) {
-                  const duration = msg.detachedDuration ? ` (disconnected ${Math.round(msg.detachedDuration)}s)` : '';
-                  xtermRef.current.write(`\r\n\x1b[38;2;34;197;94m[Session Restored]\x1b[0m Terminal session recovered${duration}.\r\n`);
-                }
                 sessionReattachedRef.current = true;
+
+                if (xtermRef.current) {
+                  // The server replays the ring buffer (recent PTY output) before sending
+                  // SESSION_REATTACHED. For TUI applications like Copilot CLI, this replay
+                  // contains absolute cursor-position codes that produce a visually broken
+                  // layout (content at wrong positions, cursor floating in the middle).
+                  //
+                  // Clearing the viewport gives the running process a clean canvas to redraw
+                  // onto after receiving SIGWINCH. The scrollback history is preserved — the
+                  // user can still scroll up to see what was on screen before reconnection.
+                  xtermRef.current.write('\x1b[2J\x1b[H');
+                  const duration = msg.detachedDuration ? ` (disconnected ${Math.round(msg.detachedDuration)}s)` : '';
+                  xtermRef.current.write(`\r\n\x1b[38;2;34;197;94m[Session Restored]\x1b[0m Terminal session recovered${duration}.\r\n\r\n`);
+                }
+
+                // Fit to the current viewport. If the size changed, term.onResize fires
+                // automatically and sends the new dimensions to the PTY, which triggers
+                // SIGWINCH so the running process redraws at the correct column count.
+                if (fitAddonRef.current && xtermRef.current) {
+                  fitAddonRef.current.fit();
+                }
                 return;
               }
 
