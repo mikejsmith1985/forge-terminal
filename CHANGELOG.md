@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.10] - 2026-04-22
+
+### Fixed
+- **Terminal rendering regression from v7.6.7/v7.6.8 reverted** — User reports v7.6.7 and v7.6.8 (and v7.6.9 which inherited their terminal code) produce the same cumulative-render breakage seen in v7.6.0–v7.6.5: massive vertical gaps between lines, broken TUI layout. `ForgeTerminal.jsx` is restored to the v7.6.6 state verbatim. The reattach `ESC[2J ESC[H` clear (v7.6.7) and the alt-screen dark-theme override + DEC prefix CSI handlers (v7.6.8) are all dropped. Only the mobile-strip cleanup from v7.6.9 is retained. The two cosmetic bugs those patches addressed (stale replay after reattach, white-on-white TUIs on light themes) are reopened and will be re-approached without touching the rendering pipeline.
+
 ## [7.6.9] - 2026-04-22
 
 ### Changed
