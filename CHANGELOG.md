@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Terminal no longer crashes on launch** — Fixed a runtime error ("intermediate must be in range 0x20 .. 0x2f") thrown by xterm.js when registering the alt-screen CSI handlers. The `?` character (0x3F) is a DEC private parameter prefix, not an intermediate byte; the handler registration now correctly uses `prefix: '?'` instead of `intermediates: '?'`.
+
 ## [7.6.2] - 2026-04-21
 
 ---

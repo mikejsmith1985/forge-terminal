@@ -1148,7 +1148,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
 
     // CSI ? ... h — entering alternate screen
-    term.parser.registerCsiHandler({ intermediates: '?', final: 'h' }, (params) => {
+    // '?' is a DEC private parameter prefix (0x3F), not an intermediate byte (0x20-0x2F).
+    // xterm.js exposes it via the 'prefix' field, not 'intermediates'.
+    term.parser.registerCsiHandler({ prefix: '?', final: 'h' }, (params) => {
       const isAltScreenEntry = params.toArray().some((code) => {
         const numericCode = Array.isArray(code) ? code[0] : code;
         return ALT_SCREEN_CODES.has(numericCode);
@@ -1164,7 +1166,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     });
 
     // CSI ? ... l — exiting alternate screen
-    term.parser.registerCsiHandler({ intermediates: '?', final: 'l' }, (params) => {
+    term.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
       const isAltScreenExit = params.toArray().some((code) => {
         const numericCode = Array.isArray(code) ? code[0] : code;
         return ALT_SCREEN_CODES.has(numericCode);
