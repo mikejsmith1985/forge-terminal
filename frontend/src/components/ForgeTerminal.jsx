@@ -1612,25 +1612,31 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       return true; // Let all other keys pass through standard xterm processing
     });
 
-    // Synchronous initial fit: useEffect runs AFTER the browser has painted, so
-    // getBoundingClientRect() already reflects the true container dimensions.
-    // Calling fit() here immediately updates term.cols/rows before the WebSocket
-    // URL is built and before ws.onopen sends the initial resize message.
+    // Initial fit strategy: we need the correct column count BEFORE the WebSocket
+    // connects, so the PTY is created at the right width. However, fit() measures
+    // the DOM container — if the container is hidden (e.g. a background tab with
+    // display:none), getBoundingClientRect() returns 0 width and fit() would set
+    // cols=0, rendering all text invisible at column 0.
     //
-    // Without this, the WebSocket URL carries ?cols=80&rows=24 (xterm defaults),
-    // and ws.onopen sends resize(80, 24). The PTY is created at 80 cols.
-    // The RAF below then corrects to the real width — but that ~16ms window is
-    // enough for the Copilot CLI (or any TUI app) to render content at the wrong
-    // width, and on reconnect it produces a SIGWINCH(80) → SIGWINCH(real) double-
-    // reflow that leaves garbled output in the scrollback.
-    if (fitAddonRef.current) {
+    // Solution: only call fit() synchronously when the container has real dimensions.
+    // A visible tab (the common case for the first terminal on page load) will have
+    // non-zero width and gets the correct cols immediately. A hidden/background tab
+    // falls back to the RAF path, which fires once the tab becomes visible.
+    const containerWidth = terminalRef.current
+      ? terminalRef.current.getBoundingClientRect().width
+      : 0;
+    const isContainerVisible = containerWidth > 0;
+
+    if (fitAddonRef.current && isContainerVisible) {
+      // Container is painted and visible — fit synchronously so the WebSocket URL
+      // and ws.onopen resize message use the real column count, not xterm's 80-col
+      // default. This prevents the SIGWINCH(80) → SIGWINCH(real) double-reflow
+      // that garbles Copilot CLI output on page reload.
       fitAddonRef.current.fit();
     }
 
-    // Second fit in the next animation frame: catches any deferred layout shifts
-    // (e.g. React state updates that alter sidebar/panel widths) that occur
-    // after this effect runs. Belt-and-suspenders — the sync fit above is the
-    // critical one for PTY sizing correctness.
+    // RAF fit: covers hidden tabs (which had 0 width above) and catches any
+    // deferred layout shifts (sidebar state updates) that occur after this effect.
     requestAnimationFrame(() => {
       if (fitAddonRef.current) {
         fitAddonRef.current.fit();

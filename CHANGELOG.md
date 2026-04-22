@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Terminal no longer blank on load** — Fixed a regression introduced in v7.6.2 where calling `fitAddon.fit()` synchronously during `useEffect` measured 0 column width on hidden/background tabs (containers with `display:none` return zero from `getBoundingClientRect()`). xterm.js set `cols=0`, rendering all text invisible. The fix gates the synchronous fit on a non-zero container width check — visible tabs get the correct cols immediately (fixing the PTY width mismatch), hidden tabs fall back to the RAF path as before.
+
 ## [7.6.3] - 2026-04-21
 
 ---
