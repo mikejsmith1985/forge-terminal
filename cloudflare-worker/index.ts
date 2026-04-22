@@ -40,6 +40,10 @@ interface Env {
   HMAC_SECRET: string
   RESEND_API_KEY: string
   EMAIL_FROM: string
+  // Optional GitHub Personal Access Token. When set, authenticated requests
+  // to api.github.com get a 5000/hr rate limit per IP instead of the 60/hr
+  // unauthenticated limit shared across all Cloudflare egress IPs.
+  GITHUB_TOKEN?: string
 }
 
 interface LicenseRecord {
@@ -294,7 +298,94 @@ export default {
     if (method === 'POST' && pathname === '/license/deactivate') return handleDeactivate(request, env)
     if (method === 'GET'  && pathname === '/download') return handleDownload(request, env)
     if (method === 'GET'  && pathname === '/download/get') return handleDownloadGet(request, env)
+    if (method === 'GET'  && pathname === '/version/latest') return handleVersionLatest(request, env)
 
     return new Response('Not Found', { status: 404 })
   },
+}
+
+// ── Version proxy ─────────────────────────────────────────────────────────────
+//
+// The desktop updater used to hit api.github.com directly, which is limited to
+// 60 unauthenticated requests per hour per source IP. When users upgraded or
+// the agent published many releases in a day, clients would start getting
+// "GitHub API returned status 403" rate-limit errors.
+//
+// This endpoint proxies GitHub's `/releases/latest` through the Cloudflare
+// Worker and caches the response at the edge for 5 minutes. Clients now hit
+// the worker (unlimited for our domain) instead of GitHub, which eliminates
+// the rate limit entirely.
+//
+// Cache key is the request URL itself (Cloudflare's default), so the first
+// request in a 5-minute window warms the cache and all subsequent requests are
+// served instantly from the edge.
+
+const GITHUB_RELEASES_LATEST_URL =
+  'https://api.github.com/repos/mikejsmith1985/forge-terminal/releases/latest'
+// Fresh cache TTL (browsers + edge cache respect this). 5 minutes keeps the
+// update banner feeling responsive without hammering GitHub.
+const VERSION_CACHE_TTL_SECONDS = 300
+// Stale-if-error TTL — if GitHub rate-limits the worker (their 60 req/hr
+// applies per source IP, and Cloudflare egress IPs are shared), we keep
+// returning the last known-good response for up to an hour so users are
+// never shown the raw rate-limit error.
+const VERSION_STALE_TTL_SECONDS = 3600
+
+async function handleVersionLatest(request: Request, env: Env): Promise<Response> {
+  const cache = caches.default
+  const cacheKey = new Request(new URL(request.url).toString(), { method: 'GET' })
+
+  const cached = await cache.match(cacheKey)
+  if (cached) {
+    // Fast path — fresh entry in edge cache.
+    return cached
+  }
+
+  const githubHeaders: Record<string, string> = {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'Forge-Terminal-Worker',
+  }
+  if (env.GITHUB_TOKEN) {
+    githubHeaders['Authorization'] = `Bearer ${env.GITHUB_TOKEN}`
+  }
+
+  let githubResponse: Response
+  try {
+    githubResponse = await fetch(GITHUB_RELEASES_LATEST_URL, { headers: githubHeaders })
+  } catch (fetchError) {
+    return new Response(
+      JSON.stringify({ error: 'upstream fetch failed', detail: String(fetchError) }),
+      { status: 502, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+
+  // Happy path — got a 200 from GitHub. Cache it and return.
+  if (githubResponse.ok) {
+    const responseBody = await githubResponse.text()
+    // `s-maxage` controls the CDN cache (VERSION_CACHE_TTL_SECONDS), while
+    // `stale-while-revalidate` lets the edge serve the cached value for an
+    // extra hour while it fetches a fresh copy in the background.
+    const edgeResponse = new Response(responseBody, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `public, s-maxage=${VERSION_CACHE_TTL_SECONDS}, stale-while-revalidate=${VERSION_STALE_TTL_SECONDS}`,
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+    await cache.put(cacheKey, edgeResponse.clone())
+    return edgeResponse
+  }
+
+  // Non-OK (most commonly 403 rate limit). Pass through the status and body
+  // but do NOT cache — we want the next request to retry GitHub after TTL.
+  // If clients were previously seeing a cached 200 this never fires because
+  // `cache.match` short-circuits above.
+  return new Response(await githubResponse.text(), {
+    status: githubResponse.status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    },
+  })
 }

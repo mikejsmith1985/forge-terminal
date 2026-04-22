@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **"GitHub API returned status 403" on update check eliminated** — The desktop updater used to query `api.github.com/repos/.../releases/latest` directly, which is capped at 60 unauthenticated requests per hour per IP. Users with heavy update-check activity (or agents publishing many releases in a day) would periodically see the raw rate-limit error. Update checks now flow through a new `/version/latest` endpoint on the license worker (`license.rootlevellabs.tech`) that authenticates to GitHub with a Personal Access Token (lifting the limit to 5000 req/hr), caches the response at the Cloudflare edge for 5 minutes, and serves stale-while-revalidate for up to an hour if GitHub is unreachable. The updater still falls back to a direct GitHub call if the worker is down, so self-hosted/offline use continues to work.
+
 ## [7.6.11] - 2026-04-22
 
 ### Added

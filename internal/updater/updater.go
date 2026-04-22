@@ -56,39 +56,34 @@ type UpdateInfo struct {
 	AssetSize      int64  `json:"assetSize"`
 }
 
-// CheckForUpdate checks GitHub for a newer version
+// CheckForUpdate checks for a newer version. It first queries the license
+// worker's cached `/version/latest` endpoint (which proxies GitHub's
+// releases/latest through the Cloudflare edge, eliminating the 60 req/hr
+// unauthenticated rate limit that used to cause "GitHub API returned status
+// 403" errors). If the worker is unreachable, it falls back to hitting GitHub
+// directly so offline/self-hosted users still get an update check.
 func CheckForUpdate() (*UpdateInfo, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", repoOwner, repoName)
+	const workerURL = "https://license.rootlevellabs.tech/version/latest"
+	githubURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", repoOwner, repoName)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+	release, err := fetchLatestRelease(workerURL)
 	if err != nil {
-		return nil, err
+		// Worker failed (network, 5xx, etc.) — fall back to GitHub directly.
+		// The fallback may still hit the unauthenticated rate limit, but that
+		// is rare for a single user and much better than failing outright.
+		release, err = fetchLatestRelease(githubURL)
+		if err != nil {
+			return nil, err
+		}
 	}
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "Forge-Terminal-Updater")
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		// No releases yet
+	// A 404-style empty release is signalled by a nil release from
+	// fetchLatestRelease; treat it as "no updates available".
+	if release == nil {
 		return &UpdateInfo{
 			Available:      false,
 			CurrentVersion: Version,
 		}, nil
-	}
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
-	}
-
-	var release Release
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, err
 	}
 
 	// Parse version (remove 'v' prefix if present)
@@ -147,6 +142,39 @@ func CheckForUpdate() (*UpdateInfo, error) {
 		AssetName:      assetName,
 		AssetSize:      assetSize,
 	}, nil
+}
+
+// fetchLatestRelease performs a single GET against a "releases/latest"-shaped
+// endpoint (either our worker proxy or api.github.com directly) and decodes
+// the response. Returns (nil, nil) for 404 so the caller can treat "no
+// releases yet" as a non-error.
+func fetchLatestRelease(endpointURL string) (*Release, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", endpointURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "Forge-Terminal-Updater")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, nil
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("update endpoint %s returned status %d", endpointURL, resp.StatusCode)
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, err
+	}
+	return &release, nil
 }
 
 // DownloadUpdate downloads the new binary to a temp location with retry logic
