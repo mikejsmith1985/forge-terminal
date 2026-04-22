@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **Terminal no longer blank on load** — Fixed a regression introduced in v7.6.2 where calling `fitAddon.fit()` synchronously during `useEffect` measured 0 column width on hidden/background tabs (containers with `display:none` return zero from `getBoundingClientRect()`). xterm.js set `cols=0`, rendering all text invisible. The fix gates the synchronous fit on a non-zero container width check — visible tabs get the correct cols immediately (fixing the PTY width mismatch), hidden tabs fall back to the RAF path as before.
+- **Terminal reattachment no longer shows stale TUI layout** — When reconnecting to a detached session (e.g., after a page reload), the server replays the PTY ring buffer before notifying the client. For TUI applications (Copilot CLI, progress bars, etc.) this replay produced a broken layout: partial text at absolute cursor positions from the previous session. The `SESSION_REATTACHED` handler now clears the viewport (`ESC[2J ESC[H`) before writing the "[Session Restored]" banner and calling `fit()`, giving the running process a clean canvas to redraw onto after SIGWINCH. Scrollback history is preserved and still accessible by scrolling up.
 
 ## [7.6.3] - 2026-04-21
 
