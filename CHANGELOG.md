@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Terminal rendering regression fixed (double RAF)** — Terminal text and TUI applications were not rendering correctly on initial load or after resizing to smaller screens. Moving the window to a larger screen would trigger a resize event that fixed the display. Root cause: single `requestAnimationFrame` runs BEFORE browser paint, meaning CSS flex layout may not have finished calculating container dimensions when `fit()` is called. Solution: double RAF pattern ensures `fit()` runs AFTER the browser has fully painted and the container has its final size. Fixes regression introduced in v7.6.0 mobile/responsive features.
 - **Terminal reattachment no longer shows stale TUI layout** — When reconnecting to a detached session (e.g., after a page reload), the server replays the PTY ring buffer before notifying the client. For TUI applications (Copilot CLI, progress bars, etc.) this replay produced a broken layout: partial text at absolute cursor positions from the previous session. The `SESSION_REATTACHED` handler now clears the viewport (`ESC[2J ESC[H`) before writing the "[Session Restored]" banner and calling `fit()`, giving the running process a clean canvas to redraw onto after SIGWINCH. Scrollback history is preserved and still accessible by scrolling up.
 
 ## [7.6.3] - 2026-04-21

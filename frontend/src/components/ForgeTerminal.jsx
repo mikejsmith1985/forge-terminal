@@ -1637,11 +1637,18 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // RAF fit: covers hidden tabs (which had 0 width above) and catches any
     // deferred layout shifts (sidebar state updates) that occur after this effect.
+    // 
+    // CRITICAL FIX (v7.6.5): Double RAF to ensure fit happens AFTER browser paint.
+    // Single RAF runs before paint, but CSS flex layout may not have finished
+    // calculating container dimensions yet. Double RAF guarantees we measure after
+    // the browser has fully painted and the container has its final size.
     requestAnimationFrame(() => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-      term.focus();
+      requestAnimationFrame(() => {
+        if (fitAddonRef.current) {
+          fitAddonRef.current.fit();
+        }
+        term.focus();
+      });
     });
 
     // Record that handlers are now attached
