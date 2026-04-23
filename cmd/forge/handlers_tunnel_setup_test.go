@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/tunnel"
@@ -116,3 +117,61 @@ func TestTunnelSetupLogin_ErrorWhenCloudflaredMissing(t *testing.T) {
 		t.Errorf("status = %d, want 400 (body=%s)", w.Code, w.Body.String())
 	}
 }
+
+func TestTunnelSetupZones_RejectsNonGET(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/api/tunnel/setup/zones", nil)
+	w := httptest.NewRecorder()
+	handleTunnelSetupZones(w, r)
+	assertStatus(t, w, http.StatusMethodNotAllowed)
+}
+
+func TestTunnelSetupCreate_RejectsNonPOST(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/api/tunnel/setup/create", nil)
+	w := httptest.NewRecorder()
+	handleTunnelSetupCreate(w, r)
+	assertStatus(t, w, http.StatusMethodNotAllowed)
+}
+
+func TestTunnelSetupCreate_BadJSON(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/api/tunnel/setup/create",
+		strings.NewReader("not json"))
+	w := httptest.NewRecorder()
+	handleTunnelSetupCreate(w, r)
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestTunnelSetupCreate_InvalidHostname(t *testing.T) {
+	body := strings.NewReader(`{"hostname":"bad host","localPort":3005}`)
+	r := httptest.NewRequest(http.MethodPost, "/api/tunnel/setup/create", body)
+	w := httptest.NewRecorder()
+	handleTunnelSetupCreate(w, r)
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestTunnelSetupStatus_ReturnsJSON(t *testing.T) {
+	// Isolate HOME so we don't report the developer's own state.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+
+	r := httptest.NewRequest(http.MethodGet, "/api/tunnel/setup/status", nil)
+	w := httptest.NewRecorder()
+	handleTunnelSetupStatus(w, r)
+	assertStatus(t, w, http.StatusOK)
+	var got map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("response not JSON: %v", err)
+	}
+	if _, ok := got["installed"]; !ok {
+		t.Errorf("expected installed field in status: %v", got)
+	}
+}
+
+func TestTunnelSetupStatus_RejectsNonGET(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/api/tunnel/setup/status", nil)
+	w := httptest.NewRecorder()
+	handleTunnelSetupStatus(w, r)
+	assertStatus(t, w, http.StatusMethodNotAllowed)
+}
+
+// Silence unused-import warning if tunnel isn't referenced elsewhere.
+var _ = tunnel.ModeIDNamed

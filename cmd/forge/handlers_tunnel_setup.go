@@ -7,6 +7,9 @@ package main
 //   POST /api/tunnel/setup/login           — spawn `cloudflared tunnel login`, return auth URL
 //   GET  /api/tunnel/setup/login/status    — poll the currently-active login session
 //   POST /api/tunnel/setup/login/cancel    — kill the current login session
+//   GET  /api/tunnel/setup/zones           — list Cloudflare zones the cert grants
+//   POST /api/tunnel/setup/create          — create tunnel, route DNS, write config.yml
+//   GET  /api/tunnel/setup/status          — aggregate wizard state (installed/loggedIn/created)
 //
 // A single in-memory LoginSession is tracked under loginMu. While a
 // login is running, repeat POSTs to /login are idempotent: they return
@@ -16,6 +19,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -120,4 +124,73 @@ func handleTunnelSetupLoginCancel(w http.ResponseWriter, r *http.Request) {
 		sess.Cancel()
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleTunnelSetupZones returns the best-effort list of Cloudflare
+// zones accessible to the logged-in token. Empty-but-successful means
+// the cert is valid but no zones are reachable; the UI should fall
+// back to a manual hostname entry field.
+func handleTunnelSetupZones(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+
+	zones, err := tunnel.ListZones(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"zones": []any{},
+			"error": err.Error(),
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"zones": zones})
+}
+
+// tunnelCreateRequest is the JSON body of POST /api/tunnel/setup/create.
+type tunnelCreateRequest struct {
+	Hostname  string `json:"hostname"`
+	LocalPort int    `json:"localPort"`
+}
+
+// handleTunnelSetupCreate runs the full create/route/config pipeline
+// under a wizard-wide mutex. Safe to retry: rerunning with the same
+// hostname reuses the existing tunnel when local credentials are intact.
+func handleTunnelSetupCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req tunnelCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body: " + err.Error()})
+		return
+	}
+	// 2 minutes is enough for list+create+route+file-copy even on a
+	// slow link; anything longer likely indicates a network hang and
+	// is better surfaced as an error than as a stuck HTTP request.
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+
+	cfg, err := tunnel.CreateNamedTunnel(ctx, req.Hostname, req.LocalPort)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": "created",
+		"config": cfg,
+	})
+}
+
+// handleTunnelSetupStatus returns the wizard's aggregate state so the UI
+// can render the correct step (install / login / create / ready).
+func handleTunnelSetupStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, http.StatusOK, tunnel.LoadWizardState())
 }
