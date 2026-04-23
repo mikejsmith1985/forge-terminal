@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.6.20] - 2026-04-23
 
+---
+
+## [v7.6.20] - 2026-04-23
+
+## [7.6.20] - 2026-04-23
+
 ### Fixed
 - **Companion QR code — base URL now follows tunnel URL change** — `applyTunnelUrl` previously only updated `companionHost` when the stored value was flagged as "stale". A Tailscale IP like `http://100.x.x.x:3005/companion/` passed the stale check, so the QR code kept using the Tailscale base URL even after a Cloudflare tunnel URL was fetched on card expand. `applyTunnelUrl` now also updates `companionHost` when it was auto-derived from the previous tunnel URL (`companionHost.toLowerCase() === getDefaultCompanionHost(prevTunnelUrl).toLowerCase()`), matching the logic already in `handleTunnelUrlChange`.
 - **QR code and Copy Link blocked when Forge URL is phone-unreachable** — when `tunnelUrl` resolves to `localhost`, `127.0.0.1`, or `::1`, the QR canvas is replaced with a plain-language hint directing the user to enter their Tailscale IP or launch a Cloudflare tunnel. The Copy Link button is also disabled. New `isPhoneUnreachableForgeUrl` helper (10 unit tests) drives this check.
