@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.19] - 2026-04-22
+
+### Fixed
+- **Companion card — Cloudflare tunnel integration** — the card now checks tunnel status when expanded and pre-fills the Forge URL input if a tunnel is already running (`useEffect([isExpanded])`). A polling loop (`useEffect([isTunnelLaunching])`) updates the URL once cloudflared prints it. Launch Tunnel and Stop Tunnel buttons are rendered and wired to `/api/tunnel/start` and `/api/tunnel/stop`.
+- **`waitFor` hang under Vitest fake timers resolved** — `@testing-library/react`'s `asyncWrapper` drain step calls `jest.advanceTimersByTime(0)` only when `jestFakeTimersAreEnabled()` returns `true`, which requires `jest` to be defined globally. Vitest's `globals: true` exposes `vi` but not `jest`; the test setup now adds `globalThis.jest = vi` so RTL correctly detects fake timers and the drain step resolves.
+- **localStorage persistence moved from `useEffect` to call-site** — the previous `useEffect([tunnelUrl])` and `useEffect([companionHost])` hooks scheduled jsdom storage-event `setTimeout(0)` timers that were created after `vi.runAllTimersAsync()` ran, leaving stale fake timers pending. `localStorage.setItem` is now called synchronously in `applyTunnelUrl`, `handleTunnelUrlChange`, and the companion-host `onChange` handler.
+
 ## [7.6.18] - 2026-04-22
 
 ---

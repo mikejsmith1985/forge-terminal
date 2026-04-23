@@ -27,6 +27,9 @@ import {
   Wifi,
   Globe,
   Settings,
+  Loader2,
+  Radio,
+  Square,
 } from 'lucide-react'
 import './CompanionAccessCard.css'
 import {
@@ -76,23 +79,152 @@ const CompanionAccessCard = () => {
       : storedHost
   })
 
+  // ── Cloudflare tunnel state ────────────────────────────────────────────────
+
+  // Tracks the live state of the cloudflared subprocess managed by the Go backend.
+  const [tunnelStatus, setTunnelStatus] = useState({ running: false, url: '', error: '' })
+  // True while we are waiting for cloudflared to print its HTTPS URL.
+  const [isTunnelLaunching, setIsTunnelLaunching] = useState(false)
+  // Error from the start call itself (distinct from a running error).
+  const [tunnelStartError, setTunnelStartError] = useState('')
+
+  // Apply a tunnel URL to the Step 2 input, sync the companion host, and
+  // persist both values to localStorage synchronously so no async storage-event
+  // timers are left pending in the fake-timer environment used by tests.
+  function applyTunnelUrl(url) {
+    setTunnelUrl(url)
+    localStorage.setItem(STORAGE_TUNNEL_URL, url)
+    // Compute new host from the current closure value — safe here because this
+    // function is only ever called once per async boundary (not in tight loops).
+    const newHost = isStaleCompanionHost(companionHost) ? getDefaultCompanionHost(url) : companionHost
+    setCompanionHost(newHost)
+    localStorage.setItem(STORAGE_COMPANION_HOST, newHost)
+  }
+
+  // Poll /api/tunnel/status every 1.5 s while the tunnel is launching.
+  // Stops as soon as a URL is returned or a non-empty error appears.
+  useEffect(() => {
+    if (!isTunnelLaunching) return
+
+    // Track attempt count in a closure variable so we can stop polling after
+    // a finite number of tries — prevents test infinite loops and bounds real
+    // wait time to ~MAX_POLL_ATTEMPTS × 1.5s.
+    const MAX_POLL_ATTEMPTS = 40
+    let attemptCount = 0
+
+    const intervalId = setInterval(async () => {
+      if (attemptCount >= MAX_POLL_ATTEMPTS) {
+        // cloudflared hasn't printed a URL yet — stop polling but keep the
+        // loading indicator so the user can see the tunnel is still starting.
+        clearInterval(intervalId)
+        return
+      }
+      attemptCount++
+      try {
+        const res = await fetch('/api/tunnel/status')
+        if (!res.ok) return
+        const data = await res.json()
+        setTunnelStatus(data)
+        if (data.url) {
+          applyTunnelUrl(data.url)
+          setIsTunnelLaunching(false)
+          clearInterval(intervalId)
+        } else if (data.error) {
+          setTunnelStartError(data.error)
+          setIsTunnelLaunching(false)
+          clearInterval(intervalId)
+        }
+      } catch {
+        // Network error — retry on next tick
+      }
+    }, 1500)
+
+    return () => clearInterval(intervalId)
+  }, [isTunnelLaunching]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When the card is expanded, check whether a tunnel was already running
+  // (e.g. from a previous session) and pre-fill Step 2 if so.
+  // No setTimeout — the fetch runs as a pure microtask chain so it completes
+  // within the act() boundary of renderExpanded() in tests, making waitFor
+  // resolve on its first synchronous check rather than hanging.
+  useEffect(() => {
+    if (!isExpanded) return
+
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/tunnel/status')
+        if (!res.ok || cancelled) return
+
+        const data = await res.json()
+        if (cancelled) return
+
+        setTunnelStatus(data)
+        if (data.url) applyTunnelUrl(data.url)
+      } catch {
+        // Non-critical — proceed without tunnel pre-fill
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [isExpanded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function launchTunnel() {
+    setTunnelStartError('')
+    setIsTunnelLaunching(true)
+    try {
+      const res = await fetch('/api/tunnel/start', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setTunnelStartError(data.error || 'Failed to start tunnel')
+        setIsTunnelLaunching(false)
+        return
+      }
+      // If the backend already has a URL (e.g. named tunnel), use it immediately.
+      if (data.url) {
+        applyTunnelUrl(data.url)
+        setTunnelStatus(data)
+        setIsTunnelLaunching(false)
+      }
+      // Otherwise polling (useEffect above) will detect the URL when cloudflared prints it.
+    } catch (err) {
+      setTunnelStartError(err.message || 'Network error')
+      setIsTunnelLaunching(false)
+    }
+  }
+
+  async function stopTunnel() {
+    try {
+      await fetch('/api/tunnel/stop', { method: 'POST' })
+      setTunnelStatus({ running: false, url: '', error: '' })
+      setIsTunnelLaunching(false)
+      setTunnelStartError('')
+    } catch {
+      // Ignore — the tunnel process may already be gone
+    }
+  }
+
   // Persist input fields so the user does not retype them every session.
-  useEffect(() => { localStorage.setItem(STORAGE_TUNNEL_URL, tunnelUrl) }, [tunnelUrl])
-  useEffect(() => { localStorage.setItem(STORAGE_COMPANION_HOST, companionHost) }, [companionHost])
+  // NOTE: these are intentionally direct synchronous writes rather than
+  // useEffect hooks, which would schedule jsdom storage-event timers that
+  // interfere with @testing-library's waitFor drain step under fake timers.
+  // Each site that changes tunnelUrl or companionHost is responsible for
+  // persisting its own write (see applyTunnelUrl, handleTunnelUrlChange, and
+  // the inline companionHost onChange below).
 
   // When the user edits the Forge URL, keep companionHost in sync unless it has
   // been manually overridden to a custom value. This ensures the QR code base
   // URL always matches the URL the phone will actually use to reach Forge.
   const handleTunnelUrlChange = useCallback((newUrl) => {
-    setCompanionHost(prevHost => {
-      // Re-sync companionHost only if it hasn't been manually overridden.
-      // A stale host (localhost, protocol-less, legacy URL) is always replaced.
-      const isAutoValue =
-        prevHost === getDefaultCompanionHost(tunnelUrl) || isStaleCompanionHost(prevHost)
-      return isAutoValue ? getDefaultCompanionHost(newUrl) : prevHost
-    })
+    const isAutoValue =
+      companionHost === getDefaultCompanionHost(tunnelUrl) || isStaleCompanionHost(companionHost)
+    const newHost = isAutoValue ? getDefaultCompanionHost(newUrl) : companionHost
+    setCompanionHost(newHost)
     setTunnelUrl(newUrl)
-  }, [tunnelUrl])
+    localStorage.setItem(STORAGE_TUNNEL_URL, newUrl)
+    localStorage.setItem(STORAGE_COMPANION_HOST, newHost)
+  }, [tunnelUrl, companionHost])
 
   // Fetch current mobile settings on mount so the header badge is accurate.
   useEffect(() => {
@@ -197,6 +329,11 @@ const CompanionAccessCard = () => {
                   onCopyLink={copyDeepLink}
                   onDisable={() => toggleEnabled(false)}
                   isTogglePending={isTogglePending}
+                  tunnelStatus={tunnelStatus}
+                  isTunnelLaunching={isTunnelLaunching}
+                  tunnelStartError={tunnelStartError}
+                  onLaunchTunnel={launchTunnel}
+                  onStopTunnel={stopTunnel}
                 />
               : <DisabledView
                   onEnable={() => toggleEnabled(true)}
@@ -258,6 +395,73 @@ const DisabledView = ({ onEnable, isTogglePending }) => (
 )
 
 /**
+ * CloudflareTunnelHint — interactive hint inside the Cloudflare connection card.
+ *
+ * Replaces the manual "run this command" instruction with a one-click
+ * Launch Tunnel button. Forge starts cloudflared on the backend and polls
+ * for the public HTTPS URL, then auto-fills Step 2 when ready.
+ */
+const CloudflareTunnelHint = ({
+  isTunnelRunning,
+  isTunnelLaunching,
+  tunnelStartError,
+  isTunnelNotFound,
+  tunnelUrl,
+  onLaunch,
+  onStop,
+}) => {
+  if (isTunnelLaunching) {
+    return (
+      <span className="cac-tunnel-launching">
+        <Loader2 size={14} className="cac-spinner" aria-label="Launching tunnel" />
+        Starting tunnel… this takes about 10–20 seconds.
+      </span>
+    )
+  }
+
+  if (isTunnelRunning && tunnelUrl) {
+    return (
+      <span className="cac-tunnel-active">
+        <Radio size={14} className="cac-tunnel-active-icon" />
+        Tunnel active: <code className="cac-tunnel-url">{tunnelUrl}</code>
+        <button
+          className="cac-btn cac-btn-ghost cac-btn-stop"
+          onClick={onStop}
+          aria-label="Stop tunnel"
+        >
+          <Square size={12} /> Stop Tunnel
+        </button>
+      </span>
+    )
+  }
+
+  return (
+    <>
+      <button
+        className="cac-btn cac-btn-primary cac-tunnel-launch-btn"
+        onClick={onLaunch}
+        aria-label="Launch Tunnel"
+      >
+        Launch Tunnel
+      </button>
+      {tunnelStartError && (
+        <span className="cac-tunnel-error">
+          {isTunnelNotFound
+            ? <>cloudflared not found. <a
+                href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cac-inline-link"
+              >Download cloudflared ↗</a></>
+            : tunnelStartError
+          }
+        </span>
+      )}
+    </>
+  )
+}
+
+/**
  * EnabledView — guided step-by-step connection flow.
  *
  * The user flow is intentionally simple:
@@ -280,9 +484,19 @@ const EnabledView = ({
   onCopyLink,
   onDisable,
   isTogglePending,
+  tunnelStatus,
+  isTunnelLaunching,
+  tunnelStartError,
+  onLaunchTunnel,
+  onStopTunnel,
 }) => {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const deepLink = buildDeepLink(companionHost, tunnelUrl, settings?.mobile_token || '')
+
+  // Whether cloudflared appears to be missing on this machine.
+  const isTunnelNotFound = tunnelStartError?.toLowerCase().includes('not found') ||
+    tunnelStartError?.toLowerCase().includes('cloudflared')
+  const isTunnelRunning = tunnelStatus?.running || Boolean(tunnelStatus?.url)
 
   return (
     <>
@@ -310,20 +524,15 @@ const EnabledView = ({
             title="No Tailscale"
             description="Free public tunnel via Cloudflare"
             hint={
-              <>
-                Run this command in a new terminal, then copy the link it prints:
-                <code className="cac-method-command">
-                  cloudflared tunnel --url http://localhost:3005
-                </code>
-                <a
-                  href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="cac-inline-link"
-                >
-                  Download cloudflared ↗
-                </a>
-              </>
+              <CloudflareTunnelHint
+                isTunnelRunning={isTunnelRunning}
+                isTunnelLaunching={isTunnelLaunching}
+                tunnelStartError={tunnelStartError}
+                isTunnelNotFound={isTunnelNotFound}
+                tunnelUrl={tunnelStatus?.url}
+                onLaunch={onLaunchTunnel}
+                onStop={onStopTunnel}
+              />
             }
           />
         </div>
@@ -340,7 +549,7 @@ const EnabledView = ({
           type="text"
           value={tunnelUrl}
           onChange={evt => setTunnelUrl(evt.target.value)}
-          placeholder="e.g. http://100.x.x.x:3005 or https://abc123.trycloudflare.com"
+          placeholder="Forge URL — e.g. http://100.x.x.x:3005 or https://xyz.trycloudflare.com"
         />
       </div>
 
@@ -392,7 +601,10 @@ const EnabledView = ({
               className="cac-input"
               type="text"
               value={companionHost}
-              onChange={evt => setCompanionHost(evt.target.value)}
+              onChange={evt => {
+                  setCompanionHost(evt.target.value)
+                  localStorage.setItem(STORAGE_COMPANION_HOST, evt.target.value)
+                }}
               placeholder="https://your-companion-host/"
             />
             <p className="cac-hint">
