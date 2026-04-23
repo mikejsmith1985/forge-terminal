@@ -16,6 +16,12 @@ var tunnelMgr = &tunnel.Manager{}
 
 // buildTunnelStartConfig reads the current notify config and returns the
 // appropriate StartConfig based on the configured tunnel provider.
+//
+// When the user has not picked a provider explicitly (empty string), this
+// auto-detects which backend is actually usable: Tailscale if the daemon is
+// running and signed in, otherwise Cloudflare ephemeral. This means a
+// first-time user with Tailscale already set up gets the stable ts.net URL
+// automatically, while a user without Tailscale falls through to cloudflared.
 func buildTunnelStartConfig() tunnel.StartConfig {
 	cfg, err := loadNotifyConfig()
 	if err == nil {
@@ -33,6 +39,13 @@ func buildTunnelStartConfig() tunnel.StartConfig {
 					Hostname: cfg.CloudflareTunnelHostname,
 				}
 			}
+		case "cloudflare":
+			// Explicit Cloudflare ephemeral — skip auto-detection.
+			return tunnel.StartConfig{Mode: tunnel.ModeEphemeral, LocalPort: activePort}
+		}
+		// Empty string = auto-detect. Prefer Tailscale when it's fully ready.
+		if cfg.TunnelProvider == "" && detectTailscale().Available {
+			return tunnel.StartConfig{Mode: tunnel.ModeTailscale, LocalPort: activePort}
 		}
 	}
 	return tunnel.StartConfig{

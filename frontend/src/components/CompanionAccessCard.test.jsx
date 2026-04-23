@@ -36,6 +36,13 @@ beforeEach(() => {
       }),
     '/api/tunnel/status': () =>
       mockFetchResponse({ running: false, url: '', error: '' }),
+    '/api/tunnel/providers': () =>
+      mockFetchResponse({
+        tailscale: { available: false, reason: 'Tailscale is not installed' },
+        cloudflare: { available: true },
+        selected: 'cloudflare',
+        explicit: false,
+      }),
     '/api/tunnel/start': () =>
       mockFetchResponse({ running: true, url: '', error: '' }),
     '/api/tunnel/stop': () =>
@@ -88,37 +95,65 @@ async function renderExpanded() {
 // ── Tests: launch button presence ────────────────────────────────────────────
 
 describe('CompanionAccessCard — tunnel integration', () => {
-  it('renders a Launch Tunnel button when no tunnel is running', async () => {
+  it('renders an Enable Remote Access button when no tunnel is running', async () => {
     await renderExpanded()
-    expect(screen.getByRole('button', { name: /launch tunnel/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /enable remote access/i })).toBeInTheDocument()
   })
 
-  it('does NOT render a Stop Tunnel button when no tunnel is running', async () => {
+  it('does NOT render a Stop button when no tunnel is running', async () => {
     await renderExpanded()
-    expect(screen.queryByRole('button', { name: /stop tunnel/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^stop(\s|$)/i })).not.toBeInTheDocument()
   })
 
   // ── Tests: launching ───────────────────────────────────────────────────────
 
-  it('calls POST /api/tunnel/start when Launch Tunnel is clicked', async () => {
+  it('calls POST /api/tunnel/start when Enable Remote Access is clicked', async () => {
     await renderExpanded()
-    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
+    fireEvent.click(screen.getByRole('button', { name: /enable remote access/i }))
     await act(async () => { await vi.runAllTimersAsync() })
     expect(fetch).toHaveBeenCalledWith('/api/tunnel/start', expect.objectContaining({ method: 'POST' }))
   })
 
-  it('shows a launching/starting indicator after clicking Launch Tunnel', async () => {
+  it('shows a launching/starting indicator after clicking Enable Remote Access', async () => {
     await renderExpanded()
-    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
+    fireEvent.click(screen.getByRole('button', { name: /enable remote access/i }))
     await act(async () => { await vi.runAllTimersAsync() })
-    // Both the Step 1 hint and the Step 3 QR-loading placeholder now show
+    // Both the Step 1 hint and the Step 2 QR-loading placeholder now show
     // "starting" text while the tunnel is warming up.
     expect(screen.getAllByText(/starting|launching/i).length).toBeGreaterThan(0)
   })
 
+  // ── Tests: provider detection caption ──────────────────────────────────────
+
+  it('shows the detected provider caption under the button', async () => {
+    fetchHandlers['/api/tunnel/providers'] = () =>
+      mockFetchResponse({
+        tailscale: { available: true },
+        cloudflare: { available: true },
+        selected: 'tailscale',
+        explicit: false,
+      })
+    await renderExpanded()
+    expect(screen.getByText(/tailscale funnel/i)).toBeInTheDocument()
+  })
+
+  it('disables the button and shows install links when no provider is available', async () => {
+    fetchHandlers['/api/tunnel/providers'] = () =>
+      mockFetchResponse({
+        tailscale: { available: false, reason: 'Tailscale is not installed' },
+        cloudflare: { available: false, reason: 'cloudflared is not installed' },
+        selected: '',
+        explicit: false,
+      })
+    await renderExpanded()
+    const btn = screen.getByRole('button', { name: /enable remote access/i })
+    expect(btn).toBeDisabled()
+    expect(screen.getByText(/no tunnel backend is installed/i)).toBeInTheDocument()
+  })
+
   // ── Tests: URL auto-population ────────────────────────────────────────────
 
-  it('auto-populates Step 2 URL input when tunnel status returns a URL', async () => {
+  it('auto-populates the manual URL input when tunnel status returns a URL', async () => {
     // The first status poll returns no URL; the second returns the tunnel URL.
     let statusCallCount = 0
     fetchHandlers['/api/tunnel/status'] = () => {
@@ -130,32 +165,34 @@ describe('CompanionAccessCard — tunnel integration', () => {
     }
 
     await renderExpanded()
-    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
+    fireEvent.click(screen.getByRole('button', { name: /enable remote access/i }))
 
     // Advance through polling intervals until URL appears
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4000)
     })
 
-    const urlInput = screen.getByPlaceholderText(/forge url|forge server url/i)
+    // The URL input lives in Advanced; open it to read the value.
+    fireEvent.click(screen.getByRole('button', { name: /advanced/i }))
+    const urlInput = screen.getByPlaceholderText(/100\.x\.x\.x|trycloudflare/i)
     expect(urlInput.value).toBe('https://abc123.trycloudflare.com')
   })
 
-  it('pre-fills the URL input on mount when a tunnel is already running', async () => {
+  it('auto-fills the URL on mount when a tunnel is already running', async () => {
     fetchHandlers['/api/tunnel/status'] = () =>
       mockFetchResponse({ running: true, url: 'https://existing.trycloudflare.com', error: '' })
 
     await renderExpanded()
 
     await waitFor(() => {
-      const urlInput = screen.getByPlaceholderText(/forge url|forge server url/i)
-      expect(urlInput.value).toBe('https://existing.trycloudflare.com')
+      // Provider active line in Step 1 should show the URL immediately.
+      expect(screen.getByText(/existing\.trycloudflare\.com/)).toBeInTheDocument()
     })
   })
 
   // ── Tests: stop tunnel ────────────────────────────────────────────────────
 
-  it('renders a Stop Tunnel button when tunnel is running', async () => {
+  it('renders a Stop button when tunnel is running', async () => {
     fetchHandlers['/api/tunnel/status'] = () =>
       mockFetchResponse({ running: true, url: 'https://abc.trycloudflare.com', error: '' })
 
@@ -165,7 +202,7 @@ describe('CompanionAccessCard — tunnel integration', () => {
     expect(screen.getByRole('button', { name: /stop tunnel/i })).toBeInTheDocument()
   })
 
-  it('calls POST /api/tunnel/stop when Stop Tunnel is clicked', async () => {
+  it('calls POST /api/tunnel/stop when Stop is clicked', async () => {
     fetchHandlers['/api/tunnel/status'] = () =>
       mockFetchResponse({ running: true, url: 'https://abc.trycloudflare.com', error: '' })
 
@@ -187,10 +224,7 @@ describe('CompanionAccessCard — tunnel integration', () => {
     await renderExpanded()
     await act(async () => { await vi.runAllTimersAsync() })
 
-    // The warning paragraph should be visible
-    expect(
-      screen.getByText(/private ip detected/i)
-    ).toBeInTheDocument()
+    expect(screen.getByText(/private ip detected/i)).toBeInTheDocument()
   })
 
   it('shows a private-IP warning above the QR when URL is a LAN IP', async () => {
@@ -212,7 +246,7 @@ describe('CompanionAccessCard — tunnel integration', () => {
   })
 
   it('does NOT show the private-IP warning when URL is localhost (blocked at QR level)', async () => {
-    // localhost triggers the "Enter a network-accessible URL" warning, not the private-IP one.
+    // localhost triggers the "Enable remote access" warning, not the private-IP one.
     localStorage.setItem('forge.companion.tunnelUrl', 'http://localhost:3005')
 
     await renderExpanded()
@@ -228,29 +262,18 @@ describe('CompanionAccessCard — tunnel integration', () => {
     localStorage.setItem('forge.companion.tunnelUrl', 'http://100.127.39.102:3005')
 
     await renderExpanded()
-    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
+    fireEvent.click(screen.getByRole('button', { name: /enable remote access/i }))
     await act(async () => { await vi.runAllTimersAsync() })
 
     // The QR canvas MUST NOT appear while the tunnel is starting — scanning it
     // now would give the phone the stale Tailscale IP which it can't reach.
     expect(document.querySelector('canvas')).toBeNull()
 
-    // Step 3 must instead show a clear "wait" message so the user doesn't scan early.
+    // Step 2 must instead show a clear "wait" message so the user doesn't scan early.
     expect(screen.getByText(/qr code will appear/i)).toBeInTheDocument()
   })
 
-  it('shows the Remote Access card as active while the tunnel is launching', async () => {
-    await renderExpanded()
-    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
-    await act(async () => { await vi.runAllTimersAsync() })
-
-    // The Remote Access card should carry the active CSS class so the user
-    // can see which connection path they are on.
-    const remoteCard = screen.getByText(/remote access/i).closest('.cac-method-card')
-    expect(remoteCard).toHaveClass('cac-method-card--active')
-  })
-
-  // ── Tests: tunnel provider label ────────────────────────────────────────────
+  // ── Tests: tunnel provider label in the active-tunnel line ─────────────────
 
   it('shows "Tailscale active" when the tunnel URL is a ts.net domain', async () => {
     fetchHandlers['/api/tunnel/status'] = () =>
@@ -259,37 +282,42 @@ describe('CompanionAccessCard — tunnel integration', () => {
     await renderExpanded()
     await act(async () => { await vi.runAllTimersAsync() })
 
-    expect(screen.getByText(/tailscale active/i)).toBeInTheDocument()
+    expect(screen.getByText(/tailscale/i)).toBeInTheDocument()
+    expect(screen.getByText(/active:/i)).toBeInTheDocument()
   })
 
-  it('shows "Cloudflare active" when the tunnel URL is a trycloudflare.com domain', async () => {
+  it('shows "Cloudflare" label when the tunnel URL is a trycloudflare.com domain', async () => {
     fetchHandlers['/api/tunnel/status'] = () =>
       mockFetchResponse({ running: true, url: 'https://abc123.trycloudflare.com', error: '' })
 
     await renderExpanded()
     await act(async () => { await vi.runAllTimersAsync() })
 
-    expect(screen.getByText(/cloudflare active/i)).toBeInTheDocument()
+    // Match the strong element with provider label "Cloudflare" next to "active:"
+    expect(screen.getAllByText(/cloudflare/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/active:/i)).toBeInTheDocument()
   })
 
-  it('shows "Tunnel active" when the tunnel URL is a custom domain', async () => {
+  it('shows "Tunnel" label when the tunnel URL is a custom domain', async () => {
     fetchHandlers['/api/tunnel/status'] = () =>
       mockFetchResponse({ running: true, url: 'https://forge.example.com', error: '' })
 
     await renderExpanded()
     await act(async () => { await vi.runAllTimersAsync() })
 
-    expect(screen.getByText(/tunnel active/i)).toBeInTheDocument()
+    expect(screen.getByText('Tunnel')).toBeInTheDocument()
+    expect(screen.getByText(/active:/i)).toBeInTheDocument()
   })
 
-  it('shows the Remote Access card as active when a public HTTPS URL is entered manually', async () => {
-    localStorage.setItem('forge.companion.tunnelUrl', 'https://myserver.example.com:3005')
+  // ── Tests: advanced collapsible ────────────────────────────────────────────
 
+  it('hides the manual URL input by default and reveals it under Advanced', async () => {
     await renderExpanded()
-    await act(async () => { await vi.runAllTimersAsync() })
-
-    const remoteCard = screen.getByText(/remote access/i).closest('.cac-method-card')
-    expect(remoteCard).toHaveClass('cac-method-card--active')
+    // Not visible in the main flow
+    expect(screen.queryByPlaceholderText(/100\.x\.x\.x|trycloudflare/i)).not.toBeInTheDocument()
+    // Open Advanced
+    fireEvent.click(screen.getByRole('button', { name: /advanced/i }))
+    expect(screen.getByPlaceholderText(/100\.x\.x\.x|trycloudflare/i)).toBeInTheDocument()
   })
 })
 

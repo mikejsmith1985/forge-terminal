@@ -453,3 +453,82 @@
   padding-top: 12px;
   margin-top: 4px;
 }
+
+/* ── Tunnel control (Step 1 single-button UX, v7.6.25) ───────────────────── */
+
+.cac-tunnel-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cac-tunnel-launch-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cac-tunnel-launching {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cac-muted, #9ca3af);
+  font-size: 13px;
+}
+
+.cac-tunnel-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.cac-tunnel-active-icon {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.cac-tunnel-url {
+  font-family: var(--mono-font, monospace);
+  background: var(--cac-code-bg, rgba(255,255,255,0.06));
+  padding: 2px 6px;
+  border-radius: 3px;
+  word-break: break-all;
+}
+
+.cac-tunnel-provider-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--cac-muted, #9ca3af);
+}
+
+.cac-tunnel-error {
+  margin: 0;
+  color: #ef4444;
+  font-size: 12px;
+}
+
+.cac-btn-stop {
+  margin-left: auto;
+}
+
+.cac-spinner {
+  animation: cac-spin 1s linear infinite;
+}
+
+@keyframes cac-spin {
+  to { transform: rotate(360deg); }
+}
+
+.cac-hint--security {
+  color: var(--cac-muted, #9ca3af);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.cac-inline-link {
+  color: var(--cac-link, #60a5fa);
+  text-decoration: underline;
+}

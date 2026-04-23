@@ -381,6 +381,7 @@ func main() {
 	http.HandleFunc("/api/tunnel/status", WrapWithMiddleware(handleTunnelStatus))
 	http.HandleFunc("/api/tunnel/start", WrapWithMiddleware(handleTunnelStart))
 	http.HandleFunc("/api/tunnel/stop", WrapWithMiddleware(handleTunnelStop))
+	http.HandleFunc("/api/tunnel/providers", WrapWithMiddleware(handleTunnelProviders))
 
 	// Hosted mode API — in-app remote access launch
 	http.HandleFunc("/api/hosted/status", WrapWithMiddleware(handleHostedStatus))

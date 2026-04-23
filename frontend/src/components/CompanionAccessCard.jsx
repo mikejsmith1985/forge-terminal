@@ -24,7 +24,7 @@ import {
   ExternalLink,
   Lock,
   Info,
-  Wifi,
+  Wifi, // eslint-disable-line no-unused-vars -- kept for future use
   Globe,
   Settings,
   Loader2,
@@ -89,6 +89,10 @@ const CompanionAccessCard = () => {
   const [isTunnelLaunching, setIsTunnelLaunching] = useState(false)
   // Error from the start call itself (distinct from a running error).
   const [tunnelStartError, setTunnelStartError] = useState('')
+  // Which tunnel backends are ready to use on this machine. Fetched once
+  // from /api/tunnel/providers when the card expands. `null` = not yet
+  // loaded (render a neutral "Enable Remote Access" label until it arrives).
+  const [providers, setProviders] = useState(null)
 
   // Refs kept in sync on every render so async callbacks (fetch, setInterval)
   // always read the current values rather than stale closure snapshots.
@@ -182,6 +186,20 @@ const CompanionAccessCard = () => {
         if (data.url) applyTunnelUrl(data.url)
       } catch {
         // Non-critical — proceed without tunnel pre-fill
+      }
+    })()
+
+    // Detect which tunnel providers are available so the UI can show the
+    // right label on the primary button ("Enable Remote Access (Tailscale)"
+    // vs "Install Cloudflared") before the user clicks it.
+    void (async () => {
+      try {
+        const res = await fetch('/api/tunnel/providers')
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        if (!cancelled) setProviders(data)
+      } catch {
+        // Non-critical — button falls back to generic label
       }
     })()
 
@@ -353,6 +371,7 @@ const CompanionAccessCard = () => {
                   tunnelStartError={tunnelStartError}
                   onLaunchTunnel={launchTunnel}
                   onStopTunnel={stopTunnel}
+                  providers={providers}
                 />
               : <DisabledView
                   onEnable={() => toggleEnabled(true)}
@@ -437,65 +456,143 @@ function detectTunnelProviderLabel(tunnelUrlString) {
   return 'Tunnel'
 }
 
-const RemoteAccessHint = ({
+/**
+ * RemoteAccessControl — the single primary action for Step 1.
+ *
+ * Before launch: one button labelled "Enable Remote Access" plus a subdued
+ * caption saying which provider will be used ("via Tailscale" / "via Cloudflare")
+ * or a call-to-install if neither is available.
+ *
+ * While launching: inline spinner + "Starting tunnel…" message.
+ *
+ * After launch: provider label, the tunnel URL, a Stop button, and a small
+ * security summary so the user understands what is exposed and how it is
+ * protected (token-authenticated HTTPS, tunnel can be stopped any time).
+ */
+const RemoteAccessControl = ({
   isTunnelRunning,
   isTunnelLaunching,
   tunnelStartError,
   isCloudflaredMissing,
   tunnelUrl,
+  providers,
   onLaunch,
   onStop,
 }) => {
   if (isTunnelLaunching) {
     return (
-      <span className="cac-tunnel-launching">
-        <Loader2 size={14} className="cac-spinner" aria-label="Launching tunnel" />
-        Starting tunnel… this takes about 10–20 seconds.
-      </span>
+      <div className="cac-tunnel-control">
+        <span className="cac-tunnel-launching">
+          <Loader2 size={14} className="cac-spinner" aria-label="Launching tunnel" />
+          Starting tunnel… this takes about 10–20 seconds.
+        </span>
+      </div>
     )
   }
 
   if (isTunnelRunning && tunnelUrl) {
     const providerLabel = detectTunnelProviderLabel(tunnelUrl)
     return (
-      <span className="cac-tunnel-active">
-        <Radio size={14} className="cac-tunnel-active-icon" />
-        {providerLabel} active: <code className="cac-tunnel-url">{tunnelUrl}</code>
-        <button
-          className="cac-btn cac-btn-ghost cac-btn-stop"
-          onClick={onStop}
-          aria-label="Stop tunnel"
-        >
-          <Square size={12} /> Stop Tunnel
-        </button>
-      </span>
+      <div className="cac-tunnel-control">
+        <div className="cac-tunnel-active">
+          <Radio size={14} className="cac-tunnel-active-icon" />
+          <span>
+            <strong>{providerLabel}</strong> active:{' '}
+            <code className="cac-tunnel-url">{tunnelUrl}</code>
+          </span>
+          <button
+            className="cac-btn cac-btn-ghost cac-btn-stop"
+            onClick={onStop}
+            aria-label="Stop tunnel"
+          >
+            <Square size={12} /> Stop
+          </button>
+        </div>
+        <p className="cac-hint cac-hint--security">
+          🔒 HTTPS end-to-end. Your phone authenticates with a 64-character token
+          stored only on this PC. Stop the tunnel when you are done.
+        </p>
+      </div>
     )
   }
 
+  // Idle state — show a single CTA plus a caption telling the user what will
+  // happen when they click it.
+  const providerCaption = buildProviderCaption(providers)
+  const neitherAvailable =
+    providers != null &&
+    providers.tailscale?.available === false &&
+    providers.cloudflare?.available === false
+
   return (
-    <>
+    <div className="cac-tunnel-control">
       <button
         className="cac-btn cac-btn-primary cac-tunnel-launch-btn"
         onClick={onLaunch}
-        aria-label="Launch Tunnel"
+        disabled={neitherAvailable}
+        aria-label="Enable Remote Access"
       >
-        Launch Tunnel
+        <Globe size={14} /> Enable Remote Access
       </button>
+      {providerCaption && (
+        <p className="cac-hint cac-tunnel-provider-caption">{providerCaption}</p>
+      )}
+      {neitherAvailable && (
+        <p className="cac-hint cac-hint--warn">
+          No tunnel backend is installed. Install{' '}
+          <a
+            href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cac-inline-link"
+          >cloudflared ↗</a>{' '}
+          (free, no account required) or{' '}
+          <a
+            href="https://tailscale.com/download"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cac-inline-link"
+          >Tailscale ↗</a>, then reload this card.
+        </p>
+      )}
       {tunnelStartError && (
-        <span className="cac-tunnel-error">
+        <p className="cac-tunnel-error">
           {isCloudflaredMissing
-            ? <>cloudflared not found. <a
-                href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="cac-inline-link"
-              >Download cloudflared ↗</a></>
+            ? <>cloudflared not found.{' '}
+                <a
+                  href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cac-inline-link"
+                >Download cloudflared ↗</a>
+              </>
             : tunnelStartError
           }
-        </span>
+        </p>
       )}
-    </>
+    </div>
   )
+}
+
+// buildProviderCaption generates the "via <provider>" hint shown under the
+// Enable Remote Access button. It reflects the backend's auto-detection so
+// the user knows exactly what will run when they click the button.
+function buildProviderCaption(providers) {
+  if (!providers) return null
+  const { selected, tailscale, cloudflare, explicit } = providers
+  if (selected === 'tailscale') {
+    return explicit
+      ? 'Uses Tailscale Funnel (from your Settings).'
+      : 'Uses Tailscale Funnel — detected on this PC. Stable URL, signed HTTPS.'
+  }
+  if (selected === 'cloudflare') {
+    const why = tailscale?.available === false && tailscale?.reason
+      ? ` ${tailscale.reason} — using Cloudflare instead.`
+      : ''
+    return `Uses a Cloudflare quick tunnel — a fresh HTTPS URL every launch.${why}`
+  }
+  if (!tailscale?.available && !cloudflare?.available) return null
+  return 'Starts a secure tunnel so your phone can reach Forge from anywhere.'
 }
 
 /**
@@ -526,6 +623,7 @@ const EnabledView = ({
   tunnelStartError,
   onLaunchTunnel,
   onStopTunnel,
+  providers,
 }) => {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const deepLink = buildDeepLink(companionHost, tunnelUrl, settings?.mobile_token || '')
@@ -538,92 +636,35 @@ const EnabledView = ({
     tunnelStartError.toLowerCase().includes('cloudflared')
   const isTunnelRunning = tunnelStatus?.running || Boolean(tunnelStatus?.url)
 
-  // "Remote Access" card is active when a tunnel is launching or running, or when
-  // the user has manually entered a public (non-private, non-localhost) URL in Step 2.
-  const hasPublicManualUrl = tunnelUrl.length > 0 &&
-    !isPrivateNetworkForgeUrl(tunnelUrl) &&
-    !isPhoneUnreachableForgeUrl(tunnelUrl)
-  const isRemoteAccessActive = isTunnelLaunching || isTunnelRunning || hasPublicManualUrl
-
-  // "Same Network" card is active only when a local/private IP is in Step 2
-  // and no tunnel is running.
-  const isSameNetworkActive = !isRemoteAccessActive && isPrivateNetworkForgeUrl(tunnelUrl)
-
   return (
     <>
-      {/* ── Step 1: Connection method ───────────────────────────────────── */}
+      {/* ── Step 1: Enable Remote Access ─────────────────────────────────── */}
       <div className="cac-section">
         <div className="cac-step-header">
           <span className="cac-step-number">1</span>
-          <span className="cac-step-title">How will you connect to Forge?</span>
+          <span className="cac-step-title">Enable remote access</span>
         </div>
-        <div className="cac-method-cards">
-          <ConnectionMethodCard
-            icon={<Wifi size={16} />}
-            title="Same Network"
-            description="LAN, WiFi, or Tailscale IP — phone and PC on the same network"
-            isActive={isSameNetworkActive}
-            hint={
-              <>
-                Your phone must be on the same network as this PC (home WiFi, office
-                LAN, or the same Tailscale tailnet).{' '}
-                Find your PC's local IP or Tailscale IP —{' '}
-                it looks like <code>192.168.x.x</code> or <code>100.x.x.x</code>.{' '}
-                Enter <code>http://&lt;your-ip&gt;:3005</code> in Step 2.
-              </>
-            }
-          />
-          <ConnectionMethodCard
-            icon={<Globe size={16} />}
-            title="Remote Access"
-            description="Access from anywhere — no VPN or Tailscale on your phone"
-            isActive={isRemoteAccessActive}
-            hint={
-              <RemoteAccessHint
-                isTunnelRunning={isTunnelRunning}
-                isTunnelLaunching={isTunnelLaunching}
-                tunnelStartError={tunnelStartError}
-                isCloudflaredMissing={isCloudflaredMissing}
-                tunnelUrl={tunnelStatus?.url}
-                onLaunch={onLaunchTunnel}
-                onStop={onStopTunnel}
-              />
-            }
-          />
-        </div>
-      </div>
-
-      {/* ── Step 2: Paste the URL ───────────────────────────────────────── */}
-      <div className="cac-section">
-        <div className="cac-step-header">
-          <span className="cac-step-number">2</span>
-          <span className="cac-step-title">
-            {isTunnelLaunching
-              ? 'Forge URL — auto-filling when tunnel is ready…'
-              : isTunnelRunning
-                ? 'Forge URL — auto-filled by tunnel'
-                : 'Paste your Forge URL here'
-            }
-          </span>
-        </div>
-        <input
-          className="cac-input"
-          type="text"
-          value={tunnelUrl}
-          onChange={evt => setTunnelUrl(evt.target.value)}
-          placeholder="Forge URL — e.g. http://100.x.x.x:3005 or https://xyz.trycloudflare.com"
+        <RemoteAccessControl
+          isTunnelRunning={isTunnelRunning}
+          isTunnelLaunching={isTunnelLaunching}
+          tunnelStartError={tunnelStartError}
+          isCloudflaredMissing={isCloudflaredMissing}
+          tunnelUrl={tunnelStatus?.url}
+          providers={providers}
+          onLaunch={onLaunchTunnel}
+          onStop={onStopTunnel}
         />
       </div>
 
-      {/* ── Step 3: QR code ────────────────────────────────────────────── */}
+      {/* ── Step 2: QR code ────────────────────────────────────────────── */}
       <div className="cac-section">
         <div className="cac-step-header">
-          <span className="cac-step-number">3</span>
+          <span className="cac-step-number">2</span>
           <span className="cac-step-title">Scan with your phone — then tap Connect</span>
         </div>
         {isTunnelLaunching ? (
           // Do NOT show a stale QR while the tunnel is still starting.
-          // The QR will update automatically once the Cloudflare URL arrives.
+          // The QR will update automatically once the tunnel URL arrives.
           <div className="cac-qr-loading">
             <Loader2 size={24} className="cac-spinner" aria-label="Tunnel starting" />
             <p className="cac-hint">
@@ -632,17 +673,16 @@ const EnabledView = ({
           </div>
         ) : isPhoneUnreachableForgeUrl(tunnelUrl) ? (
           <p className="cac-hint cac-hint--warn">
-            ↑ Enter a network-accessible Forge URL in Step 2 to generate a QR code.
-            Use your Tailscale IP (<code>http://100.x.x.x:3005</code>) or launch
-            a Cloudflare tunnel in Step 1.
+            ↑ Click <strong>Enable remote access</strong> above to start a secure
+            tunnel your phone can reach from anywhere.
           </p>
         ) : (
           <>
             {isPrivateNetworkForgeUrl(tunnelUrl) && (
               <p className="cac-hint cac-hint--warn">
-                📡 Private IP detected — your phone can only scan this QR if it is
-                on the same Tailscale or LAN network as this PC. For access from
-                anywhere, launch the Cloudflare tunnel in Step 1.
+                📡 Private IP detected — this only works if your phone is on the
+                same network. For access from anywhere, click <strong>Enable
+                remote access</strong> above.
               </p>
             )}
             <QRBlock deepLink={deepLink} />
@@ -696,6 +736,23 @@ const EnabledView = ({
       {isAdvancedOpen && (
         <div className="cac-advanced-body">
           <div className="cac-section">
+            <label className="cac-label">Forge URL (manual)</label>
+            <input
+              className="cac-input"
+              type="text"
+              value={tunnelUrl}
+              onChange={evt => setTunnelUrl(evt.target.value)}
+              placeholder="http://100.x.x.x:3005 or https://xyz.trycloudflare.com"
+            />
+            <p className="cac-hint">
+              Auto-filled when you enable remote access. Only edit this if you
+              are on the same network as this PC and have started Forge with{' '}
+              <code>--host 0.0.0.0</code>, or you want to reuse a tunnel URL
+              started outside of Forge.
+            </p>
+          </div>
+
+          <div className="cac-section">
             <label className="cac-label">Companion PWA host</label>
             <input
               className="cac-input"
@@ -739,15 +796,12 @@ const EnabledView = ({
 }
 
 /**
- * ConnectionMethodCard — one of two option cards shown in Step 1 of the
- * enabled view. Purely informational — shows the user what each tunnel path
- * looks like so they know which URL to paste in Step 2.
+ * ConnectionMethodCard — retained but unused after v7.6.25. The Step 1 flow
+ * collapsed to a single primary action (see RemoteAccessControl). Kept in
+ * case we want to reintroduce a side-by-side layout later without re-deriving
+ * the styling.
  */
-/**
- * ConnectionMethodCard — one of two option cards in Step 1.
- * When isActive is true a highlight border is applied so the user can see
- * which connection path is currently driving the QR code in Step 3.
- */
+// eslint-disable-next-line no-unused-vars
 const ConnectionMethodCard = ({ icon, title, description, hint, isActive }) => (
   <div className={`cac-method-card${isActive ? ' cac-method-card--active' : ''}`}>
     <div className="cac-method-card-header">

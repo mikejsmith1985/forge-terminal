@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.25] - 2026-04-23
+
+---
+
+## [v7.6.25] - 2026-04-23
+
+### Changed
+- **Step 1 collapsed to a single primary button ("Enable Remote Access")** — The previous two-card layout ("Same Network" / "Remote Access") was confusing because a typical user on localhost has no way to make Same Network work. Step 1 is now one button that starts a secure tunnel automatically; the manual URL input moved into an "Advanced" collapsible for the rare `--host 0.0.0.0` case.
+- **Backend auto-detects tunnel provider** — When the user has not explicitly chosen a provider in Settings, Forge now probes `tailscale status --json` and `cloudflared` on PATH: Tailscale Funnel is preferred when the daemon is running and signed in, otherwise a Cloudflare quick tunnel is used. A new endpoint `GET /api/tunnel/providers` exposes availability so the companion card can show which backend will run before the user clicks the button.
+- **Install hint when neither provider is available** — If neither Tailscale nor cloudflared is detected, the button is disabled and the card links to both download pages instead of failing silently after launch.
+- **Security summary surfaced next to the active tunnel URL** — Explains in one line: HTTPS end-to-end, 64-character token auth, stop any time.
+
 ## [7.6.24] - 2026-04-23
 
 ---
