@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Forge Terminal — Local Release Pipeline
@@ -17,7 +17,10 @@
 #>
 param(
     [Parameter(Position=0)]
-    [string]$VersionType = "patch"
+    [string]$VersionType = "patch",
+
+    # Skip interactive confirmation prompts — useful for automated/agent runs.
+    [switch]$Force
 )
 
 Set-StrictMode -Version Latest
@@ -60,8 +63,12 @@ $dirty = git status --porcelain 2>$null
 if ($dirty) {
     Write-Warn "Uncommitted changes detected:"
     git status --short
-    $confirm = Read-Host "`n  Stage and include all changes in this release? (y/N)"
-    if ($confirm -notmatch '^[Yy]$') { Write-Fail "Release cancelled" }
+    if ($Force) {
+        Write-Warn "Auto-staging all changes (--Force)"
+    } else {
+        $confirm = Read-Host "`n  Stage and include all changes in this release? (y/N)"
+        if ($confirm -notmatch '^[Yy]$') { Write-Fail "Release cancelled" }
+    }
 }
 Write-OK "Git status checked"
 
@@ -166,8 +173,12 @@ if ($preflightBlockers.Count -gt 0) {
 }
 
 if ($preflightWarnings.Count -gt 0 -and $preflightBlockers.Count -eq 0) {
-    $proceed = Read-Host "`n  Proceed with warnings? (y/N)"
-    if ($proceed -notmatch '^[Yy]$') { Write-Fail "Release cancelled by user" }
+    if ($Force) {
+        Write-Warn "Proceeding despite warnings (--Force)"
+    } else {
+        $proceed = Read-Host "`n  Proceed with warnings? (y/N)"
+        if ($proceed -notmatch '^[Yy]$') { Write-Fail "Release cancelled by user" }
+    }
 }
 
 if ($preflightPassed -and $preflightWarnings.Count -eq 0) {
