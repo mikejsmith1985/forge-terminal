@@ -389,6 +389,10 @@ func main() {
 	http.HandleFunc("/api/tunnel/setup/zones", WrapWithMiddleware(handleTunnelSetupZones))
 	http.HandleFunc("/api/tunnel/setup/create", WrapWithMiddleware(handleTunnelSetupCreate))
 	http.HandleFunc("/api/tunnel/setup/status", WrapWithMiddleware(handleTunnelSetupStatus))
+	http.HandleFunc("/api/tunnel/setup/service", WrapWithMiddleware(handleTunnelService))
+	http.HandleFunc("/api/tunnel/options", WrapWithMiddleware(handleTunnelOptions))
+	http.HandleFunc("/api/tunnel/select", WrapWithMiddleware(handleTunnelSelect))
+	http.HandleFunc("/api/tunnel/migrate-legacy", WrapWithMiddleware(handleTunnelMigrateLegacy))
 
 	// WSL detection API
 	http.HandleFunc("/api/wsl/detect", WrapWithMiddleware(handleWSLDetect))
