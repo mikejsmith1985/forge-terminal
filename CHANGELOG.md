@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.23] - 2026-04-23
+
+---
+
+## [v7.6.23] - 2026-04-23
+
+## [7.6.23] - 2026-04-24
+
+### Fixed
+- **Companion session list now shows human-readable tab titles** — sessions previously displayed raw internal IDs like `tab-4-uajzit` instead of the tab name visible in the desktop app (e.g. `forge-terminal`). The `/api/mobile/sessions` endpoint now cross-references `~/.forge/terminal/sessions.json` to include the persisted title; if the file is missing or a tab has no title, the session ID is shown as a safe fallback.
+- **iOS keyboard now opens automatically when entering a terminal session** — tapping a session card on iPhone/iPad immediately shows the keyboard so the user can start typing without hunting for the input bar.
+- **Tapping the terminal output area re-opens the keyboard** — mid-session, tapping anywhere in the terminal output scrollback re-focuses the command input and brings up the iOS keyboard.
+
 ## [7.6.22] - 2026-04-23
 
 ---

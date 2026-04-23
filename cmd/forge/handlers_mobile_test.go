@@ -6,8 +6,11 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -165,5 +168,96 @@ func TestValidateMobileRequest_AcceptsCorrectToken(t *testing.T) {
 	isValid := validateMobileRequest(responseRecorder, requestWithCorrectToken)
 	if !isValid {
 		t.Error("request with correct token should be accepted")
+	}
+}
+
+// ── Tab Title Index Tests ─────────────────────────────────────────────────────
+
+// writeTestSessionsFile creates a sessions.json file at the path Forge expects
+// inside a temporary home directory. Returns the temp dir for cleanup via t.TempDir.
+func writeTestSessionsFile(t *testing.T, sessions any) string {
+	t.Helper()
+
+	tempHome := t.TempDir()
+	t.Setenv("USERPROFILE", tempHome) // Windows: os.UserHomeDir() checks USERPROFILE first
+	t.Setenv("HOME", tempHome)        // Unix fallback
+
+	sessionDir := filepath.Join(tempHome, ".forge", "terminal")
+	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
+		t.Fatalf("could not create temp session dir: %v", err)
+	}
+
+	rawJSON, err := json.Marshal(sessions)
+	if err != nil {
+		t.Fatalf("could not marshal test sessions: %v", err)
+	}
+
+	sessionsFilePath := filepath.Join(sessionDir, "sessions.json")
+	if err := os.WriteFile(sessionsFilePath, rawJSON, 0o600); err != nil {
+		t.Fatalf("could not write sessions.json: %v", err)
+	}
+
+	return tempHome
+}
+
+func TestBuildTabTitleIndex_ReturnsMatchingTitle(t *testing.T) {
+	writeTestSessionsFile(t, map[string]any{
+		"tabs": []map[string]any{
+			{"id": "tab-4-uajzit", "title": "forge-terminal"},
+		},
+		"activeTabId": "tab-4-uajzit",
+	})
+
+	titleMap := buildTabTitleIndex()
+
+	if got := titleMap["tab-4-uajzit"]; got != "forge-terminal" {
+		t.Errorf("expected title %q for known tab ID, got %q", "forge-terminal", got)
+	}
+}
+
+func TestBuildTabTitleIndex_ReturnsEmptyForUnknownTabID(t *testing.T) {
+	writeTestSessionsFile(t, map[string]any{
+		"tabs": []map[string]any{
+			{"id": "tab-known", "title": "some-project"},
+		},
+		"activeTabId": "tab-known",
+	})
+
+	titleMap := buildTabTitleIndex()
+
+	if got, exists := titleMap["tab-unknown-xyz"]; exists {
+		t.Errorf("unknown tab ID should not be in the map, but got %q", got)
+	}
+}
+
+func TestBuildTabTitleIndex_SkipsTabsWithEmptyTitle(t *testing.T) {
+	writeTestSessionsFile(t, map[string]any{
+		"tabs": []map[string]any{
+			{"id": "tab-no-title", "title": ""},
+		},
+		"activeTabId": "tab-no-title",
+	})
+
+	titleMap := buildTabTitleIndex()
+
+	if got, exists := titleMap["tab-no-title"]; exists {
+		t.Errorf("tab with empty title should not appear in the map, but got %q", got)
+	}
+}
+
+func TestBuildTabTitleIndex_ReturnsEmptyMapWhenSessionsFileMissing(t *testing.T) {
+	// Point HOME at an empty temp dir so sessions.json does not exist.
+	tempHome := t.TempDir()
+	t.Setenv("USERPROFILE", tempHome)
+	t.Setenv("HOME", tempHome)
+
+	titleMap := buildTabTitleIndex()
+
+	// The function must not panic or return nil — it returns an empty map.
+	if titleMap == nil {
+		t.Error("expected an empty (non-nil) map when sessions.json is missing")
+	}
+	if len(titleMap) != 0 {
+		t.Errorf("expected empty map when no sessions file exists, got %d entries", len(titleMap))
 	}
 }

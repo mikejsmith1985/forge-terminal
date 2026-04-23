@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/license"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
@@ -229,8 +230,39 @@ func handleMobileInfo(w http.ResponseWriter, r *http.Request) {
 
 // ── Endpoint: GET /api/mobile/sessions ───────────────────────────────────────
 
-// handleMobileSessions returns the list of active PTY sessions. The companion
-// app renders these as session cards and lets the user tap one to open it.
+// mobileSessionInfo is the companion-specific session representation returned
+// by /api/mobile/sessions. It extends ActiveSessionInfo with a human-readable
+// tab title so the companion app can display friendly names instead of raw IDs.
+type mobileSessionInfo struct {
+	SessionID        string `json:"sessionId"`
+	TabTitle         string `json:"tabTitle"`
+	IsDetached       bool   `json:"isDetached"`
+	ConnectedClients int    `json:"connectedClients"`
+}
+
+// buildTabTitleIndex loads the persisted session state and returns a map of
+// tab ID → human-readable title. Errors are treated as non-fatal: if the file
+// cannot be read the caller falls back to using session IDs as titles.
+func buildTabTitleIndex() map[string]string {
+	titleByTabID := make(map[string]string)
+
+	sessionState, err := commands.LoadSession()
+	if err != nil {
+		log.Printf("[Mobile] could not load session titles from disk (non-fatal): %v", err)
+		return titleByTabID
+	}
+
+	for _, tab := range sessionState.Tabs {
+		if tab.ID != "" && tab.Title != "" {
+			titleByTabID[tab.ID] = tab.Title
+		}
+	}
+	return titleByTabID
+}
+
+// handleMobileSessions returns the list of active PTY sessions augmented with
+// human-readable tab titles. The companion app renders these as session cards
+// and lets the user tap one to open it.
 func handleMobileSessions(w http.ResponseWriter, r *http.Request) {
 	if handleMobileCORSPreflight(w, r) {
 		return
@@ -240,15 +272,33 @@ func handleMobileSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	if !isMobileAccessEnabled() {
 		writeMobileJSON(w, http.StatusForbidden, map[string]any{
-			"error":      "mobile_access feature is not enabled for this instance",
+			"error":       "mobile_access feature is not enabled for this instance",
 			"upgrade_url": "https://rootlevellabs.tech/upgrade",
 		})
 		return
 	}
 
 	activeSessions := termHandler.ListActiveSessions()
+	titleByTabID := buildTabTitleIndex()
+
+	sessionInfoList := make([]mobileSessionInfo, 0, len(activeSessions))
+	for _, activeSession := range activeSessions {
+		// Use the persisted tab title when available; fall back to the session ID
+		// so the list is always populated even if sessions.json is missing or stale.
+		tabTitle := titleByTabID[activeSession.SessionID]
+		if tabTitle == "" {
+			tabTitle = activeSession.SessionID
+		}
+		sessionInfoList = append(sessionInfoList, mobileSessionInfo{
+			SessionID:        activeSession.SessionID,
+			TabTitle:         tabTitle,
+			IsDetached:       activeSession.IsDetached,
+			ConnectedClients: activeSession.ConnectedClients,
+		})
+	}
+
 	writeMobileJSON(w, http.StatusOK, map[string]any{
-		"sessions": activeSessions,
+		"sessions": sessionInfoList,
 	})
 }
 
