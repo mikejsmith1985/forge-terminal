@@ -69,6 +69,26 @@ export function isStaleCompanionHost(storedHost) {
 }
 
 /**
+ * isPhoneUnreachableForgeUrl — returns true when the hostname in forgeUrl
+ * is a loopback address (localhost, 127.0.0.1, ::1) that a phone cannot reach.
+ *
+ * Used to suppress QR code generation and the Copy Link button so users
+ * are not presented with a deep link that will never open on their device.
+ *
+ * @param {string|null|undefined} forgeUrl
+ * @returns {boolean}
+ */
+export function isPhoneUnreachableForgeUrl(forgeUrl) {
+  if (!forgeUrl) return true
+  try {
+    const { hostname } = new URL(normalizeHttpUrl(forgeUrl))
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+  } catch {
+    return true
+  }
+}
+
+/**
  * buildDeepLink — assembles the companion PWA deep-link URL.
  *
  * Format: <companionHost>#forge=<forgeUrl>&token=<mobileToken>

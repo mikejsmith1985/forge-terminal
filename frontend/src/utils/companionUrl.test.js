@@ -7,6 +7,7 @@ import {
   normalizeHttpUrl,
   getDefaultCompanionHost,
   isStaleCompanionHost,
+  isPhoneUnreachableForgeUrl,
   buildDeepLink,
 } from './companionUrl.js'
 
@@ -130,6 +131,50 @@ describe('isStaleCompanionHost', () => {
 
   it('returns false for a LAN IP with http scheme', () => {
     expect(isStaleCompanionHost('http://192.168.1.50:3005/companion/')).toBe(false)
+  })
+})
+
+// ── isPhoneUnreachableForgeUrl ────────────────────────────────────────────────
+
+describe('isPhoneUnreachableForgeUrl', () => {
+  it('returns true for null', () => {
+    expect(isPhoneUnreachableForgeUrl(null)).toBe(true)
+  })
+
+  it('returns true for empty string', () => {
+    expect(isPhoneUnreachableForgeUrl('')).toBe(true)
+  })
+
+  it('returns true for http://localhost', () => {
+    expect(isPhoneUnreachableForgeUrl('http://localhost:3005')).toBe(true)
+  })
+
+  it('returns true for http://127.0.0.1', () => {
+    expect(isPhoneUnreachableForgeUrl('http://127.0.0.1:3005')).toBe(true)
+  })
+
+  it('returns true for ::1 (IPv6 loopback)', () => {
+    expect(isPhoneUnreachableForgeUrl('http://::1:3005')).toBe(true)
+  })
+
+  it('returns true for a protocol-less localhost URL (normalised before parse)', () => {
+    expect(isPhoneUnreachableForgeUrl('localhost:3005')).toBe(true)
+  })
+
+  it('returns false for a Tailscale IP', () => {
+    expect(isPhoneUnreachableForgeUrl('http://100.127.39.102:3005')).toBe(false)
+  })
+
+  it('returns false for a LAN IP', () => {
+    expect(isPhoneUnreachableForgeUrl('http://192.168.1.50:3005')).toBe(false)
+  })
+
+  it('returns false for a Cloudflare tunnel URL', () => {
+    expect(isPhoneUnreachableForgeUrl('https://abc123.trycloudflare.com')).toBe(false)
+  })
+
+  it('returns false for a custom domain', () => {
+    expect(isPhoneUnreachableForgeUrl('https://forge.mycompany.com')).toBe(false)
   })
 })
 

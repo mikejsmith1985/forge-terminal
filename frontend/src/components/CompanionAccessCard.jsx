@@ -35,6 +35,7 @@ import './CompanionAccessCard.css'
 import {
   getDefaultCompanionHost,
   isStaleCompanionHost,
+  isPhoneUnreachableForgeUrl,
   buildDeepLink,
 } from '../utils/companionUrl.js'
 
@@ -88,17 +89,33 @@ const CompanionAccessCard = () => {
   // Error from the start call itself (distinct from a running error).
   const [tunnelStartError, setTunnelStartError] = useState('')
 
+  // Refs kept in sync on every render so async callbacks (fetch, setInterval)
+  // always read the current values rather than stale closure snapshots.
+  const tunnelUrlRef = useRef(tunnelUrl)
+  const companionHostRef = useRef(companionHost)
+  tunnelUrlRef.current = tunnelUrl
+  companionHostRef.current = companionHost
+
   // Apply a tunnel URL to the Step 2 input, sync the companion host, and
   // persist both values to localStorage synchronously so no async storage-event
   // timers are left pending in the fake-timer environment used by tests.
   function applyTunnelUrl(url) {
-    setTunnelUrl(url)
     localStorage.setItem(STORAGE_TUNNEL_URL, url)
-    // Compute new host from the current closure value — safe here because this
-    // function is only ever called once per async boundary (not in tight loops).
-    const newHost = isStaleCompanionHost(companionHost) ? getDefaultCompanionHost(url) : companionHost
-    setCompanionHost(newHost)
-    localStorage.setItem(STORAGE_COMPANION_HOST, newHost)
+    setTunnelUrl(url)
+    // Read from refs (not closure) so late-arriving fetch/poll responses
+    // always compare against the current state, not a stale snapshot.
+    const currentCompanionHost = companionHostRef.current
+    const currentTunnelUrl     = tunnelUrlRef.current
+    // Update companionHost when it was auto-derived from the previous tunnelUrl
+    // OR is stale. Lowercase comparison handles any case-formatting differences.
+    const wasAutoDerived =
+      isStaleCompanionHost(currentCompanionHost) ||
+      currentCompanionHost.toLowerCase() === getDefaultCompanionHost(currentTunnelUrl).toLowerCase()
+    if (wasAutoDerived) {
+      const newHost = getDefaultCompanionHost(url)
+      setCompanionHost(newHost)
+      localStorage.setItem(STORAGE_COMPANION_HOST, newHost)
+    }
   }
 
   // Poll /api/tunnel/status every 1.5 s while the tunnel is launching.
@@ -218,7 +235,8 @@ const CompanionAccessCard = () => {
   // URL always matches the URL the phone will actually use to reach Forge.
   const handleTunnelUrlChange = useCallback((newUrl) => {
     const isAutoValue =
-      companionHost === getDefaultCompanionHost(tunnelUrl) || isStaleCompanionHost(companionHost)
+      isStaleCompanionHost(companionHost) ||
+      companionHost.toLowerCase() === getDefaultCompanionHost(tunnelUrl).toLowerCase()
     const newHost = isAutoValue ? getDefaultCompanionHost(newUrl) : companionHost
     setCompanionHost(newHost)
     setTunnelUrl(newUrl)
@@ -559,7 +577,23 @@ const EnabledView = ({
           <span className="cac-step-number">3</span>
           <span className="cac-step-title">Scan with your phone — then tap Connect</span>
         </div>
-        <QRBlock deepLink={deepLink} />
+        {isPhoneUnreachableForgeUrl(tunnelUrl) ? (
+          <p className="cac-hint cac-hint--warn">
+            ↑ Enter a network-accessible Forge URL in Step 2 to generate a QR code.
+            Use your Tailscale IP (<code>http://100.x.x.x:3005</code>) or launch
+            a Cloudflare tunnel in Step 1.
+          </p>
+        ) : (
+          <>
+            <QRBlock deepLink={deepLink} />
+            {isTunnelRunning && (
+              <p className="cac-hint cac-hint--security">
+                🔒 Your 64-character mobile token is the authentication barrier — it
+                is required even if someone discovers your tunnel URL.
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       {/* ── Actions ────────────────────────────────────────────────────── */}
@@ -567,7 +601,12 @@ const EnabledView = ({
         <button
           className="cac-btn cac-btn-secondary"
           onClick={onCopyLink}
-          title="Copy the deep-link URL to send to your phone another way"
+          disabled={isPhoneUnreachableForgeUrl(tunnelUrl)}
+          title={
+            isPhoneUnreachableForgeUrl(tunnelUrl)
+              ? 'Enter a network-accessible Forge URL first'
+              : 'Copy the deep-link URL to send to your phone another way'
+          }
         >
           {hasCopiedLink
             ? <><Check size={14} /> Copied</>

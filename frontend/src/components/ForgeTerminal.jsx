@@ -1790,7 +1790,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                     xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
                   }
                   clearTimeout(bannerTimerRef.current);
-                  bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 600);
+                  // 2000ms debounce: on Cloudflare tunnel connections the round-trip
+                  // for the old WS to close and CONTROL_GRANTED to arrive can exceed
+                  // the previous 600ms window, causing false-positive banners.
+                  bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 2000);
                 }
                 return;
               }
