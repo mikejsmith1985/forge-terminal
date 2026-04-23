@@ -231,6 +231,129 @@
     }
     .send-btn:active { opacity: 0.7; }
 
+    /* ── Cards Sheet (v7.6.28) ──────────────────────────────────────────── */
+    /*
+     * Sliding bottom sheet that lists the user's Command Cards on mobile.
+     * Opened from the ⊞ button in the command bar on the terminal screen.
+     * Tapping a card sends its .command payload via /api/mobile/exec to the
+     * active session and closes the sheet.
+     */
+    .cards-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 18px;
+      padding: 0 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .cards-btn:active { opacity: 0.7; }
+
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 900;
+    }
+    .sheet-backdrop.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      max-height: 75vh;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      transform: translateY(100%);
+      transition: transform 0.25s ease-out;
+      z-index: 901;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: var(--safe-bottom);
+    }
+    .sheet.visible { transform: translateY(0); }
+
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .sheet-title { font-size: 15px; font-weight: 600; }
+    .sheet-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 22px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    .sheet-body {
+      overflow-y: auto;
+      padding: 12px 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .card-tile {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s;
+      min-height: 70px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card-tile:active { transform: scale(0.97); border-color: var(--accent); }
+    .card-tile.disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .card-tile-title {
+      font-size: 14px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .card-tile-cmd {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-tile-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--orange);
+      margin-top: 4px;
+    }
+
     /* ── Toast Notification ─────────────────────────────────────────────── */
     #toast {
       position: fixed;
@@ -410,6 +533,7 @@
   </div>
   <div id="terminal-output"></div>
   <div class="command-bar">
+    <button class="cards-btn" id="btn-open-cards" aria-label="Command cards" title="Command cards">⊞</button>
     <input
       id="command-input"
       class="command-input"
@@ -422,6 +546,24 @@
       enterkeyhint="send"
     />
     <button class="send-btn" id="btn-send-command" aria-label="Send command">↑</button>
+  </div>
+</div>
+
+<!-- ── Cards Sheet (v7.6.28) ──────────────────────────────────────────────── -->
+<!--
+  Bottom-sheet overlay shown on the terminal screen. Hosts the user's Command
+  Cards so they can be tapped on mobile — the same cards seen in the desktop
+  sidebar. The backdrop and sheet animate in/out together; tapping either the
+  backdrop, the × button, or a runnable card closes the sheet.
+-->
+<div id="cards-backdrop" class="sheet-backdrop"></div>
+<div id="cards-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="cards-sheet-title">
+  <div class="sheet-header">
+    <span class="sheet-title" id="cards-sheet-title">Command Cards</span>
+    <button class="sheet-close" id="btn-close-cards" aria-label="Close">×</button>
+  </div>
+  <div class="sheet-body" id="cards-sheet-body">
+    <div class="empty-state"><div class="spinner"></div> Loading cards…</div>
   </div>
 </div>
 
@@ -703,6 +845,117 @@
       .replace(/"/g, '&quot;');
   }
 
+  // ── Cards Sheet (v7.6.28) ────────────────────────────────────────────────────
+  // The companion mirrors the desktop Command Cards so the user can trigger
+  // their saved workflows without typing on a phone keyboard. Cards flagged
+  // pasteOnly or system-magic come back from the API marked as disabled so we
+  // can render them greyed-out instead of silently dropping them.
+  let cardsCache = null; // populated on first open; invalidate on disconnect
+
+  async function openCardsSheet() {
+    if (!activeSession) return;
+    const backdrop = document.getElementById('cards-backdrop');
+    const sheet    = document.getElementById('cards-sheet');
+    const body     = document.getElementById('cards-sheet-body');
+
+    backdrop.classList.add('visible');
+    sheet.classList.add('visible');
+
+    // Show cached cards instantly on re-open; fetch in background to refresh.
+    if (cardsCache) {
+      renderCardsInto(body, cardsCache);
+    } else {
+      body.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading cards…</div>';
+    }
+
+    try {
+      const response = await apiGet('/api/mobile/commands');
+      if (!response.ok) {
+        if (!cardsCache) {
+          body.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Could not load cards</div><p>HTTP ${response.status}</p></div>`;
+        }
+        return;
+      }
+      const data = await response.json();
+      cardsCache = data.commands || [];
+      renderCardsInto(body, cardsCache);
+    } catch (networkError) {
+      if (!cardsCache) {
+        body.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Network error</div><p>${escapeHtml(networkError.message)}</p></div>`;
+      }
+    }
+  }
+
+  function closeCardsSheet() {
+    document.getElementById('cards-backdrop').classList.remove('visible');
+    document.getElementById('cards-sheet').classList.remove('visible');
+  }
+
+  // renderCardsInto builds the card grid. Disabled cards (pasteOnly or system
+  // magic) are rendered with a short explanation so the user understands
+  // why they cannot tap them.
+  function renderCardsInto(container, cards) {
+    if (!cards || cards.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          <div class="empty-state-title">No command cards yet</div>
+          <p>Create cards in the desktop Forge app and they'll appear here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `<div class="card-grid">${cards.map(card => {
+      const isDisabled = card.pasteOnly || card.system;
+      const disabledReason = card.system
+        ? 'Built-in'
+        : (card.pasteOnly ? 'Paste-only' : '');
+      const preview = card.system
+        ? '(desktop only)'
+        : (card.command || '');
+      return `
+        <div class="card-tile ${isDisabled ? 'disabled' : ''}" data-card-id="${card.id}">
+          <div class="card-tile-title">${escapeHtml(card.description || 'Untitled')}</div>
+          <div>
+            <div class="card-tile-cmd">${escapeHtml(preview)}</div>
+            ${disabledReason ? `<span class="card-tile-badge">${disabledReason}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('')}</div>`;
+
+    container.querySelectorAll('.card-tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        if (tile.classList.contains('disabled')) return;
+        const cardId = Number(tile.dataset.cardId);
+        const card = cards.find(c => c.id === cardId);
+        if (card) runCardOnActiveSession(card);
+      });
+    });
+  }
+
+  // runCardOnActiveSession sends the card's command string to the active
+  // PTY session and closes the sheet. Re-uses /api/mobile/exec so we get
+  // the same auth + CORS guarantees as the typed command bar.
+  async function runCardOnActiveSession(card) {
+    if (!activeSession) return;
+    closeCardsSheet();
+    try {
+      const response = await apiPost('/api/mobile/exec', {
+        session_id: activeSession.sessionId,
+        command: card.command
+      });
+      if (!response.ok) {
+        showToast('❌ Could not run card — session may have ended');
+        return;
+      }
+      showToast(`↗ Sent "${card.description || card.command}"`);
+    } catch {
+      showToast('❌ Network error — could not run card');
+    }
+  }
+
   // ── Event Wiring ──────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
     // Populate setup form from stored credentials.
@@ -736,6 +989,7 @@
       localStorage.removeItem(STORAGE_KEY_URL);
       localStorage.removeItem(STORAGE_KEY_TOKEN);
       forgeUrl = mobileToken = '';
+      cardsCache = null; // Stale tokens must not leak between connected instances.
       document.getElementById('input-forge-url').value    = '';
       document.getElementById('input-mobile-token').value = '';
       showScreen('screen-setup');
@@ -751,6 +1005,11 @@
     document.getElementById('command-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') sendCommand();
     });
+
+    // Cards sheet open/close wiring.
+    document.getElementById('btn-open-cards').addEventListener('click', openCardsSheet);
+    document.getElementById('btn-close-cards').addEventListener('click', closeCardsSheet);
+    document.getElementById('cards-backdrop').addEventListener('click', closeCardsSheet);
 
     // Track the iOS on-screen keyboard via visualViewport and push the screen
     // height down to match. Without this, the command input is hidden behind

@@ -139,6 +139,39 @@
   gap: 16px;
 }
 
+/* Timeframe selector (Day / Week / Month) — a small segmented control that
+   sits above the stats grid and swaps the Commits / Files Changed ranges. */
+.dd-timeframe-row {
+  display: inline-flex;
+  align-self: flex-start;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--card-border, #334155);
+  border-radius: 10px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.dd-timeframe-btn {
+  background: transparent;
+  color: var(--text-secondary, #94a3b8);
+  border: none;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dd-timeframe-btn:hover {
+  color: var(--text-primary, #f1f5f9);
+}
+
+.dd-timeframe-btn.active {
+  background: var(--accent, #3b82f6);
+  color: #fff;
+}
+
 /* Stats Grid */
 .dd-stats-grid {
   display: grid;

@@ -589,6 +589,7 @@ func main() {
 	http.HandleFunc("/api/mobile/sessions", handleMobileSessions)
 	http.HandleFunc("/api/mobile/exec", handleMobileExec)
 	http.HandleFunc("/api/mobile/read", handleMobileRead)
+	http.HandleFunc("/api/mobile/commands", handleMobileCommands)
 	http.HandleFunc("/api/mobile/settings", WrapWithMiddleware(handleMobileSettings))
 
 	// ── License routes (always available — bypass LicenseMiddleware) ──────

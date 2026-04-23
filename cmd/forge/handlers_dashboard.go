@@ -68,10 +68,20 @@ var serverStartTime = time.Now()
 type dashboardStats struct {
 	// Git
 	GitBranch     string         `json:"gitBranch"`
-	GitCommits    int            `json:"gitCommitsToday"`
-	GitChanged    int            `json:"gitChangedFiles"`
+	GitCommits    int            `json:"gitCommitsToday"`    // Kept for back-compat — commits in today's date
+	GitChanged    int            `json:"gitChangedFiles"`    // Kept for back-compat — current uncommitted working-tree changes
 	GitLastCommit string         `json:"gitLastCommit"`
 	GitWeekly     map[string]int `json:"gitWeekly"` // "Mon"->3, "Tue"->5, ...
+
+	// Timeframe-scoped stats (new in v7.6.28).
+	// These are filled based on the ?timeframe=today|week|month query parameter and
+	// let the dashboard show one consistent "Commits" + "Files Changed" pair for
+	// the range the user selected, instead of the confusing mix of
+	// "commits today" + "currently-uncommitted-files" that v7.6.27 and earlier
+	// displayed. Always populated — default range is "today".
+	Timeframe            string `json:"timeframe"`
+	GitCommitsInRange    int    `json:"gitCommitsInRange"`
+	GitFilesChangedInRange int  `json:"gitFilesChangedInRange"`
 
 	// Sessions
 	ActiveSessions int `json:"activeSessions"`
@@ -192,8 +202,82 @@ func handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// ── Timeframe-scoped stats (v7.6.28) ─────────────────────────────────────
+	// Compute commits + unique files touched within the selected range so the
+	// "Commits" and "Files Changed" cards in the dashboard agree with each
+	// other. Previously "Files Changed" was the uncommitted working-tree
+	// diff — which is almost always zero after a release — giving the
+	// misleading impression that the 13 commits you just pushed touched no
+	// files.
+	stats.Timeframe, stats.GitCommitsInRange, stats.GitFilesChangedInRange =
+		computeTimeframeGitStats(projectDir, r.URL.Query().Get("timeframe"))
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(stats); err != nil {
 		http.Error(w, fmt.Sprintf("encode error: %v", err), http.StatusInternalServerError)
+	}
+}
+
+// computeTimeframeGitStats returns the number of commits and the number of
+// unique files touched by those commits within the requested timeframe.
+// Valid timeframes: "today" (default), "week", "month". Unknown values fall
+// back to "today" so a caller cannot silently break the dashboard by typo.
+func computeTimeframeGitStats(projectDir, rawTimeframe string) (timeframe string, commitCount, filesChanged int) {
+	timeframe = normaliseTimeframe(rawTimeframe)
+	since := timeframeSinceISO(timeframe)
+
+	// Count commits in range (across all branches to match the existing
+	// weekly-chart behaviour, which is what the user sees when scrolling
+	// their work across feature branches over the course of a week).
+	if out, err := gitCmdInDir(projectDir, "log", "--oneline", "--all", "--since="+since).Output(); err == nil {
+		trimmed := strings.TrimSpace(string(out))
+		if trimmed != "" {
+			commitCount = len(strings.Split(trimmed, "\n"))
+		}
+	}
+
+	// Count unique files touched in range. `git log --name-only` prints each
+	// touched path on its own line, separated by blank lines and commit
+	// headers. We strip blanks and dedupe to get the true "files changed"
+	// number that a user expects.
+	if out, err := gitCmdInDir(projectDir, "log", "--all", "--since="+since, "--name-only", "--pretty=format:").Output(); err == nil {
+		seen := make(map[string]struct{})
+		for _, path := range strings.Split(string(out), "\n") {
+			trimmedPath := strings.TrimSpace(path)
+			if trimmedPath == "" {
+				continue
+			}
+			seen[trimmedPath] = struct{}{}
+		}
+		filesChanged = len(seen)
+	}
+	return timeframe, commitCount, filesChanged
+}
+
+// normaliseTimeframe canonicalises the incoming query param so the rest of
+// the pipeline can assume it is one of the three known values.
+func normaliseTimeframe(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "week":
+		return "week"
+	case "month":
+		return "month"
+	default:
+		return "today"
+	}
+}
+
+// timeframeSinceISO returns an ISO-8601 "since" bound suitable for passing
+// to `git log --since=`. Using explicit ISO strings sidesteps the locale
+// issues we hit with --since=midnight on some Windows Git builds.
+func timeframeSinceISO(timeframe string) string {
+	now := time.Now()
+	switch timeframe {
+	case "week":
+		return now.AddDate(0, 0, -6).Format("2006-01-02") + "T00:00:00"
+	case "month":
+		return now.AddDate(0, 0, -29).Format("2006-01-02") + "T00:00:00"
+	default: // today
+		return now.Format("2006-01-02") + "T00:00:00"
 	}
 }

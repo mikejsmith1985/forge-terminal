@@ -557,3 +557,81 @@ func handlePostMobileSettings(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Mobile] POST settings encode error: %v", err)
 	}
 }
+
+// ── Endpoint: GET /api/mobile/commands ───────────────────────────────────────
+
+// mobileCommandSummary is the companion-friendly projection of a Command card.
+// It strips fields that are irrelevant on mobile (keyBinding, triggerAM,
+// macro_payload, alwaysAppend, llm*, favorite) and echoes only what the PWA
+// needs to render the card grid and decide whether the card is safe to send.
+type mobileCommandSummary struct {
+	ID          int    `json:"id"`
+	Description string `json:"description"`
+	Command     string `json:"command"`
+	Icon        string `json:"icon,omitempty"`
+
+	// PasteOnly cards are intentionally not runnable on mobile — they rely on
+	// the desktop paste-into-prompt flow. We still return them so the PWA can
+	// show them greyed out with an explanation, rather than silently hiding
+	// cards the user created and expects to see.
+	PasteOnly bool `json:"pasteOnly"`
+
+	// System indicates the card is a built-in magic command (e.g.
+	// SYSTEM_RELEASE_MANAGER) whose payload is not a literal shell string.
+	// The companion uses this to disable the card client-side.
+	System bool `json:"system"`
+}
+
+// handleMobileCommands returns the user's Command Cards for display in the
+// Forge Companion PWA. The companion taps a card and calls POST
+// /api/mobile/exec with the card's `command` string, so the card list is the
+// source of truth for "what can I run from my phone".
+//
+// Cards flagged PasteOnly or whose command starts with "SYSTEM_" are
+// returned but marked so the PWA can disable them — running them as raw
+// shell input would produce nonsense output.
+func handleMobileCommands(w http.ResponseWriter, r *http.Request) {
+	if handleMobileCORSPreflight(w, r) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeMobileJSON(w, http.StatusMethodNotAllowed, map[string]string{
+			"error": "use GET",
+		})
+		return
+	}
+	if !validateMobileRequest(w, r) {
+		return
+	}
+	if !isMobileAccessEnabled() {
+		writeMobileJSON(w, http.StatusForbidden, map[string]any{
+			"error":       "mobile_access feature is not enabled",
+			"upgrade_url": "https://rootlevellabs.tech/upgrade",
+		})
+		return
+	}
+
+	rawCards, err := commands.LoadCommands()
+	if err != nil {
+		writeMobileJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "could not load commands: " + err.Error(),
+		})
+		return
+	}
+
+	summaries := make([]mobileCommandSummary, 0, len(rawCards))
+	for _, card := range rawCards {
+		summaries = append(summaries, mobileCommandSummary{
+			ID:          card.ID,
+			Description: card.Description,
+			Command:     card.Command,
+			Icon:        card.Icon,
+			PasteOnly:   card.PasteOnly,
+			System:      strings.HasPrefix(card.Command, "SYSTEM_"),
+		})
+	}
+
+	writeMobileJSON(w, http.StatusOK, map[string]any{
+		"commands": summaries,
+	})
+}

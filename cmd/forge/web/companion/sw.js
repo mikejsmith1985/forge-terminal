@@ -3,7 +3,7 @@
 // Caches the companion shell on install so users get an offline "can't connect"
 // experience instead of a browser error page when Forge isn't reachable.
 // API calls to /api/mobile/* are always fetched from the network — never cached.
-const CACHE_NAME = 'forge-companion-v7.6.27';
+const CACHE_NAME = 'forge-companion-v7.6.28';
 
 // Files that make up the companion app shell.
 const APP_SHELL_FILES = [

@@ -8,12 +8,22 @@ import './DeveloperDashboard.css';
 
 const DAY_ORDER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Supported values for the Day/Week/Month selector. Kept in a shared constant
+// so the fetch URL and the button row stay in sync — adding a new range means
+// adding one entry here, not editing two places.
+const TIMEFRAMES = [
+  { id: 'today', shortLabel: 'Day',   rangeLabel: 'Today' },
+  { id: 'week',  shortLabel: 'Week',  rangeLabel: 'Last 7 days' },
+  { id: 'month', shortLabel: 'Month', rangeLabel: 'Last 30 days' },
+];
+
 const DeveloperDashboard = ({ isOpen, onClose, devMode = false, tabCount = 0, projectDir = '' }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
   const [expandedSection, setExpandedSection] = useState('chart');
   const [refreshing, setRefreshing] = useState(false);
+  const [timeframe, setTimeframe] = useState('today');
   const sessionStart = useRef(Date.now());
 
   const fetchStats = useCallback(async () => {
@@ -22,9 +32,13 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false, tabCount = 0, pr
     setRefreshing(true);
     setError(null);
     try {
-      const url = projectDir
-        ? `/api/dashboard/stats?dir=${encodeURIComponent(projectDir)}`
-        : '/api/dashboard/stats';
+      // Build the query string from scratch so the dashboard always ships the
+      // currently-selected timeframe — fetching with a stale value would
+      // silently show yesterday's numbers after the user clicks "Week".
+      const params = new URLSearchParams();
+      if (projectDir) params.set('dir', projectDir);
+      params.set('timeframe', timeframe);
+      const url = `/api/dashboard/stats?${params.toString()}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const data = await res.json();
@@ -36,7 +50,7 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false, tabCount = 0, pr
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isOpen]);
+  }, [isOpen, projectDir, timeframe]);
 
   useEffect(() => {
     if (isOpen) {
@@ -126,17 +140,41 @@ const DeveloperDashboard = ({ isOpen, onClose, devMode = false, tabCount = 0, pr
           </div>
         ) : stats && (
           <div className="dd-content">
+            {/* Timeframe selector — switches the "Commits" and "Files Changed"
+                cards between Today, Last 7 days, and Last 30 days. The weekly
+                bar chart below always shows 7 days regardless of this choice
+                because its X-axis is intrinsically day-of-week. */}
+            <div className="dd-timeframe-row" role="tablist" aria-label="Stats timeframe">
+              {TIMEFRAMES.map(option => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={timeframe === option.id}
+                  className={`dd-timeframe-btn ${timeframe === option.id ? 'active' : ''}`}
+                  onClick={() => setTimeframe(option.id)}
+                  title={option.rangeLabel}
+                >
+                  {option.shortLabel}
+                </button>
+              ))}
+            </div>
+
             {/* Top Stats Grid */}
             <div className="dd-stats-grid">
               <div className="dd-stat-card primary">
                 <GitCommit size={20} />
-                <div className="dd-stat-value">{stats.gitCommitsToday}</div>
-                <div className="dd-stat-label">Commits Today</div>
+                <div className="dd-stat-value">{stats.gitCommitsInRange ?? stats.gitCommitsToday}</div>
+                <div className="dd-stat-label">
+                  Commits · {TIMEFRAMES.find(t => t.id === timeframe)?.rangeLabel || 'Today'}
+                </div>
               </div>
               <div className="dd-stat-card">
                 <FileCode size={20} />
-                <div className="dd-stat-value">{stats.gitChangedFiles}</div>
-                <div className="dd-stat-label">Changed Files</div>
+                <div className="dd-stat-value">{stats.gitFilesChangedInRange ?? 0}</div>
+                <div className="dd-stat-label">
+                  Files Changed · {TIMEFRAMES.find(t => t.id === timeframe)?.rangeLabel || 'Today'}
+                </div>
               </div>
               <div className="dd-stat-card">
                 <Layers size={20} />

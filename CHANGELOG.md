@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.28] - 2026-04-23
+
+---
+
+## [v7.6.28] - 2026-04-23
+
+### Added
+- **Developer Dashboard — Day / Week / Month timeframe toggle** — The Commits and Files Changed stat cards now have a segmented control at the top of the panel that switches between today, the last 7 days, and the last 30 days. Previously these stats were hardcoded to "today" with no way to see weekly or monthly velocity.
+- **Mobile Companion PWA — Command Cards access** — The companion terminal screen now has a `⊞` button next to the command input that opens a bottom-sheet grid of your saved Command Cards. Tapping a card runs it against the active mobile session via the existing `/api/mobile/exec` endpoint. System cards (like Release Manager) and paste-only cards appear greyed out with a "PC only" badge — they would have no sensible behaviour on mobile.
+
+### Fixed
+- **Developer Dashboard — "Changed Files" stat now reflects commits, not working tree** — The old stat counted `git status --porcelain` lines (uncommitted edits), so after a commit it would drop to `0` even though the Commits card showed 13 commits. The new `Files Changed` stat counts the unique file paths touched by commits within the selected timeframe, matching the label. The legacy uncommitted-working-tree value is still returned by the API for backwards compatibility but is no longer displayed.
+
 ## [7.6.27] - 2026-04-23
 
 ---
