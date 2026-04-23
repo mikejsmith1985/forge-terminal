@@ -1785,15 +1785,35 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   // Delay the banner by 600ms: on reconnect the server may send
                   // SESSION_JOINED before the previous connection's clearActive defer
                   // fires. If CONTROL_GRANTED arrives in that window we cancel it.
-                  logger.terminal('Joined live session (passive device)', { tabId });
-                  if (xtermRef.current) {
-                    xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
+                  const isLocalDesktopSession =
+                    window.location.hostname === 'localhost' ||
+                    window.location.hostname === '127.0.0.1'
+
+                  if (isLocalDesktopSession) {
+                    // Desktop user reconnecting from localhost — silently reclaim
+                    // control without showing the "another device" banner. A short
+                    // window lets CONTROL_GRANTED arrive first if the prior holder
+                    // has already disconnected; otherwise we request it ourselves.
+                    logger.terminal('Localhost passive join — auto-reclaiming control', { tabId });
+                    clearTimeout(bannerTimerRef.current);
+                    bannerTimerRef.current = setTimeout(() => {
+                      if (wsRef.current?.readyState === WebSocket.OPEN && xtermRef.current) {
+                        const { cols, rows } = xtermRef.current;
+                        wsRef.current.send(JSON.stringify({ type: 'take_control', cols, rows }));
+                      }
+                    }, 300);
+                  } else {
+                    // Remote device viewing: write notice and show banner after debounce.
+                    logger.terminal('Joined live session (passive device)', { tabId });
+                    if (xtermRef.current) {
+                      xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
+                    }
+                    clearTimeout(bannerTimerRef.current);
+                    // 2000ms debounce: on Cloudflare tunnel connections the round-trip
+                    // for the old WS to close and CONTROL_GRANTED to arrive can exceed
+                    // the previous 600ms window, causing false-positive banners.
+                    bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 2000);
                   }
-                  clearTimeout(bannerTimerRef.current);
-                  // 2000ms debounce: on Cloudflare tunnel connections the round-trip
-                  // for the old WS to close and CONTROL_GRANTED to arrive can exceed
-                  // the previous 600ms window, causing false-positive banners.
-                  bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 2000);
                 }
                 return;
               }

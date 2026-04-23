@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [7.6.20] - 2026-04-23
+## [7.6.21] - 2026-04-23
+
+---
+
+## [v7.6.21] - 2026-04-23
+
+## [7.6.21] - 2026-04-23
+
+### Fixed
+- **"Another device controls this terminal" false-positive on desktop** — when the desktop browser reconnects to a session and finds the active slot held by a stale or agent WebSocket connection, localhost connections now silently reclaim control after 300ms (via `take_control`) rather than showing the passive-device banner. The banner and `[Forge Remote]` terminal message are still shown for non-localhost (remote) connections where they remain semantically correct.
+- **QR code shows private IP warning when phone cannot reach it** — a new `isPrivateNetworkForgeUrl` helper detects RFC 1918 (10.x, 172.16–31.x, 192.168.x), Tailscale/IANA-shared (100.64–100.127), and link-local (169.254.x) IPs. When the Forge URL is in one of these ranges, a contextual warning now appears above the QR code explaining that the phone must be on the same LAN/Tailscale network, and directing the user to launch the Cloudflare tunnel for anywhere-access. The QR is still rendered so Tailscale users can still scan it.
+- **Step 1 Tailscale card text clarified** — the card now explicitly states "Tailscale installed on both devices" and includes a note that the phone must have the Tailscale app and be on the same tailnet. Prevents confusion for users whose phone does not have Tailscale.
+- **Tunnel security note corrected** — the companion card now accurately states that the 64-character mobile token protects the companion API but that the tunnel URL itself is publicly accessible, and recommends stopping the tunnel when not in use.
+
+
 
 ---
 

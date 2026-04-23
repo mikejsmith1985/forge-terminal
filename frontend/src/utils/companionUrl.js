@@ -69,6 +69,41 @@ export function isStaleCompanionHost(storedHost) {
 }
 
 /**
+ * isPrivateNetworkForgeUrl — returns true when the forge URL contains a
+ * private-network or CGNAT IP that is only reachable from devices on the
+ * same LAN or VPN (Tailscale, WireGuard, etc.).
+ *
+ * Covered ranges (all RFC-defined private / shared address spaces):
+ *   RFC 1918 — 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+ *   IANA shared — 100.64.0.0/10  (Tailscale occupies 100.64–100.127)
+ *   Link-local  — 169.254.0.0/16
+ *
+ * Unlike isPhoneUnreachableForgeUrl, these URLs CAN work when both devices
+ * are on the same VPN/LAN.  Call sites should warn the user rather than
+ * hide the QR entirely.
+ *
+ * @param {string|null|undefined} url
+ * @returns {boolean}
+ */
+export function isPrivateNetworkForgeUrl(url) {
+  if (!url) return false
+  try {
+    const { hostname } = new URL(normalizeHttpUrl(url))
+    const parts = hostname.split('.').map(Number)
+    if (parts.length !== 4 || parts.some(isNaN)) return false
+    const [a, b] = parts
+    if (a === 10) return true                             // RFC 1918 class A
+    if (a === 172 && b >= 16 && b <= 31) return true     // RFC 1918 class B
+    if (a === 192 && b === 168) return true               // RFC 1918 class C
+    if (a === 100 && b >= 64 && b <= 127) return true    // Tailscale / IANA shared
+    if (a === 169 && b === 254) return true               // link-local
+    return false
+  } catch {
+    return false
+  }
+}
+
+/**
  * isPhoneUnreachableForgeUrl — returns true when the hostname in forgeUrl
  * is a loopback address (localhost, 127.0.0.1, ::1) that a phone cannot reach.
  *

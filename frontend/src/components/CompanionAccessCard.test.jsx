@@ -176,27 +176,47 @@ describe('CompanionAccessCard — tunnel integration', () => {
     expect(fetch).toHaveBeenCalledWith('/api/tunnel/stop', expect.objectContaining({ method: 'POST' }))
   })
 
-  // ── Tests: error handling ─────────────────────────────────────────────────
+  // ── Tests: private network warning ──────────────────────────────────────
 
-  it('shows an error message when the tunnel fails to start', async () => {
-    fetchHandlers['/api/tunnel/start'] = () =>
-      mockFetchResponse({ error: 'cloudflared not found — install it or use the Forge setup wizard' }, 500)
+  it('shows a private-IP warning above the QR when URL is a Tailscale IP', async () => {
+    // Pre-seed localStorage so the URL input starts with the Tailscale IP.
+    localStorage.setItem('forge.companion.tunnelUrl', 'http://100.127.39.102:3005')
 
     await renderExpanded()
-    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
     await act(async () => { await vi.runAllTimersAsync() })
 
-    expect(screen.getByText(/cloudflared not found/i)).toBeInTheDocument()
+    // The warning paragraph should be visible
+    expect(
+      screen.getByText(/private ip detected/i)
+    ).toBeInTheDocument()
   })
 
-  it('shows a download link when cloudflared is not installed', async () => {
-    fetchHandlers['/api/tunnel/start'] = () =>
-      mockFetchResponse({ error: 'cloudflared not found' }, 500)
+  it('shows a private-IP warning above the QR when URL is a LAN IP', async () => {
+    localStorage.setItem('forge.companion.tunnelUrl', 'http://192.168.1.100:3005')
 
     await renderExpanded()
-    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
     await act(async () => { await vi.runAllTimersAsync() })
 
-    expect(screen.getByRole('link', { name: /download cloudflared/i })).toBeInTheDocument()
+    expect(screen.getByText(/private ip detected/i)).toBeInTheDocument()
+  })
+
+  it('does NOT show the private-IP warning when tunnel URL is a Cloudflare URL', async () => {
+    localStorage.setItem('forge.companion.tunnelUrl', 'https://abc123.trycloudflare.com')
+
+    await renderExpanded()
+    await act(async () => { await vi.runAllTimersAsync() })
+
+    expect(screen.queryByText(/private ip detected/i)).not.toBeInTheDocument()
+  })
+
+  it('does NOT show the private-IP warning when URL is localhost (blocked at QR level)', async () => {
+    // localhost triggers the "Enter a network-accessible URL" warning, not the private-IP one.
+    localStorage.setItem('forge.companion.tunnelUrl', 'http://localhost:3005')
+
+    await renderExpanded()
+    await act(async () => { await vi.runAllTimersAsync() })
+
+    expect(screen.queryByText(/private ip detected/i)).not.toBeInTheDocument()
   })
 })
+

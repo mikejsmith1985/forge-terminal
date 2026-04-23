@@ -36,6 +36,7 @@ import {
   getDefaultCompanionHost,
   isStaleCompanionHost,
   isPhoneUnreachableForgeUrl,
+  isPrivateNetworkForgeUrl,
   buildDeepLink,
 } from '../utils/companionUrl.js'
 
@@ -528,12 +529,14 @@ const EnabledView = ({
           <ConnectionMethodCard
             icon={<Wifi size={16} />}
             title="Tailscale"
-            description="Both devices on the same tailnet"
+            description="Tailscale installed on both devices"
             hint={
               <>
-                Open the Tailscale app on this PC and copy your machine IP —{' '}
+                Your phone must have the <strong>Tailscale app installed</strong> and
+                be joined to the same tailnet as this PC.{' '}
+                Open Tailscale on this PC and copy your machine IP —{' '}
                 it looks like <code>100.x.x.x</code>.{' '}
-                Then use <code>http://100.x.x.x:3005</code> below.
+                Enter <code>http://100.x.x.x:3005</code> in Step 2.
               </>
             }
           />
@@ -585,11 +588,19 @@ const EnabledView = ({
           </p>
         ) : (
           <>
+            {isPrivateNetworkForgeUrl(tunnelUrl) && (
+              <p className="cac-hint cac-hint--warn">
+                📡 Private IP detected — your phone can only scan this QR if it is
+                on the same Tailscale or LAN network as this PC. For access from
+                anywhere, launch the Cloudflare tunnel in Step 1.
+              </p>
+            )}
             <QRBlock deepLink={deepLink} />
             {isTunnelRunning && (
               <p className="cac-hint cac-hint--security">
-                🔒 Your 64-character mobile token is the authentication barrier — it
-                is required even if someone discovers your tunnel URL.
+                🔒 Your 64-character mobile token protects the companion API.
+                The tunnel URL itself is publicly accessible — stop the tunnel
+                when you are not using it.
               </p>
             )}
           </>

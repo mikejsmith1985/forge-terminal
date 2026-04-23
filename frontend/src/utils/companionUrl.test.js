@@ -8,6 +8,7 @@ import {
   getDefaultCompanionHost,
   isStaleCompanionHost,
   isPhoneUnreachableForgeUrl,
+  isPrivateNetworkForgeUrl,
   buildDeepLink,
 } from './companionUrl.js'
 
@@ -175,6 +176,72 @@ describe('isPhoneUnreachableForgeUrl', () => {
 
   it('returns false for a custom domain', () => {
     expect(isPhoneUnreachableForgeUrl('https://forge.mycompany.com')).toBe(false)
+  })
+})
+
+// ── isPrivateNetworkForgeUrl ──────────────────────────────────────────────────
+
+describe('isPrivateNetworkForgeUrl', () => {
+  it('returns true for RFC 1918 class A (10.x.x.x)', () => {
+    expect(isPrivateNetworkForgeUrl('http://10.0.0.1:3005')).toBe(true)
+  })
+
+  it('returns true for RFC 1918 class B (172.16–31.x.x)', () => {
+    expect(isPrivateNetworkForgeUrl('http://172.16.0.1:3005')).toBe(true)
+    expect(isPrivateNetworkForgeUrl('http://172.31.255.255:3005')).toBe(true)
+  })
+
+  it('returns false for 172.15.x.x (just outside RFC 1918 class B lower bound)', () => {
+    expect(isPrivateNetworkForgeUrl('http://172.15.0.1:3005')).toBe(false)
+  })
+
+  it('returns false for 172.32.x.x (just outside RFC 1918 class B upper bound)', () => {
+    expect(isPrivateNetworkForgeUrl('http://172.32.0.1:3005')).toBe(false)
+  })
+
+  it('returns true for RFC 1918 class C (192.168.x.x)', () => {
+    expect(isPrivateNetworkForgeUrl('http://192.168.1.50:3005')).toBe(true)
+  })
+
+  it('returns true for Tailscale IP (100.64–100.127 range)', () => {
+    expect(isPrivateNetworkForgeUrl('http://100.127.39.102:3005')).toBe(true)
+    expect(isPrivateNetworkForgeUrl('http://100.64.0.1:3005')).toBe(true)
+  })
+
+  it('returns false for 100.63.x.x (just below IANA shared range)', () => {
+    expect(isPrivateNetworkForgeUrl('http://100.63.0.1:3005')).toBe(false)
+  })
+
+  it('returns false for 100.128.x.x (just above IANA shared range)', () => {
+    expect(isPrivateNetworkForgeUrl('http://100.128.0.1:3005')).toBe(false)
+  })
+
+  it('returns true for link-local (169.254.x.x)', () => {
+    expect(isPrivateNetworkForgeUrl('http://169.254.0.1:3005')).toBe(true)
+  })
+
+  it('returns false for a Cloudflare tunnel URL (public)', () => {
+    expect(isPrivateNetworkForgeUrl('https://abc123.trycloudflare.com')).toBe(false)
+  })
+
+  it('returns false for a custom public domain', () => {
+    expect(isPrivateNetworkForgeUrl('https://forge.mycompany.com')).toBe(false)
+  })
+
+  it('returns false for localhost (loopback, not private network)', () => {
+    expect(isPrivateNetworkForgeUrl('http://localhost:3005')).toBe(false)
+  })
+
+  it('returns false for 127.0.0.1 (loopback, not private network)', () => {
+    expect(isPrivateNetworkForgeUrl('http://127.0.0.1:3005')).toBe(false)
+  })
+
+  it('returns false for null input', () => {
+    expect(isPrivateNetworkForgeUrl(null)).toBe(false)
+  })
+
+  it('returns false for empty string', () => {
+    expect(isPrivateNetworkForgeUrl('')).toBe(false)
   })
 })
 
