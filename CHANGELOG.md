@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.6.30] - 2026-04-23
 
+---
+
+## [v7.6.30] - 2026-04-23
+
+## [7.6.30] - 2026-04-23
+
 ### Fixed
 - **UI flicker on dashboards with active tunnels.** `buildCSP()` + `CORSMiddleware` were re-reading `state.json` and `notify_config.json` from disk on **every** HTTP response. On a dashboard polling `/api/tunnel/options` every 10s plus normal asset traffic, this produced dozens of disk reads per second and slowed header flush enough to cause visible flicker on repaint. Tunnel hostnames are now memoized with a 5s TTL and invalidated on notify-config writes.
 
