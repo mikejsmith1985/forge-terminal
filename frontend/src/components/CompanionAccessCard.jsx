@@ -492,6 +492,7 @@ const RemoteAccessControl = ({
 
   if (isTunnelRunning && tunnelUrl) {
     const providerLabel = detectTunnelProviderLabel(tunnelUrl)
+    const isStableUrl = providerLabel === 'Tailscale'
     return (
       <div className="cac-tunnel-control">
         <div className="cac-tunnel-active">
@@ -509,8 +510,10 @@ const RemoteAccessControl = ({
           </button>
         </div>
         <p className="cac-hint cac-hint--security">
-          🔒 HTTPS end-to-end. Your phone authenticates with a 64-character token
-          stored only on this PC. Stop the tunnel when you are done.
+          🔒 HTTPS end-to-end. Your 64-character mobile token is what protects
+          this connection — without it, the URL is useless. {isStableUrl
+            ? 'Scan the QR once; this URL stays the same every time Forge starts, so the link keeps working from anywhere your phone has internet.'
+            : 'Note: Cloudflare gives you a fresh URL every launch, so you\u2019ll need to rescan the QR next time Forge starts. Install Tailscale for a stable scan-once URL.'}
         </p>
       </div>
     )
@@ -582,14 +585,14 @@ function buildProviderCaption(providers) {
   const { selected, tailscale, cloudflare, explicit } = providers
   if (selected === 'tailscale') {
     return explicit
-      ? 'Uses Tailscale Funnel (from your Settings).'
-      : 'Uses Tailscale Funnel — detected on this PC. Stable URL, signed HTTPS.'
+      ? 'Uses Tailscale Funnel (from your Settings) — stable URL, scan once, always on.'
+      : 'Uses Tailscale Funnel — detected on this PC. Stable HTTPS URL, scan QR once, works from anywhere.'
   }
   if (selected === 'cloudflare') {
     const why = tailscale?.available === false && tailscale?.reason
       ? ` ${tailscale.reason} — using Cloudflare instead.`
       : ''
-    return `Uses a Cloudflare quick tunnel — a fresh HTTPS URL every launch.${why}`
+    return `Uses a Cloudflare quick tunnel — fresh HTTPS URL every launch, so you'll need to rescan the QR next time.${why} Tip: install Tailscale for a stable scan-once URL.`
   }
   if (!tailscale?.available && !cloudflare?.available) return null
   return 'Starts a secure tunnel so your phone can reach Forge from anywhere.'
@@ -689,8 +692,9 @@ const EnabledView = ({
             {isTunnelRunning && (
               <p className="cac-hint cac-hint--security">
                 🔒 Your 64-character mobile token protects the companion API.
-                The tunnel URL itself is publicly accessible — stop the tunnel
-                when you are not using it.
+                Without it, the tunnel URL alone cannot read or control
+                anything. Leave Forge running on this PC so your phone can
+                reach it from anywhere.
               </p>
             )}
           </>

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.26] - 2026-04-23
+
+---
+
+## [v7.6.26] - 2026-04-23
+
+### Fixed
+- **Companion tab names now match the desktop app** — The mobile companion was rendering `Session: <uuid-prefix>` for every card and `Terminal · <sessionId>` in the header, ignoring the human-readable tab title that `/api/mobile/sessions` already returns in `tabTitle`. The session picker and terminal header now use the same title shown on the desktop tab (e.g. `forge-terminal`, `ToolBox`).
+- **Command input no longer hidden behind the iOS keyboard** — The screen container now sizes itself to `window.visualViewport.height` and updates whenever the keyboard opens, closes, or the orientation changes. Focusing the command input also scrolls it into view, so typing is always visible on iPhone Safari where `100svh` does not shrink while the keyboard is open.
+- **Tunnel lifecycle messaging rewritten for on-the-go use** — Previous copy told users to "stop the tunnel when you are done", which contradicts the primary use case (mobile access while away from the PC). The security summary now explains that the 64-character token is the protection boundary and, when Tailscale is active, emphasises that the stable URL means **scan the QR once and it keeps working** across Forge restarts. Cloudflare ephemeral users are explicitly warned that the URL changes every launch and they'll need to rescan, with an install hint for Tailscale as the scan-once alternative.
+
 ## [7.6.25] - 2026-04-23
 
 ---

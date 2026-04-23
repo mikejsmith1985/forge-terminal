@@ -43,11 +43,20 @@
     }
 
     /* ── Screen Container ───────────────────────────────────────────────── */
+    /*
+     * Height resolution:
+     *  - --viewport-height is set at runtime from window.visualViewport.height
+     *    whenever the keyboard opens/closes, so the command bar stays visible
+     *    above the on-screen keyboard on iOS Safari (where 100svh does not
+     *    resize reliably while the keyboard is open).
+     *  - Falls back to 100svh on browsers without visualViewport, then 100vh.
+     */
     .screen {
       display: none;
       flex-direction: column;
+      height: 100vh; /* oldest fallback */
       height: 100svh;
-      height: 100vh; /* fallback */
+      height: var(--viewport-height, 100svh);
       padding-top: var(--safe-top);
       padding-bottom: var(--safe-bottom);
     }
@@ -566,9 +575,15 @@
         return;
       }
 
-      container.innerHTML = sessions.map(session => `
+      container.innerHTML = sessions.map(session => {
+        // Prefer the desktop tab title (matches the tabs in the PC app) and
+        // fall back to a short session-ID slice when the title is missing.
+        const cardTitle = session.tabTitle && session.tabTitle.trim()
+          ? session.tabTitle
+          : session.sessionId.slice(0, 16) + '…';
+        return `
         <div class="card" data-session-id="${session.sessionId}">
-          <div class="card-title">Session: ${escapeHtml(session.sessionId.slice(0, 16))}…</div>
+          <div class="card-title">${escapeHtml(cardTitle)}</div>
           <div class="card-meta">
             <span class="${session.isDetached ? 'badge badge-orange' : 'badge badge-green'}">
               ${session.isDetached ? 'Detached' : 'Active'}
@@ -576,7 +591,7 @@
             <span style="margin-left:8px;">${session.connectedClients} client${session.connectedClients !== 1 ? 's' : ''}</span>
           </div>
         </div>
-      `).join('');
+      `;}).join('');
 
       // Attach click handlers to each session card.
       container.querySelectorAll('.card').forEach(card => {
@@ -594,8 +609,14 @@
   // ── Terminal Screen ───────────────────────────────────────────────────────────
   function openTerminal(session) {
     activeSession = session;
-    document.getElementById('terminal-session-title').textContent =
-      'Terminal · ' + session.sessionId.slice(0, 12);
+    // Prefer the human-readable tab title supplied by the backend so the header
+    // matches what the user sees in the desktop Forge app. Fall back to a short
+    // session-ID slice only when the title is unavailable (e.g. sessions.json
+    // missing or the tab was never named).
+    const displayTitle = session.tabTitle && session.tabTitle.trim()
+      ? session.tabTitle
+      : session.sessionId.slice(0, 12);
+    document.getElementById('terminal-session-title').textContent = displayTitle;
     document.getElementById('terminal-output').textContent = '';
     showScreen('screen-terminal');
     startPolling();
@@ -729,6 +750,33 @@
     document.getElementById('btn-send-command').addEventListener('click', sendCommand);
     document.getElementById('command-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') sendCommand();
+    });
+
+    // Track the iOS on-screen keyboard via visualViewport and push the screen
+    // height down to match. Without this, the command input is hidden behind
+    // the keyboard on iOS Safari because `100svh` does not shrink reliably
+    // while the keyboard is open. See .screen CSS rule above.
+    function syncViewportHeight() {
+      const viewportHeightPx = window.visualViewport
+        ? window.visualViewport.height
+        : window.innerHeight;
+      document.documentElement.style.setProperty('--viewport-height', viewportHeightPx + 'px');
+    }
+    syncViewportHeight();
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncViewportHeight);
+      window.visualViewport.addEventListener('scroll', syncViewportHeight);
+    }
+    window.addEventListener('resize', syncViewportHeight);
+    window.addEventListener('orientationchange', syncViewportHeight);
+
+    // When the input gains focus, scroll it into view so iOS doesn't leave it
+    // behind the keyboard on the first focus (visualViewport resize fires a
+    // moment later).
+    document.getElementById('command-input').addEventListener('focus', () => {
+      setTimeout(() => {
+        document.getElementById('command-input').scrollIntoView({ block: 'end' });
+      }, 50);
     });
 
     // Read deep link fragment (from QR code / desktop share button).
