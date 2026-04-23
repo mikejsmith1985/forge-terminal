@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tunnel health state machine + capability-ranked selector** (`internal/tunnel/health.go`) — foundation for v7.6.29 unified mobile access. Every tunnel mode (Named Cloudflare Tunnel, Tailscale Funnel, Quick Tunnel, LAN) now carries a `HealthState` with a lifecycle stage (Absent → Configured → Starting → Healthy ↔ Degraded / Stopped). The new `Ranker` picks the single best option to publish to the companion, with the contract that `Healthy` strictly beats `Configured` which strictly beats `Degraded`. A broken Named Tunnel will no longer mask a working Quick Tunnel just because `cloudflared` has a config file on disk.
+
 ## [7.6.18] - 2026-04-22
 
 ---
