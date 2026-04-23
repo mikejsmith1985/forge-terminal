@@ -4,9 +4,36 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/tunnel"
 )
+
+// tunnelHostnameCache memoizes the result of tunnelHostnamesForCSPUncached
+// so SecureHeaders + CORSMiddleware don't re-read state.json / notify config
+// from disk on every HTTP response. Without this cache a busy dashboard
+// polling /api/tunnel/options every 10s + normal asset traffic triggers
+// dozens of disk reads per second, which slows header flush enough to
+// cause visible UI flicker on re-paint.
+//
+// TTL is intentionally short (5s) so that tunnel setup wizard writes are
+// reflected quickly without needing an explicit invalidation hook.
+var (
+	tunnelHostnameCacheTTL = 5 * time.Second
+	tunnelHostnameCacheMu  sync.RWMutex
+	tunnelHostnameCacheAt  time.Time
+	tunnelHostnameCacheVal []string
+)
+
+// invalidateTunnelHostnameCache forces the next tunnelHostnamesForCSP call
+// to re-read from disk. Call after writing wizard state or notify config
+// so CSP picks up the new hostname immediately instead of waiting out TTL.
+func invalidateTunnelHostnameCache() {
+	tunnelHostnameCacheMu.Lock()
+	tunnelHostnameCacheAt = time.Time{}
+	tunnelHostnameCacheMu.Unlock()
+}
 
 // rootlevellabsOrigin returns true when origin is https://rootlevellabs.tech
 // or any subdomain (e.g. https://license.rootlevellabs.tech).
@@ -28,6 +55,27 @@ func rootlevellabsOrigin(origin string) bool {
 // Quick Tunnel hosts (*.trycloudflare.com) are covered by a wildcard
 // below — no need to enumerate them here.
 func tunnelHostnamesForCSP() []string {
+	tunnelHostnameCacheMu.RLock()
+	if !tunnelHostnameCacheAt.IsZero() && time.Since(tunnelHostnameCacheAt) < tunnelHostnameCacheTTL {
+		val := tunnelHostnameCacheVal
+		tunnelHostnameCacheMu.RUnlock()
+		return val
+	}
+	tunnelHostnameCacheMu.RUnlock()
+
+	val := tunnelHostnamesForCSPUncached()
+
+	tunnelHostnameCacheMu.Lock()
+	tunnelHostnameCacheVal = val
+	tunnelHostnameCacheAt = time.Now()
+	tunnelHostnameCacheMu.Unlock()
+
+	return val
+}
+
+// tunnelHostnamesForCSPUncached is the disk-reading implementation.
+// Call tunnelHostnamesForCSP() in production hot paths.
+func tunnelHostnamesForCSPUncached() []string {
 	var out []string
 	seen := map[string]bool{}
 

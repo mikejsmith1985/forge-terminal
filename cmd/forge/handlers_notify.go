@@ -113,7 +113,11 @@ func saveNotifyConfig(cfg NotifyConfig) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0600)
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return err
+	}
+	invalidateTunnelHostnameCache()
+	return nil
 }
 
 // ── Transport interface (future-proof for Twilio, etc.) ──────────────────────
