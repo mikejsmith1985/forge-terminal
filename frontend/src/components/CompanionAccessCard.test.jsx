@@ -239,15 +239,57 @@ describe('CompanionAccessCard — tunnel integration', () => {
     expect(screen.getByText(/qr code will appear/i)).toBeInTheDocument()
   })
 
-  it('shows the Cloudflare card as active while the tunnel is launching', async () => {
+  it('shows the Remote Access card as active while the tunnel is launching', async () => {
     await renderExpanded()
     fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
     await act(async () => { await vi.runAllTimersAsync() })
 
-    // The Cloudflare method card should carry the active CSS class so the user
+    // The Remote Access card should carry the active CSS class so the user
     // can see which connection path they are on.
-    const cloudflareCard = screen.getByText(/cloudflare tunnel/i).closest('.cac-method-card')
-    expect(cloudflareCard).toHaveClass('cac-method-card--active')
+    const remoteCard = screen.getByText(/remote access/i).closest('.cac-method-card')
+    expect(remoteCard).toHaveClass('cac-method-card--active')
+  })
+
+  // ── Tests: tunnel provider label ────────────────────────────────────────────
+
+  it('shows "Tailscale active" when the tunnel URL is a ts.net domain', async () => {
+    fetchHandlers['/api/tunnel/status'] = () =>
+      mockFetchResponse({ running: true, url: 'https://mikesdell.taila9144e.ts.net', error: '' })
+
+    await renderExpanded()
+    await act(async () => { await vi.runAllTimersAsync() })
+
+    expect(screen.getByText(/tailscale active/i)).toBeInTheDocument()
+  })
+
+  it('shows "Cloudflare active" when the tunnel URL is a trycloudflare.com domain', async () => {
+    fetchHandlers['/api/tunnel/status'] = () =>
+      mockFetchResponse({ running: true, url: 'https://abc123.trycloudflare.com', error: '' })
+
+    await renderExpanded()
+    await act(async () => { await vi.runAllTimersAsync() })
+
+    expect(screen.getByText(/cloudflare active/i)).toBeInTheDocument()
+  })
+
+  it('shows "Tunnel active" when the tunnel URL is a custom domain', async () => {
+    fetchHandlers['/api/tunnel/status'] = () =>
+      mockFetchResponse({ running: true, url: 'https://forge.example.com', error: '' })
+
+    await renderExpanded()
+    await act(async () => { await vi.runAllTimersAsync() })
+
+    expect(screen.getByText(/tunnel active/i)).toBeInTheDocument()
+  })
+
+  it('shows the Remote Access card as active when a public HTTPS URL is entered manually', async () => {
+    localStorage.setItem('forge.companion.tunnelUrl', 'https://myserver.example.com:3005')
+
+    await renderExpanded()
+    await act(async () => { await vi.runAllTimersAsync() })
+
+    const remoteCard = screen.getByText(/remote access/i).closest('.cac-method-card')
+    expect(remoteCard).toHaveClass('cac-method-card--active')
   })
 })
 

@@ -420,11 +420,28 @@ const DisabledView = ({ onEnable, isTogglePending }) => (
  * Launch Tunnel button. Forge starts cloudflared on the backend and polls
  * for the public HTTPS URL, then auto-fills Step 2 when ready.
  */
-const CloudflareTunnelHint = ({
+// detectTunnelProviderLabel returns a short label for the tunnel provider
+// based on the URL's hostname suffix. Used in the "Remote Access" hint to tell
+// the user which technology is currently routing their connection.
+function detectTunnelProviderLabel(tunnelUrlString) {
+  if (!tunnelUrlString) return 'Tunnel'
+  try {
+    const hostname = new URL(tunnelUrlString).hostname.toLowerCase()
+    // *.ts.net = Tailscale-managed domain (Funnel or MagicDNS)
+    if (hostname.endsWith('.ts.net')) return 'Tailscale'
+    // *.trycloudflare.com = Cloudflare ephemeral tunnel
+    if (hostname.endsWith('.trycloudflare.com')) return 'Cloudflare'
+  } catch {
+    // malformed URL — fall through to generic label
+  }
+  return 'Tunnel'
+}
+
+const RemoteAccessHint = ({
   isTunnelRunning,
   isTunnelLaunching,
   tunnelStartError,
-  isTunnelNotFound,
+  isCloudflaredMissing,
   tunnelUrl,
   onLaunch,
   onStop,
@@ -439,10 +456,11 @@ const CloudflareTunnelHint = ({
   }
 
   if (isTunnelRunning && tunnelUrl) {
+    const providerLabel = detectTunnelProviderLabel(tunnelUrl)
     return (
       <span className="cac-tunnel-active">
         <Radio size={14} className="cac-tunnel-active-icon" />
-        Tunnel active: <code className="cac-tunnel-url">{tunnelUrl}</code>
+        {providerLabel} active: <code className="cac-tunnel-url">{tunnelUrl}</code>
         <button
           className="cac-btn cac-btn-ghost cac-btn-stop"
           onClick={onStop}
@@ -465,7 +483,7 @@ const CloudflareTunnelHint = ({
       </button>
       {tunnelStartError && (
         <span className="cac-tunnel-error">
-          {isTunnelNotFound
+          {isCloudflaredMissing
             ? <>cloudflared not found. <a
                 href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
                 target="_blank"
@@ -484,7 +502,7 @@ const CloudflareTunnelHint = ({
  * EnabledView — guided step-by-step connection flow.
  *
  * The user flow is intentionally simple:
- *   Step 1 — Pick how to expose Forge (Tailscale IP or Cloudflare Tunnel)
+ *   Step 1 — Pick connection method: Same Network or Remote Access (via tunnel)
  *   Step 2 — Confirm / edit the URL that was pre-filled
  *   Step 3 — Scan the QR code and tap Connect
  *
@@ -512,15 +530,24 @@ const EnabledView = ({
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const deepLink = buildDeepLink(companionHost, tunnelUrl, settings?.mobile_token || '')
 
-  // Whether cloudflared appears to be missing on this machine.
-  const isTunnelNotFound = tunnelStartError?.toLowerCase().includes('not found') ||
-    tunnelStartError?.toLowerCase().includes('cloudflared')
+  // True only when cloudflared is specifically absent (not for Tailscale errors).
+  // Tailscale errors are already user-friendly strings from the Go backend, so
+  // we show them verbatim; cloudflared errors get a download link instead.
+  const isCloudflaredMissing = Boolean(tunnelStartError) &&
+    tunnelStartError.toLowerCase().includes('not found') &&
+    tunnelStartError.toLowerCase().includes('cloudflared')
   const isTunnelRunning = tunnelStatus?.running || Boolean(tunnelStatus?.url)
 
-  // Derive which connection path is currently driving Step 2 so the
-  // corresponding card in Step 1 can be visually highlighted.
-  const isCloudflarePathActive = isTunnelLaunching || isTunnelRunning
-  const isTailscalePathActive  = !isCloudflarePathActive && isPrivateNetworkForgeUrl(tunnelUrl)
+  // "Remote Access" card is active when a tunnel is launching or running, or when
+  // the user has manually entered a public (non-private, non-localhost) URL in Step 2.
+  const hasPublicManualUrl = tunnelUrl.length > 0 &&
+    !isPrivateNetworkForgeUrl(tunnelUrl) &&
+    !isPhoneUnreachableForgeUrl(tunnelUrl)
+  const isRemoteAccessActive = isTunnelLaunching || isTunnelRunning || hasPublicManualUrl
+
+  // "Same Network" card is active only when a local/private IP is in Step 2
+  // and no tunnel is running.
+  const isSameNetworkActive = !isRemoteAccessActive && isPrivateNetworkForgeUrl(tunnelUrl)
 
   return (
     <>
@@ -528,35 +555,35 @@ const EnabledView = ({
       <div className="cac-section">
         <div className="cac-step-header">
           <span className="cac-step-number">1</span>
-          <span className="cac-step-title">How is your phone reaching this PC?</span>
+          <span className="cac-step-title">How will you connect to Forge?</span>
         </div>
         <div className="cac-method-cards">
           <ConnectionMethodCard
             icon={<Wifi size={16} />}
-            title="Tailscale"
-            description="Tailscale installed on both devices"
-            isActive={isTailscalePathActive}
+            title="Same Network"
+            description="LAN, WiFi, or Tailscale IP — phone and PC on the same network"
+            isActive={isSameNetworkActive}
             hint={
               <>
-                Your phone must have the <strong>Tailscale app installed</strong> and
-                be joined to the same tailnet as this PC.{' '}
-                Open Tailscale on this PC and copy your machine IP —{' '}
-                it looks like <code>100.x.x.x</code>.{' '}
-                Enter <code>http://100.x.x.x:3005</code> in Step 2.
+                Your phone must be on the same network as this PC (home WiFi, office
+                LAN, or the same Tailscale tailnet).{' '}
+                Find your PC's local IP or Tailscale IP —{' '}
+                it looks like <code>192.168.x.x</code> or <code>100.x.x.x</code>.{' '}
+                Enter <code>http://&lt;your-ip&gt;:3005</code> in Step 2.
               </>
             }
           />
           <ConnectionMethodCard
             icon={<Globe size={16} />}
-            title="Cloudflare Tunnel"
-            description="Works from anywhere — no Tailscale on phone needed"
-            isActive={isCloudflarePathActive}
+            title="Remote Access"
+            description="Access from anywhere — no VPN or Tailscale on your phone"
+            isActive={isRemoteAccessActive}
             hint={
-              <CloudflareTunnelHint
+              <RemoteAccessHint
                 isTunnelRunning={isTunnelRunning}
                 isTunnelLaunching={isTunnelLaunching}
                 tunnelStartError={tunnelStartError}
-                isTunnelNotFound={isTunnelNotFound}
+                isCloudflaredMissing={isCloudflaredMissing}
                 tunnelUrl={tunnelStatus?.url}
                 onLaunch={onLaunchTunnel}
                 onStop={onStopTunnel}

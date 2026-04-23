@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.24] - 2026-04-23
+
+---
+
+## [v7.6.24] - 2026-04-23
+
+### Fixed
+- **Service worker now actually registers** — `forge-companion/index.html` was never calling `navigator.serviceWorker.register()`, meaning the companion PWA was not caching offline and the browser had no mechanism to pick up new releases. SW registration is now added on window load.
+- **Service worker cache now busts on each release** — `CACHE_NAME` is versioned (`forge-companion-v7.6.24`) and the release script bumps it automatically. Previously the name was hardcoded to `forge-companion-v1` forever, so phones cached the old companion indefinitely.
+- **No-cache headers for companion SW and index** — The Go server now sends `Cache-Control: no-store` for `sw.js` and `index.html`, ensuring the browser always fetches the latest service worker and shell even when a stale HTTP cache entry exists.
+- **Step 1 UX redesigned: "Same Network" vs "Remote Access"** — The two connection-method cards are now labelled by use-case rather than by technology ("Tailscale" / "Cloudflare Tunnel"). "Same Network" (LAN, WiFi, Tailscale IP) and "Remote Access" (Launch Tunnel — accessible from anywhere) are much clearer for first-time users.
+- **Tunnel provider shown when active** — When a tunnel is running the hint now shows the provider name: "Tailscale active", "Cloudflare active", or "Tunnel active" depending on the URL, so the user can see exactly what is routing their connection.
+- **Cloudflare error vs Tailscale error handled separately** — The "cloudflared not found" message and download link now only appear for cloudflared errors; Tailscale error messages (already user-friendly from the Go backend) are shown verbatim instead.
+
 ## [7.6.23] - 2026-04-23
 
 ---

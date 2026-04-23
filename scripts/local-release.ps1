@@ -234,6 +234,10 @@ Update-FileContent "$ROOT\frontend\src\config\tourSteps.js" `
     "const TOUR_VERSION = '[^']*'" "const TOUR_VERSION = '$NEW_VERSION'" `
     "frontend/src/config/tourSteps.js"
 
+Update-FileContent "$ROOT\forge-companion\sw.js" `
+    "forge-companion-v[\d.]+" "forge-companion-v$NEW_VERSION" `
+    "forge-companion/sw.js"
+
 # ── Update CHANGELOG (Unreleased → versioned section) ────────────────────────
 # Inserts a fresh empty [Unreleased] above the current content, then renames
 # the existing [Unreleased] heading to [TAG] - DATE. Single replacement, no

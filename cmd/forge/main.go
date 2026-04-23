@@ -294,7 +294,19 @@ func main() {
 			"run 'cd frontend && npm run build' to regenerate them: %v", companionSubErr)
 	} else {
 		companionFileServer := http.FileServer(http.FS(companionSubFS))
-		http.Handle("/companion/", http.StripPrefix("/companion", companionFileServer))
+		// Wrap the companion file server to prevent HTTP caching of sw.js and
+		// index.html. The browser uses byte-for-byte comparison of sw.js to detect
+		// service-worker updates; if the HTTP cache returns a stale copy the phone
+		// never picks up a new release.
+		http.Handle("/companion/", http.StripPrefix("/companion", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "sw.js") ||
+				r.URL.Path == "/" || r.URL.Path == "" ||
+				strings.HasSuffix(r.URL.Path, "index.html") {
+				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+				w.Header().Set("Pragma", "no-cache")
+			}
+			companionFileServer.ServeHTTP(w, r)
+		})))
 	}
 
 	// Wrap file server with cache-control headers and explicit MIME types

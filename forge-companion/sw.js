@@ -3,7 +3,7 @@
 // Caches the companion shell on install so users get an offline "can't connect"
 // experience instead of a browser error page when Forge isn't reachable.
 // API calls to /api/mobile/* are always fetched from the network — never cached.
-const CACHE_NAME = 'forge-companion-v1';
+const CACHE_NAME = 'forge-companion-v7.6.24';
 
 // Files that make up the companion app shell.
 const APP_SHELL_FILES = [
@@ -14,7 +14,12 @@ const APP_SHELL_FILES = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL_FILES))
+    // Use cache: 'reload' so the browser fetches over the network (ignoring its
+    // own HTTP cache) when populating the app shell. Without this, an HTTP-cached
+    // sw.js would re-populate the old files even after a CACHE_NAME bump.
+    caches.open(CACHE_NAME).then(cache =>
+      cache.addAll(APP_SHELL_FILES.map(url => new Request(url, { cache: 'reload' })))
+    )
   );
   // Take control immediately — don't wait for the old SW to expire.
   self.skipWaiting();

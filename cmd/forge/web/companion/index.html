@@ -739,6 +739,17 @@
       connect();
     }
   });
+
+  // Register the service worker for offline capability.
+  // Scoped to /companion/ so it only intercepts companion requests.
+  // The SW file is versioned via CACHE_NAME — bumping it on each release
+  // forces the browser to re-fetch this file and pick up the new version.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .catch(err => console.warn('[Forge Companion] SW registration failed:', err));
+    });
+  }
 </script>
 </body>
 </html>
