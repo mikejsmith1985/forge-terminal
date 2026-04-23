@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.22] - 2026-04-23
+
+---
+
+## [v7.6.22] - 2026-04-23
+
+## [7.6.22] - 2026-04-23
+
+### Fixed
+- **QR code no longer scannable during Cloudflare tunnel launch** — when the user clicks "Launch Tunnel", Step 3 now replaces the QR canvas with a spinner and a "Tunnel starting… your QR code will appear in ~15 seconds" message. This prevents scanning the stale Tailscale IP that was showing during the 15-second warm-up window and then failing to connect on the phone.
+- **Connection method cards now show active state** — the Tailscale card highlights when the URL in Step 2 is a private/Tailscale IP; the Cloudflare Tunnel card highlights when the tunnel is launching or running. This makes it immediately obvious which connection path is in use.
+- **Step 2 label context** — the label now reads "auto-filling when tunnel is ready…" during launch and "auto-filled by tunnel" when running, so users on the Cloudflare path know not to type anything.
+- **Cloudflare card description updated** — changed from "Free public tunnel via Cloudflare" to "Works from anywhere — no Tailscale on phone needed", directly answering the common question of what this option is for.
+
 ## [7.6.21] - 2026-04-23
 
 ---

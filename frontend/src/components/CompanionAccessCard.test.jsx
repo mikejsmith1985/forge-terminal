@@ -111,7 +111,9 @@ describe('CompanionAccessCard — tunnel integration', () => {
     await renderExpanded()
     fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
     await act(async () => { await vi.runAllTimersAsync() })
-    expect(screen.getByText(/starting|launching/i)).toBeInTheDocument()
+    // Both the Step 1 hint and the Step 3 QR-loading placeholder now show
+    // "starting" text while the tunnel is warming up.
+    expect(screen.getAllByText(/starting|launching/i).length).toBeGreaterThan(0)
   })
 
   // ── Tests: URL auto-population ────────────────────────────────────────────
@@ -217,6 +219,35 @@ describe('CompanionAccessCard — tunnel integration', () => {
     await act(async () => { await vi.runAllTimersAsync() })
 
     expect(screen.queryByText(/private ip detected/i)).not.toBeInTheDocument()
+  })
+
+  // ── Tests: QR hidden while tunnel is launching ───────────────────────────
+
+  it('hides the QR canvas and shows a "starting" message while the tunnel is launching', async () => {
+    // Seed a Tailscale URL so a QR would normally render once launching is over.
+    localStorage.setItem('forge.companion.tunnelUrl', 'http://100.127.39.102:3005')
+
+    await renderExpanded()
+    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
+    await act(async () => { await vi.runAllTimersAsync() })
+
+    // The QR canvas MUST NOT appear while the tunnel is starting — scanning it
+    // now would give the phone the stale Tailscale IP which it can't reach.
+    expect(document.querySelector('canvas')).toBeNull()
+
+    // Step 3 must instead show a clear "wait" message so the user doesn't scan early.
+    expect(screen.getByText(/qr code will appear/i)).toBeInTheDocument()
+  })
+
+  it('shows the Cloudflare card as active while the tunnel is launching', async () => {
+    await renderExpanded()
+    fireEvent.click(screen.getByRole('button', { name: /launch tunnel/i }))
+    await act(async () => { await vi.runAllTimersAsync() })
+
+    // The Cloudflare method card should carry the active CSS class so the user
+    // can see which connection path they are on.
+    const cloudflareCard = screen.getByText(/cloudflare tunnel/i).closest('.cac-method-card')
+    expect(cloudflareCard).toHaveClass('cac-method-card--active')
   })
 })
 

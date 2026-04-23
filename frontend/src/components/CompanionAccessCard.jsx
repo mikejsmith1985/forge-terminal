@@ -517,6 +517,11 @@ const EnabledView = ({
     tunnelStartError?.toLowerCase().includes('cloudflared')
   const isTunnelRunning = tunnelStatus?.running || Boolean(tunnelStatus?.url)
 
+  // Derive which connection path is currently driving Step 2 so the
+  // corresponding card in Step 1 can be visually highlighted.
+  const isCloudflarePathActive = isTunnelLaunching || isTunnelRunning
+  const isTailscalePathActive  = !isCloudflarePathActive && isPrivateNetworkForgeUrl(tunnelUrl)
+
   return (
     <>
       {/* ── Step 1: Connection method ───────────────────────────────────── */}
@@ -530,6 +535,7 @@ const EnabledView = ({
             icon={<Wifi size={16} />}
             title="Tailscale"
             description="Tailscale installed on both devices"
+            isActive={isTailscalePathActive}
             hint={
               <>
                 Your phone must have the <strong>Tailscale app installed</strong> and
@@ -542,8 +548,9 @@ const EnabledView = ({
           />
           <ConnectionMethodCard
             icon={<Globe size={16} />}
-            title="No Tailscale"
-            description="Free public tunnel via Cloudflare"
+            title="Cloudflare Tunnel"
+            description="Works from anywhere — no Tailscale on phone needed"
+            isActive={isCloudflarePathActive}
             hint={
               <CloudflareTunnelHint
                 isTunnelRunning={isTunnelRunning}
@@ -563,7 +570,14 @@ const EnabledView = ({
       <div className="cac-section">
         <div className="cac-step-header">
           <span className="cac-step-number">2</span>
-          <span className="cac-step-title">Paste your Forge URL here</span>
+          <span className="cac-step-title">
+            {isTunnelLaunching
+              ? 'Forge URL — auto-filling when tunnel is ready…'
+              : isTunnelRunning
+                ? 'Forge URL — auto-filled by tunnel'
+                : 'Paste your Forge URL here'
+            }
+          </span>
         </div>
         <input
           className="cac-input"
@@ -580,7 +594,16 @@ const EnabledView = ({
           <span className="cac-step-number">3</span>
           <span className="cac-step-title">Scan with your phone — then tap Connect</span>
         </div>
-        {isPhoneUnreachableForgeUrl(tunnelUrl) ? (
+        {isTunnelLaunching ? (
+          // Do NOT show a stale QR while the tunnel is still starting.
+          // The QR will update automatically once the Cloudflare URL arrives.
+          <div className="cac-qr-loading">
+            <Loader2 size={24} className="cac-spinner" aria-label="Tunnel starting" />
+            <p className="cac-hint">
+              Tunnel starting… your QR code will appear here in ~15 seconds.
+            </p>
+          </div>
+        ) : isPhoneUnreachableForgeUrl(tunnelUrl) ? (
           <p className="cac-hint cac-hint--warn">
             ↑ Enter a network-accessible Forge URL in Step 2 to generate a QR code.
             Use your Tailscale IP (<code>http://100.x.x.x:3005</code>) or launch
@@ -693,8 +716,13 @@ const EnabledView = ({
  * enabled view. Purely informational — shows the user what each tunnel path
  * looks like so they know which URL to paste in Step 2.
  */
-const ConnectionMethodCard = ({ icon, title, description, hint }) => (
-  <div className="cac-method-card">
+/**
+ * ConnectionMethodCard — one of two option cards in Step 1.
+ * When isActive is true a highlight border is applied so the user can see
+ * which connection path is currently driving the QR code in Step 3.
+ */
+const ConnectionMethodCard = ({ icon, title, description, hint, isActive }) => (
+  <div className={`cac-method-card${isActive ? ' cac-method-card--active' : ''}`}>
     <div className="cac-method-card-header">
       <span className="cac-method-icon">{icon}</span>
       <div>
