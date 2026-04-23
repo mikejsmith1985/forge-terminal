@@ -554,6 +554,10 @@ func CreateNamedTunnel(ctx context.Context, hostnameIn string, localPort int) (N
 	if err := writeStateJSON(cfg); err != nil {
 		return NamedConfig{}, fmt.Errorf("write state.json: %w", err)
 	}
+	// 6. Harden perms on every file we just wrote. Non-fatal — a tight
+	//    tunnel is still better than refusing to ship at all if icacls
+	//    is missing; the caller can surface the warning.
+	_ = HardenTunnelDir()
 	return cfg, nil
 }
 

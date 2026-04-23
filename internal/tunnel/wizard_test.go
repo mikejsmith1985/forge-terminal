@@ -19,6 +19,7 @@ func withTempHomeWizard(t *testing.T) string {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("USERPROFILE", dir)
+	t.Setenv("FORGE_TUNNEL_SKIP_HARDEN", "1")
 	return dir
 }
 
