@@ -382,6 +382,10 @@ func main() {
 	http.HandleFunc("/api/setup/check", WrapWithMiddleware(handleSetupCheck))
 	http.HandleFunc("/api/setup/install-cloudflared", WrapWithMiddleware(handleSetupInstallCloudflared))
 	http.HandleFunc("/api/setup/activate", WrapWithMiddleware(handleSetupActivate))
+	http.HandleFunc("/api/tunnel/setup/install", WrapWithMiddleware(handleTunnelSetupInstall))
+	http.HandleFunc("/api/tunnel/setup/login", WrapWithMiddleware(handleTunnelSetupLogin))
+	http.HandleFunc("/api/tunnel/setup/login/status", WrapWithMiddleware(handleTunnelSetupLoginStatus))
+	http.HandleFunc("/api/tunnel/setup/login/cancel", WrapWithMiddleware(handleTunnelSetupLoginCancel))
 
 	// WSL detection API
 	http.HandleFunc("/api/wsl/detect", WrapWithMiddleware(handleWSLDetect))
