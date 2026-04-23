@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.27] - 2026-04-23
+
+---
+
+## [v7.6.27] - 2026-04-23
+
+### Fixed
+- **Follow Me recording no longer resets when switching sidebar views** — The `FollowMeDebugger` component was rendered inside the `sidebarView === 'debug'` branch, so clicking Cards or Files mid-recording unmounted it. React discarded the `isRecording` flag, event buffers, and `MediaRecorder` refs even though the browser's screen-capture stream kept running in the background. The debugger panel is now rendered once and toggled with `display: none`, so state — including the active screen-share session — survives sidebar navigation.
+- **Icon picker no longer closes the Command card when you pick a category** — Every `<button>` inside `IconPicker` (category tabs, the "None" option, and every icon tile) was missing `type="button"`. HTML defaults un-typed buttons to `type="submit"`, and the picker renders inside `CommandModal`'s `<form onSubmit={handleSubmit}>`, so clicking "Languages" (or any icon) submitted the form and closed the modal. All three buttons are now explicitly `type="button"`.
+
 ## [7.6.26] - 2026-04-23
 
 ---

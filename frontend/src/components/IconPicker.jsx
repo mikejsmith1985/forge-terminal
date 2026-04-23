@@ -987,6 +987,7 @@ const IconPicker = ({ selectedIcon, onSelect }) => {
           {CATEGORY_NAMES.map(cat => (
             <button
               key={cat}
+              type="button"
               className={`category-btn ${activeCategory === cat ? 'active' : ''}`}
               onClick={() => setActiveCategory(cat)}
               title={cat}
@@ -1016,6 +1017,7 @@ const IconPicker = ({ selectedIcon, onSelect }) => {
         <div className="icon-grid">
           {/* "None" option */}
           <button
+            type="button"
             className={`icon-option ${!selectedIcon ? 'selected' : ''}`}
             onClick={() => onSelect(null)}
             title="No icon"
@@ -1026,6 +1028,7 @@ const IconPicker = ({ selectedIcon, onSelect }) => {
           {filteredIcons.map(({ name, Icon, label }) => (
             <button
               key={name}
+              type="button"
               className={`icon-option ${selectedIcon === name ? 'selected' : ''}`}
               onClick={() => onSelect(name)}
               title={label}

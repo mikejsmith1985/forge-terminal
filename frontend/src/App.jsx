@@ -1798,19 +1798,34 @@ function App() {
             onSelectionChange={setContextFiles}
             terminalRef={getActiveTerminalRef()}
           />
-        ) : sidebarView === 'debug' ? (
-          <div style={{ overflowY: 'auto', height: '100%' }}>
-            <div style={{ padding: '12px' }}>
-              <WebAppDebuggerCard />
-              <div style={{ marginTop: '16px' }}>
-                <FollowMeDebugger />
-              </div>
+        ) : null}
+
+        {/*
+          Persistent Debugger panel.
+          Rendered always (hidden via display:none when the sidebar is on
+          Cards or Files) so the FollowMeDebugger keeps its MediaRecorder,
+          event buffers, and isRecording state across sidebar view
+          switches. Prior to v7.6.27 the FollowMeDebugger lived inside the
+          sidebarView === 'debug' conditional and was unmounted whenever
+          the user flipped to Cards or Files mid-recording, which silently
+          discarded the recording session while the underlying browser
+          screen-capture stream kept running.
+        */}
+        <div
+          style={{
+            display: sidebarView === 'debug' ? 'block' : 'none',
+            overflowY: 'auto',
+            height: '100%',
+          }}
+        >
+          <div style={{ padding: '12px' }}>
+            <WebAppDebuggerCard />
+            <div style={{ marginTop: '16px' }}>
+              <FollowMeDebugger />
             </div>
           </div>
-        ) : null}
+        </div>
       </div>
-
-      {/* FollowMeDebugger — HIDDEN for subscription release */}
     </div>
   );
 
