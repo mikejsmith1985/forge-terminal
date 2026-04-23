@@ -68,6 +68,9 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
 - **🖥️ Desktop Shortcut**: Create a desktop shortcut from Settings for quick access.
 - **✨ Active Tab Indicator**: Rotating "bead of light" animation for visual clarity.
 
+### Remote / Mobile Access
+- **📱 Unified Connection Setup**: Named Cloudflare Tunnel (stable hostname), Tailscale Funnel, Quick Tunnel, and LAN — all four modes presented in one health-ranked list. See [docs/mobile-access.md](docs/mobile-access.md) for the full walkthrough.
+
 ### Terminal Improvements
 - **⌨️ Smart Keyboard Shortcuts**: Ctrl+C and Ctrl+V work exactly like VS Code:
   - **Ctrl+C with selection**: Copies text to clipboard (no SIGINT)
