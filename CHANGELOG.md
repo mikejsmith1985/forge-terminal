@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.31] - 2026-04-24
+
+---
+
+## [v7.6.31] - 2026-04-24
+
+## [7.6.31] - 2026-04-23
+
+### Fixed
+- **Constant flicker inside open panels (DiagnosticOverlay, UpdateModal).** The problem-detection effect in `DiagnosticOverlay` had `events` in its dependency array, so every incoming diagnostic event tore down and recreated the 2 s `setInterval`, and each re-run called `setProblems(...)` — producing a re-render storm that manifested as a visible dark/light flicker inside any open overlay and made the Close button nearly unclickable. The interval now reads the latest events via `diagnosticCore.getEvents()` inside the callback; `[isOpen]` is the correct dependency. The `UpdateModal` close-reset effect had the same class of bug (`[isOpen, pollingInterval, timeoutTimer]`) and was collapsed to `[isOpen]` for the same reason.
+
+### Added
+- **Named Cloudflare Tunnel setup UI** (`NamedTunnelSetupCard`) — surfaces the v7.6.29 wizard backend (install → log in → pick zone → create) that previously had no UI wiring. Users authorizing Forge on their Cloudflare account can now complete the full `cloudflared` install + login + `forge.<yourdomain>` creation flow from the sidebar without touching the CLI. The v7.6.29 `ConnectionSetupCard` is also now mounted — it was built but never imported into any render path, so the ranked-connection-mode selector has been invisible since v7.6.29. (UAT regression fix: "compiled but not deployed" miss.)
+
 ## [7.6.30] - 2026-04-23
 
 ---

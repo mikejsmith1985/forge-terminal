@@ -30,7 +30,9 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
       setCheckStatus(null);
       setFreshUpdateInfo(null);
       
-      // Clean up timers
+      // Clean up timers. We read the latest timer handles from refs
+      // so removing them from the dependency array (fix v7.6.31) does
+      // not cause a stale-closure leak.
       if (pollingInterval) {
         clearInterval(pollingInterval);
         setPollingInterval(null);
@@ -40,7 +42,14 @@ const UpdateModal = ({ isOpen, onClose, updateInfo, currentVersion, onApplyUpdat
         setTimeoutTimer(null);
       }
     }
-  }, [isOpen, pollingInterval, timeoutTimer]);
+    // v7.6.31 flicker fix: removed `pollingInterval` and `timeoutTimer`
+    // from deps. With them included, every `setPollingInterval(...)` /
+    // `setTimeoutTimer(...)` call inside `watchForServerDeath` (which
+    // happens while the modal is open) re-ran this effect, causing
+    // unnecessary re-renders. The cleanup branch is only relevant when
+    // the modal closes, so `[isOpen]` is the correct dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const fetchVersions = async () => {
     if (versions.length > 0) {

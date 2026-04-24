@@ -139,7 +139,18 @@ const DiagnosticOverlay = ({ isOpen, onClose, position = 'right' }) => {
     detectProblems();
     const interval = setInterval(detectProblems, 2000);
     return () => clearInterval(interval);
-  }, [isOpen, events]);
+    // v7.6.31 flicker fix: removed `events` from deps. The previous
+    // `[isOpen, events]` made this effect tear down + recreate the
+    // 2s interval on every event arrival (dozens per second during an
+    // active diagnostic session). Each re-run also called
+    // `setProblems(...)`, producing a re-render storm inside the
+    // overlay that manifested as a constant dark/light flicker and
+    // made the close button nearly unclickable. `detectProblems` reads
+    // the latest events via `diagnosticCore.getEvents()` so the stale-
+    // closure concern that would normally justify the dependency does
+    // not apply here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Handle export
   const handleExport = useCallback(() => {

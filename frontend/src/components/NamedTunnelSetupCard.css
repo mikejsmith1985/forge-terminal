@@ -1,0 +1,190 @@
+/* NamedTunnelSetupCard.css — v7.6.31
+ * Follows the visual language of CompanionAccessCard / ConnectionSetupCard:
+ *  - Dark card with 1px subtle border
+ *  - Chevron-expand header row
+ *  - Primary / secondary / ghost buttons sharing sidebar token palette
+ */
+
+.nts-card {
+  background: var(--surface-bg, #0d1117);
+  border: 1px solid var(--surface-border, #30363d);
+  border-radius: 8px;
+  margin: 8px 0;
+  color: var(--surface-fg, #e6edf3);
+  font-size: 13px;
+}
+
+.nts-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.nts-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.nts-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.nts-sub {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-fg, #8b949e);
+}
+
+.nts-body {
+  padding: 10px 12px 14px;
+  border-top: 1px solid var(--surface-border, #30363d);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nts-step-desc {
+  margin: 0;
+  color: var(--muted-fg, #8b949e);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.nts-label {
+  font-size: 12px;
+  color: var(--muted-fg, #8b949e);
+  margin-bottom: 2px;
+}
+
+.nts-input {
+  background: var(--input-bg, #161b22);
+  color: inherit;
+  border: 1px solid var(--surface-border, #30363d);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.nts-input:focus {
+  outline: none;
+  border-color: #1f6feb;
+}
+
+.nts-preview {
+  font-size: 12px;
+  color: var(--muted-fg, #8b949e);
+}
+.nts-preview code {
+  background: rgba(110, 118, 129, 0.12);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.nts-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  width: fit-content;
+}
+.nts-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.nts-btn-primary {
+  background: #238636;
+  color: #fff;
+}
+.nts-btn-primary:hover:not(:disabled) { background: #2ea043; }
+.nts-btn-secondary {
+  background: transparent;
+  border-color: var(--surface-border, #30363d);
+  color: inherit;
+}
+.nts-btn-secondary:hover { background: rgba(255,255,255,0.04); }
+.nts-btn-ghost {
+  background: transparent;
+  color: var(--muted-fg, #8b949e);
+  padding: 4px 8px;
+}
+.nts-btn-ghost:hover { color: #e6edf3; }
+
+.nts-auth-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  word-break: break-all;
+  padding: 6px 8px;
+  background: rgba(110, 118, 129, 0.1);
+  border-radius: 4px;
+  color: var(--muted-fg, #8b949e);
+}
+
+.nts-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  color: #ffa198;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.nts-loading {
+  color: var(--muted-fg, #8b949e);
+  font-size: 12.5px;
+}
+
+.nts-ready {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.nts-ready-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #3fb950;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.nts-hostname a {
+  color: #58a6ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  word-break: break-all;
+}
+.nts-hostname a:hover { text-decoration: underline; }
+
+.nts-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nts-spin {
+  animation: nts-spin 1s linear infinite;
+}
+@keyframes nts-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
