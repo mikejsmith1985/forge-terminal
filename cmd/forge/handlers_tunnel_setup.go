@@ -179,10 +179,37 @@ func handleTunnelSetupCreate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
+
+	// Start the supervisor immediately so the tunnel is live right after
+	// setup — the user should not have to restart Forge manually.
+	go startNamedSupervisorIfConfigured(context.Background())
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status": "created",
 		"config": cfg,
 	})
+}
+
+// handleTunnelSetupRestart stops any running Named Tunnel supervisor and starts
+// a fresh one using the current wizard configuration.  Intended for the
+// "Repair tunnel" recovery action surfaced when the tunnel is Degraded or
+// Stopped.  Returns immediately; the supervisor runs asynchronously.
+func handleTunnelSetupRestart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// Quick synchronous precondition check — no point starting a goroutine
+	// when there's nothing to start.
+	st := tunnel.LoadWizardState()
+	if !st.Created || st.Config == nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "no named tunnel configured — complete the setup wizard first",
+		})
+		return
+	}
+	go startNamedSupervisorIfConfigured(context.Background())
+	writeJSON(w, http.StatusOK, map[string]string{"status": "restarting"})
 }
 
 // handleTunnelSetupStatus returns the wizard's aggregate state so the UI

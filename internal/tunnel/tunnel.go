@@ -247,13 +247,15 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 		}
 	}
 
-	// Reset any existing funnel config to avoid "listener already exists" errors.
-	// Result is intentionally discarded — a failed reset is non-fatal.
+	// Step 2: reset any existing funnel config first to avoid "listener already exists" errors,
+	// then enable Funnel for the local port.
+	// Run with a 30-second timeout — the command should exit in under a second
+	// once the daemon is running; the timeout guards against daemon hangs.
 	resetCtx, resetCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer resetCancel()
 	resetCmd := exec.CommandContext(resetCtx, bin, "funnel", "--reset")
-	hideWindow(resetCmd) // Prevent console flash on Windows
-	resetCmd.Run()       //nolint:errcheck
+	hideWindow(resetCmd)
+	resetCmd.Run() //nolint:errcheck
 
 	funnelCtx, funnelCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer funnelCancel()
@@ -324,19 +326,17 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 }
 
 // resetTailscaleFunnel disables the Tailscale Funnel configuration for this device.
-// Tries `--reset` first (newer syntax) then falls back to the positional `reset`
-// sub-command for older Tailscale versions.
 func resetTailscaleFunnel(bin string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	resetCmd1 := exec.CommandContext(ctx, bin, "funnel", "--reset")
-	hideWindow(resetCmd1) // Prevent console flash on Windows
-	if err := resetCmd1.Run(); err != nil {
+	cmd := exec.CommandContext(ctx, bin, "funnel", "--reset")
+	hideWindow(cmd)
+	if err := cmd.Run(); err != nil {
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel2()
-		resetCmd2 := exec.CommandContext(ctx2, bin, "funnel", "reset")
-		hideWindow(resetCmd2)
-		resetCmd2.Run() //nolint:errcheck
+		cmd2 := exec.CommandContext(ctx2, bin, "funnel", "reset")
+		hideWindow(cmd2)
+		cmd2.Run() //nolint:errcheck
 	}
 }
 
