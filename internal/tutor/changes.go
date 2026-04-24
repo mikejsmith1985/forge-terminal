@@ -151,6 +151,7 @@ func runGitCommand(projectPath string, args ...string) (string, error) {
 	}
 
 	cmd := exec.Command("git", args...)
+	hideExecWindow(cmd) // Prevent CMD window flash on Windows for Change Wizard git calls
 	cmd.Dir = absPath
 
 	var stdout, stderr bytes.Buffer

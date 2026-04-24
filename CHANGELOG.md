@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Named Tunnel setup stuck on "Loading…" when zone list fails** — `NamedTunnelSetupCard` silently ignored errors from `/api/tunnel/setup/zones` and displayed a perpetual "Loading…" placeholder, blocking users who had a valid cert but whose API token couldn't enumerate zones (common with scoped tokens and single-zone accounts). The card now surfaces the error, adds an "Enter domain manually" fallback with a text input, and disables the select while loading so the state is unambiguous.
+- **"Connected" badge contradicted "stopped — Repair tunnel" banner** — The `NamedTunnelSetupCard` "Connected" label described config presence (cert + credentials + config.yml on disk) while the neighboring `ConnectionSetupCard` showed live supervisor health, producing a visible contradiction when `cloudflared` was crash-looped or unstarted. Relabeled to "Configured" and added an inline note pointing users to the runtime status card above, so the two cards communicate complementary state rather than disagreeing.
+- **Remaining CMD window flashes on Windows** — Added `hideExecWindow()` to three outstanding bare `exec.Command` callsites that still flashed console windows: `tutor/changes.go` (git calls fired by the Change Wizard every time an agent runs), `files/handler.go` wsl-home probe, and `files/handler.go` ffmpeg video-frame extraction. Completes the flash-suppression work started in v7.6.32.
+
+### Added
+- **QR code for Named Tunnel URL** — The ready state of `NamedTunnelSetupCard` now renders a QR code of `https://<hostname>` using the same `qrcode` library already used by `CompanionAccessCard`. Scanning with a phone camera opens the tunnel URL directly, removing the need to hand-type a domain or copy-paste from desktop to mobile. A "Copy URL" button sits beside it for manual transfer.
+
 ## [7.6.32] - 2026-04-24
 
 ---

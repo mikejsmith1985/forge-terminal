@@ -16,7 +16,8 @@
 // is intentionally no always-on timer to avoid contributing to the
 // broader re-render flicker issue fixed elsewhere in v7.6.31.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import QRCode from 'qrcode'
 import {
   Cloud,
   ChevronDown,
@@ -26,6 +27,8 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
+  Copy,
+  Smartphone,
 } from 'lucide-react'
 import './NamedTunnelSetupCard.css'
 
@@ -43,8 +46,12 @@ const NamedTunnelSetupCard = () => {
   const [login, setLogin]               = useState(null) // LoginSnapshot
   const [zones, setZones]               = useState([])
   const [zonesLoaded, setZonesLoaded]   = useState(false)
+  const [zonesError, setZonesError]     = useState('')
+  const [manualZoneMode, setManualZoneMode] = useState(false)
+  const [manualZone, setManualZone]     = useState('')
   const [selectedZone, setSelectedZone] = useState('')
   const [subdomain, setSubdomain]       = useState('forge')
+  const [copied, setCopied]             = useState(false)
 
   // ── Fetch helpers ────────────────────────────────────────────────
 
@@ -100,15 +107,29 @@ const NamedTunnelSetupCard = () => {
   // ── Zone loading (lazy, only when needed) ────────────────────────
 
   const loadZones = useCallback(async () => {
+    setZonesError('')
     try {
       const res = await fetch('/api/tunnel/setup/zones')
-      const body = await res.json()
+      const body = await res.json().catch(() => ({}))
       const zs = Array.isArray(body?.zones) ? body.zones : []
       setZones(zs)
       setZonesLoaded(true)
-      if (zs.length > 0 && !selectedZone) setSelectedZone(zs[0].name)
+      if (!res.ok || body?.error) {
+        // Backend returns 400 + { zones: [], error } when the cert is present
+        // but the API token can't enumerate zones. Surface it so the user can
+        // enter a hostname manually instead of staring at "Loading…" forever.
+        setZonesError(body?.error || `HTTP ${res.status}`)
+        setManualZoneMode(true)
+      } else if (zs.length === 0) {
+        // Cert valid, no zones reachable — same manual-entry fallback.
+        setManualZoneMode(true)
+      } else if (!selectedZone) {
+        setSelectedZone(zs[0].name)
+      }
     } catch (err) {
-      setError(err?.message || String(err))
+      setZonesError(err?.message || String(err))
+      setZonesLoaded(true)
+      setManualZoneMode(true)
     }
   }, [selectedZone])
 
@@ -163,10 +184,11 @@ const NamedTunnelSetupCard = () => {
   }
 
   const create = async () => {
-    if (!subdomain || !selectedZone) return
+    const effectiveZone = manualZoneMode ? manualZone.trim().toLowerCase() : selectedZone
+    if (!subdomain || !effectiveZone) return
     setActionPending('create')
     setError('')
-    const hostname = `${subdomain.trim()}.${selectedZone}`.toLowerCase()
+    const hostname = `${subdomain.trim()}.${effectiveZone}`.toLowerCase()
     // Tell the tunnel to forward to the port this UI is served from —
     // that is the forge-terminal backend the user wants to expose.
     const localPort = Number(window?.location?.port) || 8333
@@ -195,6 +217,9 @@ const NamedTunnelSetupCard = () => {
     setSubdomain('forge')
     setZones([])
     setZonesLoaded(false)
+    setZonesError('')
+    setManualZoneMode(false)
+    setManualZone('')
     refreshStatus()
   }
 
@@ -209,9 +234,41 @@ const NamedTunnelSetupCard = () => {
   }, [status])
 
   const hostnamePreview = useMemo(() => {
-    if (!subdomain || !selectedZone) return ''
-    return `${subdomain.trim()}.${selectedZone}`.toLowerCase()
-  }, [subdomain, selectedZone])
+    const effectiveZone = manualZoneMode ? manualZone.trim().toLowerCase() : selectedZone
+    if (!subdomain || !effectiveZone) return ''
+    return `${subdomain.trim()}.${effectiveZone}`.toLowerCase()
+  }, [subdomain, selectedZone, manualZoneMode, manualZone])
+
+  // ── QR code for ready state ──────────────────────────────────────
+  // Mobile devices have no easy way to type long domain names — render a
+  // QR code of the tunnel URL so the companion PWA can be opened in one tap.
+  const qrCanvasRef = useRef(null)
+  const readyHostname = status?.created && status?.config?.hostname
+    ? status.config.hostname
+    : ''
+  const readyUrl = readyHostname ? `https://${readyHostname}` : ''
+
+  useEffect(() => {
+    if (!readyUrl || !qrCanvasRef.current) return
+    QRCode.toCanvas(qrCanvasRef.current, readyUrl, {
+      width: 180,
+      margin: 1,
+      color: { dark: '#1a1a1a', light: '#ffffff' },
+    }).catch(() => {
+      /* canvas unmounted or QR library error — non-fatal */
+    })
+  }, [readyUrl])
+
+  const copyReadyUrl = useCallback(async () => {
+    if (!readyUrl) return
+    try {
+      await navigator.clipboard.writeText(readyUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* clipboard API unavailable — fall back silently */
+    }
+  }, [readyUrl])
 
   // ── Render helpers ───────────────────────────────────────────────
 
@@ -232,11 +289,11 @@ const NamedTunnelSetupCard = () => {
       return (
         <div className="nts-ready">
           <div className="nts-ready-badge">
-            <Check size={14} /> Your tunnel is live
+            <Check size={14} /> Tunnel configured
           </div>
           <div className="nts-hostname">
             <a
-              href={`https://${status.config.hostname}`}
+              href={readyUrl}
               target="_blank"
               rel="noreferrer"
             >
@@ -244,13 +301,34 @@ const NamedTunnelSetupCard = () => {
               <ExternalLink size={12} />
             </a>
           </div>
-          <button
-            type="button"
-            className="nts-btn nts-btn-secondary"
-            onClick={reconfigure}
-          >
-            <RefreshCw size={14} /> Reconfigure
-          </button>
+          <div className="nts-qr-wrap">
+            <canvas ref={qrCanvasRef} className="nts-qr" aria-label="QR code for tunnel URL" />
+            <div className="nts-qr-caption">
+              <Smartphone size={12} /> Scan to open on your phone
+            </div>
+          </div>
+          <div className="nts-ready-actions">
+            <button
+              type="button"
+              className="nts-btn nts-btn-secondary"
+              onClick={copyReadyUrl}
+              aria-label="Copy tunnel URL"
+            >
+              {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy URL</>}
+            </button>
+            <button
+              type="button"
+              className="nts-btn nts-btn-ghost"
+              onClick={reconfigure}
+            >
+              <RefreshCw size={14} /> Reconfigure
+            </button>
+          </div>
+          <p className="nts-ready-note">
+            Runtime status (starting / stopped / repair) is shown in the
+            Connection Setup card above. This card only reflects that the
+            tunnel is registered with Cloudflare.
+          </p>
         </div>
       )
     }
@@ -355,22 +433,74 @@ const NamedTunnelSetupCard = () => {
         <p className="nts-step-desc">
           Pick the domain and subdomain where Forge should be reachable.
         </p>
+        {zonesError && (
+          <div className="nts-error" role="alert">
+            <AlertTriangle size={14} />
+            <span>Couldn&apos;t load your Cloudflare zones: {zonesError}</span>
+          </div>
+        )}
         <label className="nts-label" htmlFor="nts-zone">
           Domain
         </label>
-        <select
-          id="nts-zone"
-          className="nts-input"
-          value={selectedZone}
-          onChange={(e) => setSelectedZone(e.target.value)}
-        >
-          {zones.length === 0 && <option value="">Loading…</option>}
-          {zones.map((z) => (
-            <option key={z.id || z.name} value={z.name}>
-              {z.name}
-            </option>
-          ))}
-        </select>
+        {manualZoneMode ? (
+          <>
+            <input
+              id="nts-zone"
+              className="nts-input"
+              value={manualZone}
+              onChange={(e) => setManualZone(e.target.value)}
+              placeholder="example.com"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <div className="nts-hint-row">
+              <span className="nts-hint">
+                Enter the apex domain you own in Cloudflare. The cert on
+                disk will be used to sign the tunnel.
+              </span>
+              <button
+                type="button"
+                className="nts-btn nts-btn-ghost nts-btn-sm"
+                onClick={() => {
+                  setManualZoneMode(false)
+                  setZonesLoaded(false)
+                  loadZones()
+                }}
+              >
+                <RefreshCw size={12} /> Retry zone list
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <select
+              id="nts-zone"
+              className="nts-input"
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              disabled={!zonesLoaded}
+            >
+              {!zonesLoaded && <option value="">Loading…</option>}
+              {zonesLoaded && zones.length === 0 && (
+                <option value="">No zones found</option>
+              )}
+              {zones.map((z) => (
+                <option key={z.id || z.name} value={z.name}>
+                  {z.name}
+                </option>
+              ))}
+            </select>
+            {zonesLoaded && (
+              <button
+                type="button"
+                className="nts-btn nts-btn-ghost nts-btn-sm"
+                onClick={() => setManualZoneMode(true)}
+              >
+                Enter domain manually
+              </button>
+            )}
+          </>
+        )}
         <label className="nts-label" htmlFor="nts-sub">
           Subdomain
         </label>
@@ -390,7 +520,9 @@ const NamedTunnelSetupCard = () => {
           type="button"
           className="nts-btn nts-btn-primary"
           disabled={
-            actionPending === 'create' || !subdomain.trim() || !selectedZone
+            actionPending === 'create' ||
+            !subdomain.trim() ||
+            (manualZoneMode ? !manualZone.trim() : !selectedZone)
           }
           onClick={create}
         >
@@ -407,7 +539,7 @@ const NamedTunnelSetupCard = () => {
   }
 
   const stepLabel =
-    step === 'ready' ? 'Connected' :
+    step === 'ready' ? 'Configured' :
     step === 'install' ? 'Step 1 of 3 — Install' :
     step === 'login' ? 'Step 2 of 3 — Sign in' :
     step === 'create' ? 'Step 3 of 3 — Pick hostname' :

@@ -188,3 +188,54 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ── v7.6.33 additions: QR code, manual zone entry, ghost-sm button ── */
+.nts-qr-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 4px;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 6px;
+}
+.nts-qr {
+  display: block;
+  width: 180px;
+  height: 180px;
+}
+.nts-qr-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #555;
+}
+.nts-ready-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.nts-ready-note {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--surface-muted, #8b949e);
+  line-height: 1.4;
+}
+.nts-hint-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+}
+.nts-hint {
+  flex: 1;
+  font-size: 11px;
+  color: var(--surface-muted, #8b949e);
+  line-height: 1.4;
+}
+.nts-btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+}
