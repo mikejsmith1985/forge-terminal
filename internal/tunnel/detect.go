@@ -38,10 +38,18 @@ func DetectAll(ctx context.Context, ranker *Ranker, localPort int) {
 // detectNamed returns the current Named state if a supervisor has
 // already written one; otherwise derives Configured/Absent from the
 // wizard files on disk. Never downgrades Healthy → Configured.
+//
+// States written by the supervisor (Healthy, Degraded, Starting, Stopped)
+// are treated as authoritative — DetectAll must not overwrite them, since
+// the supervisor is the only entity that has real connectivity information.
+// Only Absent and Configured are "detection-owned" states.
 func detectNamed(current HealthState) HealthState {
+	// Any stage beyond Configured means a supervisor has been running and
+	// has written real health information.  Preserve it even after crash
+	// exhaustion (Stopped) so the UI can show "Repair tunnel" rather than
+	// silently rolling back to "not yet started".
 	if current.Stage == StageHealthy || current.Stage == StageDegraded ||
-		current.Stage == StageStarting {
-		// Live supervisor owns the state — don't touch it.
+		current.Stage == StageStarting || current.Stage == StageStopped {
 		return current
 	}
 	st := LoadWizardState()

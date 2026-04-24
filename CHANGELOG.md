@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Named Cloudflare Tunnel never actually started after setup wizard completed.** The `Supervisor` struct (introduced in v7.6.30) managed `cloudflared tunnel run` lifecycle but was never instantiated or started anywhere. The result: the UI showed "Connected" (wizard file-presence check) while `cloudflared` was never running, so `forge.<yourdomain>` returned Cloudflare Error 1033 every time. `startNamedSupervisorIfConfigured` now wires the supervisor into three paths: (1) on boot when the user's preference is "named" or auto-pick, (2) immediately after the setup wizard `handleTunnelSetupCreate` succeeds, (3) via the new `POST /api/tunnel/setup/restart` endpoint for manual recovery.
+- **`detectNamed` reset crash-exhausted `StageStopped` back to `StageConfigured`** on the next detection poll, hiding the error state and making the "Repair tunnel" action unreachable. `StageStopped` is now included in the set of supervisor-owned states that `detectNamed` preserves unchanged.
+- **Port drift in Named Tunnel config.yml.** When Forge restarts and claims a different port, `config.yml` retained the old `localPort`, causing `cloudflared` to proxy traffic to a dead backend. `SyncConfigPort` rewrites both `config.yml` and `state.json` atomically before the supervisor starts.
+
+### Added
+- **`POST /api/tunnel/setup/restart`** — new endpoint to stop and restart the Named Tunnel supervisor, surfacing a "Repair tunnel" recovery path without requiring a full Forge restart.
+
 ## [7.6.31] - 2026-04-24
 
 ---

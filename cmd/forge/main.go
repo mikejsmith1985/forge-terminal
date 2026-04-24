@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -30,6 +31,7 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
+	"github.com/mikejsmith1985/forge-terminal/internal/tunnel"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
 
@@ -390,6 +392,7 @@ func main() {
 	http.HandleFunc("/api/tunnel/setup/create", WrapWithMiddleware(handleTunnelSetupCreate))
 	http.HandleFunc("/api/tunnel/setup/status", WrapWithMiddleware(handleTunnelSetupStatus))
 	http.HandleFunc("/api/tunnel/setup/service", WrapWithMiddleware(handleTunnelService))
+	http.HandleFunc("/api/tunnel/setup/restart", WrapWithMiddleware(handleTunnelSetupRestart))
 	http.HandleFunc("/api/tunnel/options", WrapWithMiddleware(handleTunnelOptions))
 	http.HandleFunc("/api/tunnel/select", WrapWithMiddleware(handleTunnelSelect))
 	http.HandleFunc("/api/tunnel/migrate-legacy", WrapWithMiddleware(handleTunnelMigrateLegacy))
@@ -648,6 +651,15 @@ func main() {
 			} else {
 				log.Printf("[Tunnel] Auto-started cloudflared on port %d", activePort)
 			}
+		}
+		// Auto-start the Named Tunnel supervisor if the setup wizard has been
+		// completed AND the user's preference is "named" or unset (auto-pick).
+		// Guard: only start if the user has not explicitly chosen a different mode
+		// (e.g. Tailscale) — we should not expose Forge publicly against their will.
+		pref := tunnel.LoadPreference()
+		shouldStartNamed := pref.Mode == string(tunnel.ModeIDNamed) || pref.Mode == ""
+		if shouldStartNamed {
+			startNamedSupervisorIfConfigured(context.Background())
 		}
 		// Auto-start ntfy inbound poller if transport=ntfy and topic is set
 		if err == nil && (cfg.Transport == "ntfy" || cfg.Transport == "") && cfg.NtfyInboundTopic != "" {

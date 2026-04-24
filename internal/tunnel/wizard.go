@@ -489,6 +489,29 @@ func writeStateJSON(cfg NamedConfig) error {
 // CreateNamedTunnel — the orchestrating entry point
 // ------------------------------------------------------------------
 
+// SyncConfigPort rewrites config.yml (and state.json) when the persisted
+// localPort no longer matches the current Forge listener port.  This
+// happens when the user restarts Forge on a machine where the original
+// port is now taken by something else.  The supervisor must be stopped
+// before calling this; it reads the updated file on its next Start().
+//
+// Returns nil without touching any file when the port has not changed.
+func SyncConfigPort(cfg *NamedConfig, newPort int) error {
+	if cfg == nil || cfg.LocalPort == newPort {
+		return nil
+	}
+	cfg.LocalPort = newPort
+	// Regenerate config.yml with the corrected port.
+	if err := atomicWriteFile(cfg.ConfigPath,
+		renderConfigYAML(cfg.TunnelUUID, cfg.CredentialsPath, cfg.Hostname, newPort),
+		0o600); err != nil {
+		return fmt.Errorf("rewrite tunnel config.yml for port change: %w", err)
+	}
+	// Persist updated port in state.json so the next Forge restart also
+	// gets the right value without needing to run this correction again.
+	return writeStateJSON(*cfg)
+}
+
 // CreateNamedTunnel runs the full wizard: find-or-create tunnel, DNS
 // route, copy credentials, write config.yml, write state.json. Safe to
 // call repeatedly with the same hostname; returns the existing tunnel

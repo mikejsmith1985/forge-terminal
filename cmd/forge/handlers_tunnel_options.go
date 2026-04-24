@@ -17,7 +17,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/tunnel"
@@ -28,6 +30,65 @@ import (
 // write into this same ranker so their Healthy/Degraded transitions
 // are visible without the detector overwriting them.
 var tunnelRanker = tunnel.NewRanker()
+
+// ── Named Tunnel supervisor lifecycle ────────────────────────────────────────
+//
+// The Named Tunnel supervisor spawns `cloudflared tunnel run` and health-probes
+// the public hostname.  It writes state directly to tunnelRanker so
+// handleTunnelOptions always reflects real connectivity, not just file presence.
+
+var (
+	// namedSupervisor is the currently-active Named Tunnel supervisor, or nil
+	// when no wizard config exists or the user has not selected named mode.
+	namedSupervisor   *tunnel.Supervisor
+	namedSupervisorMu sync.Mutex
+)
+
+// startNamedSupervisorIfConfigured stops any currently-running Named Tunnel
+// supervisor, then starts a fresh one if the setup wizard has a complete
+// configuration and the current Forge port is wired into the config.
+//
+// Gated at startup: only auto-starts when the user has either explicitly
+// selected "named" mode (preference.Mode == "named") or has not set any
+// preference (auto-pick; named always ranks first when it's configured).
+// Call unconditionally after handleTunnelSetupCreate — the user just explicitly
+// completed setup and expects the tunnel to be live immediately.
+func startNamedSupervisorIfConfigured(ctx context.Context) {
+	namedSupervisorMu.Lock()
+	defer namedSupervisorMu.Unlock()
+
+	// Tear down any running supervisor before starting a new one so we
+	// never have two cloudflared processes fighting over the same tunnel.
+	if namedSupervisor != nil {
+		namedSupervisor.Stop()
+		namedSupervisor = nil
+	}
+
+	st := tunnel.LoadWizardState()
+	if !st.Created || st.Config == nil {
+		// Wizard not finished — nothing to start.
+		return
+	}
+
+	// If the Forge listener port has drifted since the wizard ran, rewrite
+	// config.yml so cloudflared forwards to the right backend.
+	if activePort > 0 && st.Config.LocalPort != activePort {
+		if err := tunnel.SyncConfigPort(st.Config, activePort); err != nil {
+			log.Printf("[NamedTunnel] Warning: could not sync config port to %d: %v", activePort, err)
+		}
+		// Reload state to get the updated NamedConfig with the new port.
+		st = tunnel.LoadWizardState()
+		if !st.Created || st.Config == nil {
+			return
+		}
+	}
+
+	sup := tunnel.NewSupervisor(*st.Config, tunnelRanker)
+	sup.Start(ctx)
+	namedSupervisor = sup
+	log.Printf("[NamedTunnel] Supervisor started for https://%s", st.Config.Hostname)
+}
+
 
 // handleTunnelOptions returns the full ranked list plus the user's
 // current preference so the UI can render the active state correctly.

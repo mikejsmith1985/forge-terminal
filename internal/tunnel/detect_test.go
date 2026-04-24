@@ -102,6 +102,17 @@ func TestDetectNamedPreservesLive(t *testing.T) {
 	}
 }
 
+func TestDetectNamedPreservesStopped(t *testing.T) {
+	// StageStopped means the supervisor exhausted its crash budget.
+	// detectNamed must not reset it back to Configured on the next poll —
+	// the UI needs to see Stopped to show a "Repair tunnel" action.
+	in := HealthState{Mode: ModeIDNamed, Stage: StageStopped, LastError: "crash storm"}
+	got := detectNamed(in)
+	if got.Stage != StageStopped {
+		t.Fatalf("detectNamed should preserve StageStopped, got %v", got.Stage)
+	}
+}
+
 func TestPreferenceRoundTrip(t *testing.T) {
 	withTempHomeDetect(t)
 	if got := LoadPreference(); got.Mode != "" {
