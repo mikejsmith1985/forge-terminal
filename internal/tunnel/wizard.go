@@ -275,7 +275,12 @@ func findExistingTunnel(ctx context.Context, name string) (*tunnelListItem, erro
 		return nil, fmt.Errorf("tunnel list: %w: %s", err, truncOutput(out))
 	}
 	var items []tunnelListItem
-	if err := json.Unmarshal(bytes.TrimSpace(out), &items); err != nil {
+	// Use json.Decoder instead of json.Unmarshal so that we stop after the
+	// first complete JSON value. Newer cloudflared versions append a
+	// structured-log warning object after the array on the same output stream
+	// (e.g. {"level":"warn","message":"Your version … is outdated"}), which
+	// causes Unmarshal to fail with "invalid character '{' after top-level value".
+	if err := json.NewDecoder(bytes.NewReader(out)).Decode(&items); err != nil {
 		return nil, fmt.Errorf("parse tunnel list: %w (raw: %s)", err, truncOutput(out))
 	}
 	for i := range items {
@@ -297,7 +302,9 @@ func createTunnel(ctx context.Context, name string) (*createOutput, error) {
 		return nil, fmt.Errorf("tunnel create: %w: %s", err, truncOutput(out))
 	}
 	var co createOutput
-	if err := json.Unmarshal(bytes.TrimSpace(out), &co); err != nil {
+	// Same decoder strategy as findExistingTunnel: cloudflared may append
+	// version-warning JSON after the tunnel object on stdout/stderr.
+	if err := json.NewDecoder(bytes.NewReader(out)).Decode(&co); err != nil {
 		return nil, fmt.Errorf("parse create output: %w (raw: %s)", err, truncOutput(out))
 	}
 	if co.ID == "" {
