@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.33] - 2026-04-24
+
+---
+
+## [v7.6.33] - 2026-04-24
+
 ### Fixed
 - **Named Tunnel setup stuck on "Loading…" when zone list fails** — `NamedTunnelSetupCard` silently ignored errors from `/api/tunnel/setup/zones` and displayed a perpetual "Loading…" placeholder, blocking users who had a valid cert but whose API token couldn't enumerate zones (common with scoped tokens and single-zone accounts). The card now surfaces the error, adds an "Enter domain manually" fallback with a text input, and disables the select while loading so the state is unambiguous.
 - **"Connected" badge contradicted "stopped — Repair tunnel" banner** — The `NamedTunnelSetupCard` "Connected" label described config presence (cert + credentials + config.yml on disk) while the neighboring `ConnectionSetupCard` showed live supervisor health, producing a visible contradiction when `cloudflared` was crash-looped or unstarted. Relabeled to "Configured" and added an inline note pointing users to the runtime status card above, so the two cards communicate complementary state rather than disagreeing.
