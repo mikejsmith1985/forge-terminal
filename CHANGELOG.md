@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.35] - 2026-04-24
+
+---
+
+## [v7.6.35] - 2026-04-24
+
 ### Fixed
 - **Named Tunnel showed "Configured" forever even when cloudflared wasn't actually running (Cloudflare error 1033 on QR scan)** — the supervisor was discarding cloudflared's stdout/stderr (`intentional discard` in `internal/tunnel/named.go`), so when the child exited or failed there was zero diagnostic output and the wizard's ready view never reflected it. Now the supervisor (a) tees cloudflared output to a rolling `~/.forge/tunnel/cloudflared.log` (256 KB cap, rotates to `.log.1`), (b) keeps the most recent log line on the supervisor for surfacing through `/api/tunnel/setup/status`, and (c) exposes the live ranker stage on the same endpoint. The wizard's Ready view now shows a color-coded health pill (Live / Starting / Degraded / Stopped), the last cloudflared error + recovery hint, and a Start/Restart-tunnel button so the user can repair without restarting the app.
 - **Phantom "Another device is controlling this terminal" purple banner on app load** — when the same browser tab reloads, the new WebSocket can arrive before the old socket's defer-driven cleanup has cleared the hub's `activeConn` pointer; the new client then receives `SESSION_JOINED isActiveDevice:false` and shows the banner even though no other device is present. Added `sessionHub.purgeStaleActive`, called before deciding `isActiveDevice`, which atomically clears `activeConn` if it points to a connection no longer in the hub's clients map. Deterministic server-side fix; the prior 600ms frontend debounce is kept as defence-in-depth.
