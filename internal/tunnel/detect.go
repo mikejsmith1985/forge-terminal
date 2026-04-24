@@ -78,7 +78,12 @@ func detectTailscale(ctx context.Context) HealthState {
 	}
 	statusCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(statusCtx, bin, "status", "--json").Output()
+	// hideWindow prevents a console flash on Windows — detectTailscale is called
+	// every 10 seconds by the tunnel options poller, so without this the user would
+	// see a CMD window flicker every 10 seconds.
+	statusCmd := exec.CommandContext(statusCtx, bin, "status", "--json")
+	hideWindow(statusCmd)
+	out, err := statusCmd.Output()
 	if err != nil {
 		return HealthState{
 			Mode:         ModeIDTailscale,

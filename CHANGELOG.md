@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Terminal windows flashing on Windows** — Seven `exec.Command` callsites in the tunnel package (`detect.go`, `service.go`, `creds_windows.go`, `tunnel.go`) were spawning subprocesses without `hideWindow()`, causing brief CMD console windows to flash on screen. The Tailscale status poller runs every 10 seconds, so users saw a cursor spin and window flicker regularly. All callsites now use `hideWindow()` to set `CREATE_NO_WINDOW`.
+- **Cloudflared tunnel list parse error** — Newer versions of cloudflared append a structured JSON version-warning object after the tunnel-list array on stdout. `json.Unmarshal` rejected this as "invalid character '{' after top-level value". Switched to `json.NewDecoder().Decode()` in `wizard.go` which stops at the first complete JSON value, ignoring trailing content.
+- **Ctrl+F terminal search not openable while terminal is focused** — The App.jsx keyboard handler returned early for `xterm-helper-textarea` events before reaching the Ctrl+F case. Restructured the handler so the search overlay shortcut fires before the xterm pass-through guard, while still skipping real input fields (modals, rename boxes). Added `stopPropagation()` to prevent xterm from forwarding `\x06` to the PTY.
+- **Macro delay of 0ms silently replaced by 1500ms default** — `CommandModal` used `||` to fall back on macro_delay, which treated `0` as falsy. Changed to `??` (nullish coalescing) so an explicitly-set 0 ms delay is preserved.
+
 ## [7.6.31] - 2026-04-24
 
 ---

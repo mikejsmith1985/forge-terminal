@@ -67,18 +67,21 @@ func runICACLS(path, principal string) error {
 
 	// Step 1: remove inheritance + drop any groups currently on ACL.
 	cmd := exec.Command(icacls, path, "/inheritance:r")
+	hideWindow(cmd) // Prevent console flash on Windows
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("icacls inheritance:r: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	// Step 2: grant current user full control.
 	cmd = exec.Command(icacls, path, "/grant:r", principal+":F")
+	hideWindow(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("icacls grant user: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	// Step 3: keep SYSTEM so service updates still work.
 	cmd = exec.Command(icacls, path, "/grant:r", "SYSTEM:F")
+	hideWindow(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("icacls grant SYSTEM: %w: %s", err, strings.TrimSpace(string(out)))
 	}

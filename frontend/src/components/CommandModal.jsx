@@ -46,7 +46,10 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     ...initialData,
                     // Ensure these are not undefined
                     macro_payload: initialData.macro_payload || '',
-                    macro_delay: initialData.macro_delay || 1500
+                    // Use ?? (nullish coalescing) so a saved macro_delay of 0 ms is
+                    // preserved. The || operator incorrectly treats 0 as falsy,
+                    // silently replacing it with the 1500 ms default.
+                    macro_delay: initialData.macro_delay ?? 1500
                 });
             } else {
                 setFormData(defaults);
@@ -222,7 +225,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                         <input
                             type="number"
                             name="macro_delay"
-                            value={formData.macro_delay || 1500}
+                            value={formData.macro_delay ?? 1500}
                             onChange={handleChange}
                             placeholder="1500"
                             min="0"
