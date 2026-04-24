@@ -930,19 +930,34 @@ function App() {
       return;
     }
 
-    // CRITICAL: Check if this is xterm's helper textarea FIRST
-    // All remaining keys (typing, Ctrl+C/V, Ctrl+T, etc.) must pass
-    // through to xterm when the terminal has keyboard focus.
+    // Compute focus context once so all routing decisions below can reference it.
     const isXtermTextarea = e.target?.classList?.contains('xterm-helper-textarea');
-    if (isXtermTextarea) {
-      return; // Let xterm handle ALL remaining keys natively
-    }
-
-    // Skip keyboard shortcuts when user is typing in input fields
     const target = e.target;
     const isInputField = target.tagName === 'INPUT' ||
                         target.tagName === 'TEXTAREA' ||
                         target.isContentEditable;
+
+    // Ctrl+F: Open terminal search overlay.
+    // Must appear BEFORE the xterm textarea guard so this shortcut fires
+    // even when the terminal has keyboard focus. We exclude real input fields
+    // (modals, rename boxes) so browser-native Ctrl+F still works there.
+    if (e.ctrlKey && !e.shiftKey && (e.key === 'f' || e.key === 'F') && !isInputField) {
+      e.preventDefault();
+      e.stopPropagation(); // Prevent xterm from forwarding \x06 (Ctrl+F) to the PTY
+      setIsSearchOpen(true);
+      return;
+    }
+
+    // For all remaining keys: when the terminal helper textarea is focused
+    // (terminal has keyboard focus), let xterm handle the event natively.
+    if (isXtermTextarea) {
+      return;
+    }
+
+    // Skip App-level shortcuts when the user is typing in a real input field.
+    if (isInputField) {
+      return;
+    }
 
     // Check if target is within xterm terminal (for copy/paste support)
     const isTerminalFocused = target.closest?.('.xterm') ||
@@ -951,10 +966,6 @@ function App() {
 
     // Allow Ctrl+C and Ctrl+V to pass through to xterm when terminal is focused
     if (isTerminalFocused && e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V')) {
-      return;
-    }
-
-    if (isInputField) {
       return;
     }
 
@@ -991,14 +1002,7 @@ function App() {
       }
     }
 
-    // Ctrl+F: Open search
-    if (e.ctrlKey && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
-      e.preventDefault();
-      setIsSearchOpen(true);
-      return;
-    }
-
-    // Ctrl+/: Toggle Forge Assist (desktop only — modal not usable on compact screens)
+    // Ctrl+/: Toggle Forge Assist(desktop only — modal not usable on compact screens)
     if (e.ctrlKey && !e.shiftKey && e.key === '/') {
       e.preventDefault();
       if (!isCompact) setIsForgeAssistOpen(prev => !prev);
