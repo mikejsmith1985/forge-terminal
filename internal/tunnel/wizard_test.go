@@ -400,3 +400,45 @@ func TestLoadWizardState_DerivedFromFiles(t *testing.T) {
 		t.Fatal("Created should remain false without state.json")
 	}
 }
+
+// TestNamedConfig_JSONKeysAreLowercase locks the on-the-wire shape of
+// NamedConfig. The frontend's NamedTunnelSetupCard reads
+// `status.config.hostname` (camelCase). If someone drops the JSON tags
+// or renames them, the ready view silently disappears and the card
+// re-shows the Create form even though the tunnel is configured.
+// Regression: v7.6.33 UAT — "forever Loading" + missing QR code.
+func TestNamedConfig_JSONKeysAreLowercase(t *testing.T) {
+	cfg := NamedConfig{
+		TunnelUUID:      "uuid-xyz",
+		Hostname:        "forge.example.com",
+		LocalPort:       3005,
+		ConfigPath:      "/tmp/config.yml",
+		CredentialsPath: "/tmp/creds.json",
+	}
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	got := string(raw)
+	for _, key := range []string{
+		`"hostname":"forge.example.com"`,
+		`"configPath":"/tmp/config.yml"`,
+		`"credentialsPath":"/tmp/creds.json"`,
+		`"tunnelUUID":"uuid-xyz"`,
+		`"localPort":3005`,
+	} {
+		if !strings.Contains(got, key) {
+			t.Errorf("expected key fragment %q in %s", key, got)
+		}
+	}
+	// Case-insensitive round-trip: legacy state.json files written before
+	// the JSON tags were added (capitalized keys) must still load.
+	legacy := []byte(`{"TunnelUUID":"old","Hostname":"legacy.example.com","LocalPort":1234,"ConfigPath":"/a","CredentialsPath":"/b"}`)
+	var parsed NamedConfig
+	if err := json.Unmarshal(legacy, &parsed); err != nil {
+		t.Fatalf("legacy unmarshal: %v", err)
+	}
+	if parsed.Hostname != "legacy.example.com" || parsed.TunnelUUID != "old" {
+		t.Fatalf("legacy state.json did not round-trip: %+v", parsed)
+	}
+}

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Named Tunnel "Configured" header but stuck on Create form + missing QR code** — `NamedConfig` had no JSON struct tags, so `/api/tunnel/setup/status` serialized `config.Hostname`, `config.ConfigPath`, etc. (Go-capitalized). The frontend's `NamedTunnelSetupCard` reads `status.config.hostname` (camelCase), which was therefore always `undefined`. The ready branch's `step === 'ready' && status?.config?.hostname` guard evaluated false, the card fell through to the Create-tunnel step, the domain dropdown showed "Loading…" forever, and the v7.6.33 QR code never rendered even though the tunnel was fully configured. Added explicit lowercase-first JSON tags (`hostname`, `configPath`, `credentialsPath`, `tunnelUUID`, `localPort`) and a regression test that locks the wire shape. Legacy `state.json` files written with capitalized keys still load because `encoding/json.Unmarshal` matches keys case-insensitively.
+
 ## [7.6.33] - 2026-04-24
 
 ---
