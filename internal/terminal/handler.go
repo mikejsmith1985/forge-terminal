@@ -664,6 +664,16 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// Scrollback was already replayed before hub.add() above.
 
+			// Purge a stale active-conn pointer left over from a previous
+			// owner whose disconnect cleanup hasn't run yet.  Without this,
+			// reload-and-rejoin races send SESSION_JOINED:isActiveDevice=false
+			// to the new client, which then shows a phantom "Another device
+			// controls this terminal" banner even though no other device is
+			// connected.
+			if hub.purgeStaleActive() {
+				log.Printf("[Terminal] Session %s: cleared stale active-conn pointer before SESSION_JOINED", sessionID)
+			}
+
 			// If no device currently controls this PTY (previous owner disconnected),
 			// auto-promote this client to active so it can resize and interact fully.
 			// This handles the common case of the same user reconnecting after a hiccup.
@@ -701,6 +711,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				isWatcher = true
 				sessionLock.Unlock()
 				log.Printf("[Terminal] Session %s: became watcher after lock (another goroutine created it)", sessionID)
+				// Same stale-active purge as the primary path so the
+				// banner doesn't flash on reload races.
+				hub.purgeStaleActive()
 				_ = conn.WriteJSON(map[string]interface{}{
 					"type":           "SESSION_JOINED",
 					"sessionId":      sessionID,

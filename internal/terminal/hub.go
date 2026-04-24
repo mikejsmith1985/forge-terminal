@@ -164,6 +164,31 @@ func (h *sessionHub) getActive() *connWriter {
 	return h.activeConn
 }
 
+// purgeStaleActive clears activeConn if it points to a connection that is
+// no longer in the hub's clients map (i.e. the previous owner disconnected
+// but its defer-driven cleanup hasn't run yet).  Returns true when a stale
+// pointer was cleared.
+//
+// Why this exists: when a browser tab reloads, the new WebSocket can arrive
+// before the old socket's read-loop has noticed the disconnect.  Without
+// this purge, the new client receives SESSION_JOINED with
+// isActiveDevice:false and shows the "Another device controls this terminal"
+// banner even though no other device is actually present.  The 600ms
+// frontend debounce was a partial workaround; this is the deterministic
+// server-side fix.
+func (h *sessionHub) purgeStaleActive() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.activeConn == nil {
+		return false
+	}
+	if _, stillConnected := h.clients[h.activeConn]; stillConnected {
+		return false
+	}
+	h.activeConn = nil
+	return true
+}
+
 // transferControl moves PTY ownership from the current active device to a new one.
 // It sends CONTROL_TRANSFERRED to the old active and CONTROL_GRANTED to the new one.
 // All other clients in the hub receive CONTROL_TRANSFERRED as an observer notification.

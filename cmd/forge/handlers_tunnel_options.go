@@ -44,6 +44,16 @@ var (
 	namedSupervisorMu sync.Mutex
 )
 
+// getNamedSupervisor returns the currently-active Named Tunnel supervisor,
+// or nil.  Safe to call from any goroutine; takes the same mutex as
+// startNamedSupervisorIfConfigured so the pointer can't be swapped out
+// mid-read.
+func getNamedSupervisor() *tunnel.Supervisor {
+	namedSupervisorMu.Lock()
+	defer namedSupervisorMu.Unlock()
+	return namedSupervisor
+}
+
 // startNamedSupervisorIfConfigured stops any currently-running Named Tunnel
 // supervisor, then starts a fresh one if the setup wizard has a complete
 // configuration and the current Forge port is wired into the config.

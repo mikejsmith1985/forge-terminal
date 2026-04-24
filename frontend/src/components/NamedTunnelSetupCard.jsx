@@ -223,6 +223,29 @@ const NamedTunnelSetupCard = () => {
     refreshStatus()
   }
 
+  // restartTunnel kicks the supervisor: stops any running cloudflared and
+  // spawns a fresh one using the saved config.  This is the user's
+  // recovery path when forge.<their-domain> shows Cloudflare error 1033
+  // ("tunnel not running") — historically they had to restart fterm.
+  const restartTunnel = async () => {
+    setActionPending('restart')
+    setError('')
+    try {
+      const res = await fetch('/api/tunnel/setup/restart', { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(body?.error || `HTTP ${res.status}`)
+        return
+      }
+      // Give the supervisor a moment to publish a "Starting" stage before
+      // we re-poll, so the user sees the badge actually transition.
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      await refreshStatus()
+    } finally {
+      setActionPending('')
+    }
+  }
+
   // ── Derived state ────────────────────────────────────────────────
 
   const step = useMemo(() => {
@@ -286,10 +309,32 @@ const NamedTunnelSetupCard = () => {
     }
 
     if (step === 'ready' && status?.config?.hostname) {
+      // Translate the supervisor's stage into a human badge.  We treat
+      // "configured" (the ranker's idle pre-supervisor state) as Stopped
+      // for UI purposes since from the user's perspective the tunnel
+      // isn't actually running.
+      const stage = status?.health?.stage || ''
+      const isLive       = stage === 'healthy'
+      const isStarting   = stage === 'starting'
+      const isDegraded   = stage === 'degraded'
+      const isStopped    = stage === 'stopped' || stage === 'configured' || stage === ''
+      const healthLabel  = isLive ? 'Live'
+                         : isStarting ? 'Starting'
+                         : isDegraded ? 'Degraded'
+                         : 'Stopped'
+      const healthClass  = isLive ? 'nts-health-live'
+                         : isStarting ? 'nts-health-starting'
+                         : isDegraded ? 'nts-health-degraded'
+                         : 'nts-health-stopped'
+      const lastError    = status?.health?.lastError || ''
+      const recoveryHint = status?.health?.recoveryHint || ''
+      const lastLogLine  = status?.lastLogLine || ''
+
       return (
         <div className="nts-ready">
           <div className="nts-ready-badge">
             <Check size={14} /> Tunnel configured
+            <span className={`nts-health-pill ${healthClass}`}>{healthLabel}</span>
           </div>
           <div className="nts-hostname">
             <a
@@ -307,6 +352,17 @@ const NamedTunnelSetupCard = () => {
               <Smartphone size={12} /> Scan to open on your phone
             </div>
           </div>
+          {!isLive && (lastError || recoveryHint || lastLogLine) ? (
+            <div className="nts-health-detail" role="status">
+              {lastError ? <div className="nts-health-error">{lastError}</div> : null}
+              {recoveryHint ? <div className="nts-health-hint">{recoveryHint}</div> : null}
+              {lastLogLine ? (
+                <div className="nts-health-log" title="Last line cloudflared logged">
+                  <code>{lastLogLine}</code>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="nts-ready-actions">
             <button
               type="button"
@@ -318,6 +374,17 @@ const NamedTunnelSetupCard = () => {
             </button>
             <button
               type="button"
+              className="nts-btn nts-btn-primary"
+              onClick={restartTunnel}
+              disabled={actionPending === 'restart'}
+              aria-label="Restart tunnel"
+            >
+              {actionPending === 'restart'
+                ? <><Loader2 size={14} className="nts-spin" /> Restarting…</>
+                : <><RefreshCw size={14} /> {isStopped || isDegraded ? 'Start tunnel' : 'Restart tunnel'}</>}
+            </button>
+            <button
+              type="button"
               className="nts-btn nts-btn-ghost"
               onClick={reconfigure}
             >
@@ -325,9 +392,9 @@ const NamedTunnelSetupCard = () => {
             </button>
           </div>
           <p className="nts-ready-note">
-            Runtime status (starting / stopped / repair) is shown in the
-            Connection Setup card above. This card only reflects that the
-            tunnel is registered with Cloudflare.
+            {isLive
+              ? 'Tunnel is live — the QR code points to a working public URL.'
+              : 'Tunnel is registered but not currently serving traffic. Click "Start tunnel" to spawn cloudflared.'}
           </p>
         </div>
       )

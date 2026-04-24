@@ -213,11 +213,35 @@ func handleTunnelSetupRestart(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleTunnelSetupStatus returns the wizard's aggregate state so the UI
-// can render the correct step (install / login / create / ready).
+// can render the correct step (install / login / create / ready).  The
+// response is augmented with live health from the Named-Tunnel ranker
+// (stage / lastError / recoveryHint) so the wizard's "Ready" view can
+// show whether the tunnel is actually serving traffic, plus the last
+// line cloudflared logged so the user has a clue when it isn't.
 func handleTunnelSetupStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	writeJSON(w, http.StatusOK, tunnel.LoadWizardState())
+	state := tunnel.LoadWizardState()
+
+	// Compose: keep wizard state at the top level for backward compat,
+	// add a `health` block and `lastLogLine` for the new ready-view UI.
+	health := tunnelRanker.Get(tunnel.ModeIDNamed)
+	resp := map[string]any{
+		"installed": state.Installed,
+		"loggedIn":  state.LoggedIn,
+		"created":   state.Created,
+		"config":    state.Config,
+		"health": map[string]any{
+			"stage":        string(health.Stage),
+			"lastError":    health.LastError,
+			"recoveryHint": health.RecoveryHint,
+			"url":          health.URL,
+		},
+	}
+	if sup := getNamedSupervisor(); sup != nil {
+		resp["lastLogLine"] = sup.LastLogLine()
+	}
+	writeJSON(w, http.StatusOK, resp)
 }

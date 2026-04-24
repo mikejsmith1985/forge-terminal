@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
@@ -82,6 +83,47 @@ type Supervisor struct {
 	stopOnce sync.Once     // guards Stop()
 	doneCh   chan struct{} // closed when the supervisor goroutine exits
 	cancel   context.CancelFunc
+
+	// logMu guards lastLogLine.  Captured for surface in the wizard's
+	// Repair view so the user has a clue why cloudflared failed instead
+	// of just seeing "Configured" forever.
+	logMu       sync.Mutex
+	lastLogLine string
+}
+
+// LastLogLine returns the most recent non-empty line emitted by cloudflared,
+// or the empty string if none has been seen.  Safe to call from any goroutine.
+func (s *Supervisor) LastLogLine() string {
+	s.logMu.Lock()
+	defer s.logMu.Unlock()
+	return s.lastLogLine
+}
+
+// maxCloudflaredLogBytes is the rolling cap for ~/.forge/tunnel/cloudflared.log.
+// Keep small: this file is for "what happened in the last few minutes",
+// not long-term archival.
+const maxCloudflaredLogBytes = 256 * 1024
+
+// openCloudflaredLog returns a writer that appends to cloudflared.log,
+// rotating the file to cloudflared.log.1 when it exceeds the size cap.
+// Errors are non-fatal — if logging fails the supervisor still runs, just
+// without log capture.
+func openCloudflaredLog(configPath string) (io.WriteCloser, string, error) {
+	dir := filepath.Dir(configPath)
+	if dir == "" || dir == "." {
+		return nil, "", errors.New("cloudflared log: empty config dir")
+	}
+	logPath := filepath.Join(dir, "cloudflared.log")
+	if info, err := os.Stat(logPath); err == nil && info.Size() > maxCloudflaredLogBytes {
+		_ = os.Rename(logPath, logPath+".1")
+	}
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return nil, "", err
+	}
+	header := fmt.Sprintf("\n=== cloudflared session started %s ===\n", time.Now().Format(time.RFC3339))
+	_, _ = f.WriteString(header)
+	return f, logPath, nil
 }
 
 // supervisorTiming collects the time-based knobs in one struct so tests
@@ -264,16 +306,40 @@ func (s *Supervisor) runOnce(ctx context.Context, timing supervisorTiming) error
 		return fmt.Errorf("cloudflared start: %w", err)
 	}
 
-	// Drain output so the pipe buffer doesn't fill up and wedge the child.
-	// We discard on purpose — named-tunnel URLs are already known; the
-	// logs are only interesting when debugging, and the user can run
-	// cloudflared by hand for that.
+	// Open a rolling log file so users can see *why* cloudflared failed
+	// instead of staring at "Configured" forever.  Failures are non-fatal:
+	// if we can't open the log we still drain the pipe, just without
+	// persistence.
+	logFile, logPath, logErr := openCloudflaredLog(s.cfg.ConfigPath)
+	if logErr != nil {
+		logFile = nil
+	}
+
+	// Drain output line-by-line: copy each line to disk (if we opened a
+	// log file) and remember the last non-empty line on the supervisor so
+	// the wizard's health endpoint can surface it.
 	go func() {
 		defer pr.Close()
-		scanner := bufio.NewScanner(pr)
-		for scanner.Scan() {
-			// intentional discard
+		if logFile != nil {
+			defer logFile.Close()
 		}
+		scanner := bufio.NewScanner(pr)
+		// cloudflared INFO lines can be long; default 64KB token limit
+		// is plenty but bump to be safe.
+		scanner.Buffer(make([]byte, 0, 64*1024), 256*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "" {
+				continue
+			}
+			if logFile != nil {
+				_, _ = logFile.Write([]byte(line + "\n"))
+			}
+			s.logMu.Lock()
+			s.lastLogLine = line
+			s.logMu.Unlock()
+		}
+		_ = logPath // referenced for future "open log" UI; silence unused
 	}()
 
 	// Give cloudflared a grace period to finish DNS handshake / cert
