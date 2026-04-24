@@ -567,6 +567,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const maxReconnectAttempts = 15; // Was 5 — increased for robustness during active Copilot work
   // Track effective max for display (higher in dev mode)
   const effectiveMaxAttemptsRef = useRef(maxReconnectAttempts);
+  // When true, the next WebSocket connect strips cmdHome/psHome/wslHome from
+  // the URL — used as an automatic one-shot recovery path after close code 4005
+  // (PTY spawn failed because the saved directory is missing). The shell then
+  // starts in the server's default cwd and the tab reconnects instead of
+  // stalling at "Cannot Reach Session".
+  const skipHomeDirRef = useRef(false);
+  // Tracks whether we already attempted the automatic home-dir fallback for
+  // the current failure. Prevents an infinite retry loop if spawn still fails
+  // after we've already cleared the home path.
+  const spawnFallbackAttemptedRef = useRef(false);
   const sessionReattachedRef = useRef(false); // Server restored existing PTY session
   const unmountingRef = useRef(false); // Set during cleanup — suppresses reconnection on unmount
   const isCopyingRef = useRef(false); // Prevent clipboard spam
@@ -1605,15 +1615,20 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Use currentDirectory as fallback initial dir when no explicit home path is configured.
         // This ensures the PTY starts in the saved directory rather than the process cwd.
         const restoredDir = currentDirectoryRef.current;
+        // If the previous connect attempt failed with close code 4005 (PTY
+        // spawn failed, typically because the saved directory is gone), we
+        // strip ALL home-directory params from this connect so the shell
+        // starts in the server's default cwd instead of failing again.
+        const skipHomeDir = skipHomeDirRef.current;
         if (cfg.shellType === 'wsl') {
           if (cfg.wslDistro) params.set('distro', cfg.wslDistro);
-          if (cfg.wslHomePath) params.set('wslHome', cfg.wslHomePath);
+          if (!skipHomeDir && cfg.wslHomePath) params.set('wslHome', cfg.wslHomePath);
         } else if (cfg.shellType === 'cmd') {
           const cmdHome = cfg.cmdHomePath || restoredDir;
-          if (cmdHome) params.set('cmdHome', cmdHome);
+          if (!skipHomeDir && cmdHome) params.set('cmdHome', cmdHome);
         } else if (cfg.shellType === 'powershell') {
           const psHome = cfg.psHomePath || restoredDir;
-          if (psHome) params.set('psHome', psHome);
+          if (!skipHomeDir && psHome) params.set('psHome', psHome);
         }
       }
       wsUrl += '?' + params.toString();
@@ -1647,6 +1662,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         // Reset reconnection state
         reconnectAttemptsRef.current = 0;
         sessionReattachedRef.current = false; // Will be set to true by SESSION_REATTACHED or SESSION_JOINED message
+        // Connection succeeded — clear the home-dir fallback flags so the
+        // next fresh disconnect (e.g. server restart) starts with the saved
+        // directory again instead of permanently defaulting to the cwd.
+        skipHomeDirRef.current = false;
+        spawnFallbackAttemptedRef.current = false;
         setReconnecting(false);
         setIsConnected(true);
         setIsActiveDevice(true); // Assume active until SESSION_JOINED says otherwise
@@ -1950,16 +1970,34 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             messageColor = '1;36'; // Cyan
             break;
           case 4005:
-            // Custom: PTY spawn failed — non-retriable fatal error.
-            // The server could not start a shell process. Retrying will hit the
-            // same failure. Show the error, stop reconnecting, and surface the
-            // diagnostic wizard so the user can fix the root cause with one click.
-            disconnectMessage = 'Terminal failed to start. Check that your saved working directory still exists.';
-            messageColor = '1;31'; // Red
-            shouldReconnect = false;
-            // Open the diagnostic wizard — it will auto-run PTY tests and offer a fix.
-            if (onSpawnFailed) {
-              setTimeout(() => onSpawnFailed(), 600);
+            // Custom: PTY spawn failed. The most common cause is a saved
+            // working directory that no longer exists (renamed folder, cross-
+            // machine sync, WSL distro removed, etc.). Before giving up and
+            // showing the diagnostic wizard, transparently retry ONCE with all
+            // home-directory params stripped — the shell will spawn in the
+            // server's default cwd and the tab recovers automatically.
+            if (!spawnFallbackAttemptedRef.current) {
+              spawnFallbackAttemptedRef.current = true;
+              skipHomeDirRef.current = true;
+              disconnectMessage =
+                'Saved folder unreachable. Reopening in the default folder...';
+              messageColor = '1;33'; // Yellow — recoverable, not fatal yet
+              // Reset the reconnect attempt counter so this one-shot retry
+              // doesn't consume the user's regular reconnect budget.
+              reconnectAttemptsRef.current = 0;
+              shouldReconnect = true;
+              logger.terminal('Auto-retrying after 4005 with home dir stripped', { tabId });
+            } else {
+              // Already tried the fallback — something else is wrong. Stop
+              // retrying and open the diagnostic wizard so the user can fix
+              // the root cause.
+              disconnectMessage =
+                'Terminal failed to start even in the default folder. Opening the diagnostic wizard.';
+              messageColor = '1;31'; // Red
+              shouldReconnect = false;
+              if (onSpawnFailed) {
+                setTimeout(() => onSpawnFailed(), 600);
+              }
             }
             break;
           default:

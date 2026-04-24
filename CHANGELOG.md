@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Tabs with a missing saved directory no longer fail to reconnect.** When a tab was saved with a subdirectory that later got deleted, renamed, moved across machines, or sits on an offline network share, reconnecting after a server restart or update ended with close code 4005 (`PTY spawn failed`) and the user saw "Cannot Reach Session." Two layers of defense now ensure the terminal always comes up:
+  - **Backend** (`internal/terminal/session.go`): the existing Windows-only directory validation is promoted to a platform-agnostic `resolveWorkingDir` helper applied on every spawn path (CMD, PowerShell, WSL, and native Unix shells). Any failing `os.Stat` — path missing, permission denied, network unavailable, invalid characters — quietly falls back to the server's default cwd instead of failing the spawn. Covered by five unit tests in `resolve_workdir_test.go`.
+  - **Frontend** (`frontend/src/components/ForgeTerminal.jsx`): if a connect attempt still returns close code 4005, the client now transparently retries once with `cmdHome` / `psHome` / `wslHome` stripped from the WebSocket URL. The shell starts in the default cwd and the tab recovers without user intervention. Only if that retry also fails does the diagnostic wizard appear.
+
 ## [7.6.32] - 2026-04-24
 
 ---

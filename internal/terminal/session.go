@@ -66,6 +66,37 @@ type TerminalSession struct {
 	doneChan chan struct{}
 }
 
+// resolveWorkingDir validates a requested shell working directory and returns
+// the path to actually use when spawning the shell.
+//
+// Returns the input path unchanged if it points to a real, accessible directory.
+// Returns "" (use the server's default cwd) in every other case — the path
+// doesn't exist, it's a file not a directory, permission is denied, the network
+// share is offline, or os.Stat returned any other error.
+//
+// This is the single guard that prevents the "Cannot Reach Session" failure
+// when tabs are restored with a saved directory that no longer exists (moved
+// repo, renamed folder, cross-machine sync, WSL distro removed, etc.). Without
+// it, CreateProcess / exec.Cmd.Start returns ERROR_DIRECTORY and the shell
+// never comes up, which the user experiences as a reconnect loop ending in
+// close code 4005.
+func resolveWorkingDir(requestedDir string) string {
+	if requestedDir == "" {
+		return ""
+	}
+
+	info, statErr := os.Stat(requestedDir)
+	if statErr != nil {
+		log.Printf("[Terminal] Working directory %q is invalid (%v) — falling back to default", requestedDir, statErr)
+		return ""
+	}
+	if !info.IsDir() {
+		log.Printf("[Terminal] Working directory %q is a file, not a directory — falling back to default", requestedDir)
+		return ""
+	}
+	return requestedDir
+}
+
 // NewTerminalSession creates a new PTY session with default shell.
 func NewTerminalSession(id string) (*TerminalSession, error) {
 	return NewTerminalSessionWithConfig(id, nil)
@@ -180,6 +211,13 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 		env = append(env, globalVault.GetAutoInjectEnv()...)
 	}
 
+	// Validate the saved working directory on ALL platforms. If the tab was
+	// saved with a path that no longer exists (deleted, renamed, on a
+	// different machine, permission denied, network unavailable), spawning the
+	// shell there fails — so we fall back to the process default cwd and the
+	// terminal still opens cleanly.
+	workingDir = resolveWorkingDir(workingDir)
+
 	if runtime.GOOS != "windows" {
 		cmd = exec.Command(shell, shellArgs...)
 		cmd.Env = env
@@ -193,26 +231,6 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	var ptmx io.ReadWriteCloser
 	var err error
 	if runtime.GOOS == "windows" {
-		// Validate that the working directory exists before spawning ConPTY.
-		// If the saved psHome/cmdHome path no longer exists (deleted, renamed, on a
-		// different machine, permission denied, or network unavailable), CreateProcess
-		// returns ERROR_DIRECTORY and the session fails. Falling back to the default
-		// directory lets the terminal open cleanly.
-		if workingDir != "" {
-			info, statErr := os.Stat(workingDir)
-			if statErr != nil {
-				// ANY error (not just IsNotExist) means we can't use this directory.
-				// Common errors: path not found, permission denied, network unavailable,
-				// path too long, invalid characters, etc.
-				log.Printf("[Terminal] Working directory %q is invalid (%v) — falling back to default", workingDir, statErr)
-				workingDir = ""
-			} else if !info.IsDir() {
-				// Path exists but is a file, not a directory
-				log.Printf("[Terminal] Working directory %q is a file, not a directory — falling back to default", workingDir)
-				workingDir = ""
-			}
-		}
-
 		// v3.12.16: Inject env var for Windows ConPTY
 		if sessionID := GetActiveDebugSession(); sessionID != "" {
 			os.Setenv("FORGE_DEBUG_SESSION_ID", sessionID)
