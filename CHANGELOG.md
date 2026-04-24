@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.32] - 2026-04-24
+
+---
+
+## [v7.6.32] - 2026-04-24
+
 ### Fixed
 - **Terminal windows flashing on Windows** — Seven `exec.Command` callsites in the tunnel package (`detect.go`, `service.go`, `creds_windows.go`, `tunnel.go`) were spawning subprocesses without `hideWindow()`, causing brief CMD console windows to flash on screen. The Tailscale status poller runs every 10 seconds, so users saw a cursor spin and window flicker regularly. All callsites now use `hideWindow()` to set `CREATE_NO_WINDOW`.
 - **Cloudflared tunnel list parse error** — Newer versions of cloudflared append a structured JSON version-warning object after the tunnel-list array on stdout. `json.Unmarshal` rejected this as "invalid character '{' after top-level value". Switched to `json.NewDecoder().Decode()` in `wizard.go` which stops at the first complete JSON value, ignoring trailing content.
