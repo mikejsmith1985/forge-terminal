@@ -59,6 +59,7 @@ func InstallService(ctx context.Context) error {
 	defer cancel()
 	cmd := exec.CommandContext(cctx, bin, "--config", st.Config.ConfigPath,
 		"service", "install")
+	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("cloudflared service install failed: %w: %s",
@@ -86,6 +87,7 @@ func UninstallService(ctx context.Context) error {
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(cctx, bin, "service", "uninstall")
+	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("cloudflared service uninstall failed: %w: %s",
@@ -114,6 +116,7 @@ func QueryService(ctx context.Context) (ServiceStatus, error) {
 	cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(cctx, sc, "query", "cloudflared")
+	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		// sc query returns nonzero when the service doesn't exist.

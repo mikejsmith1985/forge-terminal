@@ -253,7 +253,9 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 	// once the daemon is running; the timeout guards against daemon hangs.
 	resetCtx, resetCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer resetCancel()
-	exec.CommandContext(resetCtx, bin, "funnel", "--reset").Run() //nolint:errcheck
+	resetCmd := exec.CommandContext(resetCtx, bin, "funnel", "--reset")
+	hideWindow(resetCmd)
+	resetCmd.Run() //nolint:errcheck
 
 	funnelCtx, funnelCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer funnelCancel()
@@ -327,10 +329,14 @@ func (m *Manager) startTailscale(cfg StartConfig, onURL func(url string)) error 
 func resetTailscaleFunnel(bin string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := exec.CommandContext(ctx, bin, "funnel", "--reset").Run(); err != nil {
+	cmd := exec.CommandContext(ctx, bin, "funnel", "--reset")
+	hideWindow(cmd)
+	if err := cmd.Run(); err != nil {
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel2()
-		exec.CommandContext(ctx2, bin, "funnel", "reset").Run() //nolint:errcheck
+		cmd2 := exec.CommandContext(ctx2, bin, "funnel", "reset")
+		hideWindow(cmd2)
+		cmd2.Run() //nolint:errcheck
 	}
 }
 

@@ -86,7 +86,9 @@ func detectTailscale(ctx context.Context) HealthState {
 	}
 	statusCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(statusCtx, bin, "status", "--json").Output()
+	statusCmd := exec.CommandContext(statusCtx, bin, "status", "--json")
+	hideWindow(statusCmd)
+	out, err := statusCmd.Output()
 	if err != nil {
 		return HealthState{
 			Mode:         ModeIDTailscale,
