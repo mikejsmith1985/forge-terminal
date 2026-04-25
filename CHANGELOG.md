@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Mouse clicks injected as escape sequences into shell.** When an interactive application (vim, htop, fzf, Copilot CLI menus) enabled xterm mouse reporting and then exited without sending the disable sequences, the terminal stayed in mouse-tracking mode. Every subsequent mouse click was forwarded to the PTY as a raw SGR escape sequence (e.g. `[555555;44;37M`) which appeared as garbled text. Fixed by writing the six mouse-mode disable sequences directly to xterm.js on every new shell prompt (OSC 9;9), which resets xterm's internal state without a PTY roundtrip and has no effect when modes are already off.
+
 ## [7.6.32] - 2026-04-24
 
 ---

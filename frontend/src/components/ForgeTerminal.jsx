@@ -1015,6 +1015,31 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           if (onDirectoryChange) {
              onDirectoryChange(folderName, path);
           }
+
+          // Reset all mouse-tracking modes on every new shell prompt.
+          //
+          // Why: interactive applications (vim, htop, fzf, Copilot CLI menus)
+          // enable xterm mouse reporting so they can receive click/drag events.
+          // If the app exits or is killed without sending the disable sequences,
+          // the terminal stays in mouse-tracking mode indefinitely — every
+          // subsequent mouse click gets forwarded to the PTY as a raw escape
+          // sequence (e.g. "\e[<0;44;37M") instead of being ignored, and those
+          // sequences appear as garbled text in the shell.
+          //
+          // Writing these directly to term.write() (not through the WebSocket)
+          // tells xterm.js to update its own mode state — no PTY roundtrip
+          // required.  The sequences are no-ops when the modes are already off,
+          // so this is safe to send unconditionally on every prompt.
+          //
+          // Modes cleared:
+          //   ?1000l — X10 press-only reporting
+          //   ?1002l — button-event reporting
+          //   ?1003l — any-event (all motion) reporting
+          //   ?1004l — focus in/out tracking
+          //   ?1006l — SGR extended coordinates (the one that produces visible
+          //             "[555555;44;37M" sequences when coords are large)
+          //   ?1015l — URXVT extended coordinates
+          term.write('\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1004l\x1b[?1006l\x1b[?1015l');
         }
         return true; // handled
       }
