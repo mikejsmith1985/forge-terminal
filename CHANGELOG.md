@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.8.6] - 2026-04-25
+
+### Fixed
+- **Macro payload injected before CLI starts (Enter-key race)** — `handleExecute` fired the macro HTTP request at t=0 but `sendCommand` scheduled Enter after `cmd.delay` ms (up to 4500 ms on Workflow cards). The payload arrived at the server before the CLI was even launched. Fix: wrap the macro `fetch` in `setTimeout(…, cmd.delay + 200)` so the request is not sent until after Enter has been delivered to the PTY.
+- **Macro `waitForPTYQuiet` fires on stale output (false-quiet)** — the quiet-detection loop checked `now.Sub(lastOutputAt) >= 750 ms` without verifying the output occurred *after* the macro request. When the terminal was idle before the card click, the check passed immediately and the payload was injected into an empty shell. Fix: `waitForPTYQuiet` now accepts a `baseline time.Time` (set to `startedAt` before the floor sleep) and ignores output that predates it.
+- **Named tunnel health probe fails on NAT-hairpin networks** — the supervisor probed `https://<hostname>/api/ping` via the external Cloudflare URL. On home/office networks where the local machine cannot reach its own external hostname (split-horizon DNS, Windows firewall, CGNAT), the probe always timed out — even though remote clients could connect fine. Fix: dual-probe strategy in `probeAndReport` — if the external probe fails, fall back to `http://localhost:{port}/api/ping`. If the local probe succeeds and cloudflared is running, the stage is marked Healthy. Probe timeout also raised from 2 s → 8 s to handle slow Cloudflare TLS round-trips.
+- **Companion wizard showed no detail on unhealthy tunnel** — the spinning "Waiting…" hint gave no indication of *why* health was failing. The hint now renders `tunnelDetail` (the supervisor's error string) below the spinner so users can see "external=dial tcp: connection refused; local=OK" or similar.
+
 ## [7.8.5] - 2026-04-25
 
 ---

@@ -69,13 +69,14 @@ type NamedConfig struct {
 //   - Health probes run every 20s against `https://<hostname>/api/ping`;
 //     3 consecutive failures demote Healthy → Degraded
 type Supervisor struct {
-	cfg      NamedConfig
-	ranker   *Ranker
-	bin      string        // path to cloudflared, resolved once at Start()
-	probeURL string        // https://<hostname> — base for ProbeHTTP
-	stopOnce sync.Once     // guards Stop()
-	doneCh   chan struct{} // closed when the supervisor goroutine exits
-	cancel   context.CancelFunc
+	cfg           NamedConfig
+	ranker        *Ranker
+	bin           string        // path to cloudflared, resolved once at Start()
+	probeURL      string        // https://<hostname> — base for ProbeHTTP
+	localProbeURL string        // http://localhost:{port} — fallback for NAT-hairpin networks
+	stopOnce      sync.Once     // guards Stop()
+	doneCh        chan struct{} // closed when the supervisor goroutine exits
+	cancel        context.CancelFunc
 }
 
 // supervisorTiming collects the time-based knobs in one struct so tests
@@ -100,7 +101,7 @@ func defaultTiming() supervisorTiming {
 		stormWindow:      2 * time.Minute,
 		stormMaxCrashes:  5,
 		postStartGrace:   5 * time.Second,
-		probeTimeoutEach: 2 * time.Second,
+		probeTimeoutEach: 8 * time.Second,
 	}
 }
 
@@ -108,10 +109,11 @@ func defaultTiming() supervisorTiming {
 // cloudflared process — call Start to do that.
 func NewSupervisor(cfg NamedConfig, ranker *Ranker) *Supervisor {
 	return &Supervisor{
-		cfg:      cfg,
-		ranker:   ranker,
-		probeURL: fmt.Sprintf("https://%s", cfg.Hostname),
-		doneCh:   make(chan struct{}),
+		cfg:           cfg,
+		ranker:        ranker,
+		probeURL:      fmt.Sprintf("https://%s", cfg.Hostname),
+		localProbeURL: fmt.Sprintf("http://localhost:%d", cfg.LocalPort),
+		doneCh:        make(chan struct{}),
 	}
 }
 
@@ -328,26 +330,53 @@ func (s *Supervisor) runOnce(ctx context.Context, timing supervisorTiming) error
 // probeAndReport runs one health probe and updates the failure counter.
 // Returns true when the caller should abort the child (too many failures).
 //
-// The counter resets on success — a single flaky probe does not escalate.
+// Dual-probe strategy:
+//  1. External probe — GET https://<hostname>/api/ping via Cloudflare.
+//     Gold standard: confirms the full tunnel path works for remote clients.
+//  2. Local fallback — GET http://localhost:{port}/api/ping.
+//     Used when the external URL is unreachable from the local machine due
+//     to NAT-hairpin blocking (common on home/office routers and Windows
+//     firewalls). If cloudflared is still running and Forge responds locally
+//     the tunnel IS serving remote clients even if the local probe route is
+//     blocked.
+//
+// The failure counter only increments when BOTH probes fail.
 func (s *Supervisor) probeAndReport(ctx context.Context, failures *int, timing supervisorTiming) bool {
 	probeCtx, cancel := context.WithTimeout(ctx, timing.probeTimeoutEach)
 	defer cancel()
 
-	if err := ProbeHTTP(probeCtx, s.probeURL); err != nil {
-		*failures++
-		if *failures >= timing.probeFailureMax {
-			s.publish(StageDegraded, s.probeURL,
-				fmt.Sprintf("health probe failed %d times: %v", *failures, err),
-				"Repair tunnel")
-			return true
-		}
-		// Not yet over the threshold — keep saying Starting/Healthy
-		// based on current state, don't flap to Degraded on one blip.
+	extErr := ProbeHTTP(probeCtx, s.probeURL)
+	if extErr == nil {
+		// External probe succeeded — canonical healthy.
+		*failures = 0
+		s.publish(StageHealthy, s.probeURL, "", "")
 		return false
 	}
 
-	*failures = 0
-	s.publish(StageHealthy, s.probeURL, "", "")
+	// External probe failed.  Try the local fallback before counting it as
+	// a real failure, so NAT-hairpin environments don't kill cloudflared.
+	localCtx, localCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer localCancel()
+	localErr := ProbeHTTP(localCtx, s.localProbeURL)
+	if localErr == nil {
+		// Local probe OK — Forge is up and cloudflared is running.
+		// The external route is blocked from this machine but remote
+		// clients can still reach the tunnel.  Reset failures and
+		// report healthy (with the external URL as the canonical URL).
+		*failures = 0
+		s.publish(StageHealthy, s.probeURL, "", "")
+		return false
+	}
+
+	// Both probes failed — count as a real failure.
+	*failures++
+	if *failures >= timing.probeFailureMax {
+		s.publish(StageDegraded, s.probeURL,
+			fmt.Sprintf("health probe failed %d times: external=%v local=%v", *failures, extErr, localErr),
+			"Repair tunnel")
+		return true
+	}
+	// Not yet over the threshold — keep the current stage, don't flap.
 	return false
 }
 
