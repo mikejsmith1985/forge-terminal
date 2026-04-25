@@ -140,6 +140,10 @@ func RecordGate(projectRoot, taskID, gate, evidence string) (*Ticket, error) {
 	if ticket == nil || (taskID != "" && ticket.TaskID != taskID) {
 		// New task starts a fresh ledger so gate evidence cannot leak across tasks.
 		ticket = &Ticket{TaskID: taskID, StartedAt: time.Now().UTC()}
+		// Auto-install the pre-commit hook the first time a ticket is created for
+		// this project.  Best-effort: a hook-install failure is never surfaced to
+		// the caller — it should not block an agent from recording gate evidence.
+		_ = EnsureHookInstalled(projectRoot)
 	}
 	ticket.Gates = append(ticket.Gates, GateRecord{
 		Gate:     gate,

@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [7.8.0] - 2026-04-25
+## [7.8.1] - 2026-04-25
+
+### Changed
+- **Workflow pre-commit hook is now auto-installed.** Previously developers had to run `scripts/install-workflow-hooks.{ps1,sh}` once per repository. Now `internal/workflow/ticket.go` calls `EnsureHookInstalled` automatically the first time `RecordGate` creates a new ticket for a project — so any agent (or human) that records their first gate also silently gets the hook. The installer scripts remain available for manual re-installation. The hook preserves any existing non-Forge pre-commit script rather than overwriting it.
+
+
 
 ---
 

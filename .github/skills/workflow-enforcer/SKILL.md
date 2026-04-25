@@ -216,6 +216,10 @@ forge workflow preflight
 ```
 
 **One-time install of the hook in any new repo:**
+The hook is **installed automatically** the first time `workflow_gate_record` is called
+in a project (i.e., when the very first ticket is created).  No manual step is required.
+
+If for any reason you need to force-reinstall or install without recording a gate:
 ```powershell
 .\scripts\install-workflow-hooks.ps1   # Windows
 ./scripts/install-workflow-hooks.sh    # macOS / Linux
