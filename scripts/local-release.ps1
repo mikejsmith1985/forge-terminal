@@ -17,7 +17,8 @@
 #>
 param(
     [Parameter(Position=0)]
-    [string]$VersionType = "patch"
+    [string]$VersionType = "patch",
+    [switch]$Force
 )
 
 Set-StrictMode -Version Latest
@@ -166,8 +167,12 @@ if ($preflightBlockers.Count -gt 0) {
 }
 
 if ($preflightWarnings.Count -gt 0 -and $preflightBlockers.Count -eq 0) {
-    $proceed = Read-Host "`n  Proceed with warnings? (y/N)"
-    if ($proceed -notmatch '^[Yy]$') { Write-Fail "Release cancelled by user" }
+    if (-not $Force) {
+        $proceed = Read-Host "`n  Proceed with warnings? (y/N)"
+        if ($proceed -notmatch '^[Yy]$') { Write-Fail "Release cancelled by user" }
+    } else {
+        Write-Warn "Proceeding with warnings (-Force)"
+    }
 }
 
 if ($preflightPassed -and $preflightWarnings.Count -eq 0) {
