@@ -282,13 +282,18 @@ func (s *Supervisor) runOnce(ctx context.Context, timing supervisorTiming) error
 	childCtx, childCancel := context.WithCancel(ctx)
 	defer childCancel()
 
-	// --no-autoupdate: Forge manages the binary; we don't want cloudflared
-	// silently replacing itself.
-	// --config:       point at our managed config, not the user's ~/.cloudflared
+	// IMPORTANT: cloudflared flag ordering is positional.  --config and
+	// --no-autoupdate are flags of the `tunnel` subcommand, NOT of `run`.
+	// If they're placed after `run`, cloudflared silently dumps its help
+	// text and exits 0, which looks identical to "started fine" from the
+	// outside — but DNS resolution then returns Cloudflare error 1033
+	// because no edge tunnel was ever opened.  Correct shape:
+	//   cloudflared tunnel --config <path> --no-autoupdate run <UUID>
 	cmd := exec.CommandContext(childCtx, s.bin,
-		"tunnel", "run",
-		"--no-autoupdate",
+		"tunnel",
 		"--config", s.cfg.ConfigPath,
+		"--no-autoupdate",
+		"run",
 		s.cfg.TunnelUUID,
 	)
 	hideWindow(cmd)

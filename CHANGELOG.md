@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Named Tunnel always returned Cloudflare error 1033 (the actual root cause)** — the supervisor was invoking `cloudflared tunnel run --no-autoupdate --config <path> <UUID>`, but `--config` and `--no-autoupdate` are flags of the `tunnel` subcommand, not of `run`. cloudflared's CLI parser treated them as unknown `run` options, silently dumped its help text to stderr, and exited 0. The supervisor saw a clean exit and restarted forever; no edge tunnel was ever opened, so DNS resolved correctly but the edge had no origin → 1033. Corrected to `cloudflared tunnel --config <path> --no-autoupdate run <UUID>` (matches the working ordering already used in `service.go`). Verified live: cloudflared now registers 4 tunnel connections and stays up. This was only diagnosable because of the log capture added in the same release.
+
 ## [7.6.35] - 2026-04-24
 
 ---
