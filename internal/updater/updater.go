@@ -16,7 +16,7 @@ import (
 )
 
 // Version is set at build time via ldflags
-var Version = "7.8.4"
+var Version = "7.8.5"
 
 // DownloadURLResolver, when set by main at startup, is called to obtain a
 // signed R2 URL instead of using the public GitHub release asset URL.
