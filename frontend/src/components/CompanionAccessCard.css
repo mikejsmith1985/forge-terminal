@@ -388,6 +388,28 @@
 }
 .cac-inline-link:hover { text-decoration: underline; }
 
+/* ── Embedded tunnel section header ─────────────────────────────────────── */
+
+.cac-tunnel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cac-tunnel-icon {
+  color: var(--accent, #58a6ff);
+  flex-shrink: 0;
+}
+
+.cac-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #8b949e);
+}
+
 /* ── Advanced settings toggle ───────────────────────────────────────────── */
 
 .cac-advanced-toggle {

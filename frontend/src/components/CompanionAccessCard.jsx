@@ -24,8 +24,7 @@ import {
   ExternalLink,
   Lock,
   Info,
-  Wifi,
-  Globe,
+  Cloud,
   Settings,
 } from 'lucide-react'
 import './CompanionAccessCard.css'
@@ -34,6 +33,8 @@ import {
   isStaleCompanionHost,
   buildDeepLink,
 } from '../utils/companionUrl.js'
+import NamedTunnelSetupCard from './NamedTunnelSetupCard'
+import ConnectionSetupCard from './ConnectionSetupCard'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -95,9 +96,39 @@ const CompanionAccessCard = () => {
   }, [tunnelUrl])
 
   // Fetch current mobile settings on mount so the header badge is accurate.
+  // Also attempt to auto-detect the active tunnel URL so the QR code points
+  // to a reachable address without the user having to paste it manually.
   useEffect(() => {
     refreshSettings()
+    autoDetectTunnelUrl()
   }, [])
+
+  /**
+   * autoDetectTunnelUrl — queries /api/tunnel/options on mount and fills
+   * tunnelUrl + companionHost from the active named tunnel URL.  Only runs
+   * when the stored tunnelUrl is still a localhost value (the factory default)
+   * so it never overwrites a URL the user has intentionally entered.
+   */
+  async function autoDetectTunnelUrl() {
+    const currentTunnelUrl = localStorage.getItem(STORAGE_TUNNEL_URL) || window.location.origin
+    const isUsingLocalhost = /localhost|127\.0\.0\.1/.test(currentTunnelUrl)
+    if (!isUsingLocalhost) return
+
+    try {
+      const response = await fetch('/api/tunnel/options')
+      if (!response.ok) return
+      const tunnelData = await response.json()
+      // Prefer the named tunnel URL; fall back to whatever mode is active.
+      const namedOption  = tunnelData.options?.find(opt => opt.mode === 'named' && opt.url)
+      const activeOption = tunnelData.options?.find(opt => opt.mode === tunnelData.active && opt.url)
+      const detectedUrl  = namedOption?.url || activeOption?.url
+      if (!detectedUrl) return
+      setTunnelUrl(detectedUrl)
+      setCompanionHost(getDefaultCompanionHost(detectedUrl))
+    } catch {
+      // Best-effort — user can paste the URL manually if detection fails.
+    }
+  }
 
   async function refreshSettings() {
     setIsLoading(true)
@@ -258,15 +289,16 @@ const DisabledView = ({ onEnable, isTogglePending }) => (
 )
 
 /**
- * EnabledView — guided step-by-step connection flow.
+ * EnabledView — the main body rendered when mobile access is on.
  *
- * The user flow is intentionally simple:
- *   Step 1 — Pick how to expose Forge (Tailscale IP or Cloudflare Tunnel)
- *   Step 2 — Confirm / edit the URL that was pre-filled
- *   Step 3 — Scan the QR code and tap Connect
+ * Flow:
+ *   1. Cloudflare Tunnel — embedded NamedTunnelSetupCard drives setup or
+ *      shows "Your tunnel is live" when already configured.
+ *   2. Forge URL — auto-detected from the active tunnel; editable override.
+ *   3. QR code — encodes the companion deep-link; scan with iPhone to connect.
  *
- * Advanced options (PWA host override, raw token copy) are collapsed by default
- * so they don't clutter the main flow for first-time users.
+ * Advanced settings (connection mode switcher, PWA host override, raw token)
+ * are collapsed so they don't clutter the primary flow.
  */
 const EnabledView = ({
   settings,
@@ -286,74 +318,44 @@ const EnabledView = ({
 
   return (
     <>
-      {/* ── Step 1: Connection method ───────────────────────────────────── */}
+      {/* ── Cloudflare Tunnel setup / status ────────────────────────── */}
+      <div className="cac-section">
+        <div className="cac-tunnel-header">
+          <Cloud size={13} className="cac-tunnel-icon" />
+          <span className="cac-section-label">Cloudflare Tunnel</span>
+        </div>
+        <NamedTunnelSetupCard embedded={true} />
+      </div>
+
+      {/* ── Forge URL (auto-filled from active tunnel) ──────────────── */}
       <div className="cac-section">
         <div className="cac-step-header">
           <span className="cac-step-number">1</span>
-          <span className="cac-step-title">How is your phone reaching this PC?</span>
-        </div>
-        <div className="cac-method-cards">
-          <ConnectionMethodCard
-            icon={<Wifi size={16} />}
-            title="Tailscale"
-            description="Both devices on the same tailnet"
-            hint={
-              <>
-                Open the Tailscale app on this PC and copy your machine IP —{' '}
-                it looks like <code>100.x.x.x</code>.{' '}
-                Then use <code>http://100.x.x.x:3005</code> below.
-              </>
-            }
-          />
-          <ConnectionMethodCard
-            icon={<Globe size={16} />}
-            title="No Tailscale"
-            description="Free public tunnel via Cloudflare"
-            hint={
-              <>
-                Run this command in a new terminal, then copy the link it prints:
-                <code className="cac-method-command">
-                  cloudflared tunnel --url http://localhost:3005
-                </code>
-                <a
-                  href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="cac-inline-link"
-                >
-                  Download cloudflared ↗
-                </a>
-              </>
-            }
-          />
-        </div>
-      </div>
-
-      {/* ── Step 2: Paste the URL ───────────────────────────────────────── */}
-      <div className="cac-section">
-        <div className="cac-step-header">
-          <span className="cac-step-number">2</span>
-          <span className="cac-step-title">Paste your Forge URL here</span>
+          <span className="cac-step-title">Your Forge URL</span>
         </div>
         <input
           className="cac-input"
           type="text"
           value={tunnelUrl}
           onChange={evt => setTunnelUrl(evt.target.value)}
-          placeholder="e.g. http://100.x.x.x:3005 or https://abc123.trycloudflare.com"
+          placeholder="e.g. https://forge.example.com"
         />
+        <p className="cac-hint">
+          Auto-detected from your tunnel above. Edit only if you use Tailscale
+          or a different URL.
+        </p>
       </div>
 
-      {/* ── Step 3: QR code ────────────────────────────────────────────── */}
+      {/* ── QR code ─────────────────────────────────────────────────── */}
       <div className="cac-section">
         <div className="cac-step-header">
-          <span className="cac-step-number">3</span>
+          <span className="cac-step-number">2</span>
           <span className="cac-step-title">Scan with your phone — then tap Connect</span>
         </div>
         <QRBlock deepLink={deepLink} />
       </div>
 
-      {/* ── Actions ────────────────────────────────────────────────────── */}
+      {/* ── Actions ─────────────────────────────────────────────────── */}
       <div className="cac-actions">
         <button
           className="cac-btn cac-btn-secondary"
@@ -374,7 +376,7 @@ const EnabledView = ({
         </button>
       </div>
 
-      {/* ── Advanced (collapsed by default) ────────────────────────────── */}
+      {/* ── Advanced (collapsed by default) ─────────────────────────── */}
       <button
         className="cac-advanced-toggle"
         onClick={() => setIsAdvancedOpen(prev => !prev)}
@@ -386,6 +388,13 @@ const EnabledView = ({
 
       {isAdvancedOpen && (
         <div className="cac-advanced-body">
+          {/* Connection mode switcher — view all tunnel options */}
+          <div className="cac-section">
+            <label className="cac-label">Connection mode</label>
+            <ConnectionSetupCard embedded={true} />
+          </div>
+
+          {/* Companion PWA host override */}
           <div className="cac-section">
             <label className="cac-label">Companion PWA host</label>
             <input
@@ -401,6 +410,7 @@ const EnabledView = ({
             </p>
           </div>
 
+          {/* Raw mobile token */}
           <div className="cac-section">
             <label className="cac-label">Mobile token</label>
             <div className="cac-token-row">
@@ -425,24 +435,6 @@ const EnabledView = ({
     </>
   )
 }
-
-/**
- * ConnectionMethodCard — one of two option cards shown in Step 1 of the
- * enabled view. Purely informational — shows the user what each tunnel path
- * looks like so they know which URL to paste in Step 2.
- */
-const ConnectionMethodCard = ({ icon, title, description, hint }) => (
-  <div className="cac-method-card">
-    <div className="cac-method-card-header">
-      <span className="cac-method-icon">{icon}</span>
-      <div>
-        <strong className="cac-method-title">{title}</strong>
-        <span className="cac-method-desc">{description}</span>
-      </div>
-    </div>
-    <p className="cac-method-hint">{hint}</p>
-  </div>
-)
 
 /**
  * QRBlock — renders the deep-link URL as a QR code canvas.

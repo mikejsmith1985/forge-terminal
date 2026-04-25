@@ -72,7 +72,7 @@ function stageIcon(stage) {
   return null
 }
 
-export default function ConnectionSetupCard({ apiBase = '', authToken = '' }) {
+export default function ConnectionSetupCard({ apiBase = '', authToken = '', embedded = false }) {
   const [state, setState] = useState({ loading: true, active: '', options: [], preference: { mode: '' } })
   const [error, setError] = useState(null)
   const [selecting, setSelecting] = useState('')
@@ -122,7 +122,7 @@ export default function ConnectionSetupCard({ apiBase = '', authToken = '' }) {
     }
   }
 
-  if (state.loading) {
+  if (state.loading && !embedded) {
     return (
       <div className="card connection-setup-card">
         <h3><LinkIcon size={16} /> Connection Setup</h3>
@@ -134,19 +134,12 @@ export default function ConnectionSetupCard({ apiBase = '', authToken = '' }) {
   const active = state.options.find((o) => o.mode === state.active)
   const others = state.options.filter((o) => o.mode !== state.active)
 
-  return (
-    <div className="card connection-setup-card">
-      <div className="card-header">
-        <h3><LinkIcon size={16} /> Connection Setup</h3>
-        <button
-          className="icon-btn"
-          onClick={refresh}
-          title="Rescan tunnels"
-          aria-label="Rescan tunnels"
-        >
-          <RefreshCw size={14} />
-        </button>
-      </div>
+  // Inner content shared between embedded and standalone renders
+  const cardContent = (
+    <>
+      {state.loading && (
+        <p className="muted"><Loader2 size={14} className="spin" /> Scanning tunnels…</p>
+      )}
 
       {error && (
         <div className="alert alert-error" role="alert">
@@ -232,6 +225,28 @@ export default function ConnectionSetupCard({ apiBase = '', authToken = '' }) {
           </button>
         </div>
       )}
+    </>
+  )
+
+  // When embedded inside another card, skip the outer card chrome.
+  if (embedded) {
+    return <div className="connection-setup-embedded">{cardContent}</div>
+  }
+
+  return (
+    <div className="card connection-setup-card">
+      <div className="card-header">
+        <h3><LinkIcon size={16} /> Connection Setup</h3>
+        <button
+          className="icon-btn"
+          onClick={refresh}
+          title="Rescan tunnels"
+          aria-label="Rescan tunnels"
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+      {cardContent}
     </div>
   )
 }

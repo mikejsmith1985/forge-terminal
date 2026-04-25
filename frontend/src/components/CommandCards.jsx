@@ -9,8 +9,6 @@ import EnterpriseWorkflowCard from './EnterpriseWorkflowCard';
 import MCPSetupCard from './MCPSetupCard';
 import MCPDiscoveryCard from './MCPDiscoveryCard';
 import CompanionAccessCard from './CompanionAccessCard';
-import NamedTunnelSetupCard from './NamedTunnelSetupCard';
-import ConnectionSetupCard from './ConnectionSetupCard';
 
 const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, onDelete, onRetry, onToast, shellType, cwd, directoryCardVisible = true, onHideDirectoryCard }) => { // onOpenTutor removed — Code Tutor fully disabled
   if (loading) {
@@ -28,8 +26,6 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
         <MCPSetupCard />
         <MCPDiscoveryCard />
         <CompanionAccessCard />
-        <NamedTunnelSetupCard />
-        <ConnectionSetupCard />
         <div className="command-cards-loading">
           <div className="spinner"></div>
           <p>Loading command cards...</p>
@@ -53,8 +49,6 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
         <MCPSetupCard />
         <MCPDiscoveryCard />
         <CompanionAccessCard />
-        <NamedTunnelSetupCard />
-        <ConnectionSetupCard />
         <div className="command-cards-error">
           <p className="error-message">⚠️ Failed to load command cards</p>
           <p className="error-details">{error}</p>
@@ -126,12 +120,9 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
       <MCPSetupCard />
       {/* MCP Discovery — catalog of external MCP servers with copy-config */}
       <MCPDiscoveryCard />
-      {/* Companion Access — license-gated QR pairing for the Forge Companion PWA */}
+      {/* Companion Access — license-gated QR pairing for the Forge Companion PWA.
+           Named Cloudflare Tunnel and Connection Setup are nested inside this card. */}
       <CompanionAccessCard />
-      {/* v7.6.31 — Named Cloudflare Tunnel setup wizard (install → login → create) */}
-      <NamedTunnelSetupCard />
-      {/* v7.6.29 — Unified connection-mode ranker (surfaces active mode + alternates) */}
-      <ConnectionSetupCard />
     </div>
   );
 };

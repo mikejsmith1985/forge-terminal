@@ -31,7 +31,14 @@ import './NamedTunnelSetupCard.css'
 
 const LOGIN_POLL_MS = 2000
 
-const NamedTunnelSetupCard = () => {
+/**
+ * NamedTunnelSetupCard — Cloudflare Named Tunnel setup wizard.
+ *
+ * When embedded={true} (rendered inside CompanionAccessCard), the outer card
+ * chrome (border, header button) is omitted and only the step body renders.
+ * This keeps the Forge Companion card as the single top-level container.
+ */
+const NamedTunnelSetupCard = ({ embedded = false }) => {
   // Start expanded so the setup wizard is immediately actionable.
   // Users who have already completed setup see a compact "Connected"
   // view and can collapse the card; see auto-collapse effect below.
@@ -228,21 +235,40 @@ const NamedTunnelSetupCard = () => {
       return <div className="nts-loading">Loading setup status…</div>
     }
 
-    if (step === 'ready' && status?.config?.hostname) {
-      return (
-        <div className="nts-ready">
-          <div className="nts-ready-badge">
-            <Check size={14} /> Your tunnel is live
-          </div>
-          <div className="nts-hostname">
-            <a
-              href={`https://${status.config.hostname}`}
-              target="_blank"
-              rel="noreferrer"
+    if (step === 'ready') {
+      if (status?.config?.hostname) {
+        return (
+          <div className="nts-ready">
+            <div className="nts-ready-badge">
+              <Check size={14} /> Your tunnel is live
+            </div>
+            <div className="nts-hostname">
+              <a
+                href={`https://${status.config.hostname}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {status.config.hostname}
+                <ExternalLink size={12} />
+              </a>
+            </div>
+            <button
+              type="button"
+              className="nts-btn nts-btn-secondary"
+              onClick={reconfigure}
             >
-              {status.config.hostname}
-              <ExternalLink size={12} />
-            </a>
+              <RefreshCw size={14} /> Reconfigure
+            </button>
+          </div>
+        )
+      }
+      // Tunnel was marked created but the hostname is missing from config —
+      // show an actionable error instead of falling through to the create form.
+      return (
+        <div className="nts-step">
+          <div className="nts-error" role="alert">
+            <AlertTriangle size={14} />
+            <span>Tunnel hostname is missing from config. Try reconfiguring.</span>
           </div>
           <button
             type="button"
@@ -412,6 +438,17 @@ const NamedTunnelSetupCard = () => {
     step === 'login' ? 'Step 2 of 3 — Sign in' :
     step === 'create' ? 'Step 3 of 3 — Pick hostname' :
     'Setup'
+
+  // When embedded inside another card (e.g. CompanionAccessCard), skip the
+  // outer card chrome so the parent card is the single visual container.
+  if (embedded) {
+    return (
+      <div className="nts-embedded">
+        {renderError()}
+        {renderStepBody()}
+      </div>
+    )
+  }
 
   return (
     <div className="nts-card">
