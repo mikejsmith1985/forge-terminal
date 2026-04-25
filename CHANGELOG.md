@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [7.7.3] - 2026-04-25
+## [7.8.0] - 2026-04-26
+
+### Added
+- **Runtime workflow enforcement (real, not just prompts).** `internal/workflow/ticket.go` introduces a per-task gate ledger persisted at `.forge/workflow-ticket.json`. The new MCP tools `workflow_gate_record` and `workflow_preflight_check` let agents (and humans) record evidence and ask whether the required gates (`branch-created`, `tests-written`, `tests-passed`) have been satisfied. `forge workflow preflight` exits with code 2 when blocked, and `scripts/install-workflow-hooks.{ps1,sh}` install a `pre-commit` hook that refuses commits to `main`/`master` and any commit whose ticket is incomplete (with an auditable `FORGE_BYPASS=1` escape hatch). The `workflow-enforcer` skill now references the ledger so agents must record gates before claiming they passed.
+- **Forge Companion connection wizard.** Brand-new `CompanionConnectionWizard` component asks the user a single Step-1 question — *"How should your phone reach this PC?"* — with three plain-language options: **Named Cloudflare Tunnel** (persistent, recommended), **Cloudflare Quick Tunnel** (per-session, zero setup), and **Tailscale** (per-session, uses your tailnet). Subsequent steps render only the chosen method's instructions, so two connection types are *never* shown side-by-side. The QR code is generated identically at the final step regardless of method. Choice is persisted via `GET/POST /api/companion/preference` (`~/.forge/companion/preference.json`) and auto-detected on the next launch. LAN remains accessible from "Advanced settings" only.
+- **Forge Companion preference REST endpoint.** `cmd/forge/handlers_companion.go` validates against the allowlist `{named, quick, tailscale}` and round-trips through `~/.forge/companion/preference.json`. Round-trip behaviour is covered by `handlers_companion_test.go`.
+
+### Changed
+- **"Enterprise Workflow" → "Forge Workflow" everywhere.** Skill directory `.github/skills/enterprise-workflow/` is now `forge-workflow/`. Frontend component `EnterpriseWorkflowCard.{jsx,css}` is now `ForgeWorkflowCard.{jsx,css}` (CSS prefix `ewc-` → `fwc-`). All user-facing labels, AGENTS.md, README.md, copilot-instructions.md, and skill cross-references updated. Internal Go package `internal/workflow` keeps its already-neutral name.
+- **CompanionAccessCard now delegates the entire connection flow** to `CompanionConnectionWizard`. The previous always-visible Cloudflare Tunnel embed plus Forge URL field plus QR block has been replaced by the single-method wizard. `ConnectionSetupCard` is still reachable from Advanced settings for power users.
+
+
 
 ---
 
@@ -16,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Mouse clicks still injected escape sequences in *restored* tabs (carryover from v7.7.2).** The previous fix only reset xterm.js mouse-tracking modes inside the OSC 9;9 prompt-arrived handler, so it never ran on tabs reattached after an update — those tabs reattach to an existing PTY mid-session and may not see a fresh prompt for some time. `ForgeTerminal.jsx` now writes the same six disable sequences immediately after `term.open()`, before the WebSocket connects, guaranteeing a clean state on every mount regardless of restoration path.
 - **Command-card macro payloads silently corrupted multi-line workflow prompts to AI CLIs.** `sendCommand` previously sent the entire payload as a single send followed by a synthetic `\r`, with no special handling for embedded newlines. Receiving TUIs (Copilot CLI, Claude Code, etc.) interpreted each `\n` as Enter mid-payload, submitting partial prompts and dropping the rest. `sendCommand` now detects newlines and wraps multi-line payloads in xterm bracketed-paste markers (`\x1b[200~ ... \x1b[201~`) with normalized line endings, so the receiving TUI treats the entire payload as one paste event and only acts on it after the closing marker.
-- **Forge Workflow card (Enterprise Workflow card) detected wrong project root from subfolder terminals.** When the active terminal's CWD was a subfolder (e.g. `forge-terminal/frontend`), `/api/workflow/status`, `/api/workflow/compliance`, and `/api/workflow/preflight` all scanned the subfolder rather than the project root — so the card showed missing CHANGELOG, missing `.github/`, and false compliance failures. The handlers now walk up from the supplied path to the nearest project marker (`.git`, `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`) before scanning, so every subfolder of a project sees the same workflow state as the root.
+- **Forge Workflow card (Forge Workflow card) detected wrong project root from subfolder terminals.** When the active terminal's CWD was a subfolder (e.g. `forge-terminal/frontend`), `/api/workflow/status`, `/api/workflow/compliance`, and `/api/workflow/preflight` all scanned the subfolder rather than the project root — so the card showed missing CHANGELOG, missing `.github/`, and false compliance failures. The handlers now walk up from the supplied path to the nearest project marker (`.git`, `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`) before scanning, so every subfolder of a project sees the same workflow state as the root.
 
 ## [7.7.2] - 2026-04-25
 
@@ -315,8 +326,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v7.3.0] - 2026-04-21
 
 ### Fixed
-- **Code Tutor toast leak** — `EnterpriseWorkflowCard` was firing blank toast notifications via a leftover file-watcher effect even though Code Tutor is disabled. The watcher start/stop lifecycle and the broken notification effect have been removed entirely; the polling loop no longer runs.
-- **Code Tutor options in Workflow Wizard** — `tutor` and `tutor-and-agent` PR review strategy cards have been removed from the Enterprise Workflow Wizard. Users who had those strategies saved will be automatically migrated to `agent` on next open. Quality Agent is now the recommended strategy.
+- **Code Tutor toast leak** — `ForgeWorkflowCard` was firing blank toast notifications via a leftover file-watcher effect even though Code Tutor is disabled. The watcher start/stop lifecycle and the broken notification effect have been removed entirely; the polling loop no longer runs.
+- **Code Tutor options in Workflow Wizard** — `tutor` and `tutor-and-agent` PR review strategy cards have been removed from the Forge Workflow Wizard. Users who had those strategies saved will be automatically migrated to `agent` on next open. Quality Agent is now the recommended strategy.
 
 — agents can probe the host for WSL2 and Docker availability before choosing an execution strategy. Returns `wsl2_available`, `docker_available`, `docker_installed_but_not_running`, `recommended` strategy, and an `install_hint` when neither is configured.
 - **`environment_run` MCP tool** — agents can run shell commands in `native`, `linux-wsl`, `linux-docker`, or `auto` environments. Solves Windows build incompatibilities (Turbopack/OpenNext chunk filename issues) without requiring GitHub Actions workflows or CI secrets. Supports configurable timeouts up to 10 minutes for long builds. Returns `exit_code`, `stdout`, `stderr`, `environment_used`, and `duration_seconds`.
@@ -435,7 +446,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Workflow preset checkmark vanishes** — The "Selected" checkmark on Enterprise Standard and Lean Startup presets disappeared immediately after clicking. Root cause: the project-detection `useEffect` called `updateConfig()` after preset selection, which internally calls `setSelectedPreset(null)`. Fixed by adding a `!selectedPreset` guard to the effect so it skips auto-population when a preset is already chosen.
 
 ### Changed
-- **Code Tutor removed from Enterprise Workflow** — Code Tutor is no longer listed in the Enterprise Standard preset description or Quality Mode "BEST" label. Removed `code-tutor` from `DefaultConfig()` enabled modules and the frontend default config.
+- **Code Tutor removed from Forge Workflow** — Code Tutor is no longer listed in the Enterprise Standard preset description or Quality Mode "BEST" label. Removed `code-tutor` from `DefaultConfig()` enabled modules and the frontend default config.
 - **Send Feedback → email** — The feedback button now opens the user's email client pre-filled with feedback, screenshots note, and environment info addressed to `info@rootlevellabs.tech`. Removed GitHub PAT requirement entirely.
 - **Command card emoji revamp** — Emoji icon blocks are now 48×48px (was 42×42px), font size 1.7rem (was 1.45rem), with an orange gradient background, subtle border glow, and hover animation for a more polished, flashier look.
 
@@ -465,7 +476,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Guided tour re-implemented** — Populated 7-step feature tour covering Command Cards, Release Manager, Vault, Multi-Tab Themes, and the Dev Dashboard. Tour activates via **Settings → Replay Tour**. `TOUR_VERSION` bumped to `7.1.0` so existing users see the new tour on next launch. `TourOverlay` re-wired into `App.jsx`.
-- **Enterprise Workflow: AI compliance disclaimer** — Added a small but honest notice at the bottom of the Enterprise Workflow card explaining that workflow rules are strong guidance, not hard enforcement, and that compliance may vary in long sessions due to how large language models manage context. Framed as an industry-wide characteristic, not a product limitation. Also added a full explanatory section to README.md under a new `## 🧭 Enterprise Workflow — Understanding AI Compliance` heading.
+- **Forge Workflow: AI compliance disclaimer** — Added a small but honest notice at the bottom of the Forge Workflow card explaining that workflow rules are strong guidance, not hard enforcement, and that compliance may vary in long sessions due to how large language models manage context. Framed as an industry-wide characteristic, not a product limitation. Also added a full explanatory section to README.md under a new `## 🧭 Forge Workflow — Understanding AI Compliance` heading.
 - **Command Cards: icon-forward layout** — Each command card now displays a large 42×42px icon block on the left with title, command text, and Paste/Run buttons in a compact column to the right. Cards are more compact — more fit on screen at once.
 
 ## [7.0.0] - 2026-04-17
@@ -495,10 +506,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP Server** (`internal/mcp/`): Forge Terminal is now an MCP (Model Context Protocol) server. External AI tools — VS Code GitHub Copilot Chat, Cursor, Claude Code, EZTest — can call Forge tools directly via JSON-RPC 2.0 over Streamable HTTP at `POST /api/mcp`. Eight tools exposed: `terminal_sessions`, `terminal_execute`, `terminal_read`, `file_read`, `file_write`, `file_list`, `task_submit`, `workflow_status`. Auth via auto-generated bearer token at `~/.forge/mcp-token`. See `docs/developer/mcp-server.md`.
 - **TaskBroker** (`internal/mcp/tasks.go`): In-memory channel queue that replaces the `.forge/pending-tasks/` file-drop mechanism. `task_submit` returns a UUID immediately; the agent loop reads from `broker.Incoming()` and the caller can poll status at `GET /api/mcp/tasks/{id}`.
 - **MCP config in `forge.toml`** (`[mcp]` section): `enabled` flag (bool, default true) and `allowed_tools` list let operators restrict which tools are exposed without rebuilding. `enabled = false` disables the endpoint entirely.
-- Enterprise workflow initialized with Forge Terminal Workflow Architect
+- Forge Workflow initialized with Forge Terminal Workflow Architect
 - 6 new Go tests for session detach/reattach lifecycle (`session_reconnect_test.go`)
 - **PR Review Strategy** (`internal/review/`, `cmd/forge/handlers_review.go`): Configurable PR review system with 4 strategies — Manual, Code Tutor, Quality Agent, Tutor+Agent. Quality Agent uses LLM model chain to produce structured findings (naming, complexity, tests, architecture, security) with 0–100 quality score
-- **WorkflowWizard PR Review Step**: New step 3 in the 5-step Enterprise Workflow Architect wizard lets users choose their PR review strategy, configure auto-trigger, CHANGELOG gate, agent strictness, and focus areas
+- **WorkflowWizard PR Review Step**: New step 3 in the 5-step Forge Workflow Architect wizard lets users choose their PR review strategy, configure auto-trigger, CHANGELOG gate, agent strictness, and focus areas
 - **PRReviewPanel component** (`frontend/src/components/PRReviewPanel.jsx`): Full quality review results UI with score gauge, severity badges, collapsible finding cards, and filter tabs
 - **usePRReview hook** (`frontend/src/hooks/usePRReview.js`): React hook for submitting diffs to `/api/review/analyze` and managing report state
 - **Copilot Coding Agent Setup module** (`ModuleCopilotAgentSetup`): New workflow module that generates `.github/copilot/setup-steps.yml` — pre-installs project dependencies in the GitHub Copilot coding agent environment before it writes code or runs tests. Template is project-type-aware (Go, Node, Python, Rust, Java, .NET, generic)
@@ -531,7 +542,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Blank popup windows on workflow apply and ribbon tab switch (Windows)**: `configureGitHooks()` was calling `exec.Command("git", "config", ...)` without `CREATE_NO_WINDOW`
 - **Blank popup window when ForgeAssist uses Copilot/Claude CLI**: `streamViaCopilotCLI()` and `streamViaClaudeCLI()` in `handlers_chat.go` were missing `hideWindow(cmd)` calls
 - **Blank popup window on self-restart (Windows)**: `restartSelf()` Windows branch was missing `hideWindow(cmd)` before starting the new process
-- **Code Tutor notifications clicking does nothing**: Three bugs combined — `EnterpriseWorkflowCard` never passed `action`/`onAction` to `addToast()`; the `useEffect` re-fired on every new notification re-showing all duplicates; no `clearWatcherNotifications()` existed to atomically flush the queue
+- **Code Tutor notifications clicking does nothing**: Three bugs combined — `ForgeWorkflowCard` never passed `action`/`onAction` to `addToast()`; the `useEffect` re-fired on every new notification re-showing all duplicates; no `clearWatcherNotifications()` existed to atomically flush the queue
 
 ## [5.1.0] - 2026-04-04
 

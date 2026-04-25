@@ -85,7 +85,7 @@ const WIZARD_STEPS = [
 
 /**
  * WorkflowWizard — A 4-step modal wizard for configuring and applying
- * enterprise workflow settings to a project.
+ * Forge Workflow settings to a project.
  *
  * @param {Object} props
  * @param {boolean} props.isOpen - Whether the wizard modal is visible
@@ -194,7 +194,7 @@ const WorkflowWizard = ({ isOpen, onClose, projectPath, workflow, onToast }) => 
         <div className="ww-header">
           <div className="ww-header-title">
             <Shield size={20} />
-            <span>Enterprise Workflow Architect</span>
+            <span>Forge Workflow Architect</span>
           </div>
           <button className="ww-close-btn" onClick={handleClose} title="Close">
             <X size={18} />

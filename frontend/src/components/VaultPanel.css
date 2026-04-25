@@ -4,7 +4,7 @@
  * panel doesn't dominate the screen when secrets are already stored.
  *
  * Uses .vp- prefix throughout to avoid collisions with other component styles.
- * Follows the EnterpriseWorkflowCard.css pattern: kebab-case class names and
+ * Follows the ForgeWorkflowCard.css pattern: kebab-case class names and
  * animation on entry.
  */
 

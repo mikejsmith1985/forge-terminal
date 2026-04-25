@@ -5,7 +5,7 @@
 
 **Required skill invocation order (invoke ALL before writing code):**
 1. `workflow-enforcer` — must be first
-2. `enterprise-workflow`
+2. `forge-workflow`
 3. `code-quality`
 4. `branching-strategy`
 5. `code-tutor-workflow` — user always expects a walkthrough of changes
@@ -193,8 +193,8 @@ Example workflow:
 
 ---
 
-# 8. ENTERPRISE WORKFLOW ENFORCEMENT (Auto-Generated Rules)
-> Source: Enterprise Workflow Architect (Quality Mode: BEST, 11 modules)
+# 8. Forge Workflow ENFORCEMENT (Auto-Generated Rules)
+> Source: Forge Workflow Architect (Quality Mode: BEST, 11 modules)
 > These rules are ALWAYS ACTIVE. They are not optional. Violations should be self-corrected before delivering any output.
 
 ## 8.1 Naming Conventions (MANDATORY)
@@ -214,8 +214,8 @@ These are not suggestions — they are requirements. Every variable, function, c
    - ❌ `x`, `tmp`, `val`, `data`, `str`
 4. **Function names** MUST be verb-first: `createUser`, `calculateTotal`, `validateInput`
 5. **Constants** use UPPER_SNAKE_CASE or descriptive camelCase — never abbreviated
-6. **React components** use PascalCase: `WorkflowWizard`, `EnterpriseWorkflowCard`
-7. **CSS classes** use kebab-case with component prefix: `ewc-header`, `ww-step-icon`
+6. **React components** use PascalCase: `WorkflowWizard`, `ForgeWorkflowCard`
+7. **CSS classes** use kebab-case with component prefix: `fwc-header`, `ww-step-icon`
 
 ## 8.2 Comment Standards (MANDATORY)
 
@@ -271,7 +271,7 @@ Before writing any code, you MUST invoke the following skills in this exact orde
 This is not a reference list — it is a mandatory pre-flight sequence:
 
 1. `workflow-enforcer` — invoke FIRST, always, no exceptions
-2. `enterprise-workflow` — immediately after
+2. `forge-workflow` — immediately after
 3. `code-quality` — naming, comments, readability enforcement
 4. `branching-strategy` — creates the branch requirement gate
 5. `code-tutor-workflow` — user expects a walkthrough of every change

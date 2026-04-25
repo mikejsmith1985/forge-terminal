@@ -109,7 +109,7 @@ const TOUR_STEPS = [
       'every panel has tooltips, and most actions have keyboard shortcuts you\'ll discover along the way.\n\n' +
       'If you ever want to revisit this tour, go to **Settings → Replay Tour** and it will start again from the beginning.\n\n' +
       'For advanced power users, check out the **MCP Integration** for connecting AI agents to your terminal, ' +
-      'and the **Enterprise Workflow** system for enforcing team-wide coding standards automatically.',
+      'and the **Forge Workflow** system for enforcing team-wide coding standards automatically.',
   },
 ];
 

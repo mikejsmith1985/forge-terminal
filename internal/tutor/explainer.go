@@ -76,7 +76,7 @@ func (e *Explainer) ExplainFile(
 
 	prompt := e.buildPrompt(entry, fileContents, learningPath, depth, namingStrictness, reviewedFiles)
 
-	// Augment prompt with enterprise workflow quality audit if active
+	// Augment prompt with Forge Workflow quality audit if active
 	auditContext := DetectWorkflowContext(projectPath)
 	auditSection := BuildAuditPromptSection(auditContext)
 	if auditSection != "" {

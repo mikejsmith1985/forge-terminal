@@ -1,7 +1,7 @@
 // tools_workflow.go implements the workflow_status MCP tool.
 //
 // This tool lets external AI clients (VS Code Copilot, Cursor, EZTest) query
-// whether the current Forge project's enterprise workflow compliance is passing
+// whether the current Forge project's Forge Workflow compliance is passing
 // — without needing to access the filesystem directly or parse config files.
 package mcp
 
@@ -28,7 +28,7 @@ func newWorkflowStatusTool(projectPath string, config workflow.WorkflowConfig) T
 func (t *workflowStatusTool) Definition() ToolDefinition {
 	return ToolDefinition{
 		Name:        "workflow_status",
-		Description: "Scan the Forge Terminal project's enterprise workflow compliance and return the current status, score, and any active violations.",
+		Description: "Scan the Forge Terminal project's Forge Workflow compliance and return the current status, score, and any active violations.",
 		InputSchema: json.RawMessage(`{
 			"type": "object",
 			"properties": {},

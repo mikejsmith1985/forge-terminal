@@ -1,13 +1,13 @@
 ---
 name: workflow-enforcer
-description: "MANDATORY for all code changes. Enforces enterprise workflow standards. Activates on ANY implementation, refactor, bugfix, feature, build, create, modify, update, fix, add, change, or code modification task."
+description: "MANDATORY for all code changes. Enforces Forge Workflow standards. Activates on ANY implementation, refactor, bugfix, feature, build, create, modify, update, fix, add, change, or code modification task."
 ---
 
 # Workflow Enforcer
 
 > ⚠️ This skill is MANDATORY. It applies to EVERY coding task in every project.
 > However, it adapts its requirements based on whether the project uses the
-> full Forge Enterprise workflow or a standard workflow.
+> full Forge Forge Workflow or a standard workflow.
 
 ---
 
@@ -20,18 +20,18 @@ Before loading any co-skills, determine the **project mode** by checking two thi
 Test-Path "AGENTS.md"
 ```
 
-**Check 2 — Does `.github/skills/enterprise-workflow/` exist?**
+**Check 2 — Does `.github/skills/forge-workflow/` exist?**
 ```powershell
-Test-Path ".github/skills/enterprise-workflow"
+Test-Path ".github/skills/forge-workflow"
 ```
 
 ### Mode Decision Table
 
-| AGENTS.md | enterprise-workflow skill | Detected Mode |
-|-----------|--------------------------|---------------|
-| ✅ Found  | ✅ Found                 | **Forge Enterprise** |
-| ❌ Missing | ✅ Found                 | **Enterprise** |
-| ❌ Missing | ❌ Missing               | **Standard** |
+| AGENTS.md | forge-workflow skill | Detected Mode |
+|-----------|----------------------|---------------|
+| ✅ Found  | ✅ Found             | **Forge Enterprise** |
+| ❌ Missing | ✅ Found             | **Enterprise** |
+| ❌ Missing | ❌ Missing           | **Standard** |
 
 Store the detected mode. It controls which co-skills are **required** vs **optional**.
 
@@ -61,7 +61,7 @@ Attempt to load these in every project. If the project is in **Standard mode** a
 a skill is not found, mark it ⚠️ and continue — do NOT block the task.
 If the project is in **Enterprise mode** and a skill is not found, mark it ❌ and stop.
 ```
-invoke skill: enterprise-workflow
+invoke skill: forge-workflow
 invoke skill: branching-strategy
 invoke skill: code-tutor-workflow
 ```
@@ -89,7 +89,7 @@ reflects the Check 1 result from Phase 0A.
 │ code-quality            │ ✅ Loaded                                  │
 │ forge-vault             │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
 │ sequential-tasks        │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
-│ enterprise-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
+│ forge-workflow          │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ branching-strategy      │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ code-tutor-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ AGENTS.md               │ ✅ Found   /  ⚠️ Not present (standard mode) │
@@ -182,6 +182,48 @@ If this is the **Forge Terminal** project specifically:
 - Frontend build: `cd frontend && npx vite build`
 - Go tests: `go test ./...`
 - Frontend tests: `cd frontend && npx vitest run`
+
+---
+
+## PHASE 3: RUNTIME GATE LEDGER (HARD ENFORCEMENT)
+
+Skills alone cannot stop a non-compliant commit — only runtime hooks can.
+Forge Terminal ships a pre-commit hook that reads `.forge/workflow-ticket.json`
+and BLOCKS any commit whose ledger is missing a required gate.
+
+**Required gates the hook checks:**
+- `branch-created` — proves a feature branch was created before code
+- `tests-written` — proves at least one test was added or updated
+- `tests-passed` — proves the test run succeeded
+
+**Record gates as you complete them via the MCP tool:**
+```
+workflow_gate_record({
+  taskId:   "<stable id for this task>",
+  gate:     "branch-created" | "tests-written" | "tests-passed" | ...,
+  evidence: "<short proof, e.g. 'feature/foo created at HEAD ac04dbc'>",
+  branch:   "<branch name, optional>"
+})
+```
+
+**Verify the hook will allow your commit before running git:**
+```
+workflow_preflight_check()
+```
+or shell-equivalent:
+```
+forge workflow preflight
+```
+
+**One-time install of the hook in any new repo:**
+```powershell
+.\scripts\install-workflow-hooks.ps1   # Windows
+./scripts/install-workflow-hooks.sh    # macOS / Linux
+```
+
+**Bypass (last resort, audited):** set `FORGE_BYPASS=1` and
+`FORGE_BYPASS_REASON="..."` in the environment for one commit.  Bypasses
+are appended to `.forge/bypasses.log` so reviewers can spot abuse.
 
 ---
 

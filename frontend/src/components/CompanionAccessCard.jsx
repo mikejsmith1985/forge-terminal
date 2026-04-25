@@ -35,6 +35,7 @@ import {
 } from '../utils/companionUrl.js'
 import NamedTunnelSetupCard from './NamedTunnelSetupCard'
 import ConnectionSetupCard from './ConnectionSetupCard'
+import CompanionConnectionWizard from './CompanionConnectionWizard'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -318,55 +319,19 @@ const EnabledView = ({
 
   return (
     <>
-      {/* ── Cloudflare Tunnel setup / status ────────────────────────── */}
+      {/* ── Guided connection wizard ────────────────────────────────
+       * The wizard owns method selection, per-method instructions,
+       * and the final QR code.  It always shows exactly one method
+       * at a time and persists the user's choice server-side. */}
       <div className="cac-section">
-        <div className="cac-tunnel-header">
-          <Cloud size={13} className="cac-tunnel-icon" />
-          <span className="cac-section-label">Cloudflare Tunnel</span>
-        </div>
-        <NamedTunnelSetupCard embedded={true} />
-      </div>
-
-      {/* ── Forge URL (auto-filled from active tunnel) ──────────────── */}
-      <div className="cac-section">
-        <div className="cac-step-header">
-          <span className="cac-step-number">1</span>
-          <span className="cac-step-title">Your Forge URL</span>
-        </div>
-        <input
-          className="cac-input"
-          type="text"
-          value={tunnelUrl}
-          onChange={evt => setTunnelUrl(evt.target.value)}
-          placeholder="e.g. https://forge.example.com"
+        <CompanionConnectionWizard
+          mobileToken={settings?.mobile_token || ''}
+          companionHost={companionHost}
         />
-        <p className="cac-hint">
-          Auto-detected from your tunnel above. Edit only if you use Tailscale
-          or a different URL.
-        </p>
-      </div>
-
-      {/* ── QR code ─────────────────────────────────────────────────── */}
-      <div className="cac-section">
-        <div className="cac-step-header">
-          <span className="cac-step-number">2</span>
-          <span className="cac-step-title">Scan with your phone — then tap Connect</span>
-        </div>
-        <QRBlock deepLink={deepLink} />
       </div>
 
       {/* ── Actions ─────────────────────────────────────────────────── */}
       <div className="cac-actions">
-        <button
-          className="cac-btn cac-btn-secondary"
-          onClick={onCopyLink}
-          title="Copy the deep-link URL to send to your phone another way"
-        >
-          {hasCopiedLink
-            ? <><Check size={14} /> Copied</>
-            : <><Copy size={14} /> Copy Link</>
-          }
-        </button>
         <button
           className="cac-btn cac-btn-danger"
           onClick={onDisable}

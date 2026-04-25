@@ -5,7 +5,7 @@ import { SortableOwnerReleaseCard } from './SortableOwnerReleaseCard';
 import { RefreshCw } from 'lucide-react';
 import OwnerReleaseCard from './OwnerReleaseCard';
 import DirectoryCard from './DirectoryCard';
-import EnterpriseWorkflowCard from './EnterpriseWorkflowCard';
+import ForgeWorkflowCard from './ForgeWorkflowCard';
 import MCPSetupCard from './MCPSetupCard';
 import MCPDiscoveryCard from './MCPDiscoveryCard';
 import CompanionAccessCard from './CompanionAccessCard';
@@ -22,7 +22,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           shellType={shellType}
           cwd={cwd}
         />
-        <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
+        <ForgeWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
         <MCPSetupCard />
         <MCPDiscoveryCard />
         <CompanionAccessCard />
@@ -45,7 +45,7 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           shellType={shellType}
           cwd={cwd}
         />
-        <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
+        <ForgeWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
         <MCPSetupCard />
         <MCPDiscoveryCard />
         <CompanionAccessCard />
@@ -114,8 +114,8 @@ const CommandCards = ({ commands, loading, error, onExecute, onPaste, onEdit, on
           <p>No command cards yet. Click the + button to add one.</p>
         </div>
       )}
-      {/* Enterprise Workflow Architect card — always visible */}
-      <EnterpriseWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
+      {/* Forge Workflow Architect card — always visible */}
+      <ForgeWorkflowCard onExecuteCommand={onExecute} onToast={onToast} cwd={cwd} />
       {/* Adaptive Build Environments card — always visible */}
       <MCPSetupCard />
       {/* MCP Discovery — catalog of external MCP servers with copy-config */}

@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle, Copy, Eye, EyeOff, Info } from 'lucide-react'
 import { useWorkflowSetup } from '../hooks/useWorkflowSetup'
 import WorkflowWizard from './WorkflowWizard'
-import './EnterpriseWorkflowCard.css'
+import './ForgeWorkflowCard.css'
 
 /**
- * EnterpriseWorkflowCard — Sidebar card for the Enterprise Workflow Architect.
+ * ForgeWorkflowCard — Sidebar card for the Forge Workflow Architect.
  *
  * Shows the current workflow status (configured/unconfigured) with a compliance
  * badge. Clicking opens the full WorkflowWizard modal for setup or editing.
@@ -15,7 +15,7 @@ import './EnterpriseWorkflowCard.css'
  * @param {Function} props.onToast - Show a toast notification
  * @param {string} props.cwd - Current working directory (project path)
  */
-const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
+const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [showFindings, setShowFindings] = useState(false)
@@ -76,14 +76,14 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
 
   return (
     <>
-      <div className={`enterprise-workflow-card ${status?.configured ? 'configured' : 'unconfigured'}`}>
+      <div className={`forge-workflow-card ${status?.configured ? 'configured' : 'unconfigured'}`}>
         {/* Collapsed View */}
-        <div className="ewc-header" onClick={() => setIsExpanded(!isExpanded)}>
-          <div className="ewc-header-left">
-            <Shield size={18} className="ewc-shield-icon" />
-            <div className="ewc-header-info">
-              <span className="ewc-title">Enterprise Workflow</span>
-              <span className="ewc-subtitle">
+        <div className="fwc-header" onClick={() => setIsExpanded(!isExpanded)}>
+          <div className="fwc-header-left">
+            <Shield size={18} className="fwc-shield-icon" />
+            <div className="fwc-header-info">
+              <span className="fwc-title">Forge Workflow</span>
+              <span className="fwc-subtitle">
                 {status?.configured
                   ? `${status.moduleCount || 0} modules · ${status.qualityMode?.toUpperCase() || 'BEST'}`
                   : 'Not configured'
@@ -91,7 +91,7 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
               </span>
             </div>
           </div>
-          <div className="ewc-header-right">
+          <div className="fwc-header-right">
             {status?.configured && complianceBadge}
             {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </div>
@@ -99,36 +99,36 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
 
         {/* Expanded View */}
         {isExpanded && (
-          <div className="ewc-body">
+          <div className="fwc-body">
             {status?.configured ? (
               <>
                 {/* Compliance Summary */}
                 {compliance && (
-                  <div className="ewc-compliance-summary">
-                    <div className="ewc-compliance-row">
-                      <span className="ewc-compliance-label">Status</span>
-                      <span className={`ewc-compliance-value ${compliance.status}`}>
+                  <div className="fwc-compliance-summary">
+                    <div className="fwc-compliance-row">
+                      <span className="fwc-compliance-label">Status</span>
+                      <span className={`fwc-compliance-value ${compliance.status}`}>
                         {compliance.status === 'compliant' && '✓ Compliant'}
                         {compliance.status === 'warnings' && '⚠ Warnings'}
                         {compliance.status === 'violations' && '✗ Violations'}
                       </span>
                     </div>
                     {compliance.passing > 0 && (
-                      <div className="ewc-compliance-row">
-                        <span className="ewc-compliance-label">Passing</span>
-                        <span className="ewc-compliance-value passing">{compliance.passing}</span>
+                      <div className="fwc-compliance-row">
+                        <span className="fwc-compliance-label">Passing</span>
+                        <span className="fwc-compliance-value passing">{compliance.passing}</span>
                       </div>
                     )}
                     {compliance.warnings > 0 && (
-                      <div className="ewc-compliance-row">
-                        <span className="ewc-compliance-label">Warnings</span>
-                        <span className="ewc-compliance-value warnings">{compliance.warnings}</span>
+                      <div className="fwc-compliance-row">
+                        <span className="fwc-compliance-label">Warnings</span>
+                        <span className="fwc-compliance-value warnings">{compliance.warnings}</span>
                       </div>
                     )}
                     {compliance.violations > 0 && (
-                      <div className="ewc-compliance-row">
-                        <span className="ewc-compliance-label">Violations</span>
-                        <span className="ewc-compliance-value violations">{compliance.violations}</span>
+                      <div className="fwc-compliance-row">
+                        <span className="fwc-compliance-label">Violations</span>
+                        <span className="fwc-compliance-value violations">{compliance.violations}</span>
                       </div>
                     )}
                   </div>
@@ -138,7 +138,7 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
                 {compliance?.findings?.length > 0 && (
                   <>
                     <button
-                      className="ewc-btn ewc-findings-toggle"
+                      className="fwc-btn fwc-findings-toggle"
                       onClick={() => setShowFindings(!showFindings)}
                     >
                       {showFindings ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -156,17 +156,17 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="ewc-actions">
-                  <button className="ewc-btn ewc-btn-primary" onClick={handleOpenWizard}>
+                <div className="fwc-actions">
+                  <button className="fwc-btn fwc-btn-primary" onClick={handleOpenWizard}>
                     <Settings size={14} /> Edit Workflow
                   </button>
                   <button
-                    className="ewc-btn ewc-btn-secondary"
+                    className="fwc-btn fwc-btn-secondary"
                     onClick={handleRefresh}
                     disabled={isRefreshing}
                     title="Refresh compliance"
                   >
-                    <RefreshCw size={14} className={isRefreshing ? 'ewc-spin' : ''} />
+                    <RefreshCw size={14} className={isRefreshing ? 'fwc-spin' : ''} />
                   </button>
                 </div>
 
@@ -174,12 +174,12 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
                 <AiComplianceNotice />
               </>
             ) : (
-              <div className="ewc-unconfigured-body">
-                <p className="ewc-setup-message">
+              <div className="fwc-unconfigured-body">
+                <p className="fwc-setup-message">
                   Set up an enterprise-grade workflow with copilot instructions,
                   skills and branching rules. // Code Tutor integration removed
                 </p>
-                <button className="ewc-btn ewc-btn-setup" onClick={handleOpenWizard}>
+                <button className="fwc-btn fwc-btn-setup" onClick={handleOpenWizard}>
                   <Shield size={14} /> Setup Workflow
                 </button>
                 <AiComplianceNotice />
@@ -203,20 +203,20 @@ const EnterpriseWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
 
 /**
  * AiComplianceNotice — Small persistent callout shown at the bottom of the
- * Enterprise Workflow card. Sets honest expectations about AI compliance:
+ * Forge Workflow card. Sets honest expectations about AI compliance:
  * workflow rules are strong guidance, not hard enforcement, because of how
  * large language models prioritize context. Framed as a known industry
  * characteristic, not a product limitation.
  */
 function AiComplianceNotice() {
   return (
-    <div className="ewc-ai-notice">
-      <Info size={12} className="ewc-ai-notice-icon" />
-      <p className="ewc-ai-notice-text">
+    <div className="fwc-ai-notice">
+      <Info size={12} className="fwc-ai-notice-icon" />
+      <p className="fwc-ai-notice-text">
         Workflow rules guide AI behavior — they are not hard enforced like a linter.
         Compliance is high in most sessions but may vary in long or complex ones.
         This reflects how large language models work today.{' '}
-        <span className="ewc-ai-notice-emphasis">We are continually improving as AI capabilities advance.</span>
+        <span className="fwc-ai-notice-emphasis">We are continually improving as AI capabilities advance.</span>
       </p>
     </div>
   )
@@ -231,19 +231,19 @@ function getComplianceBadge(compliance) {
   switch (compliance.status) {
     case 'compliant':
       return (
-        <span className="ewc-badge ewc-badge-ok" title="All checks passing">
+        <span className="fwc-badge fwc-badge-ok" title="All checks passing">
           <CheckCircle size={12} />
         </span>
       )
     case 'warnings':
       return (
-        <span className="ewc-badge ewc-badge-warn" title={`${compliance.warnings} warnings`}>
+        <span className="fwc-badge fwc-badge-warn" title={`${compliance.warnings} warnings`}>
           <AlertTriangle size={12} />
         </span>
       )
     case 'violations':
       return (
-        <span className="ewc-badge ewc-badge-error" title={`${compliance.violations} violations`}>
+        <span className="fwc-badge fwc-badge-error" title={`${compliance.violations} violations`}>
           <XCircle size={12} />
         </span>
       )
@@ -259,9 +259,9 @@ const MAX_VISIBLE_FINDINGS = 50
 
 function getLevelIcon(level) {
   switch (level) {
-    case 'warning':   return <span className="ewc-level-icon warning" title="Warning">⚠</span>
-    case 'violation':  return <span className="ewc-level-icon violation" title="Violation">✗</span>
-    case 'passing':    return <span className="ewc-level-icon passing" title="Passing">✓</span>
+    case 'warning':   return <span className="fwc-level-icon warning" title="Warning">⚠</span>
+    case 'violation':  return <span className="fwc-level-icon violation" title="Violation">✗</span>
+    case 'passing':    return <span className="fwc-level-icon passing" title="Passing">✓</span>
     default:           return null
   }
 }
@@ -329,36 +329,36 @@ function FindingsDetailList({ findings, onToast, compliance }) {
   }, [compliance, onToast])
 
   return (
-    <div className="ewc-findings-section">
-      <div className="ewc-findings-list">
+    <div className="fwc-findings-section">
+      <div className="fwc-findings-list">
         {visibleFindings.map((finding, findingIndex) => (
-          <div key={`${finding.rule}-${finding.filePath}-${finding.line}-${findingIndex}`} className={`ewc-finding-item level-${finding.level}`}>
-            <div className="ewc-finding-header">
+          <div key={`${finding.rule}-${finding.filePath}-${finding.line}-${findingIndex}`} className={`fwc-finding-item level-${finding.level}`}>
+            <div className="fwc-finding-header">
               {getLevelIcon(finding.level)}
-              <span className="ewc-finding-rule">{finding.rule}</span>
+              <span className="fwc-finding-rule">{finding.rule}</span>
             </div>
             {finding.filePath && (
-              <div className="ewc-finding-location">
+              <div className="fwc-finding-location">
                 {finding.filePath}{finding.line != null ? `:${finding.line}` : ''}
               </div>
             )}
-            <div className="ewc-finding-message">{finding.message}</div>
+            <div className="fwc-finding-message">{finding.message}</div>
             {finding.suggestion && (
-              <div className="ewc-finding-suggestion">↳ {finding.suggestion}</div>
+              <div className="fwc-finding-suggestion">↳ {finding.suggestion}</div>
             )}
           </div>
         ))}
         {remainingCount > 0 && (
-          <div className="ewc-findings-more">
+          <div className="fwc-findings-more">
             and {remainingCount} more…
           </div>
         )}
       </div>
-      <button className="ewc-btn ewc-copy-btn" onClick={handleCopyReport} title="Copy compliance report to clipboard">
+      <button className="fwc-btn fwc-copy-btn" onClick={handleCopyReport} title="Copy compliance report to clipboard">
         <Copy size={14} /> Copy Report
       </button>
     </div>
   )
 }
 
-export default EnterpriseWorkflowCard
+export default ForgeWorkflowCard
