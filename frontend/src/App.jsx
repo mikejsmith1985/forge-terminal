@@ -216,6 +216,7 @@ function App() {
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
+    retitleAllTabsFromCwd,
   } = useTabManager(shellConfig, defaultTabTheme, namingStrategy, namingPrefix, namingRootFolder);
   
   // DevMode state
@@ -2082,6 +2083,13 @@ function App() {
           setNamingStrategy(strategy);
           setNamingPrefix(prefix);
           setNamingRootFolder(rootFolder ?? '');
+          // Apply the new strategy to all currently-open tabs immediately,
+          // re-deriving each title from the tab's stored currentDirectory.
+          // Without this, the change wouldn't take effect until the user
+          // happens to `cd` and the shell's OSC 9;9 integration fires —
+          // restored tabs from a prior session would keep stale titles
+          // forever even after the user explicitly saves new settings.
+          retitleAllTabsFromCwd(strategy, prefix, rootFolder ?? '');
         }}
         onRestartTour={() => {
           setIsSettingsModalOpen(false);
