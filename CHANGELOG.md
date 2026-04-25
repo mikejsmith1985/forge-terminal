@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.38] - 2026-04-25
+
+---
+
+## [v7.6.38] - 2026-04-25
+
 ### Fixed
 - **Mobile redirect** — Phone-class viewports (coarse pointer + width < 768) hitting the bare Forge URL now auto-redirect to `/companion/` so users land on the mobile PWA instead of the unreadable desktop SPA. Append `?desktop=1` to override for debugging.
 
