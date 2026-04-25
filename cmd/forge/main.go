@@ -215,6 +215,7 @@ func main() {
 			fmt.Println("Usage:")
 			fmt.Println("  forge                  Start the web UI server")
 			fmt.Println("  forge lens [path]      Open the Context Builder file picker")
+			fmt.Println("  forge workflow ...     Workflow ledger commands (preflight|record)")
 			fmt.Println("  forge -port PORT       Start server on specific port")
 			fmt.Println("  forge --port PORT      Start server on specific port")
 			fmt.Println("  forge --host HOST      Bind to specific host (default: localhost)")
@@ -228,6 +229,8 @@ func main() {
 			fmt.Println("  FORGE_DEV_MODE=true    Enable dev mode logging")
 			fmt.Println("")
 			return
+		case "workflow":
+			os.Exit(runWorkflowCommand(os.Args[2:]))
 		}
 	}
 
@@ -558,7 +561,7 @@ func main() {
 	http.HandleFunc("/api/tutor/recent-changes", WrapWithMiddleware(handleTutorRecentChanges))
 	http.HandleFunc("/api/tutor/explain-change", WrapWithMiddleware(handleTutorExplainChange))
 
-	// ── Enterprise Workflow Architect routes ─────────────────────────────
+	// ── Forge Workflow Architect routes ─────────────────────────────
 	http.HandleFunc("/api/workflow/detect", WrapWithMiddleware(handleWorkflowDetect))
 	http.HandleFunc("/api/workflow/presets", WrapWithMiddleware(handleWorkflowPresets))
 	http.HandleFunc("/api/workflow/preview", WrapWithMiddleware(handleWorkflowPreview))
@@ -591,6 +594,7 @@ func main() {
 	http.HandleFunc("/api/mobile/exec", handleMobileExec)
 	http.HandleFunc("/api/mobile/read", handleMobileRead)
 	http.HandleFunc("/api/mobile/settings", WrapWithMiddleware(handleMobileSettings))
+	http.HandleFunc("/api/companion/preference", WrapWithMiddleware(handleCompanionPreference))
 
 	// ── License routes (always available — bypass LicenseMiddleware) ──────
 	http.HandleFunc("/api/license/activate", WrapLicenseHandler(handleLicenseActivate))

@@ -33,7 +33,7 @@ const workflowFetch = async (url, options = {}) => {
 }
 
 /**
- * React hook for the Enterprise Workflow Architect feature.
+ * React hook for the Forge Workflow Architect feature.
  *
  * Provides full lifecycle management — project detection, preset management,
  * scaffold preview, apply, status, and compliance scanning.
@@ -363,7 +363,7 @@ export function useWorkflowSetup() {
 
   /**
    * Clear all pending watcher notifications at once.
-   * Used by EnterpriseWorkflowCard after converting notifications to toasts,
+   * Used by ForgeWorkflowCard after converting notifications to toasts,
    * to prevent the same notifications from being re-shown on the next render.
    */
   const clearWatcherNotifications = useCallback(() => {

@@ -1,6 +1,6 @@
 ---
 name: code-tutor-workflow
-description: "Integrates Code Tutor with enterprise workflow. Activates on keywords: tutor, teach, explain, walkthrough, learn, understand."
+description: "Integrates Code Tutor with Forge Workflow. Activates on keywords: tutor, teach, explain, walkthrough, learn, understand."
 ---
 
 # Code Tutor Integration

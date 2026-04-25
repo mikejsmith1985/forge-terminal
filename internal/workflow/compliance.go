@@ -233,7 +233,7 @@ func scanChangelogPresence(projectPath string, report *ComplianceReport) {
 			Rule:       "CHANGELOG Presence",
 			Level:      ComplianceViolation,
 			Message:    "CHANGELOG.md not found",
-			Suggestion: "Run the Enterprise Workflow to generate a CHANGELOG.md",
+			Suggestion: "Run the Forge Workflow to generate a CHANGELOG.md",
 		})
 	}
 }

@@ -1,0 +1,273 @@
+/* CompanionConnectionWizard.css — styles for the single-flow wizard.
+ *
+ * Class prefix: ccw-  (Companion Connection Wizard).  Keeps the wizard
+ * isolated from CompanionAccessCard's `cac-` namespace so styles never
+ * leak between the two components. */
+
+.ccw-root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ccw-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted, #8b949e);
+  padding: 16px 4px;
+}
+
+.ccw-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ccw-step-pill {
+  align-self: flex-start;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent, #8b5cf6);
+  background: rgba(139, 92, 246, 0.10);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.ccw-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text, #e6edf3);
+}
+
+.ccw-lead {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted, #8b949e);
+}
+
+.ccw-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ccw-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border, #30363d);
+}
+
+.ccw-footer-spacer { flex: 1; }
+
+.ccw-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ccw-btn-ghost {
+  background: transparent;
+  color: var(--text-muted, #8b949e);
+  border-color: var(--border, #30363d);
+}
+.ccw-btn-ghost:hover { color: var(--text, #e6edf3); border-color: var(--accent, #8b5cf6); }
+
+.ccw-btn-primary {
+  background: var(--accent, #8b5cf6);
+  color: #fff;
+}
+.ccw-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Method picker (step 1) ──────────────────────────────────────────── */
+
+.ccw-method-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ccw-method-card {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ccw-method-card:hover {
+  border-color: var(--accent, #8b5cf6);
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.ccw-method-card-selected {
+  border-color: var(--accent, #8b5cf6);
+  background: rgba(139, 92, 246, 0.10);
+}
+
+.ccw-method-icon {
+  color: var(--accent, #8b5cf6);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.ccw-method-text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+
+.ccw-method-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text, #e6edf3);
+}
+
+.ccw-method-check { color: var(--success, #3fb950); }
+
+.ccw-method-tagline {
+  font-size: 11px;
+  color: var(--accent, #8b5cf6);
+}
+
+.ccw-method-detail {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.4;
+}
+
+/* ── URL display ─────────────────────────────────────────────────────── */
+
+.ccw-url-card {
+  background: var(--surface, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ccw-url-card-pending {
+  color: var(--text-muted, #8b949e);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ccw-url-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+
+.ccw-url-link {
+  color: var(--accent, #8b5cf6);
+  font-size: 12px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  word-break: break-all;
+}
+
+.ccw-stage {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-muted, #8b949e);
+}
+.ccw-stage-healthy   { color: var(--success, #3fb950); background: rgba(63,185,80,0.10); }
+.ccw-stage-degraded  { color: #f0883e; background: rgba(240,136,62,0.10); }
+.ccw-stage-starting,
+.ccw-stage-configured { color: var(--accent, #8b5cf6); background: rgba(139,92,246,0.10); }
+
+.ccw-url-detail { margin: 0; font-size: 11px; color: var(--text-muted, #8b949e); }
+
+/* ── Status blocks ───────────────────────────────────────────────────── */
+
+.ccw-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.ccw-status p { margin: 4px 0 0; }
+.ccw-status-ok      { background: rgba(63,185,80,0.08);  color: var(--text, #e6edf3); border: 1px solid rgba(63,185,80,0.25); }
+.ccw-status-warn    { background: rgba(240,136,62,0.08); color: var(--text, #e6edf3); border: 1px solid rgba(240,136,62,0.30); }
+.ccw-status-pending { background: rgba(139,92,246,0.06); color: var(--text, #e6edf3); border: 1px solid rgba(139,92,246,0.25); }
+
+.ccw-link {
+  color: var(--accent, #8b5cf6);
+  font-size: 11px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.ccw-muted { color: var(--text-muted, #8b949e); font-size: 11px; }
+
+.ccw-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted, #8b949e);
+}
+
+/* ── QR panel ────────────────────────────────────────────────────────── */
+
+.ccw-qr-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 8px;
+}
+
+.ccw-qr-canvas { display: block; }
+
+.ccw-qr-error,
+.ccw-qr-pending {
+  font-size: 12px;
+  color: var(--text-muted, #8b949e);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Animations ──────────────────────────────────────────────────────── */
+
+.ccw-spin { animation: ccw-spin 1s linear infinite; }
+@keyframes ccw-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

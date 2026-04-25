@@ -1,6 +1,6 @@
 /* MCPSetupCard.css — Styles for the Adaptive Build Environments command-panel card.
    Uses teal (#06b6d4) as the accent colour to visually distinguish this card from the
-   EnterpriseWorkflowCard which uses purple (#8b5cf6). CSS class prefix: msc- */
+   ForgeWorkflowCard which uses purple (#8b5cf6). CSS class prefix: msc- */
 
 /* ── Card Container ──────────────────────────────────────────────────────────── */
 
@@ -42,7 +42,7 @@
   gap: 10px;
 }
 
-/* Teal icon replaces the purple shield used by EnterpriseWorkflowCard */
+/* Teal icon replaces the purple shield used by ForgeWorkflowCard */
 .msc-icon {
   color: #06b6d4;
   flex-shrink: 0;

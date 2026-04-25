@@ -1,9 +1,9 @@
 ---
-name: enterprise-workflow
-description: Enforces enterprise workflow standards for Forge Terminal itself. Activates on ANY implementation, refactor, bugfix, feature, build, create, modify, update, fix, add, change, or code modification task.
+name: forge-workflow
+description: Enforces Forge Workflow standards for Forge Terminal itself. Activates on ANY implementation, refactor, bugfix, feature, build, create, modify, update, fix, add, change, or code modification task.
 ---
 
-# Enterprise Workflow Standards (Forge Terminal)
+# Forge Workflow Standards (Forge Terminal)
 
 This skill enforces production-grade development standards for the Forge Terminal codebase. Every code change MUST comply with these rules.
 
@@ -22,8 +22,8 @@ This project operates in **BEST** mode. You MUST:
 - Boolean variables use `is`, `has`, `can`, `should` prefix: `isActive`, `hasPermission`
 - Functions start with a verb: `createSession`, `validateToken`, `renderCard`
 - Constants use UPPER_SNAKE_CASE: `MAX_RETRY_COUNT`, `DEFAULT_TIMEOUT`
-- React components use PascalCase: `WorkflowWizard`, `EnterpriseWorkflowCard`
-- CSS classes use kebab-case with component prefix: `ewc-header`, `ww-step-icon`
+- React components use PascalCase: `WorkflowWizard`, `ForgeWorkflowCard`
+- CSS classes use kebab-case with component prefix: `fwc-header`, `ww-step-icon`
 
 ### MUST NOT
 - Single-letter variables (except `i`, `j`, `k` in loops, `w`/`r` for HTTP handlers, `_` for unused)

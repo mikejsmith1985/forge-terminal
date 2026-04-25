@@ -1,6 +1,6 @@
-/* ─── Enterprise Workflow Card — Sidebar Widget ──────────────────────────── */
+/* ─── Forge Workflow Card — Sidebar Widget ──────────────────────────── */
 
-.enterprise-workflow-card {
+.forge-workflow-card {
   background: var(--card-bg);
   background-image: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
   border: 1px solid var(--card-border);
@@ -14,19 +14,19 @@
   overflow: hidden;
 }
 
-.enterprise-workflow-card:hover {
+.forge-workflow-card:hover {
   border-color: var(--accent, #8b5cf6);
   box-shadow: var(--shadow-glow, 0 0 0 1px rgba(139,92,246,0.2)), var(--shadow-md, 0 4px 12px rgba(0,0,0,0.2));
   transform: translateY(-1px);
 }
 
-.enterprise-workflow-card.configured {
+.forge-workflow-card.configured {
   border-color: rgba(139, 92, 246, 0.2);
 }
 
 /* ─── Header ──────────────────────────────────────────────────────────────── */
 
-.ewc-header {
+.fwc-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -35,34 +35,34 @@
   user-select: none;
 }
 
-.ewc-header-left {
+.fwc-header-left {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.ewc-shield-icon {
+.fwc-shield-icon {
   color: var(--accent, #8b5cf6);
 }
 
-.ewc-header-info {
+.fwc-header-info {
   display: flex;
   flex-direction: column;
 }
 
-.ewc-title {
+.fwc-title {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text);
 }
 
-.ewc-subtitle {
+.fwc-subtitle {
   font-size: 0.7rem;
   color: var(--subtext);
   margin-top: 1px;
 }
 
-.ewc-header-right {
+.fwc-header-right {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -71,7 +71,7 @@
 
 /* ─── Compliance Badges ───────────────────────────────────────────────────── */
 
-.ewc-badge {
+.fwc-badge {
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;
@@ -80,24 +80,24 @@
   font-weight: 600;
 }
 
-.ewc-badge-ok {
+.fwc-badge-ok {
   color: #10b981;
   background: rgba(16, 185, 129, 0.12);
 }
 
-.ewc-badge-warn {
+.fwc-badge-warn {
   color: #f59e0b;
   background: rgba(245, 158, 11, 0.12);
 }
 
-.ewc-badge-error {
+.fwc-badge-error {
   color: #ef4444;
   background: rgba(239, 68, 68, 0.12);
 }
 
 /* ─── Expanded Body ───────────────────────────────────────────────────────── */
 
-.ewc-body {
+.fwc-body {
   padding: 0 16px 14px;
   animation: ewcSlideDown 0.15s ease;
 }
@@ -112,13 +112,13 @@
   to   { transform: rotate(360deg); }
 }
 
-.ewc-spin {
+.fwc-spin {
   animation: ewcSpin 0.8s linear infinite;
 }
 
 /* ─── Compliance Summary ──────────────────────────────────────────────────── */
 
-.ewc-compliance-summary {
+.fwc-compliance-summary {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -129,35 +129,35 @@
   margin-bottom: 10px;
 }
 
-.ewc-compliance-row {
+.fwc-compliance-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.75rem;
 }
 
-.ewc-compliance-label {
+.fwc-compliance-label {
   color: var(--subtext);
 }
 
-.ewc-compliance-value {
+.fwc-compliance-value {
   font-weight: 500;
   color: var(--text);
 }
 
-.ewc-compliance-value.compliant { color: #10b981; }
-.ewc-compliance-value.warnings { color: #f59e0b; }
-.ewc-compliance-value.violations { color: #ef4444; }
-.ewc-compliance-value.passing { color: #10b981; }
+.fwc-compliance-value.compliant { color: #10b981; }
+.fwc-compliance-value.warnings { color: #f59e0b; }
+.fwc-compliance-value.violations { color: #ef4444; }
+.fwc-compliance-value.passing { color: #10b981; }
 
 /* ─── Buttons ─────────────────────────────────────────────────────────────── */
 
-.ewc-actions {
+.fwc-actions {
   display: flex;
   gap: 8px;
 }
 
-.ewc-btn {
+.fwc-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -169,38 +169,38 @@
   border: none;
   transition: all 0.15s;
 }
-.ewc-btn:hover { filter: brightness(1.1); }
+.fwc-btn:hover { filter: brightness(1.1); }
 
-.ewc-btn-primary {
+.fwc-btn-primary {
   flex: 1;
   background: var(--accent, #8b5cf6);
   color: white;
 }
 
-.ewc-btn-secondary {
+.fwc-btn-secondary {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
 }
-.ewc-btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+.fwc-btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
 
-.ewc-btn-setup {
+.fwc-btn-setup {
   width: 100%;
   background: linear-gradient(135deg, #8b5cf6, #6366f1);
   color: white;
   justify-content: center;
   padding: 10px 16px;
 }
-.ewc-btn-setup:hover {
+.fwc-btn-setup:hover {
   box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
 }
 
 /* ─── Unconfigured State ──────────────────────────────────────────────────── */
 
-.ewc-unconfigured-body {
+.fwc-unconfigured-body {
   text-align: center;
 }
 
-.ewc-setup-message {
+.fwc-setup-message {
   font-size: 0.78rem;
   color: var(--subtext);
   margin: 0 0 12px;
@@ -209,7 +209,7 @@
 
 /* ─── Findings Detail View ────────────────────────────────────────────────── */
 
-.ewc-findings-toggle {
+.fwc-findings-toggle {
   width: 100%;
   justify-content: center;
   gap: 6px;
@@ -219,16 +219,16 @@
   font-size: 0.75rem;
   padding: 6px 12px;
 }
-.ewc-findings-toggle:hover {
+.fwc-findings-toggle:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
 }
 
-.ewc-findings-section {
+.fwc-findings-section {
   margin-bottom: 10px;
 }
 
-.ewc-findings-list {
+.fwc-findings-list {
   max-height: 300px;
   overflow-y: auto;
   border: 1px solid var(--card-border);
@@ -242,18 +242,18 @@
 }
 
 /* Subtle scrollbar styling */
-.ewc-findings-list::-webkit-scrollbar {
+.fwc-findings-list::-webkit-scrollbar {
   width: 5px;
 }
-.ewc-findings-list::-webkit-scrollbar-track {
+.fwc-findings-list::-webkit-scrollbar-track {
   background: transparent;
 }
-.ewc-findings-list::-webkit-scrollbar-thumb {
+.fwc-findings-list::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
 }
 
-.ewc-finding-item {
+.fwc-finding-item {
   padding: 8px 10px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.03);
@@ -261,21 +261,21 @@
   font-size: 0.73rem;
   transition: background 0.12s;
 }
-.ewc-finding-item:hover {
+.fwc-finding-item:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.ewc-finding-item.level-warning {
+.fwc-finding-item.level-warning {
   border-left-color: #f59e0b;
 }
-.ewc-finding-item.level-violation {
+.fwc-finding-item.level-violation {
   border-left-color: #ef4444;
 }
-.ewc-finding-item.level-passing {
+.fwc-finding-item.level-passing {
   border-left-color: #10b981;
 }
 
-.ewc-finding-header {
+.fwc-finding-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -284,21 +284,21 @@
   margin-bottom: 3px;
 }
 
-.ewc-level-icon {
+.fwc-level-icon {
   font-size: 0.8rem;
   line-height: 1;
 }
-.ewc-level-icon.warning   { color: #f59e0b; }
-.ewc-level-icon.violation { color: #ef4444; }
-.ewc-level-icon.passing   { color: #10b981; }
+.fwc-level-icon.warning   { color: #f59e0b; }
+.fwc-level-icon.violation { color: #ef4444; }
+.fwc-level-icon.passing   { color: #10b981; }
 
-.ewc-finding-rule {
+.fwc-finding-rule {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.ewc-finding-location {
+.fwc-finding-location {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 0.68rem;
   color: var(--accent, #8b5cf6);
@@ -306,13 +306,13 @@
   opacity: 0.85;
 }
 
-.ewc-finding-message {
+.fwc-finding-message {
   color: var(--text);
   line-height: 1.4;
   margin-bottom: 2px;
 }
 
-.ewc-finding-suggestion {
+.fwc-finding-suggestion {
   color: var(--subtext);
   font-style: italic;
   font-size: 0.7rem;
@@ -320,7 +320,7 @@
   opacity: 0.8;
 }
 
-.ewc-findings-more {
+.fwc-findings-more {
   text-align: center;
   font-size: 0.72rem;
   color: var(--subtext);
@@ -328,7 +328,7 @@
   font-style: italic;
 }
 
-.ewc-copy-btn {
+.fwc-copy-btn {
   width: 100%;
   justify-content: center;
   background: rgba(139, 92, 246, 0.1);
@@ -336,7 +336,7 @@
   font-size: 0.73rem;
   padding: 6px 12px;
 }
-.ewc-copy-btn:hover {
+.fwc-copy-btn:hover {
   background: rgba(139, 92, 246, 0.2);
 }
 
@@ -345,7 +345,7 @@
 /* Subtle info callout at the bottom of the card — honest about AI compliance
    without making the feature look weak. Uses muted colors to stay secondary
    to the main card content. */
-.ewc-ai-notice {
+.fwc-ai-notice {
   display: flex;
   align-items: flex-start;
   gap: 7px;
@@ -356,14 +356,14 @@
   border-radius: 6px;
 }
 
-.ewc-ai-notice-icon {
+.fwc-ai-notice-icon {
   flex-shrink: 0;
   margin-top: 1px;
   color: var(--subtext);
   opacity: 0.6;
 }
 
-.ewc-ai-notice-text {
+.fwc-ai-notice-text {
   margin: 0;
   font-size: 0.7rem;
   line-height: 1.5;
@@ -371,7 +371,7 @@
   opacity: 0.75;
 }
 
-.ewc-ai-notice-emphasis {
+.fwc-ai-notice-emphasis {
   color: var(--text);
   opacity: 0.85;
 }

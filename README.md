@@ -78,9 +78,9 @@ Forge Terminal is a standalone, cross-platform terminal application designed for
   - **Ctrl+V**: Pastes from clipboard seamlessly
   - Uses xterm's `attachCustomKeyEventHandler` for reliable, native-like behavior
 
-## 🧭 Enterprise Workflow — Understanding AI Compliance
+## 🧭 Forge Workflow — Understanding AI Compliance
 
-The Enterprise Workflow system provides structured instructions that guide AI behavior in your development sessions — enforcing branching rules, naming conventions, quality gates, and skill cascades as active context the model references when making decisions.
+The Forge Workflow system provides structured instructions that guide AI behavior in your development sessions — enforcing branching rules, naming conventions, quality gates, and skill cascades as active context the model references when making decisions.
 
 ### What "guidance" means in practice
 

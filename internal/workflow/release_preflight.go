@@ -284,7 +284,7 @@ func checkGitHooksConfigured(projectPath string, report *PreflightReport) {
 			Severity:   PreflightWarning,
 			Status:     PreflightFail,
 			Message:    "Git hooks path not configured",
-			Suggestion: "Apply the enterprise workflow to install hooks: .forge/hooks",
+			Suggestion: "Apply the Forge Workflow to install hooks: .forge/hooks",
 		})
 		return
 	}

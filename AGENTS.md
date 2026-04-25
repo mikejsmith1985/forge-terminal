@@ -29,7 +29,7 @@ For reference, the full required sequence is:
 | Order | Skill | When Required |
 |-------|-------|---------------|
 | 1 | `workflow-enforcer` | **ALL** code tasks — invoke this first, always |
-| 2 | `enterprise-workflow` | **ALL** code tasks |
+| 2 | `forge-workflow` | **ALL** code tasks |
 | 3 | `code-quality` | **ALL** code tasks |
 | 4 | `branching-strategy` | **ALL** code tasks (branch must exist before code) |
 | 5 | `code-tutor-workflow` | **ALL** code tasks — user expects walkthrough of changes |

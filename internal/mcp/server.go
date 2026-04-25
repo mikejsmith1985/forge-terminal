@@ -321,6 +321,8 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newFileListTool(srv.deps.ProjectPath),
 		newTaskSubmitTool(srv.broker),
 		newWorkflowStatusTool(srv.deps.ProjectPath, srv.deps.WorkflowConfig),
+		newWorkflowGateRecordTool(srv.deps.ProjectPath),
+		newWorkflowPreflightTool(srv.deps.ProjectPath),
 		newEnvironmentDetectTool(environmentRunner),
 		newEnvironmentRunTool(environmentRunner),
 	}

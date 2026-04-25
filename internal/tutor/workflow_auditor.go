@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// WorkflowAuditContext holds enterprise workflow information that the tutor
+// WorkflowAuditContext holds Forge Workflow information that the tutor
 // uses to augment explanations with quality audit feedback.
 type WorkflowAuditContext struct {
 	// WorkflowActive is true when the project has a .forge/workflow.json
@@ -68,8 +68,8 @@ func BuildAuditPromptSection(auditContext WorkflowAuditContext) string {
 
 	var promptSection strings.Builder
 
-	promptSection.WriteString("\n## Quality Audit (Enterprise Workflow)\n")
-	promptSection.WriteString("This project has an active enterprise workflow. ")
+	promptSection.WriteString("\n## Quality Audit (Forge Workflow)\n")
+	promptSection.WriteString("This project has an active Forge Workflow. ")
 	promptSection.WriteString("In addition to your normal explanation, add a final section:\n\n")
 	promptSection.WriteString("## Quality Audit\n")
 	promptSection.WriteString("Review the code against these enterprise standards and flag any findings:\n\n")
