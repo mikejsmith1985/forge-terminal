@@ -149,12 +149,17 @@ func handleMacro(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startedAt := time.Now()
+	// baseline is the timestamp before the floor sleep.  waitForPTYQuiet
+	// will only react to PTY output that arrives AFTER this point, so that
+	// terminal output from before the card click cannot trigger a false-quiet
+	// and inject the payload prematurely.
+	baseline := startedAt
 
 	// Floor wait — gives the just-launched CLI a chance to print its
 	// startup banner.  This is the only fixed delay in the new flow.
 	time.Sleep(time.Duration(req.MinDelayMs) * time.Millisecond)
 
-	waitForPTYQuiet(session, req.QuietMs, req.MaxDelayMs, startedAt)
+	waitForPTYQuiet(session, req.QuietMs, req.MaxDelayMs, startedAt, baseline)
 
 	mode := pickMacroMode(session)
 	bytesWritten, err := writeMacro(session, req.Payload, mode)
@@ -192,12 +197,16 @@ func parseMacroPath(path string) (string, bool) {
 }
 
 // waitForPTYQuiet blocks until either:
-//   - quietMs milliseconds have passed since the last PTY output, OR
+//   - quietMs milliseconds have passed since the last PTY output that
+//     arrived AFTER baseline (output from before the macro request is
+//     ignored — otherwise a terminal that was idle before the card click
+//     would trigger an immediate false-quiet and inject the payload before
+//     the CLI even starts), OR
 //   - maxDelayMs milliseconds have passed since startedAt (hard cap).
 //
 // It polls every 50ms — fine-grained enough to feel snappy, coarse enough
 // to barely register on CPU.
-func waitForPTYQuiet(session *terminal.TerminalSession, quietMs, maxDelayMs int, startedAt time.Time) {
+func waitForPTYQuiet(session *terminal.TerminalSession, quietMs, maxDelayMs int, startedAt, baseline time.Time) {
 	deadline := startedAt.Add(time.Duration(maxDelayMs) * time.Millisecond)
 	quiet := time.Duration(quietMs) * time.Millisecond
 	const pollInterval = 50 * time.Millisecond
@@ -208,12 +217,12 @@ func waitForPTYQuiet(session *terminal.TerminalSession, quietMs, maxDelayMs int,
 			return
 		}
 		lastOutput := session.LastOutputAt()
-		if !lastOutput.IsZero() && now.Sub(lastOutput) >= quiet {
+		// Only count output that arrived after the baseline so that
+		// stale output (from before the command was sent) cannot cause
+		// an early injection.
+		if !lastOutput.IsZero() && lastOutput.After(baseline) && now.Sub(lastOutput) >= quiet {
 			return
 		}
-		// If the PTY has produced nothing yet (zero LastOutputAt), treat
-		// that as "still warming up" and keep polling.  When the CLI
-		// emits its first byte the timer starts naturally.
 		time.Sleep(pollInterval)
 	}
 }

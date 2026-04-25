@@ -394,7 +394,12 @@ const NamedFlow = ({
         {tunnelStage !== 'healthy' && (
           <p className="ccw-hint">
             <Loader2 size={12} className="ccw-spin" /> Waiting for the
-            tunnel to report "healthy" before you continue…
+            tunnel to report &ldquo;healthy&rdquo; before you continue&hellip;
+            {tunnelDetail && (
+              <span style={{ display: 'block', marginTop: 4, opacity: 0.7, fontSize: '0.85em' }}>
+                {tunnelDetail}
+              </span>
+            )}
           </p>
         )}
         {/*

@@ -1453,26 +1453,33 @@ function App() {
           : 1500;
         const macroSessionId = activeTabId;
         if (macroSessionId) {
-          fetch(`/api/terminal/${encodeURIComponent(macroSessionId)}/macro`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-              payload: cmd.macro_payload,
-              minDelayMs: macroMinDelayMs,
-            }),
-          })
-            .then((res) => res.json().catch(() => ({})).then((body) => ({ ok: res.ok, body })))
-            .then(({ ok, body }) => {
-              if (!ok) {
-                console.warn('[Macro] backend rejected payload', body);
-              } else {
-                console.info('[Macro] delivered', body);
-              }
+          // Delay the fetch until AFTER the Enter key fires (cmd.delay ms) plus a
+          // 200 ms buffer so the server sees a live process when it starts polling.
+          // Without this, the fetch races the Enter key and waitForPTYQuiet fires
+          // on stale quiet output before the CLI has even been launched.
+          const macroFireDelay = Math.max((cmd.delay || 0) + 200, 0);
+          setTimeout(() => {
+            fetch(`/api/terminal/${encodeURIComponent(macroSessionId)}/macro`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                payload: cmd.macro_payload,
+                minDelayMs: macroMinDelayMs,
+              }),
             })
-            .catch((err) => {
-              console.warn('[Macro] fetch failed', err);
-            });
+              .then((res) => res.json().catch(() => ({})).then((body) => ({ ok: res.ok, body })))
+              .then(({ ok, body }) => {
+                if (!ok) {
+                  console.warn('[Macro] backend rejected payload', body);
+                } else {
+                  console.info('[Macro] delivered', body);
+                }
+              })
+              .catch((err) => {
+                console.warn('[Macro] fetch failed', err);
+              });
+          }, macroFireDelay);
         } else {
           console.warn('[Macro] no active tab id — cannot send macro');
         }
