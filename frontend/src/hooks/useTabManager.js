@@ -516,6 +516,62 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
+   * Recompute every open tab's title from its stored currentDirectory using
+   * the supplied naming strategy. Called when the user changes naming
+   * settings in the Tab Controls panel and clicks Save — without this the
+   * change wouldn't take effect until the user happens to `cd` and the
+   * shell's OSC 9;9 integration fires (which may never happen on tabs
+   * restored from a prior session, leaving stale titles like project names
+   * pulled from the previous working directory).
+   *
+   * Static strategies (numbered / shell-type / custom-prefix) ignore cwd —
+   * they are recomputed from the tab's index + saved shellConfig instead.
+   *
+   * Skips tabs whose derived title would be a generic "Terminal N" or a
+   * file-like name, so we never replace a real project name with garbage.
+   *
+   * @param {string} strategy   New naming strategy id
+   * @param {string} prefix     Custom prefix (used only for 'custom-prefix')
+   * @param {string} rootFolder Configured projects root folder name
+   */
+  const retitleAllTabsFromCwd = useCallback((strategy, prefix, rootFolder) => {
+    setState(prev => {
+      const newTabs = prev.tabs.map((tab, index) => {
+        const tabNumber = index + 1;
+        let derived = null;
+
+        if (isStaticNamingStrategy(strategy)) {
+          // Static strategies derive purely from index + shell type
+          derived = getTabTitle(null, strategy, {
+            tabNumber,
+            shellType: tab.shellConfig?.shellType,
+            prefix: prefix || 'Dev',
+            fallback: `Terminal ${tabNumber}`,
+          });
+        } else if (tab.currentDirectory) {
+          derived = getTabTitle(tab.currentDirectory, strategy, {
+            tabNumber,
+            prefix: prefix || 'Dev',
+            rootFolder: rootFolder || '',
+            fallback: `Terminal ${tabNumber}`,
+          });
+        }
+
+        // Refuse to overwrite a real title with junk: skip blanks,
+        // generic "Terminal N" placeholders, and file-like names.
+        if (!derived || isFileLikeName(derived)) return tab;
+        if (!isStaticNamingStrategy(strategy) && derived.startsWith('Terminal ')) {
+          return tab;
+        }
+        if (derived === tab.title) return tab;
+
+        return { ...tab, title: derived };
+      });
+      return { ...prev, tabs: newTabs };
+    });
+  }, []);
+
+  /**
    * Reorder tabs
    * @param {number} fromIndex - Source index
    * @param {number} toIndex - Destination index
@@ -799,5 +855,6 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     toggleTabViewMode, // v3.3.0: Toggle between chat and terminal view
     updateTabDirectory,
     reorderTabs,
+    retitleAllTabsFromCwd,
   };
 }

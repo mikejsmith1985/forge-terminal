@@ -1187,11 +1187,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       window.term = term;
     }
     
-    // Critical fix: Force focus immediately after terminal.open()
-    // This ensures the terminal textarea receives focus before React re-renders
-    queueMicrotask(() => {
-      term.focus();
-    });
+    // Force focus immediately after terminal.open() — but ONLY for the visible
+    // tab. Hidden tabs use visibility:hidden (not display:none) so their
+    // xterm-helper-textarea remains focusable; calling term.focus() on a
+    // hidden tab steals focus from the active one. On session restore, all
+    // tabs mount in parallel, so whichever hidden tab mounts last would win
+    // the focus race and silently swallow the user's first keystrokes — most
+    // visibly when answering Copilot CLI numeric prompts (1/2/3). The
+    // useLayoutEffect on [isVisible] handles focus when a tab becomes visible.
+    if (isVisible) {
+      queueMicrotask(() => {
+        term.focus();
+      });
+    }
 
     // SINGLE PASTE HANDLER: Handles ALL paste operations (Ctrl+V, right-click, Edit menu).
     // clipboardMode: 'off' prevents xterm from pasting on its own.
@@ -1576,7 +1584,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       if (fitAddonRef.current) {
         fitAddonRef.current.fit();
       }
-      term.focus();
+      // Only the visible tab should grab focus — see comment above the mount
+      // queueMicrotask focus call. Hidden tabs would otherwise steal focus
+      // from the active tab during a multi-tab restore.
+      if (isVisible) {
+        term.focus();
+      }
     });
 
     // Record that handlers are now attached
