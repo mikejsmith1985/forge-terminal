@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Sidebar ribbon UX refresh** — overloaded Cards tab split into four focused tabs: **Cards** (user command shortcuts + Projects browser), **Files** (unchanged), **MCP** (MCPSetupCard + MCPDiscoveryCard + CompanionAccessCard), and **Tools** (Release Manager + Forge Workflow + Web App Debugger). The Debugger tab is retired; its contents live in Tools.
+- **Configurable tab label style** — new Tag button in the theme controls row toggles between icon+label and icon-only modes; preference persisted to localStorage (`sidebarTabStyle`).
+- **New Project wizard in the Projects card** — `FolderPlus` button opens an inline form that creates a new folder in the project root, runs `git init`, and scaffolds all Forge workflow files automatically via `DefaultConfig()`. Optional GitHub repo creation via the `gh` CLI (private or public); graceful error if `gh` is not installed.
+- `POST /api/project/create` backend endpoint with path traversal guard, git init, scaffold, and optional `gh repo create --source=. --push`.
+
+### Changed
+- Release Manager card moved out of the sortable command list and into the Tools tab permanently; legacy `id: -1` entries are silently filtered from saved commands on load.
+
 ## [7.8.6] - 2026-04-25
 
 ---

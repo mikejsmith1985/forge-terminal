@@ -248,3 +248,127 @@
 .spinning {
   animation: spin 0.8s linear infinite;
 }
+
+/* Active state for action buttons (e.g. New Project open) */
+.directory-card-action-btn.active {
+  color: var(--accent, #cba6f7);
+  background: rgba(203, 166, 247, 0.12);
+}
+
+/* New Project wizard panel */
+.directory-card-new-project {
+  background: rgba(203, 166, 247, 0.06);
+  border: 1px solid rgba(203, 166, 247, 0.2);
+  border-radius: 7px;
+  padding: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.directory-card-new-project-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.directory-card-new-project-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.directory-card-gh-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-primary, #cdd6f4);
+  cursor: pointer;
+  user-select: none;
+}
+
+.directory-card-gh-toggle input[type="checkbox"] {
+  accent-color: var(--accent, #cba6f7);
+  cursor: pointer;
+}
+
+.directory-card-visibility {
+  display: flex;
+  gap: 14px;
+  padding-left: 18px;
+}
+
+.directory-card-visibility label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-primary, #cdd6f4);
+  cursor: pointer;
+}
+
+.directory-card-visibility input[type="radio"] {
+  accent-color: var(--accent, #cba6f7);
+  cursor: pointer;
+}
+
+.directory-card-new-project-error {
+  font-size: 11px;
+  color: #f38ba8;
+  margin: 0;
+}
+
+.directory-card-btn-create {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--accent, #cba6f7);
+  color: #1e1e2e;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  width: 100%;
+}
+
+.directory-card-btn-create:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.directory-card-btn-create:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* New Project success state */
+.directory-card-new-project-success {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #a6e3a1;
+}
+
+.directory-card-gh-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent, #cba6f7);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.directory-card-gh-link:hover {
+  text-decoration: underline;
+}
+
+.directory-card-gh-warn {
+  font-size: 11px;
+  color: #fab387;
+}
