@@ -400,3 +400,75 @@ func TestLoadWizardState_DerivedFromFiles(t *testing.T) {
 		t.Fatal("Created should remain false without state.json")
 	}
 }
+
+// TestNamedConfig_JSONTags ensures the wire/persisted JSON keys stay
+// camelCase. The frontend reads `status.config.hostname` etc; if the
+// struct fields lose their tags the API silently sends "Hostname" and
+// the wizard never recognises a configured tunnel.
+func TestNamedConfig_JSONTags(t *testing.T) {
+	cfg := NamedConfig{
+		TunnelUUID:      "uuid-1",
+		Hostname:        "forge.example.com",
+		LocalPort:       3005,
+		ConfigPath:      "/tmp/config.yml",
+		CredentialsPath: "/tmp/creds.json",
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonStr := string(data)
+	for _, want := range []string{`"tunnelUuid"`, `"hostname"`, `"localPort"`, `"configPath"`, `"credentialsPath"`} {
+		if !strings.Contains(jsonStr, want) {
+			t.Errorf("expected %s in marshaled JSON, got %s", want, jsonStr)
+		}
+	}
+	for _, bad := range []string{`"Hostname"`, `"TunnelUUID"`, `"LocalPort"`} {
+		if strings.Contains(jsonStr, bad) {
+			t.Errorf("did not expect uppercase %s in JSON, got %s", bad, jsonStr)
+		}
+	}
+}
+
+// TestLoadWizardState_LegacyUppercaseKeys confirms that state.json files
+// written by older Forge builds (pre-tag, capitalized field names) still
+// load correctly thanks to encoding/json's case-insensitive matching.
+func TestLoadWizardState_LegacyUppercaseKeys(t *testing.T) {
+	home := withTempHomeWizard(t)
+	tunDir := filepath.Join(home, ".forge", "tunnel")
+	if err := os.MkdirAll(tunDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// Write paths the loader will stat.
+	cfgPath := filepath.Join(tunDir, "config.yml")
+	credPath := filepath.Join(tunDir, "creds.json")
+	if err := os.WriteFile(cfgPath, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(credPath, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Legacy state.json with capitalized keys.
+	legacy := `{
+  "installed": true, "loggedIn": true, "created": true,
+  "config": {
+    "TunnelUUID": "abc", "Hostname": "forge.example.com",
+    "LocalPort": 3005,
+    "ConfigPath": "` + strings.ReplaceAll(cfgPath, `\`, `\\`) + `",
+    "CredentialsPath": "` + strings.ReplaceAll(credPath, `\`, `\\`) + `"
+  }
+}`
+	if err := os.WriteFile(filepath.Join(tunDir, "state.json"), []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	st := LoadWizardState()
+	if !st.Created || st.Config == nil {
+		t.Fatalf("expected Created=true with config, got %+v", st)
+	}
+	if st.Config.Hostname != "forge.example.com" {
+		t.Errorf("expected hostname forge.example.com, got %q", st.Config.Hostname)
+	}
+	if st.Config.TunnelUUID != "abc" {
+		t.Errorf("expected uuid abc, got %q", st.Config.TunnelUUID)
+	}
+}

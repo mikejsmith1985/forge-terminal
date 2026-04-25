@@ -469,6 +469,13 @@ func LoadWizardState() WizardState {
 			if credErr == nil && cfgErr == nil {
 				st.Created = true
 				st.Config = persisted.Config
+				// One-time migration: legacy state.json files (pre-camelCase
+				// JSON tags) used capitalized field names. Rewrite the file
+				// so any consumer that reads the raw JSON directly sees the
+				// expected camelCase keys.
+				if bytes.Contains(data, []byte(`"Hostname"`)) || bytes.Contains(data, []byte(`"TunnelUUID"`)) {
+					_ = writeStateJSON(*persisted.Config)
+				}
 			} else {
 				st.LastError = "persisted tunnel config references missing files — re-run setup"
 			}
