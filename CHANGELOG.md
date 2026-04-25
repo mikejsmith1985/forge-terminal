@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.8.2] — Quick Tunnel wizard fix
+
+### Fixed
+- **Forge Companion Quick Tunnel flow now actually starts the tunnel.**
+  Previously the wizard said "Forge will start a Quick Tunnel" but never
+  called any API. Step 2 now shows context-sensitive buttons:
+  - `absent` stage → **Install cloudflared** button (calls `POST /api/tunnel/setup/install`)
+  - `configured`/`stopped` stage → **Start Quick Tunnel** button (calls `POST /api/tunnel/start`)
+  - `starting` stage → spinner
+  - `degraded` stage → error detail + **Try again** button
+  - `healthy` stage → success checkmark
+- **Backend polling no longer wipes a running Quick Tunnel back to "configured".**
+  `detectQuick()` now preserves supervisor-set states (Starting, Healthy,
+  Degraded, Stopped) exactly as `detectNamed()` has always done.  Before
+  this fix, every `/api/tunnel/options` poll called `DetectAll` which called
+  the old `detectQuick()`, which had no memory of the running process and
+  always returned `configured`, making the URL never appear in the wizard.
+- After clicking Start or Install, the wizard triggers three rapid re-polls
+  so the UI transitions to `starting` state within ~3 seconds instead of
+  waiting for the next 6-second interval.
+- Error messages from failed install/start API calls are now displayed
+  inline as a sticky banner above the action button, cleared on retry.
+
 ## [7.8.1] - 2026-04-25
 
 ---

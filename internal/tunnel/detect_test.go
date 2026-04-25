@@ -17,9 +17,11 @@ func withTempHomeDetect(t *testing.T) string {
 }
 
 func TestDetectQuick(t *testing.T) {
-	// When cloudflared is not installed, quick should be Absent.
+	// With no prior supervisor state, quick should be Absent or Configured
+	// depending on whether cloudflared is on PATH.  Pass an Absent seed so
+	// the guard does not fire.
 	withTempHomeDetect(t)
-	got := detectQuick()
+	got := detectQuick(HealthState{Mode: ModeIDQuick, Stage: StageAbsent})
 	// Can't easily force ResolvePath empty on dev machines that have
 	// cloudflared on PATH — just check the struct invariants.
 	if got.Mode != ModeIDQuick {
@@ -27,6 +29,29 @@ func TestDetectQuick(t *testing.T) {
 	}
 	if got.Stage != StageAbsent && got.Stage != StageConfigured {
 		t.Fatalf("unexpected stage: %v", got.Stage)
+	}
+}
+
+func TestDetectQuickPreservesLive(t *testing.T) {
+	// A live supervisor writing Healthy must not be overwritten by file-based
+	// detection on the next DetectAll poll.
+	in := HealthState{Mode: ModeIDQuick, Stage: StageHealthy, URL: "https://quick.trycloudflare.com"}
+	got := detectQuick(in)
+	if got.Stage != StageHealthy {
+		t.Fatalf("detectQuick clobbered live Healthy state: %v", got.Stage)
+	}
+	if got.URL != "https://quick.trycloudflare.com" {
+		t.Fatalf("detectQuick lost the URL: %q", got.URL)
+	}
+}
+
+func TestDetectQuickPreservesStarting(t *testing.T) {
+	// StageStarting means the supervisor spawned the process but the health
+	// probe has not yet succeeded.  detectQuick must not reset it to Configured.
+	in := HealthState{Mode: ModeIDQuick, Stage: StageStarting}
+	got := detectQuick(in)
+	if got.Stage != StageStarting {
+		t.Fatalf("detectQuick should preserve StageStarting, got %v", got.Stage)
 	}
 }
 
