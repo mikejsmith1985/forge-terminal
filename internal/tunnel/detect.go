@@ -31,7 +31,9 @@ import (
 func DetectAll(ctx context.Context, ranker *Ranker, localPort int) {
 	ranker.Set(detectNamed(ranker.Get(ModeIDNamed)))
 	ranker.Set(detectTailscale(ctx))
-	ranker.Set(detectQuick())
+	// Pass the current in-memory state so supervisor-set stages (Starting,
+	// Healthy, Degraded, Stopped) are not overwritten by file-system detection.
+	ranker.Set(detectQuick(ranker.Get(ModeIDQuick)))
 	ranker.Set(detectLAN(localPort))
 }
 
@@ -122,11 +124,18 @@ func detectTailscale(ctx context.Context) HealthState {
 	}
 }
 
-// detectQuick reports Absent unless cloudflared is on disk; a Quick
-// Tunnel can always be started on demand if the binary is present.
-// The actual URL is only known after the supervisor hands it to the
-// ranker, so this stays at Configured.
-func detectQuick() HealthState {
+// detectQuick reports the Quick Tunnel state.  Like detectNamed, it preserves
+// any live state written by the tunnel supervisor (Starting, Healthy, Degraded,
+// Stopped) so repeated DetectAll calls on the polling interval do not wipe a
+// running quick tunnel back to Configured.  Absent and Configured are the only
+// "detection-owned" states — derived from whether the cloudflared binary exists.
+func detectQuick(current HealthState) HealthState {
+	// Supervisor-owned stages: a running process has set real information
+	// that file-system detection cannot know about.  Preserve it.
+	if current.Stage == StageHealthy || current.Stage == StageDegraded ||
+		current.Stage == StageStarting || current.Stage == StageStopped {
+		return current
+	}
 	if ResolvePath() == "" {
 		return HealthState{
 			Mode:         ModeIDQuick,

@@ -103,6 +103,13 @@ export default function CompanionConnectionWizard({
   const [isPreferenceLoading, setIsPreferenceLoading] = useState(true)
   const [hasCopiedLink, setHasCopiedLink] = useState(false)
 
+  // State for Quick Tunnel install/start actions.  Separate from the
+  // tunnelStage state because these are user-triggered operations that
+  // have their own loading and error lifecycle.
+  const [isInstallingCloudflared, setIsInstallingCloudflared] = useState(false)
+  const [isStartingQuickTunnel, setIsStartingQuickTunnel] = useState(false)
+  const [quickTunnelActionError, setQuickTunnelActionError] = useState('')
+
   // ── Initial load: read persisted preference + auto-detect default ────────
   useEffect(() => {
     let cancelled = false
@@ -133,32 +140,33 @@ export default function CompanionConnectionWizard({
   }, [])
 
   // ── Live tunnel status ─────────────────────────────────────────────────────
-  // Poll /api/tunnel/options every 6s while the wizard is open so the
-  // "Waiting for tunnel…" copy resolves to a real URL the moment the
-  // backend has one.
+  // refreshTunnel is a useCallback so install/start handlers can call it
+  // directly for an immediate state update without waiting for the 6-second
+  // polling interval.
+  const refreshTunnel = useCallback(async () => {
+    if (!selectedMethod) return
+    try {
+      const response = await fetch('/api/tunnel/options')
+      if (!response.ok) return
+      const data = await response.json()
+      const option = (data.options || []).find(o => o.mode === selectedMethod)
+      if (!option) return
+      setTunnelUrl(option.url || '')
+      setTunnelStage(option.stage || 'absent')
+      setTunnelDetail(option.detail || '')
+    } catch {
+      // Best-effort polling; ignore transient errors.
+    }
+  }, [selectedMethod])
+
+  // Poll every 6 seconds while the wizard is open so "Waiting for tunnel…"
+  // resolves to a real URL the moment the backend has one.
   useEffect(() => {
     if (!selectedMethod) return
-    let cancelled = false
-
-    async function refreshTunnel() {
-      try {
-        const response = await fetch('/api/tunnel/options')
-        if (!response.ok) return
-        const data = await response.json()
-        const option = (data.options || []).find(o => o.mode === selectedMethod)
-        if (cancelled || !option) return
-        setTunnelUrl(option.url || '')
-        setTunnelStage(option.stage || 'absent')
-        setTunnelDetail(option.detail || '')
-      } catch {
-        // Best-effort polling; ignore transient errors.
-      }
-    }
-
     refreshTunnel()
     const intervalId = setInterval(refreshTunnel, 6000)
-    return () => { cancelled = true; clearInterval(intervalId) }
-  }, [selectedMethod])
+    return () => clearInterval(intervalId)
+  }, [selectedMethod, refreshTunnel])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const persistMethod = useCallback(async (method) => {
@@ -183,6 +191,8 @@ export default function CompanionConnectionWizard({
 
   const handleChangeMethod = useCallback(() => {
     setCurrentStepIndex(0)
+    // Reset Quick Tunnel action state so a new method choice starts clean.
+    setQuickTunnelActionError('')
   }, [])
 
   const handleNextStep = useCallback(() => {
@@ -192,6 +202,60 @@ export default function CompanionConnectionWizard({
   const handlePrevStep = useCallback(() => {
     setCurrentStepIndex(idx => Math.max(0, idx - 1))
   }, [])
+
+  // handleInstallCloudflared — downloads cloudflared via the backend installer.
+  // On success, triggers an immediate tunnel status refresh so the UI
+  // transitions from "absent" to "configured" without waiting 6 seconds.
+  const handleInstallCloudflared = useCallback(async () => {
+    setIsInstallingCloudflared(true)
+    setQuickTunnelActionError('')
+    try {
+      const response = await fetch('/api/tunnel/setup/install', { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) {
+        setQuickTunnelActionError(data.error || `Install failed (HTTP ${response.status})`)
+        return
+      }
+      // Refresh immediately so the UI shows "configured" before the next
+      // 6-second poll fires.
+      await refreshTunnel()
+    } catch {
+      setQuickTunnelActionError('Network error — check your connection and try again.')
+    } finally {
+      setIsInstallingCloudflared(false)
+    }
+  }, [refreshTunnel])
+
+  // handleStartQuickTunnel — tells the backend to launch an ephemeral
+  // Cloudflare tunnel.  POST /api/tunnel/start defaults to quick/ephemeral
+  // mode when no named or tailscale tunnel is configured.
+  //
+  // After a successful start, we poll aggressively for 3 seconds so the UI
+  // transitions from "configured" → "starting" before the button re-enables.
+  const handleStartQuickTunnel = useCallback(async () => {
+    setIsStartingQuickTunnel(true)
+    setQuickTunnelActionError('')
+    try {
+      const response = await fetch('/api/tunnel/start', { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) {
+        setQuickTunnelActionError(data.error || `Start failed (HTTP ${response.status})`)
+        return
+      }
+      // Three rapid polls give the supervisor time to write "starting" into
+      // the ranker so the UI shows the tunnel-starting state before we
+      // release the button spinner.
+      await refreshTunnel()
+      await new Promise(resolve => setTimeout(resolve, 1200))
+      await refreshTunnel()
+      await new Promise(resolve => setTimeout(resolve, 1200))
+      await refreshTunnel()
+    } catch {
+      setQuickTunnelActionError('Network error — check your connection and try again.')
+    } finally {
+      setIsStartingQuickTunnel(false)
+    }
+  }, [refreshTunnel])
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (isPreferenceLoading) {
@@ -215,9 +279,9 @@ export default function CompanionConnectionWizard({
   // Steps 2-N — render only the chosen method's flow.
   const stepProps = {
     currentStepIndex,
-    onPrevStep:        handlePrevStep,
-    onNextStep:        handleNextStep,
-    onChangeMethod:    handleChangeMethod,
+    onPrevStep:              handlePrevStep,
+    onNextStep:              handleNextStep,
+    onChangeMethod:          handleChangeMethod,
     mobileToken,
     companionHost,
     tunnelUrl,
@@ -225,6 +289,12 @@ export default function CompanionConnectionWizard({
     tunnelDetail,
     hasCopiedLink,
     setHasCopiedLink,
+    // Quick Tunnel action props — forwarded to QuickFlow only.
+    onInstallCloudflared:    handleInstallCloudflared,
+    onStartQuickTunnel:      handleStartQuickTunnel,
+    isInstallingCloudflared,
+    isStartingQuickTunnel,
+    quickTunnelActionError,
   }
 
   switch (selectedMethod) {
@@ -367,8 +437,8 @@ const NamedFlow = ({
 }
 
 /**
- * QuickFlow — three steps after picking Cloudflare Quick Tunnel.
- *   2. Wait for cloudflared to mint a URL.
+ * QuickFlow — steps after picking Cloudflare Quick Tunnel:
+ *   2. Install cloudflared (if needed) then start the tunnel.
  *   3. Confirm URL.
  *   4. QR scan.
  */
@@ -384,6 +454,11 @@ const QuickFlow = ({
   tunnelDetail,
   hasCopiedLink,
   setHasCopiedLink,
+  onInstallCloudflared,
+  onStartQuickTunnel,
+  isInstallingCloudflared,
+  isStartingQuickTunnel,
+  quickTunnelActionError,
 }) => {
   const totalSteps = 4
 
@@ -392,15 +467,24 @@ const QuickFlow = ({
       <StepShell
         stepNumber={2}
         totalSteps={totalSteps}
-        title="Wait for your throwaway URL"
-        helpText="Forge will start a Cloudflare Quick Tunnel and grab a URL for you. This usually takes 5-10 seconds. You don't have to do anything — just wait for the green check below."
+        title="Start your throwaway URL"
+        helpText={`A Cloudflare Quick Tunnel gives you a free throwaway URL that lasts as long as Forge is running. The URL changes on every restart. Click "Start Quick Tunnel" below — it takes about 10 seconds.`}
         onPrev={onChangeMethod}
         prevLabel="Change method"
         onNext={onNextStep}
         nextLabel="URL is ready"
         nextDisabled={tunnelStage !== 'healthy'}
       >
-        <QuickTunnelStatus stage={tunnelStage} detail={tunnelDetail} url={tunnelUrl} />
+        <QuickTunnelStatus
+          stage={tunnelStage}
+          detail={tunnelDetail}
+          url={tunnelUrl}
+          isInstalling={isInstallingCloudflared}
+          isStarting={isStartingQuickTunnel}
+          actionError={quickTunnelActionError}
+          onInstall={onInstallCloudflared}
+          onStart={onStartQuickTunnel}
+        />
       </StepShell>
     )
   }
@@ -594,33 +678,123 @@ const UrlDisplay = ({ url, stage, detail }) => {
   )
 }
 
-const QuickTunnelStatus = ({ stage, detail, url }) => {
+/**
+ * QuickTunnelStatus — shows the correct state for the Quick Tunnel flow.
+ *
+ * States and what the user sees:
+ *   absent     — cloudflared not installed → "Install cloudflared" button
+ *   configured — binary present, tunnel not running → "Start Quick Tunnel" button
+ *   stopped    — same as configured (process exited cleanly)
+ *   starting   — supervisor spawned, probe not yet succeeded → spinner
+ *   healthy    — tunnel up and URL available → success
+ *   degraded   — probes failing → error + "Try again" button
+ */
+const QuickTunnelStatus = ({ stage, detail, url, isInstalling, isStarting, actionError, onInstall, onStart }) => {
+  const errorBanner = actionError && (
+    <div className="ccw-error" role="alert">
+      <AlertTriangle size={12} /> {actionError}
+    </div>
+  )
+
   if (stage === 'absent') {
     return (
-      <div className="ccw-status ccw-status-warn">
-        <AlertTriangle size={14} />
-        <div>
-          <strong>cloudflared not installed.</strong>
-          <p>Use the Connection Setup card under Advanced settings to install it.</p>
+      <div className="ccw-status-group">
+        {errorBanner}
+        <div className="ccw-status ccw-status-warn">
+          <AlertTriangle size={14} />
+          <div>
+            <strong>cloudflared is not installed.</strong>
+            <p>
+              Forge needs a small helper program called "cloudflared" to create your tunnel URL.
+              Click Install below — it downloads automatically and takes about 30 seconds.
+            </p>
+          </div>
         </div>
+        <button
+          type="button"
+          className="ccw-btn ccw-btn-primary ccw-status-action"
+          onClick={onInstall}
+          disabled={isInstalling}
+        >
+          {isInstalling
+            ? <><Loader2 size={12} className="ccw-spin" /> Installing cloudflared…</>
+            : <>Install cloudflared</>
+          }
+        </button>
       </div>
     )
   }
+
   if (stage === 'healthy' && url) {
     return (
       <div className="ccw-status ccw-status-ok">
         <Check size={14} />
-        <div><strong>Quick tunnel is up.</strong> Your URL is ready below.</div>
+        <div><strong>Quick Tunnel is up!</strong> Your URL is ready — click "URL is ready" below.</div>
       </div>
     )
   }
-  return (
-    <div className="ccw-status ccw-status-pending">
-      <Loader2 size={14} className="ccw-spin" />
-      <div>
-        <strong>Starting your Quick Tunnel…</strong>
-        <p>{detail || 'This usually takes 5-10 seconds.'}</p>
+
+  if (stage === 'starting') {
+    return (
+      <div className="ccw-status ccw-status-pending">
+        <Loader2 size={14} className="ccw-spin" />
+        <div>
+          <strong>Starting your Quick Tunnel…</strong>
+          <p>{detail || 'Cloudflare is assigning a temporary URL. This takes 5-15 seconds.'}</p>
+        </div>
       </div>
+    )
+  }
+
+  if (stage === 'degraded') {
+    return (
+      <div className="ccw-status-group">
+        {errorBanner}
+        <div className="ccw-status ccw-status-warn">
+          <AlertTriangle size={14} />
+          <div>
+            <strong>The tunnel ran into a problem.</strong>
+            <p>{detail || 'Something went wrong. Try starting the tunnel again.'}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="ccw-btn ccw-btn-primary ccw-status-action"
+          onClick={onStart}
+          disabled={isStarting}
+        >
+          {isStarting
+            ? <><Loader2 size={12} className="ccw-spin" /> Starting…</>
+            : <><RefreshCw size={12} /> Try again</>
+          }
+        </button>
+      </div>
+    )
+  }
+
+  // Stage is 'configured' or 'stopped' — cloudflared is installed but the
+  // tunnel is not running.  The user must click a button to start it.
+  return (
+    <div className="ccw-status-group">
+      {errorBanner}
+      <div className="ccw-status ccw-status-pending">
+        <Loader2 size={14} className="ccw-spin" />
+        <div>
+          <strong>cloudflared is installed and ready.</strong>
+          <p>Click the button below to get your URL. It takes about 10 seconds.</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        className="ccw-btn ccw-btn-primary ccw-status-action"
+        onClick={onStart}
+        disabled={isStarting}
+      >
+        {isStarting
+          ? <><Loader2 size={12} className="ccw-spin" /> Starting…</>
+          : <>Start Quick Tunnel</>
+        }
+      </button>
     </div>
   )
 }
