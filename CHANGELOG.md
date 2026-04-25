@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.8.5] - 2026-04-25
+
+### Fixed
+- **Named tunnel never reached "healthy" in the Companion wizard** — `internal/tunnel/named.go` probes `https://<hostname>/api/ping` every 20 s and demotes the supervisor to *Degraded* after 3 misses, but no handler was registered for `/api/ping`. The probe always 404'd, so Step 2 of the wizard ("Tunnel is healthy") stayed disabled forever. Added a tiny unauthenticated handler in `cmd/forge/handlers_ping.go` registered before the catch-all `/` route. Probe now returns 200 within ~5 s of the tunnel starting and the wizard advances normally.
+- **Macro payloads still missed the AI CLI even after the v7.8.4 delay bump** — the old path waited a fixed `macro_delay` in the browser and shipped bracketed paste over the WebSocket, which silently failed when (a) the receiving CLI hadn't enabled DECSET 2004 yet, (b) the WebSocket reconnected during the wait, or (c) cold-start variance pushed the first prompt past the timeout. Replaced with a server-side endpoint `POST /api/terminal/{sessionID}/macro` that owns the PTY directly: it waits for an *output-quiet* window (default 750 ms of silence after a 1500 ms minimum, capped at 12 s), sniffs recent PTY output for `\x1b[?2004h`, then picks bracketed-paste or 64-byte chunked-typed mode accordingly. Every attempt is logged to `~/.forge/logs/macro.log` with mode, wait time, and delivery status.
+
+### Added
+- `cmd/forge/handlers_ping.go` + `handlers_ping_test.go` — unauthenticated `/api/ping` for tunnel health probes.
+- `cmd/forge/handlers_macro.go` + `handlers_macro_test.go` — server-side macro injection with quiet-detection and dual-mode bracketed/chunked write.
+- `internal/terminal/session.go` — output-activity tracking (`LastOutputAt`, `RecentOutput`) on every PTY read, used by the macro endpoint to gate injection on a quiet PTY rather than a wall-clock timer.
+
+### Changed
+- `frontend/src/App.jsx` — Copilot card execution now POSTs the macro payload to `/api/terminal/{tabId}/macro` instead of bracketed-pasting from the browser. Default `minDelayMs` is 1500; the backend extends as needed until the PTY goes quiet.
+
 ## [7.8.4] - 2026-04-25
 
 ---

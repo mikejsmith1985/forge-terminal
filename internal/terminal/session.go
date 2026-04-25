@@ -64,7 +64,26 @@ type TerminalSession struct {
 	mu       sync.Mutex
 	closed   bool
 	doneChan chan struct{}
+
+	// Output-activity instrumentation, used by the macro injection endpoint
+	// (cmd/forge/handlers_macro.go) to wait for the receiving CLI to be
+	// "quiet" before pasting a workflow prompt.  Without this, a fixed
+	// timeout has to guess how long copilot/claude takes to render their
+	// first prompt — and guesses are wrong often enough that the macro
+	// either lands inside startup output or arrives too late.
+	//
+	// activityMu guards both fields below independently of the main mu so
+	// the macro endpoint can poll without contending with PTY writes.
+	activityMu     sync.RWMutex
+	lastOutputAt  time.Time
+	recentOutput  []byte // ring buffer of the last ~4 KB of PTY output
 }
+
+// recentOutputCapacity is the size of the per-session output ring buffer.
+// 4 KB is enough to capture a CLI's startup banner plus an ANSI mode-set
+// sequence (`\x1b[?2004h`) without holding meaningful memory across
+// thousands of sessions.
+const recentOutputCapacity = 4096
 
 // NewTerminalSession creates a new PTY session with default shell.
 func NewTerminalSession(id string) (*TerminalSession, error) {
@@ -274,9 +293,55 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	return session, nil
 }
 
-// Read reads output from the PTY.
+// Read reads output from the PTY.  Every successful read is recorded in
+// the session's activity tracker so the macro injection endpoint can
+// detect a quiet window before pasting.
 func (s *TerminalSession) Read(p []byte) (int, error) {
-	return s.PTY.Read(p)
+	n, err := s.PTY.Read(p)
+	if n > 0 {
+		s.recordOutput(p[:n])
+	}
+	return n, err
+}
+
+// recordOutput is the single write-point for the activity tracker.  It is
+// intentionally cheap so it does not slow down the main PTY read loop.
+func (s *TerminalSession) recordOutput(chunk []byte) {
+	s.activityMu.Lock()
+	defer s.activityMu.Unlock()
+
+	s.lastOutputAt = time.Now()
+
+	// Append to the ring, dropping the oldest bytes once we exceed the cap.
+	// We always keep the most recent recentOutputCapacity bytes so callers
+	// can sniff for ANSI escape sequences (e.g. `\x1b[?2004h` for bracketed
+	// paste mode) without scanning the entire session history.
+	s.recentOutput = append(s.recentOutput, chunk...)
+	if len(s.recentOutput) > recentOutputCapacity {
+		s.recentOutput = s.recentOutput[len(s.recentOutput)-recentOutputCapacity:]
+	}
+}
+
+// LastOutputAt returns the timestamp of the most recent PTY output.  Zero
+// value means the PTY has not produced anything yet.
+func (s *TerminalSession) LastOutputAt() time.Time {
+	s.activityMu.RLock()
+	defer s.activityMu.RUnlock()
+	return s.lastOutputAt
+}
+
+// RecentOutput returns a copy of the last ~recentOutputCapacity bytes of
+// PTY output.  The copy is safe for the caller to scan without holding any
+// lock; the underlying ring buffer continues to mutate.
+func (s *TerminalSession) RecentOutput() []byte {
+	s.activityMu.RLock()
+	defer s.activityMu.RUnlock()
+	if len(s.recentOutput) == 0 {
+		return nil
+	}
+	out := make([]byte, len(s.recentOutput))
+	copy(out, s.recentOutput)
+	return out
 }
 
 // Write writes data to the PTY.

@@ -1443,16 +1443,39 @@ function App() {
       // even if the user switches tabs before the timeout fires.
       const hasMacroPayload = cmd.macro_payload && cmd.macro_payload.trim().length > 0;
       if (hasMacroPayload) {
-        // Default to 4500ms — copilot CLI typically takes 3–4s to render
-        // its first prompt after `copilot` is launched, so anything
-        // shorter occasionally truncates the payload's first line.
-        const macroDelayMs = (cmd.macro_delay !== undefined && cmd.macro_delay !== null)
+        // Server-side macro injection (v7.8.5+).  The backend owns the PTY
+        // and can wait for an *output-quiet* window before injecting, so
+        // the payload survives cold-start variance, npm-install noise, and
+        // WebSocket reconnects — all of which broke the old fixed-delay
+        // browser-side bracketed-paste path.  See cmd/forge/handlers_macro.go.
+        const macroMinDelayMs = (cmd.macro_delay !== undefined && cmd.macro_delay !== null)
           ? parseInt(cmd.macro_delay, 10)
-          : 4500;
-        const totalWaitMs = (parseInt(cmd.delay, 10) || 0) + macroDelayMs;
-        setTimeout(() => {
-          termRef.sendCommand(cmd.macro_payload, 15);
-        }, totalWaitMs);
+          : 1500;
+        const macroSessionId = activeTabId;
+        if (macroSessionId) {
+          fetch(`/api/terminal/${encodeURIComponent(macroSessionId)}/macro`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              payload: cmd.macro_payload,
+              minDelayMs: macroMinDelayMs,
+            }),
+          })
+            .then((res) => res.json().catch(() => ({})).then((body) => ({ ok: res.ok, body })))
+            .then(({ ok, body }) => {
+              if (!ok) {
+                console.warn('[Macro] backend rejected payload', body);
+              } else {
+                console.info('[Macro] delivered', body);
+              }
+            })
+            .catch((err) => {
+              console.warn('[Macro] fetch failed', err);
+            });
+        } else {
+          console.warn('[Macro] no active tab id — cannot send macro');
+        }
       }
     } else {
       // Focus terminal even if the command is empty
