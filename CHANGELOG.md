@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.7.3] - 2026-04-25
+
+---
+
+## [v7.7.3] - 2026-04-25
+
 ### Fixed
 - **Mouse clicks still injected escape sequences in *restored* tabs (carryover from v7.7.2).** The previous fix only reset xterm.js mouse-tracking modes inside the OSC 9;9 prompt-arrived handler, so it never ran on tabs reattached after an update — those tabs reattach to an existing PTY mid-session and may not see a fresh prompt for some time. `ForgeTerminal.jsx` now writes the same six disable sequences immediately after `term.open()`, before the WebSocket connects, guaranteeing a clean state on every mount regardless of restoration path.
 - **Command-card macro payloads silently corrupted multi-line workflow prompts to AI CLIs.** `sendCommand` previously sent the entire payload as a single send followed by a synthetic `\r`, with no special handling for embedded newlines. Receiving TUIs (Copilot CLI, Claude Code, etc.) interpreted each `\n` as Enter mid-payload, submitting partial prompts and dropping the rest. `sendCommand` now detects newlines and wraps multi-line payloads in xterm bracketed-paste markers (`\x1b[200~ ... \x1b[201~`) with normalized line endings, so the receiving TUI treats the entire payload as one paste event and only acts on it after the closing marker.
