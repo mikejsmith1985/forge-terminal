@@ -300,3 +300,25 @@
 .ccw-status-action {
   align-self: flex-start;
 }
+
+
+/* Inline QR shown alongside the Named Tunnel setup wizard on step 2 so
+   the user can scan even before the tunnel reports healthy. */
+.ccw-inline-qr {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border, #30363d);
+  border-radius: 8px;
+  background: var(--bg-secondary, #161b22);
+}
+.ccw-inline-qr-title {
+  margin: 0 0 6px 0;
+  font-size: 14px;
+  color: var(--text-primary, #e6edf3);
+}
+.ccw-inline-qr-help {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.4;
+}

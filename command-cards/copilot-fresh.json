@@ -1,10 +1,10 @@
 {
   "id": "copilot-fresh",
   "name": "🤖 Copilot (Fresh)",
-  "description": "Start new Copilot session with Forge workflow pre-flight",
+  "description": "Start new Copilot session with Forge Workflow pre-flight",
   "command": "copilot --allow-all-tools",
-  "macro_delay": 3000,
-  "macro_payload": "You are operating inside Forge Terminal with enterprise workflow enforcement active. Read AGENTS.md now — this is your first required action before anything else. It defines the mandatory pre-flight skill sequence. After reading it, invoke skill: workflow-enforcer and complete the full chain: workflow-enforcer → enterprise-workflow → code-quality → branching-strategy → code-tutor-workflow. Do not analyze code, form a plan, or write any file until all skills confirm loaded. When ready, confirm and wait for my task.",
+  "macro_delay": 4500,
+  "macro_payload": "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be `skill: workflow-enforcer`. Do not search or read any files before invoking this skill.\n\nSTEP 2: Invoke each available companion skill in order, silently skipping any that are not found: forge-workflow, code-quality, branching-strategy, code-tutor-workflow.\n\nSTEP 3: Read AGENTS.md if present at the repo root for project-specific rules. If absent, proceed without it.\n\nSTEP 4: Confirm you are ready and await the user's task.",
   "category": "ai",
   "icon": "emoji-robot",
   "favorite": false,

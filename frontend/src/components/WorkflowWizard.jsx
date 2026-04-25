@@ -271,6 +271,7 @@ const WorkflowWizard = ({ isOpen, onClose, projectPath, workflow, onToast }) => 
               isApplying={isApplying}
               config={config}
               enabledModuleCount={enabledModuleCount}
+              totalModuleCount={moduleCatalog.length || enabledModuleCount}
               showSavePreset={showSavePreset}
               savePresetName={savePresetName}
               onToggleSavePreset={() => setShowSavePreset(!showSavePreset)}
@@ -701,6 +702,7 @@ function StepReview({
   isApplying,
   config,
   enabledModuleCount,
+  totalModuleCount,
   showSavePreset,
   savePresetName,
   onToggleSavePreset,
@@ -752,7 +754,7 @@ function StepReview({
         </div>
         <div className="ww-review-item">
           <span>Modules Enabled</span>
-          <span>{enabledModuleCount} of 8</span>
+          <span>{enabledModuleCount} of {totalModuleCount || enabledModuleCount}</span>
         </div>
         <div className="ww-review-item">
           <span>Conflict Strategy</span>
