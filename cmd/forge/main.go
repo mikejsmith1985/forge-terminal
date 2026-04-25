@@ -327,6 +327,11 @@ func main() {
 		fileServer.ServeHTTP(wrapped, r)
 	})
 
+	// /api/ping must register BEFORE the catch-all "/" handler so the
+	// named-tunnel supervisor's probe (https://<hostname>/api/ping) reaches
+	// a real 200 instead of falling into the desktop-UI auth challenge.
+	registerPingHandler()
+
 	// Mobile-first redirect: a phone hitting the bare URL is redirected to
 	// the Companion PWA before any auth check happens.  Only the root /
 	// and /index.html paths trigger a redirect — assets and named routes
@@ -353,6 +358,11 @@ func main() {
 	// Create terminal handler with direct dependencies
 	termHandler = terminal.NewHandlerDirect(nil, visionParser, llmDetector)
 	http.HandleFunc("/ws", AuthMiddleware(LicenseMiddleware(termHandler.HandleWebSocket)))
+
+	// Server-side macro injection.  Must register AFTER termHandler is set
+	// because the handler closure dereferences it.  See handlers_macro.go
+	// for why this lives on the backend rather than in the browser.
+	registerMacroHandler()
 
 	// Commands API
 	http.HandleFunc("/api/commands", WrapWithMiddleware(handleCommands))
