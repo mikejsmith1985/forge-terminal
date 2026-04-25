@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Favicon reverted to anvil/hammer logo after every update.** The repo contained an anvil illustration as `favicon.ico`/`favicon.png` — the purple "F" icon that showed correctly was only ever cached by the browser from a prior session and was never committed. Replaced all six icon files (`favicon.ico`, `favicon.png`, `favicon-192.png`, `favicon-512.png`, `icon-192.png`, `icon-512.png`) with a purple (`#8b5cf6`) rounded-square containing a bold white **F**, matching the project accent colour. `favicon.ico` embeds 16 × 16, 32 × 32, and 48 × 48 PNG frames for sharp rendering on all platforms. Added `scripts/gen-favicons.js` (uses `sharp`) as the source-of-truth generation script.
+
 ## [7.7.0] - 2026-04-25
 
 ---
