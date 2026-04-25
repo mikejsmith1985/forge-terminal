@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.6.37] - 2026-04-25
+
+---
+
+## [v7.6.37] - 2026-04-25
+
 ### Fixed
 - **Named Tunnel wizard badge stuck on "Starting" forever even when cloudflared was fully connected** — the supervisor's HTTP probe targets `<hostname>/api/ping`, but `/api/ping` was never registered on the backend. The probe always got a 404, the supervisor never transitioned `Starting → Healthy`, and the wizard pill never updated. Added an unauthenticated `/api/ping` handler that returns `{"ok":true}` so the probe succeeds whenever the tunnel is genuinely reachable. The Named Tunnel card now also auto-polls `/api/tunnel/setup/status` every 5 s while the Ready view is open and the stage isn't yet `healthy`, so the badge transitions Live without the user having to click anything.
 - **"Another device controls this terminal" banner lingered ~45 s after a mobile tab was closed** — the WebSocket pong wait was 45 s, so a closed Safari tab on the phone kept the desktop's view in passive mode for that whole window. Tightened the keepalive to `pingPeriod=10s / pongWait=25s` (two pings in flight before timeout, so brief network hiccups still survive) which closes the stale-mobile window to ~25 s.
