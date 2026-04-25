@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Tab Controls "Save" did not retitle existing tabs.** Changing naming strategy / projects root folder and clicking Save only updated the preferences for *future* tabs and *future* `cd` events. Restored tabs whose shell never emitted OSC 9;9 (no shell integration installed, or simply the user hadn't `cd`'d since restart) kept their old, often-wrong titles forever — most visibly: a `forge-terminal` tab stuck on a stale name like `mikejsmith1985` that was never present in the actual cwd. Save now calls a new `retitleAllTabsFromCwd` action that re-derives every open tab's title from its persisted `currentDirectory` using the freshly-saved strategy. Static strategies (numbered/shell-type/custom-prefix) recompute from the tab's index + shell type instead. The action refuses to overwrite a real title with a generic `Terminal N` placeholder or a file-like name, so a tab whose `currentDirectory` is null still keeps whatever name it had.
 - **Number/letter keys silently dropped on tabs restored after an update.** Restored tabs all mounted in parallel and each ran `term.focus()` unconditionally. Because hidden tabs use `visibility:hidden` (not `display:none`), their `xterm-helper-textarea` elements remained focusable — so whichever hidden tab mounted last stole focus from the active tab, sending keystrokes into the wrong PTY. Most visibly: typing `1`/`2`/`3` to answer a Copilot CLI menu prompt would do nothing on the active tab. The two mount-time `term.focus()` calls in `ForgeTerminal.jsx` now check `isVisible` first; the existing `useLayoutEffect([isVisible])` already handles focus when a tab becomes visible, so visible-tab behaviour is unchanged.
+
 
 ## [7.6.32] - 2026-04-24
 
