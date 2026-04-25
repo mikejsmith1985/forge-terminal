@@ -7,14 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [7.8.3] - 2026-04-25
-
----
-
-## [v7.8.3] - 2026-04-25
+## [7.8.4] - 2026-04-25
 
 ### Fixed
-- **Named Tunnel wizard never recognized a configured tunnel** — `NamedConfig` had no JSON struct tags, so `/api/tunnel/setup/status` serialized `Hostname`/`TunnelUUID`/etc. with capital field names while the frontend read `config.hostname` (lowercase). Users with a fully working tunnel saw "Tunnel hostname is missing from config" and were stuck. Added `json:"hostname"` etc. tags. `LoadWizardState` now also rewrites legacy state.json files in place so existing installs heal automatically on first load.
+- **Forge Workflow Architect "Modules Enabled" badge said "11 of 8"** — the review step had `8` hardcoded as the total module count, but the live skill catalog ships 11 modules. The denominator now reflects `moduleCatalog.length` so the ratio is always honest.
+- **Macro payloads on Copilot command cards (Resume / Workflow Enforced / Fresh) frequently failed to inject** — three root causes addressed together:
+  - Default JSON templates stored newlines as the literal sequence `\n` (backslash-n) instead of real line breaks, so the bracketed-paste detector never fired and the entire payload arrived as one run-on string. Defaults now embed real newlines, and an automatic migration in `internal/commands/migration.go` heals legacy `commands.json` files on first load.
+  - The old default `macro_delay` of 1500ms fires before `copilot` finishes rendering its first prompt; the first character of the payload was being eaten. The default is now 4500ms for both fresh card creation (`storage.go`) and the App.jsx fallback. Existing workflow cards with delays under 4 seconds are bumped on migration.
+  - Default templates still referenced "enterprise workflow" wording and the legacy `enterprise-workflow` skill ID. Both are renamed to "Forge Workflow" / `forge-workflow` on disk and via migration.
+- **Phones hitting the bare Forge URL landed on the desktop terminal instead of the Companion PWA** — added a User-Agent–aware redirect in `cmd/forge/main.go` that bounces mobile / tablet browsers to `/companion/` *before* the desktop auth challenge runs. Desktop browsers, curl, and monitoring agents are unaffected (`isMobileUserAgent` only matches well-known UA tokens — `Mobi`, `Mobile`, `Android`, `iPhone`, `iPad`, `iPod`).
+- **Companion Connection Wizard QR code did not appear until step 4 of the Named Tunnel flow** — the QR is now shown on step 2 the moment a tunnel URL is known, even before the supervisor reports "healthy", so the user can scan and have the PWA waiting the moment the tunnel comes up.
+- **Companion Connection Wizard QR encoded a deep link the PWA cannot parse** — the wizard previously emitted `?host=…&token=…` (query string) while the PWA reads `#forge=…&token=…` (fragment). The wizard now reuses the canonical `buildDeepLink` helper from `utils/companionUrl.js`, so both the legacy CompanionAccessCard QR and the new wizard QR produce identical, working URLs.
+
+### Added
+- `command-cards/copilot-workflow-enforced.json` — the third Copilot card (Resume / Workflow Enforced / Fresh) is now part of the shipped defaults.
+- `cmd/forge/mobile_ua.go` and `mobile_ua_test.go` — the mobile-UA detection helper with table-driven coverage of Android phones, iPad, desktop Chrome / Firefox, and curl.
+- `internal/commands/migration_test.go` — covers literal-`\n` healing, "enterprise workflow" rename, macro_delay bump, and a happy-path "do not touch already-good cards" guard.
+
+### Known issues
+- A small percentage of restored tabs after a binary update can still freeze with garbled output. This is being tracked separately and was not reproducible from the changes in this release.
 
 ## [7.8.2] - 2026-04-25
 

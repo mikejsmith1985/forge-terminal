@@ -37,6 +37,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import NamedTunnelSetupCard from './NamedTunnelSetupCard'
+import { buildDeepLink as buildCompanionDeepLink } from '../utils/companionUrl'
 import './CompanionConnectionWizard.css'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -395,6 +396,29 @@ const NamedFlow = ({
             <Loader2 size={12} className="ccw-spin" /> Waiting for the
             tunnel to report "healthy" before you continue…
           </p>
+        )}
+        {/*
+          Show the QR code as soon as a tunnel URL is known — even before
+          the supervisor reports "healthy".  Phones can still scan and
+          have the PWA ready to connect the moment the tunnel comes up,
+          and the user explicitly asked for a QR on every step that has a
+          URL ("Step 2 should ALWAYS generate a QR code").
+        */}
+        {tunnelUrl && (
+          <div className="ccw-inline-qr">
+            <h4 className="ccw-inline-qr-title">Scan with your phone now</h4>
+            <p className="ccw-inline-qr-help">
+              Open your phone camera and point it at this code. The
+              companion app will be ready the moment the tunnel goes live.
+            </p>
+            <QrPanel
+              mobileToken={mobileToken}
+              companionHost={companionHost}
+              tunnelUrl={tunnelUrl}
+              hasCopiedLink={hasCopiedLink}
+              setHasCopiedLink={setHasCopiedLink}
+            />
+          </div>
         )}
       </StepShell>
     )
@@ -888,16 +912,8 @@ const QrPanel = ({
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * buildCompanionDeepLink — assemble the deep-link the QR code encodes.
- *
- * Format: `<companionHost>?host=<encodedTunnelUrl>&token=<mobileToken>`.
- * Returns an empty string when any input is missing so callers can render
- * a "waiting" state instead of a broken QR.
+ * buildCompanionDeepLink — re-exported from ../utils/companionUrl so the
+ * wizard and the legacy CompanionAccessCard QR both produce the IDENTICAL
+ * deep-link format the Companion PWA actually parses (`#forge=…&token=…`
+ * fragment — never a query string).
  */
-function buildCompanionDeepLink(companionHost, tunnelUrl, mobileToken) {
-  if (!companionHost || !tunnelUrl || !mobileToken) return ''
-  const base = companionHost.endsWith('/') ? companionHost : `${companionHost}/`
-  const encodedHost  = encodeURIComponent(tunnelUrl)
-  const encodedToken = encodeURIComponent(mobileToken)
-  return `${base}?host=${encodedHost}&token=${encodedToken}`
-}

@@ -302,9 +302,12 @@ func main() {
 		http.Handle("/companion/", http.StripPrefix("/companion", companionFileServer))
 	}
 
-	// Wrap file server with cache-control headers and explicit MIME types
+	// Wrap file server with cache-control headers and explicit MIME types.
+	// The outer mobile-aware redirect runs BEFORE auth so phones that hit
+	// the bare URL land on the public companion PWA without first being
+	// challenged for the desktop auth token.
 	fileServer := http.FileServer(http.FS(webFS))
-	http.HandleFunc("/", AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	rootHandler := AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		// Serve index.html with version-busted asset URLs
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			serveIndexWithVersion(w, r, webFS)
@@ -322,7 +325,20 @@ func main() {
 		wrapped.Header().Set("Pragma", "no-cache")
 		wrapped.Header().Set("Expires", "0")
 		fileServer.ServeHTTP(wrapped, r)
-	}))
+	})
+
+	// Mobile-first redirect: a phone hitting the bare URL is redirected to
+	// the Companion PWA before any auth check happens.  Only the root /
+	// and /index.html paths trigger a redirect — assets and named routes
+	// continue to fall through to the auth-protected desktop UI so existing
+	// behavior for desktop browsers is unaffected.
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if (r.URL.Path == "/" || r.URL.Path == "/index.html") && isMobileUserAgent(r.UserAgent()) {
+			http.Redirect(w, r, "/companion/", http.StatusFound)
+			return
+		}
+		rootHandler(w, r)
+	})
 
 	// WebSocket terminal handler
 

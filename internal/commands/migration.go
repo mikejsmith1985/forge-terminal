@@ -31,6 +31,49 @@ func MigrateCommands(commands []Command) ([]Command, bool) {
 			log.Printf("[Commands] Migration: Set default type 'chat' for command '%s'", cmd.Description)
 		}
 
+		// Macro payload migrations.
+		//
+		// Older command-card templates were stored with double-escaped
+		// newlines ("\\n") so the value loaded into commands.json was the
+		// literal two-character sequence "\n" instead of an actual line
+		// break.  When that payload reached the terminal, the bracketed-
+		// paste detector saw no real newlines and the AI CLI received a
+		// single run-on instruction — frequently truncated or ignored.
+		// Heal in place so existing installs benefit without manual edits.
+		if strings.Contains(updated.MacroPayload, "\\n") && !strings.Contains(updated.MacroPayload, "\n") {
+			updated.MacroPayload = strings.ReplaceAll(updated.MacroPayload, "\\n", "\n")
+			anyChanged = true
+			log.Printf("[Commands] Migration: Converted literal '\\n' sequences to real newlines in macro payload for '%s'", cmd.Description)
+		}
+
+		// Older defaults shipped with too-short macro_delay (1.5s) which
+		// fires before `copilot` finishes rendering its first prompt, so
+		// the first character of the payload is dropped.  Bump any
+		// non-pasteOnly card whose macro_delay is below 4 seconds and
+		// whose payload references the workflow pre-flight to a sane
+		// minimum.
+		if updated.MacroPayload != "" && updated.MacroDelay > 0 && updated.MacroDelay < 4000 &&
+			(strings.Contains(updated.MacroPayload, "workflow-enforcer") ||
+				strings.Contains(updated.MacroPayload, "Forge Workflow") ||
+				strings.Contains(updated.MacroPayload, "enterprise workflow")) {
+			updated.MacroDelay = 4500
+			anyChanged = true
+			log.Printf("[Commands] Migration: Raised macro_delay to 4500ms for workflow card '%s'", cmd.Description)
+		}
+
+		// Rename legacy "enterprise workflow" references to "Forge
+		// Workflow" so the payload matches the renamed skill suite.
+		if strings.Contains(updated.MacroPayload, "enterprise workflow") {
+			updated.MacroPayload = strings.ReplaceAll(updated.MacroPayload, "enterprise workflow", "Forge Workflow")
+			anyChanged = true
+			log.Printf("[Commands] Migration: Renamed 'enterprise workflow' → 'Forge Workflow' in macro payload for '%s'", cmd.Description)
+		}
+		if strings.Contains(updated.MacroPayload, "enterprise-workflow") {
+			updated.MacroPayload = strings.ReplaceAll(updated.MacroPayload, "enterprise-workflow", "forge-workflow")
+			anyChanged = true
+			log.Printf("[Commands] Migration: Renamed 'enterprise-workflow' → 'forge-workflow' skill reference for '%s'", cmd.Description)
+		}
+
 		migrated = append(migrated, updated)
 	}
 

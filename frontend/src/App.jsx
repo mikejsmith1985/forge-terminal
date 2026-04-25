@@ -1443,9 +1443,12 @@ function App() {
       // even if the user switches tabs before the timeout fires.
       const hasMacroPayload = cmd.macro_payload && cmd.macro_payload.trim().length > 0;
       if (hasMacroPayload) {
+        // Default to 4500ms — copilot CLI typically takes 3–4s to render
+        // its first prompt after `copilot` is launched, so anything
+        // shorter occasionally truncates the payload's first line.
         const macroDelayMs = (cmd.macro_delay !== undefined && cmd.macro_delay !== null)
           ? parseInt(cmd.macro_delay, 10)
-          : 1500;
+          : 4500;
         const totalWaitMs = (parseInt(cmd.delay, 10) || 0) + macroDelayMs;
         setTimeout(() => {
           termRef.sendCommand(cmd.macro_payload, 15);
