@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.8.6] - 2026-04-25
 
+---
+
+## [v7.8.6] - 2026-04-25
+
+## [7.8.6] - 2026-04-25
+
 ### Fixed
 - **Macro payload injected before CLI starts (Enter-key race)** — `handleExecute` fired the macro HTTP request at t=0 but `sendCommand` scheduled Enter after `cmd.delay` ms (up to 4500 ms on Workflow cards). The payload arrived at the server before the CLI was even launched. Fix: wrap the macro `fetch` in `setTimeout(…, cmd.delay + 200)` so the request is not sent until after Enter has been delivered to the PTY.
 - **Macro `waitForPTYQuiet` fires on stale output (false-quiet)** — the quiet-detection loop checked `now.Sub(lastOutputAt) >= 750 ms` without verifying the output occurred *after* the macro request. When the terminal was idle before the card click, the check passed immediately and the payload was injected into an empty shell. Fix: `waitForPTYQuiet` now accepts a `baseline time.Time` (set to `startedAt` before the floor sleep) and ignores output that predates it.
