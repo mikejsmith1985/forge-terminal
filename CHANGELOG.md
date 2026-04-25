@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.7.2] - 2026-04-25
+
+---
+
+## [v7.7.2] - 2026-04-25
+
 ### Fixed
 - **Named Cloudflare Tunnel and Connection Setup cards were separate from Forge Companion.** Both cards rendered as standalone sidebar entries below the Forge Companion card instead of inside it. The Cloudflare tunnel is a prerequisite for mobile access, so its setup wizard now lives directly inside the Forge Companion card as the "Cloudflare Tunnel" section. The Connection Setup card (mode switcher and live tunnel health) is accessible under Advanced settings within the same card. `CommandCards.jsx` no longer renders either card independently.
 - **Forge URL field showed localhost — QR code was unreachable from phone.** On mount, `CompanionAccessCard` now queries `/api/tunnel/options` and auto-populates the Forge URL and Companion PWA host from the active named tunnel URL when the stored value is still a localhost address (the factory default). This ensures the QR code encodes the real externally-reachable URL without the user having to paste it manually.
