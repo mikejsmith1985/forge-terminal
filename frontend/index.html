@@ -17,6 +17,36 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Mobile redirect — runs BEFORE the React bundle so phone users
+      // never see the desktop SPA flash on screen.
+      //
+      // The desktop UI is intentionally not responsive (the terminal,
+      // sidebar, and command cards all assume desktop-class width).
+      // When a phone-class device hits the bare Forge URL we forward
+      // them to /companion/, the purpose-built mobile PWA shipped in
+      // the same binary.  The companion's own setup screen handles
+      // the case where no token has been provisioned yet.
+      //
+      // Detection uses BOTH a coarse-pointer match (touch device) AND
+      // a width threshold so a narrow desktop browser window does not
+      // accidentally redirect.  ?desktop=1 forces the desktop SPA for
+      // debugging.
+      (function () {
+        try {
+          var here = new URL(window.location.href);
+          if (here.searchParams.get('desktop') === '1') return;
+          if (here.pathname.indexOf('/companion') === 0) return;
+          var isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+          var isNarrowViewport = window.innerWidth < 768;
+          if (isCoarsePointer && isNarrowViewport) {
+            window.location.replace('/companion/' + here.search + here.hash);
+          }
+        } catch (_redirectFailure) {
+          // Never block the desktop boot if the redirect logic throws.
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

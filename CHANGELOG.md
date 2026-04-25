@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Mobile redirect** — Phone-class viewports (coarse pointer + width < 768) hitting the bare Forge URL now auto-redirect to `/companion/` so users land on the mobile PWA instead of the unreadable desktop SPA. Append `?desktop=1` to override for debugging.
+
+### Changed
+- **Named Tunnel setup nested under Companion Access** — The Cloudflare named-tunnel wizard is now a sub-section of the Companion Access card (where it logically belongs as companion configuration) instead of three standalone copies in CommandCards.
+
 ## [7.6.37] - 2026-04-25
 
 ---

@@ -29,11 +29,8 @@ import {
   Settings,
 } from 'lucide-react'
 import './CompanionAccessCard.css'
-import {
-  getDefaultCompanionHost,
-  isStaleCompanionHost,
-  buildDeepLink,
-} from '../utils/companionUrl.js'
+import { buildDeepLink, getDefaultCompanionHost, isStaleCompanionHost } from '../utils/companionUrl.js'
+import NamedTunnelSetupCard from './NamedTunnelSetupCard'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -351,6 +348,16 @@ const EnabledView = ({
           <span className="cac-step-title">Scan with your phone — then tap Connect</span>
         </div>
         <QRBlock deepLink={deepLink} />
+      </div>
+
+      {/* ── Named Cloudflare Tunnel (nested config) ─────────────────────
+          The tunnel is the recommended way to expose Forge to a phone
+          outside the local network, so we surface its setup wizard
+          right inside the Companion card instead of as a peer card.
+          NamedTunnelSetupCard is self-contained — it owns its own
+          fetch/state and renders its own collapsible header. */}
+      <div className="cac-section cac-section-nested">
+        <NamedTunnelSetupCard />
       </div>
 
       {/* ── Actions ────────────────────────────────────────────────────── */}

@@ -79,6 +79,17 @@
 .cac-section { margin-bottom: 14px; }
 .cac-section:last-child { margin-bottom: 0; }
 
+/* Nested NamedTunnelSetupCard inside the companion card.  The nested
+   card brings its own border + padding, so we strip the outer cac-section
+   margin and let it breathe on its own.  The negative inline margin
+   pulls it flush with the companion card edges so the nested card looks
+   like a proper sub-section instead of an inset rectangle. */
+.cac-section-nested {
+  margin: 18px -4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .cac-label {
   display: block;
   font-size: 11px;
