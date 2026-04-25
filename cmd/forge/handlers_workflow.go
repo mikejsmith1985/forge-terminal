@@ -238,6 +238,10 @@ func handleWorkflowStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "query parameter 'path' is required", http.StatusBadRequest)
 		return
 	}
+	// Walk up to the actual project root so a CWD inside any subfolder
+	// (e.g. .../forge-terminal/frontend) returns the same status as the
+	// project root itself.
+	projectPath = resolveProjectRoot(projectPath)
 
 	status := workflow.WorkflowStatus{
 		Configured: false,
@@ -281,6 +285,8 @@ func handleWorkflowCompliance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "query parameter 'path' is required", http.StatusBadRequest)
 		return
 	}
+	// Resolve to project root so subfolders inherit the project's compliance.
+	projectPath = resolveProjectRoot(projectPath)
 
 	// Load the project's workflow config, or use defaults
 	config, err := readWorkflowConfig(projectPath)
@@ -317,6 +323,54 @@ func handleWorkflowModules(w http.ResponseWriter, r *http.Request) {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// resolveProjectRoot walks up from the given path until it finds a marker
+// that identifies a project root (.git directory, package.json, go.mod, or
+// pyproject.toml). If none is found, it returns the original path unchanged.
+//
+// Why this exists: the workflow API receives the active terminal's CWD as
+// its `path` parameter. When a user has cd'd into a subfolder of their
+// project (e.g. C:\ProjectsWin\forge-terminal\frontend), the workflow card
+// previously scanned the subfolder and missed the actual project's
+// configuration, .github/, and CHANGELOG. Resolving up to the nearest
+// marker gives every subfolder of a project the same workflow context.
+func resolveProjectRoot(startPath string) string {
+	if startPath == "" {
+		return startPath
+	}
+	absolutePath, err := filepath.Abs(startPath)
+	if err != nil {
+		return startPath
+	}
+	currentPath := absolutePath
+	// Walk up at most 20 levels — enough for any realistic checkout depth
+	// without risking an infinite loop on weird filesystem topologies.
+	for i := 0; i < 20; i++ {
+		if isProjectRootMarker(currentPath) {
+			return currentPath
+		}
+		parentPath := filepath.Dir(currentPath)
+		if parentPath == currentPath {
+			break // hit filesystem root
+		}
+		currentPath = parentPath
+	}
+	return startPath
+}
+
+// isProjectRootMarker reports whether the given directory contains any
+// marker file that identifies it as the root of a project.
+func isProjectRootMarker(dirPath string) bool {
+	if _, err := os.Stat(filepath.Join(dirPath, ".git")); err == nil {
+		return true
+	}
+	for _, markerFile := range []string{"package.json", "go.mod", "pyproject.toml", "Cargo.toml"} {
+		if _, err := os.Stat(filepath.Join(dirPath, markerFile)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // readWorkflowConfig reads and parses .forge/workflow.json from a project path.
 func readWorkflowConfig(projectPath string) (workflow.WorkflowConfig, error) {
 	configPath := filepath.Join(projectPath, ".forge", "workflow.json")
@@ -350,6 +404,9 @@ func handleReleasePreflight(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "query parameter 'path' is required", http.StatusBadRequest)
 		return
 	}
+	// Resolve to project root so a release scan triggered from any subfolder
+	// audits the same files the local-release script would.
+	projectPath = resolveProjectRoot(projectPath)
 
 	targetVersion := r.URL.Query().Get("version")
 

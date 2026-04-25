@@ -786,6 +786,33 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
         const executionDelay = (delay !== undefined && delay !== null) ? parseInt(delay, 10) : 15;
 
+        // Detect multi-line payloads (typical for command-card macro_payload
+        // values that inject a workflow prompt into an AI CLI). Without
+        // bracketed-paste mode, every embedded `\n` is interpreted by the
+        // receiving TUI as Enter — submitting partial prompts and corrupting
+        // the macro. Bracketed paste tells the TUI to treat the entire
+        // chunk as one paste event and only act on it after the closing
+        // marker arrives.
+        const hasNewlines = /\r|\n/.test(command);
+        if (hasNewlines) {
+          // Normalize line endings to '\r' (CR) so receiving TUIs that
+          // honor bracketed-paste see consistent line breaks. Some TUIs
+          // treat the LF half of CRLF as a literal newline character mid-
+          // paste; CR alone matches xterm's documented bracketed-paste
+          // behavior most reliably.
+          const normalized = command.replace(/\r\n/g, '\r').replace(/\n/g, '\r');
+          const bracketed = '\x1b[200~' + normalized + '\x1b[201~';
+          wsRef.current.send(bracketed);
+          // After the closing bracket, give the TUI time to ingest the
+          // paste event before sending the trailing Enter that submits it.
+          setTimeout(() => {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send('\r');
+            }
+          }, executionDelay);
+          return true;
+        }
+
         // For large inputs (>8KB), chunk to avoid WebSocket frame issues
         const CHUNK_SIZE = 8192;
         if (command.length > CHUNK_SIZE) {
@@ -1167,6 +1194,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.open(terminalRef.current);
     xtermRef.current = term;
     diagnosticCore.recordInitEvent('xterm_created', { tabId });
+
+    // Reset xterm.js mouse-tracking modes immediately on mount.
+    //
+    // Why this is needed at mount time (in addition to the OSC 9;9 handler):
+    // when a tab is "restored" from a prior session, xterm.js is freshly
+    // constructed but the underlying PTY may already have a TUI running
+    // (vim, htop, fzf, an AI CLI menu) that previously enabled mouse
+    // reporting. The first replayed bytes from the PTY can re-enable those
+    // modes before any new prompt fires — so the OSC 9;9 reset never gets
+    // a chance to run, and clicks immediately start injecting raw escape
+    // sequences like "\e[<0;44;37M" into the shell.
+    //
+    // Writing the disable sequences to term.write() updates xterm.js's
+    // internal mode state without sending anything to the PTY. They are
+    // no-ops when the modes are already off, so it is safe to run on
+    // every mount unconditionally.
+    term.write('\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1004l\x1b[?1006l\x1b[?1015l');
 
     // Track scroll position to show/hide the "scroll to bottom" button.
     //

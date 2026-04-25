@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Mouse clicks still injected escape sequences in *restored* tabs (carryover from v7.7.2).** The previous fix only reset xterm.js mouse-tracking modes inside the OSC 9;9 prompt-arrived handler, so it never ran on tabs reattached after an update — those tabs reattach to an existing PTY mid-session and may not see a fresh prompt for some time. `ForgeTerminal.jsx` now writes the same six disable sequences immediately after `term.open()`, before the WebSocket connects, guaranteeing a clean state on every mount regardless of restoration path.
+- **Command-card macro payloads silently corrupted multi-line workflow prompts to AI CLIs.** `sendCommand` previously sent the entire payload as a single send followed by a synthetic `\r`, with no special handling for embedded newlines. Receiving TUIs (Copilot CLI, Claude Code, etc.) interpreted each `\n` as Enter mid-payload, submitting partial prompts and dropping the rest. `sendCommand` now detects newlines and wraps multi-line payloads in xterm bracketed-paste markers (`\x1b[200~ ... \x1b[201~`) with normalized line endings, so the receiving TUI treats the entire payload as one paste event and only acts on it after the closing marker.
+- **Forge Workflow card (Enterprise Workflow card) detected wrong project root from subfolder terminals.** When the active terminal's CWD was a subfolder (e.g. `forge-terminal/frontend`), `/api/workflow/status`, `/api/workflow/compliance`, and `/api/workflow/preflight` all scanned the subfolder rather than the project root — so the card showed missing CHANGELOG, missing `.github/`, and false compliance failures. The handlers now walk up from the supplied path to the nearest project marker (`.git`, `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`) before scanning, so every subfolder of a project sees the same workflow state as the root.
+
 ## [7.7.2] - 2026-04-25
 
 ---
