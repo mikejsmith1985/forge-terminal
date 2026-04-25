@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.8.3] - 2026-04-25
+
+---
+
+## [v7.8.3] - 2026-04-25
+
 ### Fixed
 - **Named Tunnel wizard never recognized a configured tunnel** — `NamedConfig` had no JSON struct tags, so `/api/tunnel/setup/status` serialized `Hostname`/`TunnelUUID`/etc. with capital field names while the frontend read `config.hostname` (lowercase). Users with a fully working tunnel saw "Tunnel hostname is missing from config" and were stuck. Added `json:"hostname"` etc. tags. `LoadWizardState` now also rewrites legacy state.json files in place so existing installs heal automatically on first load.
 
