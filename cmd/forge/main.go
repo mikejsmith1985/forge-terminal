@@ -410,7 +410,20 @@ func main() {
 	// Version and system info API
 	http.HandleFunc("/api/version", WrapWithMiddleware(handleVersion))
 	http.HandleFunc("/api/git/version", WrapWithMiddleware(handleGitVersion))
-	http.HandleFunc("/api/system-info", WrapWithMiddleware(handleSystemInfo))  // NEW: Process safeguard info
+	http.HandleFunc("/api/system-info", WrapWithMiddleware(handleSystemInfo)) // NEW: Process safeguard info
+
+	// /api/ping — unauthenticated liveness probe used by the Named Tunnel
+	// supervisor's ProbeHTTP.  Without this endpoint the probe gets a 404,
+	// the supervisor never transitions Starting → Healthy, and the wizard
+	// badge stays stuck on "Starting" forever even when cloudflared is
+	// fully connected.  Returns 200 with a tiny JSON body so the response
+	// is small and parseable.
+	http.HandleFunc("/api/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	})
 	http.HandleFunc("/api/update/check", WrapWithMiddleware(handleUpdateCheck))
 	http.HandleFunc("/api/update/apply", WrapWithMiddleware(handleUpdateApply))
 	http.HandleFunc("/api/update/versions", WrapWithMiddleware(handleListVersions))

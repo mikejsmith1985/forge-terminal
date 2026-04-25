@@ -77,6 +77,29 @@ const NamedTunnelSetupCard = () => {
     refreshStatus()
   }, [refreshStatus])
 
+  // Health auto-refresh: while the wizard is on the Ready view and
+  // the supervisor stage is not yet "healthy", poll /status every 5 s
+  // so the badge transitions Starting → Live without the user having
+  // to click anything.  Stops once Healthy is reached or the card is
+  // collapsed, so a steady-state Live tunnel costs zero polls.
+  useEffect(() => {
+    const stage = status?.health?.stage || ''
+    const isReady = status?.state === 'ready'
+    const needsPolling = isReady && isExpanded && stage !== 'healthy'
+    if (!needsPolling) return undefined
+
+    const HEALTH_POLL_MS = 5000
+    const id = setInterval(() => {
+      // Background refresh — don't toggle the loading spinner so the
+      // pill updates silently.
+      fetch('/api/tunnel/setup/status')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((body) => { if (body) setStatus(body) })
+        .catch(() => { /* transient errors retry next tick */ })
+    }, HEALTH_POLL_MS)
+    return () => clearInterval(id)
+  }, [status?.health?.stage, status?.state, isExpanded])
+
   // ── Login polling (only while the session is running) ────────────
 
   useEffect(() => {

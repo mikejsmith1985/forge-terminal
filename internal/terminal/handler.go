@@ -927,8 +927,14 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Configure ping/pong to prevent idle disconnects
 	// Browsers and proxies often close idle WebSockets after 60-120 seconds
 	const (
-		pingPeriod = 15 * time.Second  // Send ping every 15 seconds (was 30s — too slow for some proxies)
-		pongWait   = 45 * time.Second  // Wait up to 45 seconds for pong response
+		// Tightened from 30s/60s → 10s/25s so a closed mobile tab is
+		// detected within ~25 seconds instead of ~45.  This keeps the
+		// "Another device controls this terminal" banner from lingering
+		// on the desktop view long after the user closed Safari on their
+		// phone.  Two pings are in flight before timeout, so brief
+		// network hiccups still survive.
+		pingPeriod = 10 * time.Second
+		pongWait   = 25 * time.Second
 	)
 	
 	// Set up pong handler - client must respond to our pings

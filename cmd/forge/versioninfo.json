@@ -37,5 +37,6 @@
       "LangID": "0409",
       "CharsetID": "04B0"
     }
-  }
+  },
+  "IconPath": "forge.ico"
 }

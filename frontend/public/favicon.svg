@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Forge Terminal">
+  <!--
+    Forge Terminal brand mark.
+    Composition: rounded-square indigo gradient tile, a bold geometric "F"
+    cut from white, and a small flame accent above the upper bar.  The
+    silhouette stays legible at 16×16 because the F has thick uniform
+    strokes and the flame is sized to read as a single bright pixel at
+    the smallest target.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#4338CA"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#F97316"/>
+      <stop offset="60%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#FEF3C7"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+  <!-- Bold F: vertical stem + top bar + middle bar -->
+  <g fill="#FFFFFF">
+    <rect x="148" y="120" width="64" height="288" rx="8"/>
+    <rect x="148" y="120" width="216" height="64" rx="8"/>
+    <rect x="148" y="232" width="168" height="60" rx="8"/>
+  </g>
+  <!-- Flame accent above the F's top-right corner -->
+  <path d="M364 96 C 388 76, 400 56, 392 28 C 420 44, 436 72, 428 100 C 444 92, 456 80, 460 64 C 472 96, 460 132, 432 148 C 408 162, 380 156, 364 132 C 356 120, 356 108, 364 96 Z"
+        fill="url(#flame)"/>
+</svg>
