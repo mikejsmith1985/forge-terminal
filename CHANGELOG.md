@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.8.4] - 2026-04-25
 
+---
+
+## [v7.8.4] - 2026-04-25
+
+## [7.8.4] - 2026-04-25
+
 ### Fixed
 - **Forge Workflow Architect "Modules Enabled" badge said "11 of 8"** — the review step had `8` hardcoded as the total module count, but the live skill catalog ships 11 modules. The denominator now reflects `moduleCatalog.length` so the ratio is always honest.
 - **Macro payloads on Copilot command cards (Resume / Workflow Enforced / Fresh) frequently failed to inject** — three root causes addressed together:
