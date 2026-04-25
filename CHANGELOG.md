@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Number/letter keys silently dropped on tabs restored after an update.** Restored tabs all mounted in parallel and each ran `term.focus()` unconditionally. Because hidden tabs use `visibility:hidden` (not `display:none`), their `xterm-helper-textarea` elements remained focusable — so whichever hidden tab mounted last stole focus from the active tab, sending keystrokes into the wrong PTY. Most visibly: typing `1`/`2`/`3` to answer a Copilot CLI menu prompt would do nothing on the active tab. The two mount-time `term.focus()` calls in `ForgeTerminal.jsx` now check `isVisible` first; the existing `useLayoutEffect([isVisible])` already handles focus when a tab becomes visible, so visible-tab behaviour is unchanged.
+
 ## [7.6.32] - 2026-04-24
 
 ---
