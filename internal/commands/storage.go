@@ -149,26 +149,27 @@ var DefaultCommands = []Command{
 	{
 		ID:           7,
 		Description:  "🔄 Resume",
-		Command:      "claude --resume",
+		Command:      "claude --continue",
 		PasteOnly:    false,
 		Favorite:     false,
 		Icon:         "emoji-repeat",
 		MacroPayload: CopilotWorkflowMacro,
 		MacroDelay:   4500,
 		ToolVariants: map[string]string{
-			"claude":  "claude --resume",
+			// claude --continue resumes the last session non-interactively so
+			// the enforcement macro fires after 4500 ms once claude is ready.
+			// claude --resume shows an interactive picker and the macro would
+			// arrive before the user has selected a session — use --continue
+			// here and let users type "claude --resume" manually to pick.
+			"claude":  "claude --continue",
 			"copilot": "copilot --allow-all-tools --continue",
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🔄 Claude (Resume)",
 			"copilot": "🔄 Copilot (Resume)",
 		},
-		// claude --resume opens an interactive session picker before Claude Code
-		// starts, so a non-empty macro fires into the picker as search text rather
-		// than into the running session.  Leave the claude variant empty; the
-		// copilot variant uses --continue which is non-interactive and safe to macro.
 		MacroVariants: map[string]string{
-			"claude":  "",
+			"claude":  ClaudeAwarenessMacro,
 			"copilot": CopilotWorkflowMacro,
 		},
 	},

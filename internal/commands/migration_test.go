@@ -124,17 +124,15 @@ func TestMigrateToolVariants_AddsDescriptionVariantsToID6(t *testing.T) {
 }
 
 // TestMigrateToolVariants_AddsMacroVariantsToID7 confirms that a legacy
-// Resume card (ID 7) gets MacroVariants with an EMPTY claude entry and a
-// populated copilot entry.  The claude macro must be empty because
-// "claude --resume" opens an interactive session picker — injecting the
-// macro payload during the picker stage causes it to act as a search
-// filter rather than reaching the running Claude session.
+// Resume card (ID 7) gets toolVariants set to "claude --continue" (not
+// "claude --resume") and a populated claude macro variant.
+// "claude --continue" is non-interactive and resumes the last session
+// automatically, so the enforcement macro fires correctly after macro_delay ms.
 func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
 	original := []Command{{
 		ID:           7,
 		Description:  "🔄 Copilot (Resume)",
 		Command:      "copilot --allow-all-tools --continue",
-		ToolVariants: map[string]string{"claude": "claude --resume", "copilot": "copilot --allow-all-tools --continue"},
 		MacroPayload: "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: skill: workflow-enforcer.",
 	}}
 
@@ -142,11 +140,13 @@ func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
 	if !changed {
 		t.Fatal("expected migrateToolVariants to report a change for missing MacroVariants")
 	}
+	tv := migrated[0].ToolVariants
+	if tv["claude"] != "claude --continue" {
+		t.Errorf("ID 7 claude tool variant must be 'claude --continue'; got %q", tv["claude"])
+	}
 	mv := migrated[0].MacroVariants
-	// claude --resume is interactive; macro must be empty so it does not land
-	// inside the session picker as search text.
-	if mv["claude"] != "" {
-		t.Errorf("claude macro variant for ID 7 must be empty (resume picker fix); got %q", mv["claude"])
+	if !strings.Contains(mv["claude"], "SYSTEM INJECTION") {
+		t.Errorf("claude macro variant should contain 'SYSTEM INJECTION'; got %q", mv["claude"])
 	}
 	if !strings.Contains(mv["copilot"], "workflow") {
 		t.Errorf("copilot macro variant should contain 'workflow'; got %q", mv["copilot"])

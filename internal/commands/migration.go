@@ -144,9 +144,9 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 		case 7:
 			if len(cmd.ToolVariants) == 0 {
 				commands[i].Description = "🔄 Resume"
-				commands[i].Command = "claude --resume"
+				commands[i].Command = "claude --continue"
 				commands[i].ToolVariants = map[string]string{
-					"claude":  "claude --resume",
+					"claude":  "claude --continue",
 					"copilot": "copilot --allow-all-tools --continue",
 				}
 				changed = true
@@ -166,21 +166,30 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 					copilotMacro = CopilotWorkflowMacro
 				}
 				commands[i].MacroVariants = map[string]string{
-					"claude":  "",
+					"claude":  ClaudeAwarenessMacro,
 					"copilot": copilotMacro,
 				}
 				changed = true
-				log.Printf("[Commands] Migration: Added MacroVariants to ID 7 (claude macro intentionally empty)")
+				log.Printf("[Commands] Migration: Added MacroVariants to ID 7")
 			}
-			// Clear the claude macro on ID 7 for installs that previously set it
-			// to ClaudeAwarenessMacro.  That macro fires after macro_delay ms, which
-			// elapses while the --resume session picker is still showing — so the
-			// injection text lands in the picker as a search filter instead of in
-			// the running Claude session, leaving the user stuck on a single result.
-			if claudeMacro, hasClaude := commands[i].MacroVariants["claude"]; hasClaude && claudeMacro != "" {
-				commands[i].MacroVariants["claude"] = ""
+			// Upgrade the claude toolVariant from "claude --resume" (interactive
+			// picker) to "claude --continue" (non-interactive, resumes last session).
+			// This lets the enforcement macro fire correctly after macro_delay ms.
+			// Users who want to pick a specific session can type "claude --resume"
+			// manually; the card now covers the common case of continuing the
+			// last session with enforcement active.
+			if tv, hasClaude := commands[i].ToolVariants["claude"]; hasClaude && tv == "claude --resume" {
+				commands[i].ToolVariants["claude"] = "claude --continue"
+				commands[i].Command = "claude --continue"
 				changed = true
-				log.Printf("[Commands] Migration: Cleared claude macro for ID 7 (resume picker fix)")
+				log.Printf("[Commands] Migration: Changed ID 7 claude variant from --resume to --continue (enforcement macro fix)")
+			}
+			// Restore the claude macro if it was previously cleared (an earlier
+			// intermediate migration emptied it as a workaround).
+			if claudeMacro, hasClaude := commands[i].MacroVariants["claude"]; hasClaude && claudeMacro == "" {
+				commands[i].MacroVariants["claude"] = ClaudeAwarenessMacro
+				changed = true
+				log.Printf("[Commands] Migration: Restored claude macro for ID 7 (--continue is non-interactive)")
 			}
 
 		case 8:
