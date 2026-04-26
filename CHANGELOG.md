@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.1] - 2026-04-27
+
+### Fixed
+- **Runner cards now dynamically update when "Run with Claude" or "Run with Copilot" is selected** — Cards for IDs 6 (Fresh), 7 (Resume), and 8 (Enforced) now carry `descriptionVariants` and `macroVariants` in addition to `toolVariants`. Selecting Claude shows "🤖 Claude (Fresh)", "🔄 Claude (Resume)", "🛡 Claude (Enforced)" with Claude-specific SYSTEM INJECTION macros; selecting Copilot shows the Copilot variants with the workflow-enforcer skill invocation. Existing installs are upgraded automatically via `AutoMigrateOnLoad`.
+- **ID 8 (Enforced) upgrade gap fixed** — `migrateToolVariants` previously set `hasID8 = true` without actually upgrading an existing ID 8 card that lacked `toolVariants`. All three workflow cards now receive the full variant upgrade regardless of whether they were pre-existing or freshly injected.
+- **MCP tab card ordering** — `MCP Discovery` card now appears first in the MCP tab (was: Adaptive Build Environments first). MCP Discovery is the most critical entry point for new MCP server setup.
+- **Forge Companion QR deep link uses Tailscale URL as companion base for Named Cloudflare Tunnel** — When the Named Cloudflare Tunnel method is active and Tailscale is connected, the QR code and "Copy link instead" button now generate `<tailscale-url>/companion/#forge=<named-tunnel-url>&token=…` instead of using the cloudflare URL for both the base and the `forge=` parameter. Falls back to the `companionHost` prop when Tailscale is absent.
+- **`forgeUrl` is now normalised in `buildDeepLink`** — Protocol-less forge URLs are prepended with `http://` before being embedded in the QR fragment, preventing the Companion PWA from receiving an unparseable URL on devices that enforce strict URL validation.
+
 ## [7.10.0] - 2026-04-26
 
 ---

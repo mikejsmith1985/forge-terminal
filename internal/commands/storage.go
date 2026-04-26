@@ -34,6 +34,16 @@ type Command struct {
 	// map to resolve the effective command based on the user's active CLI tool
 	// selection, making a single card work for multiple AI coding tools.
 	ToolVariants map[string]string `json:"toolVariants,omitempty"`
+	// DescriptionVariants maps CLI tool names to the card label shown in the
+	// sidebar (e.g. "🤖 Claude (Fresh)" vs "🤖 Copilot (Fresh)"). When present
+	// the frontend swaps the visible description based on the active tool so
+	// the card always clearly names which AI is about to run.
+	DescriptionVariants map[string]string `json:"descriptionVariants,omitempty"`
+	// MacroVariants maps CLI tool names to the macro payload injected after the
+	// command starts. Claude and Copilot expect different system-injection
+	// formats (Claude uses comment-style SYSTEM INJECTION blocks; Copilot uses
+	// \skill: invocation syntax), so each tool can carry its own macro text.
+	MacroVariants map[string]string `json:"macroVariants,omitempty"`
 }
 
 // CommandVersion represents a versioned snapshot of a command
@@ -48,6 +58,21 @@ type CardHistory struct {
 	CardID   int              `json:"card_id"`
 	Versions []CommandVersion `json:"versions"` // Newest first
 }
+
+// Macro payloads shared across DefaultCommands and migrateToolVariants.
+// Defined here so both the initial install and the upgrade path inject
+// identical text — no risk of the two drifting apart.
+var (
+	// ClaudeAwarenessMacro is injected after a fresh or resume Claude session.
+	ClaudeAwarenessMacro = "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md"
+
+	// ClaudeEnforcedMacro is injected after an enforced Claude session.
+	ClaudeEnforcedMacro = "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change."
+
+	// CopilotWorkflowMacro is injected after any Copilot session to activate
+	// the Forge Workflow skill suite.
+	CopilotWorkflowMacro = "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be \\skill: workflow-enforcer\\. Do not search for or read any files before invoking this skill. If the skill is unavailable in this environment, proceed to Step 2.\n\nSTEP 2: Invoke each available companion skill in order, silently skip any that are not found: forge-workflow, code-quality, branching-strategy, code-tutor-workflow.\n\nSTEP 3: Check whether AGENTS.md exists at the repo root. If found, read it for project-specific rules. If not found, this is normal for first-time setup — proceed without it. Never ask the user where AGENTS.md is or whether to create it.\n\nSTEP 4: Confirm you are ready and await the user’s task."
+)
 
 // Default commands created on first run
 var DefaultCommands = []Command{
@@ -100,45 +125,69 @@ var DefaultCommands = []Command{
 		Icon:        "emoji-eyes",
 	},
 	{
-		ID:          6,
-		Description: "🚀 Fresh Session",
-		Command:     "claude",
-		PasteOnly:   false,
-		Favorite:    false,
-		Icon:        "emoji-robot",
-		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
-		MacroDelay:  4500,
+		ID:           6,
+		Description:  "🚀 Fresh Session",
+		Command:      "claude",
+		PasteOnly:    false,
+		Favorite:     false,
+		Icon:         "emoji-robot",
+		MacroPayload: CopilotWorkflowMacro,
+		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude",
 			"copilot": "copilot --allow-all-tools",
 		},
+		DescriptionVariants: map[string]string{
+			"claude":  "🤖 Claude (Fresh)",
+			"copilot": "🤖 Copilot (Fresh)",
+		},
+		MacroVariants: map[string]string{
+			"claude":  ClaudeAwarenessMacro,
+			"copilot": CopilotWorkflowMacro,
+		},
 	},
 	{
-		ID:          7,
-		Description: "🔄 Resume",
-		Command:     "claude --resume",
-		PasteOnly:   false,
-		Favorite:    false,
-		Icon:        "emoji-repeat",
-		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
-		MacroDelay:  4500,
+		ID:           7,
+		Description:  "🔄 Resume",
+		Command:      "claude --resume",
+		PasteOnly:    false,
+		Favorite:     false,
+		Icon:         "emoji-repeat",
+		MacroPayload: CopilotWorkflowMacro,
+		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude --resume",
 			"copilot": "copilot --allow-all-tools --continue",
 		},
+		DescriptionVariants: map[string]string{
+			"claude":  "🔄 Claude (Resume)",
+			"copilot": "🔄 Copilot (Resume)",
+		},
+		MacroVariants: map[string]string{
+			"claude":  ClaudeAwarenessMacro,
+			"copilot": CopilotWorkflowMacro,
+		},
 	},
 	{
-		ID:          8,
-		Description: "🛡 Enforced",
-		Command:     "claude",
-		PasteOnly:   false,
-		Favorite:    false,
-		Icon:        "emoji-shield",
-		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change.",
-		MacroDelay:  4500,
+		ID:           8,
+		Description:  "🛡 Enforced",
+		Command:      "claude",
+		PasteOnly:    false,
+		Favorite:     false,
+		Icon:         "emoji-shield",
+		MacroPayload: CopilotWorkflowMacro,
+		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude",
 			"copilot": "copilot --allow-all-tools",
+		},
+		DescriptionVariants: map[string]string{
+			"claude":  "🛡 Claude (Enforced)",
+			"copilot": "🛡 Copilot (Enforced)",
+		},
+		MacroVariants: map[string]string{
+			"claude":  ClaudeEnforcedMacro,
+			"copilot": CopilotWorkflowMacro,
 		},
 	},
 }
