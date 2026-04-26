@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Claude Code workflow skills** — Five custom slash commands added to `.claude/commands/` that give Claude Code the same workflow enforcement previously available only to GitHub Copilot via the `\skill:` invocation syntax. Skills: `workflow-enforcer` (circuit breaker gatekeeper), `forge-workflow` (5-phase execution plan), `code-quality` (naming and comment standards), `branching-strategy` (branch-before-code enforcement), `code-tutor-workflow` (walkthrough mode). Each skill is a self-contained Markdown file that Claude Code reads and executes as binding instructions when invoked via `/skill-name` or the `Skill()` tool call.
 
+### Fixed
+- **CLI tool toggle now actually works** — `AutoMigrateOnLoad` was defined but never called at server startup, so `toolVariants`, `descriptionVariants`, and `macroVariants` were never written to `commands.json`. As a result `isToolAware` was always `false` in the frontend and the "Run with Claude / Copilot" selector was silently ignored — every runner card (IDs 6/7/8) executed its hardcoded `copilot --allow-all-tools` command regardless of selection. The call is now wired into `main()` immediately after the storage migration block, running synchronously before any HTTP handler accepts requests.
+
 ## [7.10.1] - 2026-04-27
 
 ### Fixed
