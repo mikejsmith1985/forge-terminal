@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Claude Code workflow skills** — Five custom slash commands added to `.claude/commands/` that give Claude Code the same workflow enforcement previously available only to GitHub Copilot via the `\skill:` invocation syntax. Skills: `workflow-enforcer` (circuit breaker gatekeeper), `forge-workflow` (5-phase execution plan), `code-quality` (naming and comment standards), `branching-strategy` (branch-before-code enforcement), `code-tutor-workflow` (walkthrough mode). Each skill is a self-contained Markdown file that Claude Code reads and executes as binding instructions when invoked via `/skill-name` or the `Skill()` tool call.
+
 ## [7.10.1] - 2026-04-27
 
 ### Fixed
