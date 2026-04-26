@@ -422,9 +422,21 @@ const NamedFlow = ({
               <>Waiting for the tunnel to report &ldquo;healthy&rdquo; before you continue&hellip;</>
             )}
             {tunnelDetail && (
-              <span style={{ display: 'block', marginTop: 4, opacity: 0.7, fontSize: '0.85em', whiteSpace: 'pre-wrap' }}>
+              <code style={{
+                display: 'block', marginTop: 6,
+                padding: '6px 8px',
+                background: 'rgba(0,0,0,0.35)',
+                borderRadius: 4,
+                fontSize: '0.78em',
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: 96,
+                overflowY: 'auto',
+                opacity: 0.85,
+              }}>
                 {tunnelDetail}
-              </span>
+              </code>
             )}
           </p>
         )}

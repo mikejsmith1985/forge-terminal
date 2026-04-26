@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Named tunnel crashes on cloudflared v2025.8+ due to wrong argument order** — `--config` and `--no-autoupdate` are `tunnel`-level flags in cloudflared v2025.8's `urfave/cli` strict subcommand scoping; they must appear between `tunnel` and `run`, not after it. The supervisor had `cloudflared tunnel run --config … --no-autoupdate` which caused cloudflared to immediately print its full help text and exit, triggering the storm guard in ~40 seconds. Fixed to `cloudflared tunnel --no-autoupdate --config … run <uuid>`. Validated live against the real binary before committing.
+- **Crash output buffer captured useless help text instead of the error line** — ring buffer kept only the *last* 10 lines; for startup crashes (help text printed then exit) this captured the bottom of the help page. Changed to keep the *first* 3 + *last* 5 non-empty lines so the actual error (always first) is always captured. Buffer resets at the start of each restart attempt.
+- **Crash detail text overflowed the sidebar** — raw `pre-wrap` text with 50+ lines was unconstrained. Detail block is now a scrollable monospace `<code>` element with `max-height: 96px` and `overflow-y: auto`.
+
 ## [7.9.2] - 2026-04-26
 
 ---

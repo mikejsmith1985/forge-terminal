@@ -78,30 +78,71 @@ type Supervisor struct {
 	stopOnce      sync.Once     // guards Stop()
 	doneCh        chan struct{} // closed when the supervisor goroutine exits
 	cancel        context.CancelFunc
-	lastLinesMu   sync.Mutex
-	lastLines     []string // ring buffer: last 10 lines of cloudflared stdout/stderr
+	lastLinesMu sync.Mutex
+	firstLines  []string // first 3 non-empty output lines — captures startup errors
+	lastLines   []string // last 5 non-empty output lines — captures crash context
 }
 
-// recordLine appends a cloudflared output line to the ring buffer.
-// Called from the drain goroutine in runOnce; safe for concurrent use.
+// recordLine stores an output line from cloudflared.
+// Keeps the first 3 lines (startup error messages) and a sliding window of
+// the last 5 lines (crash context). Called from the drain goroutine in runOnce.
 func (s *Supervisor) recordLine(line string) {
+	if line == "" {
+		return // skip blank lines — cloudflared emits many; they add noise
+	}
 	s.lastLinesMu.Lock()
 	defer s.lastLinesMu.Unlock()
+	if len(s.firstLines) < 3 {
+		s.firstLines = append(s.firstLines, line)
+	}
 	s.lastLines = append(s.lastLines, line)
-	if len(s.lastLines) > 10 {
+	if len(s.lastLines) > 5 {
 		s.lastLines = s.lastLines[1:]
 	}
 }
 
-// crashOutput returns the buffered cloudflared output as a single string,
-// or "" if nothing was captured yet. Used to enrich storm-guard error messages.
+// crashOutput builds a concise summary from buffered cloudflared output.
+// Combines first-lines (startup error) and last-lines (crash context),
+// deduplicating when they overlap. Returns "" if nothing was captured.
 func (s *Supervisor) crashOutput() string {
 	s.lastLinesMu.Lock()
 	defer s.lastLinesMu.Unlock()
-	if len(s.lastLines) == 0 {
+	if len(s.firstLines) == 0 && len(s.lastLines) == 0 {
 		return ""
 	}
-	return strings.Join(s.lastLines, "\n")
+	// Build a deduplicated ordered slice: firstLines + any lastLines not already present.
+	seen := make(map[string]bool, len(s.firstLines)+len(s.lastLines))
+	var out []string
+	for _, l := range s.firstLines {
+		if !seen[l] {
+			seen[l] = true
+			out = append(out, l)
+		}
+	}
+	if len(s.lastLines) > 0 {
+		// Only append last-lines that aren't already in first-lines.
+		var tail []string
+		for _, l := range s.lastLines {
+			if !seen[l] {
+				seen[l] = true
+				tail = append(tail, l)
+			}
+		}
+		if len(tail) > 0 {
+			out = append(out, "…")
+			out = append(out, tail...)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// resetCrashOutput clears the buffered output between supervisor restarts
+// so stale lines from the previous run don't pollute the next crash report.
+func (s *Supervisor) resetCrashOutput() {
+	s.lastLinesMu.Lock()
+	defer s.lastLinesMu.Unlock()
+	s.firstLines = s.firstLines[:0]
+	s.lastLines = s.lastLines[:0]
 }
 
 // supervisorTiming collects the time-based knobs in one struct so tests
@@ -261,16 +302,19 @@ func (s *Supervisor) run(ctx context.Context, timing supervisorTiming) {
 // the probe-failure threshold is hit. The returned error is the root
 // cause the caller uses to classify the retry decision.
 func (s *Supervisor) runOnce(ctx context.Context, timing supervisorTiming) error {
+	s.resetCrashOutput()
 	childCtx, childCancel := context.WithCancel(ctx)
 	defer childCancel()
 
-	// --no-autoupdate: Forge manages the binary; we don't want cloudflared
-	// silently replacing itself.
-	// --config:       point at our managed config, not the user's ~/.cloudflared
+	// --no-autoupdate and --config are tunnel-level flags in cloudflared
+	// v2025.8+ and must appear between "tunnel" and "run". Placing them
+	// after "run" causes urfave/cli to reject them as unknown flags and
+	// print the full help text instead of starting the tunnel.
 	cmd := exec.CommandContext(childCtx, s.bin,
-		"tunnel", "run",
+		"tunnel",
 		"--no-autoupdate",
 		"--config", s.cfg.ConfigPath,
+		"run",
 		s.cfg.TunnelUUID,
 	)
 	hideWindow(cmd)
