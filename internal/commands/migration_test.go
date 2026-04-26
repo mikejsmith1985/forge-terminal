@@ -124,9 +124,11 @@ func TestMigrateToolVariants_AddsDescriptionVariantsToID6(t *testing.T) {
 }
 
 // TestMigrateToolVariants_AddsMacroVariantsToID7 confirms that a legacy
-// Resume card (ID 7) gets both a claude and copilot macro variant injected,
-// with the claude variant containing "SYSTEM INJECTION" and the copilot
-// variant retaining workflow-enforcer skill invocation language.
+// Resume card (ID 7) gets MacroVariants with an EMPTY claude entry and a
+// populated copilot entry.  The claude macro must be empty because
+// "claude --resume" opens an interactive session picker — injecting the
+// macro payload during the picker stage causes it to act as a search
+// filter rather than reaching the running Claude session.
 func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
 	original := []Command{{
 		ID:           7,
@@ -141,8 +143,10 @@ func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
 		t.Fatal("expected migrateToolVariants to report a change for missing MacroVariants")
 	}
 	mv := migrated[0].MacroVariants
-	if !strings.Contains(mv["claude"], "SYSTEM INJECTION") {
-		t.Errorf("claude macro variant should contain 'SYSTEM INJECTION'; got %q", mv["claude"])
+	// claude --resume is interactive; macro must be empty so it does not land
+	// inside the session picker as search text.
+	if mv["claude"] != "" {
+		t.Errorf("claude macro variant for ID 7 must be empty (resume picker fix); got %q", mv["claude"])
 	}
 	if !strings.Contains(mv["copilot"], "workflow") {
 		t.Errorf("copilot macro variant should contain 'workflow'; got %q", mv["copilot"])

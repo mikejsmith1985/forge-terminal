@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests
+- Updated `TestMigrateToolVariants_AddsMacroVariantsToID7` to assert the claude macro is empty (was asserting it contained "SYSTEM INJECTION", which documented the bug). Updated `CompanionConnectionWizard` test to assert the QR base URL is the cloudflare named tunnel URL (was asserting Tailscale, which documented the bug).
+
 ### Fixed
 - **Persisted-tab keyboard input (numbers / special keys)** — Three layered fixes eliminate the recurring "can't type in a restored tab" regression. (1) `ForgeTerminal.onopen` now defers `xtermRef.focus()` through `requestAnimationFrame` so focus is restored after React has committed the `setIsConnected(true)` re-render rather than before it. (2) The App.jsx focus-redirect mechanism now always restores xterm focus when a terminal ref exists, even before the WebSocket is open — previously the entire redirect (including the focus call) was gated on `isConnected()`, so focus was never recovered during the brief connecting window after session restore. (3) A new `useEffect` on `sessionLoaded` polls for the active terminal to connect (up to 2 s) and focuses it once ready, providing a final safety net for the mount-to-connect transition.
 - **Claude --resume command card no longer garbles the session picker** — The `claude --resume` command opens an interactive session picker before Claude Code starts. The `macroVariants.claude` entry for the Resume card (ID 7) was previously set to `ClaudeAwarenessMacro`, which fired after `macro_delay` ms and arrived as raw keyboard input into the picker — where it acted as a search filter, leaving only sessions whose title matched "SYSTEM INJECTION". The claude macro for ID 7 is now explicitly empty in both `storage.go` (default template) and `migration.go` (one-time upgrade for existing installs). Copilot's `--continue` variant is unaffected because it is non-interactive.
