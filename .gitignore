@@ -54,8 +54,11 @@ frontend/test-results/
 # Build binary
 /forge
 
-# Tool configurations
-.claude/
+# Tool configurations — personal settings ignored, shared commands tracked in .claude/commands/
+.claude/settings.json
+.claude/settings.local.json
+.claude/*.json
+.claude/todos.md
 
 # Backup and temp files
 *.bak
