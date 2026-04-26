@@ -34,6 +34,7 @@ import {
   ExternalLink,
   Loader2,
   AlertTriangle,
+  AlertCircle,
   RefreshCw,
 } from 'lucide-react'
 import NamedTunnelSetupCard from './NamedTunnelSetupCard'
@@ -154,7 +155,7 @@ export default function CompanionConnectionWizard({
       if (!option) return
       setTunnelUrl(option.url || '')
       setTunnelStage(option.stage || 'absent')
-      setTunnelDetail(option.detail || '')
+      setTunnelDetail(option.lastError || '')
     } catch {
       // Best-effort polling; ignore transient errors.
     }
@@ -378,6 +379,14 @@ const NamedFlow = ({
   const totalSteps = 4
 
   if (currentStepIndex === 1) {
+    const isStopped = tunnelStage === 'stopped'
+
+    const handleRestartSupervisor = async () => {
+      try {
+        await fetch('/api/tunnel/setup/restart', { method: 'POST' })
+      } catch { /* ignore — next poll will reflect new state */ }
+    }
+
     return (
       <StepShell
         stepNumber={2}
@@ -393,12 +402,41 @@ const NamedFlow = ({
         <NamedTunnelSetupCard embedded={true} />
         {tunnelStage !== 'healthy' && (
           <p className="ccw-hint">
-            <Loader2 size={12} className="ccw-spin" /> Waiting for the
-            tunnel to report &ldquo;healthy&rdquo; before you continue&hellip;
+            {isStopped
+              ? <AlertCircle size={12} style={{ flexShrink: 0, color: 'var(--error, #f87171)' }} />
+              : <Loader2 size={12} className="ccw-spin" />
+            }
+            {' '}
+            {isStopped ? (
+              <>
+                Tunnel supervisor stopped.{' '}
+                <button
+                  style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, font: 'inherit', textDecoration: 'underline' }}
+                  onClick={handleRestartSupervisor}
+                >
+                  Restart supervisor
+                </button>
+                {' '}or use <strong>Reconfigure</strong> above if setup needs to be redone.
+              </>
+            ) : (
+              <>Waiting for the tunnel to report &ldquo;healthy&rdquo; before you continue&hellip;</>
+            )}
             {tunnelDetail && (
-              <span style={{ display: 'block', marginTop: 4, opacity: 0.7, fontSize: '0.85em' }}>
+              <code style={{
+                display: 'block', marginTop: 6,
+                padding: '6px 8px',
+                background: 'rgba(0,0,0,0.35)',
+                borderRadius: 4,
+                fontSize: '0.78em',
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: 96,
+                overflowY: 'auto',
+                opacity: 0.85,
+              }}>
                 {tunnelDetail}
-              </span>
+              </code>
             )}
           </p>
         )}

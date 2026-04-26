@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [7.10.0] - 2026-04-26
+
+### Added
+- **`forge-git` enforcement shim** — New binary at `cmd/forge-git/` acts as a drop-in PATH shim for the system `git` binary. It intercepts `git commit --no-verify` and `git push --no-verify` (including the `-n` shorthand for commit), blocks execution with a clear message, and logs the attempt to `~/.forge/audit/violations.log`. All other git commands are transparently forwarded to the real git found elsewhere in PATH. Install by building the binary to `~/.forge/bin/git` and placing `~/.forge/bin` first in `PATH`.
+- **`CLAUDE.md` scaffold entry** — Forge Workflow now generates `CLAUDE.md` alongside `.github/copilot-instructions.md` in every scaffolded project. Claude Code reads `CLAUDE.md` automatically at every session start; the file `@`-imports the canonical instructions file so both Claude Code and GitHub Copilot share a single source of truth with zero content duplication.
+- **Tool-agnostic workflow branding** — Template headers, module display names, and package docs renamed from Copilot-specific language (`"Copilot Instructions"`, `"Copilot Coding Agent Setup"`) to tool-neutral equivalents (`"AI Agent Instructions"`, `"CI Agent Environment Setup"`). Module IDs and disk file paths are unchanged for backwards compatibility.
+- **CLI tool selector for workflow command cards** — A compact `Run with [Claude] [Copilot]` pill strip now sits between the Projects browser and the command cards in the Cards tab. Selecting a tool switches what the three workflow action cards (`🚀 Fresh Session`, `🔄 Resume`, `🛡 Enforced`) actually run, eliminating the need for separate Copilot and Claude cards for the same action. Selection persists to `localStorage`. Each tool-aware card shows a small colour-coded badge (`Claude` or `Copilot`) so the active tool is always obvious. Existing Copilot-specific cards (IDs 6, 7) are upgraded automatically on first boot; the new Enforced card (ID 8) is injected into existing installs via `AutoMigrateOnLoad`.
+- **Enforced workflow card (ID 8)** — New `🛡 Enforced` action card starts a fresh session with an amplified macro payload that mandates the workflow-enforcer rules on every task (no shortcuts, all quality gates apply). Works with both Claude and Copilot.
+
+### Fixed
+- **Named tunnel crashes on cloudflared v2025.8+ due to wrong argument order** — `--config` and `--no-autoupdate` are `tunnel`-level flags in cloudflared v2025.8's `urfave/cli` strict subcommand scoping; they must appear between `tunnel` and `run`, not after it. The supervisor had `cloudflared tunnel run --config … --no-autoupdate` which caused cloudflared to immediately print its full help text and exit, triggering the storm guard in ~40 seconds. Fixed to `cloudflared tunnel --no-autoupdate --config … run <uuid>`. Validated live against the real binary before committing.
+- **Crash output buffer captured useless help text instead of the error line** — ring buffer kept only the *last* 10 lines; for startup crashes (help text printed then exit) this captured the bottom of the help page. Changed to keep the *first* 3 + *last* 5 non-empty lines so the actual error (always first) is always captured. Buffer resets at the start of each restart attempt.
+- **Crash detail text overflowed the sidebar** — raw `pre-wrap` text with 50+ lines was unconstrained. Detail block is now a scrollable monospace `<code>` element with `max-height: 96px` and `overflow-y: auto`.
+
+## [7.9.2] - 2026-04-26
+
+---
+
+## [v7.9.2] - 2026-04-26
+
+### Fixed
+- **Named tunnel storm-guard leaves wizard permanently stuck** — when cloudflared crashes 5 times within 2 minutes the supervisor enters `StageStopped` and never self-recovers, but the Companion wizard treated `stopped` identically to `starting` (same spinner, same disabled "Tunnel is healthy" button, no escape). Wizard step 2 now detects `tunnelStage === 'stopped'`, replaces the spinner with an `AlertCircle`, shows an actionable message, and renders an inline **Restart supervisor** button that calls `POST /api/tunnel/setup/restart` to start a fresh supervisor.
+- **Named tunnel storm publish erased the known hostname URL** — `StageStopped` was published with an empty URL, causing the wizard's QR code and hostname display to go blank on the next 6-second poll. Now passes `s.probeURL` so the URL stays visible even when the supervisor has given up.
+- **Cloudflared crash reason unknowable** — all cloudflared stdout/stderr was intentionally discarded, so the storm error message said "check logs" with no actionable detail. The supervisor now buffers the last 10 output lines and appends them to `LastError`, making the actual failure reason (auth error, port conflict, bad config path, etc.) visible in the wizard's detail area.
+
+## [7.9.1] - 2026-04-26
+
+---
+
+## [v7.9.1] - 2026-04-26
+
+## [7.9.0] - 2026-04-25
+
+---
+
+## [v7.9.0] - 2026-04-25
+
+### Fixed
+- **Named tunnel health probe never reaches "healthy" (spinner wedged in Companion wizard)** — three compounding bugs: (1) `ProbeHTTP` hardcoded its own 2-second `context.WithTimeout` that silently overrode the caller's 8-second budget added in v7.8.6 for slow Cloudflare TLS, meaning the external probe only ever got 2 s; (2) the local fallback probe used `localhost` which on Windows resolves to `::1` (IPv6) before falling back to IPv4, adding ~1 s of TCP latency and intermittently exceeding the 2-second window; (3) the wizard read `option.detail` but the backend sends `option.lastError`, so error messages in the spinner never displayed. Fixed: `ProbeHTTP` no longer wraps the caller's context — callers control the timeout budget; local probe URL changed to `127.0.0.1` to bypass Windows IPv6 resolution; wizard now reads `option.lastError`.
+- **Sidebar tab ribbon visual redesign** — icon-only tabs rendered as large boxy filled squares in accent color; replaced with a slim underline-indicator style (2 px accent border-bottom, transparent background) that matches the rest of the sidebar's visual language.
+
+### Added
+- **Sidebar ribbon UX refresh** — overloaded Cards tab split into four focused tabs: **Cards** (user command shortcuts + Projects browser), **Files** (unchanged), **MCP** (MCPSetupCard + MCPDiscoveryCard + CompanionAccessCard), and **Tools** (Release Manager + Forge Workflow + Web App Debugger). The Debugger tab is retired; its contents live in Tools.
+- **Configurable tab label style** — new Tag button in the theme controls row toggles between icon+label and icon-only modes; preference persisted to localStorage (`sidebarTabStyle`).
+- **New Project wizard in the Projects card** — `FolderPlus` button opens an inline form that creates a new folder in the project root, runs `git init`, and scaffolds all Forge workflow files automatically via `DefaultConfig()`. Optional GitHub repo creation via the `gh` CLI (private or public); graceful error if `gh` is not installed.
+- `POST /api/project/create` backend endpoint with path traversal guard, git init, scaffold, and optional `gh repo create --source=. --push`.
+
+### Changed
+- Release Manager card moved out of the sortable command list and into the Tools tab permanently; legacy `id: -1` entries are silently filtered from saved commands on load.
+
 ## [7.8.6] - 2026-04-25
 
 ---

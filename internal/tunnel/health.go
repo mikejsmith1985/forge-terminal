@@ -234,8 +234,14 @@ func less(a, b HealthState) bool {
 }
 
 // ProbeHTTP is a shared health probe used by the Named and Quick
-// supervisors. It issues a GET against `<url>/api/ping` with a 2-second
-// timeout and returns nil on 2xx/3xx responses, an error otherwise.
+// supervisors. It issues a GET against `<url>/api/ping` and returns nil
+// on 2xx/3xx responses, an error otherwise.
+//
+// The caller is responsible for setting a deadline on ctx — ProbeHTTP
+// intentionally does not impose its own timeout so the external probe
+// (8 s, to survive slow Cloudflare TLS round-trips) and the local
+// fallback probe (2 s, plenty for loopback) can use different budgets
+// without duplicating this function.
 //
 // The endpoint choice matters: /api/ping is unauthenticated, cheap, and
 // proxied through the same handler tree as /api/mobile/*, so a 200 here
@@ -247,15 +253,12 @@ func ProbeHTTP(ctx context.Context, url string) error {
 	}
 
 	probeURL := url + "/api/ping"
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
 	if err != nil {
 		return fmt.Errorf("build probe request: %w", err)
 	}
 
-	client := &http.Client{Timeout: 2 * time.Second}
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("probe %s: %w", probeURL, err)

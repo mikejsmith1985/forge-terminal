@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Folder, FolderOpen, RefreshCw, Settings, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Folder, FolderOpen, FolderPlus, RefreshCw, Settings, X, ChevronUp, ChevronDown, Github } from 'lucide-react';
 import './DirectoryCard.css';
 
 const DirectoryCard = ({ onExecute, onHide }) => {
@@ -12,6 +12,16 @@ const DirectoryCard = ({ onExecute, onHide }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredDir, setHoveredDir] = useState(null);
   const inputRef = useRef(null);
+
+  // New Project wizard state
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [createGitHub, setCreateGitHub] = useState(false);
+  const [githubVisibility, setGithubVisibility] = useState('private');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const [createResult, setCreateResult] = useState(null);
+  const newProjectInputRef = useRef(null);
 
   const fetchDirectories = useCallback(async (path) => {
     if (!path || !path.trim()) {
@@ -36,12 +46,17 @@ const DirectoryCard = ({ onExecute, onHide }) => {
     }
   }, []);
 
-  // Load directories when rootPath changes
   useEffect(() => {
     if (rootPath) {
       fetchDirectories(rootPath);
     }
   }, [rootPath, fetchDirectories]);
+
+  useEffect(() => {
+    if (showNewProject) {
+      setTimeout(() => newProjectInputRef.current?.focus(), 50);
+    }
+  }, [showNewProject]);
 
   const handleSavePath = () => {
     const trimmed = editingPath.trim();
@@ -71,9 +86,46 @@ const DirectoryCard = ({ onExecute, onHide }) => {
 
   const handleDirectoryClick = (dir) => {
     if (!onExecute) return;
-    // Normalize path for the shell: use forward slashes for cross-platform
-    const cdPath = dir.path;
-    onExecute({ command: `cd "${cdPath}"`, delay: 0 });
+    onExecute({ command: `cd "${dir.path}"`, delay: 0 });
+  };
+
+  const handleCreateProject = async () => {
+    const name = newProjectName.trim();
+    if (!name) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const res = await fetch('/api/project/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ name, rootPath, createGitHub, visibility: githubVisibility }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setCreateResult(data);
+      setNewProjectName('');
+      fetchDirectories(rootPath);
+      if (onExecute) onExecute({ command: `cd "${data.path}"`, delay: 0 });
+      setTimeout(() => {
+        setShowNewProject(false);
+        setCreateResult(null);
+        setCreateError(null);
+      }, 2500);
+    } catch (err) {
+      setCreateError(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleNewProjectKeyDown = (e) => {
+    if (e.key === 'Enter') handleCreateProject();
+    if (e.key === 'Escape') {
+      setShowNewProject(false);
+      setCreateError(null);
+      setNewProjectName('');
+    }
   };
 
   const displayRoot = rootPath
@@ -93,6 +145,18 @@ const DirectoryCard = ({ onExecute, onHide }) => {
           )}
         </div>
         <div className="directory-card-actions" onClick={e => e.stopPropagation()}>
+          <button
+            className={`directory-card-action-btn ${showNewProject ? 'active' : ''}`}
+            title={rootPath ? 'New Project' : 'Set a root directory first'}
+            onClick={() => {
+              if (!rootPath) return;
+              setShowNewProject(v => !v);
+              setCreateError(null);
+            }}
+            disabled={!rootPath}
+          >
+            <FolderPlus size={13} />
+          </button>
           <button
             className="directory-card-action-btn"
             title="Refresh directories"
@@ -144,6 +208,78 @@ const DirectoryCard = ({ onExecute, onHide }) => {
               <button className="directory-card-btn-cancel" onClick={() => setShowPathInput(false)}>
                 <X size={13} />
               </button>
+            </div>
+          )}
+
+          {showNewProject && (
+            <div className="directory-card-new-project">
+              {createResult ? (
+                <div className="directory-card-new-project-success">
+                  <span>✓ <strong>{createResult.path.split(/[\\/]/).pop()}</strong> created</span>
+                  {createResult.github?.created && (
+                    <a href={createResult.github.url} target="_blank" rel="noreferrer" className="directory-card-gh-link">
+                      <Github size={12} /> View on GitHub
+                    </a>
+                  )}
+                  {createResult.github?.error && (
+                    <span className="directory-card-gh-warn">⚠ {createResult.github.error}</span>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="directory-card-new-project-row">
+                    <input
+                      ref={newProjectInputRef}
+                      className="directory-card-path-input"
+                      type="text"
+                      value={newProjectName}
+                      onChange={e => setNewProjectName(e.target.value)}
+                      onKeyDown={handleNewProjectKeyDown}
+                      placeholder="Project name"
+                      disabled={creating}
+                    />
+                    <button
+                      className="directory-card-btn-cancel"
+                      onClick={() => { setShowNewProject(false); setCreateError(null); setNewProjectName(''); }}
+                      disabled={creating}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  <div className="directory-card-new-project-options">
+                    <label className="directory-card-gh-toggle">
+                      <input
+                        type="checkbox"
+                        checked={createGitHub}
+                        onChange={e => setCreateGitHub(e.target.checked)}
+                        disabled={creating}
+                      />
+                      <Github size={12} /> Create GitHub repo
+                    </label>
+                    {createGitHub && (
+                      <div className="directory-card-visibility">
+                        <label>
+                          <input type="radio" name="visibility" value="private" checked={githubVisibility === 'private'} onChange={() => setGithubVisibility('private')} disabled={creating} />
+                          Private
+                        </label>
+                        <label>
+                          <input type="radio" name="visibility" value="public" checked={githubVisibility === 'public'} onChange={() => setGithubVisibility('public')} disabled={creating} />
+                          Public
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                  {createError && <p className="directory-card-new-project-error">⚠ {createError}</p>}
+                  <button
+                    className="directory-card-btn-create"
+                    onClick={handleCreateProject}
+                    disabled={creating || !newProjectName.trim()}
+                  >
+                    {creating ? <RefreshCw size={12} className="spinning" /> : <FolderPlus size={12} />}
+                    {creating ? 'Creating…' : 'Create Project'}
+                  </button>
+                </>
+              )}
             </div>
           )}
 

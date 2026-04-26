@@ -247,11 +247,81 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+/* ── CLI Tool Selector strip ─────────────────────────────────────────────── */
+.cli-tool-selector {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 6px;
+  border-bottom: 1px solid var(--overlay, rgba(255,255,255,0.06));
+  margin-bottom: 2px;
+}
+
+.cli-tool-selector-label {
+  font-size: 0.68em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, rgba(255,255,255,0.35));
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.cli-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+  font-size: 0.74em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.cli-tool-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.05);
+  color: var(--text, rgba(255,255,255,0.85));
+  border-color: rgba(255,255,255,0.1);
+}
+
+.cli-tool-btn.active {
+  background: color-mix(in srgb, var(--tool-color, var(--accent)) 15%, transparent);
+  border-color: color-mix(in srgb, var(--tool-color, var(--accent)) 60%, transparent);
+  color: var(--tool-color, var(--accent));
+}
+
+/* Tool badge on individual cards */
+.tool-badge {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.67em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.tool-badge-claude {
+  background: rgba(212, 135, 94, 0.15);
+  color: #d4875e;
+  border: 1px solid rgba(212, 135, 94, 0.3);
+}
+
+.tool-badge-copilot {
+  background: rgba(139, 111, 203, 0.15);
+  color: #8b6fcb;
+  border: 1px solid rgba(139, 111, 203, 0.3);
+}
+
 /* Sidebar view toggle tabs */
 .sidebar-view-tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px;
+  gap: 0;
+  padding: 0 6px;
   background: var(--bg);
   border-bottom: 1px solid var(--overlay);
 }
@@ -261,29 +331,45 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border: 1px solid var(--overlay);
+  gap: 5px;
+  padding: 8px 6px;
+  border: none;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--subtext);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 0;
   cursor: pointer;
-  transition: all 0.2s ease;
+  margin-bottom: -1px;
+  transition: color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
   min-width: 0;
 }
 
 .sidebar-view-tab:hover {
-  background: var(--overlay);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
 }
 
 .sidebar-view-tab.active {
-  background: var(--gradient-primary);
-  border-color: var(--accent);
-  color: white;
+  background: transparent;
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Icon-only tab style — toggled by the Tag button in theme controls */
+.sidebar-view-tabs.icon-only {
+  padding: 0 4px;
+}
+
+.sidebar-view-tabs.icon-only .sidebar-view-tab {
+  flex: 1;
+  padding: 9px 4px;
+}
+
+.sidebar-view-tabs.icon-only .tab-label {
+  display: none;
 }
 
 .sidebar-path-hint {

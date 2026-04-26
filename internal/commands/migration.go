@@ -97,6 +97,67 @@ func inferProviderFromCommand(command, description string) string {
 	return ""
 }
 
+// migrateToolVariants upgrades the legacy Copilot-specific cards (IDs 6, 7)
+// to tool-agnostic "Fresh Session" / "Resume" cards with ToolVariants, and
+// injects the new "Enforced" card (ID 8) if it is missing.
+//
+// This runs as part of AutoMigrateOnLoad so existing installs are upgraded
+// transparently on first boot after the update, without any manual edits.
+func migrateToolVariants(commands []Command) ([]Command, bool) {
+	changed := false
+	hasID8 := false
+
+	// Determine what system IDs already have ToolVariants and whether ID 8 exists.
+	for i, cmd := range commands {
+		switch cmd.ID {
+		case 6:
+			if len(cmd.ToolVariants) == 0 {
+				commands[i].Description = "🚀 Fresh Session"
+				commands[i].Command = "claude"
+				commands[i].ToolVariants = map[string]string{
+					"claude":  "claude",
+					"copilot": "copilot --allow-all-tools",
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Upgraded ID 6 to tool-agnostic Fresh Session card")
+			}
+		case 7:
+			if len(cmd.ToolVariants) == 0 {
+				commands[i].Description = "🔄 Resume"
+				commands[i].Command = "claude --resume"
+				commands[i].ToolVariants = map[string]string{
+					"claude":  "claude --resume",
+					"copilot": "copilot --allow-all-tools --continue",
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Upgraded ID 7 to tool-agnostic Resume card")
+			}
+		case 8:
+			hasID8 = true
+		}
+	}
+
+	if !hasID8 {
+		enforced := Command{
+			ID:          8,
+			Description: "🛡 Enforced",
+			Command:     "claude",
+			MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change.",
+			MacroDelay:   4500,
+			Icon:         "emoji-shield",
+			ToolVariants: map[string]string{
+				"claude":  "claude",
+				"copilot": "copilot --allow-all-tools",
+			},
+		}
+		commands = append(commands, enforced)
+		changed = true
+		log.Printf("[Commands] Migration: Injected new ID 8 Enforced card")
+	}
+
+	return commands, changed
+}
+
 // AutoMigrateOnLoad performs automatic migration when commands are loaded
 func AutoMigrateOnLoad() error {
 	commands, err := LoadCommands()
@@ -105,6 +166,12 @@ func AutoMigrateOnLoad() error {
 	}
 
 	migrated, changed := MigrateCommands(commands)
+
+	// Tool-variant migration runs after the general migration so both can
+	// mark changed and the final save covers everything in one write.
+	migrated, variantChanged := migrateToolVariants(migrated)
+	changed = changed || variantChanged
+
 	if changed {
 		log.Printf("[Commands] Auto-migration: Updating %d commands with new metadata", len(migrated))
 		if err := SaveCommands(migrated); err != nil {

@@ -69,7 +69,8 @@ func DetectProject(projectPath string) (*ProjectDetection, error) {
 	// Check for existing workflow-relevant structure
 	detection.HasGit = directoryExists(absolutePath, ".git")
 	detection.HasGitHub = directoryExists(absolutePath, ".github")
-	detection.HasInstructions = fileExists(absolutePath, ".github", "copilot-instructions.md")
+	detection.HasInstructions = fileExists(absolutePath, ".github", "copilot-instructions.md") ||
+		fileExists(absolutePath, "CLAUDE.md")
 	detection.HasSkills = directoryExists(absolutePath, ".github", "skills")
 	detection.HasChangelog = fileExists(absolutePath, "CHANGELOG.md")
 	detection.HasWorkflow = fileExists(absolutePath, ".forge", "workflow.json")

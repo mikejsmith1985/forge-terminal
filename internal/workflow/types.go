@@ -1,7 +1,7 @@
 // Package workflow provides an enterprise-grade project scaffolding system.
-// It generates standardized copilot instructions, skills, git hooks, PR templates,
+// It generates standardized AI agent instructions, skills, git hooks, PR templates,
 // and workflow configuration for any project — ensuring repeatable, enforceable
-// development practices across teams and repositories.
+// development practices across teams and AI coding tools.
 package workflow
 
 import (
@@ -88,8 +88,8 @@ func ModuleCatalog() []ModuleInfo {
 	return []ModuleInfo{
 		{
 			ID:          ModuleCopilotInstructions,
-			Name:        "Copilot Instructions",
-			Description: "Agent behavior directives, coding standards, naming conventions, and quality mode configuration.",
+			Name:        "Agent Instructions",
+			Description: "AI agent behavior directives, coding standards, naming conventions, and quality mode configuration. Generates .github/copilot-instructions.md and CLAUDE.md.",
 			Category:    "core",
 			Required:    true,
 		},
@@ -139,7 +139,7 @@ func ModuleCatalog() []ModuleInfo {
 		{
 			ID:          ModuleWorkflowEnforcer,
 			Name:        "Workflow Enforcer Skill",
-			Description: "Broadest-activation Copilot skill that enforces all rules on every coding task. Primary AI enforcement.",
+			Description: "Broadest-activation AI skill that enforces all rules on every coding task. Primary AI enforcement layer.",
 			Category:    "enforcement",
 			Required:    true,
 		},
@@ -159,8 +159,8 @@ func ModuleCatalog() []ModuleInfo {
 		},
 		{
 			ID:          ModuleCopilotAgentSetup,
-			Name:        "Copilot Coding Agent Setup",
-			Description: "Generates .github/copilot/setup-steps.yml to pre-install project dependencies in the GitHub Copilot coding agent environment before it writes code or runs tests.",
+			Name:        "CI Agent Environment Setup",
+			Description: "Generates .github/copilot/setup-steps.yml to pre-install project dependencies in the coding agent environment before it writes code or runs tests.",
 			Category:    "integration",
 			Required:    false,
 		},
@@ -284,7 +284,7 @@ type ProjectDetection struct {
 	ExistingFiles  []string    `json:"existingFiles"`  // Paths of workflow-relevant files already present
 	HasGit         bool        `json:"hasGit"`
 	HasGitHub      bool        `json:"hasGitHub"`      // .github/ directory exists
-	HasInstructions bool       `json:"hasInstructions"` // .github/copilot-instructions.md exists
+	HasInstructions bool       `json:"hasInstructions"` // .github/copilot-instructions.md or CLAUDE.md exists
 	HasSkills      bool        `json:"hasSkills"`       // .github/skills/ directory exists
 	HasChangelog   bool        `json:"hasChangelog"`    // CHANGELOG.md exists
 	HasWorkflow    bool        `json:"hasWorkflow"`     // .forge/workflow.json exists

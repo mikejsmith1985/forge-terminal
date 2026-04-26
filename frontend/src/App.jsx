@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Bug, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Wrench, Plug, Tag, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
@@ -46,6 +46,11 @@ import TourOverlay from './components/TourOverlay'
 import { TOUR_STEPS } from './config/tourSteps'
 import ConnectionDiagnosticWizard from './components/ConnectionDiagnosticWizard'
 import LicenseGate from './components/LicenseGate'
+import MCPSetupCard from './components/MCPSetupCard'
+import MCPDiscoveryCard from './components/MCPDiscoveryCard'
+import CompanionAccessCard from './components/CompanionAccessCard'
+import OwnerReleaseCard from './components/OwnerReleaseCard'
+import ForgeWorkflowCard from './components/ForgeWorkflowCard'
 
 const MAX_TABS = 20;
 
@@ -135,7 +140,17 @@ function App() {
   const [waitingTabs, setWaitingTabs] = useState({})
   
   // File explorer and editor state
-  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', or 'debug' (workflows removed v3.9.0)
+  const [sidebarView, setSidebarView] = useState('cards') // 'cards', 'files', 'mcp', or 'tools'
+  const [sidebarTabStyle, setSidebarTabStyle] = useState(
+    () => localStorage.getItem('sidebarTabStyle') || 'icon-only'
+  )
+  const [preferredCliTool, setPreferredCliTool] = useState(
+    () => localStorage.getItem('preferredCliTool') || 'claude'
+  )
+  const handleCliToolChange = (tool) => {
+    setPreferredCliTool(tool)
+    localStorage.setItem('preferredCliTool', tool)
+  }
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   const [editorMode, setEditorMode] = useState('classic') // 'agentic' or 'classic' (Monaco)
@@ -252,7 +267,7 @@ function App() {
     // Sidebar tab switching
     showCardsTab: () => setSidebarView('cards'),
     showFilesTab: () => setSidebarView('files'),
-    showWebToolsTab: () => setSidebarView('debug'),
+    showWebToolsTab: () => setSidebarView('tools'),
 
     // History Slider (Time Travel)
     openHistorySlider: () => setIsHistorySliderOpen(true),
@@ -1368,9 +1383,10 @@ function App() {
       .then(data => {
         // Only update if timeout hasn't fired
         if (timeoutId !== null || commandsLoading) {
-          // Ensure data is an array
-          const cards = Array.isArray(data) ? data : [];
-          
+          // Ensure data is an array; filter out legacy Release Manager card (id: -1)
+          // which now lives permanently in the Tools tab
+          const cards = (Array.isArray(data) ? data : []).filter(c => c.id !== -1);
+
           setCommands(cards);
           setCommandsLoading(false);
         }
@@ -1556,11 +1572,6 @@ function App() {
     localStorage.setItem('forge_directory_card_visible', 'true')
   }
 
-  const handleRestoreReleaseManager = () => {
-    const entry = { id: -1, description: '🚀 Release Manager', command: 'SYSTEM_RELEASE_MANAGER', pasteOnly: true, favorite: false }
-    saveCommands([entry, ...commands])
-  }
-
   const handleEdit = (cmd) => {
     setEditingCommand(cmd)
     setIsModalOpen(true)
@@ -1634,39 +1645,44 @@ function App() {
   const sidebar = (
     <div className="sidebar" style={{ width: `${sidebarWidth}px` }}>
       {/* Row 1: View toggle tabs */}
-      <div className="sidebar-view-tabs">
-        <button 
+      <div className={`sidebar-view-tabs ${sidebarTabStyle === 'icon-only' ? 'icon-only' : ''}`}>
+        <button
           className={`sidebar-view-tab ${sidebarView === 'cards' ? 'active' : ''}`}
           onClick={() => setSidebarView('cards')}
+          title="Cards"
         >
           <Command size={16} />
-          Cards
+          <span className="tab-label">Cards</span>
         </button>
-        {/* Workflows tab REMOVED v3.9.0 - consolidated to Forge Assist */}
-        <button 
+        <button
           className={`sidebar-view-tab ${sidebarView === 'files' ? 'active' : ''}`}
           onClick={() => {
-            // Check if file access permission is set
             if (!fileAccessModeReady) {
               const ready = checkFileAccessPermission();
-              if (!ready) {
-                // Prompt will show, don't switch view yet
-                return;
-              }
+              if (!ready) return;
             }
             setSidebarView('files');
           }}
+          title="Files"
         >
           <Folder size={16} />
-          Files
+          <span className="tab-label">Files</span>
         </button>
         <button
-          className={`sidebar-view-tab ${sidebarView === 'debug' ? 'active' : ''}`}
-          onClick={() => setSidebarView('debug')}
-          title="Web App Debugger"
+          className={`sidebar-view-tab ${sidebarView === 'mcp' ? 'active' : ''}`}
+          onClick={() => setSidebarView('mcp')}
+          title="MCP"
         >
-          <Bug size={16} />
-          Debugger
+          <Plug size={16} />
+          <span className="tab-label">MCP</span>
+        </button>
+        <button
+          className={`sidebar-view-tab ${sidebarView === 'tools' ? 'active' : ''}`}
+          onClick={() => setSidebarView('tools')}
+          title="Tools"
+        >
+          <Wrench size={16} />
+          <span className="tab-label">Tools</span>
         </button>
       </div>
 
@@ -1686,16 +1702,6 @@ function App() {
                   <Folder size={14} />
                 </button>
               )}
-              {!commands.find(c => c.id === -1) && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleRestoreReleaseManager}
-                  title="Add Release Manager card"
-                  style={{ padding: '5px 8px' }}
-                >
-                  🚀
-                </button>
-              )}
               <button className="btn btn-primary" onClick={handleAdd}>
                 <Plus size={16} /> Add
               </button>
@@ -1708,15 +1714,30 @@ function App() {
               <span className="sidebar-path-hint">{activeTab?.currentDirectory ? getFolderNameFromPath(activeTab.currentDirectory) : 'Root'}</span>
             </div>
           </>
-        ) : sidebarView === 'debug' ? (
+        ) : sidebarView === 'mcp' ? (
           <>
-            <h3>🔍 Web App Debugger</h3>
+            <h3>🔌 MCP</h3>
+          </>
+        ) : sidebarView === 'tools' ? (
+          <>
+            <h3>🛠️ Tools</h3>
           </>
         ) : null}
       </div>
 
       {/* Row 3: Theme controls */}
       <div className="theme-controls">
+        <button
+          className={`btn btn-ghost btn-icon ${sidebarTabStyle === 'icon-label' ? 'active' : ''}`}
+          onClick={() => {
+            const next = sidebarTabStyle === 'icon-only' ? 'icon-label' : 'icon-only';
+            setSidebarTabStyle(next);
+            localStorage.setItem('sidebarTabStyle', next);
+          }}
+          title={sidebarTabStyle === 'icon-only' ? 'Show tab labels' : 'Hide tab labels'}
+        >
+          <Tag size={18} />
+        </button>
         <button className="btn btn-ghost btn-icon" onClick={cycleColorTheme} title={`Theme: ${themes[colorTheme]?.name || 'Molten Metal'}`}>
           <Palette size={18} />
         </button>
@@ -1804,7 +1825,7 @@ function App() {
         </button>
       </div>
 
-      {/* Content area - Cards, Workflows, Files, Assistant, or Debug */}
+      {/* Content area - Cards, Files, MCP, or Tools */}
       <div className="sidebar-content">
         {sidebarView === 'cards' ? (
           <DndContext
@@ -1826,7 +1847,8 @@ function App() {
               cwd={activeTab?.currentDirectory}
               directoryCardVisible={directoryCardVisible}
               onHideDirectoryCard={handleHideDirectoryCard}
-              // onOpenTutor — HIDDEN for subscription release
+              preferredCliTool={preferredCliTool}
+              onCliToolChange={handleCliToolChange}
             />
           </DndContext>
         ) : sidebarView === 'files' ? (
@@ -1836,19 +1858,30 @@ function App() {
             onSelectionChange={setContextFiles}
             terminalRef={getActiveTerminalRef()}
           />
-        ) : sidebarView === 'debug' ? (
+        ) : sidebarView === 'mcp' ? (
           <div style={{ overflowY: 'auto', height: '100%' }}>
-            <div style={{ padding: '12px' }}>
+            <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <MCPSetupCard />
+              <MCPDiscoveryCard />
+              <CompanionAccessCard />
+            </div>
+          </div>
+        ) : sidebarView === 'tools' ? (
+          <div style={{ overflowY: 'auto', height: '100%' }}>
+            <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <OwnerReleaseCard
+                onExecuteCommand={handleExecute}
+                onToast={addToast}
+                shellType={shellConfig.shellType}
+                cwd={activeTab?.currentDirectory}
+              />
+              <ForgeWorkflowCard onExecuteCommand={handleExecute} onToast={addToast} cwd={activeTab?.currentDirectory} />
               <WebAppDebuggerCard />
-              <div style={{ marginTop: '16px' }}>
-                <FollowMeDebugger />
-              </div>
+              <FollowMeDebugger />
             </div>
           </div>
         ) : null}
       </div>
-
-      {/* FollowMeDebugger — HIDDEN for subscription release */}
     </div>
   );
 

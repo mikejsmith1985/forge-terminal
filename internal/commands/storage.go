@@ -15,20 +15,25 @@ import (
 
 // Command represents a command card
 type Command struct {
-	ID           int    `json:"id"`
-	Description  string `json:"description"`
-	Command      string `json:"command"`
-	KeyBinding   string `json:"keyBinding"`
-	PasteOnly    bool   `json:"pasteOnly"`
-	Favorite     bool   `json:"favorite"`
-	TriggerAM    bool   `json:"triggerAM,omitempty"`
-	LLMProvider  string `json:"llmProvider,omitempty"` // "copilot", "claude", "aider"
-	LLMType      string `json:"llmType,omitempty"`     // "chat", "suggest", "explain", "code"
-	Icon         string `json:"icon,omitempty"`
-	Delay        int    `json:"delay,omitempty"`
-	AlwaysAppend bool   `json:"alwaysAppend,omitempty"` // When true, this command's text is appended to every user prompt
-	MacroPayload string `json:"macro_payload,omitempty"` // Zero-Click: Text to auto-inject after command execution
-	MacroDelay   int    `json:"macro_delay,omitempty"`   // Zero-Click: Delay in ms before macro injection (default 4500)
+	ID           int               `json:"id"`
+	Description  string            `json:"description"`
+	Command      string            `json:"command"`
+	KeyBinding   string            `json:"keyBinding"`
+	PasteOnly    bool              `json:"pasteOnly"`
+	Favorite     bool              `json:"favorite"`
+	TriggerAM    bool              `json:"triggerAM,omitempty"`
+	LLMProvider  string            `json:"llmProvider,omitempty"` // "copilot", "claude", "aider"
+	LLMType      string            `json:"llmType,omitempty"`     // "chat", "suggest", "explain", "code"
+	Icon         string            `json:"icon,omitempty"`
+	Delay        int               `json:"delay,omitempty"`
+	AlwaysAppend bool              `json:"alwaysAppend,omitempty"` // When true, this command's text is appended to every user prompt
+	MacroPayload string            `json:"macro_payload,omitempty"` // Zero-Click: Text to auto-inject after command execution
+	MacroDelay   int               `json:"macro_delay,omitempty"`   // Zero-Click: Delay in ms before macro injection (default 4500)
+	// ToolVariants maps CLI tool names ("claude", "copilot") to the command
+	// string that should run for that tool. When present the frontend uses this
+	// map to resolve the effective command based on the user's active CLI tool
+	// selection, making a single card work for multiple AI coding tools.
+	ToolVariants map[string]string `json:"toolVariants,omitempty"`
 }
 
 // CommandVersion represents a versioned snapshot of a command
@@ -95,26 +100,46 @@ var DefaultCommands = []Command{
 		Icon:        "emoji-eyes",
 	},
 	{
-		ID:           6,
-		Description:  "🤖 Copilot (Fresh)",
-		Command:      "copilot --allow-all-tools",
-		KeyBinding:   "",
-		PasteOnly:    false,
-		Favorite:     false,
-		Icon:         "emoji-robot",
+		ID:          6,
+		Description: "🚀 Fresh Session",
+		Command:     "claude",
+		PasteOnly:   false,
+		Favorite:    false,
+		Icon:        "emoji-robot",
 		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
-		MacroDelay:   4500,
+		MacroDelay:  4500,
+		ToolVariants: map[string]string{
+			"claude":  "claude",
+			"copilot": "copilot --allow-all-tools",
+		},
 	},
 	{
-		ID:           7,
-		Description:  "🔄 Copilot (Resume)",
-		Command:      "copilot --allow-all-tools --continue",
-		KeyBinding:   "",
-		PasteOnly:    false,
-		Favorite:     false,
-		Icon:         "emoji-repeat",
+		ID:          7,
+		Description: "🔄 Resume",
+		Command:     "claude --resume",
+		PasteOnly:   false,
+		Favorite:    false,
+		Icon:        "emoji-repeat",
 		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md",
-		MacroDelay:   4500,
+		MacroDelay:  4500,
+		ToolVariants: map[string]string{
+			"claude":  "claude --resume",
+			"copilot": "copilot --allow-all-tools --continue",
+		},
+	},
+	{
+		ID:          8,
+		Description: "🛡 Enforced",
+		Command:     "claude",
+		PasteOnly:   false,
+		Favorite:    false,
+		Icon:        "emoji-shield",
+		MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change.",
+		MacroDelay:  4500,
+		ToolVariants: map[string]string{
+			"claude":  "claude",
+			"copilot": "copilot --allow-all-tools",
+		},
 	},
 }
 

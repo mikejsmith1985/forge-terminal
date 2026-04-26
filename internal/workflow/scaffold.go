@@ -23,12 +23,20 @@ type scaffoldEntry struct {
 // the module that owns it, and the function that renders its content.
 func scaffoldManifest() []scaffoldEntry {
 	return []scaffoldEntry{
-		// Core: Copilot instructions (always generated)
+		// Core: Agent instructions — read by GitHub Copilot automatically
 		{
 			moduleID: ModuleCopilotInstructions,
 			relPath:  filepath.Join(".github", "copilot-instructions.md"),
 			category: "config",
 			render:   RenderCopilotInstructions,
+		},
+		// CLAUDE.md — read by Claude Code automatically at every session start;
+		// imports .github/copilot-instructions.md so both tools share one source.
+		{
+			moduleID: ModuleCopilotInstructions,
+			relPath:  "CLAUDE.md",
+			category: "config",
+			render:   RenderClaudeMD,
 		},
 		// Workflow config
 		{
