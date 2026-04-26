@@ -154,6 +154,53 @@ describe('CompanionConnectionWizard', () => {
     })
   })
 
+  it('uses Tailscale URL as companion host base when named method is active', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    })
+
+    fetchMock.mockImplementation((url) => {
+      if (url === '/api/companion/preference') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ method: 'named' }),
+        })
+      }
+      if (url === '/api/tunnel/options') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            options: [
+              { mode: 'named',     stage: 'healthy',    url: 'https://forge.rootlevellabs.tech' },
+              { mode: 'tailscale', stage: 'configured', url: 'https://mikesdell.taila9144e.ts.net' },
+            ],
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) })
+    })
+
+    render(
+      <CompanionConnectionWizard
+        mobileToken="testtoken"
+        companionHost="https://forge.rootlevellabs.tech/companion/"
+      />
+    )
+
+    // The QR panel with "Copy link instead" button appears in step 2 when tunnel is healthy
+    const copyBtn = await screen.findByText(/Copy link instead/i, {}, { timeout: 3000 })
+    fireEvent.click(copyBtn)
+
+    await waitFor(() => expect(writeTextMock).toHaveBeenCalled())
+    const copiedUrl = writeTextMock.mock.calls[0][0]
+    expect(copiedUrl).toMatch(/^https:\/\/mikesdell\.taila9144e\.ts\.net\/companion\//)
+    expect(copiedUrl).toContain('forge=https%3A%2F%2Fforge.rootlevellabs.tech')
+    expect(copiedUrl).toContain('token=testtoken')
+  })
+
   it('calls /api/tunnel/start when Start Quick Tunnel is clicked', async () => {
     fetchMock.mockImplementation((url) => {
       if (url === '/api/companion/preference') {

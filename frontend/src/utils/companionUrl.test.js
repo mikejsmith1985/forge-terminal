@@ -187,4 +187,26 @@ describe('buildDeepLink', () => {
     expect(result).toMatch(/^https:\/\/abc123\.trycloudflare\.com\/companion\/#/)
     expect(result).toContain('forge=')
   })
+
+  it('normalizes a protocol-less forgeUrl to http:// before embedding in fragment', () => {
+    const result = buildDeepLink(
+      'https://x.taila.ts.net/companion/',
+      'forge.rootlevellabs.tech',
+      'tok'
+    )
+    // normalizeHttpUrl prepends http:// for bare hostnames (backend always
+    // returns https:// for named tunnels, so real usage never hits this path)
+    expect(result).toContain('forge=http%3A%2F%2Fforge.rootlevellabs.tech')
+  })
+
+  it('named-tunnel scenario: Tailscale companion host + cloudflare forgeUrl', () => {
+    const result = buildDeepLink(
+      'https://mikesdell.taila9144e.ts.net/companion/',
+      'https://forge.rootlevellabs.tech',
+      '620561d3'
+    )
+    expect(result).toBe(
+      'https://mikesdell.taila9144e.ts.net/companion/#forge=https%3A%2F%2Fforge.rootlevellabs.tech&token=620561d3'
+    )
+  })
 })

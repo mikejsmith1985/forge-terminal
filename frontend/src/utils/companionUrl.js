@@ -100,6 +100,11 @@ export function buildDeepLink(companionHost, forgeUrl, mobileToken) {
 
   if (!forgeUrl || !mobileToken) return base
 
-  const fragment = new URLSearchParams({ forge: forgeUrl, token: mobileToken }).toString()
+  // Normalize forgeUrl so protocol-less values (e.g. "forge.example.com")
+  // become valid absolute URLs before being embedded in the QR fragment.
+  // Named cloudflare tunnels are always https, but defensive normalization
+  // ensures the Companion PWA can parse the forge= param on any device.
+  const normalizedForgeUrl = normalizeHttpUrl(forgeUrl)
+  const fragment = new URLSearchParams({ forge: normalizedForgeUrl, token: mobileToken }).toString()
   return `${base}#${fragment}`
 }

@@ -93,3 +93,89 @@ func TestMigrateCommands_LeavesGoodPayloadsAlone(t *testing.T) {
 		t.Fatal("expected MigrateCommands to leave well-formed payloads untouched")
 	}
 }
+
+// ── migrateToolVariants tests ──────────────────────────────────────────────
+
+// TestMigrateToolVariants_AddsDescriptionVariantsToID6 confirms that a
+// legacy "Copilot (Fresh)" card (ID 6) without DescriptionVariants gets
+// both the claude and copilot description variants injected.
+func TestMigrateToolVariants_AddsDescriptionVariantsToID6(t *testing.T) {
+	original := []Command{{
+		ID:           6,
+		Description:  "🤖 Copilot (Fresh)",
+		Command:      "copilot --allow-all-tools",
+		ToolVariants: map[string]string{"claude": "claude", "copilot": "copilot --allow-all-tools"},
+	}}
+
+	migrated, changed := migrateToolVariants(original)
+	if !changed {
+		t.Fatal("expected migrateToolVariants to report a change for missing DescriptionVariants")
+	}
+	dv := migrated[0].DescriptionVariants
+	if dv["claude"] == "" {
+		t.Error("claude description variant must not be empty")
+	}
+	if dv["copilot"] == "" {
+		t.Error("copilot description variant must not be empty")
+	}
+	if dv["claude"] == dv["copilot"] {
+		t.Errorf("claude and copilot description variants should differ; both are %q", dv["claude"])
+	}
+}
+
+// TestMigrateToolVariants_AddsMacroVariantsToID7 confirms that a legacy
+// Resume card (ID 7) gets both a claude and copilot macro variant injected,
+// with the claude variant containing "SYSTEM INJECTION" and the copilot
+// variant retaining workflow-enforcer skill invocation language.
+func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
+	original := []Command{{
+		ID:           7,
+		Description:  "🔄 Copilot (Resume)",
+		Command:      "copilot --allow-all-tools --continue",
+		ToolVariants: map[string]string{"claude": "claude --resume", "copilot": "copilot --allow-all-tools --continue"},
+		MacroPayload: "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: skill: workflow-enforcer.",
+	}}
+
+	migrated, changed := migrateToolVariants(original)
+	if !changed {
+		t.Fatal("expected migrateToolVariants to report a change for missing MacroVariants")
+	}
+	mv := migrated[0].MacroVariants
+	if !strings.Contains(mv["claude"], "SYSTEM INJECTION") {
+		t.Errorf("claude macro variant should contain 'SYSTEM INJECTION'; got %q", mv["claude"])
+	}
+	if !strings.Contains(mv["copilot"], "workflow") {
+		t.Errorf("copilot macro variant should contain 'workflow'; got %q", mv["copilot"])
+	}
+}
+
+// TestMigrateToolVariants_UpgradesExistingID8 verifies that when ID 8 is
+// present but lacks ToolVariants, the migration adds ToolVariants,
+// DescriptionVariants, and MacroVariants — fixing the silent upgrade gap
+// where the old code only set hasID8=true without actually upgrading it.
+func TestMigrateToolVariants_UpgradesExistingID8(t *testing.T) {
+	original := []Command{{
+		ID:           8,
+		Description:  "🛡️ Copilot (Workflow Enforced)",
+		Command:      "copilot --allow-all-tools",
+		MacroPayload: "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: skill: workflow-enforcer.",
+	}}
+
+	migrated, changed := migrateToolVariants(original)
+	if !changed {
+		t.Fatal("expected migrateToolVariants to upgrade existing ID 8 that lacks ToolVariants")
+	}
+	card := migrated[0]
+	if len(card.ToolVariants) == 0 {
+		t.Error("ID 8 should have ToolVariants after migration")
+	}
+	if card.ToolVariants["claude"] == "" || card.ToolVariants["copilot"] == "" {
+		t.Errorf("ID 8 ToolVariants incomplete: %v", card.ToolVariants)
+	}
+	if len(card.DescriptionVariants) == 0 {
+		t.Error("ID 8 should have DescriptionVariants after migration")
+	}
+	if len(card.MacroVariants) == 0 {
+		t.Error("ID 8 should have MacroVariants after migration")
+	}
+}

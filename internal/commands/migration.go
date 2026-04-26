@@ -97,9 +97,9 @@ func inferProviderFromCommand(command, description string) string {
 	return ""
 }
 
-// migrateToolVariants upgrades the legacy Copilot-specific cards (IDs 6, 7)
-// to tool-agnostic "Fresh Session" / "Resume" cards with ToolVariants, and
-// injects the new "Enforced" card (ID 8) if it is missing.
+// migrateToolVariants upgrades the legacy Copilot-specific cards (IDs 6, 7, 8)
+// to tool-agnostic cards with ToolVariants, DescriptionVariants, and
+// MacroVariants, and injects the Enforced card (ID 8) if it is missing.
 //
 // This runs as part of AutoMigrateOnLoad so existing installs are upgraded
 // transparently on first boot after the update, without any manual edits.
@@ -107,7 +107,6 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 	changed := false
 	hasID8 := false
 
-	// Determine what system IDs already have ToolVariants and whether ID 8 exists.
 	for i, cmd := range commands {
 		switch cmd.ID {
 		case 6:
@@ -121,6 +120,27 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded ID 6 to tool-agnostic Fresh Session card")
 			}
+			if len(commands[i].DescriptionVariants) == 0 {
+				commands[i].DescriptionVariants = map[string]string{
+					"claude":  "🤖 Claude (Fresh)",
+					"copilot": "🤖 Copilot (Fresh)",
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 6")
+			}
+			if len(commands[i].MacroVariants) == 0 {
+				copilotMacro := cmd.MacroPayload
+				if copilotMacro == "" {
+					copilotMacro = CopilotWorkflowMacro
+				}
+				commands[i].MacroVariants = map[string]string{
+					"claude":  ClaudeAwarenessMacro,
+					"copilot": copilotMacro,
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Added MacroVariants to ID 6")
+			}
+
 		case 7:
 			if len(cmd.ToolVariants) == 0 {
 				commands[i].Description = "🔄 Resume"
@@ -132,22 +152,84 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded ID 7 to tool-agnostic Resume card")
 			}
+			if len(commands[i].DescriptionVariants) == 0 {
+				commands[i].DescriptionVariants = map[string]string{
+					"claude":  "🔄 Claude (Resume)",
+					"copilot": "🔄 Copilot (Resume)",
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 7")
+			}
+			if len(commands[i].MacroVariants) == 0 {
+				copilotMacro := cmd.MacroPayload
+				if copilotMacro == "" {
+					copilotMacro = CopilotWorkflowMacro
+				}
+				commands[i].MacroVariants = map[string]string{
+					"claude":  ClaudeAwarenessMacro,
+					"copilot": copilotMacro,
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Added MacroVariants to ID 7")
+			}
+
 		case 8:
 			hasID8 = true
+			// Fix the silent upgrade gap: ID 8 that already exists but lacks
+			// ToolVariants (created before the tool-variant system) must still
+			// be upgraded, just like IDs 6 and 7.
+			if len(cmd.ToolVariants) == 0 {
+				commands[i].Description = "🛡 Enforced"
+				commands[i].Command = "claude"
+				commands[i].ToolVariants = map[string]string{
+					"claude":  "claude",
+					"copilot": "copilot --allow-all-tools",
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Upgraded existing ID 8 to tool-agnostic Enforced card")
+			}
+			if len(commands[i].DescriptionVariants) == 0 {
+				commands[i].DescriptionVariants = map[string]string{
+					"claude":  "🛡 Claude (Enforced)",
+					"copilot": "🛡 Copilot (Enforced)",
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 8")
+			}
+			if len(commands[i].MacroVariants) == 0 {
+				copilotMacro := cmd.MacroPayload
+				if copilotMacro == "" {
+					copilotMacro = CopilotWorkflowMacro
+				}
+				commands[i].MacroVariants = map[string]string{
+					"claude":  ClaudeEnforcedMacro,
+					"copilot": copilotMacro,
+				}
+				changed = true
+				log.Printf("[Commands] Migration: Added MacroVariants to ID 8")
+			}
 		}
 	}
 
 	if !hasID8 {
 		enforced := Command{
-			ID:          8,
-			Description: "🛡 Enforced",
-			Command:     "claude",
-			MacroPayload: "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change.",
+			ID:           8,
+			Description:  "🛡 Enforced",
+			Command:      "claude",
+			MacroPayload: CopilotWorkflowMacro,
 			MacroDelay:   4500,
 			Icon:         "emoji-shield",
 			ToolVariants: map[string]string{
 				"claude":  "claude",
 				"copilot": "copilot --allow-all-tools",
+			},
+			DescriptionVariants: map[string]string{
+				"claude":  "🛡 Claude (Enforced)",
+				"copilot": "🛡 Copilot (Enforced)",
+			},
+			MacroVariants: map[string]string{
+				"claude":  ClaudeEnforcedMacro,
+				"copilot": CopilotWorkflowMacro,
 			},
 		}
 		commands = append(commands, enforced)

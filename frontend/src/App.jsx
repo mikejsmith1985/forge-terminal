@@ -1861,8 +1861,8 @@ function App() {
         ) : sidebarView === 'mcp' ? (
           <div style={{ overflowY: 'auto', height: '100%' }}>
             <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <MCPSetupCard />
               <MCPDiscoveryCard />
+              <MCPSetupCard />
               <CompanionAccessCard />
             </div>
           </div>

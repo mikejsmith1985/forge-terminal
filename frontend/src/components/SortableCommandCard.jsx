@@ -28,13 +28,22 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
     const LucideIcon = !emojiChar && command.icon ? iconMap[command.icon] : null;
     const hasFallbackIcon = !emojiChar && !LucideIcon;
 
-    // For tool-aware cards (those with toolVariants), swap the command string
-    // based on the currently selected CLI tool before passing to handlers.
+    // For tool-aware cards (those with toolVariants), swap the command string,
+    // visible description, and macro payload based on the active CLI tool
+    // before passing to handlers — so each tool runs and announces itself correctly.
     const isToolAware = !!command.toolVariants && Object.keys(command.toolVariants).length > 0
     const resolvedCommand = isToolAware
         ? (command.toolVariants[preferredCliTool] ?? command.command)
         : command.command
-    const activeCmd = isToolAware ? { ...command, command: resolvedCommand } : command
+    const resolvedDescription = isToolAware && command.descriptionVariants?.[preferredCliTool]
+        ? command.descriptionVariants[preferredCliTool]
+        : command.description
+    const resolvedMacro = isToolAware && command.macroVariants?.[preferredCliTool] !== undefined
+        ? command.macroVariants[preferredCliTool]
+        : command.macro_payload
+    const activeCmd = isToolAware
+        ? { ...command, command: resolvedCommand, macro_payload: resolvedMacro }
+        : command
 
     return (
         <div
@@ -107,7 +116,7 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
                 {/* Command or description text — shown as a code hint */}
                 <div className="card-body">
                     <div className="command-preview" title={resolvedCommand}>
-                        {command.description || resolvedCommand}
+                        {resolvedDescription || resolvedCommand}
                     </div>
                     {isToolAware && (
                         <span
