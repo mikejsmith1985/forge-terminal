@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.9.2] - 2026-04-26
+
+---
+
+## [v7.9.2] - 2026-04-26
+
 ### Fixed
 - **Named tunnel storm-guard leaves wizard permanently stuck** — when cloudflared crashes 5 times within 2 minutes the supervisor enters `StageStopped` and never self-recovers, but the Companion wizard treated `stopped` identically to `starting` (same spinner, same disabled "Tunnel is healthy" button, no escape). Wizard step 2 now detects `tunnelStage === 'stopped'`, replaces the spinner with an `AlertCircle`, shows an actionable message, and renders an inline **Restart supervisor** button that calls `POST /api/tunnel/setup/restart` to start a fresh supervisor.
 - **Named tunnel storm publish erased the known hostname URL** — `StageStopped` was published with an empty URL, causing the wizard's QR code and hostname display to go blank on the next 6-second poll. Now passes `s.probeURL` so the URL stays visible even when the supervisor has given up.
