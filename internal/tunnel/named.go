@@ -23,6 +23,7 @@ import (
 	"io"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -73,10 +74,34 @@ type Supervisor struct {
 	ranker        *Ranker
 	bin           string        // path to cloudflared, resolved once at Start()
 	probeURL      string        // https://<hostname> — base for ProbeHTTP
-	localProbeURL string        // http://localhost:{port} — fallback for NAT-hairpin networks
+	localProbeURL string        // http://127.0.0.1:{port} — fallback for NAT-hairpin networks
 	stopOnce      sync.Once     // guards Stop()
 	doneCh        chan struct{} // closed when the supervisor goroutine exits
 	cancel        context.CancelFunc
+	lastLinesMu   sync.Mutex
+	lastLines     []string // ring buffer: last 10 lines of cloudflared stdout/stderr
+}
+
+// recordLine appends a cloudflared output line to the ring buffer.
+// Called from the drain goroutine in runOnce; safe for concurrent use.
+func (s *Supervisor) recordLine(line string) {
+	s.lastLinesMu.Lock()
+	defer s.lastLinesMu.Unlock()
+	s.lastLines = append(s.lastLines, line)
+	if len(s.lastLines) > 10 {
+		s.lastLines = s.lastLines[1:]
+	}
+}
+
+// crashOutput returns the buffered cloudflared output as a single string,
+// or "" if nothing was captured yet. Used to enrich storm-guard error messages.
+func (s *Supervisor) crashOutput() string {
+	s.lastLinesMu.Lock()
+	defer s.lastLinesMu.Unlock()
+	if len(s.lastLines) == 0 {
+		return ""
+	}
+	return strings.Join(s.lastLines, "\n")
 }
 
 // supervisorTiming collects the time-based knobs in one struct so tests
@@ -202,10 +227,13 @@ func (s *Supervisor) run(ctx context.Context, timing supervisorTiming) {
 
 		crashes.record(time.Now())
 		if crashes.stormTripped() {
-			s.publish(StageStopped, "",
-				fmt.Sprintf("cloudflared crashed %d times within %s — giving up; check logs and try 'Repair tunnel'",
-					timing.stormMaxCrashes, timing.stormWindow),
-				"Repair tunnel")
+			errMsg := fmt.Sprintf("cloudflared crashed %d times within %s — giving up; use 'Restart supervisor' in the wizard or 'Repair tunnel' to try again",
+				timing.stormMaxCrashes, timing.stormWindow)
+			if out := s.crashOutput(); out != "" {
+				errMsg += "\n\nLast cloudflared output:\n" + out
+			}
+			// Preserve s.probeURL so the frontend keeps showing the hostname.
+			s.publish(StageStopped, s.probeURL, errMsg, "Repair tunnel")
 			return
 		}
 
@@ -260,15 +288,14 @@ func (s *Supervisor) runOnce(ctx context.Context, timing supervisorTiming) error
 		return fmt.Errorf("cloudflared start: %w", err)
 	}
 
-	// Drain output so the pipe buffer doesn't fill up and wedge the child.
-	// We discard on purpose — named-tunnel URLs are already known; the
-	// logs are only interesting when debugging, and the user can run
-	// cloudflared by hand for that.
+	// Drain output to prevent the pipe buffer from filling and wedging the
+	// child. Buffer the last 10 lines in the Supervisor so the storm-guard
+	// error message can include the actual cloudflared failure reason.
 	go func() {
 		defer pr.Close()
 		scanner := bufio.NewScanner(pr)
 		for scanner.Scan() {
-			// intentional discard
+			s.recordLine(scanner.Text())
 		}
 	}()
 
