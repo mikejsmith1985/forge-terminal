@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [7.10.0] - 2026-04-26
+
 ### Added
 - **`forge-git` enforcement shim** — New binary at `cmd/forge-git/` acts as a drop-in PATH shim for the system `git` binary. It intercepts `git commit --no-verify` and `git push --no-verify` (including the `-n` shorthand for commit), blocks execution with a clear message, and logs the attempt to `~/.forge/audit/violations.log`. All other git commands are transparently forwarded to the real git found elsewhere in PATH. Install by building the binary to `~/.forge/bin/git` and placing `~/.forge/bin` first in `PATH`.
 - **`CLAUDE.md` scaffold entry** — Forge Workflow now generates `CLAUDE.md` alongside `.github/copilot-instructions.md` in every scaffolded project. Claude Code reads `CLAUDE.md` automatically at every session start; the file `@`-imports the canonical instructions file so both Claude Code and GitHub Copilot share a single source of truth with zero content duplication.
