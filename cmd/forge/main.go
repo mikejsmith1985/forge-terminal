@@ -246,6 +246,12 @@ func main() {
 	}
 	log.Printf("[Forge] Storage structure: %s", storage.GetCurrentStructure())
 
+	// Migrate command cards — adds toolVariants/descriptionVariants/macroVariants
+	// to the runner cards (IDs 6/7/8) so the CLI tool toggle works on first boot.
+	if err := commands.AutoMigrateOnLoad(); err != nil {
+		log.Printf("[Forge] Warning: command auto-migration failed: %v", err)
+	}
+
 	// v3.12.3: SLM engine removed - context windows too small for complex tasks
 	// Archived: internal/slm.removed/
 
