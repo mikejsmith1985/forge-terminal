@@ -7,7 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Play, Clipboard, Edit2, Trash2, GripVertical, Zap } from 'lucide-react';
 import { iconMap, getEmojiFromIcon } from './IconPicker';
 
-export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDelete }) {
+export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDelete, preferredCliTool = 'claude' }) {
     const {
         attributes,
         listeners,
@@ -27,6 +27,14 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
     const emojiChar = getEmojiFromIcon(command.icon);
     const LucideIcon = !emojiChar && command.icon ? iconMap[command.icon] : null;
     const hasFallbackIcon = !emojiChar && !LucideIcon;
+
+    // For tool-aware cards (those with toolVariants), swap the command string
+    // based on the currently selected CLI tool before passing to handlers.
+    const isToolAware = !!command.toolVariants && Object.keys(command.toolVariants).length > 0
+    const resolvedCommand = isToolAware
+        ? (command.toolVariants[preferredCliTool] ?? command.command)
+        : command.command
+    const activeCmd = isToolAware ? { ...command, command: resolvedCommand } : command
 
     return (
         <div
@@ -96,18 +104,26 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
                     </div>
                 </div>
 
-                {/* Command or description text — shown in monospace as a code hint */}
+                {/* Command or description text — shown as a code hint */}
                 <div className="card-body">
-                    <div className="command-preview" title={command.command}>
-                        {command.description || command.command}
+                    <div className="command-preview" title={resolvedCommand}>
+                        {command.description || resolvedCommand}
                     </div>
+                    {isToolAware && (
+                        <span
+                            className={`tool-badge tool-badge-${preferredCliTool}`}
+                            title={`Running with ${preferredCliTool === 'claude' ? 'Claude Code' : 'GitHub Copilot'}: ${resolvedCommand}`}
+                        >
+                            {preferredCliTool === 'claude' ? 'Claude' : 'Copilot'}
+                        </span>
+                    )}
                 </div>
 
                 {/* Paste + Run buttons */}
                 <div className={`card-footer ${command.pasteOnly ? 'paste-only' : ''}`}>
                     <button
                         className="btn-action btn-paste"
-                        onClick={() => onPaste(command)}
+                        onClick={() => onPaste(activeCmd)}
                         title="Paste to Terminal"
                     >
                         <Clipboard size={14} /> Paste
@@ -115,7 +131,7 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
                     {!command.pasteOnly && (
                         <button
                             className="btn-action btn-run"
-                            onClick={() => onExecute(command)}
+                            onClick={() => onExecute(activeCmd)}
                             title="Run in Terminal"
                         >
                             <Play size={14} /> Run

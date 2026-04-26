@@ -247,6 +247,76 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+/* ── CLI Tool Selector strip ─────────────────────────────────────────────── */
+.cli-tool-selector {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 6px;
+  border-bottom: 1px solid var(--overlay, rgba(255,255,255,0.06));
+  margin-bottom: 2px;
+}
+
+.cli-tool-selector-label {
+  font-size: 0.68em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, rgba(255,255,255,0.35));
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.cli-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+  font-size: 0.74em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.cli-tool-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.05);
+  color: var(--text, rgba(255,255,255,0.85));
+  border-color: rgba(255,255,255,0.1);
+}
+
+.cli-tool-btn.active {
+  background: color-mix(in srgb, var(--tool-color, var(--accent)) 15%, transparent);
+  border-color: color-mix(in srgb, var(--tool-color, var(--accent)) 60%, transparent);
+  color: var(--tool-color, var(--accent));
+}
+
+/* Tool badge on individual cards */
+.tool-badge {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.67em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.tool-badge-claude {
+  background: rgba(212, 135, 94, 0.15);
+  color: #d4875e;
+  border: 1px solid rgba(212, 135, 94, 0.3);
+}
+
+.tool-badge-copilot {
+  background: rgba(139, 111, 203, 0.15);
+  color: #8b6fcb;
+  border: 1px solid rgba(139, 111, 203, 0.3);
+}
+
 /* Sidebar view toggle tabs */
 .sidebar-view-tabs {
   display: flex;

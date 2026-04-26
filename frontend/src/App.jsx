@@ -144,6 +144,13 @@ function App() {
   const [sidebarTabStyle, setSidebarTabStyle] = useState(
     () => localStorage.getItem('sidebarTabStyle') || 'icon-only'
   )
+  const [preferredCliTool, setPreferredCliTool] = useState(
+    () => localStorage.getItem('preferredCliTool') || 'claude'
+  )
+  const handleCliToolChange = (tool) => {
+    setPreferredCliTool(tool)
+    localStorage.setItem('preferredCliTool', tool)
+  }
   const [editorFile, setEditorFile] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   const [editorMode, setEditorMode] = useState('classic') // 'agentic' or 'classic' (Monaco)
@@ -1840,6 +1847,8 @@ function App() {
               cwd={activeTab?.currentDirectory}
               directoryCardVisible={directoryCardVisible}
               onHideDirectoryCard={handleHideDirectoryCard}
+              preferredCliTool={preferredCliTool}
+              onCliToolChange={handleCliToolChange}
             />
           </DndContext>
         ) : sidebarView === 'files' ? (

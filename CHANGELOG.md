@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CLI tool selector for workflow command cards** — A compact `Run with [Claude] [Copilot]` pill strip now sits between the Projects browser and the command cards in the Cards tab. Selecting a tool switches what the three workflow action cards (`🚀 Fresh Session`, `🔄 Resume`, `🛡 Enforced`) actually run, eliminating the need for separate Copilot and Claude cards for the same action. Selection persists to `localStorage`. Each tool-aware card shows a small colour-coded badge (`Claude` or `Copilot`) so the active tool is always obvious. Existing Copilot-specific cards (IDs 6, 7) are upgraded automatically on first boot; the new Enforced card (ID 8) is injected into existing installs via `AutoMigrateOnLoad`.
+- **Enforced workflow card (ID 8)** — New `🛡 Enforced` action card starts a fresh session with an amplified macro payload that mandates the workflow-enforcer rules on every task (no shortcuts, all quality gates apply). Works with both Claude and Copilot.
+
 ### Fixed
 - **Named tunnel crashes on cloudflared v2025.8+ due to wrong argument order** — `--config` and `--no-autoupdate` are `tunnel`-level flags in cloudflared v2025.8's `urfave/cli` strict subcommand scoping; they must appear between `tunnel` and `run`, not after it. The supervisor had `cloudflared tunnel run --config … --no-autoupdate` which caused cloudflared to immediately print its full help text and exit, triggering the storm guard in ~40 seconds. Fixed to `cloudflared tunnel --no-autoupdate --config … run <uuid>`. Validated live against the real binary before committing.
 - **Crash output buffer captured useless help text instead of the error line** — ring buffer kept only the *last* 10 lines; for startup crashes (help text printed then exit) this captured the bottom of the help page. Changed to keep the *first* 3 + *last* 5 non-empty lines so the actual error (always first) is always captured. Buffer resets at the start of each restart attempt.
