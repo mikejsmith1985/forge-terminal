@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v7.9.0] - 2026-04-25
 
+### Fixed
+- **Named tunnel health probe never reaches "healthy" (spinner wedged in Companion wizard)** — three compounding bugs: (1) `ProbeHTTP` hardcoded its own 2-second `context.WithTimeout` that silently overrode the caller's 8-second budget added in v7.8.6 for slow Cloudflare TLS, meaning the external probe only ever got 2 s; (2) the local fallback probe used `localhost` which on Windows resolves to `::1` (IPv6) before falling back to IPv4, adding ~1 s of TCP latency and intermittently exceeding the 2-second window; (3) the wizard read `option.detail` but the backend sends `option.lastError`, so error messages in the spinner never displayed. Fixed: `ProbeHTTP` no longer wraps the caller's context — callers control the timeout budget; local probe URL changed to `127.0.0.1` to bypass Windows IPv6 resolution; wizard now reads `option.lastError`.
+- **Sidebar tab ribbon visual redesign** — icon-only tabs rendered as large boxy filled squares in accent color; replaced with a slim underline-indicator style (2 px accent border-bottom, transparent background) that matches the rest of the sidebar's visual language.
+
 ### Added
 - **Sidebar ribbon UX refresh** — overloaded Cards tab split into four focused tabs: **Cards** (user command shortcuts + Projects browser), **Files** (unchanged), **MCP** (MCPSetupCard + MCPDiscoveryCard + CompanionAccessCard), and **Tools** (Release Manager + Forge Workflow + Web App Debugger). The Debugger tab is retired; its contents live in Tools.
 - **Configurable tab label style** — new Tag button in the theme controls row toggles between icon+label and icon-only modes; preference persisted to localStorage (`sidebarTabStyle`).

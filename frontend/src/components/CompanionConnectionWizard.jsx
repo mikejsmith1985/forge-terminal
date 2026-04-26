@@ -154,7 +154,7 @@ export default function CompanionConnectionWizard({
       if (!option) return
       setTunnelUrl(option.url || '')
       setTunnelStage(option.stage || 'absent')
-      setTunnelDetail(option.detail || '')
+      setTunnelDetail(option.lastError || '')
     } catch {
       // Best-effort polling; ignore transient errors.
     }

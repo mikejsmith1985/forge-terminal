@@ -112,7 +112,7 @@ func NewSupervisor(cfg NamedConfig, ranker *Ranker) *Supervisor {
 		cfg:           cfg,
 		ranker:        ranker,
 		probeURL:      fmt.Sprintf("https://%s", cfg.Hostname),
-		localProbeURL: fmt.Sprintf("http://localhost:%d", cfg.LocalPort),
+		localProbeURL: fmt.Sprintf("http://127.0.0.1:%d", cfg.LocalPort),
 		doneCh:        make(chan struct{}),
 	}
 }

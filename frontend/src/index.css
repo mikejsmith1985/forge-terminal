@@ -250,8 +250,8 @@ body {
 /* Sidebar view toggle tabs */
 .sidebar-view-tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px;
+  gap: 0;
+  padding: 0 6px;
   background: var(--bg);
   border-bottom: 1px solid var(--overlay);
 }
@@ -261,42 +261,41 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border: 1px solid var(--overlay);
+  gap: 5px;
+  padding: 8px 6px;
+  border: none;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--subtext);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 0;
   cursor: pointer;
-  transition: all 0.2s ease;
+  margin-bottom: -1px;
+  transition: color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
   min-width: 0;
 }
 
 .sidebar-view-tab:hover {
-  background: var(--overlay);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
 }
 
 .sidebar-view-tab.active {
-  background: var(--gradient-primary);
-  border-color: var(--accent);
-  color: white;
+  background: transparent;
+  border-bottom-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Icon-only tab style — toggled by the Tag button in theme controls */
 .sidebar-view-tabs.icon-only {
-  justify-content: center;
-  gap: 6px;
+  padding: 0 4px;
 }
 
 .sidebar-view-tabs.icon-only .sidebar-view-tab {
-  flex: unset;
-  width: 38px;
-  padding: 6px;
-  justify-content: center;
+  flex: 1;
+  padding: 9px 4px;
 }
 
 .sidebar-view-tabs.icon-only .tab-label {
