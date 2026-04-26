@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.3] - 2026-04-26
+
+---
+
+## [v7.10.3] - 2026-04-26
+
 ### Tests
 - Updated `TestMigrateToolVariants_AddsMacroVariantsToID7` to assert the claude toolVariant is `claude --continue` and the macro contains SYSTEM INJECTION. Updated `CompanionConnectionWizard` test to assert the QR base URL is the cloudflare named tunnel URL (was asserting Tailscale, which documented the bug).
 
