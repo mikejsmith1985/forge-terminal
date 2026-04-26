@@ -166,11 +166,21 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 					copilotMacro = CopilotWorkflowMacro
 				}
 				commands[i].MacroVariants = map[string]string{
-					"claude":  ClaudeAwarenessMacro,
+					"claude":  "",
 					"copilot": copilotMacro,
 				}
 				changed = true
-				log.Printf("[Commands] Migration: Added MacroVariants to ID 7")
+				log.Printf("[Commands] Migration: Added MacroVariants to ID 7 (claude macro intentionally empty)")
+			}
+			// Clear the claude macro on ID 7 for installs that previously set it
+			// to ClaudeAwarenessMacro.  That macro fires after macro_delay ms, which
+			// elapses while the --resume session picker is still showing — so the
+			// injection text lands in the picker as a search filter instead of in
+			// the running Claude session, leaving the user stuck on a single result.
+			if claudeMacro, hasClaude := commands[i].MacroVariants["claude"]; hasClaude && claudeMacro != "" {
+				commands[i].MacroVariants["claude"] = ""
+				changed = true
+				log.Printf("[Commands] Migration: Cleared claude macro for ID 7 (resume picker fix)")
 			}
 
 		case 8:

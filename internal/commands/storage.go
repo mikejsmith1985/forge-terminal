@@ -163,8 +163,12 @@ var DefaultCommands = []Command{
 			"claude":  "🔄 Claude (Resume)",
 			"copilot": "🔄 Copilot (Resume)",
 		},
+		// claude --resume opens an interactive session picker before Claude Code
+		// starts, so a non-empty macro fires into the picker as search text rather
+		// than into the running session.  Leave the claude variant empty; the
+		// copilot variant uses --continue which is non-interactive and safe to macro.
 		MacroVariants: map[string]string{
-			"claude":  ClaudeAwarenessMacro,
+			"claude":  "",
 			"copilot": CopilotWorkflowMacro,
 		},
 	},

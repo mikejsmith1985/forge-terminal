@@ -995,6 +995,14 @@ function App() {
     // from xterm's hidden textarea. Without this redirect, the first key the user
     // types after such an interaction is silently dropped — common when Copilot CLI
     // or other TUI apps show a numbered-selection menu immediately after a UI action.
+    //
+    // Persisted-tab variant: after session restore the terminal mounts and the
+    // WebSocket opens, but a React re-render triggered by setIsConnected(true) can
+    // steal focus before the first keystroke.  We split the logic so focus is ALWAYS
+    // restored when a terminal ref exists — even if the socket is not yet open —
+    // and the character is only forwarded when the socket is ready.  Restoring focus
+    // without forwarding is acceptable: the character is sacrificed once, but all
+    // subsequent keystrokes route directly through xterm without needing the redirect.
     const isPlainPrintable = !e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1;
     const isAnyOverlayOpen = isSearchOpen || isForgeAssistOpen || isModalOpen ||
       isSettingsModalOpen || isFeedbackModalOpen ||
@@ -1003,17 +1011,21 @@ function App() {
 
     if (isPlainPrintable && !isAnyOverlayOpen) {
       const termRef = getActiveTerminalRef();
-      if (termRef?.isConnected()) {
+      if (termRef) {
         e.preventDefault();
         e.stopPropagation();
-        // Restore focus so all subsequent keystrokes route directly to xterm
+        // Always restore focus — this is the invariant that matters most.
         termRef.focus();
-        // Forward the character that triggered this redirect to the PTY directly,
-        // since the current key event can no longer be re-routed to xterm's textarea.
-        const activeSocket = termRef.getSocket();
-        if (activeSocket?.readyState === WebSocket.OPEN) {
-          activeSocket.send(e.key);
+        if (termRef.isConnected()) {
+          // Forward the character that triggered this redirect to the PTY directly,
+          // since the current key event can no longer be re-routed to xterm's textarea.
+          const activeSocket = termRef.getSocket();
+          if (activeSocket?.readyState === WebSocket.OPEN) {
+            activeSocket.send(e.key);
+          }
         }
+        // else: socket not yet open — focus is restored so the next keypress routes
+        // correctly through xterm without needing this redirect at all.
         return;
       }
     }
@@ -1081,6 +1093,30 @@ function App() {
     window.addEventListener('keydown', stableKeyboardHandler, { capture: true });
     return () => window.removeEventListener('keydown', stableKeyboardHandler, { capture: true });
   }, []);
+
+  // After session restore, poll until the active terminal is connected then
+  // focus it.  Persisted tabs mount and begin connecting asynchronously; the
+  // useLayoutEffect inside ForgeTerminal only fires once on mount and the
+  // onopen handler re-focuses via requestAnimationFrame, but a React re-render
+  // can still steal focus before the user starts typing.  This effect fires
+  // when sessionLoaded transitions to true and retries for up to two seconds,
+  // providing a reliable final safety net without any visible flicker.
+  useEffect(() => {
+    if (!sessionLoaded) return;
+    const MAX_POLL_COUNT = 20;
+    let pollCount = 0;
+    const focusWhenConnectedInterval = setInterval(() => {
+      pollCount++;
+      const termRef = getActiveTerminalRef();
+      if (termRef?.isConnected()) {
+        termRef.focus();
+        clearInterval(focusWhenConnectedInterval);
+      } else if (pollCount >= MAX_POLL_COUNT) {
+        clearInterval(focusWhenConnectedInterval);
+      }
+    }, 100);
+    return () => clearInterval(focusWhenConnectedInterval);
+  }, [sessionLoaded, getActiveTerminalRef]);
 
   // Handle new tab creation
   const handleNewTab = useCallback((options = {}) => {

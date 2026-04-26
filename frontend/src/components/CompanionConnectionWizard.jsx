@@ -298,12 +298,14 @@ export default function CompanionConnectionWizard({
 
   // Steps 2-N — render only the chosen method's flow.
   //
-  // For the Named Cloudflare Tunnel, use the Tailscale URL as the companion
-  // host when available so the QR points to the machine's private network
-  // address rather than the public cloudflare tunnel.  Falls back to the
-  // companionHost prop (which may be the cloudflare URL itself) when
-  // Tailscale is absent or not yet connected.
-  const resolvedCompanionHost = (selectedMethod === 'named' && tailscaleUrl)
+  // QR host resolution: only use the Tailscale URL when the user has
+  // explicitly chosen the Tailscale method.  For the Named Cloudflare
+  // Tunnel the QR must point to the public named-tunnel URL — that is the
+  // stable address the phone will reach regardless of network, and it is
+  // what the user sees and trusts.  Routing to Tailscale when Named is
+  // selected only works if the phone is on the same LAN/VPN, which is
+  // rarely true in the companion use-case.
+  const resolvedCompanionHost = (selectedMethod === 'tailscale' && tailscaleUrl)
     ? getDefaultCompanionHost(tailscaleUrl)
     : companionHost
 
@@ -427,6 +429,30 @@ const NamedFlow = ({
         nextLabel="Tunnel is healthy"
         nextDisabled={tunnelStage !== 'healthy'}
       >
+        {/*
+          Show the QR code first — above Reconfigure — so the phone can be
+          scanned immediately once a tunnel URL exists.  Layout order per
+          design spec: QR → Reconfigure → Change method + Tunnel health →
+          Disable.  The Reconfigure button lives inside NamedTunnelSetupCard
+          so rendering the QR block before that component achieves the
+          correct visual order.
+        */}
+        {tunnelUrl && (
+          <div className="ccw-inline-qr">
+            <h4 className="ccw-inline-qr-title">Scan with your phone now</h4>
+            <p className="ccw-inline-qr-help">
+              Open your phone camera and point it at this code. The
+              companion app will be ready the moment the tunnel goes live.
+            </p>
+            <QrPanel
+              mobileToken={mobileToken}
+              companionHost={companionHost}
+              tunnelUrl={tunnelUrl}
+              hasCopiedLink={hasCopiedLink}
+              setHasCopiedLink={setHasCopiedLink}
+            />
+          </div>
+        )}
         <NamedTunnelSetupCard embedded={true} />
         {tunnelStage !== 'healthy' && (
           <p className="ccw-hint">
@@ -467,29 +493,6 @@ const NamedFlow = ({
               </code>
             )}
           </p>
-        )}
-        {/*
-          Show the QR code as soon as a tunnel URL is known — even before
-          the supervisor reports "healthy".  Phones can still scan and
-          have the PWA ready to connect the moment the tunnel comes up,
-          and the user explicitly asked for a QR on every step that has a
-          URL ("Step 2 should ALWAYS generate a QR code").
-        */}
-        {tunnelUrl && (
-          <div className="ccw-inline-qr">
-            <h4 className="ccw-inline-qr-title">Scan with your phone now</h4>
-            <p className="ccw-inline-qr-help">
-              Open your phone camera and point it at this code. The
-              companion app will be ready the moment the tunnel goes live.
-            </p>
-            <QrPanel
-              mobileToken={mobileToken}
-              companionHost={companionHost}
-              tunnelUrl={tunnelUrl}
-              hasCopiedLink={hasCopiedLink}
-              setHasCopiedLink={setHasCopiedLink}
-            />
-          </div>
         )}
       </StepShell>
     )

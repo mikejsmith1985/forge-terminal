@@ -1733,11 +1733,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         setIsConnected(true);
         setIsActiveDevice(true); // Assume active until SESSION_JOINED says otherwise
 
-        // Re-focus the terminal so keyboard input works immediately after connect/reconnect.
-        // xterm.js loses focus when the WebSocket is closed and the reconnect overlay appears.
-        if (xtermRef.current) {
-          xtermRef.current.focus();
-        }
+        // Re-focus the terminal after connect/reconnect.  setIsConnected(true)
+        // above queues a React re-render; calling focus() immediately would
+        // focus before that render settles and a DOM change could steal it back.
+        // requestAnimationFrame defers to after the browser's next paint, by
+        // which point React has committed and no further focus-stealing occurs.
+        requestAnimationFrame(() => {
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        });
         
         // Send initial size (always needed — terminal may have been resized during disconnect)
         const { cols, rows } = term;
@@ -1863,16 +1868,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                     wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
                   }
                 } else {
-                  // A different device is already controlling this session.
-                  // Delay the banner by 600ms: on reconnect the server may send
-                  // SESSION_JOINED before the previous connection's clearActive defer
-                  // fires. If CONTROL_GRANTED arrives in that window we cancel it.
-                  logger.terminal('Joined live session (passive device)', { tabId });
+                  // SESSION_JOINED with isActiveDevice:false fires on every
+                  // reconnect — the backend sends it before the previous
+                  // connection's deferred clearActive has run, so it is NOT a
+                  // reliable signal that a real remote device is present.
+                  // We log and print the terminal hint, but deliberately do NOT
+                  // show the purple banner here.  Only CONTROL_TRANSFERRED
+                  // (an explicit hand-off from an actively connected second device)
+                  // is a trustworthy trigger for the overlay.
+                  logger.terminal('Joined live session (passive device — banner suppressed)', { tabId });
                   if (xtermRef.current) {
                     xtermRef.current.write(`\r\n\x1b[38;2;99;102;241m[Forge Remote]\x1b[0m Viewing terminal session. Tap \x1b[1m"Take Control"\x1b[0m to interact.\r\n`);
                   }
                   clearTimeout(bannerTimerRef.current);
-                  bannerTimerRef.current = setTimeout(() => setIsActiveDevice(false), 600);
                 }
                 return;
               }
