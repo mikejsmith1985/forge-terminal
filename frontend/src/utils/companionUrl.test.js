@@ -199,7 +199,10 @@ describe('buildDeepLink', () => {
     expect(result).toContain('forge=http%3A%2F%2Fforge.rootlevellabs.tech')
   })
 
-  it('named-tunnel scenario: Tailscale companion host + cloudflare forgeUrl', () => {
+  it('handles a Tailscale companionHost with a cloudflare forgeUrl (pure function — inputs are valid)', () => {
+    // buildDeepLink is a pure utility; it accepts any valid companionHost.
+    // The wizard no longer passes a Tailscale URL when the user chose Named
+    // Cloudflare Tunnel — this test just proves the function does not panic.
     const result = buildDeepLink(
       'https://mikesdell.taila9144e.ts.net/companion/',
       'https://forge.rootlevellabs.tech',
@@ -207,6 +210,21 @@ describe('buildDeepLink', () => {
     )
     expect(result).toBe(
       'https://mikesdell.taila9144e.ts.net/companion/#forge=https%3A%2F%2Fforge.rootlevellabs.tech&token=620561d3'
+    )
+  })
+
+  it('named-tunnel scenario: cloudflare URL used as both companionHost base and forgeUrl', () => {
+    // When the user picks Named Cloudflare Tunnel, the wizard derives the
+    // companion base from tunnelUrl (the cloudflare URL) via
+    // getDefaultCompanionHost().  Both the PWA load path and the forge=
+    // fragment must encode the cloudflare address — never a Tailscale URL.
+    const result = buildDeepLink(
+      'https://forge.rootlevellabs.tech/companion/',
+      'https://forge.rootlevellabs.tech',
+      '620561d3'
+    )
+    expect(result).toBe(
+      'https://forge.rootlevellabs.tech/companion/#forge=https%3A%2F%2Fforge.rootlevellabs.tech&token=620561d3'
     )
   })
 })
