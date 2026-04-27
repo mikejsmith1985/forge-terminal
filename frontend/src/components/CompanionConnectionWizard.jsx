@@ -102,12 +102,6 @@ export default function CompanionConnectionWizard({
   const [tunnelUrl, setTunnelUrl] = useState('')
   const [tunnelStage, setTunnelStage] = useState('absent')
   const [tunnelDetail, setTunnelDetail] = useState('')
-  // When the named tunnel method is active and Tailscale is connected, the QR
-  // code should load the companion PWA via Tailscale (the machine's private
-  // network address) while the forge= fragment points to the named cloudflare
-  // tunnel.  tailscaleUrl captures the Tailscale URL for this override; an
-  // empty string means "fall back to the companionHost prop".
-  const [tailscaleUrl, setTailscaleUrl] = useState('')
 
   const [isPreferenceLoading, setIsPreferenceLoading] = useState(true)
   const [hasCopiedLink, setHasCopiedLink] = useState(false)
@@ -163,17 +157,6 @@ export default function CompanionConnectionWizard({
       setTunnelUrl(option.url || '')
       setTunnelStage(option.stage || 'absent')
       setTunnelDetail(option.lastError || '')
-      // For the Named Cloudflare Tunnel method, prefer the Tailscale URL as
-      // the companion host base so the QR encodes:
-      //   <tailscale-url>/companion/#forge=<named-tunnel-url>&token=…
-      // This lets the phone load the companion PWA over its private Tailscale
-      // network while Forge API calls go through the stable cloudflare tunnel.
-      if (selectedMethod === 'named') {
-        const ts = (data.options || []).find(o => o.mode === 'tailscale' && o.url)
-        setTailscaleUrl(ts?.url || '')
-      } else {
-        setTailscaleUrl('')
-      }
     } catch {
       // Best-effort polling; ignore transient errors.
     }
@@ -298,13 +281,12 @@ export default function CompanionConnectionWizard({
 
   // Steps 2-N — render only the chosen method's flow.
   //
-  // For the Named Cloudflare Tunnel, use the Tailscale URL as the companion
-  // host when available so the QR points to the machine's private network
-  // address rather than the public cloudflare tunnel.  Falls back to the
-  // companionHost prop (which may be the cloudflare URL itself) when
-  // Tailscale is absent or not yet connected.
-  const resolvedCompanionHost = (selectedMethod === 'named' && tailscaleUrl)
-    ? getDefaultCompanionHost(tailscaleUrl)
+  // The QR code must encode the URL for the method the user actually chose.
+  // For Named Cloudflare Tunnel, derive the companion base from the tunnel
+  // URL so both the PWA load path and the forge= fragment use the cloudflare
+  // address — never a Tailscale address the user didn't select.
+  const resolvedCompanionHost = (selectedMethod === 'named' && tunnelUrl)
+    ? getDefaultCompanionHost(tunnelUrl)
     : companionHost
 
   const stepProps = {
