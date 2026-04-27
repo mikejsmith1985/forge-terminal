@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.5] - 2026-04-27
+
+---
+
+## [v7.10.5] - 2026-04-27
+
 ### Fixed
 - **Companion QR code now encodes the chosen connection method's URL end-to-end** — When the user selected Named Cloudflare Tunnel and Tailscale was also connected, the wizard silently overrode the QR base URL with the Tailscale address. The phone received `tailscale-host/companion/#forge=cloudflare-url` instead of the Cloudflare URL throughout. Removed the Tailscale-override logic; `resolvedCompanionHost` now derives from `tunnelUrl` (the active Cloudflare URL) so both the PWA load path and the `forge=` fragment encode the method the user actually chose. Component test updated to serve as a regression guard against re-introducing the Tailscale substitution.
 - **Release Manager no longer re-releases the same version when git tags live on feature branches** — `local-release.ps1` used `git describe --tags --abbrev=0` which only searches branch ancestry. When a release is made from a feature branch before merging to main, new branches cut from main don't see that tag in their ancestry, causing `git describe` to return the previous version. Patch-bumping that yields the same tag as the one just released. Replaced with `git tag --sort=-version:refname` which finds the highest semver tag globally.
