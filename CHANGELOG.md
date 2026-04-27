@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.4] - 2026-04-27
+
+---
+
+## [v7.10.4] - 2026-04-27
+
 ### Fixed
 - **Release Manager no longer re-releases the same version when git tags live on feature branches** — `local-release.ps1` used `git describe --tags --abbrev=0` which only searches branch ancestry. When a release is made from a feature branch before merging to main, new branches cut from main don't see that tag in their ancestry, causing `git describe` to return the previous version. Patch-bumping that yields the same tag as the one just released. Replaced with `git tag --sort=-version:refname` which finds the highest semver tag globally.
 - **Release Manager UI now shows the correct current version when the running binary predates the latest tag** — `/api/version` returned only the binary's compiled-in version string. Added `latestGitTag` to the response (populated by the same global tag query). The Release Manager now prefers `latestGitTag` so it shows the right base even in the window between a release being tagged and the new binary being installed.
