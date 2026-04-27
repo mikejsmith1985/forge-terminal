@@ -154,7 +154,9 @@ describe('CompanionConnectionWizard', () => {
     })
   })
 
-  it('uses Tailscale URL as companion host base when named method is active', async () => {
+  it('uses the Named Cloudflare Tunnel URL as companion host base when named method is active', async () => {
+    // Regression guard: when Tailscale is also connected, the QR must still
+    // encode the Cloudflare URL end-to-end — not silently switch to Tailscale.
     const writeTextMock = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText: writeTextMock },
@@ -196,7 +198,8 @@ describe('CompanionConnectionWizard', () => {
 
     await waitFor(() => expect(writeTextMock).toHaveBeenCalled())
     const copiedUrl = writeTextMock.mock.calls[0][0]
-    expect(copiedUrl).toMatch(/^https:\/\/mikesdell\.taila9144e\.ts\.net\/companion\//)
+    // Both the PWA load path and the forge= param must use the Cloudflare URL.
+    expect(copiedUrl).toMatch(/^https:\/\/forge\.rootlevellabs\.tech\/companion\//)
     expect(copiedUrl).toContain('forge=https%3A%2F%2Fforge.rootlevellabs.tech')
     expect(copiedUrl).toContain('token=testtoken')
   })
