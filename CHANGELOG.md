@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release Manager no longer re-releases the same version when git tags live on feature branches** — `local-release.ps1` used `git describe --tags --abbrev=0` which only searches branch ancestry. When a release is made from a feature branch before merging to main, new branches cut from main don't see that tag in their ancestry, causing `git describe` to return the previous version. Patch-bumping that yields the same tag as the one just released. Replaced with `git tag --sort=-version:refname` which finds the highest semver tag globally.
 - **Release Manager UI now shows the correct current version when the running binary predates the latest tag** — `/api/version` returned only the binary's compiled-in version string. Added `latestGitTag` to the response (populated by the same global tag query). The Release Manager now prefers `latestGitTag` so it shows the right base even in the window between a release being tagged and the new binary being installed.
 - **Release Manager command now passes the explicit version to the script, not a bump type** — Previously `generateReleaseCommand` sent `patch`/`minor`/`major`, allowing the script's git-tag detection to override whatever the UI computed. The command now sends the exact version number (e.g. `7.10.4`), bypassing git-tag detection entirely. The UI is now the single source of truth for what gets released.
+- **`-ReleaseNotes` parameter added to `local-release.ps1`** — The interactive `Read-Host` prompt is now skipped when notes are supplied via `-ReleaseNotes`, enabling automated and tooling-driven invocations without blocking on stdin.
+
+## [7.10.3] - 2026-04-27
+
+---
+
+## [v7.10.3] - 2026-04-27
+
+### Fixed
+- **Companion PWA bottom edge no longer clipped on iOS Safari** — The `height: 100svh` / `height: 100vh` declarations in `.screen` were in the wrong order: CSS last-wins means `100vh` always overrode `100svh` in every modern browser, so the Small Viewport Height unit was completely inert. Swapped to `100vh` first (fallback) then `100svh` (override), so the collapsible Safari toolbar is now properly excluded from the layout height.
+- **Sessions screen Refresh button no longer overlaps the iOS home indicator** — The footer bar used a flat `padding: 12px 16px` with no safe-area compensation. Added `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px))` so the button clears the swipe zone on Face ID devices.
+- **Companion sessions list now auto-refreshes every 5 seconds** — The list was fetched once at connect time and never updated in the background. If no terminal was open at that moment the user saw "No active sessions" permanently and had to tap Refresh manually. Background polling (silent — no spinner flash) now starts when the sessions screen is shown and stops when navigating to a terminal or disconnecting.
 
 ## [7.10.2] - 2026-04-26
 
