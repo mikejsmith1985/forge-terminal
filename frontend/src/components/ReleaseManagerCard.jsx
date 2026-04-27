@@ -20,8 +20,13 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
         const response = await fetch('/api/version');
         if (response.ok) {
           const data = await response.json();
-          const version = data.version || '1.23.10';
-          setCurrentVersion(version.startsWith('v') ? version : `v${version}`);
+          // Prefer latestGitTag over the binary's compiled-in version string.
+          // The two diverge in the window between a release being tagged on a
+          // feature branch and the new binary being installed — exactly when the
+          // Release Manager would otherwise show a stale version number.
+          const binaryVersion = data.version || '1.23.10';
+          const resolvedVersion = data.latestGitTag || binaryVersion;
+          setCurrentVersion(resolvedVersion.startsWith('v') ? resolvedVersion : `v${resolvedVersion}`);
           setError(null);
         } else {
           setError('Failed to fetch version');
@@ -56,16 +61,18 @@ const ReleaseManagerCard = ({ onExecuteCommand, onToast, shellType }) => {
 
   const generateReleaseCommand = useCallback(() => {
     if (!next) return '';
-    
-    // Invoke local release pipeline — builds all platforms and publishes
-    // GitHub Release directly via gh CLI (no GitHub Actions required).
-    const bumpType = selectedIncrement === 'fix' ? 'patch' : selectedIncrement;
+
+    // Pass the explicit version number rather than a bump type (patch/minor/major).
+    // When the script receives a specific version it skips its own git-tag detection,
+    // so whatever the UI displays is exactly what gets released — eliminating the
+    // class of bug where the script computes a different version than the UI showed.
+    const explicitVersionNumber = next.replace(/^v/, '');
     if (shellType === 'powershell') {
-      return `.\\scripts\\local-release.ps1 ${bumpType}`;
+      return `.\\scripts\\local-release.ps1 ${explicitVersionNumber}`;
     } else {
-      return `pwsh -File ./scripts/local-release.ps1 ${bumpType}`;
+      return `pwsh -File ./scripts/local-release.ps1 ${explicitVersionNumber}`;
     }
-  }, [next, shellType, selectedIncrement]);
+  }, [next, shellType]);
 
   const releaseCommand = generateReleaseCommand();
 

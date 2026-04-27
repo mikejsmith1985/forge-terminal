@@ -1296,10 +1296,30 @@ func handleDetectBuildSystem(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// getLatestGitTag returns the highest semver tag found across all refs.
+// Unlike git-describe, which only walks the current branch's ancestry, this
+// query covers tags created on feature branches before they merge to main.
+// Returns an empty string when git is unavailable or no semver tags exist.
+func getLatestGitTag() string {
+	rawOutput, err := exec.Command("git", "tag", "--sort=-version:refname").Output()
+	if err != nil {
+		return ""
+	}
+	semverPattern := regexp.MustCompile(`^v\d+\.\d+\.\d+$`)
+	for _, rawLine := range strings.Split(string(rawOutput), "\n") {
+		trimmedTag := strings.TrimSpace(rawLine)
+		if semverPattern.MatchString(trimmedTag) {
+			return trimmedTag
+		}
+	}
+	return ""
+}
+
 func handleVersion(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"version": updater.GetVersion(),
+		"version":      updater.GetVersion(),
+		"latestGitTag": getLatestGitTag(),
 	})
 }
 

@@ -182,7 +182,12 @@ if ($preflightPassed -and $preflightWarnings.Count -eq 0) {
 # ── Version calculation ───────────────────────────────────────────────────────
 Write-Banner "Version"
 
-$currentTag = git describe --tags --abbrev=0 2>$null
+# git describe only searches branch ancestry — it misses tags created on other
+# branches (e.g. a release made from a feature branch before merging to main).
+# Sorting all tags by semver finds the true highest version across the whole repo.
+$currentTag = git tag --sort=-version:refname 2>$null |
+    Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } |
+    Select-Object -First 1
 if (-not $currentTag) { $currentTag = "v0.0.0" }
 $current = $currentTag.TrimStart('v')
 Write-Step "Current: v$current"
