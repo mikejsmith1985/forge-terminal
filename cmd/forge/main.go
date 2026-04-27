@@ -106,8 +106,16 @@ func main() {
 		devMode = os.Getenv("FORGE_DEV_MODE")
 	}
 	
-	// Ensure directory exists for logging (created by lockfile usually, but we want to log earlier)
+	// Ensure ~/.forge exists before the lock file and logger write to it.
 	_ = os.MkdirAll(forgeDir, 0755)
+
+	// Single-instance guard — exit early if another Forge is already running.
+	lockRelease, lockErr := acquireSingleInstanceLock(forgeDir)
+	if lockErr != nil {
+		fmt.Fprintln(os.Stderr, "[Forge] "+lockErr.Error())
+		os.Exit(1)
+	}
+	defer lockRelease()
 
 	// Set up file-based logging EARLY for production diagnostics
 	logFilename := "forge.log"
@@ -626,6 +634,9 @@ func main() {
 	http.HandleFunc("/api/mobile/sessions", handleMobileSessions)
 	http.HandleFunc("/api/mobile/exec", handleMobileExec)
 	http.HandleFunc("/api/mobile/read", handleMobileRead)
+	http.HandleFunc("/api/mobile/commands", handleMobileCommands)
+	http.HandleFunc("/api/mobile/files", handleMobileFiles)
+	http.HandleFunc("/api/mobile/file", handleMobileFileRead)
 	http.HandleFunc("/api/mobile/settings", WrapWithMiddleware(handleMobileSettings))
 	http.HandleFunc("/api/companion/preference", WrapWithMiddleware(handleCompanionPreference))
 

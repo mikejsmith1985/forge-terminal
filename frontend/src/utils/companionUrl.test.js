@@ -227,4 +227,34 @@ describe('buildDeepLink', () => {
       'https://forge.rootlevellabs.tech/companion/#forge=https%3A%2F%2Fforge.rootlevellabs.tech&token=620561d3'
     )
   })
+
+  it('includes local= param when localUrl is provided', () => {
+    const result = buildDeepLink(
+      'https://forge.rootlevellabs.tech/companion/',
+      'https://forge.rootlevellabs.tech',
+      'abc123',
+      'http://192.168.1.42:3005'
+    )
+    expect(result).toContain('local=http%3A%2F%2F192.168.1.42%3A3005')
+  })
+
+  it('omits local= param when localUrl is empty string', () => {
+    const result = buildDeepLink(
+      'https://forge.rootlevellabs.tech/companion/',
+      'https://forge.rootlevellabs.tech',
+      'abc123',
+      ''
+    )
+    expect(result).not.toContain('local=')
+  })
+
+  it('normalises a protocol-less localUrl', () => {
+    const result = buildDeepLink(
+      'https://forge.rootlevellabs.tech/companion/',
+      'https://forge.rootlevellabs.tech',
+      'abc123',
+      '192.168.1.42:3005'
+    )
+    expect(result).toContain('local=http%3A%2F%2F192.168.1.42%3A3005')
+  })
 })

@@ -17,6 +17,10 @@ type ActiveSessionInfo struct {
 	// SessionID is the unique identifier for this PTY session.
 	SessionID string `json:"sessionId"`
 
+	// Title is the human-readable tab name shown in the Forge desktop app.
+	// Empty for sessions created before v7.10.6 (pre-tabTitle param).
+	Title string `json:"title,omitempty"`
+
 	// IsDetached is true when the PTY is alive but the WebSocket client disconnected.
 	// The session is still recoverable within its grace period.
 	IsDetached bool `json:"isDetached"`
@@ -33,14 +37,16 @@ func (h *Handler) ListActiveSessions() []ActiveSessionInfo {
 	var result []ActiveSessionInfo
 
 	// Walk connected sessions.
-	h.sessions.Range(func(rawKey, _ any) bool {
+	h.sessions.Range(func(rawKey, rawVal any) bool {
 		sessionID := rawKey.(string)
+		sess := rawVal.(*TerminalSession)
 		connectedClientCount := 0
 		if hubRaw, ok := h.hubs.Load(sessionID); ok {
 			connectedClientCount = hubRaw.(*sessionHub).size()
 		}
 		result = append(result, ActiveSessionInfo{
 			SessionID:        sessionID,
+			Title:            sess.TabTitle,
 			IsDetached:       false,
 			ConnectedClients: connectedClientCount,
 		})
@@ -48,10 +54,12 @@ func (h *Handler) ListActiveSessions() []ActiveSessionInfo {
 	})
 
 	// Walk detached sessions that are still alive.
-	h.detachedSessions.Range(func(rawKey, _ any) bool {
+	h.detachedSessions.Range(func(rawKey, rawVal any) bool {
 		sessionID := rawKey.(string)
+		ds := rawVal.(*DetachedSession)
 		result = append(result, ActiveSessionInfo{
 			SessionID:        sessionID,
+			Title:            ds.session.TabTitle,
 			IsDetached:       true,
 			ConnectedClients: 0,
 		})

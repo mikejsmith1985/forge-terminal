@@ -327,6 +327,7 @@ const EnabledView = ({
         <CompanionConnectionWizard
           mobileToken={settings?.mobile_token || ''}
           companionHost={companionHost}
+          localUrl={settings?.local_url || ''}
         />
       </div>
 

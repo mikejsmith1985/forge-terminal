@@ -1682,6 +1682,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       const params = new URLSearchParams();
       // CRITICAL: Pass tabID for AM/LLM logging
       params.set('tabId', tabId);
+      if (tabNameRef.current) params.set('tabTitle', tabNameRef.current);
       if (cfg && cfg.shellType) {
         params.set('shell', cfg.shellType);
         // Use currentDirectory as fallback initial dir when no explicit home path is configured.

@@ -19,13 +19,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
+	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/license"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
@@ -445,6 +449,44 @@ type mobileSettingsResponse struct {
 
 	// TokenPath is the absolute path where the mobile token is stored on disk.
 	TokenPath string `json:"token_path"`
+
+	// LocalUrl is the first non-loopback IPv4 address the Forge binary is
+	// reachable on (e.g. "http://192.168.1.42:3005").  The companion encodes this
+	// in the QR fragment as &local=… so the PWA can fall back to the LAN URL
+	// when the primary tunnel URL becomes unreachable.
+	LocalUrl string `json:"local_url,omitempty"`
+}
+
+// getLocalNetworkUrl returns the first non-loopback IPv4 address as
+// "http://IP:port".  Returns "" when no suitable interface is found.
+func getLocalNetworkUrl(port int) string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() || ip.To4() == nil {
+				continue
+			}
+			return fmt.Sprintf("http://%s:%d", ip, port)
+		}
+	}
+	return ""
 }
 
 // handleMobileSettings serves the mobile settings page used by the desktop UI.
@@ -471,6 +513,7 @@ func handleGetMobileSettings(w http.ResponseWriter, r *http.Request) {
 		MobileAccessEnabled: isMobileAccessEnabled(),
 		MobileToken:         activeMobileToken,
 		TokenPath:           mobileTokenPath(),
+		LocalUrl:            getLocalNetworkUrl(activePort),
 	}); err != nil {
 		log.Printf("[Mobile] GET settings encode error: %v", err)
 	}
@@ -506,4 +549,179 @@ func handlePostMobileSettings(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		log.Printf("[Mobile] POST settings encode error: %v", err)
 	}
+}
+
+// ── Endpoint: GET /api/mobile/commands ───────────────────────────────────────
+
+// handleMobileCommands returns the user's saved command cards so the companion
+// app can display and execute them from the mobile ribbon.
+func handleMobileCommands(w http.ResponseWriter, r *http.Request) {
+	if handleMobileCORSPreflight(w, r) {
+		return
+	}
+	if !validateMobileRequest(w, r) {
+		return
+	}
+	if !isMobileAccessEnabled() {
+		writeMobileJSON(w, http.StatusForbidden, map[string]any{
+			"error":       "mobile_access feature is not enabled",
+			"upgrade_url": "https://rootlevellabs.tech/upgrade",
+		})
+		return
+	}
+
+	cmds, err := commands.LoadCommands()
+	if err != nil {
+		writeMobileJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "could not load command cards: " + err.Error(),
+		})
+		return
+	}
+
+	writeMobileJSON(w, http.StatusOK, map[string]any{"commands": cmds})
+}
+
+// ── Endpoint: GET /api/mobile/files ──────────────────────────────────────────
+
+// mobileFileEntry is a single item returned by /api/mobile/files.
+type mobileFileEntry struct {
+	Name  string `json:"name"`
+	IsDir bool   `json:"isDir"`
+	Size  int64  `json:"size,omitempty"`
+}
+
+// handleMobileFiles lists the contents of a directory on the server.
+// Query params:
+//
+//	path — directory to list (required); use "/" for the filesystem root.
+//
+// The endpoint intentionally returns a flat listing (no recursion) so the
+// companion can implement a simple tap-to-navigate file browser.
+func handleMobileFiles(w http.ResponseWriter, r *http.Request) {
+	if handleMobileCORSPreflight(w, r) {
+		return
+	}
+	if !validateMobileRequest(w, r) {
+		return
+	}
+	if !isMobileAccessEnabled() {
+		writeMobileJSON(w, http.StatusForbidden, map[string]any{
+			"error":       "mobile_access feature is not enabled",
+			"upgrade_url": "https://rootlevellabs.tech/upgrade",
+		})
+		return
+	}
+
+	reqPath := r.URL.Query().Get("path")
+	if reqPath == "" {
+		// Default to the user's home directory.
+		home, _ := os.UserHomeDir()
+		reqPath = home
+	}
+
+	absPath, err := filepath.Abs(reqPath)
+	if err != nil {
+		writeMobileJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid path"})
+		return
+	}
+
+	entries, err := os.ReadDir(absPath)
+	if err != nil {
+		writeMobileJSON(w, http.StatusNotFound, map[string]string{
+			"error": "cannot read directory: " + err.Error(),
+		})
+		return
+	}
+
+	items := make([]mobileFileEntry, 0, len(entries))
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".") {
+			continue // skip hidden files
+		}
+		info, _ := e.Info()
+		var size int64
+		if info != nil && !e.IsDir() {
+			size = info.Size()
+		}
+		items = append(items, mobileFileEntry{
+			Name:  e.Name(),
+			IsDir: e.IsDir(),
+			Size:  size,
+		})
+	}
+
+	// Directories first, then files, both sorted alphabetically.
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].IsDir != items[j].IsDir {
+			return items[i].IsDir
+		}
+		return items[i].Name < items[j].Name
+	})
+
+	parent := filepath.Dir(absPath)
+	if parent == absPath {
+		parent = "" // already at root
+	}
+
+	writeMobileJSON(w, http.StatusOK, map[string]any{
+		"path":    absPath,
+		"parent":  parent,
+		"entries": items,
+	})
+}
+
+// ── Endpoint: GET /api/mobile/file ───────────────────────────────────────────
+
+// handleMobileFileRead returns the text content of a single file for the mobile
+// file viewer. Caps at 256 KB to avoid sending large binaries to the phone.
+func handleMobileFileRead(w http.ResponseWriter, r *http.Request) {
+	if handleMobileCORSPreflight(w, r) {
+		return
+	}
+	if !validateMobileRequest(w, r) {
+		return
+	}
+	if !isMobileAccessEnabled() {
+		writeMobileJSON(w, http.StatusForbidden, map[string]any{
+			"error":       "mobile_access feature is not enabled",
+			"upgrade_url": "https://rootlevellabs.tech/upgrade",
+		})
+		return
+	}
+
+	reqPath := r.URL.Query().Get("path")
+	if reqPath == "" {
+		writeMobileJSON(w, http.StatusBadRequest, map[string]string{"error": "path is required"})
+		return
+	}
+
+	absPath, err := filepath.Abs(reqPath)
+	if err != nil {
+		writeMobileJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid path"})
+		return
+	}
+
+	f, err := os.Open(absPath)
+	if err != nil {
+		writeMobileJSON(w, http.StatusNotFound, map[string]string{
+			"error": "cannot open file: " + err.Error(),
+		})
+		return
+	}
+	defer f.Close()
+
+	const maxBytes = 256 * 1024
+	data, err := io.ReadAll(io.LimitReader(f, maxBytes))
+	if err != nil {
+		writeMobileJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "read error: " + err.Error(),
+		})
+		return
+	}
+
+	writeMobileJSON(w, http.StatusOK, map[string]any{
+		"path":      absPath,
+		"content":   string(data),
+		"truncated": int64(len(data)) == maxBytes,
+	})
 }

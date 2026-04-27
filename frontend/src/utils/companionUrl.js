@@ -71,18 +71,23 @@ export function isStaleCompanionHost(storedHost) {
 /**
  * buildDeepLink — assembles the companion PWA deep-link URL.
  *
- * Format: <companionHost>#forge=<forgeUrl>&token=<mobileToken>
+ * Format: <companionHost>#forge=<forgeUrl>&token=<mobileToken>[&local=<localUrl>]
  *
  * The companion PWA reads this fragment on load (readAndClearDeepLink) to
  * auto-populate and initiate a connection.  The base URL is normalised to
  * always carry an http/https scheme so mobile browsers can open the link.
  *
+ * The optional `localUrl` is the LAN address (e.g. "http://192.168.1.42:3005").
+ * When present the companion will fall back to it if the primary tunnel URL
+ * becomes unreachable, allowing transparent reconnection on the home network.
+ *
  * @param {string} companionHost - Base URL of the companion PWA (protocol optional)
  * @param {string} forgeUrl      - Forge server URL the phone will use for API calls
  * @param {string} mobileToken   - One-time auth token
+ * @param {string} [localUrl]    - Optional LAN fallback URL
  * @returns {string} Full deep-link URL
  */
-export function buildDeepLink(companionHost, forgeUrl, mobileToken) {
+export function buildDeepLink(companionHost, forgeUrl, mobileToken, localUrl = '') {
   // Localhost values cannot be reached by a phone — fall back to forgeUrl.
   const isLocalhostHost =
     !companionHost ||
@@ -105,6 +110,8 @@ export function buildDeepLink(companionHost, forgeUrl, mobileToken) {
   // Named cloudflare tunnels are always https, but defensive normalization
   // ensures the Companion PWA can parse the forge= param on any device.
   const normalizedForgeUrl = normalizeHttpUrl(forgeUrl)
-  const fragment = new URLSearchParams({ forge: normalizedForgeUrl, token: mobileToken }).toString()
+  const params = { forge: normalizedForgeUrl, token: mobileToken }
+  if (localUrl) params.local = normalizeHttpUrl(localUrl)
+  const fragment = new URLSearchParams(params).toString()
   return `${base}#${fragment}`
 }

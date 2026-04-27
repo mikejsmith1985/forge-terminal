@@ -596,6 +596,7 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		tabID = uuid.New().String()
 		log.Printf("[Terminal] Warning: No tabID provided, using session ID: %s", tabID)
 	}
+	tabTitle := query.Get("tabTitle")
 
 	// Parse initial terminal dimensions from query params.
 	// TUI apps (e.g. Copilot CLI) query the PTY size at startup; if the PTY is
@@ -749,6 +750,11 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				log.Printf("[Terminal] Session %s created (shell: %s, tabID: %s)", sessionID, shellConfig.ShellType, tabID)
+			}
+			// Keep the human-readable title current on every (re)connect so the
+			// companion app shows the right name even if the user renamed the tab.
+			if tabTitle != "" {
+				session.TabTitle = tabTitle
 			}
 			h.sessions.Store(sessionID, session)
 		}

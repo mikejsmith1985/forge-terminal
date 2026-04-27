@@ -57,9 +57,10 @@ type ShellConfig struct {
 
 // TerminalSession represents a single PTY terminal session.
 type TerminalSession struct {
-	ID  string
-	PTY io.ReadWriteCloser
-	Cmd *exec.Cmd // nil on Windows (ConPTY manages process internally)
+	ID       string
+	TabTitle string // Human-readable title from the desktop tab (empty for legacy sessions)
+	PTY      io.ReadWriteCloser
+	Cmd      *exec.Cmd // nil on Windows (ConPTY manages process internally)
 
 	mu       sync.Mutex
 	closed   bool

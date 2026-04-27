@@ -85,6 +85,7 @@ const COPY_RESET_DELAY_MS = 1800
 export default function CompanionConnectionWizard({
   mobileToken,
   companionHost,
+  localUrl = '',
   onMethodChange,
 }) {
   // ── State ──────────────────────────────────────────────────────────────────
@@ -297,6 +298,7 @@ export default function CompanionConnectionWizard({
     mobileToken,
     companionHost:           resolvedCompanionHost,
     tunnelUrl,
+    localUrl,
     tunnelStage,
     tunnelDetail,
     hasCopiedLink,
@@ -381,6 +383,7 @@ const NamedFlow = ({
   mobileToken,
   companionHost,
   tunnelUrl,
+  localUrl = '',
   tunnelStage,
   tunnelDetail,
   hasCopiedLink,
@@ -468,6 +471,7 @@ const NamedFlow = ({
               mobileToken={mobileToken}
               companionHost={companionHost}
               tunnelUrl={tunnelUrl}
+              localUrl={localUrl}
               hasCopiedLink={hasCopiedLink}
               setHasCopiedLink={setHasCopiedLink}
             />
@@ -506,6 +510,7 @@ const NamedFlow = ({
         mobileToken={mobileToken}
         companionHost={companionHost}
         tunnelUrl={tunnelUrl}
+        localUrl={localUrl}
         hasCopiedLink={hasCopiedLink}
         setHasCopiedLink={setHasCopiedLink}
       />
@@ -527,6 +532,7 @@ const QuickFlow = ({
   mobileToken,
   companionHost,
   tunnelUrl,
+  localUrl = '',
   tunnelStage,
   tunnelDetail,
   hasCopiedLink,
@@ -595,6 +601,7 @@ const QuickFlow = ({
         mobileToken={mobileToken}
         companionHost={companionHost}
         tunnelUrl={tunnelUrl}
+        localUrl={localUrl}
         hasCopiedLink={hasCopiedLink}
         setHasCopiedLink={setHasCopiedLink}
       />
@@ -616,6 +623,7 @@ const TailscaleFlow = ({
   mobileToken,
   companionHost,
   tunnelUrl,
+  localUrl = '',
   tunnelStage,
   tunnelDetail,
   hasCopiedLink,
@@ -671,6 +679,7 @@ const TailscaleFlow = ({
         mobileToken={mobileToken}
         companionHost={companionHost}
         tunnelUrl={tunnelUrl}
+        localUrl={localUrl}
         hasCopiedLink={hasCopiedLink}
         setHasCopiedLink={setHasCopiedLink}
       />
@@ -911,12 +920,13 @@ const QrPanel = ({
   mobileToken,
   companionHost,
   tunnelUrl,
+  localUrl = '',
   hasCopiedLink,
   setHasCopiedLink,
 }) => {
   const canvasRef = useRef(null)
   const [renderError, setRenderError] = useState(null)
-  const deepLink = buildCompanionDeepLink(companionHost, tunnelUrl, mobileToken)
+  const deepLink = buildCompanionDeepLink(companionHost, tunnelUrl, mobileToken, localUrl)
 
   useEffect(() => {
     if (!canvasRef.current || !deepLink) return
