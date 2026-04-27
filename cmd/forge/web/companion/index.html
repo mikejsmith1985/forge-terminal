@@ -46,8 +46,8 @@
     .screen {
       display: none;
       flex-direction: column;
-      height: 100vh;   /* fallback for browsers without Small Viewport Height support */
-      height: 100svh;  /* overrides in modern browsers — excludes iOS Safari's collapsible toolbar */
+      height: 100svh;
+      height: 100vh; /* fallback */
       padding-top: var(--safe-top);
       padding-bottom: var(--safe-bottom);
     }
@@ -387,7 +387,7 @@
   <div class="content" id="sessions-list-container">
     <!-- Populated by JS -->
   </div>
-  <div style="padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;">
+  <div style="padding: 12px 16px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;">
     <button class="btn btn-secondary" id="btn-refresh-sessions">↻ Refresh</button>
   </div>
 </div>
@@ -424,11 +424,10 @@
   const STORAGE_KEY_URL   = 'forge_url';
   const STORAGE_KEY_TOKEN = 'forge_mobile_token';
 
-  let forgeUrl              = localStorage.getItem(STORAGE_KEY_URL)   || '';
-  let mobileToken           = localStorage.getItem(STORAGE_KEY_TOKEN) || '';
-  let activeSession         = null;   // { sessionId, isDetached, connectedClients }
-  let pollTimerId           = null;   // setInterval ID for terminal output polling
-  let sessionPollTimerId    = null;   // setInterval ID for sessions-list background refresh
+  let forgeUrl     = localStorage.getItem(STORAGE_KEY_URL)   || '';
+  let mobileToken  = localStorage.getItem(STORAGE_KEY_TOKEN) || '';
+  let activeSession = null;   // { sessionId, isDetached, connectedClients }
+  let pollTimerId   = null;   // setInterval ID for terminal polling
 
   // ── Screen Navigation ────────────────────────────────────────────────────────
   function showScreen(screenId) {
@@ -527,12 +526,11 @@
         return;
       }
 
-      // Connected and mobile access is on — load sessions and begin background refresh.
+      // Connected and mobile access is on — load sessions.
       showScreen('screen-sessions');
       connectBtn.disabled = false;
       connectBtn.textContent = 'Connect';
       loadSessions();
-      startSessionPolling();
 
     } catch (networkError) {
       showToast('❌ Could not reach Forge — check the URL and your connection');
@@ -542,26 +540,15 @@
   }
 
   // ── Sessions Screen ───────────────────────────────────────────────────────────
-
-  // loadSessions fetches the current session list from the backend and updates the UI.
-  // When isBackgroundRefresh is true the loading spinner is suppressed so the screen
-  // does not flash on every 5-second poll while the user is looking at "No active sessions".
-  async function loadSessions(isBackgroundRefresh = false) {
+  async function loadSessions() {
     const container = document.getElementById('sessions-list-container');
-
-    if (!isBackgroundRefresh) {
-      container.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading sessions…</div>';
-    }
+    container.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading sessions…</div>';
 
     try {
       const response = await apiGet('/api/mobile/sessions');
 
       if (!response.ok) {
-        // Only overwrite the container on explicit loads — background failures are silently ignored
-        // so a transient tunnel hiccup does not erase a previously displayed session list.
-        if (!isBackgroundRefresh) {
-          container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Could not load sessions</div><p>HTTP ${response.status}</p></div>`;
-        }
+        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Could not load sessions</div><p>HTTP ${response.status}</p></div>`;
         return;
       }
 
@@ -573,7 +560,7 @@
           <div class="empty-state">
             <div class="empty-state-icon">💤</div>
             <div class="empty-state-title">No active sessions</div>
-            <p>Open a terminal in Forge — this screen refreshes automatically.</p>
+            <p>Open a terminal in Forge and refresh here.</p>
           </div>
         `;
         return;
@@ -600,15 +587,12 @@
       });
 
     } catch (networkError) {
-      if (!isBackgroundRefresh) {
-        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Network error</div><p>${escapeHtml(networkError.message)}</p></div>`;
-      }
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Network error</div><p>${escapeHtml(networkError.message)}</p></div>`;
     }
   }
 
   // ── Terminal Screen ───────────────────────────────────────────────────────────
   function openTerminal(session) {
-    stopSessionPolling(); // sessions list no longer visible — stop its background refresh
     activeSession = session;
     document.getElementById('terminal-session-title').textContent =
       'Terminal · ' + session.sessionId.slice(0, 12);
@@ -622,7 +606,6 @@
     activeSession = null;
     showScreen('screen-sessions');
     loadSessions();
-    startSessionPolling(); // resume background refresh now that the sessions list is visible again
   }
 
   // pollTerminalOutput fetches the current scrollback and updates the display.
@@ -660,24 +643,6 @@
     if (pollTimerId !== null) {
       clearInterval(pollTimerId);
       pollTimerId = null;
-    }
-  }
-
-  // ── Sessions-List Background Refresh ─────────────────────────────────────────
-  // The sessions list is not a live stream — it must be polled. Five seconds
-  // balances responsiveness (a new terminal tab appears promptly) against
-  // hammering the tunnel with requests while the user is idle.
-  const SESSION_POLL_INTERVAL_MS = 5000;
-
-  function startSessionPolling() {
-    stopSessionPolling(); // guard against duplicate intervals
-    sessionPollTimerId = setInterval(() => loadSessions(true), SESSION_POLL_INTERVAL_MS);
-  }
-
-  function stopSessionPolling() {
-    if (sessionPollTimerId !== null) {
-      clearInterval(sessionPollTimerId);
-      sessionPollTimerId = null;
     }
   }
 
@@ -747,7 +712,6 @@
 
     // Sessions screen.
     document.getElementById('btn-disconnect').addEventListener('click', () => {
-      stopSessionPolling(); // halt background requests before clearing credentials
       localStorage.removeItem(STORAGE_KEY_URL);
       localStorage.removeItem(STORAGE_KEY_TOKEN);
       forgeUrl = mobileToken = '';

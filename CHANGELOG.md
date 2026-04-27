@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.3] - 2026-04-27
+
+---
+
+## [v7.10.3] - 2026-04-27
+
 ### Fixed
 - **Companion PWA bottom edge no longer clipped on iOS Safari** — The `height: 100svh` / `height: 100vh` declarations in `.screen` were in the wrong order: CSS last-wins means `100vh` always overrode `100svh` in every modern browser, so the Small Viewport Height unit was completely inert. Swapped to `100vh` first (fallback) then `100svh` (override), so the collapsible Safari toolbar is now properly excluded from the layout height.
 - **Sessions screen Refresh button no longer overlaps the iOS home indicator** — The footer bar used a flat `padding: 12px 16px` with no safe-area compensation. Added `padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px))` so the button clears the swipe zone on Face ID devices.
