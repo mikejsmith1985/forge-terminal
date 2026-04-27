@@ -10,15 +10,24 @@
 .PARAMETER VersionType
     Version bump type: patch, minor, major, or a specific version like "3.19.0"
 
+.PARAMETER ReleaseNotes
+    Optional release notes string. When provided the interactive Read-Host prompt
+    is skipped — required for non-interactive (automated) invocations.
+
+.PARAMETER Force
+    Skip non-blocking preflight warnings without prompting.
+
 .EXAMPLE
     .\scripts\local-release.ps1 patch
     .\scripts\local-release.ps1 minor
     .\scripts\local-release.ps1 3.19.0
+    .\scripts\local-release.ps1 7.10.4 -Force -ReleaseNotes "Bug fixes and improvements"
 #>
 param(
     [Parameter(Position=0)]
     [string]$VersionType = "patch",
-    [switch]$Force
+    [switch]$Force,
+    [string]$ReleaseNotes = ""
 )
 
 Set-StrictMode -Version Latest
@@ -416,14 +425,21 @@ Write-OK "Tag $TAG pushed to origin"
 
 # ── Release notes ─────────────────────────────────────────────────────────────
 Write-Banner "Release notes"
-Write-Host "  Enter release notes (press Enter twice to finish):" -ForegroundColor Yellow
-$lines = @()
-$emptyCount = 0
-while ($emptyCount -lt 1) {
-    $line = Read-Host "  "
-    if ($line -eq "") { $emptyCount++ } else { $emptyCount = 0; $lines += $line }
+if ($ReleaseNotes) {
+    # Non-interactive path: caller supplied notes via -ReleaseNotes parameter.
+    # This allows the script to run in automated/CI contexts without Read-Host.
+    $RELEASE_NOTES = $ReleaseNotes
+    Write-OK "Using provided release notes"
+} else {
+    Write-Host "  Enter release notes (press Enter twice to finish):" -ForegroundColor Yellow
+    $lines = @()
+    $emptyCount = 0
+    while ($emptyCount -lt 1) {
+        $line = Read-Host "  "
+        if ($line -eq "") { $emptyCount++ } else { $emptyCount = 0; $lines += $line }
+    }
+    $RELEASE_NOTES = if ($lines.Count -gt 0) { $lines -join "`n" } else { "Release $TAG" }
 }
-$RELEASE_NOTES = if ($lines.Count -gt 0) { $lines -join "`n" } else { "Release $TAG" }
 
 # ── Create GitHub Release ─────────────────────────────────────────────────────
 Write-Banner "Publishing GitHub Release"
