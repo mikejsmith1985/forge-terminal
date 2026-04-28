@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Forge Companion PWA — full mobile experience with bottom ribbon navigation** — Complete rewrite of the companion app shell. The app now has a persistent bottom ribbon with three tabs: Terminal (session viewer + command input), Commands (tap to execute saved command cards in the active session), and Files (directory browser with file viewer). Previously the companion was a minimal terminal-only viewer with no navigation.
+- **Forge Companion — iOS/Safari viewport fix** — The command input bar was cut off by the Safari floating URL bar on iPhone. Fixed using `height: 100dvh` (dynamic viewport height, iOS 15.4+) with `100svh`/`100vh` fallback chain, and `position: sticky` on the command bar with `max(10px, env(safe-area-inset-bottom))` padding.
+- **Forge Companion — session tab titles** — Sessions listed in the companion now show the human-readable tab name from the Forge desktop (e.g. "claude" or "Project A") instead of raw UUIDs. Title is passed through the WebSocket URL as `tabTitle` and stored server-side.
+- **Forge Companion — LAN fallback connection** — The QR code now encodes both the tunnel URL and the local network URL (`&local=http://192.168.x.x:PORT`). If the tunnel URL becomes unreachable (e.g. after Forge restarts and the ephemeral tunnel URL changes), the companion automatically retries using the LAN address. On success it promotes the LAN URL to primary so subsequent launches also connect without re-scanning.
+- **Forge Companion — standalone PWA escape hatch** — When saved to the iOS home screen, a failed connection previously left the user stuck with no way to reset (no address bar, no navigation). Connect failures now show a persistent inline error banner instead of a vanishing toast. The banner includes: a "Reset Connection" button that clears all stored credentials, and a "Paste a link from Forge" expander where users can paste the full deep-link URL (copied from Forge → Settings → Mobile Access) to re-authenticate without scanning a QR code.
+- **Single-instance lock** — Forge now writes a PID file to `~/.forge/forge.pid` on startup and refuses to launch a second instance if the first is still running, preventing the "two fterm.exe instances sharing port" bug that caused the companion to receive stale responses.
+- **MCP `terminal_sessions` — session titles** — `ListActiveSessions` now includes the human-readable `title` field alongside `sessionId`, `isDetached`, and `connectedClients`.
+
+### Fixed
+- **Forge Companion service worker cache** — Bumped `CACHE_NAME` to `forge-companion-v3` so devices running the previous cached shell automatically receive the new app on next visit.
+
 ## [7.10.6] - 2026-04-27
 
 ---
