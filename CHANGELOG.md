@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.7] - 2026-04-28
+
+---
+
+## [v7.10.7] - 2026-04-28
+
 ### Added
 - **Forge Companion PWA — full mobile experience with bottom ribbon navigation** — Complete rewrite of the companion app shell. The app now has a persistent bottom ribbon with three tabs: Terminal (session viewer + command input), Commands (tap to execute saved command cards in the active session), and Files (directory browser with file viewer). Previously the companion was a minimal terminal-only viewer with no navigation.
 - **Forge Companion — iOS/Safari viewport fix** — The command input bar was cut off by the Safari floating URL bar on iPhone. Fixed using `height: 100dvh` (dynamic viewport height, iOS 15.4+) with `100svh`/`100vh` fallback chain, and `position: sticky` on the command bar with `max(10px, env(safe-area-inset-bottom))` padding.
