@@ -571,6 +571,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const unmountingRef = useRef(false); // Set during cleanup — suppresses reconnection on unmount
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
+  // Suppress directory detection while a pasted file path is still echoing through the PTY.
+  // Without this guard, the echo of "see file at C:\...\clipboard.png" can land in buf.data
+  // mid-debounce and cause extractDirectory to fire on a stale prompt line, renaming the tab.
+  const isPasteDirectorySuppressionActiveRef = useRef(false);
   const isVisibleRef = useRef(isVisible); // Track visibility to avoid stale closures in paste handlers
   
   // State for scroll button visibility
@@ -1372,8 +1376,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   }
                 }
                 
-                // Send the file path to the terminal
+                // Send the file path to the terminal.
+                // Activate directory-suppression BEFORE writing so that the PTY echo of
+                // "see file at …" cannot race with the idle debounce and rename the tab.
+                // 3 000 ms > the 1 500 ms debounce window, giving the echo time to flush.
                 if (wsRef.current?.readyState === WebSocket.OPEN && filePath) {
+                  isPasteDirectorySuppressionActiveRef.current = true;
+                  setTimeout(() => {
+                    isPasteDirectorySuppressionActiveRef.current = false;
+                  }, 3000);
+
                   const textToSend = `see file at ${filePath}`;
                   xtermRef.current.write(textToSend);
                   wsRef.current.send(textToSend);
@@ -1491,8 +1503,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   }
                 }
                 
-                // Send the file path to the terminal
+                // Send the file path to the terminal (clipboardData fallback path).
+                // Same suppression as the clipboard.read() path above — prevents the PTY
+                // echo of "see file at …" from spuriously renaming the active tab.
                 if (wsRef.current?.readyState === WebSocket.OPEN && filePath) {
+                  isPasteDirectorySuppressionActiveRef.current = true;
+                  setTimeout(() => {
+                    isPasteDirectorySuppressionActiveRef.current = false;
+                  }, 3000);
+
                   const textToSend = `see file at ${filePath}`;
                   xtermRef.current.write(textToSend);
                   wsRef.current.send(textToSend);
@@ -1954,8 +1973,13 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Directory detection (also uses regex)
-          const detectedDir = extractDirectory(buf.data);
+          // Directory detection (also uses regex).
+          // Skip entirely if a paste operation is still active — the PTY echo of
+          // "see file at C:\...\clipboard.png" can make extractDirectory return a
+          // stale prompt path that differs from lastDirectoryRef, causing a spurious rename.
+          const detectedDir = isPasteDirectorySuppressionActiveRef.current
+            ? null
+            : extractDirectory(buf.data);
           if (detectedDir && detectedDir !== lastDirectoryRef.current) {
             lastDirectoryRef.current = detectedDir;
             const folderName = getFolderName(detectedDir);

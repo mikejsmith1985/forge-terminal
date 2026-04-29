@@ -47,6 +47,15 @@ describe('isFileLikeName', () => {
     expect(isFileLikeName(null)).toBe(false);
     expect(isFileLikeName(undefined)).toBe(false);
   });
+
+  it('identifies pasted clipboard image filenames as file-like', () => {
+    // Clipboard temp files (e.g. clipboard-1777485001974770300.png) must never
+    // become tab titles.  The "see file at …" paste path sends these through
+    // extractProjectFolder; this guard ensures handleDirectoryChange rejects them.
+    expect(isFileLikeName('clipboard-1777485001974770300.png')).toBe(true);
+    expect(isFileLikeName('clipboard-1234567890.jpg')).toBe(true);
+    expect(isFileLikeName('screenshot-20251225-100141.png')).toBe(true);
+  });
 });
 
 describe('extractProjectFolder', () => {
