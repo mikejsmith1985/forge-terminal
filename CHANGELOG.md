@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.8] - 2026-04-30
+
+---
+
+## [v7.10.8] - 2026-04-30
+
 ### Fixed
 - **Release Manager now shows the correct current version in dev builds** — Two compounding bugs caused the Release Manager to display a stale version (e.g. v7.10.3) even when git tags showed a newer release (v7.10.7). First: `run-dev-clean.ps1` built the dev binary with `-X main.buildTime` and `-X main.devMode` only — never injecting `-X internal/updater.Version`. Second: `var Version` in `updater.go` was left at the value from when the branch was cut from main, which never received the version bumps that live on the release branch. Fixed by (1) dynamically reading the latest semver git tag in `run-dev-clean.ps1` and injecting it as an ldflag, and (2) syncing the `var Version` fallback to the current latest tag `"7.10.7"`.
 - **Companion QR code now encodes the chosen connection method's URL end-to-end** — When the user selected Named Cloudflare Tunnel and Tailscale was also connected, the wizard silently overrode the QR base URL with the Tailscale address. The phone received `tailscale-host/companion/#forge=cloudflare-url` instead of the Cloudflare URL throughout. Removed the Tailscale-override logic; `resolvedCompanionHost` now derives from `tunnelUrl` (the active Cloudflare URL) so both the PWA load path and the `forge=` fragment encode the method the user actually chose. Component test updated to serve as a regression guard against re-introducing the Tailscale substitution.
