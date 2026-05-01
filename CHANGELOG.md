@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Tab title and project directory no longer change when AI tools view a pasted image** — When a user pasted an image, the system saved it to the OS temp directory (e.g. `%TEMP%` on Windows, `/tmp` on macOS/Linux). If Copilot or Claude navigated there to access the file, the shell's CWD notification fired `handleDirectoryChange`, which overwrote the tab title (e.g. `forge-terminal` → `mikej`) and `tab.currentDirectory` with the temp path — breaking the Release Manager card, Workflow card, Git panel, and other features that depend on `currentDirectory` pointing at the project root. Added `isTempOrSystemPath()` to `projectFolder.js` (covering Windows `AppData\Local\Temp`, `Windows\Temp`, Unix `/tmp`, macOS `/var/folders`, etc.) and applied an early-return guard in `handleDirectoryChange` that skips both title and directory updates when the new path is a temp/system location.
+
 ## [7.10.8] - 2026-04-30
 
 ---

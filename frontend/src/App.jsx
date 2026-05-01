@@ -39,7 +39,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName } from './utils/projectFolder'
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName, isTempOrSystemPath } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
@@ -1184,6 +1184,14 @@ function App() {
   // Respects the user's chosen tab naming strategy: static strategies (numbered,
   // shell-type, custom-prefix) never auto-rename; dynamic strategies update on cd.
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
+    // Guard: skip all updates when the shell navigates into a temp or system
+    // directory. AI tools that open pasted images from %TEMP% (or /tmp) would
+    // otherwise overwrite the tab's project name AND currentDirectory, breaking
+    // the release manager card, workflow card, git panel, and other features
+    // that depend on currentDirectory pointing at the actual project root.
+    if (fullPath && isTempOrSystemPath(fullPath)) {
+      return;
+    }
     // Static strategies: never auto-rename on directory change
     if (isStaticNamingStrategy(namingStrategy)) {
       if (fullPath) updateTabDirectory(tabId, fullPath);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel, isFileLikeName } from './projectFolder';
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel, isFileLikeName, isTempOrSystemPath } from './projectFolder';
 
 // Tests for projectFolder.js -- the canonical source for tab title extraction logic.
 
@@ -261,5 +261,79 @@ describe('getTabTitle', () => {
   it('defaults tab number to 1 when not provided', () => {
     expect(getTabTitle(null, 'numbered', {})).toBe('Terminal 1');
     expect(getTabTitle(null, 'custom-prefix', { prefix: 'X' })).toBe('X 1');
+  });
+});
+
+describe('isTempOrSystemPath', () => {
+  // Windows temp paths — the primary vector for this bug (pasted images land in %TEMP%)
+  it('identifies Windows AppData\\Local\\Temp as a temp path', () => {
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp')).toBe(true);
+  });
+
+  it('identifies a deep Windows temp path (e.g. pasted image subfolder)', () => {
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp\\paste-12345')).toBe(true);
+  });
+
+  it('identifies Windows TEMP with forward slashes', () => {
+    expect(isTempOrSystemPath('C:/Users/mikej/AppData/Local/Temp')).toBe(true);
+  });
+
+  it('identifies Windows AppData\\LocalLow as a system path', () => {
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\LocalLow\\SomeCache')).toBe(true);
+  });
+
+  it('identifies Windows system temp (C:\\Windows\\Temp)', () => {
+    expect(isTempOrSystemPath('C:\\Windows\\Temp')).toBe(true);
+    expect(isTempOrSystemPath('C:\\Windows\\Temp\\some-file')).toBe(true);
+  });
+
+  it('identifies ProgramData temp as a system path', () => {
+    expect(isTempOrSystemPath('C:\\ProgramData\\Temp')).toBe(true);
+  });
+
+  // Unix/macOS temp paths
+  it('identifies /tmp as a temp path', () => {
+    expect(isTempOrSystemPath('/tmp')).toBe(true);
+    expect(isTempOrSystemPath('/tmp/')).toBe(true);
+    expect(isTempOrSystemPath('/tmp/forge-paste-abc123')).toBe(true);
+  });
+
+  it('identifies macOS /var/folders as a temp path', () => {
+    expect(isTempOrSystemPath('/var/folders/xy/abc123/T/image.png')).toBe(true);
+  });
+
+  it('identifies macOS /private/var/folders as a temp path', () => {
+    expect(isTempOrSystemPath('/private/var/folders/xy/abc123/T')).toBe(true);
+  });
+
+  it('identifies /var/tmp as a temp path', () => {
+    expect(isTempOrSystemPath('/var/tmp/some-cache')).toBe(true);
+  });
+
+  // Project paths — must NOT be flagged
+  it('does NOT flag a normal Windows project path', () => {
+    expect(isTempOrSystemPath('C:\\ProjectsWin\\forge-terminal')).toBe(false);
+    expect(isTempOrSystemPath('C:\\ProjectsWin\\forge-terminal\\src\\components')).toBe(false);
+  });
+
+  it('does NOT flag a Unix project path', () => {
+    expect(isTempOrSystemPath('/home/user/repos/my-project')).toBe(false);
+    expect(isTempOrSystemPath('/Users/mikej/projects/forge-terminal')).toBe(false);
+  });
+
+  it('does NOT flag a user home directory (not temp)', () => {
+    // Navigating to ~/ is valid — only the Temp sub-path is blocked
+    expect(isTempOrSystemPath('C:\\Users\\mikej')).toBe(false);
+    expect(isTempOrSystemPath('/home/mikej')).toBe(false);
+  });
+
+  it('does NOT flag AppData\\Roaming (only Local\\Temp and LocalLow are blocked)', () => {
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Roaming\\SomeApp')).toBe(false);
+  });
+
+  it('returns false for empty, null, or non-string values', () => {
+    expect(isTempOrSystemPath('')).toBe(false);
+    expect(isTempOrSystemPath(null)).toBe(false);
+    expect(isTempOrSystemPath(undefined)).toBe(false);
   });
 });
