@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Number keys no longer silently consumed by hidden recovered tabs** — On startup with multiple recovered sessions, all tab components mount in parallel. Three `term.focus()` calls in `ForgeTerminal.jsx` fired unconditionally for every tab, including hidden ones: two `queueMicrotask(() => term.focus())` calls after FitAddon and SearchAddon load, and one in `ws.onopen`. Whichever hidden tab ran its focus call last would steal keyboard focus from the active tab, silently routing the user's keystrokes — especially Copilot CLI numbered-menu responses — to the wrong PTY. All three calls are now guarded by `isVisible` / `isVisibleRef.current` so only the visible tab claims focus during initialization.
+
 ## [7.10.10] - 2026-05-01
 
 ---

@@ -1084,20 +1084,30 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     term.loadAddon(fitAddon);
     fitAddonRef.current = fitAddon;
     
-    // Critical fix: Re-focus after fit addon loads (it steals focus during init)
-    queueMicrotask(() => {
-      term.focus();
-    });
+    // Re-focus after FitAddon loads, but ONLY for the visible tab. FitAddon can
+    // steal focus during init; we need to reclaim it. However, unconditionally
+    // calling term.focus() on a hidden recovered tab causes it to win a focus race
+    // against the active tab — silently swallowing the user's first keystrokes
+    // (numbers are especially affected because Copilot CLI numeric prompts appear
+    // immediately on session restore). See the matching guard below term.open().
+    if (isVisible) {
+      queueMicrotask(() => {
+        term.focus();
+      });
+    }
 
     // Add search addon
     const searchAddon = new SearchAddon();
     term.loadAddon(searchAddon);
     searchAddonRef.current = searchAddon;
     
-    // Critical fix: Re-focus after search addon loads
-    queueMicrotask(() => {
-      term.focus();
-    });
+    // Same guard as the FitAddon focus call above — SearchAddon can also shift
+    // focus; only the visible tab should reclaim it.
+    if (isVisible) {
+      queueMicrotask(() => {
+        term.focus();
+      });
+    }
 
     // Unicode 11 support — required for box-drawing characters (├ ─ ┤ etc.)
     // used by TUI apps like Copilot CLI, gh dash, lazygit, etc.
@@ -1743,9 +1753,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         setIsConnected(true);
         setIsActiveDevice(true); // Assume active until SESSION_JOINED says otherwise
 
-        // Re-focus the terminal so keyboard input works immediately after connect/reconnect.
-        // xterm.js loses focus when the WebSocket is closed and the reconnect overlay appears.
-        if (xtermRef.current) {
+        // Re-focus the terminal on connect/reconnect so keyboard input works immediately,
+        // but ONLY when this terminal is actually visible to the user. Hidden recovered
+        // tabs also fire ws.onopen on startup; if they call focus() here they steal focus
+        // from the active tab — causing keystrokes (especially numbers in Copilot CLI
+        // numeric prompts) to be silently consumed by the wrong PTY.
+        if (xtermRef.current && isVisibleRef.current) {
           xtermRef.current.focus();
         }
         
