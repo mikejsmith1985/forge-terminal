@@ -337,3 +337,94 @@ describe('isTempOrSystemPath', () => {
     expect(isTempOrSystemPath(undefined)).toBe(false);
   });
 });
+
+// ── isStaticNamingStrategy ──────────────────────────────────────────────────
+
+describe('isStaticNamingStrategy', () => {
+  // Static strategies produce a title once at creation (e.g. "Terminal 3") and
+  // never update it when the user changes directories.  This set must stay in
+  // sync with the static-naming branch in useTabManager's createTabAction.
+
+  it('returns true for numbered strategy', () => {
+    expect(isStaticNamingStrategy('numbered')).toBe(true);
+  });
+
+  it('returns true for shell-type strategy', () => {
+    expect(isStaticNamingStrategy('shell-type')).toBe(true);
+  });
+
+  it('returns true for custom-prefix strategy', () => {
+    expect(isStaticNamingStrategy('custom-prefix')).toBe(true);
+  });
+
+  it('returns false for dynamic strategies', () => {
+    expect(isStaticNamingStrategy('project-root')).toBe(false);
+    expect(isStaticNamingStrategy('current-dir')).toBe(false);
+    expect(isStaticNamingStrategy('parent-child')).toBe(false);
+  });
+
+  it('returns false for unknown or empty values', () => {
+    expect(isStaticNamingStrategy('')).toBe(false);
+    expect(isStaticNamingStrategy(null)).toBe(false);
+    expect(isStaticNamingStrategy(undefined)).toBe(false);
+    expect(isStaticNamingStrategy('random-string')).toBe(false);
+  });
+});
+
+// ── Tab number collision helpers ────────────────────────────────────────────
+// Tests for the max-number logic used by useTabManager.createTabAction to
+// prevent duplicate tab titles after a tab is closed.
+//
+// The formula used is:
+//   Math.max(0, ...tabs.map(t => parseInt(t.title?.match(/\d+$/)?.[0] || '0', 10))) + 1
+//
+// We exercise this formula directly here since it is a pure computation
+// that doesn't require mounting React hooks.
+
+describe('next tab number computation (static strategy)', () => {
+  /**
+   * Mirrors the formula in useTabManager.createTabAction so that the test
+   * acts as a regression guard for the max-number logic.
+   * @param {Array<{title: string}>} tabs
+   * @returns {number}
+   */
+  function computeNextTabNumber(tabs) {
+    return Math.max(0, ...tabs.map(tab => parseInt(tab.title?.match(/\d+$/)?.[0] || '0', 10))) + 1;
+  }
+
+  it('starts at 1 when there are no existing tabs', () => {
+    expect(computeNextTabNumber([])).toBe(1);
+  });
+
+  it('increments beyond the highest tab number in a contiguous list', () => {
+    const tabs = [{ title: 'Terminal 1' }, { title: 'Terminal 2' }, { title: 'Terminal 3' }];
+    expect(computeNextTabNumber(tabs)).toBe(4);
+  });
+
+  it('uses max+1 to skip gaps left by closed tabs', () => {
+    // Closing "Terminal 2" leaves a gap — next should be 4, not 3 (which would duplicate)
+    const tabs = [{ title: 'Terminal 1' }, { title: 'Terminal 3' }];
+    expect(computeNextTabNumber(tabs)).toBe(4);
+  });
+
+  it('works correctly for shell-type titles (e.g. "PowerShell 2")', () => {
+    const tabs = [{ title: 'PowerShell 1' }, { title: 'PowerShell 3' }];
+    expect(computeNextTabNumber(tabs)).toBe(4);
+  });
+
+  it('works correctly for custom-prefix titles (e.g. "Dev 5")', () => {
+    const tabs = [{ title: 'Dev 2' }, { title: 'Dev 5' }];
+    expect(computeNextTabNumber(tabs)).toBe(6);
+  });
+
+  it('handles tabs with no trailing number gracefully (treats them as 0)', () => {
+    const tabs = [{ title: 'forge-terminal' }, { title: 'Terminal 2' }];
+    expect(computeNextTabNumber(tabs)).toBe(3);
+  });
+
+  it('handles undefined or null titles without throwing', () => {
+    const tabs = [{ title: null }, { title: undefined }, { title: 'Terminal 1' }];
+    expect(computeNextTabNumber(tabs)).toBe(2);
+  });
+});
+

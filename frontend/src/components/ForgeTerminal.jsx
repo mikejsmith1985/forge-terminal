@@ -572,6 +572,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
   const isVisibleRef = useRef(isVisible); // Track visibility to avoid stale closures in paste handlers
+  // Keystrokes that arrive while the WebSocket is still CONNECTING are buffered here
+  // and flushed in bulk the moment the socket opens.  Without this, rapid typing
+  // immediately after a session recovery (or the initial mount) silently drops keys
+  // because the WebSocket isn't open yet.  The buffer is cleared on every new
+  // connection attempt so stale pre-disconnect input is never replayed.
+  const pendingInputRef = useRef([]);
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -1666,6 +1672,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
 
     // Connect to WebSocket
     const connectWebSocket = () => {
+      // Clear any buffered keystrokes from a previous (failed or replaced) connection.
+      // We don't want input from before a disconnect to be replayed on the new session.
+      pendingInputRef.current = [];
+
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       // Use window.location.host to respect the current port (3000)
       // If running in dev mode (Vite on 5173), we might need to proxy, but the built app runs on 3000.
@@ -1743,6 +1753,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         const { cols, rows } = term;
         ws.send(JSON.stringify({ type: 'resize', cols, rows }));
         logger.terminal('Initial size sent', { tabId, cols, rows });
+
+        // Flush any keystrokes that were typed while the socket was still CONNECTING.
+        // This is the common case for recovered sessions: the terminal gains keyboard focus
+        // (from term.focus() in the mount requestAnimationFrame) before the WebSocket
+        // handshake completes, so early input is held here rather than discarded.
+        if (pendingInputRef.current.length > 0) {
+          logger.terminal('Flushing buffered input from CONNECTING window', {
+            tabId,
+            byteCount: pendingInputRef.current.length,
+          });
+          pendingInputRef.current.forEach(bufferedData => ws.send(bufferedData));
+          pendingInputRef.current = [];
+        }
 
         // Delay the welcome message briefly to allow SESSION_REATTACHED to arrive first.
         // If the server reattached us to an existing PTY, we suppress the fresh "Connected" 
@@ -2144,6 +2167,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }
           logger.terminal('Waiting state cleared by user input', { tabId });
         }
+      } else if (activeWs && activeWs.readyState === WebSocket.CONNECTING) {
+        // The terminal has focus but the WebSocket handshake isn't complete yet.
+        // Buffer the keystroke so it is delivered once the connection opens,
+        // rather than being silently dropped (the common failure mode for
+        // number keys pressed immediately after a session recovery).
+        pendingInputRef.current.push(data);
       }
     });
 
