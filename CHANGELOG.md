@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.10] - 2026-05-01
+
+---
+
+## [v7.10.10] - 2026-05-01
+
 ### Fixed
 - **Number keys and other input no longer lost on tabs recovered after an application update** — When Forge restarts and recovers saved tabs, the terminal gains keyboard focus (via `term.focus()`) before the WebSocket handshake completes. Any keystroke during that CONNECTING window was silently discarded because `xterm.onData` only sends data when `readyState === OPEN`. Input is now buffered while the socket is CONNECTING and flushed in bulk the instant `onopen` fires. The buffer is cleared on each new connection attempt so no stale pre-disconnect input is ever replayed.
 - **Tab numbers no longer duplicate after closing a tab** — For static naming strategies (`numbered`, `shell-type`, `custom-prefix`), the next tab number was computed as `tabs.length + 1`. After closing a tab this could collide with an existing title (e.g. closing "Terminal 2" from ["Terminal 1", "Terminal 2", "Terminal 3"] gave the next tab "Terminal 3" again). The number is now derived as `max(existing_numbers) + 1`, guaranteeing a fresh, collision-free title regardless of which tabs have been closed.
