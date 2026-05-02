@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
-	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 )
 
 // MacroRequest describes the body posted to /api/terminal/{id}/macro.
@@ -43,8 +42,18 @@ import (
 // The min/max/quiet knobs are exposed so the frontend can tune behaviour
 // per command card if the defaults ever stop working — but most callers
 // can omit them entirely and rely on the defaults below.
+//
+// Mode, when set, overrides the automatic bracketed-paste detection:
+//   - "bracketed" — always use bracketed paste (safe for modern AI CLIs)
+//   - "chunked"   — always use chunked typed input (debug / legacy use)
+//   - ""          — auto-detect via PTY output sniffing (default)
+//
+// Prefer "bracketed" for AI CLI cards (copilot, claude, aider) because
+// all modern CLIs enable DECSET 2004 and the override eliminates the
+// chunked fallback that mangles multiline payloads.
 type MacroRequest struct {
 	Payload    string `json:"payload"`
+	Mode       string `json:"mode,omitempty"`       // "bracketed" | "chunked" | "" (auto)
 	MinDelayMs int    `json:"minDelayMs,omitempty"` // floor before any quiet-detection starts
 	MaxDelayMs int    `json:"maxDelayMs,omitempty"` // hard cap on total wait
 	QuietMs    int    `json:"quietMs,omitempty"`    // continuous silence required before paste
@@ -86,6 +95,21 @@ const (
 	// the race and submits a partial buffer.
 	macroPostPasteSettleMs = 50
 )
+
+// ptyActivityReader is the minimal read-only view of a terminal session
+// required by waitForPTYQuiet and pickMacroMode.  Defined as an interface
+// so the quiet-detection logic is testable without a real PTY.
+type ptyActivityReader interface {
+	LastOutputAt() time.Time
+	IsBracketedPasteEnabled() bool
+	RecentOutput() []byte
+}
+
+// ptyWriter is the write side of a terminal session, separated from
+// ptyActivityReader so test doubles only need to implement what they use.
+type ptyWriter interface {
+	WriteToPty([]byte) (int, error)
+}
 
 // registerMacroHandler wires POST /api/terminal/{id}/macro into the
 // default ServeMux.  Called from main() AFTER termHandler is initialised
@@ -161,7 +185,7 @@ func handleMacro(w http.ResponseWriter, r *http.Request) {
 
 	waitForPTYQuiet(session, req.QuietMs, req.MaxDelayMs, startedAt, baseline)
 
-	mode := pickMacroMode(session)
+	mode := pickMacroMode(session, req.Mode)
 	bytesWritten, err := writeMacro(session, req.Payload, mode)
 
 	waited := time.Since(startedAt).Milliseconds()
@@ -202,13 +226,16 @@ func parseMacroPath(path string) (string, bool) {
 //     ignored — otherwise a terminal that was idle before the card click
 //     would trigger an immediate false-quiet and inject the payload before
 //     the CLI even starts), OR
+//   - the CLI was already quiet BEFORE the baseline (fast-start case):
+//     inject once quietMs has elapsed since the baseline itself, avoiding
+//     an unnecessary wait until maxDelayMs, OR
 //   - maxDelayMs milliseconds have passed since startedAt (hard cap).
 //
 // It polls every 50ms — fine-grained enough to feel snappy, coarse enough
 // to barely register on CPU.
-func waitForPTYQuiet(session *terminal.TerminalSession, quietMs, maxDelayMs int, startedAt, baseline time.Time) {
+func waitForPTYQuiet(session ptyActivityReader, quietMs, maxDelayMs int, startedAt, baseline time.Time) {
 	deadline := startedAt.Add(time.Duration(maxDelayMs) * time.Millisecond)
-	quiet := time.Duration(quietMs) * time.Millisecond
+	quietDuration := time.Duration(quietMs) * time.Millisecond
 	const pollInterval = 50 * time.Millisecond
 
 	for {
@@ -216,13 +243,27 @@ func waitForPTYQuiet(session *terminal.TerminalSession, quietMs, maxDelayMs int,
 		if now.After(deadline) {
 			return
 		}
+
 		lastOutput := session.LastOutputAt()
-		// Only count output that arrived after the baseline so that
-		// stale output (from before the command was sent) cannot cause
-		// an early injection.
-		if !lastOutput.IsZero() && lastOutput.After(baseline) && now.Sub(lastOutput) >= quiet {
-			return
+
+		if !lastOutput.IsZero() && lastOutput.After(baseline) {
+			// Normal case: the CLI has produced output after the macro request
+			// arrived.  Wait until it has been quiet for quietMs.
+			if now.Sub(lastOutput) >= quietDuration {
+				return
+			}
+		} else {
+			// Fast-start case: the CLI finished its startup banner before the
+			// macro POST even arrived at the server.  lastOutput is either zero
+			// or before baseline, so the CLI is already quiet relative to the
+			// macro request.  Use baseline as the silence reference — inject
+			// once quietMs has passed since the macro was requested rather than
+			// waiting until the maxDelayMs hard cap fires.
+			if now.Sub(baseline) >= quietDuration {
+				return
+			}
 		}
+
 		time.Sleep(pollInterval)
 	}
 }
@@ -233,20 +274,45 @@ func waitForPTYQuiet(session *terminal.TerminalSession, quietMs, maxDelayMs int,
 // `\x1b[200~ … \x1b[201~` as an opaque paste event.
 var bracketedPasteEnableSeq = []byte{0x1b, '[', '?', '2', '0', '0', '4', 'h'}
 
-// pickMacroMode decides how to inject the payload by sniffing the recent
-// output for DECSET 2004.  If we have not seen it, fall back to chunked
-// typed input which works against any CLI but is slower.
-func pickMacroMode(session *terminal.TerminalSession) string {
-	recent := session.RecentOutput()
-	if bytes.Contains(recent, bracketedPasteEnableSeq) {
+// pickMacroMode decides how to inject the payload.
+//
+// Priority order:
+//  1. Explicit caller override in req.Mode ("bracketed" or "chunked").
+//  2. The persistent isBracketedPasteEnabled flag on the session — set
+//     permanently the first time DECSET 2004 appears in PTY output, so
+//     CLIs that emitted the sequence early but have since scrolled their
+//     startup banner past the ring-buffer cap are still detected correctly.
+//  3. Fallback scan of the ring buffer for CLIs that emit DECSET 2004
+//     after the macro request arrives but before injection fires.
+//
+// Prefer "bracketed" whenever possible — chunked mode injects \r characters
+// as chunk separators, which causes TUI CLIs (copilot, claude, aider) to
+// submit each newline-delimited paragraph as a separate message instead of
+// delivering the whole payload as one unit.
+func pickMacroMode(session ptyActivityReader, requestedMode string) string {
+	// Honour explicit caller override first.
+	if requestedMode == "bracketed" || requestedMode == "chunked" {
+		return requestedMode
+	}
+
+	// Persistent flag: the CLI has announced bracketed-paste support at
+	// some point during this session, regardless of ring-buffer eviction.
+	if session.IsBracketedPasteEnabled() {
 		return "bracketed"
 	}
+
+	// Secondary: scan the current ring buffer in case the CLI emitted the
+	// sequence after the macro request was received but before this check.
+	if bytes.Contains(session.RecentOutput(), bracketedPasteEnableSeq) {
+		return "bracketed"
+	}
+
 	return "chunked"
 }
 
 // writeMacro performs the actual PTY write.  It returns the total bytes
 // written (excluding the trailing CR) so the caller can log the size.
-func writeMacro(session *terminal.TerminalSession, payload, mode string) (int, error) {
+func writeMacro(session ptyWriter, payload, mode string) (int, error) {
 	// Normalise newlines: bracketed-paste mode expects CR (0x0D) as the
 	// in-paste line separator.  Chunked-typed mode also wants CR, since
 	// most TUIs interpret LF mid-input as a literal character.
@@ -259,7 +325,7 @@ func writeMacro(session *terminal.TerminalSession, payload, mode string) (int, e
 	return writeChunked(session, normalized)
 }
 
-func writeBracketed(session *terminal.TerminalSession, payload string) (int, error) {
+func writeBracketed(session ptyWriter, payload string) (int, error) {
 	var buf bytes.Buffer
 	buf.WriteString("\x1b[200~")
 	buf.WriteString(payload)
@@ -274,7 +340,7 @@ func writeBracketed(session *terminal.TerminalSession, payload string) (int, err
 	return len(payload), nil
 }
 
-func writeChunked(session *terminal.TerminalSession, payload string) (int, error) {
+func writeChunked(session ptyWriter, payload string) (int, error) {
 	for offset := 0; offset < len(payload); offset += macroChunkSize {
 		end := offset + macroChunkSize
 		if end > len(payload) {

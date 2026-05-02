@@ -1490,6 +1490,11 @@ function App() {
               body: JSON.stringify({
                 payload: cmd.macro_payload,
                 minDelayMs: macroMinDelayMs,
+                // Forward the per-card mode override when present.
+                // "bracketed" forces bracketed-paste regardless of detection,
+                // which prevents chunked mode from mangling multiline payloads
+                // by submitting each paragraph as a separate message.
+                ...(cmd.macro_mode ? { mode: cmd.macro_mode } : {}),
               }),
             })
               .then((res) => res.json().catch(() => ({})).then((body) => ({ ok: res.ok, body })))

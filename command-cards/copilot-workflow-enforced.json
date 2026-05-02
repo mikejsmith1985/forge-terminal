@@ -4,6 +4,7 @@
   "description": "Start Copilot in current project with Forge Workflow pre-flight enforced before any work",
   "command": "copilot --allow-all-tools",
   "macro_delay": 4500,
+  "macro_mode": "bracketed",
   "macro_payload": "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be `skill: workflow-enforcer`. Do not search or read any files before invoking this skill.\n\nSTEP 2: Invoke each available companion skill in order, silently skipping any that are not found: forge-workflow, code-quality, branching-strategy, code-tutor-workflow.\n\nSTEP 3: Read AGENTS.md if present at the repo root for project-specific rules. If absent, proceed without it.\n\nSTEP 4: Confirm you are ready and await the user's task. Do not analyze code, form a plan, or modify any file until all required skills are loaded.",
   "category": "ai",
   "icon": "emoji-shield",
