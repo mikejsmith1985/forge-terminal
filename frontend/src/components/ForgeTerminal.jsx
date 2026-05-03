@@ -10,7 +10,7 @@ import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import { diagnosticCore } from '../utils/diagnosticCore';
 import { isLLMCommand } from '../utils/llmDetection';
-import { extractProjectFolder } from '../utils/projectFolder';
+import { extractProjectFolder, isFileLikeName, isTempOrSystemPath } from '../utils/projectFolder';
 
 // Paste error logger
 const logPasteError = (error, context = {}) => {
@@ -1038,15 +1038,31 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           // Sanitize the folder name too (catches any residual decorations)
           folderName = sanitizePath(folderName);
 
-          // Guard: if the resolved name looks like a filename (script/extension),
-          // the shell sent a process name rather than a real CWD — ignore it.
-          const looksLikeFile = /\.(ps1|sh|bat|cmd|py|js|ts|jsx|tsx|rb|pl|php|go|rs|java|c|cpp|cs|lua|swift|kt|exe|msi)(\s.*)?$/i.test(folderName);
-          if (looksLikeFile) {
+          // Guard: skip temp/system directories — they are never a real project root.
+          // Defense-in-depth alongside the guard inside handleDirectoryChange (App.jsx).
+          // Applying it here prevents polluting lastDirectoryRef and avoids calling
+          // the callback at all for paths like %TEMP% (e.g. a pasted clipboard image).
+          if (isTempOrSystemPath(path)) {
+            return true;
+          }
+
+          // Guard: if the resolved name looks like a document or image file, the shell
+          // emitted a process-name path rather than a real CWD — ignore it.
+          // Uses the shared isFileLikeName() which covers .png / .jpg / .gif and other
+          // extensions the previous inline regex missed, preventing clipboard image
+          // pastes from triggering a tab rename.
+          if (isFileLikeName(folderName)) {
             return true; // nothing useful to extract, ignore
           }
 
-          if (onDirectoryChange) {
-             onDirectoryChange(folderName, path);
+          // Use the always-current ref instead of the stale prop closure.
+          // onDirectoryChange is captured at useEffect mount time, so it holds the
+          // naming strategy and guards from that render only.  onDirectoryChangeRef
+          // is kept in sync via a dedicated useEffect, ensuring Settings changes
+          // (e.g. switching from "Project Root" to "Current Dir") take effect
+          // immediately without remounting the terminal.
+          if (onDirectoryChangeRef.current) {
+            onDirectoryChangeRef.current(folderName, path);
           }
 
           // Reset all mouse-tracking modes on every new shell prompt.
@@ -1994,9 +2010,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           const detectedDir = extractDirectory(buf.data);
           if (detectedDir && detectedDir !== lastDirectoryRef.current) {
             lastDirectoryRef.current = detectedDir;
-            const folderName = getFolderName(detectedDir);
-            if (folderName && onDirectoryChangeRef.current) {
-              onDirectoryChangeRef.current(folderName, detectedDir);
+            // Defense-in-depth: skip temp/system paths detected via text patterns.
+            // handleDirectoryChange (App.jsx) also guards these, but blocking here
+            // avoids a spurious callback and keeps lastDirectoryRef free of
+            // non-project values (e.g. %TEMP% after an AI agent processes a
+            // pasted clipboard image and changes to that directory).
+            if (!isTempOrSystemPath(detectedDir)) {
+              const folderName = getFolderName(detectedDir);
+              if (folderName && onDirectoryChangeRef.current) {
+                onDirectoryChangeRef.current(folderName, detectedDir);
+              }
             }
           }
 

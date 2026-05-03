@@ -338,6 +338,46 @@ describe('isTempOrSystemPath', () => {
   });
 });
 
+// ── Image paste / clipboard path contract ──────────────────────────────────
+// These tests document the contract that ForgeTerminal's OSC 9;9 handler must
+// honour: pasted images saved to %TEMP% must never cause a tab rename.
+// The handler uses isFileLikeName() + isTempOrSystemPath() together as its
+// guard — so both utilities must handle the clipboard image scenario correctly.
+
+describe('isFileLikeName – image paste scenario', () => {
+  it('identifies timestamped clipboard image filenames as files, not directories', () => {
+    // Forge Terminal stores pasted images as clipboard-<timestamp>.<ext> in %TEMP%.
+    // extractProjectFolder() strips the file segment but returns the username
+    // ("mikej") as the project folder via the Windows parts[2] heuristic.
+    // isFileLikeName() must flag the raw filename BEFORE extractProjectFolder
+    // is called so the OSC 9;9 guard can short-circuit without ever firing the
+    // tab-rename callback.
+    expect(isFileLikeName('clipboard-1777811581166059900.png')).toBe(true);
+    expect(isFileLikeName('clipboard-abc123.jpg')).toBe(true);
+    expect(isFileLikeName('screenshot-2024.webp')).toBe(true);
+    expect(isFileLikeName('frame-001.gif')).toBe(true);
+    expect(isFileLikeName('screenshot.bmp')).toBe(true);
+    expect(isFileLikeName('capture.ico')).toBe(true);
+    expect(isFileLikeName('photo.jpeg')).toBe(true);
+  });
+});
+
+describe('isTempOrSystemPath – image paste scenario', () => {
+  it('blocks the full clipboard image path (file extension included in the path)', () => {
+    // Some AI tools emit OSC 9;9 with the file path rather than just the parent
+    // directory.  The path still contains /appdata/local/temp so it must be blocked.
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp\\clipboard-1777811581166059900.png')).toBe(true);
+    expect(isTempOrSystemPath('C:/Users/mikej/AppData/Local/Temp/screenshot.png')).toBe(true);
+  });
+
+  it('blocks the Windows temp directory at any sub-path depth', () => {
+    // AI agents processing a pasted image may cd to %TEMP% and emit OSC 9;9.
+    // Every sub-path under %TEMP% must be blocked so the tab keeps its project name.
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp')).toBe(true);
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp\\subfolder')).toBe(true);
+  });
+});
+
 // ── isStaticNamingStrategy ──────────────────────────────────────────────────
 
 describe('isStaticNamingStrategy', () => {
