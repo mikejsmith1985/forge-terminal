@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel, isFileLikeName } from './projectFolder';
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel, isFileLikeName, isTempOrSystemPath } from './projectFolder';
 
 // Tests for projectFolder.js -- the canonical source for tab title extraction logic.
 
@@ -263,3 +263,208 @@ describe('getTabTitle', () => {
     expect(getTabTitle(null, 'custom-prefix', { prefix: 'X' })).toBe('X 1');
   });
 });
+
+describe('isTempOrSystemPath', () => {
+  // Windows temp paths — the primary vector for this bug (pasted images land in %TEMP%)
+  it('identifies Windows AppData\\Local\\Temp as a temp path', () => {
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp')).toBe(true);
+  });
+
+  it('identifies a deep Windows temp path (e.g. pasted image subfolder)', () => {
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp\\paste-12345')).toBe(true);
+  });
+
+  it('identifies Windows TEMP with forward slashes', () => {
+    expect(isTempOrSystemPath('C:/Users/mikej/AppData/Local/Temp')).toBe(true);
+  });
+
+  it('identifies Windows AppData\\LocalLow as a system path', () => {
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\LocalLow\\SomeCache')).toBe(true);
+  });
+
+  it('identifies Windows system temp (C:\\Windows\\Temp)', () => {
+    expect(isTempOrSystemPath('C:\\Windows\\Temp')).toBe(true);
+    expect(isTempOrSystemPath('C:\\Windows\\Temp\\some-file')).toBe(true);
+  });
+
+  it('identifies ProgramData temp as a system path', () => {
+    expect(isTempOrSystemPath('C:\\ProgramData\\Temp')).toBe(true);
+  });
+
+  // Unix/macOS temp paths
+  it('identifies /tmp as a temp path', () => {
+    expect(isTempOrSystemPath('/tmp')).toBe(true);
+    expect(isTempOrSystemPath('/tmp/')).toBe(true);
+    expect(isTempOrSystemPath('/tmp/forge-paste-abc123')).toBe(true);
+  });
+
+  it('identifies macOS /var/folders as a temp path', () => {
+    expect(isTempOrSystemPath('/var/folders/xy/abc123/T/image.png')).toBe(true);
+  });
+
+  it('identifies macOS /private/var/folders as a temp path', () => {
+    expect(isTempOrSystemPath('/private/var/folders/xy/abc123/T')).toBe(true);
+  });
+
+  it('identifies /var/tmp as a temp path', () => {
+    expect(isTempOrSystemPath('/var/tmp/some-cache')).toBe(true);
+  });
+
+  // Project paths — must NOT be flagged
+  it('does NOT flag a normal Windows project path', () => {
+    expect(isTempOrSystemPath('C:\\ProjectsWin\\forge-terminal')).toBe(false);
+    expect(isTempOrSystemPath('C:\\ProjectsWin\\forge-terminal\\src\\components')).toBe(false);
+  });
+
+  it('does NOT flag a Unix project path', () => {
+    expect(isTempOrSystemPath('/home/user/repos/my-project')).toBe(false);
+    expect(isTempOrSystemPath('/Users/mikej/projects/forge-terminal')).toBe(false);
+  });
+
+  it('does NOT flag a user home directory (not temp)', () => {
+    // Navigating to ~/ is valid — only the Temp sub-path is blocked
+    expect(isTempOrSystemPath('C:\\Users\\mikej')).toBe(false);
+    expect(isTempOrSystemPath('/home/mikej')).toBe(false);
+  });
+
+  it('does NOT flag AppData\\Roaming (only Local\\Temp and LocalLow are blocked)', () => {
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Roaming\\SomeApp')).toBe(false);
+  });
+
+  it('returns false for empty, null, or non-string values', () => {
+    expect(isTempOrSystemPath('')).toBe(false);
+    expect(isTempOrSystemPath(null)).toBe(false);
+    expect(isTempOrSystemPath(undefined)).toBe(false);
+  });
+});
+
+// ── Image paste / clipboard path contract ──────────────────────────────────
+// These tests document the contract that ForgeTerminal's OSC 9;9 handler must
+// honour: pasted images saved to %TEMP% must never cause a tab rename.
+// The handler uses isFileLikeName() + isTempOrSystemPath() together as its
+// guard — so both utilities must handle the clipboard image scenario correctly.
+
+describe('isFileLikeName – image paste scenario', () => {
+  it('identifies timestamped clipboard image filenames as files, not directories', () => {
+    // Forge Terminal stores pasted images as clipboard-<timestamp>.<ext> in %TEMP%.
+    // extractProjectFolder() strips the file segment but returns the username
+    // ("mikej") as the project folder via the Windows parts[2] heuristic.
+    // isFileLikeName() must flag the raw filename BEFORE extractProjectFolder
+    // is called so the OSC 9;9 guard can short-circuit without ever firing the
+    // tab-rename callback.
+    expect(isFileLikeName('clipboard-1777811581166059900.png')).toBe(true);
+    expect(isFileLikeName('clipboard-abc123.jpg')).toBe(true);
+    expect(isFileLikeName('screenshot-2024.webp')).toBe(true);
+    expect(isFileLikeName('frame-001.gif')).toBe(true);
+    expect(isFileLikeName('screenshot.bmp')).toBe(true);
+    expect(isFileLikeName('capture.ico')).toBe(true);
+    expect(isFileLikeName('photo.jpeg')).toBe(true);
+  });
+});
+
+describe('isTempOrSystemPath – image paste scenario', () => {
+  it('blocks the full clipboard image path (file extension included in the path)', () => {
+    // Some AI tools emit OSC 9;9 with the file path rather than just the parent
+    // directory.  The path still contains /appdata/local/temp so it must be blocked.
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp\\clipboard-1777811581166059900.png')).toBe(true);
+    expect(isTempOrSystemPath('C:/Users/mikej/AppData/Local/Temp/screenshot.png')).toBe(true);
+  });
+
+  it('blocks the Windows temp directory at any sub-path depth', () => {
+    // AI agents processing a pasted image may cd to %TEMP% and emit OSC 9;9.
+    // Every sub-path under %TEMP% must be blocked so the tab keeps its project name.
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp')).toBe(true);
+    expect(isTempOrSystemPath('C:\\Users\\mikej\\AppData\\Local\\Temp\\subfolder')).toBe(true);
+  });
+});
+
+// ── isStaticNamingStrategy ──────────────────────────────────────────────────
+
+describe('isStaticNamingStrategy', () => {
+  // Static strategies produce a title once at creation (e.g. "Terminal 3") and
+  // never update it when the user changes directories.  This set must stay in
+  // sync with the static-naming branch in useTabManager's createTabAction.
+
+  it('returns true for numbered strategy', () => {
+    expect(isStaticNamingStrategy('numbered')).toBe(true);
+  });
+
+  it('returns true for shell-type strategy', () => {
+    expect(isStaticNamingStrategy('shell-type')).toBe(true);
+  });
+
+  it('returns true for custom-prefix strategy', () => {
+    expect(isStaticNamingStrategy('custom-prefix')).toBe(true);
+  });
+
+  it('returns false for dynamic strategies', () => {
+    expect(isStaticNamingStrategy('project-root')).toBe(false);
+    expect(isStaticNamingStrategy('current-dir')).toBe(false);
+    expect(isStaticNamingStrategy('parent-child')).toBe(false);
+  });
+
+  it('returns false for unknown or empty values', () => {
+    expect(isStaticNamingStrategy('')).toBe(false);
+    expect(isStaticNamingStrategy(null)).toBe(false);
+    expect(isStaticNamingStrategy(undefined)).toBe(false);
+    expect(isStaticNamingStrategy('random-string')).toBe(false);
+  });
+});
+
+// ── Tab number collision helpers ────────────────────────────────────────────
+// Tests for the max-number logic used by useTabManager.createTabAction to
+// prevent duplicate tab titles after a tab is closed.
+//
+// The formula used is:
+//   Math.max(0, ...tabs.map(t => parseInt(t.title?.match(/\d+$/)?.[0] || '0', 10))) + 1
+//
+// We exercise this formula directly here since it is a pure computation
+// that doesn't require mounting React hooks.
+
+describe('next tab number computation (static strategy)', () => {
+  /**
+   * Mirrors the formula in useTabManager.createTabAction so that the test
+   * acts as a regression guard for the max-number logic.
+   * @param {Array<{title: string}>} tabs
+   * @returns {number}
+   */
+  function computeNextTabNumber(tabs) {
+    return Math.max(0, ...tabs.map(tab => parseInt(tab.title?.match(/\d+$/)?.[0] || '0', 10))) + 1;
+  }
+
+  it('starts at 1 when there are no existing tabs', () => {
+    expect(computeNextTabNumber([])).toBe(1);
+  });
+
+  it('increments beyond the highest tab number in a contiguous list', () => {
+    const tabs = [{ title: 'Terminal 1' }, { title: 'Terminal 2' }, { title: 'Terminal 3' }];
+    expect(computeNextTabNumber(tabs)).toBe(4);
+  });
+
+  it('uses max+1 to skip gaps left by closed tabs', () => {
+    // Closing "Terminal 2" leaves a gap — next should be 4, not 3 (which would duplicate)
+    const tabs = [{ title: 'Terminal 1' }, { title: 'Terminal 3' }];
+    expect(computeNextTabNumber(tabs)).toBe(4);
+  });
+
+  it('works correctly for shell-type titles (e.g. "PowerShell 2")', () => {
+    const tabs = [{ title: 'PowerShell 1' }, { title: 'PowerShell 3' }];
+    expect(computeNextTabNumber(tabs)).toBe(4);
+  });
+
+  it('works correctly for custom-prefix titles (e.g. "Dev 5")', () => {
+    const tabs = [{ title: 'Dev 2' }, { title: 'Dev 5' }];
+    expect(computeNextTabNumber(tabs)).toBe(6);
+  });
+
+  it('handles tabs with no trailing number gracefully (treats them as 0)', () => {
+    const tabs = [{ title: 'forge-terminal' }, { title: 'Terminal 2' }];
+    expect(computeNextTabNumber(tabs)).toBe(3);
+  });
+
+  it('handles undefined or null titles without throwing', () => {
+    const tabs = [{ title: null }, { title: undefined }, { title: 'Terminal 1' }];
+    expect(computeNextTabNumber(tabs)).toBe(2);
+  });
+});
+

@@ -87,7 +87,15 @@ if (-not $NoBuild) {
     # Step 4: Rebuild Go Binary with ldflags for dev mode
     Write-Host "[4/6] Rebuilding Go binary (dev mode)..." -ForegroundColor Cyan
     $buildTime = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
-    go build -ldflags "-X main.buildTime=$buildTime -X main.devMode=true" -o forge-dev.exe ./cmd/forge
+    # Inject the latest semver git tag so the Release Manager shows the correct
+    # current version even in dev builds that don't go through local-release.ps1.
+    # Without this, the dev binary always inherits the hardcoded source fallback.
+    $devVersionTag = git tag --sort=-version:refname 2>$null |
+        Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } |
+        Select-Object -First 1
+    $devVersion = if ($devVersionTag) { $devVersionTag.TrimStart('v') } else { "0.0.0" }
+    $updaterVersionFlag = "github.com/mikejsmith1985/forge-terminal/internal/updater.Version=$devVersion"
+    go build -ldflags "-X main.buildTime=$buildTime -X main.devMode=true -X $updaterVersionFlag" -o forge-dev.exe ./cmd/forge
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[X] Go build failed!" -ForegroundColor Red
         exit 1

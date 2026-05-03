@@ -68,9 +68,10 @@ invoke skill: code-tutor-workflow
 
 ### Conditionally Required (invoke when the task warrants it)
 ```
-invoke skill: multi-agent        # tasks spanning 3+ files
-invoke skill: testing-standards  # test creation or modification
-invoke skill: pr-workflow        # PR creation or review
+invoke skill: multi-agent             # tasks spanning 3+ files
+invoke skill: testing-standards       # test creation or modification
+invoke skill: pr-workflow             # PR creation or review
+invoke skill: forge-release-process   # release, publish, bump version, create a release
 ```
 
 ---

@@ -2,6 +2,7 @@
 package terminal
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -72,18 +73,28 @@ type TerminalSession struct {
 	// first prompt — and guesses are wrong often enough that the macro
 	// either lands inside startup output or arrives too late.
 	//
-	// activityMu guards both fields below independently of the main mu so
+	// activityMu guards all fields below independently of the main mu so
 	// the macro endpoint can poll without contending with PTY writes.
-	activityMu     sync.RWMutex
-	lastOutputAt  time.Time
-	recentOutput  []byte // ring buffer of the last ~4 KB of PTY output
+	activityMu             sync.RWMutex
+	lastOutputAt           time.Time
+	recentOutput           []byte // ring buffer of the last ~16 KB of PTY output
+	// isBracketedPasteEnabled is set permanently the moment we observe the
+	// DECSET 2004 enable sequence (\x1b[?2004h) in PTY output.  Unlike
+	// scanning the evictable ring buffer, this flag is never cleared — so
+	// a CLI that emits the sequence once during startup is always injected
+	// via bracketed paste even after its startup banner scrolls off the
+	// ring buffer.
+	isBracketedPasteEnabled bool
 }
 
 // recentOutputCapacity is the size of the per-session output ring buffer.
-// 4 KB is enough to capture a CLI's startup banner plus an ANSI mode-set
-// sequence (`\x1b[?2004h`) without holding meaningful memory across
-// thousands of sessions.
-const recentOutputCapacity = 4096
+// 16 KB gives enough headroom to retain ANSI mode-set sequences
+// (e.g. `\x1b[?2004h` for bracketed paste) even when a CLI emits a verbose
+// startup banner.  The persistent isBracketedPasteEnabled flag (set in
+// recordOutput) is the primary detection path; the ring buffer is a
+// secondary fallback for CLIs that did not emit the sequence before the
+// macro request arrived but do so during the wait window.
+const recentOutputCapacity = 16384
 
 // NewTerminalSession creates a new PTY session with default shell.
 func NewTerminalSession(id string) (*TerminalSession, error) {
@@ -320,6 +331,14 @@ func (s *TerminalSession) recordOutput(chunk []byte) {
 	if len(s.recentOutput) > recentOutputCapacity {
 		s.recentOutput = s.recentOutput[len(s.recentOutput)-recentOutputCapacity:]
 	}
+
+	// Once the CLI announces bracketed-paste support, remember it permanently.
+	// The ring buffer is evictable, so this flag is the authoritative record
+	// that the sequence was ever seen — even after verbose startup output
+	// scrolls the sequence off the ring.
+	if !s.isBracketedPasteEnabled && containsBracketedPasteEnableSeq(chunk) {
+		s.isBracketedPasteEnabled = true
+	}
 }
 
 // LastOutputAt returns the timestamp of the most recent PTY output.  Zero
@@ -342,6 +361,29 @@ func (s *TerminalSession) RecentOutput() []byte {
 	out := make([]byte, len(s.recentOutput))
 	copy(out, s.recentOutput)
 	return out
+}
+
+// IsBracketedPasteEnabled reports whether this session's PTY process has
+// ever emitted the DECSET 2004 enable sequence (\x1b[?2004h).  Once true
+// it never returns to false — the flag is a permanent record that the CLI
+// supports bracketed-paste mode regardless of ring-buffer eviction.
+func (s *TerminalSession) IsBracketedPasteEnabled() bool {
+	s.activityMu.RLock()
+	defer s.activityMu.RUnlock()
+	return s.isBracketedPasteEnabled
+}
+
+// bracketedPasteEnableBytes is the 8-byte ANSI sequence a TUI sends to
+// enable bracketed-paste mode.  Defined here (rather than only in
+// handlers_macro.go) so recordOutput can detect it inline without a
+// package-level import cycle.
+var bracketedPasteEnableBytes = []byte{0x1b, '[', '?', '2', '0', '0', '4', 'h'}
+
+// containsBracketedPasteEnableSeq reports whether the given chunk contains
+// the DECSET 2004 enable sequence.  Called from recordOutput on every PTY
+// read, so it must be allocation-free and fast.
+func containsBracketedPasteEnableSeq(chunk []byte) bool {
+	return bytes.Contains(chunk, bracketedPasteEnableBytes)
 }
 
 // Write writes data to the PTY.

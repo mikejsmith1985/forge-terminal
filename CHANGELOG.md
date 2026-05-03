@@ -8,6 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Release Manager card now passes explicit version to `local-release.ps1`** — When a project has `scripts/local-release.ps1`, the card was sending a relative bump type (`patch`/`minor`/`major`) rather than the explicit next-version shown in the UI. If a previous release attempt had partially bumped `package.json` before failing, the script would compute a *different* version than the card displayed, creating a double-bump. The card now always passes the exact version string (e.g. `0.0.14`), ensuring the script releases precisely what was shown.
+
+## [7.10.11] - 2026-05-03
+
+---
+
+## [v7.10.11] - 2026-05-03
+
+### Fixed
+- **Pasting a clipboard image no longer renames the active tab** — Three overlapping bugs allowed the `see file at C:\...\AppData\Local\Temp\clipboard-<timestamp>.png` text emitted after an image paste to trigger an OSC 9;9 directory-change event that renamed the tab:
+  1. *Stale prop closure in the OSC 9;9 handler*: the xterm `addOscHandler` callback captured `onDirectoryChange` at terminal mount time. If the user later changed the Tab Naming strategy in Settings, the handler continued using the old strategy until the terminal was remounted. Fixed by switching to `onDirectoryChangeRef.current`, which is always the latest callback.
+  2. *Narrow `looksLikeFile` guard missing image extensions*: the inline regex only blocked script extensions (`.ps1`, `.sh`, `.py`, …) and did not cover `.png`, `.jpg`, `.gif`, `.webp`, `.bmp`, etc. Replaced the inline regex with the shared `isFileLikeName()` utility from `projectFolder.js`, which covers all document and image extensions.
+  3. *Missing `isTempOrSystemPath` guard before the OSC callback*: the guard existed inside `handleDirectoryChange` (App.jsx) but was unreachable whenever the stale closure held a version of that function that lacked the guard. Added a defense-in-depth `isTempOrSystemPath(path)` check directly in the OSC 9;9 handler before the callback is invoked at all.
+- **Text-based directory detection no longer renames tabs to temp paths** — The `extractDirectory` code path that parses PTY output for `cd`-style paths lacked a `isTempOrSystemPath` guard. An AI agent processing a pasted image and briefly navigating to `%TEMP%` could trigger a spurious rename. The guard is now applied before calling `onDirectoryChangeRef.current`.
+- **Tab Naming setting is now always respected, including after settings changes mid-session** — The stale-closure fix above ensures the active naming strategy from Settings drives all tab title updates, satisfying the "Ultimate Law of Tab Naming."
+- **Macro payload injection is now reliable for fast-starting CLIs (Copilot, Claude, Aider)** — Three bugs caused the workflow enforcement payload to either arrive 12 seconds late or be mangled into multiple separate messages:
+  1. *12-second timeout on fast-start*: `waitForPTYQuiet` only fired when PTY output arrived *after* the macro request. If Copilot finished its startup banner before the POST arrived, the condition was never true and injection waited the full 12-second hard cap. Fixed by using the request-arrival time (`baseline`) as the silence reference when no post-baseline output is observed — injection now fires after `quietMs` (~750 ms) in the fast-start case.
+  2. *Multiline payload submitted as separate messages in chunked mode*: When the `\x1b[?2004h` bracketed-paste sequence wasn't in the ring buffer, the code fell back to chunked mode where `\n` → `\r` normalization caused each paragraph to be submitted as a separate Copilot message. Fixed by (a) persisting a `isBracketedPasteEnabled` boolean on `TerminalSession` that is never evicted from the ring buffer, and (b) adding a `macro_mode` field to command cards so AI CLI cards force bracketed-paste mode regardless of detection.
+  3. *Bracketed-paste detection failure after ring buffer eviction*: If Copilot emitted the DECSET 2004 enable sequence early then printed >4 KB of output, the sequence scrolled off the 4 KB ring buffer and `pickMacroMode` fell back to chunked. Fixed by tracking the enable sequence as a persistent session flag and expanding the ring buffer from 4 KB to 16 KB.
+- **`copilot-workflow-enforced.json` now sets `"macro_mode": "bracketed"`** to force bracketed-paste injection, bypassing detection for a card that is exclusively used with AI CLIs.
+
+## [7.10.10] - 2026-05-01
+
+---
+
+## [v7.10.10] - 2026-05-01
+
+### Fixed
+- **Number keys and other input no longer lost on tabs recovered after an application update** — When Forge restarts and recovers saved tabs, the terminal gains keyboard focus (via `term.focus()`) before the WebSocket handshake completes. Any keystroke during that CONNECTING window was silently discarded because `xterm.onData` only sends data when `readyState === OPEN`. Input is now buffered while the socket is CONNECTING and flushed in bulk the instant `onopen` fires. The buffer is cleared on each new connection attempt so no stale pre-disconnect input is ever replayed.
+- **Tab numbers no longer duplicate after closing a tab** — For static naming strategies (`numbered`, `shell-type`, `custom-prefix`), the next tab number was computed as `tabs.length + 1`. After closing a tab this could collide with an existing title (e.g. closing "Terminal 2" from ["Terminal 1", "Terminal 2", "Terminal 3"] gave the next tab "Terminal 3" again). The number is now derived as `max(existing_numbers) + 1`, guaranteeing a fresh, collision-free title regardless of which tabs have been closed.
+
+## [7.10.9] - 2026-05-01
+
+---
+
+## [v7.10.9] - 2026-05-01
+
+### Fixed
+- **Tab title and project directory no longer change when AI tools view a pasted image** — When a user pasted an image, the system saved it to the OS temp directory (e.g. `%TEMP%` on Windows, `/tmp` on macOS/Linux). If Copilot or Claude navigated there to access the file, the shell's CWD notification fired `handleDirectoryChange`, which overwrote the tab title (e.g. `forge-terminal` → `mikej`) and `tab.currentDirectory` with the temp path — breaking the Release Manager card, Workflow card, Git panel, and other features that depend on `currentDirectory` pointing at the project root. Added `isTempOrSystemPath()` to `projectFolder.js` (covering Windows `AppData\Local\Temp`, `Windows\Temp`, Unix `/tmp`, macOS `/var/folders`, etc.) and applied an early-return guard in `handleDirectoryChange` that skips both title and directory updates when the new path is a temp/system location.
+
+## [7.10.8] - 2026-04-30
+
+---
+
+## [v7.10.8] - 2026-04-30
+
+### Fixed
+- **Release Manager now shows the correct current version in dev builds** — Two compounding bugs caused the Release Manager to display a stale version (e.g. v7.10.3) even when git tags showed a newer release (v7.10.7). First: `run-dev-clean.ps1` built the dev binary with `-X main.buildTime` and `-X main.devMode` only — never injecting `-X internal/updater.Version`. Second: `var Version` in `updater.go` was left at the value from when the branch was cut from main, which never received the version bumps that live on the release branch. Fixed by (1) dynamically reading the latest semver git tag in `run-dev-clean.ps1` and injecting it as an ldflag, and (2) syncing the `var Version` fallback to the current latest tag `"7.10.7"`.
 - **Companion QR code now encodes the chosen connection method's URL end-to-end** — When the user selected Named Cloudflare Tunnel and Tailscale was also connected, the wizard silently overrode the QR base URL with the Tailscale address. The phone received `tailscale-host/companion/#forge=cloudflare-url` instead of the Cloudflare URL throughout. Removed the Tailscale-override logic; `resolvedCompanionHost` now derives from `tunnelUrl` (the active Cloudflare URL) so both the PWA load path and the `forge=` fragment encode the method the user actually chose. Component test updated to serve as a regression guard against re-introducing the Tailscale substitution.
 - **Release Manager no longer re-releases the same version when git tags live on feature branches** — `local-release.ps1` used `git describe --tags --abbrev=0` which only searches branch ancestry. When a release is made from a feature branch before merging to main, new branches cut from main don't see that tag in their ancestry, causing `git describe` to return the previous version. Patch-bumping that yields the same tag as the one just released. Replaced with `git tag --sort=-version:refname` which finds the highest semver tag globally.
 - **Release Manager UI now shows the correct current version when the running binary predates the latest tag** — `/api/version` returned only the binary's compiled-in version string. Added `latestGitTag` to the response (populated by the same global tag query). The Release Manager now prefers `latestGitTag` so it shows the right base even in the window between a release being tagged and the new binary being installed.

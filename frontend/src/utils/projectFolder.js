@@ -121,6 +121,42 @@ export function getShellLabel(shellType) {
 }
 
 /**
+ * Returns true if the given path is a system or temporary directory that
+ * should never overwrite an established tab project root.
+ *
+ * Covers common Windows and Unix temp locations. Users with non-standard
+ * temp dirs (e.g. D:\Temp) may not be covered; they can work around this
+ * by setting a rootFolder in Tab Controls so the project-root strategy
+ * anchors correctly.
+ *
+ * @param {string} rawPath - A filesystem path (backslashes or forward slashes).
+ * @returns {boolean}
+ */
+export function isTempOrSystemPath(rawPath) {
+  if (!rawPath || typeof rawPath !== 'string') return false;
+  const normalized = rawPath.replace(/\\/g, '/').toLowerCase();
+  return (
+    // Windows: C:\Users\<user>\AppData\Local\Temp (standard %TEMP%)
+    normalized.includes('/appdata/local/temp') ||
+    // Windows: C:\Users\<user>\AppData\LocalLow (browser/app cache area)
+    normalized.includes('/appdata/locallow') ||
+    // Windows: C:\Windows\Temp (system-wide temp)
+    normalized.includes('/windows/temp') ||
+    // Windows: C:\ProgramData\Temp
+    normalized.includes('/programdata/temp') ||
+    // Unix/macOS: /tmp (standard temp mount, exact match or subpath)
+    normalized === '/tmp' ||
+    normalized.startsWith('/tmp/') ||
+    // macOS: /var/folders (NSTemporaryDirectory / Gatekeeper quarantine)
+    normalized.includes('/var/folders/') ||
+    // macOS: /private/var/folders (real path backing the /var/folders symlink)
+    normalized.includes('/private/var/folders/') ||
+    // Linux: /var/tmp (temp area that survives reboots)
+    normalized.includes('/var/tmp/')
+  );
+}
+
+/**
  * Returns true for strategies whose tab title is set once at creation and
  * should NOT be auto-updated when the user changes directory.
  *

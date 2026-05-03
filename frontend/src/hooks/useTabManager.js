@@ -388,7 +388,15 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       }
 
       const config = shellConfig || configRef.current;
-      const newTabNumber = prev.tabs.length + 1;
+      // For static strategies (numbered / shell-type / custom-prefix), compute the next
+      // number from the highest existing tab number rather than the current tab count.
+      // Using count+1 causes duplicates whenever a tab has been closed — e.g. if tabs are
+      // ["Terminal 1", "Terminal 3"] (count=2), count+1 gives 3, producing "Terminal 3"
+      // again.  Max+1 always gives a fresh, collision-free number.
+      const currentStrategy = namingStrategyRef.current;
+      const newTabNumber = isStaticNamingStrategy(currentStrategy)
+        ? Math.max(0, ...prev.tabs.map(tab => parseInt(tab.title?.match(/\d+$/)?.[0] || '0', 10))) + 1
+        : prev.tabs.length + 1;
       const newTab = createTab(config, newTabNumber, null, null, currentDirectory, themePreferenceRef.current, {
         namingStrategy: namingStrategyRef.current,
         namingPrefix: namingPrefixRef.current,

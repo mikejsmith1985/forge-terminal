@@ -15,8 +15,10 @@ import (
 	"time"
 )
 
-// Version is set at build time via ldflags
-var Version = "7.10.3"
+// Version is set at build time via ldflags.
+// Keep this in sync with the latest git tag so dev builds without ldflags
+// show a reasonable fallback instead of a stale release from months ago.
+var Version = "7.10.11"
 
 // DownloadURLResolver, when set by main at startup, is called to obtain a
 // signed R2 URL instead of using the public GitHub release asset URL.
