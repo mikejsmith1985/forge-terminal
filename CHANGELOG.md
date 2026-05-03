@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Release script template: replaced em dash characters with ASCII hyphens in `throw` error messages. Em dash (U+2014) UTF-8 bytes end in `0x94`, which Windows PowerShell 5.1 (reading without a UTF-8 BOM) maps to a right double-quote — prematurely terminating string literals and causing a `ParseException`.
+
 ## [7.10.12] - 2026-05-03
 
 ---

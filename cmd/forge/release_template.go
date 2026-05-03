@@ -124,12 +124,12 @@ if ($BumpType -ne '') {
 # git describe then returns the correct version from any branch after the release.
 Write-Host "  Merging '$originalBranch' → main..."
 git checkout main
-if ($LASTEXITCODE -ne 0) { throw "git checkout main failed — ensure main exists" }
+if ($LASTEXITCODE -ne 0) { throw "git checkout main failed - ensure main exists" }
 git pull origin main
 git merge $originalBranch --no-edit
-if ($LASTEXITCODE -ne 0) { throw "git merge $originalBranch failed — resolve conflicts then re-run" }
+if ($LASTEXITCODE -ne 0) { throw "git merge $originalBranch failed - resolve conflicts then re-run" }
 git push origin main
-if ($LASTEXITCODE -ne 0) { throw "Failed to push main — check push permissions" }
+if ($LASTEXITCODE -ne 0) { throw "Failed to push main - check push permissions" }
 Write-Host '  ✅ Merged and pushed to main'
 
 # Remove stale local tag. Guard with git tag -l first — attempting to delete a
