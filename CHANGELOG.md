@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.12] - 2026-05-03
+
+---
+
+## [v7.10.12] - 2026-05-03
+
 ### Added
 - **Release Manager card now scaffolds `scripts/local-release.ps1` for any project** — When a project has no release pipeline, the card shows a **"⚙️ Setup Release Pipeline"** button. Clicking it calls `POST /api/project/scaffold-release`, which creates `scripts/local-release.ps1` from the embedded generic template. The template handles Node.js and non-Node projects, accepts explicit versions (`1.2.3`) and bump types (`patch`/`minor`/`major`), and includes a merge-to-main step so tags always land on the primary branch. After scaffolding, the user just commits the new file to lock in the pipeline.
 - **`POST /api/project/scaffold-release` endpoint** — Creates `scripts/local-release.ps1` in any project directory. Idempotent: returns `created: false` if the script already exists rather than overwriting it.
