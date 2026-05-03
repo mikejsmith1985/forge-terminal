@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.11] - 2026-05-03
+
+---
+
+## [v7.10.11] - 2026-05-03
+
 ### Fixed
 - **Pasting a clipboard image no longer renames the active tab** — Three overlapping bugs allowed the `see file at C:\...\AppData\Local\Temp\clipboard-<timestamp>.png` text emitted after an image paste to trigger an OSC 9;9 directory-change event that renamed the tab:
   1. *Stale prop closure in the OSC 9;9 handler*: the xterm `addOscHandler` callback captured `onDirectoryChange` at terminal mount time. If the user later changed the Tab Naming strategy in Settings, the handler continued using the old strategy until the terminal was remounted. Fixed by switching to `onDirectoryChangeRef.current`, which is always the latest callback.
