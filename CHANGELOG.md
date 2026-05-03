@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Release Manager card now scaffolds `scripts/local-release.ps1` for any project** — When a project has no release pipeline, the card shows a **"⚙️ Setup Release Pipeline"** button. Clicking it calls `POST /api/project/scaffold-release`, which creates `scripts/local-release.ps1` from the embedded generic template. The template handles Node.js and non-Node projects, accepts explicit versions (`1.2.3`) and bump types (`patch`/`minor`/`major`), and includes a merge-to-main step so tags always land on the primary branch. After scaffolding, the user just commits the new file to lock in the pipeline.
+- **`POST /api/project/scaffold-release` endpoint** — Creates `scripts/local-release.ps1` in any project directory. Idempotent: returns `created: false` if the script already exists rather than overwriting it.
+- **Generic release script template** (`cmd/forge/release_template.go`) — Embedded in the binary. Works for any project type. Clearly commented with customization points for build steps and release assets.
+- **`forge-release-process` skill: "Setting Up a New Project" section** — Agents now have explicit pre-release checklist instructions: check for the script, scaffold if absent, authenticate `gh` CLI, clear stale `GH_TOKEN`, confirm feature branch. Deployed to all 9 sibling repos.
+
 ### Fixed
-- **Release Manager card now passes explicit version to `local-release.ps1`** — When a project has `scripts/local-release.ps1`, the card was sending a relative bump type (`patch`/`minor`/`major`) rather than the explicit next-version shown in the UI. If a previous release attempt had partially bumped `package.json` before failing, the script would compute a *different* version than the card displayed, creating a double-bump. The card now always passes the exact version string (e.g. `0.0.14`), ensuring the script releases precisely what was shown.
+- **Release Manager card workflow steps no longer say "GitHub Actions builds release"** — The inline command path uses `gh release create` directly (no CI dependency). Label corrected to "gh release create (no CI needed)".
 
 ## [7.10.11] - 2026-05-03
 

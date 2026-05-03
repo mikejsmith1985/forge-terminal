@@ -15,6 +15,47 @@ The `release.yml` workflow in forge-terminal is a legacy artifact (workflow_disp
 
 ---
 
+## Setting Up a New Project's Release Pipeline (MANDATORY FIRST STEP)
+
+**BEFORE attempting any release in a new project, check if the local pipeline exists:**
+
+```powershell
+Test-Path "scripts\local-release.ps1"
+```
+
+**If `False`** — the project has no release pipeline. You MUST set it up first.
+
+### Option A: Use the Release Manager card (recommended for interactive sessions)
+1. Open Forge Terminal with the project's directory as the active tab
+2. Click the **🚀 Release Manager** card in the Tools sidebar
+3. Click **"⚙️ Setup Release Pipeline"** — this calls `POST /api/project/scaffold-release` and creates `scripts/local-release.ps1` from the canonical template
+4. Commit the new script:
+   ```powershell
+   git add scripts/local-release.ps1
+   git commit -m "chore: add local release pipeline"
+   git push origin HEAD
+   ```
+
+### Option B: Call the API directly (for agents/automation)
+```powershell
+$body = '{"path":"C:\\Path\\To\\Project"}' | ConvertTo-Json -Depth 1
+# Or just construct it manually:
+$body = "{`"path`":`"C:\\Path\\To\\Project`"}"
+Invoke-RestMethod -Method POST -Uri "http://localhost:9999/api/project/scaffold-release" -ContentType "application/json" -Body "{`"path`":`"C:\\ProjectsWin\\YourProject`"}"
+```
+Response: `{"created": true, "exists": true, "path": "...", "message": "scripts/local-release.ps1 created — commit it to save the pipeline"}`
+
+### Option C: Copy the template manually
+Copy `C:\ProjectsWin\forge-terminal\scripts\local-release.ps1` to the new project as a starting point, then customize it for the project's build steps and release assets.
+
+### After setup: customize the template
+Open `scripts/local-release.ps1` in the new project and:
+1. Uncomment and edit the **Build steps** section (near the bottom)
+2. Add project-specific files to `$ReleaseAssets` array if you want binaries attached to the GitHub Release
+3. Commit: `git add scripts/ && git commit -m "chore: configure release pipeline"`
+
+---
+
 ## How to Release Any Project from Forge Terminal
 
 ### Step 1: Check for project-specific release assets
@@ -131,6 +172,7 @@ git push origin main
 - ❌ Do NOT suggest `gh workflow run` to trigger a release
 - ❌ Do NOT use `npm version` with git tag (use `--no-git-tag-version`)
 - ❌ Do NOT create releases without merging to main first
+- ❌ Do NOT skip the "does scripts/local-release.ps1 exist?" check when starting on a new project
 
 ---
 
@@ -143,4 +185,17 @@ The 🚀 Release Manager command card in Forge Terminal automatically generates 
 
 If the card isn't visible, restore it via Settings → Restore Release Manager.
 
+---
+
+## Agent Checklist — Before Every Release
+
+Run through this before executing ANY release command:
+
+1. ☑ **`Test-Path "scripts\local-release.ps1"`** → if False, scaffold it first (see "Setting Up a New Project" above)
+2. ☑ **`gh auth status`** → ensure `gh` is authenticated (not using `$env:GH_TOKEN`)
+3. ☑ **`Remove-Item Env:\GH_TOKEN -ErrorAction SilentlyContinue`** → clear stale token
+4. ☑ **You are on a feature branch, not `main`** → the script merges to main for you
+5. ☑ **The explicit version to release is known** → pass it as `.\scripts\local-release.ps1 X.Y.Z`
+
+If any check fails, fix it before proceeding. A broken release half-way through is worse than no release.
 

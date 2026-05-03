@@ -439,6 +439,73 @@
   font-size: 0.85rem;
 }
 
+/* ── Setup Release Pipeline CTA ──────────────────────────────────────────────
+   Shown when hasLocalScript=false. Invites the user to scaffold the
+   local release pipeline so the card can run build + publish in one step. */
+.orc-scaffold-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px dashed rgba(99, 102, 241, 0.35);
+  border-radius: 6px;
+}
+
+.orc-scaffold-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 0.8rem;
+  color: #aaa;
+  line-height: 1.4;
+}
+
+.orc-scaffold-info svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #6366f1;
+}
+
+.orc-scaffold-info strong {
+  color: #c7c8ff;
+}
+
+.orc-scaffold-button {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  border-radius: 5px;
+  color: #a5b4fc;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.orc-scaffold-button:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.32);
+  border-color: rgba(99, 102, 241, 0.75);
+  color: #c7d2fe;
+}
+
+.orc-scaffold-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.orc-scaffold-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #ef4444;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .owner-release-card {

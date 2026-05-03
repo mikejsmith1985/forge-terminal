@@ -135,6 +135,10 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   
   // v3.19.1: detect local release pipeline script
   const [hasLocalScript, setHasLocalScript] = useState(false);
+
+  // v3.20.0: one-click scaffold state — tracks the scaffold API call lifecycle
+  const [isScaffolding, setIsScaffolding] = useState(false);
+  const [scaffoldError, setScaffoldError] = useState(null);
   
   // Quick save current repo to favorites
   const saveCurrentToFavorites = () => {
@@ -306,6 +310,48 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       });
     }
   }, [releaseCommand, next, onExecuteCommand]);
+
+  // v3.20.0: Call the scaffold endpoint to create scripts/local-release.ps1 in the
+  // current project. The backend writes the generic template; the user just needs to
+  // commit the file afterwards. This means any project can adopt the local pipeline in
+  // one click — no manual copy-paste or hunting for the template.
+  const handleScaffoldPipeline = useCallback(async () => {
+    const targetPath = (isExternalRepo && externalRepoPath) ? externalRepoPath : cwd;
+    if (!targetPath) return;
+
+    setIsScaffolding(true);
+    setScaffoldError(null);
+
+    try {
+      const response = await fetch('/api/project/scaffold-release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: targetPath }),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Server error: ${response.status}`);
+      }
+
+      // Mark the script as present so the card switches to the local-pipeline mode.
+      setHasLocalScript(true);
+
+      if (responseData.created) {
+        if (onToast) onToast('✅ Release pipeline created! Commit scripts/local-release.ps1 to save it.', 'success', 6000);
+      } else {
+        // Script already existed — we just missed it on the initial check (race or stale state).
+        if (onToast) onToast('Release pipeline already exists — switching to local script mode.', 'info', 3000);
+      }
+    } catch (scaffoldErr) {
+      const errorMessage = scaffoldErr.message || 'Unknown error';
+      setScaffoldError(errorMessage);
+      if (onToast) onToast(`Failed to create pipeline: ${errorMessage}`, 'error', 4000);
+    } finally {
+      setIsScaffolding(false);
+    }
+  }, [isExternalRepo, externalRepoPath, cwd, onToast]);
 
   const getReleaseTypeDisplay = () => {
     if (!releaseType) return { label: 'BUG FIXES', color: 'green', icon: '🐛' };
@@ -568,10 +614,40 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
               <div className="orc-step-arrow">↓</div>
               <div className="orc-step"><Tag size={14} /> Create & push tag {next}</div>
               <div className="orc-step-arrow">↓</div>
-              <div className="orc-step"><Upload size={14} /> GitHub Actions builds release</div>
+              <div className="orc-step"><Upload size={14} /> gh release create (no CI needed)</div>
             </>
           )}
         </div>
+
+        {/* v3.20.0: Setup Release Pipeline CTA
+            Shown when no local release script is detected. Offers to scaffold
+            scripts/local-release.ps1 from the built-in template so the user
+            can adopt the full build+publish pipeline in one click. */}
+        {!hasLocalScript && (isExternalRepo || cwd) && (
+          <div className="orc-scaffold-section">
+            <div className="orc-scaffold-info">
+              <Settings size={13} />
+              <span>
+                Using inline command.{' '}
+                <strong>Add a dedicated release script</strong> for build artifacts and cleaner re-runs.
+              </span>
+            </div>
+            <button
+              className="orc-scaffold-button"
+              onClick={handleScaffoldPipeline}
+              disabled={isScaffolding}
+              title="Create scripts/local-release.ps1 from the Forge template"
+            >
+              {isScaffolding ? '⏳ Creating pipeline...' : '⚙️ Setup Release Pipeline'}
+            </button>
+            {scaffoldError && (
+              <div className="orc-scaffold-error">
+                <AlertCircle size={12} />
+                {scaffoldError}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Command Toggle */}
         <div className="orc-command-section">
