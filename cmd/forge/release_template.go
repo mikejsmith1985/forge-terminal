@@ -140,9 +140,12 @@ if ($existingLocalTag) {
 }
 
 # Delete stale remote tag and release so this step is idempotent (safe to re-run).
+# Use try/catch: gh release view exits non-zero when no release exists, which
+# throws NativeCommandError under $ErrorActionPreference = 'Stop'.
 git push origin ":refs/tags/$GitTag" 2>&1 | Out-Null
-$staleRelease = gh release view $GitTag 2>&1
-if ($LASTEXITCODE -eq 0) {
+$staleReleaseExists = $false
+try { $null = gh release view $GitTag 2>$null; $staleReleaseExists = $true } catch { $staleReleaseExists = $false }
+if ($staleReleaseExists) {
     gh release delete $GitTag --yes 2>&1 | Out-Null
 }
 
