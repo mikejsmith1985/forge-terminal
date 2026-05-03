@@ -1003,18 +1003,25 @@ function App() {
 
     if (isPlainPrintable && !isAnyOverlayOpen) {
       const termRef = getActiveTerminalRef();
-      if (termRef?.isConnected()) {
-        e.preventDefault();
-        e.stopPropagation();
-        // Restore focus so all subsequent keystrokes route directly to xterm
-        termRef.focus();
-        // Forward the character that triggered this redirect to the PTY directly,
-        // since the current key event can no longer be re-routed to xterm's textarea.
-        const activeSocket = termRef.getSocket();
-        if (activeSocket?.readyState === WebSocket.OPEN) {
-          activeSocket.send(e.key);
+      if (termRef) {
+        const socket = termRef.getSocket();
+        const socketState = socket?.readyState;
+        // Forward printable characters when the socket is OPEN or still CONNECTING.
+        // Using sendOrBuffer instead of a direct socket.send handles both states:
+        //   OPEN      → sent immediately (same behaviour as before)
+        //   CONNECTING → buffered in pendingInputRef, flushed when ws.onopen fires
+        // This fixes the "number keys lost on recovered tabs" regression where
+        // keystrokes typed before the WebSocket handshake completes were silently
+        // dropped because isConnected() only returns true for WebSocket.OPEN.
+        if (socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING) {
+          e.preventDefault();
+          e.stopPropagation();
+          // Restore focus so all subsequent keystrokes route directly to xterm
+          termRef.focus();
+          // Forward the character that triggered this redirect (and buffer if needed)
+          termRef.sendOrBuffer(e.key);
+          return;
         }
-        return;
       }
     }
 

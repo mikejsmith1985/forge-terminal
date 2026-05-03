@@ -94,6 +94,30 @@ const cancelIdleWork = (id) => {
 };
 
 // ============================================================================
+// Mouse Escape Sequence Detection
+// ============================================================================
+// Returns true when `data` (as received by xterm.js onData) looks like a mouse
+// event escape sequence.  Three formats are in common use:
+//   - X10 basic:      ESC [ M <btn> <col> <row>  (enabled by ?1000h)
+//   - SGR extended:   ESC [ < digits;digits;digits M|m  (enabled by ?1006h)
+//   - URXVT extended: ESC [ digits;digits;digits M  (enabled by ?1015h)
+//
+// Used as a belt-and-suspenders filter in onData: during the brief race window
+// between queuing a mode-disable write (e.g. from the OSC 9;9 reset) and xterm
+// actually processing that write, a stale non-'none' mouseTrackingMode could
+// cause xterm to fire onData for a click — forwarding the raw sequence to the
+// PTY shell where it displays as literal text.
+const isMouseEscapeSequence = (data) => {
+  if (data.length < 3 || data[0] !== '\x1b' || data[1] !== '[') return false;
+  // X10 basic: ESC [ M + 3 payload bytes
+  if (data[2] === 'M') return true;
+  // SGR extended: ESC [ < N;N;N M|m
+  if (data[2] === '<') return /^\x1b\[<\d+;\d+;\d+[Mm]$/.test(data);
+  // URXVT extended: ESC [ N;N;N M
+  return /^\x1b\[\d+;\d+;\d+M$/.test(data);
+};
+
+// ============================================================================
 // CLI Prompt Detection for Auto-Respond Feature
 // ============================================================================
 // Detects when CLI tools (Copilot, Claude, npm, etc.) are waiting for user input
@@ -943,6 +967,24 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     sendRaw: (bytes) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(bytes);
+        return true;
+      }
+      return false;
+    },
+    // Sends `data` immediately when the socket is OPEN, or buffers it in
+    // pendingInputRef when still CONNECTING.  The buffer is flushed in bulk
+    // once ws.onopen fires (same path as onData's CONNECTING guard).
+    // This prevents keystrokes forwarded from App.jsx's isPlainPrintable
+    // redirect from being silently dropped during the connection window.
+    sendOrBuffer: (data) => {
+      const ws = wsRef.current;
+      if (!ws) return false;
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
+        return true;
+      }
+      if (ws.readyState === WebSocket.CONNECTING) {
+        pendingInputRef.current.push(data);
         return true;
       }
       return false;
@@ -1891,6 +1933,27 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   xtermRef.current.write(`\r\n\x1b[38;2;34;197;94m[Session Restored]\x1b[0m Terminal session recovered${duration}.\r\n`);
                 }
                 sessionReattachedRef.current = true;
+
+                // Deferred mouse-mode reset — fixes "mouse clicks appear as text" bug.
+                //
+                // The server sends the 64 KiB scrollback ring-buffer replay as binary
+                // WebSocket frames BEFORE this SESSION_REATTACHED message.  Those frames
+                // are already queued in xterm's write buffer at this point.  xterm
+                // processes queued writes via queueMicrotask, so by the time our 500 ms
+                // timer fires, all replay data has been parsed — including any
+                // \x1b[?1000h sequences a TUI left behind.
+                //
+                // The reset writes \x1b[?1000l … to xterm CLIENT-SIDE only, which
+                // clears the stale mode without touching the PTY.  If a TUI is still
+                // running it will re-enable tracking the next time it redraws (triggered
+                // by the SIGWINCH our resize message sends in ws.onopen), so this is
+                // safe for both the "TUI active" and "TUI exited without cleanup" cases.
+                setTimeout(() => {
+                  if (xtermRef.current) {
+                    xtermRef.current.write('\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1004l\x1b[?1006l\x1b[?1015l');
+                  }
+                }, 500);
+
                 return;
               }
 
@@ -2185,6 +2248,19 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     const onDataDisposable = term.onData((data) => {
       if (data === '\x7f' || data === '\x08') {
         console.log('[Terminal] onData backspace:', data === '\x7f' ? '\\x7f (DEL)' : '\\x08 (BS)');
+      }
+
+      // Belt-and-suspenders: drop mouse escape sequences when xterm's internal
+      // mouse-tracking mode is 'none'.  Normally xterm doesn't call onData for
+      // mouse events when the mode is disabled, but there is a brief race window
+      // (between our queuing a \x1b[?1000l reset and xterm processing it on the
+      // next microtask) where the mode flag is still stale.  This guard ensures
+      // no raw sequences like "\x1b[<0;44;37M" reach the PTY during that window.
+      if (isMouseEscapeSequence(data)) {
+        const currentMode = xtermRef.current?.modes?.mouseTrackingMode;
+        if (!currentMode || currentMode === 'none') {
+          return;
+        }
       }
 
       if (diagnosticCore.isEnabled()) {
