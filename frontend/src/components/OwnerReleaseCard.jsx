@@ -243,13 +243,18 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         }
     }
 
-    // v3.19.1: Use local release pipeline if the project has it
+    // v3.19.2: Pass the explicit next-version number to the local release script
+    // instead of a relative bump type (patch/minor/major). Sending a bump type
+    // causes the script to recompute the version from package.json, which diverges
+    // from what the card is displaying when a previous release attempt partially
+    // bumped the version file. Passing the explicit version guarantees the script
+    // releases exactly what the UI showed — eliminating the double-bump bug.
     if (hasLocalScript) {
-      const bumpType = selectedIncrement === 'fix' ? 'patch' : selectedIncrement;
+      const explicitVersionNumber = next.replace(/^v/, '');
       if (shellType === 'powershell') {
-        return `${cmdPrefix}.\\scripts\\local-release.ps1 ${bumpType}`;
+        return `${cmdPrefix}.\\scripts\\local-release.ps1 ${explicitVersionNumber}`;
       } else {
-        return `${cmdPrefix}pwsh -File ./scripts/local-release.ps1 ${bumpType}`;
+        return `${cmdPrefix}pwsh -File ./scripts/local-release.ps1 ${explicitVersionNumber}`;
       }
     }
 
