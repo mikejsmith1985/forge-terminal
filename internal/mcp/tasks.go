@@ -9,6 +9,7 @@
 package mcp
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -126,4 +127,23 @@ func (broker *TaskBroker) UpdateStatus(taskID string, newStatus string) {
 // The agent calls <-broker.Incoming() to receive the next submitted task.
 func (broker *TaskBroker) Incoming() <-chan *PendingTask {
 	return broker.incoming
+}
+
+// ListAll returns a snapshot of every task currently tracked by the broker,
+// sorted from newest to oldest by SubmittedAt. The returned slice is a copy —
+// callers may safely iterate it without holding the mutex.
+func (broker *TaskBroker) ListAll() []*PendingTask {
+	broker.mu.RLock()
+	snapshot := make([]*PendingTask, 0, len(broker.taskMap))
+	for _, task := range broker.taskMap {
+		taskCopy := *task
+		snapshot = append(snapshot, &taskCopy)
+	}
+	broker.mu.RUnlock()
+
+	// Sort newest-first so the panel shows the most recent activity at the top.
+	sort.Slice(snapshot, func(i, j int) bool {
+		return snapshot[i].SubmittedAt.After(snapshot[j].SubmittedAt)
+	})
+	return snapshot
 }

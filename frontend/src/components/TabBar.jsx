@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, BarChart3, Bell, BellOff, Zap, BookOpen, Lock } from 'lucide-react';
+import { Plus, BarChart3, Bell, BellOff, Zap, BookOpen, Lock, FlaskConical } from 'lucide-react';
 import Tab from './Tab';
 
 /**
@@ -23,6 +23,9 @@ function TabBar({
   // isTutorOpen removed — Code Tutor fully disabled
   onToggleVault = null,
   isVaultOpen = false,
+  onToggleEZTestPanel = null,
+  isEZTestPanelOpen = false,
+  ezTestActiveBadgeCount = 0,
   disableNewTab = false,
   waitingTabs = {},
   mode = 'dark',
@@ -151,6 +154,28 @@ function TabBar({
           data-testid="vault-btn"
         >
           <Lock size={16} />
+        </button>
+      )}
+      {/* EZTest task-status panel — shows MCP tasks from EZTest */}
+      {onToggleEZTestPanel && (
+        <button
+          className={`dashboard-btn ${isEZTestPanelOpen ? 'active' : ''}`}
+          onClick={onToggleEZTestPanel}
+          aria-label={isEZTestPanelOpen ? 'Close EZTest Tasks' : 'EZTest Tasks'}
+          title="EZTest Tasks"
+          data-testid="eztest-panel-btn"
+          style={{ position: 'relative' }}
+        >
+          <FlaskConical size={16} />
+          {/* Active-task badge — appears when EZTest has pending or running work */}
+          {ezTestActiveBadgeCount > 0 && (
+            <span
+              className="eztest-tabbar-badge"
+              aria-label={`${ezTestActiveBadgeCount} active EZTest task${ezTestActiveBadgeCount > 1 ? 's' : ''}`}
+            >
+              {ezTestActiveBadgeCount > 9 ? '9+' : ezTestActiveBadgeCount}
+            </span>
+          )}
         </button>
       )}
       {/* Notifications bell — HIDDEN for subscription release (ntfy.sh integration not vetted) */}

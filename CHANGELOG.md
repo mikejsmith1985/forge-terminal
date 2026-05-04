@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **EZTest task-status panel** — a new `FlaskConical` button in the TabBar opens a live panel showing all tasks submitted to Forge by EZTest (or any MCP client). Each task card shows status (pending / running / done / failed), type, source, relative submission time, and an expandable payload preview. The button displays a blue badge when tasks are actively running or pending. Data polls every 5 seconds via a new `/api/mcp/ui-tasks` endpoint (standard Forge session auth — no MCP token needed in the browser).
+- **`GET /api/mcp/ui-tasks` endpoint** — returns all TaskBroker tasks sorted newest-first. Protected by the same standard auth middleware as the rest of the Forge API (not the MCP bearer token), making it safe to call from the frontend.
+- **EZTest ↔ Forge MCP connection configured** — `EZTEST_FORGE_MCP_URL` and `EZTEST_FORGE_MCP_TOKEN` set in `EZTest/.env`, enabling the full EZTest bug-capture → Forge agent fix loop via MCP `task_submit` with zero code changes on either side.
+
 ### Fixed
 - Release script template: `gh release view` exited non-zero (no release exists) was throwing `NativeCommandError` under `$ErrorActionPreference = 'Stop'`, aborting the release before the GitHub Release was created even though the merge to main had already succeeded. Fixed with `try { } catch {}` — the same pattern used in forge-terminal's own pipeline.
 - Release script template: replaced em dash characters with ASCII hyphens in `throw` error messages. Em dash (U+2014) UTF-8 bytes end in `0x94`, which Windows PowerShell 5.1 (reading without a UTF-8 BOM) maps to a right double-quote — prematurely terminating string literals and causing a `ParseException`.

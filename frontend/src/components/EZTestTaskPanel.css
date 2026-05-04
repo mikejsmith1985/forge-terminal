@@ -1,0 +1,292 @@
+/**
+ * EZTestTaskPanel.css — Styles for the EZTest task-status panel.
+ *
+ * Layout mirrors the VaultPanel: a fixed-width slide-in panel anchored to the
+ * right side of the viewport, appearing above the terminal. Colour tokens are
+ * pulled from the existing Forge CSS custom properties so it inherits the
+ * active colour theme automatically.
+ */
+
+/* ── Panel container ─────────────────────────────────────────────────────── */
+
+.eztest-panel {
+  position: fixed;
+  top: 40px;               /* sits below the TabBar */
+  right: 0;
+  width: 360px;
+  height: calc(100vh - 40px);
+  background: var(--bg-secondary, #1a1a1a);
+  border-left: 1px solid var(--border-color, #333);
+  display: flex;
+  flex-direction: column;
+  z-index: 900;
+  font-size: 13px;
+  color: var(--text-primary, #e0e0e0);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.eztest-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color, #333);
+  flex-shrink: 0;
+}
+
+.eztest-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-primary, #e0e0e0);
+}
+
+/* Small pill showing total task count next to the panel title */
+.eztest-panel__count {
+  background: var(--accent-primary, #6b8afd);
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.eztest-panel__actions {
+  display: flex;
+  gap: 4px;
+}
+
+.eztest-panel__action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary, #999);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.eztest-panel__action-btn:hover {
+  color: var(--text-primary, #e0e0e0);
+  background: var(--bg-hover, #2a2a2a);
+}
+
+.eztest-panel__action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Body (scrollable task list) ─────────────────────────────────────────── */
+
+.eztest-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.eztest-panel__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 16px;
+  gap: 8px;
+}
+
+.eztest-panel__empty-icon {
+  color: var(--text-muted, #555);
+  opacity: 0.6;
+}
+
+.eztest-panel__empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary, #999);
+  margin: 0;
+}
+
+.eztest-panel__empty-hint {
+  font-size: 12px;
+  color: var(--text-muted, #666);
+  margin: 0;
+  max-width: 260px;
+  line-height: 1.5;
+}
+
+/* ── Error banner ────────────────────────────────────────────────────────── */
+
+.eztest-panel__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(220, 53, 69, 0.12);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 6px;
+  color: #f87171;
+  font-size: 12px;
+}
+
+/* ── Task card ───────────────────────────────────────────────────────────── */
+
+.eztest-task-card {
+  background: var(--bg-tertiary, #222);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left-width: 3px;   /* coloured left accent matches status */
+}
+
+/* Status-specific left border accents */
+.eztest-task-card--pending  { border-left-color: #f59e0b; }
+.eztest-task-card--running  { border-left-color: #3b82f6; }
+.eztest-task-card--done     { border-left-color: #22c55e; }
+.eztest-task-card--failed   { border-left-color: #ef4444; }
+
+.eztest-task-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eztest-task-card__badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.eztest-task-card__time {
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Source + ID meta row ────────────────────────────────────────────────── */
+
+.eztest-task-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eztest-task-card__source {
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  font-style: italic;
+}
+
+.eztest-task-card__id-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #666);
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+  font-size: 11px;
+}
+
+.eztest-task-card__id-btn:hover {
+  color: var(--text-secondary, #999);
+  background: var(--bg-hover, #2a2a2a);
+}
+
+.eztest-task-card__id-btn code {
+  font-family: var(--font-mono, 'Fira Code', monospace);
+  font-size: 10px;
+}
+
+/* ── Payload preview block ───────────────────────────────────────────────── */
+
+.eztest-task-card__payload {
+  cursor: default;
+}
+
+.eztest-task-card__payload[role="button"] {
+  cursor: pointer;
+}
+
+.eztest-task-card__payload-text {
+  margin: 0;
+  font-family: var(--font-mono, 'Fira Code', monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary, #aaa);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-primary, #111);
+  border-radius: 4px;
+  padding: 6px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.eztest-task-card__expand-hint {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--accent-primary, #6b8afd);
+  margin-top: 4px;
+}
+
+/* ── Status + type badges ────────────────────────────────────────────────── */
+
+.eztest-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+/* Status colours */
+.eztest-badge--pending  { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.eztest-badge--running  { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.eztest-badge--done     { background: rgba(34, 197, 94, 0.15);  color: #4ade80; }
+.eztest-badge--failed   { background: rgba(239, 68,  68, 0.15); color: #f87171; }
+
+/* Type badge — neutral grey */
+.eztest-badge--type {
+  background: var(--bg-hover, #2a2a2a);
+  color: var(--text-secondary, #aaa);
+  text-transform: capitalize;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+/* ── Spinner animation for the refresh button ─────────────────────────────── */
+
+@keyframes eztest-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.eztest-spin {
+  animation: eztest-spin 0.8s linear infinite;
+}

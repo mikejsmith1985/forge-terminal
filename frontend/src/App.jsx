@@ -31,6 +31,8 @@ import HistorySlider from './components/HistorySlider'
 // TaskDashboard removed in v3.12.3 - was unimplemented scaffolding with no backend
 // CodeTutorPanel import removed — Code Tutor fully disabled
 import VaultPanel from './components/VaultPanel'
+import EZTestTaskPanel from './components/EZTestTaskPanel'
+import { useEZTestTasks } from './hooks/useEZTestTasks'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
@@ -188,6 +190,11 @@ function App() {
 
   // Forge Vault state (v5.3.0: encrypted secret store)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
+
+  // EZTest task-status panel state — badge count comes from the polling hook
+  // so the button glows even when the panel is closed.
+  const [isEZTestPanelOpen, setIsEZTestPanelOpen] = useState(false)
+  const { activeBadgeCount: ezTestActiveBadgeCount } = useEZTestTasks(isEZTestPanelOpen)
 
   // Mobile companion app is a separate PWA (forge-companion/) — the desktop
   // UI does not adapt its layout to small viewports. `isCompact` is kept as
@@ -999,7 +1006,7 @@ function App() {
     const isAnyOverlayOpen = isSearchOpen || isForgeAssistOpen || isModalOpen ||
       isSettingsModalOpen || isFeedbackModalOpen ||
       isUpdateModalOpen || isDiagnosticOverlayOpen || isTutorOpen ||
-      isVaultOpen || isHistorySliderOpen || isDeveloperDashboardOpen;
+      isVaultOpen || isHistorySliderOpen || isDeveloperDashboardOpen || isEZTestPanelOpen;
 
     if (isPlainPrintable && !isAnyOverlayOpen) {
       const termRef = getActiveTerminalRef();
@@ -1954,6 +1961,9 @@ function App() {
             // isTutorOpen — HIDDEN for subscription release
             onToggleVault={() => setIsVaultOpen(prev => !prev)}
             isVaultOpen={isVaultOpen}
+            onToggleEZTestPanel={() => setIsEZTestPanelOpen(prev => !prev)}
+            isEZTestPanelOpen={isEZTestPanelOpen}
+            ezTestActiveBadgeCount={ezTestActiveBadgeCount}
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
             mode={theme}
@@ -2263,6 +2273,12 @@ function App() {
         isOpen={isVaultOpen}
         onClose={() => setIsVaultOpen(false)}
         onToast={addToast}
+      />}
+
+      {/* EZTest Task Panel — live status of MCP tasks submitted by EZTest */}
+      {!isCompact && <EZTestTaskPanel
+        isOpen={isEZTestPanelOpen}
+        onClose={() => setIsEZTestPanelOpen(false)}
       />}
 
       {/* Connection Diagnostic Wizard — shown on first run and on PTY spawn failure */}

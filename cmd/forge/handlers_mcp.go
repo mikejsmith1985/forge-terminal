@@ -194,6 +194,37 @@ func handleMCPTaskStatus(w http.ResponseWriter, r *http.Request) {
 	_ = enc.Encode(task)
 }
 
+// handleMCPUITasks handles GET /api/mcp/ui-tasks — returns all tasks currently
+// tracked by the TaskBroker, sorted newest-first. Protected by standard Forge
+// auth (session cookie) rather than the MCP bearer token so the Forge frontend
+// can call it directly without ever exposing the MCP secret to the browser.
+//
+// This is the data source for the EZTest task-status panel. An empty task list
+// is returned (not 404) when the MCP server is disabled, so the panel can show
+// an appropriate empty state.
+func handleMCPUITasks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Return an empty list gracefully when MCP is disabled — the panel should
+	// render an empty state rather than showing an error to the user.
+	if mcpServer == nil {
+		enc := json.NewEncoder(w)
+		_ = enc.Encode(map[string]any{"tasks": []any{}})
+		return
+	}
+
+	allTasks := mcpServer.Broker().ListAll()
+
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(map[string]any{"tasks": allTasks})
+}
+
 // handleMCPUIStatus handles GET /api/mcp/ui-status — returns a lightweight,
 // UI-friendly snapshot of the MCP server state for display in the Adaptive
 // Build Environments command card. Unlike /api/mcp itself, this endpoint is

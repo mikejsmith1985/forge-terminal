@@ -614,9 +614,11 @@ func main() {
 	http.HandleFunc("/api/mcp", handleMCP)
 	http.HandleFunc("/api/mcp/reload", handleMCPReload)
 	http.HandleFunc("/api/mcp/tasks/", handleMCPTaskStatus)
-	// /api/mcp/ui-status uses standard Forge auth (not MCP bearer token) so
-	// the command card panel can poll it without exposing the MCP secret.
+	// /api/mcp/ui-status and /api/mcp/ui-tasks both use standard Forge auth
+	// (session cookie, not the MCP bearer token) so the frontend panels can
+	// poll them without ever exposing the MCP secret to the browser.
 	http.HandleFunc("/api/mcp/ui-status", AuthMiddleware(handleMCPUIStatus))
+	http.HandleFunc("/api/mcp/ui-tasks", AuthMiddleware(handleMCPUITasks))
 
 	// ── Mobile Companion routes (scoped mobile-token auth + CORS) ─────────
 	// The mobile token is separate from the MCP token — it scopes to terminal
