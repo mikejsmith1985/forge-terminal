@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.13] - 2026-05-04
+
+---
+
+## [v7.10.13] - 2026-05-04
+
 ### Added
 - **EZTest task-status panel** — a new `FlaskConical` button in the TabBar opens a live panel showing all tasks submitted to Forge by EZTest (or any MCP client). Each task card shows status (pending / running / done / failed), type, source, relative submission time, and an expandable payload preview. The button displays a blue badge when tasks are actively running or pending. Data polls every 5 seconds via a new `/api/mcp/ui-tasks` endpoint (standard Forge session auth — no MCP token needed in the browser).
 - **`GET /api/mcp/ui-tasks` endpoint** — returns all TaskBroker tasks sorted newest-first. Protected by the same standard auth middleware as the rest of the Forge API (not the MCP bearer token), making it safe to call from the frontend.
