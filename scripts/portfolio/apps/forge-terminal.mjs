@@ -29,18 +29,52 @@ const FORGE_TERMINAL_LAUNCH_STRATEGY = {
   isCleanLaunch: true,
 };
 
-// ── Real screenshot asset paths ───────────────────────────────────────────────
-// All three Forge Terminal showcase screenshots are REAL UI captured from the
-// live dev build — not generated SVG storyboards. Their source copies live
-// at tests/playwright/test-results/ and are produced by the Playwright suite.
-// build-portfolio-assets.mjs copies them into the public asset folder below.
-const REAL_UI_ASSET_BASE_PATH = './assets/forge-terminal';
-
-// Keyed by descriptive label so features below stay readable without raw paths.
-const FORGE_TERMINAL_SCREENSHOT_PATHS = {
-  appLoaded:    `${REAL_UI_ASSET_BASE_PATH}/01-app-loaded.png`,
-  typedCommand: `${REAL_UI_ASSET_BASE_PATH}/03-typed-command.png`,
-  afterPaste:   `${REAL_UI_ASSET_BASE_PATH}/05-after-paste.png`,
+export const FORGE_TERMINAL_PORTFOLIO_CONFIG = {
+  slug: 'forge-terminal',
+  name: 'Forge Terminal',
+  localRepoPath: 'C:\\ProjectsWin\\forge-terminal',
+  outputDirPath: 'web/portfolio/assets/forge-terminal',
+  captureToolchain: 'playwright',
+  launchStrategy: {
+    localRepoPath: 'C:\\ProjectsWin\\forge-terminal',
+    command: FORGE_TERMINAL_LAUNCH_STRATEGY.command,
+    readySignal: FORGE_TERMINAL_LAUNCH_STRATEGY.baseUrl,
+    environmentVariables: {
+      FORGE_DEV_MODE: 'true',
+      FORGE_PORT: '9999',
+    },
+  },
+  demoSetupHooks: [
+    {
+      id: 'generate-code-rendered-mock-screens',
+      description:
+        'Generate code-rendered mocked Forge Terminal screens from the shared portfolio scene definitions.',
+      mockDataApproach:
+        'Use fictional repository names, safe workflow output, demo tunnel values, and generic assistant text so no private terminal state is published.',
+      runnerInstruction:
+        'Run scripts/portfolio/build-portfolio-assets.mjs so the Forge Terminal cards use generated SVG screen mockups from web/portfolio/assets/generated.',
+    },
+  ],
+  captureTargets: [
+    {
+      featureId: 'multi-tab-terminal',
+      outputFileName: 'forge-terminal-multi-tab-terminal.svg',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    },
+    {
+      featureId: 'instruction-workflow',
+      outputFileName: 'forge-terminal-instruction-workflow.svg',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    },
+    {
+      featureId: 'tunnel-mobile',
+      outputFileName: 'forge-terminal-tunnel-mobile.svg',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    },
+  ],
 };
 
 // ── App definition ────────────────────────────────────────────────────────────
@@ -48,8 +82,7 @@ const FORGE_TERMINAL_SCREENSHOT_PATHS = {
 // pulling in the launch-strategy or path constants above.
 //
 // imageKind values:
-//   'real-ui'    — the portfolio page shows the actual captured screenshot
-//   'storyboard' — the page shows a generated SVG placeholder (none here)
+//   'code-rendered' — the portfolio page shows a generated mocked app screen
 export const FORGE_TERMINAL_APP = {
   slug: 'forge-terminal',
   name: 'Forge Terminal',
@@ -57,7 +90,7 @@ export const FORGE_TERMINAL_APP = {
     'Agentic terminal UX with real PTYs, workflow enforcement, and remote access in one product.',
   summary:
     'Forge Terminal combines a full terminal, AI-assisted workflows, command cards, and secure remote ' +
-    'access. The strongest employer story is the way product design, local tooling, and developer ' +
+    'access. The strongest product story is the way product design, local tooling, and developer ' +
     'ergonomics converge into one desktop experience.',
   accent: '#5d8cff',
   category: 'Desktop + web hybrid',
@@ -65,18 +98,15 @@ export const FORGE_TERMINAL_APP = {
   // Human-readable launch surface for the portfolio page footer note.
   launchSurface: FORGE_TERMINAL_LAUNCH_STRATEGY.command,
 
-  // Full strategy object consumed by the portfolio capture runner.
-  launchStrategy: FORGE_TERMINAL_LAUNCH_STRATEGY,
-
   techStack: ['Go', 'React', 'xterm.js', 'Cypress'],
   proofNote:
-    'All three showcase screenshots are real UI captured from the Forge Terminal dev build. ' +
-    'No storyboard SVGs are needed unless a new feature without a captured screenshot is added.',
+    'All three visuals in this section are polished code-rendered mock interfaces built from the ' +
+    'implemented product structure and seeded demo content.',
 
   // ── Three wow moments ──────────────────────────────────────────────────────
-  // Each feature maps to exactly one real-ui screenshot. The imageKind field
-  // makes the asset type explicit so the portfolio renderer and reviewers can
-  // tell at a glance whether a screen is production-captured or a placeholder.
+  // Each feature maps to one code-rendered mocked UI screen with safe sample
+  // data. This keeps the portfolio presentation polished without repeating
+  // local development screenshots.
   features: [
     {
       id: 'multi-tab-terminal',
@@ -85,17 +115,15 @@ export const FORGE_TERMINAL_APP = {
         'Shows product depth beyond a normal shell wrapper: tabs, saved commands, and quick ' +
         'actions work together as one developer cockpit.',
       whatItShows:
-        'A polished terminal workspace with the app shell fully loaded and the first tab active ' +
-        'with the prompt ready, demonstrating the clean initial UX at boot.',
+        'A mocked Forge Terminal workspace with four terminal tabs, a workflow-status command ' +
+        'running, pinned command cards, and repo health signals visible in one screen.',
       mockDataApproach:
-        'Use safe terminal commands and demo-friendly command cards so no customer repositories ' +
-        'or secrets appear in the captured state.',
+        'The screen uses a fictional benefits-enrollment demo repository, safe workflow-gate ' +
+        'output, and generic command cards instead of a real customer workspace.',
       capturePlan:
         'Portfolio Playwright run: navigate to localhost:9999, wait for the app shell to fully ' +
         'render, then screenshot the loaded state.',
-      // Source: tests/playwright/test-results/01-app-loaded.png  →  real UI
-      imagePath: FORGE_TERMINAL_SCREENSHOT_PATHS.appLoaded,
-      imageKind: 'real-ui',
+      imageKind: 'code-rendered',
     },
     {
       id: 'instruction-workflow',
@@ -104,17 +132,15 @@ export const FORGE_TERMINAL_APP = {
         'Shows opinionated UX for repeatable, high-signal AI collaboration — the assistant ' +
         'workflow feels controllable rather than magical.',
       whatItShows:
-        'A terminal session mid-flight with a typed command visible, illustrating the direct-input ' +
-        'flow that feeds the instruction surface and assistant panel.',
+        'A mocked assistant workflow screen with the user request, Copilot response, workflow ' +
+        'gates, and task state presented together so the AI process feels controlled.',
       mockDataApproach:
-        'Seed a harmless sample repository context and safe instruction templates so the captured ' +
-        'text contains no private identifiers or credentials.',
+        'The conversation text, task name, and workflow checklist are portfolio-safe examples ' +
+        'that describe this visual rebuild rather than a private development session.',
       capturePlan:
         'Portfolio Playwright run: type a representative safe command into the active terminal ' +
         'tab, then screenshot the typed state.',
-      // Source: tests/playwright/test-results/03-typed-command.png  →  real UI
-      imagePath: FORGE_TERMINAL_SCREENSHOT_PATHS.typedCommand,
-      imageKind: 'real-ui',
+      imageKind: 'code-rendered',
     },
     {
       id: 'tunnel-mobile',
@@ -123,17 +149,15 @@ export const FORGE_TERMINAL_APP = {
         'Demonstrates platform thinking, networking knowledge, and user-centric onboarding — ' +
         'shows the app is designed for real work, not just localhost demos.',
       whatItShows:
-        'A terminal state after a paste action, representing the remote-access and clipboard ' +
-        'integration story that makes Forge Terminal useful across devices.',
+        'A mocked remote-access setup screen with a named tunnel, companion PWA handoff, one-time ' +
+        'access code, and safety controls displayed in the same flow.',
       mockDataApproach:
-        'Use safe hostnames, fake tunnel identifiers, and local-only demo states so no real ' +
-        'network topology or credentials appear in the capture.',
+        'The hostname, access code, and connection settings are fictional portfolio values that ' +
+        'show the intended UX without exposing real network topology.',
       capturePlan:
         'Portfolio Playwright run: paste a safe demo string into the active tab, then screenshot ' +
         'the post-paste state.',
-      // Source: tests/playwright/test-results/05-after-paste.png  →  real UI
-      imagePath: FORGE_TERMINAL_SCREENSHOT_PATHS.afterPaste,
-      imageKind: 'real-ui',
+      imageKind: 'code-rendered',
     },
   ],
 };

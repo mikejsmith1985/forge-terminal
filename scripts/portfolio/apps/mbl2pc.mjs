@@ -1,179 +1,119 @@
-// Portfolio capture and config definition for MBL2PC.
-//
-// This file is the single operational source of truth for how the MBL2PC
-// portfolio screenshots are captured. It encodes the launch strategy, the
-// demo-state setup hooks, and the three wow-moment capture targets so a
-// portfolio runner can reproduce the same showcase output deterministically.
-//
-// The matching narrative data (title, wowFactor, etc.) lives in
-// web/portfolio/data/apps.mjs under slug "mbl2pc".
+// App-specific portfolio display and capture definitions for MBL2PC.
 
-// ── Constants ─────────────────────────────────────────────────────────────
-
-/** Absolute path to the MBL2PC repository on the portfolio capture machine. */
 const LOCAL_REPO_PATH = 'C:\\ProjectsWin\\mbl2pc';
-
-/**
- * Port on which the MBL2PC local test server listens during a demo capture.
- * The test_local.py script defaults to this port, kept here as a single
- * source of truth so every URL in this file derives from one value.
- */
-const LOCAL_SERVER_PORT = 5000;
-
-/** Base URL of the running MBL2PC local test server. */
+const LOCAL_SERVER_PORT = 8765;
 const LOCAL_SERVER_BASE_URL = `http://localhost:${LOCAL_SERVER_PORT}`;
 
-// ── Launch strategy ────────────────────────────────────────────────────────
-
-/**
- * Instructions for starting MBL2PC in a state suitable for portfolio capture.
- *
- * The `command` field is run from `localRepoPath`. The `readySignal` string
- * must appear in stdout before the capture runner proceeds — this avoids
- * timing-based sleeps.
- */
-const LAUNCH_STRATEGY = {
-  localRepoPath: LOCAL_REPO_PATH,
-  command: 'python test_local.py',
-  readySignal: `Running on http://127.0.0.1:${LOCAL_SERVER_PORT}`,
-  // No environment overrides needed: test_local.py already seeds safe demo
-  // messages and serves the real send.html UI locally.
-  environmentVariables: {},
-};
-
-// ── Demo setup hooks ───────────────────────────────────────────────────────
-
-/**
- * Ordered list of setup steps a capture runner executes after the server is
- * ready but before any screenshot is taken.
- *
- * Each step is intentionally small and named so failures are easy to diagnose.
- * "mockDataApproach" mirrors the field name used in the narrative data so the
- * two sources stay aligned.
- */
-const DEMO_SETUP_HOOKS = [
-  {
-    id: 'set-demo-device-name',
-    description:
-      'Inject a safe demo device name into localStorage so the personalization header shows a recognisable but non-personal label.',
-    mockDataApproach:
-      'Use the string "Demo Device" — generic enough to communicate the feature without revealing the capturist\'s machine name.',
-    playwrightAction: async (page) => {
-      await page.goto(`${LOCAL_SERVER_BASE_URL}/send.html`);
-      await page.evaluate(() => {
-        localStorage.setItem('mbl2pc_device_name', 'Demo Device');
-        localStorage.setItem('mbl2pc_theme', 'dark-ocean');
-        localStorage.setItem('mbl2pc_font_size', '15');
-      });
-      // Reload so the injected values are picked up by app initialisation.
-      await page.reload();
-    },
-  },
-  {
-    id: 'seed-demo-messages',
-    description:
-      'Verify the seeded message list from test_local.py is visible so the chat dashboard looks active rather than empty.',
-    mockDataApproach:
-      'The test_local.py script already seeds deterministic fake messages. This hook only confirms they rendered correctly.',
-    playwrightAction: async (page) => {
-      // Wait for at least one message bubble to be present before proceeding.
-      await page.locator('.message-bubble').first().waitFor();
-    },
-  },
-  {
-    id: 'seed-demo-snippets',
-    description:
-      'Inject sample clipboard snippet cards into the app state so the clipboard-and-files view tells a complete story.',
-    mockDataApproach:
-      'Snippets contain only generic demo text (code samples, a short note, a file reference) with no personal data.',
-    playwrightAction: async (page) => {
-      await page.evaluate(() => {
-        localStorage.setItem(
-          'mbl2pc_snippets',
-          JSON.stringify([
-            { id: 'snp-1', label: 'Quick note', text: 'Pick up the demo build from the CI link above.' },
-            { id: 'snp-2', label: 'Code snippet', text: 'console.log("portfolio demo — safe state");' },
-            {
-              id: 'snp-3',
-              label: 'File reference',
-              text: 'design/showcase-v2.fig — shared via MBL2PC on 2025-01-10',
-            },
-          ]),
-        );
-      });
-    },
-  },
-];
-
-// ── Wow-moment capture targets ─────────────────────────────────────────────
-
-/**
- * The three portfolio showcase captures for MBL2PC.
- *
- * Each entry maps to a feature in web/portfolio/data/apps.mjs (same `id`).
- * The `captureAction` field describes what the runner does immediately before
- * calling page.screenshot(), allowing precise framing without arbitrary waits.
- */
-const WOW_MOMENT_CAPTURES = [
-  {
-    id: 'chat-dashboard',
-    title: 'Rich chat dashboard with search, pinning, and timeline depth',
-    outputFileName: 'mbl2pc-chat-dashboard.png',
-    captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
-    captureAction: async (page) => {
-      // Confirm the message list is rendered — the seeded messages make the
-      // timeline look busy and real without exposing personal content.
-      await page.locator('.message-bubble').first().waitFor();
-    },
-    viewportWidth: 1440,
-    viewportHeight: 900,
-  },
-  {
-    id: 'personalization',
-    title: 'Theme, font, and identity customization',
-    outputFileName: 'mbl2pc-personalization.png',
-    captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
-    captureAction: async (page) => {
-      // Open the settings or personalization panel so theme, font, and device
-      // name controls are all visible in the same frame.
-      const settingsButton = page.getByRole('button', { name: /settings|personalise|theme/i });
-      await settingsButton.click();
-      await page.locator('.settings-panel, .theme-panel').first().waitFor();
-    },
-    viewportWidth: 1440,
-    viewportHeight: 900,
-  },
-  {
-    id: 'clipboard-and-files',
-    title: 'Clipboard sync, snippets, and file-sharing workflow',
-    outputFileName: 'mbl2pc-clipboard-and-files.png',
-    captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
-    captureAction: async (page) => {
-      // Open the snippets or clipboard tab so the injected demo snippet cards
-      // are visible alongside the active conversation.
-      const snippetsButton = page.getByRole('button', { name: /snippets|clipboard/i });
-      await snippetsButton.click();
-      await page.locator('.snippets-panel, .clipboard-panel').first().waitFor();
-    },
-    viewportWidth: 1440,
-    viewportHeight: 900,
-  },
-];
-
-// ── Exported definition ────────────────────────────────────────────────────
-
-/**
- * Full portfolio capture and config definition for MBL2PC.
- *
- * A portfolio runner imports this object and uses it to launch the app,
- * apply demo state, capture each wow moment, and generate storyboard SVGs
- * as fallbacks when the real UI is not available.
- */
-export const MBL2PC_PORTFOLIO_CONFIG = {
+export const MBL2PC_APP = {
   slug: 'mbl2pc',
   name: 'MBL2PC',
+  tagline:
+    'Phone-to-PC messaging experience with uploads, snippets, and personalization in one lightweight app.',
+  summary:
+    'MBL2PC tells a strong story about end-user empathy: cross-device messaging, quick sharing, and personalization. The local test server makes it ideal for a demo-safe portfolio because the real UI already works with seeded messages.',
+  accent: '#ff8a4c',
+  category: 'Cross-device utility',
+  launchSurface: 'python test_local.py',
+  techStack: ['FastAPI', 'Python', 'HTML', 'Cypress'],
+  proofNote:
+    'All three visuals in this section are polished code-rendered mock interfaces based on the shipped ' +
+    'messaging, search, and theming flows.',
+  features: [
+    {
+      id: 'chat-dashboard',
+      title: 'Rich chat dashboard with search, pinning, and timeline depth',
+      wowFactor: 'Shows consumer-style UX polish with real utility features.',
+      whatItShows:
+        'A mocked message dashboard with seeded phone-to-PC messages, quick actions, pinned context, and a polished conversation layout.',
+      mockDataApproach:
+        'The thread uses a fictional Demo Phone and Product Review conversation with generic notes, links, and handoff actions.',
+      capturePlan:
+        'Open /send.html on the local test server and capture after the first .bubble element is rendered.',
+      imageKind: 'code-rendered',
+    },
+    {
+      id: 'dark-mode-theme',
+      title: 'Theme system that supports light and dark use comfortably',
+      wowFactor: 'Shows attention to visual polish, readability, and day-to-day usability.',
+      whatItShows:
+        'A mocked theme settings screen showing dark-mode controls, a live message preview, palette choices, and density settings.',
+      mockDataApproach:
+        'The theme values are safe portfolio settings such as Midnight Ocean, Coral accent, and Comfortable density.',
+      capturePlan:
+        'Switch the live page into dark theme, wait for the surface colors to settle, and capture the full messaging viewport.',
+      imageKind: 'code-rendered',
+    },
+    {
+      id: 'search-and-theme',
+      title: 'Search and personalization working together in the same flow',
+      wowFactor: 'Highlights practical utility layered on top of a visually distinctive interface.',
+      whatItShows:
+        'A mocked search screen with a release-notes query, matching message threads, active palette context, snippets, and file handoff state.',
+      mockDataApproach:
+        'The search results are fictional product-review, dev-sync, and QA-thread records rather than real messages or device identifiers.',
+      capturePlan:
+        'Apply the ocean palette, enter a safe search term, and capture the filtered live view.',
+      imageKind: 'code-rendered',
+    },
+  ],
+};
+
+export const MBL2PC_PORTFOLIO_CONFIG = {
+  slug: MBL2PC_APP.slug,
+  name: MBL2PC_APP.name,
   localRepoPath: LOCAL_REPO_PATH,
-  launchStrategy: LAUNCH_STRATEGY,
-  demoSetupHooks: DEMO_SETUP_HOOKS,
-  wowMomentCaptures: WOW_MOMENT_CAPTURES,
+  outputDirPath: 'web/portfolio/assets/mbl2pc',
+  captureToolchain: 'playwright',
+  launchStrategy: {
+    localRepoPath: LOCAL_REPO_PATH,
+    command: 'python test_local.py',
+    readySignal: `http://localhost:${LOCAL_SERVER_PORT}/send.html`,
+    environmentVariables: {},
+  },
+  demoSetupHooks: [
+    {
+      id: 'seed-safe-device-preferences',
+      description:
+        'Store a generic demo device name plus theme preferences in localStorage before the page reloads.',
+      mockDataApproach:
+        'Use safe strings such as "Demo Device" and palette values already supported by the app.',
+      runnerInstruction:
+        'Set localStorage keys for mbl2pc_theme, mbl2pc_palette_dark, and a generic device-name key before reloading the page.',
+    },
+    {
+      id: 'expand-safe-productivity-panels',
+      description:
+        'Open the built-in clipboard and snippets panels so the productivity story is visible without creating a fake sidebar.',
+      mockDataApproach:
+        'Seed snippets with generic note, code, and file-reference text only.',
+      runnerInstruction:
+        'Write safe snippets into localStorage, remove the "collapsed" class from #clipboardPanel and #snippetsPanel, and then reload or re-render the page.',
+    },
+  ],
+  captureTargets: [
+    {
+      featureId: 'chat-dashboard',
+      outputFileName: 'mbl2pc-chat-dashboard.png',
+      captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
+      waitForSelector: '.bubble',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    },
+    {
+      featureId: 'dark-mode-theme',
+      outputFileName: 'mbl2pc-dark-mode.png',
+      captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
+      waitForSelector: '#themePopover.open',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    },
+    {
+      featureId: 'search-and-theme',
+      outputFileName: 'mbl2pc-search-theme.png',
+      captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
+      waitForSelector: '#snippetsList',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    },
+  ],
 };

@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Shareable portfolio microsite scaffold for employer-facing product storytelling** — Added `web/portfolio/` as a recruiter-friendly showcase for Forge Terminal, NodeToolbox, EZTest, MBL2PC, and QuiKeys. The first pass is data-driven, includes three curated "wow" moments per application, generates storyboard preview assets for safe demo states, and reuses existing Forge Terminal screenshots where available so the portfolio can evolve into a repeatable capture workflow instead of a one-off deck. The portfolio data is now emitted as a self-contained runtime module so the site can be published directly to GitHub Pages without depending on repo-internal script paths.
+- **Portfolio language now targets employers directly and labels evidence sources clearly** — The live portfolio no longer explains itself as an artifact being shown to the candidate. It now presents each product as a direct case study, distinguishes live product captures from code-derived renderings, and hides internal capture-plan jargon that did not belong in employer-facing copy.
+- **Portfolio visuals now use large code-rendered mock interfaces instead of tiny repeated screenshots** — The portfolio generator now creates polished seeded demo compositions for every product highlight, and the layout gives the visual mockups primary space so each application reads like a designed case study rather than a screenshot gallery.
+- **Portfolio mockups now render distinct app screens with visible sample data** — Rebuilt the generated assets so every card shows a separate mocked product screen with realistic controls, records, dialogs, terminal output, or mobile states, and updated the card copy to explain the mocked UI in action.
+
 ### Fixed
+- **Terminal sessions now survive Windows sleep instead of reopening as fresh shells** — Forge previously treated `PBT_APMSUSPEND` as a signal to close every live and detached PTY before the machine slept. After resume, reconnect created a new prompt because the original shell had already been destroyed. Forge now records the suspend event without tearing down PTYs, and any disconnect that happens shortly after wake receives an extended reconnect grace window so the original shell can be reattached instead of replaced.
 - **Release Manager card now passes explicit version to `local-release.ps1`** — When a project has `scripts/local-release.ps1`, the card was sending a relative bump type (`patch`/`minor`/`major`) rather than the explicit next-version shown in the UI. If a previous release attempt had partially bumped `package.json` before failing, the script would compute a *different* version than the card displayed, creating a double-bump. The card now always passes the exact version string (e.g. `0.0.14`), ensuring the script releases precisely what was shown.
 
 ## [7.10.11] - 2026-05-03

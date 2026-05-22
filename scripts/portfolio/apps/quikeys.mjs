@@ -232,16 +232,13 @@ export const WOW_MOMENTS = [
 
     // What a viewer should take away when they see the screenshot.
     whatItShows:
-      'A first-run or unlock path that communicates trust, validation, and a native feel. ' +
-      'The password prompt is purposeful, the window chrome is minimal, and the visual ' +
-      'hierarchy guides the user straight to the action.',
+      'A mocked native unlock dialog with masked password input, vault location, encryption ' +
+      'context, and the trust cues a user needs before opening sensitive macros.',
 
     // How the demo state is kept safe (no real credentials in the screenshot).
     mockDataApproach:
-      'Launch with UNLOCK_FLOW_OVERRIDES applied so the vault appears locked. ' +
-      'The password shown in any walkthrough is the fictional DEMO_VAULT_PASSWORD — ' +
-      'not the user\'s real master password. The vault file is the seeded demo vault ' +
-      'created from SEEDED_VAULT_STATE and deleted after the session.',
+      'The vault path, masked password, and encryption state are fictional portfolio values; ' +
+      'no real master password or credential value is shown.',
 
     // Exact steps the capture helper must follow to produce a good screenshot.
     capturePlan:
@@ -267,16 +264,12 @@ export const WOW_MOMENTS = [
     wowFactor: 'Shows a power-user table workflow with strong utility value.',
 
     whatItShows:
-      'A management surface where macros, triggers, categories, and masked values ' +
-      'feel organized and serious. The credential row with asterisked value ' +
-      'communicates that the app handles sensitive material responsibly.',
+      'A mocked macro table with names, hotkeys, triggers, categories, actions, and a masked ' +
+      'token row so the desktop workflow reads like a real power-user manager.',
 
     mockDataApproach:
-      'Apply MACRO_MANAGER_OVERRIDES so the vault is unlocked and the full macro ' +
-      'list is visible. All six rows come from SEEDED_VAULT_STATE.macros — entirely ' +
-      'fictional entries spanning Development, DevOps, Credentials, Communication, ' +
-      'and Infrastructure categories. The masked API token row shows asterisks, not ' +
-      'a real token.',
+      'The table uses fictional Development, Communication, DevOps, and Credentials rows; ' +
+      'the token-like value is deliberately masked with bullets.',
 
     capturePlan:
       'Start QuiKeys with isVaultUnlocked=true and the full seeded macro list. ' +
@@ -298,16 +291,12 @@ export const WOW_MOMENTS = [
     wowFactor: 'Shows detail-oriented form design inside a desktop app.',
 
     whatItShows:
-      'The form users rely on to define hotkeys, triggers, masking, and delivery ' +
-      'behaviour. Every field has a clear purpose; the hotkey recorder widget and ' +
-      'the mask toggle communicate depth without clutter.',
+      'A mocked add/edit dialog with name, safe command text, hotkey, text trigger, category, ' +
+      'and masking choice visible before the user saves the automation.',
 
     mockDataApproach:
-      'Pre-fill the dialog via MACRO_DIALOG_PREFILL using PORTFOLIO_PREFILL_MACRO ' +
-      'environment variable. The values look realistic (a real npm command) but ' +
-      'contain no sensitive data. The isMasked field is false so the value is ' +
-      'fully visible — showing what the field looks like when the user is writing ' +
-      'a safe automation rather than storing a credential.',
+      'The dialog is prefilled with a fictional Build and Test macro using a safe npm command, ' +
+      'not a password, token, or private shortcut.',
 
     capturePlan:
       'Start QuiKeys with the vault unlocked and open the add/edit dialog ' +
@@ -357,4 +346,63 @@ export const QUIKEYS_CAPTURE_CONFIG = {
       dialogPrefill: MACRO_DIALOG_PREFILL,
     },
   ],
+};
+
+export const QUIKEYS_APP = {
+  slug: 'quikeys',
+  name: 'QuiKeys',
+  tagline:
+    'Secure keyboard automation and credential helper built as a native desktop experience.',
+  summary:
+    'QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted storage, and operator-focused UX in a compact product that feels genuinely useful.',
+  accent: QUIKEYS_ACCENT_COLOUR,
+  category: 'Native desktop utility',
+  launchSurface: 'python src\\main.py',
+  techStack: ['Python', 'Tkinter', 'Pillow', 'cryptography'],
+  proofNote:
+    'All three visuals in this section are polished code-rendered mock windows based on the shipped ' +
+    'desktop flows and safe seeded macro data.',
+  features: WOW_MOMENTS.map((wowMoment) => ({
+    id: wowMoment.id,
+    title: wowMoment.title,
+    wowFactor: wowMoment.wowFactor,
+    whatItShows: wowMoment.whatItShows,
+    mockDataApproach: wowMoment.mockDataApproach,
+    capturePlan: wowMoment.capturePlan,
+    imageKind: 'code-rendered',
+  })),
+};
+
+export const QUIKEYS_PORTFOLIO_CONFIG = {
+  slug: QUIKEYS_SLUG,
+  name: 'QuiKeys',
+  localRepoPath: QUIKEYS_REPO_PATH,
+  outputDirPath: 'web/portfolio/assets/quikeys',
+  captureToolchain: 'native-desktop',
+  launchStrategy: {
+    localRepoPath: QUIKEYS_REPO_PATH,
+    command: `python ${QUIKEYS_ENTRY_POINT}`,
+    readySignal: 'QuiKeys',
+    environmentVariables: {
+      PORTFOLIO_VAULT: '%TEMP%\\quikeys-portfolio-demo.vault',
+    },
+  },
+  demoSetupHooks: [
+    {
+      id: 'seed-demo-vault',
+      description:
+        'Create a temporary encrypted demo vault from the fictional seeded macro state before launching the native window.',
+      mockDataApproach:
+        'The seeded vault contains only fictional macro values and uses a disposable demo password.',
+      runnerInstruction:
+        'Write SEEDED_VAULT_STATE to a temporary vault file, point PORTFOLIO_VAULT at that file, and delete it after the capture session ends.',
+    },
+  ],
+  captureTargets: QUIKEYS_CAPTURE_CONFIG.captureSteps.map((captureStep) => ({
+    featureId: captureStep.wowMoment.id,
+    outputFileName: captureStep.wowMoment.outputFilename,
+    waitForWindowTitle: captureStep.wowMoment.expectedWindowTitle,
+    viewportWidth: 1200,
+    viewportHeight: 760,
+  })),
 };

@@ -1,155 +1,99 @@
-// Validates the app-specific portfolio capture/config definitions for EZTest
-// and MBL2PC so the operational runner contract stays consistent as the
-// definitions evolve.
+// Validates the shared portfolio app and capture registries for all five products.
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { EZTEST_PORTFOLIO_CONFIG, MBL2PC_PORTFOLIO_CONFIG } from './apps/index.mjs';
+import {
+  PORTFOLIO_APP_DEFINITIONS,
+  PORTFOLIO_CAPTURE_CONFIGS,
+} from './apps/index.mjs';
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-const ALL_APP_CONFIGS = [EZTEST_PORTFOLIO_CONFIG, MBL2PC_PORTFOLIO_CONFIG];
-
-/**
- * Asserts that a given value is a non-empty string.
- * Used throughout to verify required string fields in one call.
- */
-function assertIsNonEmptyString(value, fieldLabel) {
+function assertHasNonEmptyString(value, fieldLabel) {
   assert.equal(typeof value, 'string', `${fieldLabel} must be a string`);
   assert.ok(value.length > 0, `${fieldLabel} must not be empty`);
 }
 
-// ── Identity and paths ─────────────────────────────────────────────────────
+test('portfolio registry exports five display app definitions', () => {
+  assert.equal(PORTFOLIO_APP_DEFINITIONS.length, 5);
+});
 
-test('each app config exports a unique non-empty slug', () => {
-  const slugSet = new Set(ALL_APP_CONFIGS.map((appConfig) => appConfig.slug));
-  assert.equal(slugSet.size, ALL_APP_CONFIGS.length, 'slug values must be unique');
+test('portfolio registry exports five capture configs', () => {
+  assert.equal(PORTFOLIO_CAPTURE_CONFIGS.length, 5);
+});
 
-  for (const appConfig of ALL_APP_CONFIGS) {
-    assertIsNonEmptyString(appConfig.slug, `${appConfig.slug}.slug`);
+test('every display app definition uses a unique slug and three showcase features', () => {
+  const slugSet = new Set(PORTFOLIO_APP_DEFINITIONS.map((appDefinition) => appDefinition.slug));
+  assert.equal(slugSet.size, PORTFOLIO_APP_DEFINITIONS.length);
+
+  for (const appDefinition of PORTFOLIO_APP_DEFINITIONS) {
+    assertHasNonEmptyString(appDefinition.slug, `${appDefinition.name}.slug`);
+    assert.equal(appDefinition.features.length, 3, `${appDefinition.name} must define three showcase features`);
   }
 });
 
-test('each app config provides a concrete localRepoPath', () => {
-  for (const appConfig of ALL_APP_CONFIGS) {
-    assertIsNonEmptyString(appConfig.localRepoPath, `${appConfig.slug}.localRepoPath`);
+test('every capture config maps to a display app with the same slug', () => {
+  const appSlugSet = new Set(PORTFOLIO_APP_DEFINITIONS.map((appDefinition) => appDefinition.slug));
+
+  for (const captureConfig of PORTFOLIO_CAPTURE_CONFIGS) {
+    assert.ok(appSlugSet.has(captureConfig.slug), `${captureConfig.slug} must have a matching display app definition`);
   }
 });
 
-test('EZTest localRepoPath points to the expected Windows directory', () => {
-  assert.equal(EZTEST_PORTFOLIO_CONFIG.localRepoPath, 'C:\\ProjectsWin\\EZTest');
-});
+test('every capture config defines the shared runner fields', () => {
+  for (const captureConfig of PORTFOLIO_CAPTURE_CONFIGS) {
+    assertHasNonEmptyString(captureConfig.slug, `${captureConfig.name}.slug`);
+    assertHasNonEmptyString(captureConfig.name, `${captureConfig.slug}.name`);
+    assertHasNonEmptyString(captureConfig.localRepoPath, `${captureConfig.slug}.localRepoPath`);
+    assertHasNonEmptyString(captureConfig.outputDirPath, `${captureConfig.slug}.outputDirPath`);
+    assertHasNonEmptyString(captureConfig.captureToolchain, `${captureConfig.slug}.captureToolchain`);
 
-test('MBL2PC localRepoPath points to the expected Windows directory', () => {
-  assert.equal(MBL2PC_PORTFOLIO_CONFIG.localRepoPath, 'C:\\ProjectsWin\\mbl2pc');
-});
-
-// ── Launch strategy ────────────────────────────────────────────────────────
-
-test('each app config defines a launch strategy with required fields', () => {
-  for (const appConfig of ALL_APP_CONFIGS) {
-    const launchStrategy = appConfig.launchStrategy;
-    const configLabel = `${appConfig.slug}.launchStrategy`;
-
-    assert.ok(launchStrategy, `${configLabel} must be defined`);
-    assertIsNonEmptyString(launchStrategy.localRepoPath, `${configLabel}.localRepoPath`);
-    assertIsNonEmptyString(launchStrategy.command, `${configLabel}.command`);
-    assertIsNonEmptyString(launchStrategy.readySignal, `${configLabel}.readySignal`);
+    assert.ok(captureConfig.launchStrategy, `${captureConfig.slug}.launchStrategy must be defined`);
+    assertHasNonEmptyString(captureConfig.launchStrategy.localRepoPath, `${captureConfig.slug}.launchStrategy.localRepoPath`);
+    assertHasNonEmptyString(captureConfig.launchStrategy.command, `${captureConfig.slug}.launchStrategy.command`);
+    assertHasNonEmptyString(captureConfig.launchStrategy.readySignal, `${captureConfig.slug}.launchStrategy.readySignal`);
     assert.equal(
-      typeof launchStrategy.environmentVariables,
+      typeof captureConfig.launchStrategy.environmentVariables,
       'object',
-      `${configLabel}.environmentVariables must be an object`,
+      `${captureConfig.slug}.launchStrategy.environmentVariables must be an object`,
     );
+
+    assert.ok(Array.isArray(captureConfig.demoSetupHooks), `${captureConfig.slug}.demoSetupHooks must be an array`);
+    assert.ok(captureConfig.demoSetupHooks.length >= 1, `${captureConfig.slug} must define at least one demo hook`);
+
+    assert.ok(Array.isArray(captureConfig.captureTargets), `${captureConfig.slug}.captureTargets must be an array`);
+    assert.equal(captureConfig.captureTargets.length, 3, `${captureConfig.slug} must define three capture targets`);
   }
 });
 
-// ── Demo setup hooks ───────────────────────────────────────────────────────
-
-test('each app config defines at least one demo setup hook', () => {
-  for (const appConfig of ALL_APP_CONFIGS) {
-    assert.ok(
-      Array.isArray(appConfig.demoSetupHooks),
-      `${appConfig.slug}.demoSetupHooks must be an array`,
-    );
-    assert.ok(
-      appConfig.demoSetupHooks.length >= 1,
-      `${appConfig.slug} must define at least one demo setup hook`,
-    );
-  }
-});
-
-test('every demo setup hook has the required narrative and action fields', () => {
-  for (const appConfig of ALL_APP_CONFIGS) {
-    for (const setupHook of appConfig.demoSetupHooks) {
-      const hookLabel = `${appConfig.slug} hook "${setupHook.id}"`;
-      assertIsNonEmptyString(setupHook.id, `${hookLabel}.id`);
-      assertIsNonEmptyString(setupHook.description, `${hookLabel}.description`);
-      assertIsNonEmptyString(setupHook.mockDataApproach, `${hookLabel}.mockDataApproach`);
-      assert.equal(
-        typeof setupHook.playwrightAction,
-        'function',
-        `${hookLabel}.playwrightAction must be a function`,
-      );
+test('every demo setup hook describes how the runner should seed a safe state', () => {
+  for (const captureConfig of PORTFOLIO_CAPTURE_CONFIGS) {
+    for (const demoSetupHook of captureConfig.demoSetupHooks) {
+      assertHasNonEmptyString(demoSetupHook.id, `${captureConfig.slug}.demoHook.id`);
+      assertHasNonEmptyString(demoSetupHook.description, `${captureConfig.slug}.${demoSetupHook.id}.description`);
+      assertHasNonEmptyString(demoSetupHook.mockDataApproach, `${captureConfig.slug}.${demoSetupHook.id}.mockDataApproach`);
+      assertHasNonEmptyString(demoSetupHook.runnerInstruction, `${captureConfig.slug}.${demoSetupHook.id}.runnerInstruction`);
     }
   }
 });
 
-// ── Wow-moment captures ────────────────────────────────────────────────────
+test('every capture target maps to one display feature id', () => {
+  const featureIdMap = new Map(
+    PORTFOLIO_APP_DEFINITIONS.map((appDefinition) => [
+      appDefinition.slug,
+      new Set(appDefinition.features.map((featureDefinition) => featureDefinition.id)),
+    ]),
+  );
 
-test('each app config defines exactly three wow-moment captures', () => {
-  for (const appConfig of ALL_APP_CONFIGS) {
-    assert.equal(
-      appConfig.wowMomentCaptures.length,
-      3,
-      `${appConfig.name} must define exactly three wow-moment capture targets`,
-    );
-  }
-});
+  for (const captureConfig of PORTFOLIO_CAPTURE_CONFIGS) {
+    const expectedFeatureIds = featureIdMap.get(captureConfig.slug);
+    assert.ok(expectedFeatureIds, `${captureConfig.slug} must have a matching feature set`);
 
-test('every wow-moment capture has the required fields', () => {
-  for (const appConfig of ALL_APP_CONFIGS) {
-    for (const captureTarget of appConfig.wowMomentCaptures) {
-      const captureLabel = `${appConfig.slug} capture "${captureTarget.id}"`;
-      assertIsNonEmptyString(captureTarget.id, `${captureLabel}.id`);
-      assertIsNonEmptyString(captureTarget.title, `${captureLabel}.title`);
-      assertIsNonEmptyString(captureTarget.outputFileName, `${captureLabel}.outputFileName`);
-      assertIsNonEmptyString(captureTarget.captureUrl, `${captureLabel}.captureUrl`);
-      assert.equal(
-        typeof captureTarget.captureAction,
-        'function',
-        `${captureLabel}.captureAction must be a function`,
-      );
-      assert.equal(typeof captureTarget.viewportWidth, 'number', `${captureLabel}.viewportWidth must be a number`);
-      assert.equal(typeof captureTarget.viewportHeight, 'number', `${captureLabel}.viewportHeight must be a number`);
+    for (const captureTarget of captureConfig.captureTargets) {
+      assertHasNonEmptyString(captureTarget.featureId, `${captureConfig.slug}.captureTarget.featureId`);
+      assertHasNonEmptyString(captureTarget.outputFileName, `${captureConfig.slug}.${captureTarget.featureId}.outputFileName`);
+      assert.equal(typeof captureTarget.viewportWidth, 'number', `${captureConfig.slug}.${captureTarget.featureId}.viewportWidth must be a number`);
+      assert.equal(typeof captureTarget.viewportHeight, 'number', `${captureConfig.slug}.${captureTarget.featureId}.viewportHeight must be a number`);
+      assert.ok(expectedFeatureIds.has(captureTarget.featureId), `${captureConfig.slug}.${captureTarget.featureId} must exist in the display app definition`);
     }
-  }
-});
-
-test('wow-moment capture ids match the slugs expected by portfolio-data apps.mjs', () => {
-  const expectedEztestCaptureIds = ['onboarding', 'dashboard-actions', 'run-modal'];
-  const expectedMbl2pcCaptureIds = ['chat-dashboard', 'personalization', 'clipboard-and-files'];
-
-  const actualEztestCaptureIds = EZTEST_PORTFOLIO_CONFIG.wowMomentCaptures.map((captureTarget) => captureTarget.id);
-  const actualMbl2pcCaptureIds = MBL2PC_PORTFOLIO_CONFIG.wowMomentCaptures.map((captureTarget) => captureTarget.id);
-
-  assert.deepEqual(actualEztestCaptureIds, expectedEztestCaptureIds);
-  assert.deepEqual(actualMbl2pcCaptureIds, expectedMbl2pcCaptureIds);
-});
-
-test('output file names match the generated-asset naming convention used by the build script', () => {
-  // The build script writes files to assets/generated/{slug}-{featureId}.svg.
-  // The capture runner should write PNG counterparts with the same base naming.
-  for (const captureTarget of EZTEST_PORTFOLIO_CONFIG.wowMomentCaptures) {
-    assert.ok(
-      captureTarget.outputFileName.startsWith('eztest-'),
-      `EZTest capture "${captureTarget.id}" fileName must start with "eztest-"`,
-    );
-  }
-  for (const captureTarget of MBL2PC_PORTFOLIO_CONFIG.wowMomentCaptures) {
-    assert.ok(
-      captureTarget.outputFileName.startsWith('mbl2pc-'),
-      `MBL2PC capture "${captureTarget.id}" fileName must start with "mbl2pc-"`,
-    );
   }
 });

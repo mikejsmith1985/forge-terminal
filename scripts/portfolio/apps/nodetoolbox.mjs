@@ -1,232 +1,137 @@
-// App-specific portfolio capture and configuration definition for NodeToolbox.
-// This file describes how the portfolio runner should launch NodeToolbox, activate
-// demo mode, and capture the three employer-facing wow moments. It is intentionally
-// standalone so the shared runner can discover and execute it without knowing
-// NodeToolbox internals.
-//
-// Safe for employer-facing demos: all data is mock-safe by default. No real Jira,
-// ServiceNow, or GitHub credentials are needed — demo mode supplies deterministic
-// fixture data for every capture target.
+// App-specific portfolio display and capture definitions for NodeToolbox.
 
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-/** Absolute path to the NodeToolbox repository on the developer machine. */
 const LOCAL_REPO_PATH = 'C:\\ProjectsWin\\NodeToolbox';
-
-/** Port NodeToolbox binds to when started in demo mode. */
-const DEMO_SERVER_PORT = 3000;
-
-/** Base URL the Playwright capture sessions connect to. */
+const DEMO_SERVER_PORT = 5556;
 const DEMO_BASE_URL = `http://localhost:${DEMO_SERVER_PORT}`;
 
-/**
- * How long (in milliseconds) to wait after the server process starts before
- * Playwright attempts to connect. NodeToolbox compiles the React client on startup,
- * so the first launch is slower than subsequent runs.
- */
-const SERVER_READINESS_TIMEOUT_MS = 45_000;
-
-/** How long (in milliseconds) each Playwright page navigation may take. */
-const PAGE_NAVIGATION_TIMEOUT_MS = 15_000;
-
-// ── Launch strategy ────────────────────────────────────────────────────────────
-
-/**
- * Describes how to bring NodeToolbox up in a reproducible demo-safe state.
- *
- * The two-step launch (build:client then start) matches the npm scripts that
- * ship with the repository. The DEMO_MODE environment variable activates the
- * in-app fixture layer so no real service credentials are required.
- *
- * @type {import('../types.d.mjs').LaunchStrategy}
- */
-export const LAUNCH_STRATEGY = {
-  repoDirPath: LOCAL_REPO_PATH,
-
-  // Install dependencies before the first run if node_modules is absent.
-  bootstrapCommand: 'npm install',
-
-  // Build the React client bundle and then start the Express server. The
-  // build step is required because NodeToolbox serves the compiled bundle —
-  // it does not have a Vite dev server.
-  launchCommand: 'npm run build:client && npm start',
-
-  // DEMO_MODE=true instructs the NodeToolbox server to:
-  //   1. Skip live Jira / ServiceNow / GitHub connections
-  //   2. Load deterministic fixture data from the in-repo demo store
-  //   3. Suppress any first-run setup wizard so the UI lands directly
-  environment: {
-    DEMO_MODE: 'true',
-    PORT: String(DEMO_SERVER_PORT),
-  },
-
-  serverReadinessTimeoutMs: SERVER_READINESS_TIMEOUT_MS,
-  readinessProbeUrl: `${DEMO_BASE_URL}/api/health`,
-};
-
-// ── Demo hooks ─────────────────────────────────────────────────────────────────
-
-/**
- * Ordered sequence of actions the capture runner executes before taking
- * screenshots. Each hook brings the app into a deterministic, employer-safe state
- * so the captures look intentional rather than empty or half-loaded.
- *
- * @type {import('../types.d.mjs').DemoHook[]}
- */
-export const DEMO_HOOKS = [
-  {
-    id: 'activate-demo-mode',
-    description:
-      'Confirm the demo fixture layer is active by checking the /api/health endpoint for the "demo":true flag. Abort if it is missing — running against a live account would expose real data.',
-    route: '/api/health',
-    // The runner reads this selector from the JSON response body.
-    // A missing key causes a hard abort, not a silent screenshot.
-    assertJsonPath: 'demo',
-    assertValue: true,
-    isBlockingGate: true,
-  },
-  {
-    id: 'load-demo-sprint-data',
-    description:
-      'POST to the demo fixture endpoint so the sprint dashboard is pre-populated with a realistic but safe sprint. This is idempotent — posting again when data already exists is a no-op.',
-    route: '/api/demo/seed',
-    method: 'POST',
-    body: { scenario: 'standard-sprint' },
-    isBlockingGate: false,
-  },
-  {
-    id: 'navigate-to-home',
-    description:
-      'Navigate to the root route and wait for the home launcher grid to paint. This step stabilises the browser state before any capture sequence begins.',
-    route: '/',
-    waitForSelector: '[data-testid="home-launcher-grid"]',
-    isBlockingGate: true,
-  },
-];
-
-// ── Wow-moment capture targets ─────────────────────────────────────────────────
-
-/**
- * The three employer-facing showcase moments for NodeToolbox. Each entry maps
- * directly to a feature defined in web/portfolio/data/apps.mjs so the shared
- * runner can correlate capture output with the display metadata.
- *
- * All capture targets use Playwright and the DEMO_BASE_URL above. Playwright
- * already ships with the NodeToolbox repository, so no additional tooling is
- * needed.
- *
- * @type {import('../types.d.mjs').CaptureTarget[]}
- */
-export const CAPTURE_TARGETS = [
-  {
-    // ── Wow moment 1: Home launcher ──────────────────────────────────────────
-    featureId: 'home-launcher',
-    outputFilename: 'nodetoolbox-home-launcher.png',
-    route: '/',
-
-    // Wait for the launcher grid rather than just DOMContentLoaded so every
-    // module tile is rendered before the screenshot is taken.
-    waitForSelector: '[data-testid="home-launcher-grid"]',
-
-    // Capture the full above-the-fold home surface. A 1440×900 viewport shows
-    // all module tiles without scrolling, which communicates product breadth
-    // in a single frame.
-    viewportWidth: 1440,
-    viewportHeight: 900,
-
-    // Demo-safety notes for this capture:
-    //   - Module labels are static UI strings, not fetched from any live service
-    //   - Connectivity badges come from the demo fixture store (all show "Demo")
-    //   - No usernames, org names, or real account identifiers appear
-    mockSafetyNotes: [
-      'All module labels are hard-coded UI strings.',
-      'Connectivity badges are set to "Demo" by the fixture layer.',
-      'No real account information is rendered on the home route.',
-    ],
-  },
-
-  {
-    // ── Wow moment 2: Sprint dashboard ───────────────────────────────────────
-    featureId: 'sprint-dashboard',
-    outputFilename: 'nodetoolbox-sprint-dashboard.png',
-    route: '/sprint',
-
-    // Wait for the sprint health summary bar so the density of data signals
-    // enterprise maturity rather than a loading skeleton.
-    waitForSelector: '[data-testid="sprint-health-bar"]',
-
-    viewportWidth: 1440,
-    viewportHeight: 900,
-
-    // The activate-demo-mode and load-demo-sprint-data hooks above seed all
-    // the data this route needs. The runner must confirm those hooks ran before
-    // attempting this capture.
-    requiredHookIds: ['activate-demo-mode', 'load-demo-sprint-data'],
-
-    mockSafetyNotes: [
-      'Sprint name uses the fixture value "Demo Sprint Q1" — no real sprint names.',
-      'Story counts and burn metrics are generated from the seed payload.',
-      'Team member avatars are replaced with initials by the demo fixture layer.',
-      'No GitHub repo links, PR numbers, or real issue keys appear.',
-    ],
-  },
-
-  {
-    // ── Wow moment 3: Specialist workflow — ServiceNow Hub or ART View ───────
-    featureId: 'snow-hub-art',
-    outputFilename: 'nodetoolbox-specialist-workflow.png',
-
-    // The runner will attempt the ServiceNow Hub route first. If the page
-    // renders a "not configured" placeholder, it falls back to the ART View.
-    // Either surface communicates cross-program orchestration capability.
-    route: '/snow-hub',
-    fallbackRoute: '/art-view',
-
-    // Waiting for the content panel ensures we capture the data surface rather
-    // than a loading state.
-    waitForSelector: '[data-testid="snow-hub-content"], [data-testid="art-view-content"]',
-
-    viewportWidth: 1440,
-    viewportHeight: 900,
-
-    mockSafetyNotes: [
-      'ServiceNow records are served from the demo fixture store with fake incident and change IDs.',
-      'ART View uses seeded PI planning mock data — no real program increments appear.',
-      'All user-facing identifiers are replaced with safe demo values by DEMO_MODE.',
-    ],
-  },
-];
-
-// ── Consolidated definition export ────────────────────────────────────────────
-
-/**
- * The complete NodeToolbox portfolio capture definition consumed by the shared
- * portfolio runner.
- *
- * The runner expects a default export shaped like this object so it can iterate
- * all app definitions with a single dynamic import loop.
- *
- * Keeping the definition data-driven means the runner logic never needs to know
- * which app it is running — it just executes launch, hooks, and captures in
- * order for whatever definition it loaded.
- */
-export default {
-  // Must match the slug in web/portfolio/data/apps.mjs for asset correlation.
+export const NODE_TOOLBOX_APP = {
   slug: 'nodetoolbox',
   name: 'NodeToolbox',
+  tagline:
+    'Local-first enterprise delivery workspace that unifies Jira, ServiceNow, GitHub, and reporting.',
+  summary:
+    'NodeToolbox is the clearest story of product breadth: one application orchestrating planning, reporting, ITSM, and delivery operations behind a localhost proxy. It reads like a serious internal platform, not a toy side project.',
+  accent: '#1cc88a',
+  category: 'Enterprise operations workspace',
+  launchSurface: 'node server.js',
+  techStack: ['Node.js', 'Express', 'React', 'Playwright'],
+  proofNote:
+    'This section uses mocked UI screens based on the implemented routes, module layout, and enterprise delivery workflows.',
+  features: [
+    {
+      id: 'home-launcher',
+      title: 'Product launcher that feels like an internal operating system',
+      wowFactor: 'Quickly communicates product breadth and information architecture skill.',
+      whatItShows:
+        'A mocked launcher screen with delivery modules, connected workstreams, release trains, and open-risk counts organized as a single internal platform.',
+      mockDataApproach:
+        'The screen uses a fictional HSCS Enrollment Platform workspace with mock program, release-train, and workstream totals.',
+      capturePlan:
+        'Complete the demo setup flow with safe placeholder values, land on /?demo=1, then capture the home view once the "Your personal utility belt" heading is visible.',
+      imageKind: 'code-rendered',
+    },
+    {
+      id: 'sprint-dashboard',
+      title: 'Sprint dashboard for execution, planning, and release readiness',
+      wowFactor: 'Signals enterprise complexity handled through coherent UX.',
+      whatItShows:
+        'A mocked sprint dashboard with health metrics, priority Jira-style work items, team load, and blocker status visible together.',
+      mockDataApproach:
+        'The board uses fictional BEN issue keys, sample owners, and safe delivery metrics instead of live Jira or GitHub data.',
+      capturePlan:
+        'Navigate to /sprint-dashboard?demo=1 and capture once the "Team Dashboard" title is rendered.',
+      imageKind: 'code-rendered',
+    },
+    {
+      id: 'snow-hub-art',
+      title: 'Specialist workflow surface: ServiceNow Hub or ART View',
+      wowFactor: 'Shows that the product scales from team execution to cross-program orchestration.',
+      whatItShows:
+        'A mocked ServiceNow and ART operations hub with incident queues, change windows, release risk, and PI confidence surfaced as product UI.',
+      mockDataApproach:
+        'The incident IDs, change records, and release-train metrics are fictional samples designed to show the workflow without exposing enterprise systems.',
+      capturePlan:
+        'Navigate to /snow-hub?demo=1, wait for the "SNow Hub" title, and fall back to /art?demo=1 if the ServiceNow surface is unavailable.',
+      imageKind: 'code-rendered',
+    },
+  ],
+};
 
-  // Playwright is already installed in the NodeToolbox repository, so the
-  // runner can invoke it directly without a separate install step.
-  captureToolchain: 'playwright',
-  captureToolchainNote:
-    'Playwright ships with the NodeToolbox repo. The runner invokes npx playwright test --headed=false from the repo directory.',
-
-  launchStrategy: LAUNCH_STRATEGY,
-  demoHooks: DEMO_HOOKS,
-  captureTargets: CAPTURE_TARGETS,
-
-  // Output directory relative to the forge-terminal project root. Real captured
-  // PNGs land here; the storyboard SVG generator skips features whose output
-  // file already exists in this directory.
+export const NODE_TOOLBOX_PORTFOLIO_CONFIG = {
+  slug: NODE_TOOLBOX_APP.slug,
+  name: NODE_TOOLBOX_APP.name,
+  localRepoPath: LOCAL_REPO_PATH,
   outputDirPath: 'web/portfolio/assets/nodetoolbox',
+  captureToolchain: 'playwright',
+  launchStrategy: {
+    localRepoPath: LOCAL_REPO_PATH,
+    command: 'node server.js',
+    readySignal: `${DEMO_BASE_URL}/setup?demo=1`,
+    environmentVariables: {
+      TBX_PORT: String(DEMO_SERVER_PORT),
+      TBX_JIRA_URL: 'https://jira.test.example.com',
+      TBX_JIRA_PAT: 'portfolio-demo-token',
+    },
+  },
+  demoSetupHooks: [
+    {
+      id: 'open-first-install-demo',
+      description:
+        'Open the first-install demo flow through /setup?demo=1 so all storage remains isolated to the demo tab.',
+      mockDataApproach:
+        'The demo query parameter routes localStorage reads into session-scoped demo storage without touching saved user settings.',
+      runnerInstruction:
+        'Navigate to /setup?demo=1 before any feature capture begins.',
+    },
+    {
+      id: 'submit-safe-demo-setup',
+      description:
+        'POST the demo setup form with safe placeholder values so the app can redirect into the main shell without using real credentials.',
+      mockDataApproach:
+        'Use synthetic Jira, GitHub, and Confluence values like the repository integration tests already do.',
+      runnerInstruction:
+        'POST /api/setup?demo=1 with fake values such as jiraBaseUrl=https://demo.atlassian.net and githubPat=ghp_demo, then follow the redirect to /?demo=1.',
+    },
+  ],
+  captureTargets: [
+    {
+      featureId: 'home-launcher',
+      outputFileName: 'nodetoolbox-home-launcher.png',
+      captureUrl: `${DEMO_BASE_URL}/?demo=1`,
+      waitForText: 'Your personal utility belt',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+      mockSafetyNotes: [
+        'The demo tab never reuses the user’s saved settings.',
+        'Placeholder connectivity values come from the isolated demo setup flow.',
+        'The capture focuses on static module cards rather than live service data.',
+      ],
+    },
+    {
+      featureId: 'sprint-dashboard',
+      outputFileName: 'nodetoolbox-sprint-dashboard.png',
+      captureUrl: `${DEMO_BASE_URL}/sprint-dashboard?demo=1`,
+      waitForText: 'Team Dashboard',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+      mockSafetyNotes: [
+        'The route is entered only after the safe demo setup flow completes.',
+        'No production Jira issue keys or GitHub links are required for the shell capture.',
+      ],
+    },
+    {
+      featureId: 'snow-hub-art',
+      outputFileName: 'nodetoolbox-specialist-workflow.png',
+      captureUrl: `${DEMO_BASE_URL}/snow-hub?demo=1`,
+      fallbackCaptureUrl: `${DEMO_BASE_URL}/art?demo=1`,
+      waitForText: 'SNow Hub',
+      fallbackWaitForText: 'ART View tabs',
+      viewportWidth: 1440,
+      viewportHeight: 900,
+      mockSafetyNotes: [
+        'The capture prefers SNow Hub but can fall back to ART View without changing the showcase narrative.',
+        'Both routes stay in the isolated demo tab.',
+      ],
+    },
+  ],
 };
