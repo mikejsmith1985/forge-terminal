@@ -1,0 +1,230 @@
+// Generated portfolio data for the standalone showcase site.
+// Rebuild this file with `node scripts/portfolio/build-portfolio-assets.mjs`.
+
+export const PORTFOLIO_APPS = [
+  {
+    "slug": "forge-terminal",
+    "name": "Forge Terminal",
+    "tagline": "Agentic terminal UX with real PTYs, workflow enforcement, and remote access in one product.",
+    "summary": "Forge Terminal combines a full terminal, AI-assisted workflows, command cards, and secure remote access. The strongest product story is the way product design, local tooling, and developer ergonomics converge into one desktop experience.",
+    "accent": "#5d8cff",
+    "category": "Desktop + web hybrid",
+    "launchSurface": ".\\run-dev-clean.ps1 -Port 9999",
+    "techStack": [
+      "Go",
+      "React",
+      "xterm.js",
+      "Cypress"
+    ],
+    "proofNote": "All three visuals in this section are polished code-rendered mock interfaces built from the implemented product structure and seeded demo content.",
+    "features": [
+      {
+        "id": "multi-tab-terminal",
+        "title": "Multi-tab terminal with command-card acceleration",
+        "wowFactor": "Shows product depth beyond a normal shell wrapper: tabs, saved commands, and quick actions work together as one developer cockpit.",
+        "whatItShows": "A mocked Forge Terminal workspace with four terminal tabs, a workflow-status command running, pinned command cards, and repo health signals visible in one screen.",
+        "mockDataApproach": "The screen uses a fictional benefits-enrollment demo repository, safe workflow-gate output, and generic command cards instead of a real customer workspace.",
+        "capturePlan": "Portfolio Playwright run: navigate to localhost:9999, wait for the app shell to fully render, then screenshot the loaded state.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "instruction-workflow",
+        "title": "Persistent instruction workflow for AI-driven development",
+        "wowFactor": "Shows opinionated UX for repeatable, high-signal AI collaboration — the assistant workflow feels controllable rather than magical.",
+        "whatItShows": "A mocked assistant workflow screen with the user request, Copilot response, workflow gates, and task state presented together so the AI process feels controlled.",
+        "mockDataApproach": "The conversation text, task name, and workflow checklist are portfolio-safe examples that describe this visual rebuild rather than a private development session.",
+        "capturePlan": "Portfolio Playwright run: type a representative safe command into the active terminal tab, then screenshot the typed state.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "tunnel-mobile",
+        "title": "Remote and mobile access setup",
+        "wowFactor": "Demonstrates platform thinking, networking knowledge, and user-centric onboarding — shows the app is designed for real work, not just localhost demos.",
+        "whatItShows": "A mocked remote-access setup screen with a named tunnel, companion PWA handoff, one-time access code, and safety controls displayed in the same flow.",
+        "mockDataApproach": "The hostname, access code, and connection settings are fictional portfolio values that show the intended UX without exposing real network topology.",
+        "capturePlan": "Portfolio Playwright run: paste a safe demo string into the active tab, then screenshot the post-paste state.",
+        "imageKind": "code-rendered"
+      }
+    ]
+  },
+  {
+    "slug": "nodetoolbox",
+    "name": "NodeToolbox",
+    "tagline": "Local-first enterprise delivery workspace that unifies Jira, ServiceNow, GitHub, and reporting.",
+    "summary": "NodeToolbox is the clearest story of product breadth: one application orchestrating planning, reporting, ITSM, and delivery operations behind a localhost proxy. It reads like a serious internal platform, not a toy side project.",
+    "accent": "#1cc88a",
+    "category": "Enterprise operations workspace",
+    "launchSurface": "node server.js",
+    "techStack": [
+      "Node.js",
+      "Express",
+      "React",
+      "Playwright"
+    ],
+    "proofNote": "This section uses mocked UI screens based on the implemented routes, module layout, and enterprise delivery workflows.",
+    "features": [
+      {
+        "id": "home-launcher",
+        "title": "Product launcher that feels like an internal operating system",
+        "wowFactor": "Quickly communicates product breadth and information architecture skill.",
+        "whatItShows": "A mocked launcher screen with delivery modules, connected workstreams, release trains, and open-risk counts organized as a single internal platform.",
+        "mockDataApproach": "The screen uses a fictional HSCS Enrollment Platform workspace with mock program, release-train, and workstream totals.",
+        "capturePlan": "Complete the demo setup flow with safe placeholder values, land on /?demo=1, then capture the home view once the \"Your personal utility belt\" heading is visible.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "sprint-dashboard",
+        "title": "Sprint dashboard for execution, planning, and release readiness",
+        "wowFactor": "Signals enterprise complexity handled through coherent UX.",
+        "whatItShows": "A mocked sprint dashboard with health metrics, priority Jira-style work items, team load, and blocker status visible together.",
+        "mockDataApproach": "The board uses fictional BEN issue keys, sample owners, and safe delivery metrics instead of live Jira or GitHub data.",
+        "capturePlan": "Navigate to /sprint-dashboard?demo=1 and capture once the \"Team Dashboard\" title is rendered.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "snow-hub-art",
+        "title": "Specialist workflow surface: ServiceNow Hub or ART View",
+        "wowFactor": "Shows that the product scales from team execution to cross-program orchestration.",
+        "whatItShows": "A mocked ServiceNow and ART operations hub with incident queues, change windows, release risk, and PI confidence surfaced as product UI.",
+        "mockDataApproach": "The incident IDs, change records, and release-train metrics are fictional samples designed to show the workflow without exposing enterprise systems.",
+        "capturePlan": "Navigate to /snow-hub?demo=1, wait for the \"SNow Hub\" title, and fall back to /art?demo=1 if the ServiceNow surface is unavailable.",
+        "imageKind": "code-rendered"
+      }
+    ]
+  },
+  {
+    "slug": "eztest",
+    "name": "EZTest",
+    "tagline": "AI-assisted behavioral testing companion with a polished browser wizard and Playwright-native workflows.",
+    "summary": "EZTest stands out because it turns test generation, defect capture, and fix validation into a guided product experience. The UI reads more like a polished SaaS wizard than a developer utility.",
+    "accent": "#a66bff",
+    "category": "Developer productivity",
+    "launchSurface": "npm run dev -- ui -p 7433",
+    "techStack": [
+      "TypeScript",
+      "Express",
+      "Socket.io",
+      "Playwright"
+    ],
+    "proofNote": "This section uses mocked UI screens composed from the implemented wizard, dashboard, and run-feedback flows.",
+    "features": [
+      {
+        "id": "onboarding",
+        "title": "Two-step onboarding that explains value without jargon",
+        "wowFactor": "Proves the product is approachable to non-experts, not just power users.",
+        "whatItShows": "A mocked onboarding wizard with project folder, framework detection, provider setup, and ready-to-generate steps shown in plain language.",
+        "mockDataApproach": "The wizard uses a fictional Sample React Checkout project, local demo provider, and safe localhost target URL.",
+        "capturePlan": "Open the wizard root, ensure the onboarding overlay is visible, and capture the screen once the \"Browse for project folder\" button is rendered.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "dashboard-actions",
+        "title": "Action dashboard that frames testing work as outcomes",
+        "wowFactor": "Shows product strategy, not just command execution.",
+        "whatItShows": "A mocked action dashboard where Generate, Record, Fix, Run, MCP Setup, and API Settings are presented as clear testing jobs to be done.",
+        "mockDataApproach": "The summary metrics are seeded with safe fixture values: 12 behaviors, 8 specs, 1 flaky test, and 74% coverage.",
+        "capturePlan": "Reveal the app shell, populate the project summary bar with safe fixture text, and capture once the action-grid and project-summary-bar are visible together.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "run-modal",
+        "title": "Live run modal with progress, logs, and follow-up actions",
+        "wowFactor": "Communicates end-to-end workflow maturity and actionable feedback loops.",
+        "whatItShows": "A mocked run modal with generation logs, created spec files, completion state, and follow-up actions such as opening the report.",
+        "mockDataApproach": "The run transcript references fictional fixture specs only, so the workflow reads realistically without using private project output.",
+        "capturePlan": "Show the run modal with safe pass logs and an \"Open Report\" affordance, then capture once the run-terminal and done-bar are visible.",
+        "imageKind": "code-rendered"
+      }
+    ]
+  },
+  {
+    "slug": "mbl2pc",
+    "name": "MBL2PC",
+    "tagline": "Phone-to-PC messaging experience with uploads, snippets, and personalization in one lightweight app.",
+    "summary": "MBL2PC tells a strong story about end-user empathy: cross-device messaging, quick sharing, and personalization. The local test server makes it ideal for a demo-safe portfolio because the real UI already works with seeded messages.",
+    "accent": "#ff8a4c",
+    "category": "Cross-device utility",
+    "launchSurface": "python test_local.py",
+    "techStack": [
+      "FastAPI",
+      "Python",
+      "HTML",
+      "Cypress"
+    ],
+    "proofNote": "All three visuals in this section are polished code-rendered mock interfaces based on the shipped messaging, search, and theming flows.",
+    "features": [
+      {
+        "id": "chat-dashboard",
+        "title": "Rich chat dashboard with search, pinning, and timeline depth",
+        "wowFactor": "Shows consumer-style UX polish with real utility features.",
+        "whatItShows": "A mocked message dashboard with seeded phone-to-PC messages, quick actions, pinned context, and a polished conversation layout.",
+        "mockDataApproach": "The thread uses a fictional Demo Phone and Product Review conversation with generic notes, links, and handoff actions.",
+        "capturePlan": "Open /send.html on the local test server and capture after the first .bubble element is rendered.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "dark-mode-theme",
+        "title": "Theme system that supports light and dark use comfortably",
+        "wowFactor": "Shows attention to visual polish, readability, and day-to-day usability.",
+        "whatItShows": "A mocked theme settings screen showing dark-mode controls, a live message preview, palette choices, and density settings.",
+        "mockDataApproach": "The theme values are safe portfolio settings such as Midnight Ocean, Coral accent, and Comfortable density.",
+        "capturePlan": "Switch the live page into dark theme, wait for the surface colors to settle, and capture the full messaging viewport.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "search-and-theme",
+        "title": "Search and personalization working together in the same flow",
+        "wowFactor": "Highlights practical utility layered on top of a visually distinctive interface.",
+        "whatItShows": "A mocked search screen with a release-notes query, matching message threads, active palette context, snippets, and file handoff state.",
+        "mockDataApproach": "The search results are fictional product-review, dev-sync, and QA-thread records rather than real messages or device identifiers.",
+        "capturePlan": "Apply the ocean palette, enter a safe search term, and capture the filtered live view.",
+        "imageKind": "code-rendered"
+      }
+    ]
+  },
+  {
+    "slug": "quikeys",
+    "name": "QuiKeys",
+    "tagline": "Secure keyboard automation and credential helper built as a native desktop experience.",
+    "summary": "QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted storage, and operator-focused UX in a compact product that feels genuinely useful.",
+    "accent": "#ff5fa2",
+    "category": "Native desktop utility",
+    "launchSurface": "python src\\main.py",
+    "techStack": [
+      "Python",
+      "Tkinter",
+      "Pillow",
+      "cryptography"
+    ],
+    "proofNote": "All three visuals in this section are polished code-rendered mock windows based on the shipped desktop flows and safe seeded macro data.",
+    "features": [
+      {
+        "id": "unlock-flow",
+        "title": "First-run unlock and secure vault setup",
+        "wowFactor": "Demonstrates security thinking without sacrificing clarity.",
+        "whatItShows": "A mocked native unlock dialog with masked password input, vault location, encryption context, and the trust cues a user needs before opening sensitive macros.",
+        "mockDataApproach": "The vault path, masked password, and encryption state are fictional portfolio values; no real master password or credential value is shown.",
+        "capturePlan": "Start QuiKeys via python src\\main.py with PORTFOLIO_VAULT pointing at the seeded demo vault and isVaultUnlocked=false. Wait for the unlock window to appear (poll window title for \"QuiKeys\" or \"Unlock\"). Capture the full window bounds. Do not enter the password — the locked state is the story.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "macro-manager",
+        "title": "Macro manager for operational shortcuts and guarded secrets",
+        "wowFactor": "Shows a power-user table workflow with strong utility value.",
+        "whatItShows": "A mocked macro table with names, hotkeys, triggers, categories, actions, and a masked token row so the desktop workflow reads like a real power-user manager.",
+        "mockDataApproach": "The table uses fictional Development, Communication, DevOps, and Credentials rows; the token-like value is deliberately masked with bullets.",
+        "capturePlan": "Start QuiKeys with isVaultUnlocked=true and the full seeded macro list. Wait for the main manager window to appear. Ensure the macro table is scrolled to the top so all six rows are visible (or as many as fit without scrolling). Capture the full window bounds.",
+        "imageKind": "code-rendered"
+      },
+      {
+        "id": "macro-dialog",
+        "title": "Add and edit dialog for secure automation rules",
+        "wowFactor": "Shows detail-oriented form design inside a desktop app.",
+        "whatItShows": "A mocked add/edit dialog with name, safe command text, hotkey, text trigger, category, and masking choice visible before the user saves the automation.",
+        "mockDataApproach": "The dialog is prefilled with a fictional Build and Test macro using a safe npm command, not a password, token, or private shortcut.",
+        "capturePlan": "Start QuiKeys with the vault unlocked and open the add/edit dialog programmatically (via PORTFOLIO_OPEN_DIALOG=add environment variable if the build supports it, otherwise trigger the \"Add\" button via the OS accessibility API). Wait for the dialog window to appear. Let the PORTFOLIO_PREFILL_MACRO values populate. Capture the dialog window bounds.",
+        "imageKind": "code-rendered"
+      }
+    ]
+  }
+];
