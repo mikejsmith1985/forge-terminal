@@ -24,13 +24,13 @@ export const QUIKEYS_ENTRY_POINT = 'src\\main.py';
 export const QUIKEYS_SLUG = 'quikeys';
 
 // Accent colour that must match the value in web/portfolio/data/apps.mjs so
-// storyboard SVGs produced from this config stay visually consistent.
+// source-derived PNG replicas produced from this config stay visually consistent.
 export const QUIKEYS_ACCENT_COLOUR = '#ff5fa2';
 
 // ── Screenshot Strategy ────────────────────────────────────────────────────────
 
 // QuiKeys renders native Tkinter windows. Playwright and Cypress cannot reach
-// those windows, so the capture pipeline uses a NATIVE DESKTOP strategy instead:
+// those windows, so the capture pipeline uses a SOURCE-DERIVED REPLICA strategy instead:
 //
 //   1. The capture helper launches `python src\main.py` with the PORTFOLIO_VAULT
 //      environment variable pointing at the seeded demo vault file.
@@ -39,15 +39,15 @@ export const QUIKEYS_ACCENT_COLOUR = '#ff5fa2';
 //   3. Once the correct window title is confirmed, it calls the OS screenshot
 //      API (mss or PIL.ImageGrab) cropped to that window's bounding rectangle.
 //   4. The resulting PNG is saved under web/portfolio/assets/quikeys/ so the
-//      shared build-portfolio-assets.mjs runner can copy it alongside the
-//      storyboard SVG fallbacks.
+//      shared build-portfolio-assets.mjs runner can publish it directly.
 //
-// IMPORTANT: do not attempt Playwright or Cypress automation against QuiKeys.
-// Those tools inject into a browser context. QuiKeys has no browser context.
+// IMPORTANT: do not attempt Cypress automation against QuiKeys. The portfolio
+// capture runner renders a browser PNG replica from the Tkinter layouts and
+// seeded macro data below so no native desktop automation is required.
 export const SCREENSHOT_STRATEGY = {
   // Signals to the runner that this app needs the native-desktop path, not
   // the browser-based Playwright/Cypress path used by other portfolio apps.
-  captureMethod: 'native-desktop',
+  captureMethod: 'source-derived-replica',
 
   // Python-based screen capture library preferred by the capture helper.
   // Pillow (PIL.ImageGrab) is already a QuiKeys dependency, so no extra
@@ -360,8 +360,7 @@ export const QUIKEYS_APP = {
   launchSurface: 'python src\\main.py',
   techStack: ['Python', 'Tkinter', 'Pillow', 'cryptography'],
   proofNote:
-    'All three visuals in this section are polished code-rendered mock windows based on the shipped ' +
-    'desktop flows and safe seeded macro data.',
+    'All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded macro data.',
   features: WOW_MOMENTS.map((wowMoment) => ({
     id: wowMoment.id,
     title: wowMoment.title,
@@ -369,7 +368,8 @@ export const QUIKEYS_APP = {
     whatItShows: wowMoment.whatItShows,
     mockDataApproach: wowMoment.mockDataApproach,
     capturePlan: wowMoment.capturePlan,
-    imageKind: 'code-rendered',
+    imageKind: 'source-derived-replica',
+    imagePath: `./assets/quikeys/quikeys-${wowMoment.id}.png`,
   })),
 };
 
@@ -378,7 +378,7 @@ export const QUIKEYS_PORTFOLIO_CONFIG = {
   name: 'QuiKeys',
   localRepoPath: QUIKEYS_REPO_PATH,
   outputDirPath: 'web/portfolio/assets/quikeys',
-  captureToolchain: 'native-desktop',
+  captureToolchain: 'playwright-source-derived',
   launchStrategy: {
     localRepoPath: QUIKEYS_REPO_PATH,
     command: `python ${QUIKEYS_ENTRY_POINT}`,

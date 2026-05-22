@@ -16,7 +16,7 @@ export const NODE_TOOLBOX_APP = {
   launchSurface: 'node server.js',
   techStack: ['Node.js', 'Express', 'React', 'Playwright'],
   proofNote:
-    'This section uses mocked UI screens based on the implemented routes, module layout, and enterprise delivery workflows.',
+    'This section uses PNG source-derived replicas based on the implemented routes, module layout, and enterprise delivery workflows.',
   features: [
     {
       id: 'home-launcher',
@@ -27,8 +27,9 @@ export const NODE_TOOLBOX_APP = {
       mockDataApproach:
         'The screen uses a fictional HSCS Enrollment Platform workspace with mock program, release-train, and workstream totals.',
       capturePlan:
-        'Complete the demo setup flow with safe placeholder values, land on /?demo=1, then capture the home view once the "Your personal utility belt" heading is visible.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders a source-derived home launcher PNG from the implemented Home route card catalog and safe workspace metrics.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/nodetoolbox/nodetoolbox-home-launcher.png',
     },
     {
       id: 'sprint-dashboard',
@@ -39,8 +40,9 @@ export const NODE_TOOLBOX_APP = {
       mockDataApproach:
         'The board uses fictional BEN issue keys, sample owners, and safe delivery metrics instead of live Jira or GitHub data.',
       capturePlan:
-        'Navigate to /sprint-dashboard?demo=1 and capture once the "Team Dashboard" title is rendered.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders a source-derived Team Dashboard PNG from the implemented dashboard tabs, Jira issue shape, and safe sprint metrics.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/nodetoolbox/nodetoolbox-sprint-dashboard.png',
     },
     {
       id: 'snow-hub-art',
@@ -51,8 +53,9 @@ export const NODE_TOOLBOX_APP = {
       mockDataApproach:
         'The incident IDs, change records, and release-train metrics are fictional samples designed to show the workflow without exposing enterprise systems.',
       capturePlan:
-        'Navigate to /snow-hub?demo=1, wait for the "SNow Hub" title, and fall back to /art?demo=1 if the ServiceNow surface is unavailable.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders a source-derived SNow Hub and ART PNG from the implemented operations routes and safe incident/change data.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/nodetoolbox/nodetoolbox-snow-hub-art.png',
     },
   ],
 };

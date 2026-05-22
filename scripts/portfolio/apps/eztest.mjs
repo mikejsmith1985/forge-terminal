@@ -16,7 +16,7 @@ export const EZTEST_APP = {
   launchSurface: 'npm run dev -- ui -p 7433',
   techStack: ['TypeScript', 'Express', 'Socket.io', 'Playwright'],
   proofNote:
-    'This section uses mocked UI screens composed from the implemented wizard, dashboard, and run-feedback flows.',
+    'This section uses PNG source-derived replicas composed from the implemented wizard, dashboard, and run-feedback flows.',
   features: [
     {
       id: 'onboarding',
@@ -27,8 +27,9 @@ export const EZTEST_APP = {
       mockDataApproach:
         'The wizard uses a fictional Sample React Checkout project, local demo provider, and safe localhost target URL.',
       capturePlan:
-        'Open the wizard root, ensure the onboarding overlay is visible, and capture the screen once the "Browse for project folder" button is rendered.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders a source-derived onboarding PNG from the implemented wizard steps and safe project-detection data.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/eztest/eztest-onboarding.png',
     },
     {
       id: 'dashboard-actions',
@@ -39,8 +40,9 @@ export const EZTEST_APP = {
       mockDataApproach:
         'The summary metrics are seeded with safe fixture values: 12 behaviors, 8 specs, 1 flaky test, and 74% coverage.',
       capturePlan:
-        'Reveal the app shell, populate the project summary bar with safe fixture text, and capture once the action-grid and project-summary-bar are visible together.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders a source-derived dashboard PNG from the implemented action grid and safe project summary data.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/eztest/eztest-dashboard-actions.png',
     },
     {
       id: 'run-modal',
@@ -51,8 +53,9 @@ export const EZTEST_APP = {
       mockDataApproach:
         'The run transcript references fictional fixture specs only, so the workflow reads realistically without using private project output.',
       capturePlan:
-        'Show the run modal with safe pass logs and an "Open Report" affordance, then capture once the run-terminal and done-bar are visible.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders a source-derived run-modal PNG from the implemented terminal feedback flow and safe generated-spec transcript.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/eztest/eztest-run-modal.png',
     },
   ],
 };

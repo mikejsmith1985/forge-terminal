@@ -1,295 +1,47 @@
-// Builds screen-level mocked UI assets and standalone data for the portfolio site.
+// Builds PNG-only portfolio visuals and standalone data for the employer-facing showcase.
 
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 
-import { PORTFOLIO_APP_DEFINITIONS } from './apps/index.mjs';
+import {
+  PORTFOLIO_APP_DEFINITIONS,
+  PORTFOLIO_CAPTURE_CONFIGS,
+} from './apps/index.mjs';
+
+const require = createRequire(import.meta.url);
 
 const PROJECT_ROOT = process.cwd();
-const GENERATED_ASSET_DIRECTORY = path.join(PROJECT_ROOT, 'web', 'portfolio', 'assets', 'generated');
+const PORTFOLIO_ASSET_DIRECTORY = path.join(PROJECT_ROOT, 'web', 'portfolio', 'assets');
+const GENERATED_SVG_DIRECTORY = path.join(PORTFOLIO_ASSET_DIRECTORY, 'generated');
 const PORTFOLIO_DATA_DIRECTORY = path.join(PROJECT_ROOT, 'web', 'portfolio', 'data');
 const PORTFOLIO_DATA_FILE_PATH = path.join(PORTFOLIO_DATA_DIRECTORY, 'apps.mjs');
-const MOCK_SCREEN_WIDTH = 1600;
-const MOCK_SCREEN_HEIGHT = 1040;
+const NODE_TOOLBOX_PLAYWRIGHT_PATH = 'C:\\ProjectsWin\\NodeToolbox\\node_modules\\playwright';
+const MBL2PC_CAPTURE_DIRECTORY = 'C:\\ProjectsWin\\mbl2pc\\portfolio_screenshots';
+const DESKTOP_SCREEN_WIDTH = 1600;
+const DESKTOP_SCREEN_HEIGHT = 1000;
+const QUIKEYS_SCREEN_WIDTH = 1280;
+const QUIKEYS_SCREEN_HEIGHT = 820;
+const MBL2PC_ASSET_SOURCES = new Map([
+  ['chat-dashboard', '01_chat_messages_light.png'],
+  ['dark-mode-theme', '02_chat_dark_mode.png'],
+  ['search-and-theme', '03_ocean_theme_search.png'],
+]);
 
-const MOCK_UI_SCENES = {
-  'forge-terminal:multi-tab-terminal': {
-    shellKind: 'terminal',
-    windowTitle: 'Forge Terminal - C:\\ProjectsWin\\forge-terminal',
-    activeNavigationItem: 'Terminal',
-    navigationItems: ['Terminal', 'Command Cards', 'Agents', 'Git', 'Workflow'],
-    screenTitle: 'Multi-tab terminal workspace',
-    screenSubtitle: 'A seeded development session with multiple tabs, command cards, and repo health visible together.',
-    sampleDataNote: 'Mock repo: rootlevellabs/benefits-enrollment-demo · Branch: feature/portfolio-showcase',
-    components: [
-      { type: 'tabs', title: 'Open terminal tabs', items: ['PowerShell - API', 'Node UI', 'Test Runner', 'Release Notes'] },
-      {
-        type: 'terminal',
-        title: 'PowerShell - API',
-        lines: [
-          'PS C:\\ProjectsWin\\benefits-enrollment-demo> forge workflow status',
-          '[OK] branch-created     feature/portfolio-showcase',
-          '[OK] tests-written      portfolio-data.test.mjs',
-          '[RUNNING] tests-passed  go test ./... && npx vitest run',
-          'Next: publish static portfolio preview',
-        ],
-      },
-      {
-        type: 'commandCards',
-        title: 'Pinned command cards',
-        items: [
-          ['Run regression pack', 'go test ./... + vitest'],
-          ['Open PR checklist', 'Branch, tests, changelog'],
-          ['Publish GitHub Pages', 'portfolio static deploy'],
-        ],
-      },
-      { type: 'metrics', title: 'Session signals', items: [['Open PTYs', '4'], ['Command cards', '12'], ['Workflow gates', '3/3'], ['Repo health', 'Green']] },
-    ],
-  },
-  'forge-terminal:instruction-workflow': {
-    shellKind: 'browser',
-    windowTitle: 'Forge Terminal - AI workflow',
-    activeNavigationItem: 'Assistant',
-    navigationItems: ['Terminal', 'Assistant', 'Plan', 'Review', 'Tutor'],
-    screenTitle: 'Persistent instruction workflow',
-    screenSubtitle: 'The mocked screen shows how instructions, task state, and terminal output stay connected during agentic development.',
-    sampleDataNote: 'Mock task: rebuild portfolio visuals · Agent mode: workflow-enforced',
-    components: [
-      {
-        type: 'conversation',
-        title: 'Assistant thread',
-        items: [
-          ['User', 'Build portfolio cards that show mocked app UI with seeded data.'],
-          ['Copilot', 'Creating screen-level mockups for each feature card.'],
-          ['Copilot', 'Portfolio tests will confirm every asset is generated and unique.'],
-        ],
-      },
-      { type: 'checklist', title: 'Workflow gates', items: ['Feature branch confirmed', 'Screen mockup generator updated', 'Portfolio data tests queued', 'Pages publish pending'] },
-      { type: 'callout', title: 'In action', body: 'A reviewer can see the AI workflow being controlled by explicit gates rather than a loose chat transcript.' },
-    ],
-  },
-  'forge-terminal:tunnel-mobile': {
-    shellKind: 'browser',
-    windowTitle: 'Forge Terminal - Remote access setup',
-    activeNavigationItem: 'Remote Access',
-    navigationItems: ['Terminal', 'Remote Access', 'Vault', 'Mobile', 'Settings'],
-    screenTitle: 'Remote and mobile access setup',
-    screenSubtitle: 'A safe tunnel setup screen with a companion handoff, connection method, and security controls.',
-    sampleDataNote: 'Mock tunnel: portfolio-demo.trycloudflare.com · One-time code: FT-2048',
-    components: [
-      { type: 'statusSteps', title: 'Connection method', items: ['Named tunnel selected', 'Companion PWA enabled', 'QR token generated', 'Clipboard sanitizer active'] },
-      { type: 'phone', title: 'Mobile companion preview', messages: ['Scan QR', 'Join Portfolio Demo', 'Terminal session ready', 'Clipboard handoff enabled'] },
-      { type: 'settings', title: 'Safety controls', items: [['Hostname', 'portfolio-demo.trycloudflare.com'], ['Token lifetime', '10 minutes'], ['Access mode', 'Read/write PTY'], ['Vault injection', 'Disabled']] },
-    ],
-  },
-  'nodetoolbox:home-launcher': {
-    shellKind: 'browser',
-    windowTitle: 'NodeToolbox - Home',
-    activeNavigationItem: 'Home',
-    navigationItems: ['Home', 'Sprint', 'Reports', 'ServiceNow', 'ART View'],
-    screenTitle: 'Internal platform launcher',
-    screenSubtitle: 'A realistic landing page that organizes delivery modules like a cohesive internal operating system.',
-    sampleDataNote: 'Mock workspace: HSCS Enrollment Platform · PI: 2026-Q2',
-    components: [
-      {
-        type: 'launcher',
-        title: 'Utility belt modules',
-        items: [
-          ['Sprint Dashboard', 'Plan and inspect active sprint health'],
-          ['Reports Hub', 'Create executive delivery summaries'],
-          ['ServiceNow Hub', 'Track incidents, changes, and hygiene'],
-          ['ART View', 'Roll up release-train commitments'],
-          ['GitHub Insights', 'Review PR and defect flow'],
-          ['My Issues', 'Focus the individual operator view'],
-        ],
-      },
-      { type: 'metrics', title: 'Mock team snapshot', items: [['Programs', '3'], ['Workstreams', '11'], ['Release trains', '2'], ['Open risks', '5']] },
-    ],
-  },
-  'nodetoolbox:sprint-dashboard': {
-    shellKind: 'browser',
-    windowTitle: 'NodeToolbox - Sprint Dashboard',
-    activeNavigationItem: 'Sprint',
-    navigationItems: ['Home', 'Sprint', 'Capacity', 'Risks', 'Defects'],
-    screenTitle: 'Sprint execution dashboard',
-    screenSubtitle: 'Sprint health, capacity, blockers, and delivery risks are mocked as one high-signal operating view.',
-    sampleDataNote: 'Mock board: Enrollment API Team · Sprint 24.6 · 86% sprint goal confidence',
-    components: [
-      { type: 'metrics', title: 'Sprint health', items: [['Goal confidence', '86%'], ['Blocked stories', '4'], ['Open defects', '7'], ['Carryover risk', 'Medium']] },
-      {
-        type: 'table',
-        title: 'Priority work',
-        columns: ['Key', 'Summary', 'Owner', 'Status'],
-        rows: [
-          ['BEN-1421', 'Eligibility rule sync', 'A. Rivera', 'In review'],
-          ['BEN-1440', 'Enrollment retry audit', 'M. Chen', 'Blocked'],
-          ['BEN-1452', 'API latency dashboard', 'J. Patel', 'Ready QA'],
-        ],
-      },
-      { type: 'progressList', title: 'Team load', items: [['Backend', '72'], ['Frontend', '64'], ['QA', '58'], ['DevOps', '41']] },
-    ],
-  },
-  'nodetoolbox:snow-hub-art': {
-    shellKind: 'browser',
-    windowTitle: 'NodeToolbox - ServiceNow Hub',
-    activeNavigationItem: 'ServiceNow',
-    navigationItems: ['Home', 'ServiceNow', 'ART View', 'Change Windows', 'Reports'],
-    screenTitle: 'ServiceNow and ART operating hub',
-    screenSubtitle: 'Cross-program work is shown as queues, change windows, and release-train signals instead of scattered status links.',
-    sampleDataNote: 'Mock data: 2 Sev-2 incidents · 7 change windows · PI confidence 4.6/5',
-    components: [
-      {
-        type: 'kanban',
-        title: 'Operational queue',
-        columns: [
-          ['Triage', ['INC-4021 Enrollment timeout', 'INC-4035 Batch warning']],
-          ['In progress', ['CHG-1182 Policy sync', 'TASK-552 Data cleanup']],
-          ['Ready for CAB', ['CHG-1201 Release approval']],
-        ],
-      },
-      { type: 'metrics', title: 'Program signals', items: [['Sev-2 items', '2'], ['Change windows', '7'], ['PI confidence', '4.6/5'], ['Release risk', 'Low']] },
-    ],
-  },
-  'eztest:onboarding': {
-    shellKind: 'browser',
-    windowTitle: 'EZTest - Onboarding',
-    activeNavigationItem: 'Setup',
-    navigationItems: ['Setup', 'Generate', 'Record', 'Run', 'Reports'],
-    screenTitle: 'Guided testing onboarding',
-    screenSubtitle: 'A first-run wizard with plain-language setup, framework detection, and provider configuration.',
-    sampleDataNote: 'Mock project: Sample React Checkout · Provider: Local demo model',
-    components: [
-      { type: 'wizard', title: 'Project setup', steps: ['Project folder', 'Framework detected', 'AI provider', 'Ready to generate'], activeStep: 'Framework detected' },
-      { type: 'form', title: 'Detected project details', rows: [['Project folder', 'C:\\Repos\\sample-checkout'], ['Framework', 'React + Vite'], ['Test runner', 'Playwright'], ['Target URL', 'http://localhost:5173']] },
-      { type: 'callout', title: 'In action', body: 'The mocked screen shows a non-expert path from folder selection to a runnable test plan without exposing a real repository.' },
-    ],
-  },
-  'eztest:dashboard-actions': {
-    shellKind: 'browser',
-    windowTitle: 'EZTest - Dashboard',
-    activeNavigationItem: 'Dashboard',
-    navigationItems: ['Dashboard', 'Generate', 'Record', 'Fix', 'Runs'],
-    screenTitle: 'Outcome-oriented test dashboard',
-    screenSubtitle: 'The mocked UI frames testing work as product actions rather than raw command-line operations.',
-    sampleDataNote: 'Mock scan: 12 behaviors mapped · 8 existing specs · Last run 2 minutes ago',
-    components: [
-      {
-        type: 'launcher',
-        title: 'Testing jobs to be done',
-        items: [
-          ['Generate Tests', 'Create specs from discovered behavior'],
-          ['Record Flow', 'Capture a user journey'],
-          ['Fix Failures', 'Convert errors into repair tasks'],
-          ['Run Suite', 'Execute and report'],
-          ['MCP Setup', 'Connect automation tools'],
-          ['API Settings', 'Manage provider settings'],
-        ],
-      },
-      { type: 'metrics', title: 'Project summary', items: [['Behaviors', '12'], ['Specs', '8'], ['Flaky tests', '1'], ['Coverage', '74%']] },
-    ],
-  },
-  'eztest:run-modal': {
-    shellKind: 'browser',
-    windowTitle: 'EZTest - Run Modal',
-    activeNavigationItem: 'Run',
-    navigationItems: ['Dashboard', 'Generate', 'Run', 'Reports', 'Settings'],
-    screenTitle: 'Live generation and run feedback',
-    screenSubtitle: 'A modal run state shows progress, logs, generated files, and follow-up actions in one place.',
-    sampleDataNote: 'Mock run: generated 3 Playwright specs from a fixture checkout app',
-    components: [
-      { type: 'modalLog', title: 'Playwright generation run', lines: ['Analyzing interaction graph...', 'Mapped 8 components with event coverage', 'Created sign-in.spec.ts', 'Created cart-checkout.spec.ts', 'Created profile-update.spec.ts', 'Generation complete - 3 tests ready'] },
-      { type: 'statusSteps', title: 'Follow-up actions', items: ['Open HTML report', 'Review generated specs', 'Run changed tests only', 'Create fix task'] },
-    ],
-  },
-  'mbl2pc:chat-dashboard': {
-    shellKind: 'mobile',
-    windowTitle: 'MBL2PC - Messages',
-    activeNavigationItem: 'Messages',
-    navigationItems: ['Messages', 'Clipboard', 'Snippets', 'Files', 'Themes'],
-    screenTitle: 'Cross-device messaging dashboard',
-    screenSubtitle: 'Seeded messages, quick actions, and pinned items make the utility feel ready for daily use.',
-    sampleDataNote: 'Mock device: Demo Phone · Thread: Product Review',
-    components: [
-      { type: 'chat', title: 'Product Review', messages: [['received', 'Design review starts in 10 minutes.'], ['sent', 'Sending the updated deck now.'], ['received', 'Include the companion notes too.'], ['sent', 'Done - pinned for the team.']] },
-      { type: 'statusSteps', title: 'Quick actions', items: ['Send clipboard', 'Upload file', 'Pin thread', 'Search messages'] },
-    ],
-  },
-  'mbl2pc:dark-mode-theme': {
-    shellKind: 'mobile',
-    windowTitle: 'MBL2PC - Theme Settings',
-    activeNavigationItem: 'Themes',
-    navigationItems: ['Messages', 'Clipboard', 'Snippets', 'Files', 'Themes'],
-    screenTitle: 'Theme system and personalization',
-    screenSubtitle: 'The mocked settings panel shows dark-mode choices while preserving the message preview.',
-    sampleDataNote: 'Mock theme: Midnight Ocean · Accent: Coral · Density: Comfortable',
-    components: [
-      { type: 'settings', title: 'Theme controls', items: [['Mode', 'Dark'], ['Palette', 'Midnight Ocean'], ['Bubble style', 'Rounded'], ['Density', 'Comfortable']] },
-      { type: 'chat', title: 'Live preview', messages: [['received', 'Dark mode looks sharp.'], ['sent', 'Contrast passes the review checklist.']] },
-      { type: 'palette', title: 'Available palettes', items: ['Midnight', 'Ocean', 'Forest', 'Rose'] },
-    ],
-  },
-  'mbl2pc:search-and-theme': {
-    shellKind: 'mobile',
-    windowTitle: 'MBL2PC - Search',
-    activeNavigationItem: 'Search',
-    navigationItems: ['Messages', 'Search', 'Snippets', 'Files', 'Themes'],
-    screenTitle: 'Search and personalization flow',
-    screenSubtitle: 'Search results, snippets, and theme context are visible in the same mocked workflow.',
-    sampleDataNote: 'Mock search: "release notes" · 3 matching threads',
-    components: [
-      { type: 'searchResults', title: 'Search: release notes', rows: ['Product Review - release notes pinned', 'Dev Sync - release package checklist', 'QA Thread - notes sent to laptop'] },
-      { type: 'settings', title: 'Active context', items: [['Palette', 'Ocean'], ['Snippets', '5 saved'], ['Clipboard', 'Ready'], ['File handoff', 'Enabled']] },
-    ],
-  },
-  'quikeys:unlock-flow': {
-    shellKind: 'desktop',
-    windowTitle: 'QuiKeys - Unlock',
-    activeNavigationItem: 'Vault',
-    navigationItems: ['Vault', 'Macros', 'Security', 'Settings'],
-    screenTitle: 'Secure first-run unlock',
-    screenSubtitle: 'A native-style unlock dialog communicates local encryption and a clear path into the app.',
-    sampleDataNote: 'Mock vault: portfolio-demo.vault · No real credentials displayed',
-    components: [
-      { type: 'form', title: 'Unlock encrypted vault', rows: [['Master password', '••••••••••'], ['Remember session', 'Off'], ['Vault location', '%TEMP%\\portfolio-demo.vault'], ['Encryption', 'AES-256 local vault']] },
-      { type: 'callout', title: 'Security cue', body: 'The mocked screen demonstrates that sensitive macro data starts behind an intentional unlock step.' },
-    ],
-  },
-  'quikeys:macro-manager': {
-    shellKind: 'desktop',
-    windowTitle: 'QuiKeys - Macro Manager',
-    activeNavigationItem: 'Macros',
-    navigationItems: ['Vault', 'Macros', 'Categories', 'Hotkeys', 'Audit'],
-    screenTitle: 'Macro manager with guarded values',
-    screenSubtitle: 'A management screen with hotkeys, triggers, categories, and masked secret rows.',
-    sampleDataNote: 'Mock vault rows: 6 fictional macros · API token row is masked',
-    components: [
-      {
-        type: 'table',
-        title: 'Saved macros',
-        columns: ['Name', 'Hotkey', 'Trigger', 'Category', 'Value'],
-        rows: [
-          ['Build Check', 'Ctrl+Shift+B', ':build:', 'Development', 'npm run build && npm test'],
-          ['Work Email', 'Ctrl+Shift+2', ':work:', 'Communication', 'm.smith@example.com'],
-          ['Demo API Token', 'Ctrl+Shift+9', ':token:', 'Credentials', '••••••••••••'],
-          ['Release Note', 'Ctrl+Shift+R', ':release:', 'DevOps', 'Draft release summary'],
-        ],
-      },
-      { type: 'statusSteps', title: 'Available actions', items: ['Add macro', 'Edit selected', 'Delete selected', 'Lock vault'] },
-    ],
-  },
-  'quikeys:macro-dialog': {
-    shellKind: 'desktop',
-    windowTitle: 'QuiKeys - Add Macro',
-    activeNavigationItem: 'Editor',
-    navigationItems: ['Vault', 'Macros', 'Editor', 'Hotkeys'],
-    screenTitle: 'Add/edit automation rule',
-    screenSubtitle: 'The mocked dialog shows how a user defines shortcut text, trigger, hotkey, masking, and category.',
-    sampleDataNote: 'Mock macro: Build and Test · Value: npm run build && npm test',
-    components: [
-      { type: 'form', title: 'Macro details', rows: [['Name', 'Build and Test'], ['Text / secret', 'npm run build && npm test'], ['Hotkey', 'Ctrl+Shift+B'], ['Text trigger', ':build:'], ['Category', 'Development'], ['Mask value', 'No']] },
-      { type: 'callout', title: 'In action', body: 'The screen makes the automation rule visible before saving, which is what a hiring manager needs to understand the product flow quickly.' },
-    ],
-  },
+const SOURCE_DERIVED_SCREEN_BUILDERS = {
+  'forge-terminal:multi-tab-terminal': createForgeTerminalWorkspaceScreen,
+  'forge-terminal:instruction-workflow': createForgeInstructionWorkflowScreen,
+  'forge-terminal:tunnel-mobile': createForgeTunnelScreen,
+  'nodetoolbox:home-launcher': createNodeToolboxHomeScreen,
+  'nodetoolbox:sprint-dashboard': createNodeToolboxSprintScreen,
+  'nodetoolbox:snow-hub-art': createNodeToolboxOperationsScreen,
+  'eztest:onboarding': createEztestOnboardingScreen,
+  'eztest:dashboard-actions': createEztestDashboardScreen,
+  'eztest:run-modal': createEztestRunModalScreen,
+  'quikeys:unlock-flow': createQuiKeysUnlockScreen,
+  'quikeys:macro-manager': createQuiKeysManagerScreen,
+  'quikeys:macro-dialog': createQuiKeysDialogScreen,
 };
 
 function escapeHtml(value) {
@@ -300,328 +52,719 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
-function ensureSceneExists(portfolioApp, portfolioFeature) {
-  const sceneKey = `${portfolioApp.slug}:${portfolioFeature.id}`;
-  const mockUiScene = MOCK_UI_SCENES[sceneKey];
+function createPngImagePath(portfolioApp, portfolioFeature) {
+  return `./assets/${portfolioApp.slug}/${portfolioApp.slug}-${portfolioFeature.id}.png`;
+}
 
-  if (!mockUiScene) {
-    throw new Error(`No mocked UI screen is defined for ${sceneKey}.`);
+function createBrowser() {
+  if (!fsSync.existsSync(path.join(NODE_TOOLBOX_PLAYWRIGHT_PATH, 'package.json'))) {
+    throw new Error(
+      `Playwright is required at ${NODE_TOOLBOX_PLAYWRIGHT_PATH}. Run npm install in C:\\ProjectsWin\\NodeToolbox first.`,
+    );
   }
 
-  return mockUiScene;
+  const { chromium } = require(NODE_TOOLBOX_PLAYWRIGHT_PATH);
+  return chromium.launch({ headless: true });
 }
 
-function createNavigationMarkup(mockUiScene) {
-  return mockUiScene.navigationItems.map((navigationItem) => {
-    const activeClassName = navigationItem === mockUiScene.activeNavigationItem ? ' mock-ui-navigation-item--active' : '';
-    return `<div class="mock-ui-navigation-item${activeClassName}">${escapeHtml(navigationItem)}</div>`;
-  }).join('');
-}
+function getCaptureConfig(portfolioAppSlug) {
+  const captureConfig = PORTFOLIO_CAPTURE_CONFIGS.find(
+    (candidateConfig) => candidateConfig.slug === portfolioAppSlug,
+  );
 
-function createMetricMarkup(componentDefinition) {
-  const metricsMarkup = componentDefinition.items.map(([metricLabel, metricValue]) => `
-    <div class="mock-ui-metric">
-      <span>${escapeHtml(metricLabel)}</span>
-      <strong>${escapeHtml(metricValue)}</strong>
-    </div>
-  `).join('');
-
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-metrics">${metricsMarkup}</div></section>`;
-}
-
-function createTerminalMarkup(componentDefinition) {
-  const terminalLineMarkup = componentDefinition.lines.map((terminalLine) => `<div class="mock-ui-terminal-line">${escapeHtml(terminalLine)}</div>`).join('');
-  return `<section class="mock-ui-panel mock-ui-panel--wide mock-ui-terminal"><h3>${escapeHtml(componentDefinition.title)}</h3>${terminalLineMarkup}</section>`;
-}
-
-function createLauncherMarkup(componentDefinition) {
-  const launcherMarkup = componentDefinition.items.map(([launcherTitle, launcherDescription]) => `
-    <div class="mock-ui-launch-card">
-      <strong>${escapeHtml(launcherTitle)}</strong>
-      <span>${escapeHtml(launcherDescription)}</span>
-    </div>
-  `).join('');
-
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-launch-grid">${launcherMarkup}</div></section>`;
-}
-
-function createCommandCardMarkup(componentDefinition) {
-  const commandCardMarkup = componentDefinition.items.map(([commandTitle, commandDescription]) => `
-    <div class="mock-ui-command-card">
-      <strong>${escapeHtml(commandTitle)}</strong>
-      <span>${escapeHtml(commandDescription)}</span>
-    </div>
-  `).join('');
-
-  return `<section class="mock-ui-panel"><h3>${escapeHtml(componentDefinition.title)}</h3>${commandCardMarkup}</section>`;
-}
-
-function createSimpleListMarkup(componentDefinition, className) {
-  const listMarkup = componentDefinition.items.map((listItem) => `<li>${escapeHtml(listItem)}</li>`).join('');
-  return `<section class="mock-ui-panel ${className}"><h3>${escapeHtml(componentDefinition.title)}</h3><ul>${listMarkup}</ul></section>`;
-}
-
-function createSettingsMarkup(componentDefinition) {
-  const settingsRowsMarkup = componentDefinition.items.map(([settingLabel, settingValue]) => `
-    <div class="mock-ui-setting-row">
-      <span>${escapeHtml(settingLabel)}</span>
-      <strong>${escapeHtml(settingValue)}</strong>
-    </div>
-  `).join('');
-
-  return `<section class="mock-ui-panel"><h3>${escapeHtml(componentDefinition.title)}</h3>${settingsRowsMarkup}</section>`;
-}
-
-function createTableMarkup(componentDefinition) {
-  const tableHeaderMarkup = componentDefinition.columns.map((tableColumn) => `<span>${escapeHtml(tableColumn)}</span>`).join('');
-  const tableRowMarkup = componentDefinition.rows.map((tableRow) => `
-    <div class="mock-ui-table-row">${tableRow.map((tableCell) => `<span>${escapeHtml(tableCell)}</span>`).join('')}</div>
-  `).join('');
-
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-table mock-ui-table--${componentDefinition.columns.length}"><div class="mock-ui-table-header">${tableHeaderMarkup}</div>${tableRowMarkup}</div></section>`;
-}
-
-function createProgressMarkup(componentDefinition) {
-  const progressRowsMarkup = componentDefinition.items.map(([progressLabel, progressValue]) => `
-    <div class="mock-ui-progress-row">
-      <div><span>${escapeHtml(progressLabel)}</span><strong>${escapeHtml(progressValue)}%</strong></div>
-      <div class="mock-ui-progress-track"><span style="width:${escapeHtml(progressValue)}%"></span></div>
-    </div>
-  `).join('');
-
-  return `<section class="mock-ui-panel"><h3>${escapeHtml(componentDefinition.title)}</h3>${progressRowsMarkup}</section>`;
-}
-
-function createKanbanMarkup(componentDefinition) {
-  const kanbanColumnMarkup = componentDefinition.columns.map(([columnTitle, columnItems]) => `
-    <div class="mock-ui-kanban-column">
-      <strong>${escapeHtml(columnTitle)}</strong>
-      ${columnItems.map((columnItem) => `<span>${escapeHtml(columnItem)}</span>`).join('')}
-    </div>
-  `).join('');
-
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-kanban">${kanbanColumnMarkup}</div></section>`;
-}
-
-function createWizardMarkup(componentDefinition) {
-  const stepMarkup = componentDefinition.steps.map((stepTitle) => {
-    const activeClassName = stepTitle === componentDefinition.activeStep ? ' mock-ui-step--active' : '';
-    return `<div class="mock-ui-step${activeClassName}">${escapeHtml(stepTitle)}</div>`;
-  }).join('');
-
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-steps">${stepMarkup}</div></section>`;
-}
-
-function createFormMarkup(componentDefinition) {
-  const formRowsMarkup = componentDefinition.rows.map(([fieldLabel, fieldValue]) => `
-    <label class="mock-ui-form-row">
-      <span>${escapeHtml(fieldLabel)}</span>
-      <strong>${escapeHtml(fieldValue)}</strong>
-    </label>
-  `).join('');
-
-  return `<section class="mock-ui-panel"><h3>${escapeHtml(componentDefinition.title)}</h3>${formRowsMarkup}</section>`;
-}
-
-function createConversationMarkup(componentDefinition) {
-  const conversationMarkup = componentDefinition.items.map(([speakerName, messageText]) => `
-    <div class="mock-ui-conversation-row">
-      <span>${escapeHtml(speakerName)}</span>
-      <p>${escapeHtml(messageText)}</p>
-    </div>
-  `).join('');
-
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><h3>${escapeHtml(componentDefinition.title)}</h3>${conversationMarkup}</section>`;
-}
-
-function createPhoneMarkup(componentDefinition) {
-  const phoneRowsMarkup = componentDefinition.messages.map((phoneMessage) => `<div class="mock-ui-phone-row">${escapeHtml(phoneMessage)}</div>`).join('');
-  return `<section class="mock-ui-panel"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-phone">${phoneRowsMarkup}</div></section>`;
-}
-
-function createChatMarkup(componentDefinition) {
-  const chatMarkup = componentDefinition.messages.map(([messageType, messageText]) => `
-    <div class="mock-ui-chat-bubble mock-ui-chat-bubble--${escapeHtml(messageType)}">${escapeHtml(messageText)}</div>
-  `).join('');
-
-  return `<section class="mock-ui-panel mock-ui-phone-panel"><h3>${escapeHtml(componentDefinition.title)}</h3>${chatMarkup}</section>`;
-}
-
-function createModalLogMarkup(componentDefinition) {
-  const modalLogMarkup = componentDefinition.lines.map((modalLine) => `<div class="mock-ui-terminal-line">${escapeHtml(modalLine)}</div>`).join('');
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><div class="mock-ui-modal"><h3>${escapeHtml(componentDefinition.title)}</h3>${modalLogMarkup}<button>Open report</button></div></section>`;
-}
-
-function createSearchResultsMarkup(componentDefinition) {
-  const searchRowsMarkup = componentDefinition.rows.map((searchRow) => `<div class="mock-ui-search-row">${escapeHtml(searchRow)}</div>`).join('');
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-search-box">release notes</div>${searchRowsMarkup}</section>`;
-}
-
-function createPaletteMarkup(componentDefinition) {
-  const paletteMarkup = componentDefinition.items.map((paletteItem) => `<div class="mock-ui-palette-card">${escapeHtml(paletteItem)}</div>`).join('');
-  return `<section class="mock-ui-panel"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-palette-grid">${paletteMarkup}</div></section>`;
-}
-
-function createCalloutMarkup(componentDefinition) {
-  return `<section class="mock-ui-panel mock-ui-callout"><h3>${escapeHtml(componentDefinition.title)}</h3><p>${escapeHtml(componentDefinition.body)}</p></section>`;
-}
-
-function createTabsMarkup(componentDefinition) {
-  const tabMarkup = componentDefinition.items.map((tabTitle, tabIndex) => {
-    const activeClassName = tabIndex === 0 ? ' mock-ui-tab--active' : '';
-    return `<div class="mock-ui-tab${activeClassName}">${escapeHtml(tabTitle)}</div>`;
-  }).join('');
-
-  return `<section class="mock-ui-panel mock-ui-panel--wide"><h3>${escapeHtml(componentDefinition.title)}</h3><div class="mock-ui-tabs">${tabMarkup}</div></section>`;
-}
-
-function createComponentMarkup(componentDefinition) {
-  const componentRenderers = {
-    tabs: createTabsMarkup,
-    terminal: createTerminalMarkup,
-    commandCards: createCommandCardMarkup,
-    metrics: createMetricMarkup,
-    conversation: createConversationMarkup,
-    checklist: (definition) => createSimpleListMarkup(definition, 'mock-ui-checklist'),
-    statusSteps: (definition) => createSimpleListMarkup(definition, 'mock-ui-status-list'),
-    callout: createCalloutMarkup,
-    phone: createPhoneMarkup,
-    settings: createSettingsMarkup,
-    launcher: createLauncherMarkup,
-    table: createTableMarkup,
-    progressList: createProgressMarkup,
-    kanban: createKanbanMarkup,
-    wizard: createWizardMarkup,
-    form: createFormMarkup,
-    modalLog: createModalLogMarkup,
-    chat: createChatMarkup,
-    palette: createPaletteMarkup,
-    searchResults: createSearchResultsMarkup,
-  };
-  const componentRenderer = componentRenderers[componentDefinition.type];
-
-  if (!componentRenderer) {
-    throw new Error(`No mocked UI component renderer exists for "${componentDefinition.type}".`);
+  if (!captureConfig) {
+    throw new Error(`No capture config exists for ${portfolioAppSlug}.`);
   }
 
-  return componentRenderer(componentDefinition);
+  return captureConfig;
 }
 
-function createMockScreenStyles() {
+function getCaptureTarget(portfolioApp, portfolioFeature) {
+  const captureConfig = getCaptureConfig(portfolioApp.slug);
+  const captureTarget = captureConfig.captureTargets.find(
+    (candidateTarget) => candidateTarget.featureId === portfolioFeature.id,
+  );
+
+  if (!captureTarget) {
+    throw new Error(`${portfolioApp.slug}.${portfolioFeature.id} has no capture target.`);
+  }
+
+  return captureTarget;
+}
+
+function createWindowChrome(title, bodyMarkup, options = {}) {
+  const {
+    appSlug = '',
+    activeNav = '',
+    navigationItems = [],
+    sidebarTitle = 'Portfolio demo',
+    footerMarkup = '',
+  } = options;
+  const navMarkup = navigationItems.map((navigationItem) => {
+    const activeClassName = navigationItem === activeNav ? ' active' : '';
+    return `<div class="nav-item${activeClassName}">${escapeHtml(navigationItem)}</div>`;
+  }).join('');
+
   return `
-    .mock-ui-frame{height:100%;padding:34px;border-radius:38px;background:linear-gradient(135deg,rgba(13,24,43,.98),rgba(6,10,18,.98));color:#edf4ff;font-family:Inter,Segoe UI,Arial,sans-serif;box-sizing:border-box}
-    .mock-ui-window{height:100%;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:30px;background:#0a1324;box-shadow:0 30px 90px rgba(0,0,0,.42)}
-    .mock-ui-titlebar{height:56px;display:flex;align-items:center;gap:14px;padding:0 22px;background:rgba(255,255,255,.045);border-bottom:1px solid rgba(255,255,255,.09);box-sizing:border-box}
-    .mock-ui-dot{width:13px;height:13px;border-radius:50%;background:#ff5f57}.mock-ui-dot:nth-child(2){background:#ffbd2e}.mock-ui-dot:nth-child(3){background:#28c840}
-    .mock-ui-window-title{margin-left:8px;color:#c9d8f4;font-size:17px}
-    .mock-ui-screen{height:calc(100% - 56px);display:grid;grid-template-columns:220px minmax(0,1fr);background:linear-gradient(180deg,#101c31,#08111f)}
-    .mock-ui-navigation{padding:24px 16px;border-right:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025)}
-    .mock-ui-navigation-item{margin-bottom:10px;padding:12px 14px;border-radius:14px;color:#9fb2d7;font-size:17px}
-    .mock-ui-navigation-item--active{background:linear-gradient(135deg,var(--accent),rgba(255,255,255,.16));color:#07101d;font-weight:800}
-    .mock-ui-content{padding:26px;display:grid;grid-template-rows:auto 1fr;gap:20px;min-width:0}
-    .mock-ui-header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}
-    .mock-ui-feature-title{margin-bottom:8px;color:var(--accent);font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.11em}
-    .mock-ui-header h2{margin:0 0 8px;font-size:34px;line-height:1.1;color:#f5f8ff}
-    .mock-ui-header p{margin:0;color:#b8c9eb;font-size:18px;line-height:1.42;max-width:900px}
-    .mock-ui-sample-data{flex:0 0 360px;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);color:#dfe9ff;font-size:15px;line-height:1.35}
-    .mock-ui-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(130px,auto);gap:16px;min-height:0}
-    .mock-ui-panel{padding:18px;border-radius:22px;background:rgba(255,255,255,.052);border:1px solid rgba(255,255,255,.09);box-sizing:border-box;min-width:0}
-    .mock-ui-panel--wide{grid-column:span 2}.mock-ui-panel h3{margin:0 0 14px;font-size:20px;color:#f2f6ff}.mock-ui-panel p{margin:0;color:#c5d5f2;font-size:18px;line-height:1.45}
-    .mock-ui-metrics,.mock-ui-launch-grid,.mock-ui-kanban,.mock-ui-palette-grid,.mock-ui-tabs,.mock-ui-steps{display:grid;gap:12px}
-    .mock-ui-metrics{grid-template-columns:repeat(4,1fr)}.mock-ui-launch-grid{grid-template-columns:repeat(3,1fr)}.mock-ui-kanban{grid-template-columns:repeat(3,1fr)}.mock-ui-tabs,.mock-ui-steps{grid-template-columns:repeat(4,1fr)}
-    .mock-ui-metric,.mock-ui-launch-card,.mock-ui-command-card,.mock-ui-kanban-column,.mock-ui-step,.mock-ui-tab,.mock-ui-palette-card{padding:14px;border-radius:16px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.08)}
-    .mock-ui-metric span,.mock-ui-launch-card span,.mock-ui-command-card span,.mock-ui-window-title{display:block}.mock-ui-metric span,.mock-ui-launch-card span,.mock-ui-command-card span{color:#95abd3;font-size:14px;line-height:1.35}.mock-ui-metric strong,.mock-ui-launch-card strong,.mock-ui-command-card strong{display:block;color:#f7faff;font-size:21px;margin-bottom:6px}
-    .mock-ui-terminal{background:#050912}.mock-ui-terminal-line{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.07);font:18px Consolas,Menlo,monospace;color:#d7e3fa}.mock-ui-terminal-line:last-child{border-bottom:0}
-    ul{margin:0;padding-left:20px}li{margin:0 0 10px;color:#dbe6fb;font-size:17px;line-height:1.35}
-    .mock-ui-setting-row,.mock-ui-form-row,.mock-ui-progress-row,.mock-ui-search-row{display:block;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.075);color:#dce6f9;font-size:16px}.mock-ui-setting-row strong,.mock-ui-form-row strong{float:right;color:#fff}
-    .mock-ui-table-header,.mock-ui-table-row{display:grid;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.075);font-size:15px}.mock-ui-table--4 .mock-ui-table-header,.mock-ui-table--4 .mock-ui-table-row{grid-template-columns:.8fr 1.8fr 1fr 1fr}.mock-ui-table--5 .mock-ui-table-header,.mock-ui-table--5 .mock-ui-table-row{grid-template-columns:1fr 1fr .9fr 1fr 1.7fr}.mock-ui-table-header{color:#93a9d3;text-transform:uppercase;letter-spacing:.08em;font-size:12px}.mock-ui-table-row span{color:#edf4ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .mock-ui-progress-row>div:first-child{display:flex;justify-content:space-between;margin-bottom:8px}.mock-ui-progress-track{height:10px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}.mock-ui-progress-track span{display:block;height:100%;border-radius:99px;background:var(--accent)}
-    .mock-ui-kanban-column strong{display:block;margin-bottom:10px}.mock-ui-kanban-column span{display:block;margin-bottom:8px;padding:9px;border-radius:12px;background:rgba(0,0,0,.18);color:#dce6fb;font-size:15px}
-    .mock-ui-step--active,.mock-ui-tab--active{background:rgba(255,255,255,.12);border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-    .mock-ui-conversation-row{margin-bottom:10px;padding:12px;border-left:4px solid var(--accent);border-radius:14px;background:rgba(255,255,255,.05)}.mock-ui-conversation-row span{display:block;color:#91a8d1;font-size:12px;text-transform:uppercase;letter-spacing:.12em}.mock-ui-conversation-row p{margin:6px 0 0;color:#e8f0ff;font-size:17px}
-    .mock-ui-phone{width:230px;margin:auto;padding:18px;border-radius:28px;background:#050912;border:1px solid rgba(255,255,255,.12)}.mock-ui-phone-row{margin-bottom:10px;padding:11px;border-radius:14px;background:rgba(255,255,255,.08);color:#eaf1ff;text-align:center}
-    .mock-ui-phone-panel{background:#06101f}.mock-ui-chat-bubble{max-width:76%;margin:0 0 10px;padding:13px 15px;border-radius:18px;background:rgba(255,255,255,.09);font-size:17px;line-height:1.35}.mock-ui-chat-bubble--sent{margin-left:auto;background:linear-gradient(135deg,var(--accent),#ffd9c2);color:#06101f;font-weight:700}
-    .mock-ui-modal{max-width:760px;margin:auto;padding:24px;border-radius:24px;background:#050912;border:1px solid rgba(255,255,255,.1);box-shadow:0 18px 60px rgba(0,0,0,.42)}button{margin-top:14px;padding:11px 16px;border:0;border-radius:12px;background:var(--accent);color:#07101d;font-weight:800}
-    .mock-ui-search-box{margin-bottom:12px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.08);color:#fff}.mock-ui-palette-grid{grid-template-columns:repeat(2,1fr)}
-    .mock-ui-shell--mobile .mock-ui-grid{grid-template-columns:.85fr 1.15fr}.mock-ui-shell--desktop .mock-ui-window{max-width:1180px;margin:0 auto}.mock-ui-shell--terminal .mock-ui-navigation-item--active{background:linear-gradient(135deg,#7cf7c8,var(--accent))}
+    <div class="desktop-frame ${escapeHtml(appSlug)}">
+      <div class="window-shell">
+        <div class="titlebar">
+          <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+          <strong>${escapeHtml(title)}</strong>
+        </div>
+        <div class="app-shell">
+          <aside class="sidebar">
+            <div class="sidebar-title">${escapeHtml(sidebarTitle)}</div>
+            ${navMarkup}
+          </aside>
+          <main class="content-area">${bodyMarkup}</main>
+        </div>
+        ${footerMarkup}
+      </div>
+    </div>
   `;
 }
 
-function createMockRenderSvg(portfolioApp, portfolioFeature) {
-  const mockUiScene = ensureSceneExists(portfolioApp, portfolioFeature);
-  const componentMarkup = mockUiScene.components.map((componentDefinition) => createComponentMarkup(componentDefinition)).join('');
+function createMetricCards(metrics) {
+  return `<div class="metric-grid">${metrics.map(([label, value, detail]) => `
+    <div class="metric-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </div>
+  `).join('')}</div>`;
+}
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${MOCK_SCREEN_WIDTH}" height="${MOCK_SCREEN_HEIGHT}" viewBox="0 0 ${MOCK_SCREEN_WIDTH} ${MOCK_SCREEN_HEIGHT}" fill="none">
-  <rect width="${MOCK_SCREEN_WIDTH}" height="${MOCK_SCREEN_HEIGHT}" rx="48" fill="#050c18"/>
-  <foreignObject x="36" y="36" width="1528" height="968">
-    <div xmlns="http://www.w3.org/1999/xhtml" class="mock-ui-frame mock-ui-shell--${escapeHtml(mockUiScene.shellKind)}" style="--accent:${escapeHtml(portfolioApp.accent)}">
-      <style>${createMockScreenStyles()}</style>
-      <div class="mock-ui-window">
-        <div class="mock-ui-titlebar">
-          <span class="mock-ui-dot"></span><span class="mock-ui-dot"></span><span class="mock-ui-dot"></span>
-          <span class="mock-ui-window-title">${escapeHtml(mockUiScene.windowTitle)}</span>
+function createDataTable(columns, rows, extraClassName = '') {
+  return `
+    <div class="data-table ${escapeHtml(extraClassName)}">
+      <div class="table-row table-head">${columns.map((column) => `<span>${escapeHtml(column)}</span>`).join('')}</div>
+      ${rows.map((row) => `<div class="table-row">${row.map((cell) => `<span>${escapeHtml(cell)}</span>`).join('')}</div>`).join('')}
+    </div>
+  `;
+}
+
+function createTerminalBlock(lines) {
+  return `<div class="terminal-block">${lines.map((line) => `<div>${escapeHtml(line)}</div>`).join('')}</div>`;
+}
+
+function createBoardColumns(columns) {
+  return `<div class="board-columns">${columns.map(([title, cards]) => `
+    <section class="board-column">
+      <h3>${escapeHtml(title)}</h3>
+      ${cards.map((card) => `<article>${escapeHtml(card)}</article>`).join('')}
+    </section>
+  `).join('')}</div>`;
+}
+
+function createSourceScreenDocument(title, accentColor, bodyMarkup) {
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>${escapeHtml(title)}</title>
+      <style>
+        :root { --accent: ${accentColor}; --bg: #07101d; --panel: rgba(255,255,255,.075); --line: rgba(255,255,255,.11); --text: #f4f8ff; --muted: #9fb1d1; }
+        * { box-sizing: border-box; }
+        body { margin: 0; width: 100vw; min-height: 100vh; overflow: hidden; background: radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 28%, transparent), transparent 34%), #060b14; color: var(--text); font-family: Inter, "Segoe UI", Arial, sans-serif; }
+        .desktop-frame { width: 100vw; height: 100vh; padding: 30px; background: linear-gradient(135deg, rgba(15,27,47,.96), rgba(5,8,16,.98)); }
+        .window-shell { height: 100%; overflow: hidden; border: 1px solid var(--line); border-radius: 26px; background: #0a1324; box-shadow: 0 30px 90px rgba(0,0,0,.46); }
+        .titlebar { height: 54px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.045); color: #dce8ff; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; } .red { background: #ff5f57; } .yellow { background: #ffbd2e; } .green { background: #28c840; }
+        .titlebar strong { margin-left: 8px; font-weight: 650; }
+        .app-shell { height: calc(100% - 54px); display: grid; grid-template-columns: 235px minmax(0, 1fr); }
+        .sidebar { padding: 24px 16px; border-right: 1px solid var(--line); background: rgba(255,255,255,.035); }
+        .sidebar-title { margin-bottom: 18px; color: var(--accent); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; font-size: 13px; }
+        .nav-item { margin-bottom: 9px; padding: 12px 14px; border-radius: 14px; color: #b9c8e8; font-weight: 650; }
+        .nav-item.active { background: linear-gradient(135deg, var(--accent), rgba(255,255,255,.18)); color: #07101d; }
+        .content-area { padding: 26px; overflow: hidden; }
+        .screen-heading { display: flex; justify-content: space-between; gap: 22px; align-items: flex-start; margin-bottom: 20px; }
+        .screen-heading h1 { margin: 0 0 7px; font-size: 34px; line-height: 1.08; letter-spacing: -.02em; }
+        .screen-heading p { margin: 0; max-width: 850px; color: #b9c8e8; font-size: 18px; line-height: 1.42; }
+        .pill-row, .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .pill, .toolbar span, .badge { padding: 8px 12px; border-radius: 999px; background: rgba(255,255,255,.075); border: 1px solid var(--line); color: #dbe7ff; font-weight: 700; font-size: 13px; }
+        .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .metric-card, .panel, .feature-tile, .dialog-card { border: 1px solid var(--line); border-radius: 19px; background: var(--panel); box-shadow: inset 0 1px 0 rgba(255,255,255,.045); }
+        .metric-card { padding: 16px; } .metric-card span { color: var(--muted); font-size: 13px; display: block; } .metric-card strong { display: block; margin: 5px 0; font-size: 30px; } .metric-card small { color: #c2d2ef; }
+        .two-column { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(350px, .75fr); gap: 18px; }
+        .three-column { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .panel { padding: 18px; } .panel h2, .panel h3 { margin: 0 0 14px; }
+        .data-table { display: grid; gap: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 15px; }
+        .table-row { display: grid; grid-template-columns: .85fr 1.7fr 1fr .9fr; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); color: #eef4ff; align-items: center; }
+        .table-row:last-child { border-bottom: 0; } .table-head { color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-size: 12px; font-weight: 800; background: rgba(255,255,255,.045); }
+        .terminal-block { padding: 18px; border-radius: 18px; background: #030712; border: 1px solid rgba(130,180,255,.22); color: #d8e5ff; font: 17px/1.58 Consolas, "Cascadia Mono", monospace; box-shadow: inset 0 0 40px rgba(53,116,255,.08); }
+        .terminal-block div { border-bottom: 1px solid rgba(255,255,255,.06); padding: 3px 0; } .terminal-block div:last-child { border-bottom: 0; }
+        .feature-tile { padding: 16px; min-height: 125px; } .feature-tile strong { display: block; font-size: 18px; margin-bottom: 8px; } .feature-tile p { margin: 0; color: #b9c8e8; line-height: 1.38; }
+        .board-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+        .board-column { padding: 14px; border-radius: 17px; background: rgba(255,255,255,.055); border: 1px solid var(--line); } .board-column h3 { margin: 0 0 12px; color: var(--accent); }
+        .board-column article { padding: 11px; margin-bottom: 10px; border-radius: 13px; background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.08); color: #e9f1ff; }
+        .progress-track { height: 10px; border-radius: 999px; background: rgba(255,255,255,.09); overflow: hidden; } .progress-track span { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+        .phone-frame { width: 310px; margin: 0 auto; padding: 18px; border-radius: 38px; background: #050914; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 18px 40px rgba(0,0,0,.35); }
+        .phone-screen { min-height: 540px; border-radius: 28px; padding: 18px; background: linear-gradient(180deg,#101d31,#07101d); }
+        .qr-box { width: 168px; height: 168px; margin: 20px auto; background: repeating-linear-gradient(45deg,#f5f8ff 0 8px,#07101d 8px 16px); border: 12px solid #f5f8ff; border-radius: 14px; }
+        .wizard-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; } .wizard-step { padding: 14px; border-radius: 15px; background: rgba(255,255,255,.065); border: 1px solid var(--line); color: #dbe8ff; } .wizard-step.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+        .form-row { display: grid; grid-template-columns: 180px 1fr; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); color: #dce8ff; } .form-row span { color: var(--muted); }
+        .native-window { margin: 0 auto; border: 1px solid #b8c0cc; border-radius: 10px; background: #f1f3f7; color: #1d2430; box-shadow: 0 24px 70px rgba(0,0,0,.42); overflow: hidden; font-family: "Segoe UI", Arial, sans-serif; }
+        .native-title { height: 42px; padding: 10px 14px; background: #ffffff; border-bottom: 1px solid #d5dbe5; font-weight: 700; }
+        .native-body { padding: 20px; } .native-body label { display: block; color: #4d5868; margin-bottom: 6px; font-size: 13px; }
+        .native-input, .native-select, .native-textarea { width: 100%; padding: 10px 12px; border: 1px solid #c6ceda; border-radius: 7px; background: white; color: #1f2937; font: inherit; }
+        .native-textarea { min-height: 122px; }
+        .native-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; } .native-button { padding: 9px 16px; border-radius: 7px; border: 1px solid #b5bfcc; background: #fff; font-weight: 700; } .native-button.primary { background: #2563eb; color: white; border-color: #2563eb; }
+        .native-table .table-row { color: #1f2937; grid-template-columns: 1.3fr .9fr 1fr 1fr 1.7fr .8fr; border-color: #d7dde7; } .native-table .table-head { background: #e8edf5; color: #4b5563; }
+      </style>
+    </head>
+    <body>${bodyMarkup}</body>
+  </html>`;
+}
+
+function createForgeTerminalWorkspaceScreen() {
+  const bodyMarkup = createWindowChrome(
+    'Forge Terminal - C:\\ProjectsWin\\benefits-enrollment-demo',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>Developer cockpit with real terminal state</h1>
+          <p>Multiple PTY tabs, saved command cards, and workflow gates share one workspace so engineering rituals are visible while work happens.</p>
         </div>
-        <div class="mock-ui-screen">
-          <aside class="mock-ui-navigation">${createNavigationMarkup(mockUiScene)}</aside>
-          <main class="mock-ui-content">
-            <header class="mock-ui-header">
-              <div>
-                <div class="mock-ui-feature-title">${escapeHtml(portfolioFeature.title)}</div>
-                <h2>${escapeHtml(mockUiScene.screenTitle)}</h2>
-                <p>${escapeHtml(mockUiScene.screenSubtitle)}</p>
-              </div>
-              <div class="mock-ui-sample-data">${escapeHtml(mockUiScene.sampleDataNote)}</div>
-            </header>
-            <section class="mock-ui-grid">${componentMarkup}</section>
-          </main>
+        <div class="pill-row"><span class="pill">feature/portfolio-showcase</span><span class="pill">4 PTYs</span><span class="pill">Workflow green</span></div>
+      </header>
+      ${createMetricCards([
+        ['Open tabs', '4', 'PowerShell, API, UI, Tests'],
+        ['Command cards', '12', 'Saved repeatable workflows'],
+        ['Workflow gates', '3/3', 'Branch, tests, proof recorded'],
+        ['Repo health', 'Green', 'No failing checks in demo state'],
+      ])}
+      <div class="two-column">
+        <section class="panel">
+          <div class="toolbar"><span>PowerShell - API</span><span>Node UI</span><span>Test Runner</span><span>Release Notes</span></div>
+          ${createTerminalBlock([
+            'PS C:\\ProjectsWin\\benefits-enrollment-demo> forge workflow status',
+            '[PASS] branch-created    feature/portfolio-showcase',
+            '[PASS] tests-written     portfolio-data.test.mjs',
+            '[PASS] tests-passed      go test ./... && npx vitest run',
+            '[INFO] evidence bundle   validation.html with highlighted screenshots',
+            'PS C:\\ProjectsWin\\benefits-enrollment-demo> npm run portfolio:publish',
+            'Published static preview to GitHub Pages.',
+          ])}
+        </section>
+        <section class="panel">
+          <h2>Pinned command cards</h2>
+          <div class="three-column" style="grid-template-columns: 1fr;">
+            <div class="feature-tile"><strong>Run regression pack</strong><p>go test ./... + frontend vitest with compact status output.</p></div>
+            <div class="feature-tile"><strong>Open PR checklist</strong><p>Branch, tests, changelog, proof dashboard, and release notes in one card.</p></div>
+            <div class="feature-tile"><strong>Publish static preview</strong><p>Build portfolio assets and push GitHub Pages without leaving the terminal.</p></div>
+          </div>
+        </section>
+      </div>
+    `,
+    {
+      appSlug: 'forge-terminal',
+      sidebarTitle: 'Forge Terminal',
+      activeNav: 'Terminal',
+      navigationItems: ['Terminal', 'Command Cards', 'Agents', 'Git', 'Workflow'],
+    },
+  );
+  return createSourceScreenDocument('Forge Terminal multi-tab workspace', '#5d8cff', bodyMarkup);
+}
+
+function createForgeInstructionWorkflowScreen() {
+  const bodyMarkup = createWindowChrome(
+    'Forge Terminal - AI workflow controls',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>AI workflow with enforceable guardrails</h1>
+          <p>The assistant thread, task plan, terminal output, and verification gates stay connected instead of becoming an unstructured chat transcript.</p>
+        </div>
+        <div class="pill-row"><span class="pill">Tutor mode</span><span class="pill">TDD enforced</span><span class="pill">PR-ready proof</span></div>
+      </header>
+      <div class="two-column">
+        <section class="panel">
+          <h2>Assistant conversation</h2>
+          <div class="feature-tile"><strong>User</strong><p>Build employer-facing portfolio cards using real UI screenshots or source-derived replicas with safe mock data.</p></div>
+          <div class="feature-tile"><strong>Copilot</strong><p>Replacing generic SVG mockups with PNG captures, asset validation, and direct portfolio wiring.</p></div>
+          <div class="feature-tile"><strong>Code Tutor</strong><p>The changes teach through readable structures: per-app capture metadata, explicit image paths, and no hidden fallback.</p></div>
+        </section>
+        <section class="panel">
+          <h2>Workflow ledger</h2>
+          ${createDataTable(
+            ['Gate', 'Evidence', 'Owner', 'State'],
+            [
+              ['Branch', 'feature/build-portfolio-showcase', 'GitHub Flow', 'Recorded'],
+              ['Tests', 'portfolio-data + renderer', 'Node test', 'Queued'],
+              ['Visual proof', 'PNG screenshots only', 'Portfolio runner', 'In progress'],
+              ['Publish', 'GitHub Pages preview', 'gh-pages', 'Pending'],
+            ],
+          )}
+        </section>
+      </div>
+      <section class="panel" style="margin-top:18px;">
+        ${createTerminalBlock([
+          '> workflow_preflight_check',
+          'branch-created: pass',
+          'tests-written: pass',
+          'tests-passed: waiting on recovered portfolio validation',
+          'next: capture highlighted visual proof and publish employer preview',
+        ])}
+      </section>
+    `,
+    {
+      appSlug: 'forge-terminal',
+      sidebarTitle: 'Forge Terminal',
+      activeNav: 'Assistant',
+      navigationItems: ['Terminal', 'Assistant', 'Plan', 'Review', 'Tutor'],
+    },
+  );
+  return createSourceScreenDocument('Forge Terminal workflow assistant', '#5d8cff', bodyMarkup);
+}
+
+function createForgeTunnelScreen() {
+  const bodyMarkup = createWindowChrome(
+    'Forge Terminal - remote access setup',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>Remote and mobile handoff without leaking local context</h1>
+          <p>Named tunnel setup, one-time access, mobile companion state, and safety controls are presented as one operator-ready flow.</p>
+        </div>
+        <div class="pill-row"><span class="pill">Named tunnel</span><span class="pill">10 min token</span><span class="pill">Vault disabled</span></div>
+      </header>
+      <div class="two-column">
+        <section class="panel">
+          <h2>Tunnel setup</h2>
+          ${createDataTable(
+            ['Setting', 'Configured value', 'Safety note', 'Status'],
+            [
+              ['Hostname', 'portfolio-demo.trycloudflare.com', 'Fictional demo host', 'Ready'],
+              ['Access code', 'FT-2048', 'Rotates after preview', 'Active'],
+              ['PTY mode', 'Read/write', 'Explicit user approval', 'Enabled'],
+              ['Vault injection', 'Disabled', 'No secrets in browser session', 'Locked'],
+            ],
+          )}
+          <div class="toolbar" style="margin-top:16px;"><span>Generate QR</span><span>Copy invite</span><span>Revoke session</span></div>
+        </section>
+        <section class="panel">
+          <h2>Mobile companion preview</h2>
+          <div class="phone-frame"><div class="phone-screen">
+            <div class="badge">Forge Companion</div>
+            <div class="qr-box"></div>
+            <div class="feature-tile"><strong>Portfolio Demo</strong><p>Terminal session ready. Clipboard handoff is enabled for this one-time code only.</p></div>
+          </div></div>
+        </section>
+      </div>
+    `,
+    {
+      appSlug: 'forge-terminal',
+      sidebarTitle: 'Forge Terminal',
+      activeNav: 'Remote Access',
+      navigationItems: ['Terminal', 'Remote Access', 'Vault', 'Mobile', 'Settings'],
+    },
+  );
+  return createSourceScreenDocument('Forge Terminal tunnel workflow', '#5d8cff', bodyMarkup);
+}
+
+function createNodeToolboxHomeScreen() {
+  const bodyMarkup = createWindowChrome(
+    'NodeToolbox - Your personal utility belt',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>Your personal utility belt</h1>
+          <p>A single local-first launcher organizes Agile delivery, ServiceNow, reporting, development utilities, and documentation surfaces into one internal operating system.</p>
+        </div>
+        <div class="pill-row"><span class="pill">Jira ready</span><span class="pill">ServiceNow ready</span><span class="pill">Confluence ready</span></div>
+      </header>
+      <section class="panel">
+        <div class="three-column">
+          ${[
+            ['🏃 Team Dashboard', 'Live sprint/Kanban view with burndown, blockers, DSU, metrics, planning, and pointing.'],
+            ['🚂 ART View', 'Release Train Engineer view with team health, predictability, goals, and release radar.'],
+            ['📊 My Issues', 'Jira issues, custom JQL, saved filters, boards, health badges, and export.'],
+            ['❄️ SNow Hub', 'Create change requests from Jira versions and pair Problem Records with Jira work.'],
+            ['📈 Reports Hub', 'Director and RTE snapshots for delivery health, flow, quality, and status summaries.'],
+            ['📖 Code Walkthrough', 'Architecture, security model, data flow, and API transparency report.'],
+          ].map(([title, text]) => `<div class="feature-tile"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`).join('')}
+        </div>
+      </section>
+      <div style="margin-top:18px;">${createMetricCards([
+        ['Programs', '3', 'HSCS enrollment workstreams'],
+        ['Modules', '11', 'One workspace, many jobs'],
+        ['Release trains', '2', 'ART and team-level views'],
+        ['Open risks', '5', 'Surfaced before status meetings'],
+      ])}</div>
+    `,
+    {
+      appSlug: 'nodetoolbox',
+      sidebarTitle: 'NodeToolbox',
+      activeNav: 'Home',
+      navigationItems: ['Home', 'Team Dashboard', 'My Issues', 'SNow Hub', 'Reports'],
+    },
+  );
+  return createSourceScreenDocument('NodeToolbox home launcher', '#1cc88a', bodyMarkup);
+}
+
+function createNodeToolboxSprintScreen() {
+  const bodyMarkup = createWindowChrome(
+    'NodeToolbox - Team Dashboard',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>Team Dashboard</h1>
+          <p>Monitor sprint health, board progress, blocker age, defects, standup flow, and story-point readiness from one Jira-backed workspace.</p>
+        </div>
+        <div class="toolbar"><span>Overview</span><span>By Assignee</span><span>Blockers</span><span>Pipeline</span><span>Releases</span></div>
+      </header>
+      ${createMetricCards([
+        ['Goal confidence', '86%', 'Sprint 24.6 is trending green'],
+        ['Blocked stories', '4', 'Two are older than 48 hours'],
+        ['Open defects', '7', 'One production severity item'],
+        ['Carryover risk', 'Medium', 'Capacity model says watch QA'],
+      ])}
+      <div class="two-column">
+        <section class="panel">
+          <h2>Priority Jira work</h2>
+          ${createDataTable(
+            ['Key', 'Summary', 'Owner', 'Status'],
+            [
+              ['BEN-1421', 'Eligibility rule sync', 'A. Rivera', 'In Review'],
+              ['BEN-1440', 'Enrollment retry audit', 'M. Chen', 'Blocked'],
+              ['BEN-1452', 'API latency dashboard', 'J. Patel', 'Ready QA'],
+              ['BEN-1468', 'Evidence export polish', 'S. Moore', 'In Dev'],
+            ],
+          )}
+        </section>
+        <section class="panel">
+          <h2>Team load</h2>
+          ${[
+            ['Backend', 72],
+            ['Frontend', 64],
+            ['QA', 58],
+            ['DevOps', 41],
+          ].map(([label, value]) => `<p><strong>${escapeHtml(label)}</strong><span style="float:right">${value}%</span></p><div class="progress-track"><span style="width:${value}%"></span></div>`).join('')}
+        </section>
+      </div>
+    `,
+    {
+      appSlug: 'nodetoolbox',
+      sidebarTitle: 'NodeToolbox',
+      activeNav: 'Team Dashboard',
+      navigationItems: ['Home', 'Team Dashboard', 'My Issues', 'SNow Hub', 'Reports'],
+    },
+  );
+  return createSourceScreenDocument('NodeToolbox sprint dashboard', '#1cc88a', bodyMarkup);
+}
+
+function createNodeToolboxOperationsScreen() {
+  const bodyMarkup = createWindowChrome(
+    'NodeToolbox - SNow Hub and ART View',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>SNow Hub + ART operating view</h1>
+          <p>ServiceNow change work and release-train signals are pulled into a workflow surface that makes cross-program hygiene visible.</p>
+        </div>
+        <div class="pill-row"><span class="pill">PI confidence 4.6/5</span><span class="pill">7 change windows</span><span class="pill">2 Sev-2 incidents</span></div>
+      </header>
+      <div class="two-column">
+        <section class="panel">
+          <h2>Operational queue</h2>
+          ${createBoardColumns([
+            ['Triage', ['INC-4021 Enrollment timeout', 'INC-4035 Batch warning', 'PRB-118 Missing validation note']],
+            ['In progress', ['CHG-1182 Policy sync', 'TASK-552 Data cleanup', 'STORY-772 CAB evidence']],
+            ['Ready for CAB', ['CHG-1201 Release approval', 'CHG-1205 Weekend deployment']],
+          ])}
+        </section>
+        <section class="panel">
+          <h2>Release train radar</h2>
+          ${createMetricCards([
+            ['Teams green', '8/10', 'Two teams need dependency help'],
+            ['Objectives met', '91%', 'Based on committed PI goals'],
+            ['Aging risks', '5', 'Escalation list is visible'],
+            ['Release risk', 'Low', 'CAB evidence is complete'],
+          ])}
+        </section>
+      </div>
+    `,
+    {
+      appSlug: 'nodetoolbox',
+      sidebarTitle: 'NodeToolbox',
+      activeNav: 'SNow Hub',
+      navigationItems: ['Home', 'Team Dashboard', 'My Issues', 'SNow Hub', 'Reports'],
+    },
+  );
+  return createSourceScreenDocument('NodeToolbox ServiceNow ART workflow', '#1cc88a', bodyMarkup);
+}
+
+function createEztestOnboardingScreen() {
+  const bodyMarkup = createWindowChrome(
+    'EZTest - Guided onboarding',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>Connect a project and generate useful tests</h1>
+          <p>The first-run wizard explains each decision in plain language: project folder, detected framework, provider, and local app URL.</p>
+        </div>
+        <div class="pill-row"><span class="pill">React + Vite</span><span class="pill">Playwright detected</span><span class="pill">Local provider</span></div>
+      </header>
+      <section class="panel">
+        <div class="wizard-steps">
+          <div class="wizard-step active"><strong>1. Project folder</strong><br />C:\\Repos\\sample-checkout</div>
+          <div class="wizard-step active"><strong>2. Framework</strong><br />React + Vite detected</div>
+          <div class="wizard-step"><strong>3. Provider</strong><br />Local demo model</div>
+          <div class="wizard-step"><strong>4. Ready</strong><br />Generate a test plan</div>
+        </div>
+      </section>
+      <div class="two-column" style="margin-top:18px;">
+        <section class="panel">
+          <h2>Detected project details</h2>
+          ${['Project folder|C:\\Repos\\sample-checkout', 'Framework|React + Vite', 'Test runner|Playwright', 'Target URL|http://localhost:5173'].map((row) => {
+            const [label, value] = row.split('|');
+            return `<div class="form-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+          }).join('')}
+        </section>
+        <section class="panel">
+          <h2>Plain-language guidance</h2>
+          <div class="feature-tile"><strong>What EZTest will do</strong><p>Scan visible behavior, map interaction paths, and generate focused specs for the selected app.</p></div>
+          <div class="feature-tile"><strong>What stays local</strong><p>Project paths and provider settings are demo values; no customer repository or API key appears.</p></div>
+        </section>
+      </div>
+    `,
+    {
+      appSlug: 'eztest',
+      sidebarTitle: 'EZTest',
+      activeNav: 'Setup',
+      navigationItems: ['Setup', 'Dashboard', 'Generate', 'Record', 'Reports'],
+    },
+  );
+  return createSourceScreenDocument('EZTest onboarding', '#a66bff', bodyMarkup);
+}
+
+function createEztestDashboardScreen() {
+  const bodyMarkup = createWindowChrome(
+    'EZTest - Project dashboard',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>Sample React Checkout</h1>
+          <p>Testing work is framed as product outcomes: generate, record, fix, run, configure MCP, and manage provider settings from one action grid.</p>
+        </div>
+        <div class="pill-row"><span class="pill">12 behaviors mapped</span><span class="pill">8 existing specs</span><span class="pill">Last run 2 min ago</span></div>
+      </header>
+      ${createMetricCards([
+        ['Behaviors', '12', 'Mapped from app routes'],
+        ['Specs', '8', 'Existing Playwright coverage'],
+        ['Flaky tests', '1', 'One selector repair suggested'],
+        ['Coverage', '74%', 'Behavior-level confidence'],
+      ])}
+      <section class="panel">
+        <div class="three-column">
+          ${[
+            ['Generate Tests', 'Create specs from discovered behavior and selected target flows.'],
+            ['Record Flow', 'Capture a browser journey and convert it into maintainable test code.'],
+            ['Fix Failures', 'Turn failing traces into repair tasks with exact file context.'],
+            ['Run Suite', 'Execute tests and open the report without leaving the wizard.'],
+            ['MCP Setup', 'Connect automation tools and browser control safely.'],
+            ['API Settings', 'Manage local provider configuration and model choices.'],
+          ].map(([title, text]) => `<div class="feature-tile"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`).join('')}
+        </div>
+      </section>
+    `,
+    {
+      appSlug: 'eztest',
+      sidebarTitle: 'EZTest',
+      activeNav: 'Dashboard',
+      navigationItems: ['Setup', 'Dashboard', 'Generate', 'Record', 'Reports'],
+    },
+  );
+  return createSourceScreenDocument('EZTest dashboard actions', '#a66bff', bodyMarkup);
+}
+
+function createEztestRunModalScreen() {
+  const bodyMarkup = createWindowChrome(
+    'EZTest - Run feedback',
+    `
+      <header class="screen-heading">
+        <div>
+          <h1>Live generation run with next actions</h1>
+          <p>The modal gives non-experts understandable progress, generated files, completion state, and the next button to open evidence.</p>
+        </div>
+        <div class="pill-row"><span class="pill">3 specs generated</span><span class="pill">0 secrets</span><span class="pill">Report ready</span></div>
+      </header>
+      <div class="panel" style="max-width:1080px;margin:0 auto;">
+        <div class="dialog-card" style="padding:22px;background:#050912;">
+          <h2>Generate Playwright tests</h2>
+          ${createTerminalBlock([
+            '[10:42:01] Analyzing interaction graph for Sample React Checkout...',
+            '[10:42:06] Mapped 8 components with event coverage.',
+            '[10:42:11] Created tests/sign-in.spec.ts',
+            '[10:42:15] Created tests/cart-checkout.spec.ts',
+            '[10:42:20] Created tests/profile-update.spec.ts',
+            '[10:42:24] Generation complete - 3 tests ready for review.',
+          ])}
+          <div class="toolbar" style="margin-top:18px;"><span>Open HTML report</span><span>Review generated specs</span><span>Run changed tests only</span><span>Create fix task</span></div>
+        </div>
+      </div>
+    `,
+    {
+      appSlug: 'eztest',
+      sidebarTitle: 'EZTest',
+      activeNav: 'Reports',
+      navigationItems: ['Setup', 'Dashboard', 'Generate', 'Record', 'Reports'],
+    },
+  );
+  return createSourceScreenDocument('EZTest run modal', '#a66bff', bodyMarkup);
+}
+
+function createQuiKeysUnlockScreen() {
+  const bodyMarkup = `
+    <div class="desktop-frame quikeys">
+      <div class="native-window" style="width:620px;margin-top:120px;">
+        <div class="native-title">QuiKeys - Unlock encrypted vault</div>
+        <div class="native-body">
+          <h1 style="margin:0 0 8px;">Unlock QuiKeys</h1>
+          <p style="margin:0 0 18px;color:#4b5563;">Local encrypted macro vault. No cloud account is required.</p>
+          <label>Master password</label>
+          <input class="native-input" value="••••••••••••" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+            <div><label>Vault location</label><div class="native-input">%TEMP%\\portfolio-demo.vault</div></div>
+            <div><label>Encryption</label><div class="native-input">AES-256 local vault</div></div>
+          </div>
+          <div class="native-buttons"><button class="native-button">Cancel</button><button class="native-button primary">Unlock</button></div>
         </div>
       </div>
     </div>
-  </foreignObject>
-</svg>`;
+  `;
+  return createSourceScreenDocument('QuiKeys unlock', '#ff5fa2', bodyMarkup);
 }
 
-async function ensureDirectoryExists(directoryPath) {
-  await fs.mkdir(directoryPath, { recursive: true });
+function createQuiKeysManagerScreen() {
+  const bodyMarkup = `
+    <div class="desktop-frame quikeys">
+      <div class="native-window" style="width:1160px;margin-top:46px;">
+        <div class="native-title">QuiKeys - Macro Manager</div>
+        <div class="native-body">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div><h1 style="margin:0;">Macro Manager</h1><p style="margin:4px 0 0;color:#4b5563;">Operational shortcuts, guarded secrets, hotkeys, and text triggers.</p></div>
+            <div class="native-buttons" style="margin:0;"><button class="native-button primary">Add Macro</button><button class="native-button">Edit</button><button class="native-button">Lock Vault</button></div>
+          </div>
+          ${createDataTable(
+            ['Name', 'Hotkey', 'Trigger', 'Category', 'Value', 'Enabled'],
+            [
+              ['Git Push Origin', 'Ctrl+Shift+G', ':push:', 'Development', 'git push origin main --follow-tags', 'Yes'],
+              ['Deploy to Staging', 'Ctrl+Shift+D', ':deploy:', 'DevOps', 'npm run deploy:staging', 'Yes'],
+              ['API Token (demo)', 'Ctrl+Shift+T', ':token:', 'Credentials', '••••••••••••••••••••••', 'Yes'],
+              ['Daily Standup', 'Ctrl+Shift+S', ':standup:', 'Communication', 'Yesterday / Today / Blockers template', 'Yes'],
+              ['SSH Demo Server', 'Ctrl+Shift+H', ':ssh:', 'Infrastructure', 'ssh demo@192.0.2.42', 'No'],
+              ['Docker Compose Up', 'Ctrl+Shift+U', ':docker:', 'DevOps', 'docker compose up --build -d', 'Yes'],
+            ],
+            'native-table',
+          )}
+        </div>
+      </div>
+    </div>
+  `;
+  return createSourceScreenDocument('QuiKeys manager', '#ff5fa2', bodyMarkup);
 }
 
-async function writePortfolioDataModule() {
-  await ensureDirectoryExists(PORTFOLIO_DATA_DIRECTORY);
-
-  const serializedPortfolioApps = JSON.stringify(PORTFOLIO_APP_DEFINITIONS, null, 2);
-  const generatedModuleContents = `// Generated portfolio data for the standalone showcase site.
-// Rebuild this file with \`node scripts/portfolio/build-portfolio-assets.mjs\`.
-
-export const PORTFOLIO_APPS = ${serializedPortfolioApps};
-`;
-
-  await fs.writeFile(PORTFOLIO_DATA_FILE_PATH, generatedModuleContents, 'utf8');
+function createQuiKeysDialogScreen() {
+  const bodyMarkup = `
+    <div class="desktop-frame quikeys">
+      <div class="native-window" style="width:720px;margin-top:70px;">
+        <div class="native-title">QuiKeys - Add Macro</div>
+        <div class="native-body">
+          <h1 style="margin:0 0 14px;">Add automation rule</h1>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div><label>Name</label><input class="native-input" value="Build and Test" /></div>
+            <div><label>Category</label><select class="native-select"><option>Development</option></select></div>
+            <div><label>Hotkey</label><input class="native-input" value="Ctrl+Shift+B" /></div>
+            <div><label>Text trigger</label><input class="native-input" value=":build:" /></div>
+          </div>
+          <div style="margin-top:14px;"><label>Text or command typed by the macro</label><textarea class="native-textarea">npm run build && npm test</textarea></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+            <div><label>Mask value in manager table</label><div class="native-input">No - command is safe to display</div></div>
+            <div><label>Enabled</label><div class="native-input">Yes - available after save</div></div>
+          </div>
+          <div class="native-buttons"><button class="native-button">Cancel</button><button class="native-button primary">Save Macro</button></div>
+        </div>
+      </div>
+    </div>
+  `;
+  return createSourceScreenDocument('QuiKeys add macro', '#ff5fa2', bodyMarkup);
 }
 
-async function removeStaleGeneratedAssets() {
-  await ensureDirectoryExists(GENERATED_ASSET_DIRECTORY);
-  const existingGeneratedEntries = await fs.readdir(GENERATED_ASSET_DIRECTORY, { withFileTypes: true });
+async function copyMbl2pcCapture(portfolioApp, portfolioFeature, outputPath) {
+  const sourceFileName = MBL2PC_ASSET_SOURCES.get(portfolioFeature.id);
 
-  for (const existingGeneratedEntry of existingGeneratedEntries) {
-    const isGeneratedSvg = existingGeneratedEntry.isFile() && path.extname(existingGeneratedEntry.name) === '.svg';
+  if (!sourceFileName) {
+    throw new Error(`No MBL2PC source screenshot mapping exists for ${portfolioFeature.id}.`);
+  }
 
-    if (isGeneratedSvg) {
-      await fs.unlink(path.join(GENERATED_ASSET_DIRECTORY, existingGeneratedEntry.name));
+  const sourcePath = path.join(MBL2PC_CAPTURE_DIRECTORY, sourceFileName);
+  await fs.access(sourcePath);
+  await fs.copyFile(sourcePath, outputPath);
+}
+
+async function renderSourceDerivedReplica(browser, portfolioApp, portfolioFeature, outputPath) {
+  const screenKey = `${portfolioApp.slug}:${portfolioFeature.id}`;
+  const screenBuilder = SOURCE_DERIVED_SCREEN_BUILDERS[screenKey];
+
+  if (!screenBuilder) {
+    throw new Error(`No source-derived screen builder exists for ${screenKey}.`);
+  }
+
+  const captureTarget = getCaptureTarget(portfolioApp, portfolioFeature);
+  const page = await browser.newPage({
+    viewport: {
+      width: captureTarget.viewportWidth ?? DESKTOP_SCREEN_WIDTH,
+      height: captureTarget.viewportHeight ?? DESKTOP_SCREEN_HEIGHT,
+    },
+    deviceScaleFactor: 1,
+  });
+
+  await page.setContent(screenBuilder(), { waitUntil: 'networkidle' });
+  await page.screenshot({ path: outputPath, type: 'png' });
+  await page.close();
+}
+
+async function buildPngAssets() {
+  const browser = await createBrowser();
+
+  try {
+    await fs.rm(GENERATED_SVG_DIRECTORY, { recursive: true, force: true });
+
+    for (const portfolioApp of PORTFOLIO_APP_DEFINITIONS) {
+      const appAssetDirectory = path.join(PORTFOLIO_ASSET_DIRECTORY, portfolioApp.slug);
+      await fs.mkdir(appAssetDirectory, { recursive: true });
+
+      for (const portfolioFeature of portfolioApp.features) {
+        const outputPath = path.join(
+          appAssetDirectory,
+          `${portfolioApp.slug}-${portfolioFeature.id}.png`,
+        );
+
+        if (portfolioFeature.imageKind === 'real-ui') {
+          await copyMbl2pcCapture(portfolioApp, portfolioFeature, outputPath);
+        } else {
+          await renderSourceDerivedReplica(browser, portfolioApp, portfolioFeature, outputPath);
+        }
+      }
     }
+  } finally {
+    await browser.close();
   }
 }
 
-async function buildRenderedAssets() {
-  await removeStaleGeneratedAssets();
+async function writePortfolioData() {
+  const standaloneData = `// Auto-generated by scripts/portfolio/build-portfolio-assets.mjs.\n\nexport const PORTFOLIO_APPS = ${JSON.stringify(PORTFOLIO_APP_DEFINITIONS, null, 2)};\n`;
 
-  for (const portfolioApp of PORTFOLIO_APP_DEFINITIONS) {
-    for (const portfolioFeature of portfolioApp.features) {
-      const outputPath = path.join(GENERATED_ASSET_DIRECTORY, `${portfolioApp.slug}-${portfolioFeature.id}.svg`);
-      const renderSvg = createMockRenderSvg(portfolioApp, portfolioFeature);
-      await fs.writeFile(outputPath, renderSvg, 'utf8');
-    }
-  }
+  await fs.mkdir(PORTFOLIO_DATA_DIRECTORY, { recursive: true });
+  await fs.writeFile(PORTFOLIO_DATA_FILE_PATH, standaloneData, 'utf8');
 }
 
-await writePortfolioDataModule();
-await buildRenderedAssets();
+async function main() {
+  await buildPngAssets();
+  await writePortfolioData();
+}
+
+await main();

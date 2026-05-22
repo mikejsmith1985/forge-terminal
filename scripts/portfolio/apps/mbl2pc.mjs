@@ -16,8 +16,7 @@ export const MBL2PC_APP = {
   launchSurface: 'python test_local.py',
   techStack: ['FastAPI', 'Python', 'HTML', 'Cypress'],
   proofNote:
-    'All three visuals in this section are polished code-rendered mock interfaces based on the shipped ' +
-    'messaging, search, and theming flows.',
+    'All three visuals in this section are real screenshots captured from the shipped messaging UI with safe seeded demo data.',
   features: [
     {
       id: 'chat-dashboard',
@@ -29,7 +28,8 @@ export const MBL2PC_APP = {
         'The thread uses a fictional Demo Phone and Product Review conversation with generic notes, links, and handoff actions.',
       capturePlan:
         'Open /send.html on the local test server and capture after the first .bubble element is rendered.',
-      imageKind: 'code-rendered',
+      imageKind: 'real-ui',
+      imagePath: './assets/mbl2pc/mbl2pc-chat-dashboard.png',
     },
     {
       id: 'dark-mode-theme',
@@ -41,7 +41,8 @@ export const MBL2PC_APP = {
         'The theme values are safe portfolio settings such as Midnight Ocean, Coral accent, and Comfortable density.',
       capturePlan:
         'Switch the live page into dark theme, wait for the surface colors to settle, and capture the full messaging viewport.',
-      imageKind: 'code-rendered',
+      imageKind: 'real-ui',
+      imagePath: './assets/mbl2pc/mbl2pc-dark-mode-theme.png',
     },
     {
       id: 'search-and-theme',
@@ -53,7 +54,8 @@ export const MBL2PC_APP = {
         'The search results are fictional product-review, dev-sync, and QA-thread records rather than real messages or device identifiers.',
       capturePlan:
         'Apply the ocean palette, enter a safe search term, and capture the filtered live view.',
-      imageKind: 'code-rendered',
+      imageKind: 'real-ui',
+      imagePath: './assets/mbl2pc/mbl2pc-search-and-theme.png',
     },
   ],
 };
@@ -101,7 +103,7 @@ export const MBL2PC_PORTFOLIO_CONFIG = {
     },
     {
       featureId: 'dark-mode-theme',
-      outputFileName: 'mbl2pc-dark-mode.png',
+      outputFileName: 'mbl2pc-dark-mode-theme.png',
       captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
       waitForSelector: '#themePopover.open',
       viewportWidth: 1440,
@@ -109,7 +111,7 @@ export const MBL2PC_PORTFOLIO_CONFIG = {
     },
     {
       featureId: 'search-and-theme',
-      outputFileName: 'mbl2pc-search-theme.png',
+      outputFileName: 'mbl2pc-search-and-theme.png',
       captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
       waitForSelector: '#snippetsList',
       viewportWidth: 1440,

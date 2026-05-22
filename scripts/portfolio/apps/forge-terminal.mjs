@@ -46,31 +46,31 @@ export const FORGE_TERMINAL_PORTFOLIO_CONFIG = {
   },
   demoSetupHooks: [
     {
-      id: 'generate-code-rendered-mock-screens',
+      id: 'generate-source-derived-png-screens',
       description:
-        'Generate code-rendered mocked Forge Terminal screens from the shared portfolio scene definitions.',
+        'Generate source-derived Forge Terminal screens as PNG assets from the portfolio capture runner.',
       mockDataApproach:
         'Use fictional repository names, safe workflow output, demo tunnel values, and generic assistant text so no private terminal state is published.',
       runnerInstruction:
-        'Run scripts/portfolio/build-portfolio-assets.mjs so the Forge Terminal cards use generated SVG screen mockups from web/portfolio/assets/generated.',
+        'Run scripts/portfolio/build-portfolio-assets.mjs so the Forge Terminal cards use PNG assets from web/portfolio/assets/forge-terminal.',
     },
   ],
   captureTargets: [
     {
       featureId: 'multi-tab-terminal',
-      outputFileName: 'forge-terminal-multi-tab-terminal.svg',
+      outputFileName: 'forge-terminal-multi-tab-terminal.png',
       viewportWidth: 1440,
       viewportHeight: 900,
     },
     {
       featureId: 'instruction-workflow',
-      outputFileName: 'forge-terminal-instruction-workflow.svg',
+      outputFileName: 'forge-terminal-instruction-workflow.png',
       viewportWidth: 1440,
       viewportHeight: 900,
     },
     {
       featureId: 'tunnel-mobile',
-      outputFileName: 'forge-terminal-tunnel-mobile.svg',
+      outputFileName: 'forge-terminal-tunnel-mobile.png',
       viewportWidth: 1440,
       viewportHeight: 900,
     },
@@ -82,7 +82,7 @@ export const FORGE_TERMINAL_PORTFOLIO_CONFIG = {
 // pulling in the launch-strategy or path constants above.
 //
 // imageKind values:
-//   'code-rendered' — the portfolio page shows a generated mocked app screen
+//   'source-derived-replica' — the portfolio page shows a PNG rendered from source-informed UI structure.
 export const FORGE_TERMINAL_APP = {
   slug: 'forge-terminal',
   name: 'Forge Terminal',
@@ -100,13 +100,11 @@ export const FORGE_TERMINAL_APP = {
 
   techStack: ['Go', 'React', 'xterm.js', 'Cypress'],
   proofNote:
-    'All three visuals in this section are polished code-rendered mock interfaces built from the ' +
-    'implemented product structure and seeded demo content.',
+    'All three visuals in this section are PNG source-derived replicas built from the implemented ' +
+    'product structure, component names, and seeded demo content.',
 
   // ── Three wow moments ──────────────────────────────────────────────────────
-  // Each feature maps to one code-rendered mocked UI screen with safe sample
-  // data. This keeps the portfolio presentation polished without repeating
-  // local development screenshots.
+  // Each feature maps to one source-derived PNG screen with safe sample data.
   features: [
     {
       id: 'multi-tab-terminal',
@@ -121,9 +119,9 @@ export const FORGE_TERMINAL_APP = {
         'The screen uses a fictional benefits-enrollment demo repository, safe workflow-gate ' +
         'output, and generic command cards instead of a real customer workspace.',
       capturePlan:
-        'Portfolio Playwright run: navigate to localhost:9999, wait for the app shell to fully ' +
-        'render, then screenshot the loaded state.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders the source-derived terminal workspace replica as a PNG using the implemented component structure and safe seeded command output.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/forge-terminal/forge-terminal-multi-tab-terminal.png',
     },
     {
       id: 'instruction-workflow',
@@ -138,9 +136,9 @@ export const FORGE_TERMINAL_APP = {
         'The conversation text, task name, and workflow checklist are portfolio-safe examples ' +
         'that describe this visual rebuild rather than a private development session.',
       capturePlan:
-        'Portfolio Playwright run: type a representative safe command into the active terminal ' +
-        'tab, then screenshot the typed state.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders the source-derived assistant workflow replica as a PNG using workflow-gate and task-state concepts from the app.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/forge-terminal/forge-terminal-instruction-workflow.png',
     },
     {
       id: 'tunnel-mobile',
@@ -155,9 +153,9 @@ export const FORGE_TERMINAL_APP = {
         'The hostname, access code, and connection settings are fictional portfolio values that ' +
         'show the intended UX without exposing real network topology.',
       capturePlan:
-        'Portfolio Playwright run: paste a safe demo string into the active tab, then screenshot ' +
-        'the post-paste state.',
-      imageKind: 'code-rendered',
+        'Portfolio runner renders the source-derived remote-access replica as a PNG with fictional tunnel, mobile, and vault-safety values.',
+      imageKind: 'source-derived-replica',
+      imagePath: './assets/forge-terminal/forge-terminal-tunnel-mobile.png',
     },
   ],
 };
