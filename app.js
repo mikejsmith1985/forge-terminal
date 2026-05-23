@@ -3,17 +3,19 @@
 import { PORTFOLIO_APPS } from './data/apps.mjs';
 
 function createFeatureImage(feature, app) {
-  const imagePath = feature.imagePath ?? `./assets/generated/${app.slug}-${feature.id}.svg`;
+  if (!feature.imagePath) {
+    throw new Error(`${app.name} feature "${feature.id}" is missing a PNG imagePath.`);
+  }
+
   const imageKindLabels = {
-    'real-ui': 'Live product capture',
-    'code-rendered': 'Code-rendered mock interface',
-    storyboard: 'Concept rendering',
+    'real-ui': 'Real UI capture',
+    'source-derived-replica': 'Source-derived UI replica',
   };
   const imageKindLabel = imageKindLabels[feature.imageKind] ?? 'Portfolio visual';
 
   return `
     <div class="feature-preview">
-      <img src="${imagePath}" alt="${app.name} - ${feature.title}" />
+      <img src="${feature.imagePath}" alt="${app.name} - ${feature.title}" />
       <div class="feature-preview__overlay">
         <span>${imageKindLabel}</span>
         <span>${feature.title}</span>
@@ -27,7 +29,7 @@ function createFeatureCard(feature, app) {
     <article class="feature-card">
       ${createFeatureImage(feature, app)}
       <div class="feature-copy">
-        <div class="feature-label">Mocked UI in action</div>
+        <div class="feature-label">Product workflow shown</div>
         <h3>${feature.title}</h3>
         <p>${feature.whatItShows}</p>
         <p><strong>Why it matters:</strong> ${feature.wowFactor}</p>
