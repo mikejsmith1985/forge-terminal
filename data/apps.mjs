@@ -196,8 +196,8 @@ export const PORTFOLIO_APPS = [
   {
     "slug": "quikeys",
     "name": "QuiKeys",
-    "tagline": "Secure keyboard automation and credential helper built as a native desktop experience.",
-    "summary": "QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted storage, and operator-focused UX in a compact product that feels genuinely useful.",
+    "tagline": "Secure keyboard automation for reusable greetings, signatures, and support responses.",
+    "summary": "QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted local storage, and operator-focused UX through a practical support workflow: save a standard greeting, a customer service paragraph, and a signature once, then reuse them with a hotkey or text trigger.",
     "accent": "#ff5fa2",
     "category": "Native desktop utility",
     "launchSurface": "python src\\main.py",
@@ -207,7 +207,7 @@ export const PORTFOLIO_APPS = [
       "Pillow",
       "cryptography"
     ],
-    "proofNote": "All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded macro data.",
+    "proofNote": "All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded customer-service macro data.",
     "features": [
       {
         "id": "unlock-flow",
@@ -221,20 +221,20 @@ export const PORTFOLIO_APPS = [
       },
       {
         "id": "macro-manager",
-        "title": "Macro manager for operational shortcuts and guarded secrets",
-        "wowFactor": "Shows a power-user table workflow with strong utility value.",
-        "whatItShows": "A mocked macro table with names, hotkeys, triggers, categories, actions, and a masked token row so the desktop workflow reads like a real power-user manager.",
-        "mockDataApproach": "The table uses fictional Development, Communication, DevOps, and Credentials rows; the token-like value is deliberately masked with bullets.",
+        "title": "Macro manager for reusable customer-service text",
+        "wowFactor": "Shows how repeated support language becomes a one-keystroke workflow.",
+        "whatItShows": "A mocked macro table with a standard greeting, customer service paragraph, follow-up, and support signature so the desktop workflow reads like a real communication assistant.",
+        "mockDataApproach": "The table uses fictional customer-service language, safe hotkeys, and no real customer, credential, or ticket data.",
         "capturePlan": "Start QuiKeys with isVaultUnlocked=true and the full seeded macro list. Wait for the main manager window to appear. Ensure the macro table is scrolled to the top so all six rows are visible (or as many as fit without scrolling). Capture the full window bounds.",
         "imageKind": "source-derived-replica",
         "imagePath": "./assets/quikeys/quikeys-macro-manager.png"
       },
       {
         "id": "macro-dialog",
-        "title": "Add and edit dialog for secure automation rules",
-        "wowFactor": "Shows detail-oriented form design inside a desktop app.",
-        "whatItShows": "A mocked add/edit dialog with name, safe command text, hotkey, text trigger, category, and masking choice visible before the user saves the automation.",
-        "mockDataApproach": "The dialog is prefilled with a fictional Build and Test macro using a safe npm command, not a password, token, or private shortcut.",
+        "title": "Add and edit dialog for service paragraph templates",
+        "wowFactor": "Shows that long, repeated response text can be standardized without memorizing it.",
+        "whatItShows": "A mocked add/edit dialog for a reusable customer service paragraph, including label, category, hotkey, text trigger, and the exact paragraph that QuiKeys would type.",
+        "mockDataApproach": "The dialog is prefilled with fictional support language, not a real customer message, password, token, or private shortcut.",
         "capturePlan": "Start QuiKeys with the vault unlocked and open the add/edit dialog programmatically (via PORTFOLIO_OPEN_DIALOG=add environment variable if the build supports it, otherwise trigger the \"Add\" button via the OS accessibility API). Wait for the dialog window to appear. Let the PORTFOLIO_PREFILL_MACRO values populate. Capture the dialog window bounds.",
         "imageKind": "source-derived-replica",
         "imagePath": "./assets/quikeys/quikeys-macro-dialog.png"
