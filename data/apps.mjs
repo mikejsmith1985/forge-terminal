@@ -196,8 +196,8 @@ export const PORTFOLIO_APPS = [
   {
     "slug": "quikeys",
     "name": "QuiKeys",
-    "tagline": "Secure keyboard automation for reusable greetings, signatures, and support responses.",
-    "summary": "QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted local storage, and operator-focused UX through a practical support workflow: save a standard greeting, a customer service paragraph, and a signature once, then reuse them with a hotkey or text trigger.",
+    "tagline": "Secure keyboard automation for commands, guarded values, reusable greetings, and support responses.",
+    "summary": "QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted local storage, and operator-focused UX through a practical mix of secure automation and reusable text: save commands, masked demo credentials, a standard greeting, a customer service paragraph, and a signature once, then reuse them with a hotkey or text trigger.",
     "accent": "#ff5fa2",
     "category": "Native desktop utility",
     "launchSurface": "python src\\main.py",
@@ -207,7 +207,7 @@ export const PORTFOLIO_APPS = [
       "Pillow",
       "cryptography"
     ],
-    "proofNote": "All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded customer-service macro data.",
+    "proofNote": "All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded automation plus customer-service macro data.",
     "features": [
       {
         "id": "unlock-flow",
@@ -221,11 +221,11 @@ export const PORTFOLIO_APPS = [
       },
       {
         "id": "macro-manager",
-        "title": "Macro manager for reusable customer-service text",
-        "wowFactor": "Shows how repeated support language becomes a one-keystroke workflow.",
-        "whatItShows": "A mocked macro table with a standard greeting, customer service paragraph, follow-up, and support signature so the desktop workflow reads like a real communication assistant.",
-        "mockDataApproach": "The table uses fictional customer-service language, safe hotkeys, and no real customer, credential, or ticket data.",
-        "capturePlan": "Start QuiKeys with isVaultUnlocked=true and the full seeded macro list. Wait for the main manager window to appear. Ensure the macro table is scrolled to the top so all six rows are visible (or as many as fit without scrolling). Capture the full window bounds.",
+        "title": "Macro manager for secure automation and reusable text",
+        "wowFactor": "Shows a flexible power-user workflow across commands, guarded values, and repeated text.",
+        "whatItShows": "A mocked macro table with deploy commands, a masked demo token, Docker automation, a standard greeting, customer service paragraph, and support signature.",
+        "mockDataApproach": "The table uses fictional developer commands, a deliberately masked demo token, and safe customer-service language with no real customer, credential, or ticket data.",
+        "capturePlan": "Start QuiKeys with isVaultUnlocked=true and the full seeded macro list. Wait for the main manager window to appear. Ensure the macro table is scrolled to the top so the blended automation and text rows are visible. Capture the full window bounds.",
         "imageKind": "source-derived-replica",
         "imagePath": "./assets/quikeys/quikeys-macro-manager.png"
       },
