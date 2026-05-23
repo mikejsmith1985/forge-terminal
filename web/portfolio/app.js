@@ -1,6 +1,6 @@
 // Client-side renderer for the recruiter-facing product portfolio microsite.
 
-import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260523-quikeys-service-snippets';
+import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260523-quikeys-blended-snippets';
 
 function createFeatureImage(feature, app) {
   if (!feature.imagePath) {

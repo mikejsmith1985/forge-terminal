@@ -623,7 +623,7 @@ function createQuiKeysUnlockScreen() {
         <div class="native-title">QuiKeys - Unlock encrypted vault</div>
         <div class="native-body">
           <h1 style="margin:0 0 8px;">Unlock QuiKeys</h1>
-          <p style="margin:0 0 18px;color:#4b5563;">Local encrypted vault for reusable greetings, signatures, and support responses.</p>
+          <p style="margin:0 0 18px;color:#4b5563;">Local encrypted vault for commands, guarded values, greetings, signatures, and support responses.</p>
           <label>Master password</label>
           <input class="native-input" value="••••••••••••" />
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
@@ -645,18 +645,19 @@ function createQuiKeysManagerScreen() {
         <div class="native-title">QuiKeys - Macro Manager</div>
         <div class="native-body">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div><h1 style="margin:0;">Macro Manager</h1><p style="margin:4px 0 0;color:#4b5563;">Reusable customer-service text, signatures, hotkeys, and text triggers.</p></div>
+            <div><h1 style="margin:0;">Macro Manager</h1><p style="margin:4px 0 0;color:#4b5563;">Secure automation, guarded values, reusable text, hotkeys, and triggers.</p></div>
             <div class="native-buttons" style="margin:0;"><button class="native-button primary">Add Macro</button><button class="native-button">Edit</button><button class="native-button">Lock Vault</button></div>
           </div>
           ${createDataTable(
             ['Name', 'Hotkey', 'Trigger', 'Category', 'Value', 'Enabled'],
             [
-              ['Standard greeting', 'Ctrl+Shift+G', ':hello:', 'Customer Service', 'Hello, thank you for reaching out. I am happy to help...', 'Yes'],
+              ['Git Push Origin', 'Ctrl+Shift+G', ':push:', 'Development', 'git push origin main --follow-tags', 'Yes'],
+              ['Deploy to Staging', 'Ctrl+Shift+D', ':deploy:', 'DevOps', 'npm run deploy:staging', 'Yes'],
+              ['API Token (demo)', 'Ctrl+Shift+T', ':token:', 'Credentials', '••••••••••••••••••••••', 'Yes'],
+              ['Docker Compose Up', 'Ctrl+Shift+U', ':docker:', 'DevOps', 'docker compose up --build -d', 'Yes'],
+              ['Standard greeting', 'Ctrl+Alt+G', ':hello:', 'Customer Service', 'Hello, thank you for reaching out. I am happy to help...', 'Yes'],
               ['Customer service paragraph', 'Ctrl+Shift+P', ':resolve:', 'Customer Service', 'I reviewed the details and documented the next steps...', 'Yes'],
-              ['Support signature', 'Ctrl+Shift+S', ':sig:', 'Signature', 'Best regards / Michael Smith / Customer Support', 'Yes'],
-              ['Follow-up reminder', 'Ctrl+Shift+F', ':follow:', 'Customer Service', 'Just checking in to confirm whether the response helped.', 'Yes'],
-              ['Escalation note', 'Ctrl+Shift+E', ':escalate:', 'Internal Notes', 'Escalated for specialist review; update by end of day.', 'No'],
-              ['Appointment confirmation', 'Ctrl+Shift+A', ':appt:', 'Customer Service', 'Your appointment is confirmed. Reply if the time changes.', 'Yes'],
+              ['Support signature', 'Ctrl+Alt+S', ':sig:', 'Signature', 'Best regards / Michael Smith / Customer Support', 'Yes'],
             ],
             'native-table',
           )}

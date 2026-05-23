@@ -106,16 +106,46 @@ export const SEEDED_VAULT_STATE = {
   // and overridden to true for the macro-manager and macro-dialog captures.
   isVaultUnlocked: false,
 
-  // Seeded text macros. All hotkeys, labels, and values are fictional demo
-  // entries that show repeated customer communication instead of private data.
-  // No real passwords, tokens, API keys, or personal data appear here.
+  // Seeded macros. All hotkeys, labels, and values are fictional demo entries.
+  // The mix intentionally shows both the original secure-automation story and
+  // the newer repeated customer-communication use case without private data.
   macros: [
+    {
+      id: 'demo-macro-git-push',
+      label: 'Git Push Origin',
+      category: 'Development',
+      hotkey: 'Ctrl+Shift+G',
+      // The `value` field is what QuiKeys types when the macro fires.
+      // This safe command keeps the developer workflow visible without secrets.
+      value: 'git push origin main --follow-tags',
+      isMasked: false,
+      isEnabled: true,
+    },
+    {
+      id: 'demo-macro-deploy-staging',
+      label: 'Deploy to Staging',
+      category: 'DevOps',
+      hotkey: 'Ctrl+Shift+D',
+      value: 'npm run deploy:staging',
+      isMasked: false,
+      isEnabled: true,
+    },
+    {
+      id: 'demo-macro-api-token',
+      label: 'API Token (demo)',
+      category: 'Credentials',
+      hotkey: 'Ctrl+Shift+T',
+      // A clearly fictional token value. The masked flag demonstrates that
+      // sensitive-looking values can be protected in the manager table.
+      value: 'tok_demo_0000000000000000000000000000',
+      isMasked: true,
+      isEnabled: true,
+    },
     {
       id: 'demo-macro-standard-greeting',
       label: 'Standard greeting',
       category: 'Customer Service',
-      hotkey: 'Ctrl+Shift+G',
-      // The `value` field is what QuiKeys types when the macro fires.
+      hotkey: 'Ctrl+Alt+G',
       // This is a fictional service greeting that demonstrates repeated use.
       value: 'Hello, thank you for reaching out. I am happy to help with your request today.',
       isMasked: false,
@@ -134,17 +164,17 @@ export const SEEDED_VAULT_STATE = {
       id: 'demo-macro-support-signature',
       label: 'Support signature',
       category: 'Signature',
-      hotkey: 'Ctrl+Shift+S',
+      hotkey: 'Ctrl+Alt+S',
       value: 'Best regards,\nMichael Smith\nCustomer Support',
       isMasked: false,
       isEnabled: true,
     },
     {
-      id: 'demo-macro-follow-up',
-      label: 'Follow-up reminder',
-      category: 'Customer Service',
-      hotkey: 'Ctrl+Shift+F',
-      value: 'Just checking in to confirm whether the previous response resolved your question.',
+      id: 'demo-macro-docker-up',
+      label: 'Docker Compose Up',
+      category: 'DevOps',
+      hotkey: 'Ctrl+Shift+U',
+      value: 'docker compose up --build -d',
       isMasked: false,
       isEnabled: true,
     },
@@ -170,7 +200,7 @@ export const SEEDED_VAULT_STATE = {
 
   // Category list used by the macro manager dropdown. Must include every
   // category referenced in the macros array above.
-  categories: ['Customer Service', 'Signature', 'Internal Notes'],
+  categories: ['Development', 'DevOps', 'Credentials', 'Customer Service', 'Signature', 'Internal Notes'],
 };
 
 // ── Unlock-Flow Demo State ─────────────────────────────────────────────────────
@@ -257,22 +287,22 @@ export const WOW_MOMENTS = [
 
   {
     id: 'macro-manager',
-    title: 'Macro manager for reusable customer-service text',
+    title: 'Macro manager for secure automation and reusable text',
 
-    wowFactor: 'Shows how repeated support language becomes a one-keystroke workflow.',
+    wowFactor: 'Shows a flexible power-user workflow across commands, guarded values, and repeated text.',
 
     whatItShows:
-      'A mocked macro table with a standard greeting, customer service paragraph, follow-up, ' +
-      'and support signature so the desktop workflow reads like a real communication assistant.',
+      'A mocked macro table with deploy commands, a masked demo token, Docker automation, ' +
+      'a standard greeting, customer service paragraph, and support signature.',
 
     mockDataApproach:
-      'The table uses fictional customer-service language, safe hotkeys, and no real customer, ' +
-      'credential, or ticket data.',
+      'The table uses fictional developer commands, a deliberately masked demo token, and safe ' +
+      'customer-service language with no real customer, credential, or ticket data.',
 
     capturePlan:
       'Start QuiKeys with isVaultUnlocked=true and the full seeded macro list. ' +
       'Wait for the main manager window to appear. Ensure the macro table is scrolled ' +
-      'to the top so all six rows are visible (or as many as fit without scrolling). ' +
+      'to the top so the blended automation and text rows are visible. ' +
       'Capture the full window bounds.',
 
     expectedWindowTitle: 'QuiKeys',
@@ -350,15 +380,15 @@ export const QUIKEYS_APP = {
   slug: 'quikeys',
   name: 'QuiKeys',
   tagline:
-    'Secure keyboard automation for reusable greetings, signatures, and support responses.',
+    'Secure keyboard automation for commands, guarded values, reusable greetings, and support responses.',
   summary:
-    'QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted local storage, and operator-focused UX through a practical support workflow: save a standard greeting, a customer service paragraph, and a signature once, then reuse them with a hotkey or text trigger.',
+    'QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted local storage, and operator-focused UX through a practical mix of secure automation and reusable text: save commands, masked demo credentials, a standard greeting, a customer service paragraph, and a signature once, then reuse them with a hotkey or text trigger.',
   accent: QUIKEYS_ACCENT_COLOUR,
   category: 'Native desktop utility',
   launchSurface: 'python src\\main.py',
   techStack: ['Python', 'Tkinter', 'Pillow', 'cryptography'],
   proofNote:
-    'All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded customer-service macro data.',
+    'All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded automation plus customer-service macro data.',
   features: WOW_MOMENTS.map((wowMoment) => ({
     id: wowMoment.id,
     title: wowMoment.title,

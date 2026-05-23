@@ -50,7 +50,7 @@ test('MBL2PC portfolio copy uses the concise PC device label', () => {
   assert.match(JSON.stringify(mbl2pcPortfolioApp), /\bPC\b/);
 });
 
-test('QuiKeys portfolio focuses on reusable service text snippets', () => {
+test('QuiKeys portfolio blends secure automation with reusable service text snippets', () => {
   const quikeysPortfolioApp = PORTFOLIO_APPS.find((portfolioApp) => portfolioApp.slug === 'quikeys');
   const quikeysPortfolioJson = JSON.stringify(quikeysPortfolioApp);
   const assetBuilderSource = fs.readFileSync(
@@ -65,7 +65,10 @@ test('QuiKeys portfolio focuses on reusable service text snippets', () => {
   assert.match(assetBuilderSource, /Customer service paragraph/);
   assert.match(assetBuilderSource, /Standard greeting/);
   assert.match(assetBuilderSource, /Support signature/);
-  assert.doesNotMatch(quikeysPortfolioJson, /API Token|Docker Compose|Deploy to Staging/);
+  assert.match(quikeysPortfolioJson, /secure automation/i);
+  assert.match(assetBuilderSource, /API Token/);
+  assert.match(assetBuilderSource, /Docker Compose/);
+  assert.match(assetBuilderSource, /Deploy to Staging/);
 });
 
 function readPngDimensions(assetPath) {

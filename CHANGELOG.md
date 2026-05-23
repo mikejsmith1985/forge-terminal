@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Portfolio module URLs now bust GitHub Pages cache** — Added static cache-busting query strings to the portfolio app/data module URLs so public visitors receive the latest deployed showcase copy immediately.
 - **MBL2PC portfolio device label now says PC** — Simplified the mocked sender label from "Work PC" to "PC" in the portfolio copy, refreshed MBL2PC screenshots, and bumped the portfolio cache key so public visitors receive the concise label.
 - **QuiKeys portfolio now highlights reusable service snippets** — Reframed the QuiKeys showcase around standard greetings, customer-service paragraphs, follow-up text, and support signatures instead of developer command macros.
+- **QuiKeys portfolio now blends service snippets with secure automation** — Restored the original command, deploy, Docker, and masked demo-token examples while keeping reusable greetings, customer-service paragraphs, and signatures in the same showcase.
 
 ### Fixed
 - **Terminal sessions now survive Windows sleep instead of reopening as fresh shells** — Forge previously treated `PBT_APMSUSPEND` as a signal to close every live and detached PTY before the machine slept. After resume, reconnect created a new prompt because the original shell had already been destroyed. Forge now records the suspend event without tearing down PTYs, and any disconnect that happens shortly after wake receives an extended reconnect grace window so the original shell can be reattached instead of replaced.
