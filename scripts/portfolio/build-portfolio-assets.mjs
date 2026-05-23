@@ -623,7 +623,7 @@ function createQuiKeysUnlockScreen() {
         <div class="native-title">QuiKeys - Unlock encrypted vault</div>
         <div class="native-body">
           <h1 style="margin:0 0 8px;">Unlock QuiKeys</h1>
-          <p style="margin:0 0 18px;color:#4b5563;">Local encrypted macro vault. No cloud account is required.</p>
+          <p style="margin:0 0 18px;color:#4b5563;">Local encrypted vault for reusable greetings, signatures, and support responses.</p>
           <label>Master password</label>
           <input class="native-input" value="••••••••••••" />
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
@@ -645,18 +645,18 @@ function createQuiKeysManagerScreen() {
         <div class="native-title">QuiKeys - Macro Manager</div>
         <div class="native-body">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div><h1 style="margin:0;">Macro Manager</h1><p style="margin:4px 0 0;color:#4b5563;">Operational shortcuts, guarded secrets, hotkeys, and text triggers.</p></div>
+            <div><h1 style="margin:0;">Macro Manager</h1><p style="margin:4px 0 0;color:#4b5563;">Reusable customer-service text, signatures, hotkeys, and text triggers.</p></div>
             <div class="native-buttons" style="margin:0;"><button class="native-button primary">Add Macro</button><button class="native-button">Edit</button><button class="native-button">Lock Vault</button></div>
           </div>
           ${createDataTable(
             ['Name', 'Hotkey', 'Trigger', 'Category', 'Value', 'Enabled'],
             [
-              ['Git Push Origin', 'Ctrl+Shift+G', ':push:', 'Development', 'git push origin main --follow-tags', 'Yes'],
-              ['Deploy to Staging', 'Ctrl+Shift+D', ':deploy:', 'DevOps', 'npm run deploy:staging', 'Yes'],
-              ['API Token (demo)', 'Ctrl+Shift+T', ':token:', 'Credentials', '••••••••••••••••••••••', 'Yes'],
-              ['Daily Standup', 'Ctrl+Shift+S', ':standup:', 'Communication', 'Yesterday / Today / Blockers template', 'Yes'],
-              ['SSH Demo Server', 'Ctrl+Shift+H', ':ssh:', 'Infrastructure', 'ssh demo@192.0.2.42', 'No'],
-              ['Docker Compose Up', 'Ctrl+Shift+U', ':docker:', 'DevOps', 'docker compose up --build -d', 'Yes'],
+              ['Standard greeting', 'Ctrl+Shift+G', ':hello:', 'Customer Service', 'Hello, thank you for reaching out. I am happy to help...', 'Yes'],
+              ['Customer service paragraph', 'Ctrl+Shift+P', ':resolve:', 'Customer Service', 'I reviewed the details and documented the next steps...', 'Yes'],
+              ['Support signature', 'Ctrl+Shift+S', ':sig:', 'Signature', 'Best regards / Michael Smith / Customer Support', 'Yes'],
+              ['Follow-up reminder', 'Ctrl+Shift+F', ':follow:', 'Customer Service', 'Just checking in to confirm whether the response helped.', 'Yes'],
+              ['Escalation note', 'Ctrl+Shift+E', ':escalate:', 'Internal Notes', 'Escalated for specialist review; update by end of day.', 'No'],
+              ['Appointment confirmation', 'Ctrl+Shift+A', ':appt:', 'Customer Service', 'Your appointment is confirmed. Reply if the time changes.', 'Yes'],
             ],
             'native-table',
           )}
@@ -673,16 +673,19 @@ function createQuiKeysDialogScreen() {
       <div class="native-window" style="width:720px;margin-top:70px;">
         <div class="native-title">QuiKeys - Add Macro</div>
         <div class="native-body">
-          <h1 style="margin:0 0 14px;">Add automation rule</h1>
+          <h1 style="margin:0 0 14px;">Add reusable service response</h1>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-            <div><label>Name</label><input class="native-input" value="Build and Test" /></div>
-            <div><label>Category</label><select class="native-select"><option>Development</option></select></div>
-            <div><label>Hotkey</label><input class="native-input" value="Ctrl+Shift+B" /></div>
-            <div><label>Text trigger</label><input class="native-input" value=":build:" /></div>
+            <div><label>Name</label><input class="native-input" value="Customer service paragraph" /></div>
+            <div><label>Category</label><select class="native-select"><option>Customer Service</option></select></div>
+            <div><label>Hotkey</label><input class="native-input" value="Ctrl+Shift+P" /></div>
+            <div><label>Text trigger</label><input class="native-input" value=":resolve:" /></div>
           </div>
-          <div style="margin-top:14px;"><label>Text or command typed by the macro</label><textarea class="native-textarea">npm run build && npm test</textarea></div>
+          <div style="margin-top:14px;"><label>Text typed by the macro</label><textarea class="native-textarea">I reviewed the details you provided and documented the next steps. I will follow up as soon as the update is ready.
+
+Best regards,
+Michael Smith</textarea></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
-            <div><label>Mask value in manager table</label><div class="native-input">No - command is safe to display</div></div>
+            <div><label>Mask value in manager table</label><div class="native-input">No - service text is safe to display</div></div>
             <div><label>Enabled</label><div class="native-input">Yes - available after save</div></div>
           </div>
           <div class="native-buttons"><button class="native-button">Cancel</button><button class="native-button primary">Save Macro</button></div>

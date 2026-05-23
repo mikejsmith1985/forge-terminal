@@ -106,65 +106,63 @@ export const SEEDED_VAULT_STATE = {
   // and overridden to true for the macro-manager and macro-dialog captures.
   isVaultUnlocked: false,
 
-  // Seeded macros. All hotkeys, labels, and values are fictional demo entries.
+  // Seeded text macros. All hotkeys, labels, and values are fictional demo
+  // entries that show repeated customer communication instead of private data.
   // No real passwords, tokens, API keys, or personal data appear here.
   macros: [
     {
-      id: 'demo-macro-git-push',
-      label: 'Git Push Origin',
-      category: 'Development',
+      id: 'demo-macro-standard-greeting',
+      label: 'Standard greeting',
+      category: 'Customer Service',
       hotkey: 'Ctrl+Shift+G',
       // The `value` field is what QuiKeys types when the macro fires.
-      // Using a generic safe command that looks plausible on screen.
-      value: 'git push origin main --follow-tags',
+      // This is a fictional service greeting that demonstrates repeated use.
+      value: 'Hello, thank you for reaching out. I am happy to help with your request today.',
       isMasked: false,
       isEnabled: true,
     },
     {
-      id: 'demo-macro-deploy-staging',
-      label: 'Deploy to Staging',
-      category: 'DevOps',
-      hotkey: 'Ctrl+Shift+D',
-      value: 'npm run deploy:staging',
+      id: 'demo-macro-service-paragraph',
+      label: 'Customer service paragraph',
+      category: 'Customer Service',
+      hotkey: 'Ctrl+Shift+P',
+      value: 'I reviewed the details you provided and documented the next steps. I will follow up as soon as the update is ready.',
       isMasked: false,
       isEnabled: true,
     },
     {
-      id: 'demo-macro-api-token',
-      label: 'API Token (demo)',
-      category: 'Credentials',
-      hotkey: 'Ctrl+Shift+T',
-      // A clearly fictional token value. The masked flag means QuiKeys
-      // displays asterisks in the manager table — exactly the UX moment
-      // the screenshot is designed to show.
-      value: 'tok_demo_0000000000000000000000000000',
-      isMasked: true,
-      isEnabled: true,
-    },
-    {
-      id: 'demo-macro-standup-template',
-      label: 'Daily Standup',
-      category: 'Communication',
+      id: 'demo-macro-support-signature',
+      label: 'Support signature',
+      category: 'Signature',
       hotkey: 'Ctrl+Shift+S',
-      value: 'Yesterday: completed feature work.\nToday: code review and testing.\nBlockers: none.',
+      value: 'Best regards,\nMichael Smith\nCustomer Support',
       isMasked: false,
       isEnabled: true,
     },
     {
-      id: 'demo-macro-ssh-demo',
-      label: 'SSH Demo Server',
-      category: 'Infrastructure',
-      hotkey: 'Ctrl+Shift+H',
-      value: 'ssh demo@192.0.2.42',
+      id: 'demo-macro-follow-up',
+      label: 'Follow-up reminder',
+      category: 'Customer Service',
+      hotkey: 'Ctrl+Shift+F',
+      value: 'Just checking in to confirm whether the previous response resolved your question.',
+      isMasked: false,
+      isEnabled: true,
+    },
+    {
+      id: 'demo-macro-escalation-note',
+      label: 'Escalation note',
+      category: 'Internal Notes',
+      hotkey: 'Ctrl+Shift+E',
+      value: 'Escalated for specialist review. Customer has been notified that an update will be provided by end of day.',
       isMasked: false,
       isEnabled: false, // Disabled macro demonstrates the enabled/disabled toggle.
     },
     {
-      id: 'demo-macro-docker-up',
-      label: 'Docker Compose Up',
-      category: 'DevOps',
-      hotkey: 'Ctrl+Shift+U',
-      value: 'docker compose up --build -d',
+      id: 'demo-macro-appointment-confirmation',
+      label: 'Appointment confirmation',
+      category: 'Customer Service',
+      hotkey: 'Ctrl+Shift+A',
+      value: 'Your appointment is confirmed. Please reply if the scheduled time no longer works.',
       isMasked: false,
       isEnabled: true,
     },
@@ -172,7 +170,7 @@ export const SEEDED_VAULT_STATE = {
 
   // Category list used by the macro manager dropdown. Must include every
   // category referenced in the macros array above.
-  categories: ['Development', 'DevOps', 'Credentials', 'Communication', 'Infrastructure'],
+  categories: ['Customer Service', 'Signature', 'Internal Notes'],
 };
 
 // ── Unlock-Flow Demo State ─────────────────────────────────────────────────────
@@ -206,10 +204,10 @@ export const MACRO_MANAGER_OVERRIDES = {
 // but safe example. The capture helper passes these values to QuiKeys via the
 // PORTFOLIO_PREFILL_MACRO environment variable so the dialog opens populated.
 export const MACRO_DIALOG_PREFILL = {
-  label: 'Build and Test',
-  category: 'Development',
-  hotkey: 'Ctrl+Shift+B',
-  value: 'npm run build && npm test',
+  label: 'Customer service paragraph',
+  category: 'Customer Service',
+  hotkey: 'Ctrl+Shift+P',
+  value: 'I reviewed the details you provided and documented the next steps. I will follow up as soon as the update is ready.',
   isMasked: false,
   isEnabled: true,
 };
@@ -259,17 +257,17 @@ export const WOW_MOMENTS = [
 
   {
     id: 'macro-manager',
-    title: 'Macro manager for operational shortcuts and guarded secrets',
+    title: 'Macro manager for reusable customer-service text',
 
-    wowFactor: 'Shows a power-user table workflow with strong utility value.',
+    wowFactor: 'Shows how repeated support language becomes a one-keystroke workflow.',
 
     whatItShows:
-      'A mocked macro table with names, hotkeys, triggers, categories, actions, and a masked ' +
-      'token row so the desktop workflow reads like a real power-user manager.',
+      'A mocked macro table with a standard greeting, customer service paragraph, follow-up, ' +
+      'and support signature so the desktop workflow reads like a real communication assistant.',
 
     mockDataApproach:
-      'The table uses fictional Development, Communication, DevOps, and Credentials rows; ' +
-      'the token-like value is deliberately masked with bullets.',
+      'The table uses fictional customer-service language, safe hotkeys, and no real customer, ' +
+      'credential, or ticket data.',
 
     capturePlan:
       'Start QuiKeys with isVaultUnlocked=true and the full seeded macro list. ' +
@@ -286,17 +284,17 @@ export const WOW_MOMENTS = [
 
   {
     id: 'macro-dialog',
-    title: 'Add and edit dialog for secure automation rules',
+    title: 'Add and edit dialog for service paragraph templates',
 
-    wowFactor: 'Shows detail-oriented form design inside a desktop app.',
+    wowFactor: 'Shows that long, repeated response text can be standardized without memorizing it.',
 
     whatItShows:
-      'A mocked add/edit dialog with name, safe command text, hotkey, text trigger, category, ' +
-      'and masking choice visible before the user saves the automation.',
+      'A mocked add/edit dialog for a reusable customer service paragraph, including label, ' +
+      'category, hotkey, text trigger, and the exact paragraph that QuiKeys would type.',
 
     mockDataApproach:
-      'The dialog is prefilled with a fictional Build and Test macro using a safe npm command, ' +
-      'not a password, token, or private shortcut.',
+      'The dialog is prefilled with fictional support language, not a real customer message, ' +
+      'password, token, or private shortcut.',
 
     capturePlan:
       'Start QuiKeys with the vault unlocked and open the add/edit dialog ' +
@@ -352,15 +350,15 @@ export const QUIKEYS_APP = {
   slug: 'quikeys',
   name: 'QuiKeys',
   tagline:
-    'Secure keyboard automation and credential helper built as a native desktop experience.',
+    'Secure keyboard automation for reusable greetings, signatures, and support responses.',
   summary:
-    'QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted storage, and operator-focused UX in a compact product that feels genuinely useful.',
+    'QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted local storage, and operator-focused UX through a practical support workflow: save a standard greeting, a customer service paragraph, and a signature once, then reuse them with a hotkey or text trigger.',
   accent: QUIKEYS_ACCENT_COLOUR,
   category: 'Native desktop utility',
   launchSurface: 'python src\\main.py',
   techStack: ['Python', 'Tkinter', 'Pillow', 'cryptography'],
   proofNote:
-    'All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded macro data.',
+    'All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded customer-service macro data.',
   features: WOW_MOMENTS.map((wowMoment) => ({
     id: wowMoment.id,
     title: wowMoment.title,
