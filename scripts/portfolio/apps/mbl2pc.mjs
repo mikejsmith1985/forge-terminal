@@ -25,7 +25,7 @@ export const MBL2PC_APP = {
       whatItShows:
         'A real MBL2PC message thread where a phone sends a portfolio link that renders better on desktop, then the PC returns a downloadable resume PDF for mobile use.',
       mockDataApproach:
-        'The thread uses safe portfolio values: a public GitHub Pages link, a fictional Work PC sender, and a renamed resume PDF file card rather than any private document.',
+        'The thread uses safe portfolio values: a public GitHub Pages link, a fictional PC sender, and a renamed resume PDF file card rather than any private document.',
       capturePlan:
         'Open /send.html on the local test server and capture after the first .bubble element is rendered.',
       imageKind: 'real-ui',

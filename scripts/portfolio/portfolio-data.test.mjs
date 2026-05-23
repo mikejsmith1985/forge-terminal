@@ -42,6 +42,14 @@ test('runtime portfolio data stays aligned with the shared registry', () => {
   assert.deepEqual(PORTFOLIO_APPS, PORTFOLIO_APP_DEFINITIONS);
 });
 
+test('MBL2PC portfolio copy uses the concise PC device label', () => {
+  const mbl2pcPortfolioApp = PORTFOLIO_APPS.find((portfolioApp) => portfolioApp.slug === 'mbl2pc');
+
+  assert.ok(mbl2pcPortfolioApp, 'MBL2PC should be present in the public portfolio data.');
+  assert.doesNotMatch(JSON.stringify(mbl2pcPortfolioApp), /Work PC/);
+  assert.match(JSON.stringify(mbl2pcPortfolioApp), /\bPC\b/);
+});
+
 function readPngDimensions(assetPath) {
   const pngHeader = fs.readFileSync(assetPath);
 
