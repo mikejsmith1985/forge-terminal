@@ -148,8 +148,8 @@ export const PORTFOLIO_APPS = [
   {
     "slug": "mbl2pc",
     "name": "MBL2PC",
-    "tagline": "Phone-to-PC messaging experience with uploads, snippets, and personalization in one lightweight app.",
-    "summary": "MBL2PC tells a strong story about end-user empathy: cross-device messaging, quick sharing, and personalization. The local test server makes it ideal for a demo-safe portfolio because the real UI already works with seeded messages.",
+    "tagline": "Phone-to-PC file handoff, link sharing, snippets, and messaging in one lightweight app.",
+    "summary": "MBL2PC tells a strong story about end-user empathy: move a link from phone to PC, send a resume file back to mobile, and save reusable snippets without context switching. The local test server makes it ideal for a demo-safe portfolio because the real UI works with seeded messages, files, and snippets.",
     "accent": "#ff8a4c",
     "category": "Cross-device utility",
     "launchSurface": "python test_local.py",
@@ -163,30 +163,30 @@ export const PORTFOLIO_APPS = [
     "features": [
       {
         "id": "chat-dashboard",
-        "title": "Rich chat dashboard with search, pinning, and timeline depth",
-        "wowFactor": "Shows consumer-style UX polish with real utility features.",
-        "whatItShows": "A mocked message dashboard with seeded phone-to-PC messages, quick actions, pinned context, and a polished conversation layout.",
-        "mockDataApproach": "The thread uses a fictional Demo Phone and Product Review conversation with generic notes, links, and handoff actions.",
+        "title": "Phone-to-PC link and resume handoff",
+        "wowFactor": "Shows practical cross-device utility instead of a basic chat demo.",
+        "whatItShows": "A real MBL2PC message thread where a phone sends a portfolio link that renders better on desktop, then the PC returns a downloadable resume PDF for mobile use.",
+        "mockDataApproach": "The thread uses safe portfolio values: a public GitHub Pages link, a fictional Work PC sender, and a renamed resume PDF file card rather than any private document.",
         "capturePlan": "Open /send.html on the local test server and capture after the first .bubble element is rendered.",
         "imageKind": "real-ui",
         "imagePath": "./assets/mbl2pc/mbl2pc-chat-dashboard.png"
       },
       {
         "id": "dark-mode-theme",
-        "title": "Theme system that supports light and dark use comfortably",
-        "wowFactor": "Shows attention to visual polish, readability, and day-to-day usability.",
-        "whatItShows": "A mocked theme settings screen showing dark-mode controls, a live message preview, palette choices, and density settings.",
-        "mockDataApproach": "The theme values are safe portfolio settings such as Midnight Ocean, Coral accent, and Comfortable density.",
+        "title": "Dark-mode file handoff with saved outreach snippets",
+        "wowFactor": "Shows the app is useful for real recruiting and field workflows, not just sending text bubbles.",
+        "whatItShows": "The same link-and-resume handoff in the shipped dark mobile UI, with saved snippets visible for resume notes, PC-friendly links, and follow-up language.",
+        "mockDataApproach": "The screenshot uses fictional snippet text and safe file names such as Michael_Smith_Resume_2026.pdf and Resume_Portfolio_Packet.zip.",
         "capturePlan": "Switch the live page into dark theme, wait for the surface colors to settle, and capture the full messaging viewport.",
         "imageKind": "real-ui",
         "imagePath": "./assets/mbl2pc/mbl2pc-dark-mode-theme.png"
       },
       {
         "id": "search-and-theme",
-        "title": "Search and personalization working together in the same flow",
-        "wowFactor": "Highlights practical utility layered on top of a visually distinctive interface.",
-        "whatItShows": "A mocked search screen with a release-notes query, matching message threads, active palette context, snippets, and file handoff state.",
-        "mockDataApproach": "The search results are fictional product-review, dev-sync, and QA-thread records rather than real messages or device identifiers.",
+        "title": "Searchable file history and reusable snippets",
+        "wowFactor": "Highlights a productivity loop: find the file handoff later and reuse the exact outreach text.",
+        "whatItShows": "A real search result filtered to resume-related handoffs, showing the downloadable PDF, a zipped portfolio packet, and saved snippets ready to copy.",
+        "mockDataApproach": "The search term, file names, and snippet contents are seeded portfolio examples that demonstrate the workflow without exposing private messages.",
         "capturePlan": "Apply the ocean palette, enter a safe search term, and capture the filtered live view.",
         "imageKind": "real-ui",
         "imagePath": "./assets/mbl2pc/mbl2pc-search-and-theme.png"
