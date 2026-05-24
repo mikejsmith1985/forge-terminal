@@ -117,7 +117,7 @@ func (t *environmentRunTool) Execute(args map[string]any) (*CallToolResult, erro
 	runCtx, cancelRun := context.WithTimeout(context.Background(), timeout)
 	defer cancelRun()
 
-	runResult, runErr := runInEnvironment(runCtx, t.runner, RunOptions{
+	runResult, runErr := RunInEnvironment(runCtx, t.runner, RunOptions{
 		Command:          parsedArgs.Command,
 		Environment:      parsedArgs.Environment,
 		WorkingDirectory: parsedArgs.WorkingDirectory,

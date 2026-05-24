@@ -309,7 +309,7 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 	// OS process runner that shells out to wsl.exe / docker / cmd.exe.
 	environmentRunner := srv.deps.EnvironmentCommandRunner
 	if environmentRunner == nil {
-		environmentRunner = &realCommandRunner{}
+		environmentRunner = &RealCommandRunner{}
 	}
 
 	candidates := []ToolHandler{

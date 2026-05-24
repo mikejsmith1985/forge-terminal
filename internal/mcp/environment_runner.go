@@ -87,14 +87,14 @@ type RunOutput struct {
 
 // realCommandRunner executes commands using the OS process API.
 // Tests use mockCommandRunner or testCommandRunner instead.
-type realCommandRunner struct{}
+type RealCommandRunner struct{}
 
 // RunCommand forks a child process, captures stdout and stderr separately,
 // and returns them along with the exit code.
 //
 // suppressConsoleWindow is called before Start so that wsl.exe and cmd.exe
 // do not pop a visible terminal window when Forge itself is the terminal.
-func (r *realCommandRunner) RunCommand(ctx context.Context, name string, args []string) (RunOutput, error) {
+func (r *RealCommandRunner) RunCommand(ctx context.Context, name string, args []string) (RunOutput, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	suppressConsoleWindow(cmd) // platform-specific; no-op on non-Windows
 
@@ -288,7 +288,7 @@ type EnvironmentRunResult struct {
 
 // runInEnvironment executes the command described by opts using the appropriate
 // strategy, returning structured output including the exit code and timing.
-func runInEnvironment(ctx context.Context, runner CommandRunner, opts RunOptions) (EnvironmentRunResult, error) {
+func RunInEnvironment(ctx context.Context, runner CommandRunner, opts RunOptions) (EnvironmentRunResult, error) {
 	startTime := time.Now()
 
 	strategy := resolveConcreteStrategy(opts.Environment, runner)
@@ -357,3 +357,4 @@ func clampTimeout(requestedSeconds int) int {
 	}
 	return requestedSeconds
 }
+
