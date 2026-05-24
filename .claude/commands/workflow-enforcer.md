@@ -7,9 +7,8 @@ You have invoked the Forge Workflow circuit breaker. This skill is the gatekeepe
 1. **Invoke `forge-workflow`** — loads the 5-Phase execution plan you will follow for this task
 2. **Invoke `code-quality`** — loads naming conventions and comment standards that apply to every line you write
 3. **Invoke `branching-strategy`** — enforces branch creation before the first file edit
-4. **Invoke `code-tutor-workflow`** — user expects a clear walkthrough of every change you make
 
-Do not read any files, write any code, or run any commands until all four companion skills are loaded.
+Do not read any files, write any code, or run any commands until all three companion skills are loaded.
 
 ## Hard rules that apply after skills are loaded
 

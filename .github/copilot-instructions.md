@@ -8,7 +8,6 @@
 2. `forge-workflow`
 3. `code-quality`
 4. `branching-strategy`
-5. `code-tutor-workflow` — user always expects a walkthrough of changes
 
 For 3+ files: also invoke `multi-agent`.
 For tests: also invoke `testing-standards`.
@@ -274,7 +273,6 @@ This is not a reference list — it is a mandatory pre-flight sequence:
 2. `forge-workflow` — immediately after
 3. `code-quality` — naming, comments, readability enforcement
 4. `branching-strategy` — creates the branch requirement gate
-5. `code-tutor-workflow` — user expects a walkthrough of every change
 
 For tasks spanning 3+ files: also invoke `multi-agent` before starting.
 For test changes: also invoke `testing-standards`.

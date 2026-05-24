@@ -32,10 +32,9 @@ For reference, the full required sequence is:
 | 2 | `forge-workflow` | **ALL** code tasks |
 | 3 | `code-quality` | **ALL** code tasks |
 | 4 | `branching-strategy` | **ALL** code tasks (branch must exist before code) |
-| 5 | `code-tutor-workflow` | **ALL** code tasks — user expects walkthrough of changes |
-| 6 | `multi-agent` | Tasks spanning 3+ files |
-| 7 | `testing-standards` | Any test creation or modification |
-| 8 | `pr-workflow` | Creating or reviewing pull requests |
+| 5 | `multi-agent` | Tasks spanning 3+ files |
+| 6 | `testing-standards` | Any test creation or modification |
+| 7 | `pr-workflow` | Creating or reviewing pull requests |
 
 ---
 
