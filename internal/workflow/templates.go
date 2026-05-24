@@ -250,8 +250,12 @@ var skillTemplates = map[ModuleID]string{
 	ModulePRWorkflow:        prWorkflowSkill,
 	ModuleDocumentation:     documentationSkill,
 	ModuleMultiAgent:        multiAgentSkill,
-
 	ModuleWorkflowEnforcer:  workflowEnforcerSkill,
+	// Forge MCP Tool Skills
+	ModuleForgeVault:          forgeVaultSkill,
+	ModuleAdaptiveBuildEnv:    adaptiveBuildEnvSkill,
+	ModuleForgeReleaseProcess: forgeReleaseProcessSkill,
+	ModuleSequentialTasks:     sequentialTasksSkill,
 }
 
 var branchingStrategySkill = `---

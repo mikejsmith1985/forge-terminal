@@ -94,6 +94,31 @@ func scaffoldManifest() []scaffoldEntry {
 			category: "skill",
 			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleWorkflowEnforcer, c) },
 		},
+		// Forge MCP Tool Skills
+		{
+			moduleID: ModuleForgeVault,
+			relPath:  filepath.Join(".github", "skills", "forge-vault", "SKILL.md"),
+			category: "skill",
+			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleForgeVault, c) },
+		},
+		{
+			moduleID: ModuleAdaptiveBuildEnv,
+			relPath:  filepath.Join(".github", "skills", "adaptive-build-environments", "SKILL.md"),
+			category: "skill",
+			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleAdaptiveBuildEnv, c) },
+		},
+		{
+			moduleID: ModuleForgeReleaseProcess,
+			relPath:  filepath.Join(".github", "skills", "forge-release-process", "SKILL.md"),
+			category: "skill",
+			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleForgeReleaseProcess, c) },
+		},
+		{
+			moduleID: ModuleSequentialTasks,
+			relPath:  filepath.Join(".github", "skills", "sequential-tasks", "SKILL.md"),
+			category: "skill",
+			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleSequentialTasks, c) },
+		},
 		// Documentation: CHANGELOG
 		{
 			moduleID: ModuleDocumentation,

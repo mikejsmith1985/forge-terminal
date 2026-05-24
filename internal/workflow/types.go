@@ -46,14 +46,34 @@ const (
 	ModulePRWorkflow          ModuleID = "pr-workflow"
 	ModuleDocumentation       ModuleID = "documentation"
 	ModuleMultiAgent          ModuleID = "multi-agent"
-// ModuleCodeTutor removed — Code Tutor fully disabled
-	ModuleWorkflowEnforcer    ModuleID = "workflow-enforcer"
-	ModuleGitHooks            ModuleID = "git-hooks"
-	ModulePRTemplate          ModuleID = "pr-template"
+	// ModuleCodeTutor removed — Code Tutor fully disabled
+	ModuleWorkflowEnforcer ModuleID = "workflow-enforcer"
+	ModuleGitHooks         ModuleID = "git-hooks"
+	ModulePRTemplate       ModuleID = "pr-template"
 	// ModuleCopilotAgentSetup generates .github/copilot/setup-steps.yml, which
 	// pre-installs project dependencies in the Copilot coding agent's environment
 	// before it begins writing code or running tests.
 	ModuleCopilotAgentSetup ModuleID = "copilot-agent-setup"
+
+	// Forge MCP Tool Skills — teach agents about Forge Terminal's built-in MCP tools.
+	// These are universally useful in any project opened inside Forge Terminal.
+
+	// ModuleForgeVault teaches agents to check the encrypted local credential store
+	// before asking the user for API keys, usernames, or passwords.
+	ModuleForgeVault ModuleID = "forge-vault"
+
+	// ModuleAdaptiveBuildEnv teaches agents to use environment_detect and
+	// environment_run to run Linux-compatible builds from a Windows host without
+	// GitHub Actions or manual WSL configuration.
+	ModuleAdaptiveBuildEnv ModuleID = "adaptive-build-environments"
+
+	// ModuleForgeReleaseProcess enforces the local gh-CLI release pipeline so
+	// agents never create GitHub Actions workflows to publish releases.
+	ModuleForgeReleaseProcess ModuleID = "forge-release-process"
+
+	// ModuleSequentialTasks enforces task completion discipline: finish the
+	// active task before accepting a new one, preventing mid-task context switches.
+	ModuleSequentialTasks ModuleID = "sequential-tasks"
 )
 
 // AllModules returns every available module ID in recommended activation order.
@@ -66,11 +86,15 @@ func AllModules() []ModuleID {
 		ModulePRWorkflow,
 		ModuleDocumentation,
 		ModuleMultiAgent,
-
 		ModuleWorkflowEnforcer,
 		ModuleGitHooks,
 		ModulePRTemplate,
 		ModuleCopilotAgentSetup,
+		// Forge MCP Tool Skills
+		ModuleForgeVault,
+		ModuleAdaptiveBuildEnv,
+		ModuleForgeReleaseProcess,
+		ModuleSequentialTasks,
 	}
 }
 
@@ -164,6 +188,35 @@ func ModuleCatalog() []ModuleInfo {
 			Category:    "integration",
 			Required:    false,
 		},
+		// Forge MCP Tool Skills
+		{
+			ID:          ModuleForgeVault,
+			Name:        "Forge Vault Credential Access",
+			Description: "Teaches agents to check Forge Terminal's encrypted local vault before asking for API keys, passwords, or tokens.",
+			Category:    "integration",
+			Required:    false,
+		},
+		{
+			ID:          ModuleAdaptiveBuildEnv,
+			Name:        "Adaptive Build Environments",
+			Description: "Teaches agents to use environment_detect and environment_run MCP tools for Linux-compatible builds from Windows. Prevents broken chunk filenames and Windows-path build failures.",
+			Category:    "integration",
+			Required:    false,
+		},
+		{
+			ID:          ModuleForgeReleaseProcess,
+			Name:        "Forge Release Process",
+			Description: "Enforces the local gh-CLI release pipeline. Agents never create GitHub Actions workflows to publish releases.",
+			Category:    "enforcement",
+			Required:    false,
+		},
+		{
+			ID:          ModuleSequentialTasks,
+			Name:        "Sequential Task Discipline",
+			Description: "Agents complete the active task before accepting a new one, preventing mid-task context switches.",
+			Category:    "core",
+			Required:    false,
+		},
 	}
 }
 
@@ -251,6 +304,11 @@ func DefaultConfig() WorkflowConfig {
 			ModuleGitHooks,
 			ModulePRTemplate,
 			ModuleCopilotAgentSetup,
+			// Forge MCP Tool Skills — always enabled for Forge-managed projects
+			ModuleForgeVault,
+			ModuleAdaptiveBuildEnv,
+			ModuleForgeReleaseProcess,
+			ModuleSequentialTasks,
 		},
 		ConflictStrategy: ConflictSkip,
 
