@@ -144,6 +144,13 @@ func scaffoldManifest() []scaffoldEntry {
 			category: "hook",
 			render:   RenderPrePushPS1,
 		},
+		// Release pipeline: local gh CLI release script
+		{
+			moduleID: ModuleGitHooks,
+			relPath:  filepath.Join("scripts", "local-release.ps1"),
+			category: "release",
+			render:   RenderLocalReleasePS1,
+		},
 		// Enforcement: PR template
 		{
 			moduleID: ModulePRTemplate,

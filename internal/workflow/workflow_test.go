@@ -482,6 +482,31 @@ func TestScaffoldProject_CreatesAgentsMD(t *testing.T) {
 	}
 }
 
+func TestScaffoldProject_CreatesLocalReleaseScript(t *testing.T) {
+	tempDir := t.TempDir()
+
+	config := DefaultConfig()
+	config.ProjectName = "release-script-test"
+
+	if _, err := ScaffoldProject(tempDir, config); err != nil {
+		t.Fatalf("ScaffoldProject() error: %v", err)
+	}
+
+	releaseScriptPath := filepath.Join(tempDir, "scripts", "local-release.ps1")
+	releaseScriptContent, readErr := os.ReadFile(releaseScriptPath)
+	if readErr != nil {
+		t.Fatalf("scripts/local-release.ps1 was not created on disk: %v", readErr)
+	}
+
+	releaseScript := string(releaseScriptContent)
+	if !containsString(releaseScript, "gh release create") {
+		t.Error("local release script should create GitHub releases through the gh CLI")
+	}
+	if !containsString(releaseScript, "chore: release $releaseTag") {
+		t.Error("local release script should use a commit-msg-hook-compliant release commit")
+	}
+}
+
 func TestScaffoldProject_SkipExistingFiles(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -733,6 +758,30 @@ func TestRenderPrePushSH(t *testing.T) {
 	}
 	if !containsString(result, "go test") {
 		t.Error("Pre-push SH missing Go test command")
+	}
+}
+
+func TestRenderLocalReleasePS1(t *testing.T) {
+	config := DefaultConfig()
+	config.ProjectName = "release-render-test"
+
+	renderedScript, err := RenderLocalReleasePS1(config)
+	if err != nil {
+		t.Fatalf("RenderLocalReleasePS1() error: %v", err)
+	}
+
+	requiredSnippets := []string{
+		"scripts/local-release.ps1",
+		"npm version $releaseTag",
+		"git merge $originalBranch --no-edit",
+		"git tag $releaseTag",
+		"gh release create $releaseTag",
+		"chore: release $releaseTag",
+	}
+	for _, snippet := range requiredSnippets {
+		if !containsString(renderedScript, snippet) {
+			t.Errorf("RenderLocalReleasePS1() missing required release pipeline snippet: %s", snippet)
+		}
 	}
 }
 

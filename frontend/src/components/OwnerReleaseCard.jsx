@@ -258,7 +258,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       }
     }
 
-    const msg = commitMessage.trim() || `Release ${next}`;
+    const msg = commitMessage.trim() || `chore: release ${next}`;
     
     // Auto-update package.json if it exists
     let versionBump = '';
@@ -545,7 +545,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
           <input
             type="text"
             className="orc-commit-input"
-            placeholder={`Release ${next}`}
+            placeholder={`chore: release ${next}`}
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             data-testid="commit-message-input"
@@ -568,7 +568,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
               <div className="orc-step-arrow">↓</div>
               <div className="orc-step"><Tag size={14} /> Create & push tag {next}</div>
               <div className="orc-step-arrow">↓</div>
-              <div className="orc-step"><Upload size={14} /> GitHub Actions builds release</div>
+              <div className="orc-step"><Upload size={14} /> Create GitHub Release locally</div>
             </>
           )}
         </div>

@@ -35,7 +35,7 @@ Test-Path "scripts\local-release.ps1"
 .\scripts\local-release.ps1 1.2.3    # exact version
 ```
 
-**If NO `scripts/local-release.ps1`** (most external projects): use the self-contained command below.
+**If NO `scripts/local-release.ps1`**: first prefer scaffolding the local release script from Forge Workflow. If scaffolding is not available, use the self-contained command below.
 
 ### Step 2B: Self-contained release command (no local-release.ps1)
 
@@ -52,7 +52,7 @@ if (Test-Path package.json) {
 if ($ver_success) {
     $b = git branch --show-current
     git add -A
-    if ($?) { git commit -m "Release $ver" --allow-empty
+    if ($?) { git commit -m "chore: release $ver" --allow-empty
     if ($?) { git push origin $b
     if ($?) { git checkout main
     if ($?) { git pull origin main
@@ -76,7 +76,7 @@ unset GH_TOKEN
 ver="vX.Y.Z"
 [ -f package.json ] && npm version $ver --no-git-tag-version --allow-same-version
 b=$(git branch --show-current)
-git add -A && git commit -m "Release $ver" --allow-empty \
+git add -A && git commit -m "chore: release $ver" --allow-empty \
   && git push origin $b \
   && git checkout main && git pull origin main \
   && git merge $b --no-edit && git push origin main \
@@ -111,7 +111,8 @@ git push origin main
 - `gh` CLI authenticated: `gh auth login` (use keyring, NOT `$env:GH_TOKEN`)
 - `git` with push access to origin
 - Remove `$env:GH_TOKEN` before running — a stale token overrides keyring auth and causes failures
-- For `local-release.ps1`: also needs `go` and `node`
+- For Forge Terminal's own `local-release.ps1`: also needs `go` and `node`
+- For scaffolded project scripts: project-specific build tools are only required if that script is customized to call them
 
 ---
 
@@ -142,5 +143,4 @@ The 🚀 Release Manager command card in Forge Terminal automatically generates 
 4. Pastes it into the terminal ready to run
 
 If the card isn't visible, restore it via Settings → Restore Release Manager.
-
 
