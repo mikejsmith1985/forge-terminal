@@ -120,6 +120,6 @@ const TOUR_STORAGE_KEY = 'forge_tour_completed';
 // Bump this version string whenever the tour content changes significantly.
 // Users who completed a lower-versioned tour will be shown the updated tour
 // on their next launch (checked in useGuidedTour.js).
-const TOUR_VERSION = '7.10.12';
+const TOUR_VERSION = '7.10.14';
 
 export { TOUR_STEPS, TOUR_STORAGE_KEY, TOUR_VERSION };
