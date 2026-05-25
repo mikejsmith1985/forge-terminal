@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Projects card folders now support right-click Copy Path** — Right-click any folder in the Projects browser to copy its full path without changing the active terminal directory.
+
 ## [7.10.15] - 2026-05-25
 
 ---

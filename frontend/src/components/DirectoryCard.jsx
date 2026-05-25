@@ -1,8 +1,15 @@
+// DirectoryCard renders the Projects browser and project creation shortcuts.
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Folder, FolderOpen, FolderPlus, RefreshCw, Settings, X, ChevronUp, ChevronDown, Github } from 'lucide-react';
+import { Folder, FolderOpen, FolderPlus, RefreshCw, Settings, X, ChevronUp, ChevronDown, Github, Copy } from 'lucide-react';
 import './DirectoryCard.css';
 
-const DirectoryCard = ({ onExecute, onHide }) => {
+const COPY_SUCCESS_TOAST_MS = 1500;
+const COPY_FAILURE_TOAST_MS = 2500;
+const COPY_SUCCESS_MESSAGE = 'Copied folder path';
+const COPY_FAILURE_MESSAGE = 'Failed to copy folder path';
+
+const DirectoryCard = ({ onExecute, onHide, onToast }) => {
   const [rootPath, setRootPath] = useState(() => localStorage.getItem('forge_directory_card_root') || '');
   const [editingPath, setEditingPath] = useState('');
   const [showPathInput, setShowPathInput] = useState(false);
@@ -11,7 +18,9 @@ const DirectoryCard = ({ onExecute, onHide }) => {
   const [error, setError] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredDir, setHoveredDir] = useState(null);
+  const [directoryContextMenu, setDirectoryContextMenu] = useState(null);
   const inputRef = useRef(null);
+  const contextMenuRef = useRef(null);
 
   // New Project wizard state
   const [showNewProject, setShowNewProject] = useState(false);
@@ -31,15 +40,15 @@ const DirectoryCard = ({ onExecute, onHide }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/directory/list?path=${encodeURIComponent(path.trim())}`);
-      if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `HTTP ${res.status}`);
+      const response = await fetch(`/api/directory/list?path=${encodeURIComponent(path.trim())}`);
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(errorMessage || `HTTP ${response.status}`);
       }
-      const data = await res.json();
-      setDirectories(data || []);
-    } catch (err) {
-      setError(err.message);
+      const directoryListing = await response.json();
+      setDirectories(directoryListing || []);
+    } catch (fetchError) {
+      setError(fetchError.message);
       setDirectories([]);
     } finally {
       setLoading(false);
@@ -58,6 +67,25 @@ const DirectoryCard = ({ onExecute, onHide }) => {
     }
   }, [showNewProject]);
 
+  useEffect(() => {
+    if (!directoryContextMenu) return undefined;
+
+    const closeMenuOnOutsideMouseDown = (event) => {
+      if (contextMenuRef.current?.contains(event.target)) return;
+      setDirectoryContextMenu(null);
+    };
+    const closeMenuOnEscape = (event) => {
+      if (event.key === 'Escape') setDirectoryContextMenu(null);
+    };
+
+    document.addEventListener('mousedown', closeMenuOnOutsideMouseDown);
+    document.addEventListener('keydown', closeMenuOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeMenuOnOutsideMouseDown);
+      document.removeEventListener('keydown', closeMenuOnEscape);
+    };
+  }, [directoryContextMenu]);
+
   const handleSavePath = () => {
     const trimmed = editingPath.trim();
     setRootPath(trimmed);
@@ -66,9 +94,9 @@ const DirectoryCard = ({ onExecute, onHide }) => {
     if (trimmed) fetchDirectories(trimmed);
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') handleSavePath();
-    if (e.key === 'Escape') setShowPathInput(false);
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter') handleSavePath();
+    if (event.key === 'Escape') setShowPathInput(false);
   };
 
   const handleShowInput = () => {
@@ -84,9 +112,37 @@ const DirectoryCard = ({ onExecute, onHide }) => {
     setError(null);
   };
 
-  const handleDirectoryClick = (dir) => {
+  const handleDirectoryClick = (directory) => {
     if (!onExecute) return;
-    onExecute({ command: `cd "${dir.path}"`, delay: 0 });
+    onExecute({ command: `cd "${directory.path}"`, delay: 0 });
+  };
+
+  const handleDirectoryContextMenu = (event, directory) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setHoveredDir(directory.path);
+    setDirectoryContextMenu({
+      directory,
+      horizontalPosition: event.clientX,
+      verticalPosition: event.clientY,
+    });
+  };
+
+  const handleCopyDirectoryPath = async () => {
+    if (!directoryContextMenu?.directory?.path) return;
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API is unavailable');
+      }
+      await navigator.clipboard.writeText(directoryContextMenu.directory.path);
+      onToast?.(COPY_SUCCESS_MESSAGE, 'success', COPY_SUCCESS_TOAST_MS);
+    } catch (clipboardError) {
+      console.error('[DirectoryCard] Failed to copy folder path:', clipboardError);
+      onToast?.(COPY_FAILURE_MESSAGE, 'error', COPY_FAILURE_TOAST_MS);
+    } finally {
+      setDirectoryContextMenu(null);
+    }
   };
 
   const handleCreateProject = async () => {
@@ -95,33 +151,33 @@ const DirectoryCard = ({ onExecute, onHide }) => {
     setCreating(true);
     setCreateError(null);
     try {
-      const res = await fetch('/api/project/create', {
+      const response = await fetch('/api/project/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         body: JSON.stringify({ name, rootPath, createGitHub, visibility: githubVisibility }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setCreateResult(data);
+      const projectCreationResult = await response.json();
+      if (!response.ok) throw new Error(projectCreationResult.error || `HTTP ${response.status}`);
+      setCreateResult(projectCreationResult);
       setNewProjectName('');
       fetchDirectories(rootPath);
-      if (onExecute) onExecute({ command: `cd "${data.path}"`, delay: 0 });
+      if (onExecute) onExecute({ command: `cd "${projectCreationResult.path}"`, delay: 0 });
       setTimeout(() => {
         setShowNewProject(false);
         setCreateResult(null);
         setCreateError(null);
       }, 2500);
-    } catch (err) {
-      setCreateError(err.message);
+    } catch (createProjectError) {
+      setCreateError(createProjectError.message);
     } finally {
       setCreating(false);
     }
   };
 
-  const handleNewProjectKeyDown = (e) => {
-    if (e.key === 'Enter') handleCreateProject();
-    if (e.key === 'Escape') {
+  const handleNewProjectKeyDown = (event) => {
+    if (event.key === 'Enter') handleCreateProject();
+    if (event.key === 'Escape') {
       setShowNewProject(false);
       setCreateError(null);
       setNewProjectName('');
@@ -134,7 +190,7 @@ const DirectoryCard = ({ onExecute, onHide }) => {
 
   return (
     <div className="directory-card">
-      <div className="directory-card-header" onClick={() => setCollapsed(c => !c)}>
+      <div className="directory-card-header" onClick={() => setCollapsed(isCurrentlyCollapsed => !isCurrentlyCollapsed)}>
         <div className="directory-card-title-group">
           <FolderOpen size={18} className="directory-card-icon" />
           <span className="directory-card-title">Projects</span>
@@ -144,13 +200,13 @@ const DirectoryCard = ({ onExecute, onHide }) => {
             </span>
           )}
         </div>
-        <div className="directory-card-actions" onClick={e => e.stopPropagation()}>
+        <div className="directory-card-actions" onClick={event => event.stopPropagation()}>
           <button
             className={`directory-card-action-btn ${showNewProject ? 'active' : ''}`}
             title={rootPath ? 'New Project' : 'Set a root directory first'}
             onClick={() => {
               if (!rootPath) return;
-              setShowNewProject(v => !v);
+              setShowNewProject(isCurrentlyVisible => !isCurrentlyVisible);
               setCreateError(null);
             }}
             disabled={!rootPath}
@@ -200,7 +256,7 @@ const DirectoryCard = ({ onExecute, onHide }) => {
                 className="directory-card-path-input"
                 type="text"
                 value={editingPath}
-                onChange={e => setEditingPath(e.target.value)}
+                onChange={event => setEditingPath(event.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="e.g. C:\Projects or ~/projects"
               />
@@ -233,7 +289,7 @@ const DirectoryCard = ({ onExecute, onHide }) => {
                       className="directory-card-path-input"
                       type="text"
                       value={newProjectName}
-                      onChange={e => setNewProjectName(e.target.value)}
+                      onChange={event => setNewProjectName(event.target.value)}
                       onKeyDown={handleNewProjectKeyDown}
                       placeholder="Project name"
                       disabled={creating}
@@ -251,7 +307,7 @@ const DirectoryCard = ({ onExecute, onHide }) => {
                       <input
                         type="checkbox"
                         checked={createGitHub}
-                        onChange={e => setCreateGitHub(e.target.checked)}
+                        onChange={event => setCreateGitHub(event.target.checked)}
                         disabled={creating}
                       />
                       <Github size={12} /> Create GitHub repo
@@ -309,19 +365,42 @@ const DirectoryCard = ({ onExecute, onHide }) => {
 
           {rootPath && !error && directories.length > 0 && (
             <div className="directory-card-grid">
-              {directories.map(dir => (
+              {directories.map(directory => (
                 <button
-                  key={dir.path}
-                  className={`directory-card-folder-btn ${hoveredDir === dir.path ? 'hovered' : ''}`}
-                  onClick={() => handleDirectoryClick(dir)}
-                  onMouseEnter={() => setHoveredDir(dir.path)}
+                  key={directory.path}
+                  className={`directory-card-folder-btn ${hoveredDir === directory.path ? 'hovered' : ''}`}
+                  onClick={() => handleDirectoryClick(directory)}
+                  onContextMenu={(event) => handleDirectoryContextMenu(event, directory)}
+                  onMouseEnter={() => setHoveredDir(directory.path)}
                   onMouseLeave={() => setHoveredDir(null)}
-                  title={dir.path}
+                  title={directory.path}
                 >
                   <Folder size={14} />
-                  <span>{dir.name}</span>
+                  <span>{directory.name}</span>
                 </button>
               ))}
+              {directoryContextMenu && (
+                <div
+                  ref={contextMenuRef}
+                  className="directory-card-context-menu"
+                  role="menu"
+                  style={{
+                    top: directoryContextMenu.verticalPosition,
+                    left: directoryContextMenu.horizontalPosition,
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="directory-card-context-menu-item"
+                    role="menuitem"
+                    onClick={handleCopyDirectoryPath}
+                  >
+                    <Copy size={13} />
+                    Copy Path
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -52,7 +52,7 @@ const CommandCards = ({
   if (loading) {
     return (
       <div className="command-cards-container">
-        {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} />}
+        {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} onToast={onToast} />}
         <div className="command-cards-loading">
           <div className="spinner"></div>
           <p>Loading command cards...</p>
@@ -64,7 +64,7 @@ const CommandCards = ({
   if (error) {
     return (
       <div className="command-cards-container">
-        {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} />}
+        {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} onToast={onToast} />}
         <div className="command-cards-error">
           <p className="error-message">⚠️ Failed to load command cards</p>
           <p className="error-details">{error}</p>
@@ -81,7 +81,7 @@ const CommandCards = ({
 
   return (
     <div className="command-cards-container">
-      {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} />}
+      {directoryCardVisible && <DirectoryCard onExecute={onExecute} onHide={onHideDirectoryCard} onToast={onToast} />}
       <CliToolSelector tool={preferredCliTool} onChange={onCliToolChange} />
       {commands.length > 0 ? (
         <SortableContext
