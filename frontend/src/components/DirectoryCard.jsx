@@ -95,18 +95,18 @@ const DirectoryCard = ({ onExecute, onHide }) => {
     setCreating(true);
     setCreateError(null);
     try {
-      const res = await fetch('/api/project/create', {
+      const createResponse = await fetch('/api/project/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         body: JSON.stringify({ name, rootPath, createGitHub, visibility: githubVisibility }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setCreateResult(data);
+      const createPayload = await parseProjectCreateResponse(createResponse);
+      if (!createResponse.ok) throw new Error(createPayload.error || `HTTP ${createResponse.status}`);
+      setCreateResult(createPayload);
       setNewProjectName('');
       fetchDirectories(rootPath);
-      if (onExecute) onExecute({ command: `cd "${data.path}"`, delay: 0 });
+      if (onExecute) onExecute({ command: `cd "${createPayload.path}"`, delay: 0 });
       setTimeout(() => {
         setShowNewProject(false);
         setCreateResult(null);
@@ -329,5 +329,18 @@ const DirectoryCard = ({ onExecute, onHide }) => {
     </div>
   );
 };
+
+async function parseProjectCreateResponse(response) {
+  const contentType = response.headers?.get?.('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    return { error: responseText || `HTTP ${response.status}` };
+  }
+  throw new Error(responseText || `Project create response was not JSON (HTTP ${response.status})`);
+}
 
 export default DirectoryCard;

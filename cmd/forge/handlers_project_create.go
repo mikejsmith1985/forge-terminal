@@ -31,6 +31,8 @@ type githubResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
+const initialProjectCommitMessage = "chore: initialize Forge project"
+
 // handleProjectCreate handles POST /api/project/create.
 // Creates a new directory, runs git init, scaffolds Forge workflow files,
 // and optionally creates a GitHub repository via the gh CLI.
@@ -107,11 +109,46 @@ func handleProjectCreate(w http.ResponseWriter, r *http.Request) {
 
 	// Optional GitHub repo creation
 	if req.CreateGitHub {
+		if commitErr := createInitialProjectCommit(absProject); commitErr != nil {
+			resp.GitHub = &githubResult{
+				Created: false,
+				Error:   "initial commit failed: " + commitErr.Error(),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
 		resp.GitHub = createGitHubRepo(name, absProject, req.Visibility)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// createInitialProjectCommit creates the first commit needed before gh can push
+// a newly scaffolded project. Generated hooks are skipped because this automated
+// bootstrap commit exists before a human task has a workflow-ticket ledger.
+func createInitialProjectCommit(projectPath string) error {
+	gitAddCmd := exec.Command("git", "-C", projectPath, "add", "-A")
+	hideWindow(gitAddCmd)
+	if output, addErr := gitAddCmd.CombinedOutput(); addErr != nil {
+		return fmt.Errorf("git add failed: %s — %s", addErr, strings.TrimSpace(string(output)))
+	}
+
+	gitCommitCmd := exec.Command(
+		"git",
+		"-C", projectPath,
+		"-c", "user.name=Forge Terminal",
+		"-c", "user.email=forge-terminal@users.noreply.github.com",
+		"commit",
+		"--no-verify",
+		"-m", initialProjectCommitMessage,
+	)
+	hideWindow(gitCommitCmd)
+	if output, commitErr := gitCommitCmd.CombinedOutput(); commitErr != nil {
+		return fmt.Errorf("git commit failed: %s — %s", commitErr, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 // createGitHubRepo attempts to create a GitHub repo from the local directory
@@ -143,16 +180,27 @@ func createGitHubRepo(name, projectPath, visibility string) *githubResult {
 		}
 	}
 
-	// gh prints the repo URL as the last line of output
 	url := ""
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
-		if strings.HasPrefix(line, "https://") {
-			url = line
+		if extractedURL := extractGitHubURL(line); extractedURL != "" {
+			url = extractedURL
 			break
 		}
 	}
 
 	return &githubResult{Created: true, URL: url}
+}
+
+func extractGitHubURL(line string) string {
+	startIndex := strings.Index(line, "https://github.com/")
+	if startIndex == -1 {
+		return ""
+	}
+	urlCandidate := line[startIndex:]
+	if endIndex := strings.IndexAny(urlCandidate, " \t\r\n"); endIndex >= 0 {
+		return urlCandidate[:endIndex]
+	}
+	return urlCandidate
 }

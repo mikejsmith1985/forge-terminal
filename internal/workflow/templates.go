@@ -109,6 +109,12 @@ func RenderClaudeMD(config WorkflowConfig) (string, error) {
 	return renderTemplate("claude-md", claudeMDTemplate, config)
 }
 
+// RenderAgentsMD generates AGENTS.md, which Copilot CLI reads at session start.
+// It imports the canonical instruction file so project setup has one source of truth.
+func RenderAgentsMD(config WorkflowConfig) (string, error) {
+	return renderTemplate("agents-md", agentsMDTemplate, config)
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Template: AI Agent Instructions (generates .github/copilot-instructions.md)
 // Read by GitHub Copilot automatically; imported by CLAUDE.md for Claude Code.
@@ -193,6 +199,18 @@ This project uses **GitHub Flow**:
 `
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Template: AGENTS.md
+// ──────────────────────────────────────────────────────────────────────────────
+
+var agentsMDTemplate = `# AGENTS.md — {{.ProjectName}} Agent Instructions
+
+> This file is read automatically by GitHub Copilot CLI at session start.
+> It imports the canonical Forge Workflow instructions for this project.
+
+@.github/copilot-instructions.md
+`
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Template: CHANGELOG.md
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -251,7 +269,7 @@ var skillTemplates = map[ModuleID]string{
 	ModuleDocumentation:     documentationSkill,
 	ModuleMultiAgent:        multiAgentSkill,
 
-	ModuleWorkflowEnforcer:  workflowEnforcerSkill,
+	ModuleWorkflowEnforcer: workflowEnforcerSkill,
 }
 
 var branchingStrategySkill = `---

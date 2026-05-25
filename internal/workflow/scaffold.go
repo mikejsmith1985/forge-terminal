@@ -38,6 +38,13 @@ func scaffoldManifest() []scaffoldEntry {
 			category: "config",
 			render:   RenderClaudeMD,
 		},
+		// AGENTS.md — read automatically by Copilot CLI; imports canonical instructions.
+		{
+			moduleID: ModuleCopilotInstructions,
+			relPath:  "AGENTS.md",
+			category: "config",
+			render:   RenderAgentsMD,
+		},
 		// Workflow config
 		{
 			moduleID: ModuleCopilotInstructions, // Tied to core module
@@ -83,10 +90,9 @@ func scaffoldManifest() []scaffoldEntry {
 			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleMultiAgent, c) },
 		},
 		{
-// ModuleCodeTutor entry removed — Code Tutor fully disabled
+			// ModuleCodeTutor entry removed — Code Tutor fully disabled
 			relPath:  filepath.Join(".github", "skills", "code-tutor-workflow", "SKILL.md"),
 			category: "skill",
-		
 		},
 		{
 			moduleID: ModuleWorkflowEnforcer,

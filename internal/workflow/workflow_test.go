@@ -308,8 +308,8 @@ func TestRenderCopilotInstructions(t *testing.T) {
 	expectedPhrases := []string{
 		"test-project",
 		"BEST",
-		"single-letter",  // naming rule
-		"CHANGELOG",      // changelog rule
+		"single-letter", // naming rule
+		"CHANGELOG",     // changelog rule
 	}
 
 	for _, phrase := range expectedPhrases {
@@ -459,6 +459,26 @@ func TestScaffoldProject(t *testing.T) {
 	workflowJSONPath := filepath.Join(tempDir, ".forge", "workflow.json")
 	if _, err := os.Stat(workflowJSONPath); os.IsNotExist(err) {
 		t.Error("workflow.json was not created on disk")
+	}
+}
+
+func TestScaffoldProject_CreatesAgentsMD(t *testing.T) {
+	tempDir := t.TempDir()
+
+	config := DefaultConfig()
+	config.ProjectName = "agents-test"
+
+	if _, err := ScaffoldProject(tempDir, config); err != nil {
+		t.Fatalf("ScaffoldProject() error: %v", err)
+	}
+
+	agentsPath := filepath.Join(tempDir, "AGENTS.md")
+	agentsContent, readErr := os.ReadFile(agentsPath)
+	if readErr != nil {
+		t.Fatalf("AGENTS.md was not created on disk: %v", readErr)
+	}
+	if !containsString(string(agentsContent), "@.github/copilot-instructions.md") {
+		t.Error("AGENTS.md should import the canonical Copilot instructions")
 	}
 }
 
