@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.12] - 2026-05-25
+
+---
+
+## [v7.10.12] - 2026-05-25
+
 ### Added
 - **forge-env CLI tool brings adaptive environment execution to Copilot agents** — Created a standalone `cmd/forge-env/` executable that agents can invoke from any terminal to detect and run commands in the appropriate Linux environment (WSL2, Docker, or native). This fills the gap where MCP tools (`environment_detect` and `environment_run`) exist in the Forge Terminal backend but are not exposed as callable tools in Copilot CLI sessions. The forge-env binary accepts `--command`, `--environment`, `--cwd`, `--image`, and `--timeout` flags and returns structured JSON output: `{exit_code, stdout, stderr, environment_used, duration_seconds}`. Works whether Forge Terminal is running or not, enabling any shell script or agent to invoke adaptive builds without external dependencies.
 - **Forge MCP Tool Skills now scaffold into every new project** — Added `ModuleForgeVault`, `ModuleAdaptiveBuildEnv`, `ModuleForgeReleaseProcess`, and `ModuleSequentialTasks` to the workflow scaffold engine. Every project created via the Projects card now receives `.github/skills/forge-vault/`, `adaptive-build-environments/`, `forge-release-process/`, and `sequential-tasks/` SKILL.md files automatically, ensuring AI agents in any project are aware of Forge Terminal's MCP tools.
