@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.16] - 2026-05-25
+
+---
+
+## [v7.10.16] - 2026-05-25
+
 ### Fixed
 - **Release Manager fallback releases now satisfy Forge Workflow commit hooks** — External projects without `scripts/local-release.ps1` now default to `chore: release vX.Y.Z` and the workflow preview correctly says the GitHub Release is created locally instead of implying GitHub Actions.
 - **Forge Workflow scaffolding now installs a local release pipeline** — Newly scaffolded projects receive `scripts/local-release.ps1`, giving them the same local `gh release create` path that the Release Manager checks for before falling back to inline commands.
