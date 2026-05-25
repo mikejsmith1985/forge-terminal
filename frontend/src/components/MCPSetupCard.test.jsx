@@ -183,6 +183,10 @@ describe('MCPSetupCard — client tabs', () => {
     expect(screen.getByText(/available in this terminal session automatically/i)).toBeInTheDocument()
   })
 
+  it('shows the namespaced Copilot CLI adaptive tool name', () => {
+    expect(screen.getByText('forge-vault-environment_run')).toBeInTheDocument()
+  })
+
   it('switches to VS Code tab and shows config JSON', () => {
     fireEvent.click(screen.getByRole('button', { name: 'VS Code' }))
     expect(screen.getByText(/Add to your workspace/i)).toBeInTheDocument()

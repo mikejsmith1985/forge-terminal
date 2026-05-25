@@ -283,7 +283,8 @@ function ClientTabContent({ activeClientTab, hasCopiedConfig, onCopyConfig }) {
         </p>
         <p className="msc-tab-description">
           Forge MCP tools are available in this terminal session automatically.
-          Use <code>environment_run</code> to run builds in WSL2 or Docker.
+          In Copilot CLI they appear with the MCP namespace, so call{' '}
+          <code>forge-vault-environment_run</code> to run builds in WSL2 or Docker.
         </p>
       </div>
     )
@@ -352,7 +353,7 @@ function BuildCallout() {
           When npm build, OpenNext, or Turbopack fails on Windows, ask your agent:
         </p>
         <code className="msc-callout-quote">
-          "Use environment_run with auto strategy to build this"
+          "Use forge-vault-environment_run with auto strategy to build this"
         </code>
         <p className="msc-callout-text">
           Forge will pick WSL2 or Docker automatically.

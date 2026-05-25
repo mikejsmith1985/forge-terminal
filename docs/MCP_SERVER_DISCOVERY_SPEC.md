@@ -8,7 +8,11 @@ This document specifies how Copilot CLI should discover and integrate with Forge
 
 ## Use Case
 
-**Today**: Copilot CLI has no knowledge of Forge Terminal's MCP server. Agents cannot use `environment_detect` or `environment_run` even though they're fully implemented and production-ready.
+**Current Forge Terminal sessions**: Copilot CLI can use the Forge MCP proxy and
+sees namespaced tools such as `forge-vault-environment_detect` and
+`forge-vault-environment_run`. This spec describes a future alias/discovery flow
+that could make the raw MCP names available without relying on a project-local
+MCP proxy configuration.
 
 **After Option A**: When Copilot CLI starts a new session:
 1. It reads a discovery file from the project
@@ -26,13 +30,15 @@ This document specifies how Copilot CLI should discover and integrate with Forge
 At session startup, Copilot CLI checks:
 
 ```powershell
-# Windows: Check if Forge Terminal binary is running
-Get-Process forge* -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "forge|fterm" }
+# Windows: Check only the known production binary name.
+# Never use wildcard process matching because agents also run inside Forge.
+Get-Process -Name "fterm" -ErrorAction SilentlyContinue
 ```
 
 **What we provide**: The Forge MCP server listens on a well-known port (default `1970`) on `localhost`.
 
-**What Copilot CLI must do**: Check if a process matching `forge*` or `fterm*` is running.
+**What Copilot CLI must do**: Check whether the known `fterm` process is running;
+do not use wildcard process matching.
 
 ### Step 2: Copilot CLI Reads MCP Server Configuration
 
@@ -209,7 +215,7 @@ These changes would be made to the Copilot CLI repository:
 ```
 Session Start
   ↓
-Check if Forge process is running (Windows: Get-Process forge*)
+Check if Forge process is running (Windows: Get-Process -Name "fterm")
   ├─ Yes → Read ~/.forge/mcp-server.json
   │        Validate PID matches running process
   │        Query http://localhost:1970/api/mcp

@@ -12,10 +12,10 @@ import (
 // was found and compiled into the binary with meaningful content.
 func TestForgeSkillAssetsAreNonEmpty(t *testing.T) {
 	skillAssets := map[string]string{
-		"forge-vault":                  forgeVaultSkill,
-		"adaptive-build-environments":  adaptiveBuildEnvSkill,
-		"forge-release-process":        forgeReleaseProcessSkill,
-		"sequential-tasks":             sequentialTasksSkill,
+		"forge-vault":                 forgeVaultSkill,
+		"adaptive-build-environments": adaptiveBuildEnvSkill,
+		"forge-release-process":       forgeReleaseProcessSkill,
+		"sequential-tasks":            sequentialTasksSkill,
 	}
 
 	for skillName, skillContent := range skillAssets {
@@ -83,6 +83,38 @@ func TestForgeSkillModulesInDefaultConfig(t *testing.T) {
 	for _, moduleID := range requiredModules {
 		if !defaultCfg.HasModule(moduleID) {
 			t.Errorf("module %q is not in DefaultConfig().EnabledModules — new projects will not receive this skill", moduleID)
+		}
+	}
+}
+
+// TestAdaptiveBuildSkillDocumentsNamespacedCopilotTools protects the exact
+// guidance that keeps Copilot CLI agents from mistaking namespaced Forge MCP
+// tools for missing capabilities.
+func TestAdaptiveBuildSkillDocumentsNamespacedCopilotTools(t *testing.T) {
+	requiredGuidance := []string{
+		"forge-vault-environment_detect",
+		"forge-vault-environment_run",
+		"forge-vault-terminal_sessions",
+		"forge-vault-terminal_execute",
+		"forge-env",
+	}
+
+	for _, expectedText := range requiredGuidance {
+		if !strings.Contains(adaptiveBuildEnvSkill, expectedText) {
+			t.Errorf("adaptive build skill must mention %q so agents can call the correct tool", expectedText)
+		}
+	}
+
+	staleGuidance := []string{
+		"This is exactly what `environment_run` replaces",
+		"Not needed — `environment_run` runs locally",
+		"`environment_run` deploys from the local machine",
+		"Before using `environment_run`, try the PTY-first approach",
+	}
+
+	for _, staleText := range staleGuidance {
+		if strings.Contains(adaptiveBuildEnvSkill, staleText) {
+			t.Errorf("adaptive build skill still contains stale unnamespaced guidance %q", staleText)
 		}
 	}
 }

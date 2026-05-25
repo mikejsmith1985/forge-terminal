@@ -1,13 +1,18 @@
 ---
 name: adaptive-build-environments
-description: "Teaches agents to use Forge's environment_detect and environment_run MCP tools when builds fail on Windows. Activates on keywords: build, npm, deploy, compile, OpenNext, Turbopack, next build, chunk, Linux, Docker, WSL, ENAMETOOLONG, Windows path, cross-platform."
+description: "Teaches agents to use Forge's namespaced adaptive build tools when builds fail on Windows. Activates on keywords: build, npm, deploy, compile, OpenNext, Turbopack, next build, chunk, Linux, Docker, WSL, ENAMETOOLONG, Windows path, cross-platform."
 ---
 
 # Adaptive Build Environments
 
 ## ⛔ CIRCUIT BREAKER — READ THIS FIRST
 
-**If any of the following are true, you MUST call `environment_detect` before doing anything else:**
+**If any of the following are true, you MUST call the available environment detection tool before doing anything else.**
+
+In Copilot CLI sessions launched inside Forge Terminal, that tool is exposed as
+`forge-vault-environment_detect` (shown to the model as
+`functions.forge-vault-environment_detect`). Do not conclude the tool is missing
+just because the unnamespaced alias `environment_detect` is absent.
 
 - The build is failing or producing bad output on a Windows machine
 - The user mentions chunk filename errors, 404s after deploy, ENAMETOOLONG, or backslash path issues
@@ -19,32 +24,56 @@ description: "Teaches agents to use Forge's environment_detect and environment_r
 
 | Forbidden action | Why |
 |-----------------|-----|
-| Create or modify `.github/workflows/*.yml` for build/deploy problems | This is exactly what `environment_run` replaces |
-| Ask the user for `CLOUDFLARE_API_TOKEN` or other CI secrets | Not needed — `environment_run` runs locally |
+| Create or modify `.github/workflows/*.yml` for build/deploy problems | This is exactly what `forge-vault-environment_run` replaces |
+| Ask the user for `CLOUDFLARE_API_TOKEN` or other CI secrets | Not needed — `forge-vault-environment_run` runs locally |
 | Tell the user to "add secrets" or "configure GitHub Actions" | The local Linux environment handles this |
-| Push a deploy workflow and tell the user to trigger it | `environment_run` deploys from the local machine |
+| Push a deploy workflow and tell the user to trigger it | `forge-vault-environment_run` deploys from the local machine |
 | Run the build with `powershell` / `cmd` and accept Windows output | Windows builds produce broken artifacts for Linux targets |
 
 > **If you find yourself writing `name: Deploy` or `on: push:` or `jobs:` YAML — STOP.**
-> Close that thought. Call `environment_detect` instead.
+> Close that thought. Call `forge-vault-environment_detect` instead.
+
+---
+
+## Actual Callable Tool Names
+
+Forge's raw MCP server registers short tool names, but Copilot CLI prefixes MCP
+tools with the configured server namespace from `.mcp.json`. In this repository
+the server namespace is `forge-vault`, so these are the names agents can call:
+
+| Need | Copilot CLI callable tool | Raw MCP tool name |
+|------|---------------------------|-------------------|
+| Detect WSL2/Docker availability | `forge-vault-environment_detect` | `environment_detect` |
+| Run a command in auto/WSL/Docker/native | `forge-vault-environment_run` | `environment_run` |
+| List visible Forge terminal tabs | `forge-vault-terminal_sessions` | `terminal_sessions` |
+| Execute in a visible Forge tab | `forge-vault-terminal_execute` | `terminal_execute` |
+| Read a Forge tab scrollback | `forge-vault-terminal_read` | `terminal_read` |
+
+If the current tool surface exposes the short raw MCP names instead, use them.
+If neither namespaced nor raw MCP tools are available, fall back to the standalone
+`forge-env` CLI instead of declaring adaptive build environments unusable:
+
+```powershell
+forge-env --command "npm install && npm run build" --environment auto --cwd "C:\ProjectsWin\my-site\website" --timeout 480
+```
 
 ---
 
 ## Preferred Approach: Run in the Active Forge Tab
 
-**Forge IS a terminal app.** Before using `environment_run`, try the PTY-first approach:
+**Forge IS a terminal app.** Before using `forge-vault-environment_run`, try the PTY-first approach:
 
-1. Call `terminal_sessions` to list active Forge sessions
+1. Call `forge-vault-terminal_sessions` to list active Forge sessions
 2. Pick the session that is already in (or closest to) the project directory
-3. Call `terminal_execute` with the WSL command directly — the user sees output live in their tab
+3. Call `forge-vault-terminal_execute` with the WSL command directly — the user sees output live in their tab
 
 ```json
 // Step 1 — find the active session
-{ "tool": "terminal_sessions", "arguments": {} }
+{ "tool": "forge-vault-terminal_sessions", "arguments": {} }
 
 // Step 2 — cd and build inside the existing Forge terminal
 {
-  "tool": "terminal_execute",
+  "tool": "forge-vault-terminal_execute",
   "arguments": {
     "session_id": "<id from step 1>",
     "command": "wsl -e bash -c 'cd /mnt/c/ProjectsWin/RLL/website && npm install && npm run build'",
@@ -55,7 +84,7 @@ description: "Teaches agents to use Forge's environment_detect and environment_r
 
 **Why this is better:** Output streams live in the user's terminal tab. No hidden background process. No external window. The user sees progress in real time, exactly as if they ran it themselves.
 
-**Fall back to `environment_run`** only when:
+**Fall back to `forge-vault-environment_run`** only when:
 - No active Forge PTY session exists
 - The session is on the wrong machine (remote session)
 - You need structured JSON output with `exit_code`, `environment_used`, and `duration_seconds`
@@ -69,18 +98,18 @@ Forge Terminal ships two MCP tools that let AI agents run Linux-compatible build
 
 | Tool | What it does |
 |------|-------------|
-| `environment_detect` | Probes the host for WSL2 and Docker. Returns availability + recommended strategy. Call this first, always. |
-| `environment_run` | Runs a shell command in `native`, `linux-wsl`, `linux-docker`, or `auto` environment. Returns `exit_code`, `stdout`, `stderr`, `environment_used`, and `duration_seconds`. |
+| `forge-vault-environment_detect` | Probes the host for WSL2 and Docker. Returns availability + recommended strategy. Call this first, always. |
+| `forge-vault-environment_run` | Runs a shell command in `native`, `linux-wsl`, `linux-docker`, or `auto` environment. Returns `exit_code`, `stdout`, `stderr`, `environment_used`, and `duration_seconds`. |
 
 ---
 
 ## MANDATORY FIRST STEP
 
-Before running any build or deploy command, you **MUST** call `environment_detect`:
+Before running any build or deploy command, you **MUST** call `forge-vault-environment_detect`:
 
 ```json
 {
-  "tool": "environment_detect",
+  "tool": "forge-vault-environment_detect",
   "arguments": {}
 }
 ```
@@ -102,11 +131,11 @@ Use the `recommended` field to choose your strategy. Never skip this step.
 
 ## MANDATORY SECOND STEP — Run the build
 
-Once you know what's available, call `environment_run` with `environment: "auto"`:
+Once you know what's available, call `forge-vault-environment_run` with `environment: "auto"`:
 
 ```json
 {
-  "tool": "environment_run",
+  "tool": "forge-vault-environment_run",
   "arguments": {
     "command": "npm install && npm run build",
     "environment": "auto",
@@ -141,7 +170,7 @@ This is the correct default for almost every case.
 
 ## When These Tools Apply
 
-Use `environment_run` for:
+Use `forge-vault-environment_run` for:
 
 - `npm run build` producing garbled chunk filenames like `chunks/[hash]_[hash]_[hash].js`
 - `next build` or OpenNext failing with Windows path errors (`ENAMETOOLONG`, backslash issues)
@@ -171,11 +200,11 @@ have Windows-style `\` path separators embedded in their names, causing 404s at 
 
 ```json
 // Step 1
-{ "tool": "environment_detect", "arguments": {} }
+{ "tool": "forge-vault-environment_detect", "arguments": {} }
 
 // Step 2 — use the path to the website subdirectory, not the repo root
 {
-  "tool": "environment_run",
+  "tool": "forge-vault-environment_run",
   "arguments": {
     "command": "npm install && npm run build",
     "environment": "auto",
@@ -195,9 +224,13 @@ reproduce the original bug.
 
 These tools are served by the Forge MCP server (`POST /api/mcp`).
 
-- **Copilot CLI in Forge** — Connected automatically when Forge is running. No setup needed.
+- **Copilot CLI in Forge** — Connected automatically when Forge is running. Use the
+  namespaced callable tools such as `forge-vault-environment_detect` and
+  `forge-vault-environment_run`.
 - **Other MCP clients** — Require configuration. See the "Adaptive Build Environments" card
   in the Forge command panel sidebar for token path and per-client setup tabs.
+- **No MCP tools available** — Use `forge-env` as the local fallback; it does not
+  require Forge Terminal to be running.
 
 MCP token: `~/.forge/mcp-token` — auto-generated on first Forge launch.
 
@@ -205,7 +238,7 @@ MCP token: `~/.forge/mcp-token` — auto-generated on first Forge launch.
 
 ## Reporting Results
 
-After `environment_run` completes, tell the user:
+After `forge-vault-environment_run` or `forge-env` completes, tell the user:
 
 1. Which environment was used (`environment_used`)
 2. The exit code and duration
