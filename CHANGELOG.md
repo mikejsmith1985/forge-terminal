@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.15] - 2026-05-25
+
+---
+
+## [v7.10.15] - 2026-05-25
+
 ### Fixed
 - **Adaptive Build Environment guidance now uses the actual Copilot CLI tool names** — Updated the live and scaffolded `adaptive-build-environments` skill, MCP setup card copy, and exposure docs so agents call `forge-vault-environment_detect`, `forge-vault-environment_run`, and PTY helper tools instead of incorrectly treating missing unnamespaced aliases as unavailable capabilities. Documented `forge-env` as the fallback when MCP tools are absent.
 
