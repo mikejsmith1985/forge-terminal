@@ -23,13 +23,15 @@ const CLIENT_TABS = [
   { tabId: CLIENT_TAB_CLAUDE,  tabLabel: 'Claude Code' },
 ]
 
-// These two tools are sorted to the top of the tool list and highlighted with a star.
-const FEATURED_TOOL_NAMES = ['environment_detect', 'environment_run']
+// These tools are sorted to the top so agents notice detection, execution, and recovery together.
+const FEATURED_TOOL_NAMES = ['environment_detect', 'environment_run', 'environment_jobs', 'environment_read_job']
 
 // Short descriptions shown only for the featured (Adaptive Build Environment) tools.
 const FEATURED_TOOL_DESCRIPTIONS = {
   environment_detect: 'Probe WSL2 & Docker availability before choosing a strategy',
   environment_run:    'Run builds in native, WSL2, or Docker — auto-selects on Windows',
+  environment_jobs:   'List detached adaptive builds that can be recovered after session resume',
+  environment_read_job: 'Read a detached build job and its persisted log output',
 }
 
 // Config snippets copied to clipboard from the VS Code and Claude tabs.
@@ -283,7 +285,7 @@ function ClientTabContent({ activeClientTab, hasCopiedConfig, onCopyConfig }) {
         </p>
         <p className="msc-tab-description">
           Forge MCP tools are available in this terminal session automatically.
-          Use <code>environment_run</code> to run builds in WSL2 or Docker.
+          Use <code>environment_run</code> to run builds in WSL2 or Docker; add <code>detach: true</code> for recoverable jobs.
         </p>
       </div>
     )
@@ -364,7 +366,7 @@ function BuildCallout() {
 
 /**
  * ToolsList — Compact list of all registered MCP tools.
- * The two Adaptive Build Environment tools are sorted first and highlighted with ★.
+ * Adaptive Build Environment tools are sorted first and highlighted with ★.
  *
  * @param {Object}   props
  * @param {string[]} props.activeTools - Tool names returned by GET /api/mcp/ui-status

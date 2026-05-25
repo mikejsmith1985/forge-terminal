@@ -60,11 +60,12 @@ func (t *environmentDetectTool) Execute(_ map[string]any) (*CallToolResult, erro
 // environmentRunTool executes a shell command inside the requested Linux environment
 // and returns the exit code, stdout, stderr, and timing as structured JSON.
 type environmentRunTool struct {
-	runner CommandRunner
+	runner     CommandRunner
+	jobManager *EnvironmentJobManager
 }
 
-func newEnvironmentRunTool(runner CommandRunner) ToolHandler {
-	return &environmentRunTool{runner: runner}
+func newEnvironmentRunTool(runner CommandRunner, jobManager *EnvironmentJobManager) ToolHandler {
+	return &environmentRunTool{runner: runner, jobManager: jobManager}
 }
 
 // Definition returns the MCP tool descriptor for environment_run.
@@ -98,6 +99,10 @@ func (t *environmentRunTool) Definition() ToolDefinition {
 				"timeout_seconds": {
 					"type": "number",
 					"description": "Maximum seconds to wait for the command to finish (1–600). Default: 120."
+				},
+				"detach": {
+					"type": "boolean",
+					"description": "When true, starts a recoverable background job and returns job_id plus log_path immediately."
 				}
 			},
 			"required": ["command"]
@@ -111,6 +116,9 @@ func (t *environmentRunTool) Execute(args map[string]any) (*CallToolResult, erro
 	parsedArgs, parseErr := parseEnvironmentRunArgs(args)
 	if parseErr != nil {
 		return errorContent(parseErr.Error()), nil
+	}
+	if parsedArgs.Detach {
+		return t.startDetachedJob(parsedArgs)
 	}
 
 	timeout := time.Duration(parsedArgs.TimeoutSeconds) * time.Second
@@ -135,6 +143,34 @@ func (t *environmentRunTool) Execute(args map[string]any) (*CallToolResult, erro
 	return textContent(string(output)), nil
 }
 
+func (t *environmentRunTool) startDetachedJob(parsedArgs environmentRunArgs) (*CallToolResult, error) {
+	if t.jobManager == nil {
+		return errorContent("environment job manager is not configured"), nil
+	}
+	job, startErr := t.jobManager.StartJob(EnvironmentJobCreateOptions{
+		Command:              parsedArgs.Command,
+		RequestedEnvironment: parsedArgs.Environment,
+		WorkingDirectory:     parsedArgs.WorkingDirectory,
+		DockerImage:          parsedArgs.DockerImage,
+		TimeoutSeconds:       parsedArgs.TimeoutSeconds,
+	})
+	if startErr != nil {
+		return errorContent("starting detached environment job: " + startErr.Error()), nil
+	}
+	startResponse := environmentJobStartResponse{
+		JobID:    job.JobID,
+		Status:   job.Status,
+		LogPath:  job.LogPath,
+		Detached: true,
+		Job:      *job,
+	}
+	output, marshalErr := json.MarshalIndent(startResponse, "", "  ")
+	if marshalErr != nil {
+		return errorContent("serialising detached job result: " + marshalErr.Error()), nil
+	}
+	return textContent(string(output)), nil
+}
+
 // ── Argument Parsing ──────────────────────────────────────────────────────────
 
 // environmentRunArgs holds the validated, normalised arguments for one environment_run call.
@@ -144,6 +180,7 @@ type environmentRunArgs struct {
 	WorkingDirectory string
 	DockerImage      string
 	TimeoutSeconds   int
+	Detach           bool
 }
 
 // parseEnvironmentRunArgs extracts and validates the caller's arguments,
@@ -198,6 +235,14 @@ func parseEnvironmentRunArgs(args map[string]any) (environmentRunArgs, error) {
 		}
 	}
 
+	if rawDetach, hasDetach := args["detach"]; hasDetach {
+		detachValue, isBool := rawDetach.(bool)
+		if !isBool {
+			return parsed, fmt.Errorf("detach must be a boolean")
+		}
+		parsed.Detach = detachValue
+	}
+
 	return parsed, nil
 }
 
@@ -209,4 +254,115 @@ func isValidEnvironmentStrategy(strategy string) bool {
 		return true
 	}
 	return false
+}
+
+// ── environment job recovery tools ────────────────────────────────────────────
+
+type environmentJobStartResponse struct {
+	JobID    string         `json:"job_id"`
+	Status   string         `json:"status"`
+	LogPath  string         `json:"log_path"`
+	Detached bool           `json:"detached"`
+	Job      EnvironmentJob `json:"job"`
+}
+
+type environmentJobsTool struct {
+	jobManager *EnvironmentJobManager
+}
+
+func newEnvironmentJobsTool(jobManager *EnvironmentJobManager) ToolHandler {
+	return &environmentJobsTool{jobManager: jobManager}
+}
+
+func (t *environmentJobsTool) Definition() ToolDefinition {
+	return ToolDefinition{
+		Name:        "environment_jobs",
+		Description: "List recoverable adaptive build jobs persisted for this project. Use after session resume to discover running or completed detached builds.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {},
+			"required": []
+		}`),
+	}
+}
+
+func (t *environmentJobsTool) Execute(_ map[string]any) (*CallToolResult, error) {
+	if t.jobManager == nil {
+		return errorContent("environment job manager is not configured"), nil
+	}
+	jobs, listErr := t.jobManager.ListJobs()
+	if listErr != nil {
+		return errorContent("listing environment jobs: " + listErr.Error()), nil
+	}
+	output, marshalErr := json.MarshalIndent(map[string]any{"jobs": jobs, "count": len(jobs)}, "", "  ")
+	if marshalErr != nil {
+		return errorContent("serialising environment jobs: " + marshalErr.Error()), nil
+	}
+	return textContent(string(output)), nil
+}
+
+type environmentReadJobTool struct {
+	jobManager *EnvironmentJobManager
+}
+
+func newEnvironmentReadJobTool(jobManager *EnvironmentJobManager) ToolHandler {
+	return &environmentReadJobTool{jobManager: jobManager}
+}
+
+func (t *environmentReadJobTool) Definition() ToolDefinition {
+	return ToolDefinition{
+		Name:        "environment_read_job",
+		Description: "Read one recoverable adaptive build job and its persisted log output by job_id.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"job_id": {
+					"type": "string",
+					"description": "The job_id returned by environment_run with detach=true."
+				},
+				"max_log_bytes": {
+					"type": "number",
+					"description": "Maximum log bytes to return from the tail. Defaults to 20000."
+				}
+			},
+			"required": ["job_id"]
+		}`),
+	}
+}
+
+func (t *environmentReadJobTool) Execute(args map[string]any) (*CallToolResult, error) {
+	if t.jobManager == nil {
+		return errorContent("environment job manager is not configured"), nil
+	}
+	jobID, maxLogBytes, parseErr := parseEnvironmentReadJobArgs(args)
+	if parseErr != nil {
+		return errorContent(parseErr.Error()), nil
+	}
+	job, logText, readErr := t.jobManager.ReadJob(jobID, maxLogBytes)
+	if readErr != nil {
+		return errorContent("reading environment job: " + readErr.Error()), nil
+	}
+	output, marshalErr := json.MarshalIndent(map[string]any{"job": job, "log": logText}, "", "  ")
+	if marshalErr != nil {
+		return errorContent("serialising environment job: " + marshalErr.Error()), nil
+	}
+	return textContent(string(output)), nil
+}
+
+func parseEnvironmentReadJobArgs(args map[string]any) (string, int, error) {
+	rawJobID, hasJobID := args["job_id"]
+	if !hasJobID {
+		return "", 0, fmt.Errorf("job_id is required")
+	}
+	jobID, isString := rawJobID.(string)
+	if !isString || jobID == "" {
+		return "", 0, fmt.Errorf("job_id must be a non-empty string")
+	}
+	maxLogBytes := buildOutputMaxBytes
+	if rawMaxLogBytes, hasMaxLogBytes := args["max_log_bytes"]; hasMaxLogBytes {
+		if floatVal, isFloat := rawMaxLogBytes.(float64); isFloat && floatVal > 0 {
+			maxLogBytes = int(floatVal)
+		}
+	}
+	return jobID, maxLogBytes, nil
 }

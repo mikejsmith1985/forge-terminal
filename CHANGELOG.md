@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Adaptive build environments now support recoverable detached jobs** — `environment_run` accepts `detach: true`, persists job metadata and logs under `.forge/adaptive-build-jobs/`, and exposes `environment_jobs` plus `environment_read_job` so resumed agent sessions can rediscover build status and logs instead of losing long-running work.
+
 ### Fixed
 - **Release Manager card now passes explicit version to `local-release.ps1`** — When a project has `scripts/local-release.ps1`, the card was sending a relative bump type (`patch`/`minor`/`major`) rather than the explicit next-version shown in the UI. If a previous release attempt had partially bumped `package.json` before failing, the script would compute a *different* version than the card displayed, creating a double-bump. The card now always passes the exact version string (e.g. `0.0.14`), ensuring the script releases precisely what was shown.
 
