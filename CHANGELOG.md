@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.19] - 2026-05-26
+
+---
+
+## [v7.10.19] - 2026-05-26
+
+### Fixed
+- **Forge Vault modal is now wider so toolbar actions stay readable** — Increased the modal max width from 480px to 840px, which gives the search, sort, and add controls enough horizontal room in the header ribbon without clipping.
+
 ## [7.10.18] - 2026-05-26
 
 ---
