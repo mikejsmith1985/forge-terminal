@@ -68,7 +68,7 @@ if (Test-Path $badWorkflow) {
     Push-Location $TargetRepo
     try {
         git add ".github/workflows/release.yml" 2>$null
-        git commit -m "Remove GH Actions release workflow — Forge uses local gh CLI pipeline
+        git commit -m "chore: remove GH Actions release workflow
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>$null
         git push origin (git branch --show-current) 2>$null
@@ -86,7 +86,7 @@ try {
     $status = git status --porcelain ".github/skills/forge-release-process" 2>$null
     if ($status) {
         git add ".github/skills/forge-release-process" 2>$null
-        git commit -m "Add forge-release-process skill (Copilot CLI)
+        git commit -m "chore: add forge-release-process skill
 
 Ensures releases always use the local gh CLI pipeline.
 Never uses GitHub Actions for releases.

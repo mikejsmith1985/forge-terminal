@@ -258,7 +258,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       }
     }
 
-    const msg = commitMessage.trim() || `Release ${next}`;
+    const releaseCommitMessage = commitMessage.trim() || `chore: release ${next}`;
     
     // Auto-update package.json if it exists
     let versionBump = '';
@@ -269,9 +269,9 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     }
 
     if (shellType === 'powershell') {
-      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { gh release delete ${next} --yes 2>$null; gh release create ${next} --title "Release ${next}" --notes "Release ${next}" --latest; git checkout $b; Write-Host "Release ${next} published on GitHub." -ForegroundColor Green } } } } } } } } } }`;
+      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${releaseCommitMessage}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { gh release delete ${next} --yes 2>$null; gh release create ${next} --title "Release ${next}" --notes "Release ${next}" --latest; git checkout $b; Write-Host "Release ${next} published on GitHub." -ForegroundColor Green } } } } } } } } } }`;
     } else {
-      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && (gh release delete ${next} --yes 2>/dev/null; gh release create ${next} --title "Release ${next}" --notes "Release ${next}" --latest) && git checkout $b && echo "Release ${next} published on GitHub."`;
+      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${releaseCommitMessage}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && (gh release delete ${next} --yes 2>/dev/null; gh release create ${next} --title "Release ${next}" --notes "Release ${next}" --latest) && git checkout $b && echo "Release ${next} published on GitHub."`;
     }
   }, [next, shellType, commitMessage, isExternalRepo, externalRepoPath, hasLocalScript, selectedIncrement]);
 
@@ -545,7 +545,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
           <input
             type="text"
             className="orc-commit-input"
-            placeholder={`Release ${next}`}
+            placeholder={`chore: release ${next}`}
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             data-testid="commit-message-input"
@@ -568,7 +568,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
               <div className="orc-step-arrow">↓</div>
               <div className="orc-step"><Tag size={14} /> Create & push tag {next}</div>
               <div className="orc-step-arrow">↓</div>
-              <div className="orc-step"><Upload size={14} /> GitHub Actions builds release</div>
+              <div className="orc-step"><Upload size={14} /> GitHub Release created locally</div>
             </>
           )}
         </div>

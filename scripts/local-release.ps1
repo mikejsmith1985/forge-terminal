@@ -386,13 +386,12 @@ if (Test-Path $changelogPath) {
 # ── Commit version bump ───────────────────────────────────────────────────────
 Write-Banner "Committing version bump"
 git add -A
-# --no-verify bypasses pre-commit and commit-msg hooks intentionally:
+# --no-verify bypasses pre-commit hooks intentionally:
 # release commits are automated pipeline meta-commits (version bumps + built
-# assets) — not feature commits — and "Release vX.Y.Z" is not a conventional
-# commit type.  The CHANGELOG was already updated in feature commits.
-git commit -m "Release $TAG" --allow-empty --no-verify
+# assets), not feature commits. The CHANGELOG was already updated in feature commits.
+git commit -m "chore: release $TAG" --allow-empty --no-verify
 if ($LASTEXITCODE -ne 0) { Write-Fail "git commit failed" }
-Write-OK "Committed: Release $TAG"
+Write-OK "Committed: chore: release $TAG"
 
 git push origin HEAD
 if ($LASTEXITCODE -ne 0) { Write-Fail "git push failed" }
