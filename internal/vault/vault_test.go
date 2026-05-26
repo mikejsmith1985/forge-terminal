@@ -113,7 +113,10 @@ func TestAddAndListEntry(t *testing.T) {
 		SecretName:       "OpenAI API Key",
 		EnvVarName:       "OPENAI_API_KEY",
 		SecretValue:      "sk-test-secret-value",
+		URL:              "https://platform.openai.com",
 		Description:      "Used for AI completions",
+		BundleID:         "openai-primary",
+		BundleType:       "password",
 		ShouldAutoInject: true,
 	}
 
@@ -131,6 +134,15 @@ func TestAddAndListEntry(t *testing.T) {
 	}
 	if allEntries[0].ID != createdEntry.ID {
 		t.Error("listed entry ID does not match created entry ID")
+	}
+	if allEntries[0].URL != "https://platform.openai.com" {
+		t.Errorf("expected URL to persist, got %q", allEntries[0].URL)
+	}
+	if allEntries[0].BundleID != "openai-primary" {
+		t.Errorf("expected BundleID to persist, got %q", allEntries[0].BundleID)
+	}
+	if allEntries[0].BundleType != "password" {
+		t.Errorf("expected BundleType to persist, got %q", allEntries[0].BundleType)
 	}
 }
 
@@ -468,6 +480,41 @@ func TestUpdateEntryValueOnly(t *testing.T) {
 	}
 	if allEntries[0].EnvVarName != "KEEP_THIS_ENV" {
 		t.Errorf("EnvVarName should be unchanged; expected %q, got %q", "KEEP_THIS_ENV", allEntries[0].EnvVarName)
+	}
+}
+
+// TestUpdateEntryURLOnly verifies that updating only URL leaves the core identifiers unchanged.
+func TestUpdateEntryURLOnly(t *testing.T) {
+	testVault, cleanup := openTestVault(t)
+	defer cleanup()
+
+	createdEntry, addErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "URL Secret",
+		EnvVarName:  "URL_SECRET",
+		SecretValue: "url-secret",
+		URL:         "https://old.example.com",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	_, updateErr := testVault.UpdateEntry(UpdateEntryRequest{
+		ID:  createdEntry.ID,
+		URL: "https://new.example.com",
+	})
+	if updateErr != nil {
+		t.Fatalf("UpdateEntry returned unexpected error: %v", updateErr)
+	}
+
+	allEntries := testVault.ListEntries()
+	if len(allEntries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(allEntries))
+	}
+	if allEntries[0].URL != "https://new.example.com" {
+		t.Errorf("expected updated URL, got %q", allEntries[0].URL)
+	}
+	if allEntries[0].EnvVarName != "URL_SECRET" {
+		t.Errorf("expected env var to remain unchanged, got %q", allEntries[0].EnvVarName)
 	}
 }
 

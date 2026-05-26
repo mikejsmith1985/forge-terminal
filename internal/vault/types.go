@@ -23,10 +23,13 @@ const CurrentVaultFileVersion = 1
 // controlled access when building PTY environment overlays.
 type VaultEntry struct {
 	ID               string     `json:"id"`
-	SecretName       string     `json:"secretName"`       // Human label, e.g. "OpenAI API Key"
-	EnvVarName       string     `json:"envVarName"`       // Shell variable, e.g. "OPENAI_API_KEY"
+	SecretName       string     `json:"secretName"`    // Human label, e.g. "OpenAI API Key"
+	EnvVarName       string     `json:"envVarName"`    // Shell variable, e.g. "OPENAI_API_KEY"
+	URL              string     `json:"url,omitempty"` // Optional associated URL, e.g. login endpoint
 	Description      string     `json:"description"`
-	ShouldAutoInject bool       `json:"shouldAutoInject"` // Inject into every new PTY session
+	BundleID         string     `json:"bundleId,omitempty"`   // Optional grouping id for related entries (e.g. username/password pair)
+	BundleType       string     `json:"bundleType,omitempty"` // Optional role within a bundle (e.g. "username" or "password")
+	ShouldAutoInject bool       `json:"shouldAutoInject"`     // Inject into every new PTY session
 	CreatedAt        time.Time  `json:"createdAt"`
 	LastUsedAt       *time.Time `json:"lastUsedAt,omitempty"`
 }
@@ -38,7 +41,10 @@ type AddEntryRequest struct {
 	SecretName       string `json:"secretName"`
 	EnvVarName       string `json:"envVarName"`
 	SecretValue      string `json:"secretValue"`
+	URL              string `json:"url,omitempty"`
 	Description      string `json:"description"`
+	BundleID         string `json:"bundleId,omitempty"`
+	BundleType       string `json:"bundleType,omitempty"`
 	ShouldAutoInject bool   `json:"shouldAutoInject"`
 }
 
@@ -51,6 +57,7 @@ type UpdateEntryRequest struct {
 	SecretName  string `json:"secretName,omitempty"`
 	EnvVarName  string `json:"envVarName,omitempty"`
 	SecretValue string `json:"secretValue,omitempty"`
+	URL         string `json:"url,omitempty"`
 	Description string `json:"description,omitempty"`
 }
 
@@ -72,8 +79,8 @@ type InjectRequest struct {
 // The script self-deletes after running so values are never persisted to shell
 // history or left on disk beyond the sourcing window.
 type InjectResult struct {
-	ScriptPath   string `json:"scriptPath"`
-	InjectedCount int   `json:"injectedCount"`
+	ScriptPath    string `json:"scriptPath"`
+	InjectedCount int    `json:"injectedCount"`
 }
 
 // VaultStatus is returned by GET /api/vault/status.
@@ -108,7 +115,10 @@ type diskEntry struct {
 	SecretName       string     `json:"secretName"`
 	EnvVarName       string     `json:"envVarName"`
 	SecretValue      string     `json:"secretValue"` // plaintext inside the encrypted blob
+	URL              string     `json:"url,omitempty"`
 	Description      string     `json:"description"`
+	BundleID         string     `json:"bundleId,omitempty"`
+	BundleType       string     `json:"bundleType,omitempty"`
 	ShouldAutoInject bool       `json:"shouldAutoInject"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	LastUsedAt       *time.Time `json:"lastUsedAt,omitempty"`

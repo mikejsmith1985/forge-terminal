@@ -2,8 +2,8 @@
 //
 // The Vault API intentionally never returns secret values in any response body.
 // Values are only used server-side for two purposes:
-//   1. Building the environment for new PTY sessions (auto-inject, transparent).
-//   2. Writing a short-lived temp script that the frontend sources in the terminal.
+//  1. Building the environment for new PTY sessions (auto-inject, transparent).
+//  2. Writing a short-lived temp script that the frontend sources in the terminal.
 //
 // All endpoints operate on the application-wide vault singleton (activeVault).
 // Callers must have already initialised the vault via initVault() in main.go.
@@ -11,8 +11,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -112,8 +114,18 @@ func handleVaultAddEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "secretName, envVarName, and secretValue are required", http.StatusBadRequest)
 		return
 	}
+
+	normalizedURL, urlErr := normalizeOptionalURL(addRequest.URL)
+	if urlErr != nil {
+		http.Error(w, urlErr.Error(), http.StatusBadRequest)
+		return
+	}
+
 	addRequest.SecretName = trimmedSecretName
 	addRequest.EnvVarName = trimmedEnvVarName
+	addRequest.URL = normalizedURL
+	addRequest.BundleID = strings.TrimSpace(addRequest.BundleID)
+	addRequest.BundleType = strings.TrimSpace(addRequest.BundleType)
 
 	createdEntry, addErr := activeVault.AddEntry(addRequest)
 	if addErr != nil {
@@ -156,16 +168,27 @@ func handleVaultUpdateEntry(w http.ResponseWriter, r *http.Request) {
 	// Trim whitespace from name fields while preserving empty-means-no-change semantics.
 	updateRequest.SecretName = strings.TrimSpace(updateRequest.SecretName)
 	updateRequest.EnvVarName = strings.TrimSpace(updateRequest.EnvVarName)
+	updateRequest.URL = strings.TrimSpace(updateRequest.URL)
 	updateRequest.Description = strings.TrimSpace(updateRequest.Description)
 
 	// Require at least one field to actually update.
 	hasNoFieldsToUpdate := updateRequest.SecretName == "" &&
 		updateRequest.EnvVarName == "" &&
 		updateRequest.SecretValue == "" &&
+		updateRequest.URL == "" &&
 		updateRequest.Description == ""
 	if hasNoFieldsToUpdate {
-		http.Error(w, "at least one field (secretName, envVarName, secretValue, description) must be provided", http.StatusBadRequest)
+		http.Error(w, "at least one field (secretName, envVarName, secretValue, url, description) must be provided", http.StatusBadRequest)
 		return
+	}
+
+	if updateRequest.URL != "" {
+		normalizedURL, urlErr := normalizeOptionalURL(updateRequest.URL)
+		if urlErr != nil {
+			http.Error(w, urlErr.Error(), http.StatusBadRequest)
+			return
+		}
+		updateRequest.URL = normalizedURL
 	}
 
 	updatedEntry, updateErr := activeVault.UpdateEntry(updateRequest)
@@ -307,6 +330,21 @@ func scheduleScriptCleanup(scriptPath string) {
 	// Allow 60 seconds for the user to source the script before force-deleting.
 	time.Sleep(60 * time.Second)
 	os.Remove(scriptPath)
+}
+
+// normalizeOptionalURL validates an optional URL field and returns a normalized value.
+// Empty input is allowed and represented as an empty string.
+func normalizeOptionalURL(rawURL string) (string, error) {
+	trimmedURL := strings.TrimSpace(rawURL)
+	if trimmedURL == "" {
+		return "", nil
+	}
+
+	parsedURL, parseErr := url.ParseRequestURI(trimmedURL)
+	if parseErr != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return "", errors.New("url must be a valid absolute URL, e.g. https://example.com/login")
+	}
+	return trimmedURL, nil
 }
 
 // ── GET /api/vault/entries/value ─────────────────────────────────────────────
