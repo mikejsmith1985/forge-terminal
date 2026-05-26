@@ -56,6 +56,33 @@ const CONFIG_TABS = [
 
 const MCP_CATALOG = [
   {
+    id: 'forge-vault',
+    name: 'Forge Vault',
+    category: 'Core',
+    description: 'Discover Forge Terminal vault access and copy a portable Claude Code snippet for the local proxy.',
+    docsUrl: 'https://github.com/mikejsmith1985/forge-terminal/blob/main/docs/developer/mcp-server.md',
+    configs: {
+      copilot: 'copilot mcp add forge-vault -- node mcp-forge-vault/index.js',
+      vscode: JSON.stringify({
+        servers: {
+          'forge-vault': {
+            type: 'stdio',
+            command: 'node',
+            args: ['mcp-forge-vault/index.js'],
+          },
+        },
+      }, null, 2),
+      claude: JSON.stringify({
+        mcpServers: {
+          'forge-vault': {
+            command: 'node',
+            args: ['mcp-forge-vault/index.js'],
+          },
+        },
+      }, null, 2),
+    },
+  },
+  {
     id: 'filesystem',
     name: 'Filesystem',
     category: 'Core',

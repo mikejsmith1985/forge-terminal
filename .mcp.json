@@ -3,7 +3,7 @@
     "forge-vault": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:/ProjectsWin/forge-terminal/mcp-forge-vault/index.js"]
+      "args": ["mcp-forge-vault/index.js"]
     }
   }
 }

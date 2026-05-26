@@ -50,12 +50,17 @@ const VSCODE_CONFIG_JSON = JSON.stringify(
 )
 
 // Claude Code connects via a local Node process rather than an HTTP endpoint.
+const FORGE_VAULT_PROXY_PATH = 'mcp-forge-vault/index.js'
+
+// Jira entries usually pair a base URL with username/password credentials.
+const JIRA_URL_ENV_VAR_NAME = 'JIRA_URL'
+
 const CLAUDE_CONFIG_JSON = JSON.stringify(
   {
     mcpServers: {
       forge: {
         command: 'node',
-        args: ['<path-to-forge>/mcp-forge-vault/index.js'],
+        args: [FORGE_VAULT_PROXY_PATH],
       },
     },
   },
@@ -170,6 +175,7 @@ const MCPSetupCard = () => {
             onCopyConfig={copyClientConfig}
           />
 
+          <VaultCallout />
           <BuildCallout />
 
           <ToolsList activeTools={mcpStatus?.active_tools || []} />
@@ -337,6 +343,28 @@ function CopyConfigButton({ hasCopied, onCopy }) {
       {hasCopied ? <Check size={12} /> : <Copy size={12} />}
       {hasCopied ? 'Copied' : 'Copy'}
     </button>
+  )
+}
+
+/**
+ * VaultCallout — Explains how the repo-root MCP config keeps Forge Vault
+ * discoverable and how Jira URLs are stored alongside vault credentials.
+ */
+function VaultCallout() {
+  return (
+    <div className="msc-callout">
+      <Info size={14} className="msc-callout-icon" />
+      <div className="msc-callout-body">
+        <strong className="msc-callout-title">🔐 Vault and Jira metadata</strong>
+        <p className="msc-callout-text">
+          The repo-root <code>.mcp.json</code> uses a relative path so the Forge Vault proxy stays available in every clone.
+        </p>
+        <p className="msc-callout-text">
+          Store Jira base URLs in Vault&apos;s <code>Associated URL</code> field and keep the Jira metadata as
+          <code>{JIRA_URL_ENV_VAR_NAME}</code>, <code>JIRA_USERNAME</code>, and <code>JIRA_PASSWORD</code> when a project needs Jira access.
+        </p>
+      </div>
+    </div>
   )
 }
 

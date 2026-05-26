@@ -232,6 +232,21 @@ describe('MCPSetupCard — build callout', () => {
   })
 })
 
+// ── Vault Guidance ─────────────────────────────────────────────────────────────
+
+describe('MCPSetupCard — vault guidance', () => {
+  it('explains how the repo-root vault config and Jira metadata fit together', async () => {
+    mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
+    render(<MCPSetupCard />)
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
+    fireEvent.click(screen.getByText('Adaptive Build Environments'))
+
+    expect(screen.getByText(/Forge Vault proxy stays available in every clone/i)).toBeInTheDocument()
+    expect(screen.getByText(/Associated URL/i)).toBeInTheDocument()
+    expect(screen.getByText(/JIRA_URL/i)).toBeInTheDocument()
+  })
+})
+
 // ── Tools List ────────────────────────────────────────────────────────────────
 
 describe('MCPSetupCard — tools list', () => {
