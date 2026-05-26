@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [7.10.20] - 2026-05-26
+
+---
+
+## [v7.10.20] - 2026-05-26
 - **Forge Vault setup now uses portable repo-relative paths and calls out Jira metadata** — The repo-root MCP config no longer hardcodes a machine-specific vault proxy path, and the MCP setup/discovery docs now explain how to store Jira base URLs alongside vault credentials so every project in the repo can discover the same setup.
 
 ## [7.10.19] - 2026-05-26
