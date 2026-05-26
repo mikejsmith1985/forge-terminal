@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.21] - 2026-05-26
+
+---
+
+## [v7.10.21] - 2026-05-26
+
 ### Fixed
 - **Release commands now use conventional commit messages** — External release commands and Release Manager defaults now use `chore: release vX.Y.Z`, preventing Forge-generated `commit-msg` hooks from blocking releases in repositories such as GitDiscord.
 
