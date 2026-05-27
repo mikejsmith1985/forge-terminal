@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`add-command-card` skill** — New agent skill that teaches any Copilot session how to build and register a Command Card in Forge Terminal. Covers the full data schema, POC/dev-server templates, Zero-Click macro patterns, tool-variant cards, the read→append→POST workflow, and a validation checklist. Registered in `workflow-enforcer` and `copilot-instructions.md` as a conditionally-loaded skill (activates on keywords: command card, launch POC, add shortcut, sidebar button).
+
 ## [7.10.22] - 2026-05-27
 
 ---

@@ -13,6 +13,7 @@
 For 3+ files: also invoke `multi-agent`.
 For tests: also invoke `testing-standards`.
 For PRs: also invoke `pr-workflow`.
+For command cards / launching a POC: also invoke `add-command-card`.
 
 **After skills are loaded: create your branch. After the branch exists: start Phase 1 below.**
 
@@ -280,6 +281,7 @@ For tasks spanning 3+ files: also invoke `multi-agent` before starting.
 For test changes: also invoke `testing-standards`.
 For PRs/reviews: also invoke `pr-workflow`.
 For docs/CHANGELOG: also invoke `documentation`.
+For command cards / launching a POC / adding a sidebar shortcut: also invoke `add-command-card`.
 
 **SKIPPING THIS SEQUENCE IS A WORKFLOW VIOLATION. Undo changes and restart from pre-flight.**
 
