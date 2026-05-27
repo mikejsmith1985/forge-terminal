@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.23] - 2026-05-27
+
+---
+
+## [v7.10.23] - 2026-05-27
+
 ### Added
 - **`add-command-card` skill** — New agent skill that teaches any Copilot session how to build and register a Command Card in Forge Terminal. Covers the full data schema, POC/dev-server templates, Zero-Click macro patterns, tool-variant cards, the read→append→POST workflow, and a validation checklist. Registered in `workflow-enforcer` and `copilot-instructions.md` as a conditionally-loaded skill (activates on keywords: command card, launch POC, add shortcut, sidebar button).
 - **Refresh button on the ⚡ Commands ribbon** — A `RefreshCw` icon button in the command-card sidebar header lets you pull in cards added by agents without a full browser page refresh. The icon spins while the fetch is in-flight and is disabled to prevent double-fetches.
