@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.22] - 2026-05-27
+
+---
+
+## [v7.10.22] - 2026-05-27
+
+### Fixed
+- **Release Manager now resolves external repo versions from global highest semver tags** — NodeToolbox-style repositories with newer tags on non-ancestor branches now report the correct CURRENT version by using sorted `git tag` lookup instead of ancestry-limited `git describe`.
+
 ## [7.10.21] - 2026-05-26
 
 ---
