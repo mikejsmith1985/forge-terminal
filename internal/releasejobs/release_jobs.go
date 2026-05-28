@@ -377,26 +377,53 @@ func (manager *ReleaseJobManager) finishJob(store *ReleaseJobStore, job *Release
 	_ = store.SaveJob(job)
 }
 
+// buildReleaseArguments constructs the PowerShell.exe argument slice for a background release job.
+// It switches from -File to -Command so that the command block can introspect the target script's
+// declared parameters before passing any named flags. This makes the runner compatible with any
+// project's local-release.ps1 — not just forge-terminal's — because forge-specific flags like
+// -NonInteractive and -IncludeUncommittedChanges are only injected when the script actually declares them.
 func buildReleaseArguments(job *ReleaseJob) []string {
-	arguments := []string{
+	return []string{
 		"-NoProfile",
-		"-NonInteractive",
+		"-NonInteractive", // powershell.exe process flag — prevents stdin reads at the host level
 		"-ExecutionPolicy",
 		"Bypass",
-		"-File",
-		job.ScriptPath,
-		job.Version,
-		"-NonInteractive",
-		"-ReleaseNotes",
-		job.ReleaseNotes,
+		"-Command",
+		buildIntrospectingReleaseCommand(job),
 	}
+}
+
+// buildIntrospectingReleaseCommand returns a semicolon-separated PowerShell command string that:
+//  1. Uses Get-Command to read the target script's declared parameters.
+//  2. Builds a splat table containing only the parameters the script actually accepts.
+//  3. Invokes the script with that table, then exits with the script's own exit code.
+//
+// User-provided strings (version, notes) are embedded in single-quoted PS literals.
+// In PowerShell single-quoted strings the only special character is ', escaped as ''.
+func buildIntrospectingReleaseCommand(job *ReleaseJob) string {
+	// Escape single quotes in user-provided values so they are safe inside '...' PS literals.
+	escapedScriptPath := strings.ReplaceAll(job.ScriptPath, "'", "''")
+	escapedVersion := strings.ReplaceAll(job.Version, "'", "''")
+	escapedNotes := strings.ReplaceAll(job.ReleaseNotes, "'", "''")
+
+	var commandBuilder strings.Builder
+	// Load the script's parameter metadata without executing it.
+	commandBuilder.WriteString(fmt.Sprintf("$scriptPath = '%s'; ", escapedScriptPath))
+	commandBuilder.WriteString("$availableParameters = (Get-Command $scriptPath).Parameters.Keys; ")
+	// Always pass the version as the positional VersionType argument.
+	commandBuilder.WriteString(fmt.Sprintf("$scriptArguments = @{ VersionType = '%s' }; ", escapedVersion))
+	// Pass optional named parameters only when the target script declares them.
+	commandBuilder.WriteString(fmt.Sprintf("if ('ReleaseNotes' -in $availableParameters) { $scriptArguments['ReleaseNotes'] = '%s' }; ", escapedNotes))
+	commandBuilder.WriteString("if ('NonInteractive' -in $availableParameters) { $scriptArguments['NonInteractive'] = [switch]$true }; ")
 	if job.IncludeUncommittedChanges {
-		arguments = append(arguments, "-IncludeUncommittedChanges")
+		commandBuilder.WriteString("if ('IncludeUncommittedChanges' -in $availableParameters) { $scriptArguments['IncludeUncommittedChanges'] = [switch]$true }; ")
 	}
 	if job.ShouldProceedWithWarnings {
-		arguments = append(arguments, "-Force")
+		commandBuilder.WriteString("if ('Force' -in $availableParameters) { $scriptArguments['Force'] = [switch]$true }; ")
 	}
-	return arguments
+	// Invoke the script via splatting and propagate its exit code to the parent process.
+	commandBuilder.WriteString("& $scriptPath @scriptArguments; exit $LASTEXITCODE")
+	return commandBuilder.String()
 }
 
 func releasePowerShellExecutable() string {

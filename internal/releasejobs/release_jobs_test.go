@@ -132,14 +132,16 @@ func TestReleaseJobManager_UsesPowerShellArgumentsSafely(t *testing.T) {
 
 	arguments := strings.Join(runner.capturedCommand.arguments, "\n")
 	for _, expectedArgument := range []string{
-		"-File",
+		// The runner now uses -Command with an introspecting block instead of -File,
+		// so parameter names appear without a leading dash inside PS string literals.
+		"-Command",
 		"local-release.ps1",
 		"7.10.24",
-		"-NonInteractive",
-		"-ReleaseNotes",
+		"NonInteractive",
+		"ReleaseNotes",
 		"Line one\nLine two",
-		"-IncludeUncommittedChanges",
-		"-Force",
+		"IncludeUncommittedChanges",
+		"Force",
 	} {
 		if !strings.Contains(arguments, expectedArgument) {
 			t.Fatalf("PowerShell arguments %q do not include %q", arguments, expectedArgument)
