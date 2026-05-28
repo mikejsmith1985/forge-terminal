@@ -413,6 +413,7 @@ func main() {
 	http.HandleFunc("/api/hosted/stop", WrapWithMiddleware(handleHostedStop))
 
 	http.HandleFunc("/api/project/release-script", WrapWithMiddleware(handleProjectReleaseScript))
+	http.HandleFunc("/api/project/release-jobs", WrapWithMiddleware(handleProjectReleaseJobs))
 	http.HandleFunc("/api/project/create", WrapWithMiddleware(handleProjectCreate))
 
 	// Setup wizard

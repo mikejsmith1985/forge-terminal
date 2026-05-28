@@ -35,6 +35,14 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   // v3.17.9: Custom version support
   const [customVersion, setCustomVersion] = useState('');
   const [useCustomVersion, setUseCustomVersion] = useState(false);
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [releaseNotes, setReleaseNotes] = useState('');
+  const [includeUncommittedChanges, setIncludeUncommittedChanges] = useState(false);
+  const [shouldProceedWithWarnings, setShouldProceedWithWarnings] = useState(false);
+  const [activeReleaseJob, setActiveReleaseJob] = useState(null);
+  const [releaseJobLog, setReleaseJobLog] = useState('');
+  const [releaseJobError, setReleaseJobError] = useState(null);
+  const [isSubmittingRelease, setIsSubmittingRelease] = useState(false);
 
   const { incrementMajor, incrementMinor, incrementFix, getReleaseType } = useVersionIncrement();
 
@@ -228,6 +236,8 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
 
   const next = nextVersion();
   const releaseType = getReleaseType(currentVersion, next);
+  const releaseRepoPath = (isExternalRepo && externalRepoPath) ? externalRepoPath : cwd;
+  const releaseVersionNumber = next ? next.replace(/^v/, '') : '';
 
   // Generate complete release command (commit, push, merge to main, tag, push tag, gh release create — no GH Actions needed)
   const generateReleaseCommand = useCallback(() => {
@@ -298,6 +308,12 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   }, [releaseCommand, onToast]);
 
   const handleExecute = useCallback(() => {
+    if (hasLocalScript && releaseRepoPath) {
+      setReleaseNotes((currentNotes) => currentNotes || `Release ${next}`);
+      setShowReleaseModal(true);
+      return;
+    }
+
     if (onExecuteCommand && releaseCommand) {
       onExecuteCommand({
         id: 'owner-release',
@@ -305,7 +321,96 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         description: `Release ${next}`,
       });
     }
-  }, [releaseCommand, next, onExecuteCommand]);
+  }, [hasLocalScript, releaseRepoPath, releaseCommand, next, onExecuteCommand]);
+
+  const readReleaseJobStatus = useCallback(async (jobId) => {
+    if (!releaseRepoPath || !jobId) return;
+    const query = new URLSearchParams({
+      repoPath: releaseRepoPath,
+      jobId,
+      maxLogBytes: '20000',
+    });
+    const response = await fetch(`/api/project/release-jobs?${query.toString()}`);
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(body.error || 'Failed to read release job status');
+    }
+    setActiveReleaseJob(body.job);
+    setReleaseJobLog(body.log || '');
+    return body.job;
+  }, [releaseRepoPath]);
+
+  useEffect(() => {
+    if (!activeReleaseJob || !activeReleaseJob.job_id) return undefined;
+    if (activeReleaseJob.status === 'completed' || activeReleaseJob.status === 'failed') return undefined;
+
+    let shouldContinuePolling = true;
+    let failedPollCount = 0;
+    const pollReleaseJob = async () => {
+      try {
+        const latestJob = await readReleaseJobStatus(activeReleaseJob.job_id);
+        if (!shouldContinuePolling || !latestJob) return;
+        failedPollCount = 0;
+        if (latestJob.status === 'completed') {
+          if (onToast) onToast(`Release ${next} completed`, 'success', 5000);
+          shouldContinuePolling = false;
+        }
+        if (latestJob.status === 'failed') {
+          if (onToast) onToast(`Release ${next} failed`, 'error', 6000);
+          shouldContinuePolling = false;
+        }
+      } catch (err) {
+        failedPollCount += 1;
+        setReleaseJobError(err.message);
+        if (failedPollCount >= 3) {
+          shouldContinuePolling = false;
+          if (onToast) onToast(`Release ${next} status polling paused`, 'warning', 5000);
+        }
+      }
+    };
+    const pollTimer = setInterval(pollReleaseJob, 1000);
+    pollReleaseJob();
+    return () => {
+      shouldContinuePolling = false;
+      clearInterval(pollTimer);
+    };
+  }, [activeReleaseJob?.job_id, activeReleaseJob?.status, readReleaseJobStatus, onToast, next]);
+
+  const startBackgroundRelease = useCallback(async () => {
+    if (!releaseRepoPath || !releaseVersionNumber || !releaseNotes.trim()) {
+      setReleaseJobError('Release notes are required for background releases.');
+      return;
+    }
+
+    setIsSubmittingRelease(true);
+    setReleaseJobError(null);
+    try {
+      const response = await fetch('/api/project/release-jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath: releaseRepoPath,
+          version: releaseVersionNumber,
+          releaseNotes,
+          includeUncommittedChanges,
+          shouldProceedWithWarnings,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.error || 'Failed to start release job');
+      }
+      setActiveReleaseJob(body.job);
+      setReleaseJobLog(body.log || '');
+      setShowReleaseModal(false);
+      if (onToast) onToast(`Release ${next} started in the background`, 'info', 3000);
+    } catch (err) {
+      setReleaseJobError(err.message);
+      if (onToast) onToast(err.message, 'error', 5000);
+    } finally {
+      setIsSubmittingRelease(false);
+    }
+  }, [releaseRepoPath, releaseVersionNumber, releaseNotes, includeUncommittedChanges, shouldProceedWithWarnings, onToast, next]);
 
   const getReleaseTypeDisplay = () => {
     if (!releaseType) return { label: 'BUG FIXES', color: 'green', icon: '🐛' };
@@ -556,9 +661,9 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         <div className="orc-workflow">
           {hasLocalScript ? (
             <>
-              <div className="orc-step"><Play size={14} /> Run local-release.ps1</div>
+              <div className="orc-step"><Play size={14} /> Start background release job</div>
               <div className="orc-step-arrow">↓</div>
-              <div className="orc-step"><Upload size={14} /> Builds & publishes GitHub Release</div>
+              <div className="orc-step"><Upload size={14} /> Builds & publishes with toast notification</div>
             </>
           ) : (
             <>
@@ -572,6 +677,21 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
             </>
           )}
         </div>
+
+        {activeReleaseJob && (
+          <div className={`orc-release-job-panel ${activeReleaseJob.status}`} data-testid="release-job-panel">
+            <div className="orc-release-job-header">
+              <span>Background release</span>
+              <strong>{activeReleaseJob.status}</strong>
+            </div>
+            <div className="orc-release-job-meta">
+              Job {activeReleaseJob.job_id} · v{activeReleaseJob.version || releaseVersionNumber}
+            </div>
+            {releaseJobLog && (
+              <pre className="orc-release-job-log">{releaseJobLog}</pre>
+            )}
+          </div>
+        )}
 
         {/* Command Toggle */}
         <div className="orc-command-section">
@@ -607,7 +727,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
           data-testid="release-execute-btn"
         >
           <Play size={18} />
-          Release {next}
+          {hasLocalScript ? `Prepare Release ${next}` : `Release ${next}`}
         </button>
 
         {error && (
@@ -616,7 +736,72 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
             {error}
           </div>
         )}
+        {releaseJobError && (
+          <div className="orc-error">
+            <AlertCircle size={16} />
+            {releaseJobError}
+          </div>
+        )}
       </div>
+
+      {showReleaseModal && (
+        <div className="modal-overlay">
+          <div className="modal orc-release-modal" role="dialog" aria-modal="true" aria-label="Prepare background release">
+            <div className="modal-header">
+              <h3>Prepare Release {next}</h3>
+              <button className="btn-close" onClick={() => setShowReleaseModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="orc-release-summary">
+                <span className="orc-version-label">Repository</span>
+                <code>{releaseRepoPath}</code>
+              </div>
+              <div className="form-group">
+                <label htmlFor="release-notes">Release notes</label>
+                <textarea
+                  id="release-notes"
+                  value={releaseNotes}
+                  onChange={(event) => setReleaseNotes(event.target.value)}
+                  rows={5}
+                  placeholder={`Release ${next}`}
+                />
+              </div>
+              <label className="orc-release-checkbox">
+                <input
+                  type="checkbox"
+                  checked={includeUncommittedChanges}
+                  onChange={(event) => setIncludeUncommittedChanges(event.target.checked)}
+                />
+                Include uncommitted changes in this release
+              </label>
+              <label className="orc-release-checkbox">
+                <input
+                  type="checkbox"
+                  checked={shouldProceedWithWarnings}
+                  onChange={(event) => setShouldProceedWithWarnings(event.target.checked)}
+                />
+                Proceed despite warnings from non-blocking preflight checks
+              </label>
+              <p className="orc-release-help">
+                The release runs with local-release.ps1 in non-interactive mode. If required choices are missing, the job fails safely instead of hanging in the background.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="orc-action-button" onClick={() => setShowReleaseModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="orc-execute-button"
+                onClick={startBackgroundRelease}
+                disabled={isSubmittingRelease || !releaseNotes.trim()}
+              >
+                <Play size={16} />
+                {isSubmittingRelease ? 'Starting...' : 'Start Background Release'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

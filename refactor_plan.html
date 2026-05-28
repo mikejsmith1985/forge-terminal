@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- refactor_plan.html is the single dashboard for the background Release Manager implementation. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Background Release Manager Plan</title>
+  <style>
+    body { background: #0b1020; color: #f8fafc; font-family: Segoe UI, Arial, sans-serif; margin: 32px; }
+    main { max-width: 1100px; margin: 0 auto; }
+    h1, h2 { color: #fb923c; }
+    .card { border: 1px solid #334155; border-radius: 12px; padding: 18px; margin: 16px 0; background: #111827; }
+    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-weight: 700; margin-right: 8px; }
+    .pending { background: #3f3f46; }
+    .progress { background: #1d4ed8; }
+    .done { background: #15803d; }
+    pre { background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Background Release Manager</h1>
+    <div class="card">
+      <span class="badge progress">[IN_PROGRESS]</span>
+      Implement the corrected Option 3 slice: pre-run modal choices, server-side background release job, persistent logs, polling, and completion toasts.
+    </div>
+    <div class="card">
+      <h2>Architecture</h2>
+      <pre class="mermaid">
+graph TD
+  "Release Manager Card" --> "Pre-run Release Modal"
+  "Pre-run Release Modal" --> "POST /api/project/release-jobs"
+  "Release Job Handler" --> "Release Job Manager"
+  "Release Job Manager" --> ".forge/release-jobs metadata and logs"
+  "Release Job Manager" --> "PowerShell local-release.ps1 -NonInteractive"
+  "Release Manager Card" --> "GET /api/project/release-jobs polling"
+  "GET /api/project/release-jobs polling" --> "Toast success or failure"
+      </pre>
+    </div>
+    <div class="card">
+      <h2>Task Status</h2>
+      <p><span class="badge done">[COMPLETED]</span>Branch created: feature/background-release-manager</p>
+      <p><span class="badge progress">[IN_PROGRESS]</span>Write tests first for backend jobs, script flags, and frontend modal.</p>
+      <p><span class="badge pending">[PENDING]</span>Implement backend release job manager and HTTP handler.</p>
+      <p><span class="badge pending">[PENDING]</span>Update local-release.ps1 non-interactive flags.</p>
+      <p><span class="badge pending">[PENDING]</span>Update Release Manager card modal, polling, and toasts.</p>
+      <p><span class="badge pending">[PENDING]</span>Run targeted and full validation.</p>
+    </div>
+  </main>
+</body>
+</html>

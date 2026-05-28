@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Release Manager background jobs** — Local release scripts can now be started from a pre-run modal and executed by the Forge backend with persistent `.forge/release-jobs` logs, status polling, and completion toasts so the active CLI terminal stays usable.
+
+### Changed
+- **`local-release.ps1` supports explicit non-interactive choices** — Added `-NonInteractive` and `-IncludeUncommittedChanges` so background releases fail safely instead of waiting on `Read-Host`, while `-ReleaseNotes` and `-Force` cover release notes and warning prompts.
+
 ## [7.10.23] - 2026-05-27
 
 ---
