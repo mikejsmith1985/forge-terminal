@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.25] - 2026-05-28
+
+---
+
+## [v7.10.25] - 2026-05-28
+
 ### Fixed
 - **Background release manager compatibility** — The background runner now uses parameter introspection (`Get-Command`) before invoking `local-release.ps1`, so forge-specific flags (`-NonInteractive`, `-Force`, `-IncludeUncommittedChanges`) are only passed when the target script declares them. Previously, running the Release Manager against any project whose script did not declare `-NonInteractive` caused an immediate `ParameterBindingException` failure.
 
