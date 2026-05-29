@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v7.10.30] - 2026-05-29
 
+### Fixed
+- **Release script parameter binding error on external projects** — Fixed a ParameterBindingException when executing release scripts in repositories that name the version parameter `BumpType` or `Version` instead of `VersionType`. Introspection now dynamically resolves the correct version parameter name from the script's `Get-Command` metadata (falling back to the first positional parameter) to ensure compatibility across all repositories.
+
 ## [7.10.29] - 2026-05-29
 
 ---
