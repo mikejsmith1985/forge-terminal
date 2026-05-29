@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.32] - 2026-05-29
+
+---
+
+## [v7.10.32] - 2026-05-29
+
+### Fixed
+- **Release Manager typed the release command into a running Claude Code session instead of starting a background job** — Forge infers the active tab's working directory by scraping shell prompts out of terminal output. A live Claude Code session draws a box-framed input prompt containing a Windows path and a `>` chevron, which the prompt parser mistook for the shell's current directory. That corrupted the tab directory, so the Release Manager card could no longer locate `scripts/local-release.ps1` and fell back to typing the full release command into the agent. Prompt-based directory detection is now suppressed whenever a full-screen TUI owns the terminal — both the alternate screen buffer (vim, htop) and a box-drawn frame in the normal buffer (Claude Code, lazygit) — so the last real shell directory is preserved and the release always runs as a background job. Copilot and agy were unaffected because their UIs do not render `C:\…>`-shaped lines.
+
 ## [7.10.31] - 2026-05-29
 
 ---
