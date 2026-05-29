@@ -1,7 +1,7 @@
 {
   "name": "forge-terminal-frontend",
   "private": true,
-  "version": "7.10.26",
+  "version": "7.10.27",
   "type": "module",
   "scripts": {
     "dev": "vite",

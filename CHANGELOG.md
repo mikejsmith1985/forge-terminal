@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.27] - 2026-05-29
+
+---
+
+## [v7.10.27] - 2026-05-29
+
 ### Added
 - **Google CLI tool support for command cards** — Added "Google" as an option to the "Run with" selector. Workflow command cards (`🚀 Fresh Session`, `🔄 Resume`, `🛡 Enforced`) now dynamically resolve to run `gemini` or `gemini --resume` commands with the workflow macro injection when Google is selected.
 - **Gemini CLI command detection** — Updated Go backend patterns and frontend utility functions to recognize the `gemini` command as an LLM CLI tool, enabling smart context injection and system process tracking.
