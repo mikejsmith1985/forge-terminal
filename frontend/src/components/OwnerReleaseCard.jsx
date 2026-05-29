@@ -40,6 +40,9 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   const [includeUncommittedChanges, setIncludeUncommittedChanges] = useState(false);
   const [shouldProceedWithWarnings, setShouldProceedWithWarnings] = useState(false);
   const [activeReleaseJob, setActiveReleaseJob] = useState(null);
+  // activeJobRepoPath is frozen at the moment a job starts so that polling always
+  // targets the original repo regardless of which tab is active while the job runs.
+  const [activeJobRepoPath, setActiveJobRepoPath] = useState(null);
   const [releaseJobLog, setReleaseJobLog] = useState('');
   const [releaseJobError, setReleaseJobError] = useState(null);
   const [isSubmittingRelease, setIsSubmittingRelease] = useState(false);
@@ -323,10 +326,13 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     }
   }, [hasLocalScript, releaseRepoPath, releaseCommand, next, onExecuteCommand]);
 
-  const readReleaseJobStatus = useCallback(async (jobId) => {
-    if (!releaseRepoPath || !jobId) return;
+  // fetchReleaseJobStatus is a pure fetch helper with no state mutations.
+  // It deliberately does NOT close over `releaseRepoPath` — callers must pass the
+  // repo path explicitly so that stale closures from a previous tab never corrupt state.
+  const fetchReleaseJobStatus = useCallback(async (jobId, jobRepoPath) => {
+    if (!jobRepoPath || !jobId) return null;
     const query = new URLSearchParams({
-      repoPath: releaseRepoPath,
+      repoPath: jobRepoPath,
       jobId,
       maxLogBytes: '20000',
     });
@@ -335,36 +341,46 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     if (!response.ok) {
       throw new Error(body.error || 'Failed to read release job status');
     }
-    setActiveReleaseJob(body.job);
-    setReleaseJobLog(body.log || '');
-    return body.job;
-  }, [releaseRepoPath]);
+    return { job: body.job, log: body.log || '' };
+  }, []); // Empty deps — never changes, never closes over live CWD-derived values
 
   useEffect(() => {
     if (!activeReleaseJob || !activeReleaseJob.job_id) return undefined;
     if (activeReleaseJob.status === 'completed' || activeReleaseJob.status === 'failed') return undefined;
+    if (!activeJobRepoPath) return undefined;
+
+    // Freeze the job context at effect-creation time.
+    // If the user switches tabs while this job runs, cwd changes but these frozen
+    // values stay correct for the duration of this particular effect invocation.
+    const frozenJobId = activeReleaseJob.job_id;
+    const frozenRepoPath = activeJobRepoPath;
 
     let shouldContinuePolling = true;
     let failedPollCount = 0;
     const pollReleaseJob = async () => {
       try {
-        const latestJob = await readReleaseJobStatus(activeReleaseJob.job_id);
-        if (!shouldContinuePolling || !latestJob) return;
+        const result = await fetchReleaseJobStatus(frozenJobId, frozenRepoPath);
+        // Guard: discard result if polling was cancelled during the async fetch.
+        if (!shouldContinuePolling || !result) return;
+        setActiveReleaseJob(result.job);
+        setReleaseJobLog(result.log);
         failedPollCount = 0;
-        if (latestJob.status === 'completed') {
-          if (onToast) onToast(`Release ${next} completed`, 'success', 5000);
+        if (result.job.status === 'completed') {
+          if (onToast) onToast(`Release ${result.job.version} completed`, 'success', 5000);
           shouldContinuePolling = false;
+          setActiveJobRepoPath(null);
         }
-        if (latestJob.status === 'failed') {
-          if (onToast) onToast(`Release ${next} failed`, 'error', 6000);
+        if (result.job.status === 'failed') {
+          if (onToast) onToast(`Release ${result.job.version} failed`, 'error', 6000);
           shouldContinuePolling = false;
+          setActiveJobRepoPath(null);
         }
       } catch (err) {
         failedPollCount += 1;
         setReleaseJobError(err.message);
         if (failedPollCount >= 3) {
           shouldContinuePolling = false;
-          if (onToast) onToast(`Release ${next} status polling paused`, 'warning', 5000);
+          if (onToast) onToast(`Release status polling paused`, 'warning', 5000);
         }
       }
     };
@@ -374,13 +390,18 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       shouldContinuePolling = false;
       clearInterval(pollTimer);
     };
-  }, [activeReleaseJob?.job_id, activeReleaseJob?.status, readReleaseJobStatus, onToast, next]);
+  }, [activeReleaseJob?.job_id, activeReleaseJob?.status, activeJobRepoPath, fetchReleaseJobStatus, onToast]);
 
   const startBackgroundRelease = useCallback(async () => {
     if (!releaseRepoPath || !releaseVersionNumber || !releaseNotes.trim()) {
       setReleaseJobError('Release notes are required for background releases.');
       return;
     }
+
+    // Snapshot the repo path NOW, before any async work.
+    // This frozen value travels with the job so that polling never drifts to the
+    // current tab's CWD when the user switches tabs while the release is running.
+    const frozenRepoPath = releaseRepoPath;
 
     setIsSubmittingRelease(true);
     setReleaseJobError(null);
@@ -389,7 +410,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repoPath: releaseRepoPath,
+          repoPath: frozenRepoPath,
           version: releaseVersionNumber,
           releaseNotes,
           includeUncommittedChanges,
@@ -401,6 +422,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         throw new Error(body.error || 'Failed to start release job');
       }
       setActiveReleaseJob(body.job);
+      setActiveJobRepoPath(frozenRepoPath);
       setReleaseJobLog(body.log || '');
       setShowReleaseModal(false);
       if (onToast) onToast(`Release ${next} started in the background`, 'info', 3000);

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Background Release Manager: polling no longer uses the wrong project after tab switch** — `readReleaseJobStatus` previously closed over `releaseRepoPath`, a live-computed value derived from `cwd`. When the user switched tabs mid-release, `cwd` changed, `releaseRepoPath` updated to the new project, and all subsequent poll requests sent the old job ID paired with the new project path — causing 404 errors and corrupted job state. Fix: `activeJobRepoPath` state is now snapshot from `releaseRepoPath` the moment a job starts and frozen for the lifetime of that job. The fetch helper is a pure function with empty dependency array that accepts explicit `(jobId, jobRepoPath)` parameters; it never closes over live CWD-derived values.
+- **Background Release Manager: stale in-flight poll responses no longer corrupt state** — The old callback called `setActiveReleaseJob` internally, before the polling effect could check `shouldContinuePolling`. A response in-flight during a tab switch could therefore overwrite state with data from the previous project. Fix: `fetchReleaseJobStatus` now returns data only; all state mutations happen inside the polling effect, after the `shouldContinuePolling` guard.
+- **Background Release Manager: toast completion/failure messages now use the job's own version** — Previously used the live `next` version computed from the current tab, which diverged after a tab switch. Now uses `result.job.version` from the polled response.
+- **Background Release Manager: concurrent write/read race on job.json eliminated** — Each HTTP request previously created a new `ReleaseJobStore` with a fresh `sync.RWMutex`, so the background release goroutine and HTTP poll handlers never actually shared a lock. A poll arriving mid-write could read a partially written file, producing "unexpected end of JSON input". Fix: a package-level `sync.Map` registry now ensures all `ReleaseJobStore` instances for the same canonical project root share one `*sync.RWMutex`. Path canonicalisation uses `filepath.Abs` + `filepath.Clean` + lowercase normalisation on Windows so that case variants and relative paths resolve to the same lock.
+
 ## [7.10.26] - 2026-05-28
 
 ---

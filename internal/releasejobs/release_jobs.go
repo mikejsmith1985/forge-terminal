@@ -20,6 +20,36 @@ import (
 	"github.com/google/uuid"
 )
 
+// projectMutexRegistry holds one shared RWMutex per canonical project root path.
+// This ensures that the background release goroutine and HTTP polling handlers always
+// synchronize on the same lock, even though each HTTP request creates a fresh store.
+var projectMutexRegistry sync.Map // map[string]*sync.RWMutex
+
+// sharedMutexForPath returns the canonical shared mutex for a project root, creating
+// one on first access. Two paths that resolve to the same directory share one mutex.
+func sharedMutexForPath(projectRoot string) *sync.RWMutex {
+	registryKey := canonicalProjectPath(projectRoot)
+	newMutex := &sync.RWMutex{}
+	actual, _ := projectMutexRegistry.LoadOrStore(registryKey, newMutex)
+	return actual.(*sync.RWMutex)
+}
+
+// canonicalProjectPath produces a stable, case-normalized registry key from any path form.
+// It resolves to an absolute path so that relative paths, trailing slashes, and (on Windows)
+// letter-case differences all map to the same key.
+func canonicalProjectPath(rawPath string) string {
+	absPath, absErr := filepath.Abs(rawPath)
+	if absErr != nil {
+		absPath = rawPath
+	}
+	clean := filepath.Clean(absPath)
+	// Windows NTFS is case-insensitive; normalise to lowercase so C:\Repo and c:\repo are the same key.
+	if runtime.GOOS == "windows" {
+		return strings.ToLower(clean)
+	}
+	return clean
+}
+
 const (
 	releaseJobsDirectoryName = "release-jobs"
 	releaseJobMetadataFile   = "job.json"
@@ -90,18 +120,27 @@ type ReleaseProcessRunner interface {
 }
 
 // ReleaseJobStore owns on-disk metadata and logs for release jobs in one repository.
+// mu is a shared pointer so that all store instances for the same project root—including
+// the background goroutine and each HTTP polling handler—synchronise on one lock.
 type ReleaseJobStore struct {
 	projectRoot string
 	jobsRoot    string
-	mu          sync.RWMutex
+	mu          *sync.RWMutex
 }
 
 // NewReleaseJobStore creates a store rooted at <repo>/.forge/release-jobs.
+// Stores with the same canonical project root share a single mutex so that the
+// background release goroutine and concurrent HTTP poll requests never race on job.json.
 func NewReleaseJobStore(projectRoot string) *ReleaseJobStore {
-	cleanProjectRoot := filepath.Clean(projectRoot)
+	absPath, absErr := filepath.Abs(projectRoot)
+	if absErr != nil {
+		absPath = projectRoot
+	}
+	cleanProjectRoot := filepath.Clean(absPath)
 	return &ReleaseJobStore{
 		projectRoot: cleanProjectRoot,
 		jobsRoot:    filepath.Join(cleanProjectRoot, ".forge", releaseJobsDirectoryName),
+		mu:          sharedMutexForPath(projectRoot),
 	}
 }
 
