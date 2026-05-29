@@ -140,7 +140,7 @@ var DefaultCommands = []Command{
 		ToolVariants: map[string]string{
 			"claude":  "claude",
 			"copilot": "copilot --allow-all-tools",
-			"google":  "gemini",
+			"google":  "agy --dangerously-skip-permissions",
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🤖 Claude (Fresh)",
@@ -165,7 +165,7 @@ var DefaultCommands = []Command{
 		ToolVariants: map[string]string{
 			"claude":  "claude --resume",
 			"copilot": "copilot --allow-all-tools --continue",
-			"google":  "gemini --resume",
+			"google":  "agy --dangerously-skip-permissions --continue",
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🔄 Claude (Resume)",
@@ -190,7 +190,7 @@ var DefaultCommands = []Command{
 		ToolVariants: map[string]string{
 			"claude":  "claude",
 			"copilot": "copilot --allow-all-tools",
-			"google":  "gemini",
+			"google":  "agy --dangerously-skip-permissions",
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🛡 Claude (Enforced)",

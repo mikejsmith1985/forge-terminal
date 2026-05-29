@@ -57,6 +57,20 @@ describe('isLLMCommand', () => {
     });
   });
 
+  describe('Agy commands', () => {
+    it('detects agy with arguments', () => {
+      expect(isLLMCommand('agy chat hello')).toBe(true);
+    });
+
+    it('detects bare agy command', () => {
+      expect(isLLMCommand('agy')).toBe(true);
+    });
+
+    it('handles whitespace', () => {
+      expect(isLLMCommand('  agy  ')).toBe(true);
+    });
+  });
+
   describe('Subagent commands', () => {
     it('detects @reviewer commands', () => {
       expect(isLLMCommand('@reviewer check this PR')).toBe(true);
@@ -144,6 +158,11 @@ describe('startsWithLLMCommand', () => {
   it('detects partial gemini typing', () => {
     expect(startsWithLLMCommand('gem')).toBe(true);
     expect(startsWithLLMCommand('gemin')).toBe(true);
+  });
+
+  it('detects partial agy typing', () => {
+    expect(startsWithLLMCommand('ag')).toBe(true);
+    expect(startsWithLLMCommand('agy')).toBe(true);
   });
 
   it('detects full copilot command', () => {

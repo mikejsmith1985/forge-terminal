@@ -8,7 +8,7 @@ import {
   isDuplicateKeybinding 
 } from '../utils/keybindingManager';
 
-const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) => {
+const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [], preferredCliTool = 'claude' }) => {
     const [formData, setFormData] = useState({
         description: '',
         command: '',
@@ -41,11 +41,23 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
             };
 
             if (initialData) {
+                const isToolAware = !!initialData.toolVariants && Object.keys(initialData.toolVariants).length > 0;
+                const activeCommand = isToolAware 
+                    ? (initialData.toolVariants[preferredCliTool] ?? initialData.command)
+                    : initialData.command;
+                const activeDescription = isToolAware && initialData.descriptionVariants?.[preferredCliTool]
+                    ? initialData.descriptionVariants[preferredCliTool]
+                    : initialData.description;
+                const activeMacroPayload = isToolAware && initialData.macroVariants?.[preferredCliTool] !== undefined
+                    ? initialData.macroVariants[preferredCliTool]
+                    : (initialData.macro_payload || '');
+
                 setFormData({
                     ...defaults,
                     ...initialData,
-                    // Ensure these are not undefined
-                    macro_payload: initialData.macro_payload || '',
+                    command: activeCommand,
+                    description: activeDescription,
+                    macro_payload: activeMacroPayload,
                     // Use ?? (nullish coalescing) so a saved macro_delay of 0 ms is
                     // preserved. The || operator incorrectly treats 0 as falsy,
                     // silently replacing it with the 1500 ms default.
@@ -56,7 +68,7 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
             }
             setShowIconPicker(false);
         }
-    }, [isOpen, initialData]);
+    }, [isOpen, initialData, preferredCliTool]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -115,6 +127,19 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                 </div>
                 <div className="modal-body">
                     <form id="command-form" onSubmit={handleSubmit}>
+                    {initialData && initialData.toolVariants && Object.keys(initialData.toolVariants).length > 0 && (
+                        <div style={{
+                            padding: '8px 12px',
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            borderLeft: '3px solid #3b82f6',
+                            borderRadius: '4px',
+                            marginBottom: '16px',
+                            fontSize: '12px',
+                            color: '#e2e8f0'
+                        }}>
+                            💡 You are editing the command card settings for the active tool: <strong>{preferredCliTool === 'claude' ? 'Claude' : preferredCliTool === 'google' ? 'Google (Agy)' : 'Copilot'}</strong>.
+                        </div>
+                    )}
                     <div className="form-row" style={{ gap: '12px', alignItems: 'flex-end' }}>
                         <div className="form-group" style={{ flex: '0 0 auto' }}>
                             <label>Icon</label>

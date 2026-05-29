@@ -1627,8 +1627,38 @@ function App() {
     let newCommands;
     if (editingCommand) {
       // Update existing
+      const isToolAware = !!editingCommand.toolVariants && Object.keys(editingCommand.toolVariants).length > 0;
+      let finalCommandData = { ...commandData, id: editingCommand.id };
+
+      if (isToolAware) {
+        // Save the edited values back to the active tool's variant maps
+        const updatedToolVariants = {
+          ...editingCommand.toolVariants,
+          [preferredCliTool]: commandData.command
+        };
+        const updatedDescriptionVariants = {
+          ...editingCommand.descriptionVariants,
+          [preferredCliTool]: commandData.description
+        };
+        const updatedMacroVariants = {
+          ...editingCommand.macroVariants,
+          [preferredCliTool]: commandData.macro_payload
+        };
+
+        finalCommandData = {
+          ...finalCommandData,
+          toolVariants: updatedToolVariants,
+          descriptionVariants: updatedDescriptionVariants,
+          macroVariants: updatedMacroVariants,
+          // Preserve base values for non-active tools/fallbacks
+          command: editingCommand.command,
+          description: editingCommand.description,
+          macro_payload: editingCommand.macro_payload
+        };
+      }
+
       newCommands = commands.map(c =>
-        c.id === editingCommand.id ? { ...commandData, id: c.id } : c
+        c.id === editingCommand.id ? finalCommandData : c
       )
     } else {
       // Add new with smart keybinding
@@ -2150,6 +2180,7 @@ function App() {
         onSave={handleSaveCommand}
         initialData={editingCommand}
         commands={commands}
+        preferredCliTool={preferredCliTool}
       />
 
       <FeedbackModal
