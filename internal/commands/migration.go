@@ -93,6 +93,9 @@ func inferProviderFromCommand(command, description string) string {
 	if strings.Contains(combined, "aider") {
 		return "aider"
 	}
+	if strings.Contains(combined, "google") || strings.Contains(combined, "gemini") {
+		return "google"
+	}
 
 	return ""
 }
@@ -116,17 +119,27 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude",
 					"copilot": "copilot --allow-all-tools",
+					"google":  "gemini",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded ID 6 to tool-agnostic Fresh Session card")
+			} else if _, ok := cmd.ToolVariants["google"]; !ok {
+				commands[i].ToolVariants["google"] = "gemini"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google ToolVariant to ID 6")
 			}
 			if len(commands[i].DescriptionVariants) == 0 {
 				commands[i].DescriptionVariants = map[string]string{
 					"claude":  "🤖 Claude (Fresh)",
 					"copilot": "🤖 Copilot (Fresh)",
+					"google":  "🤖 Google (Fresh)",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 6")
+			} else if _, ok := commands[i].DescriptionVariants["google"]; !ok {
+				commands[i].DescriptionVariants["google"] = "🤖 Google (Fresh)"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google DescriptionVariant to ID 6")
 			}
 			if len(commands[i].MacroVariants) == 0 {
 				copilotMacro := cmd.MacroPayload
@@ -136,9 +149,14 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants = map[string]string{
 					"claude":  ClaudeAwarenessMacro,
 					"copilot": copilotMacro,
+					"google":  GoogleWorkflowMacro,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 6")
+			} else if _, ok := commands[i].MacroVariants["google"]; !ok {
+				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+				changed = true
+				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 6")
 			}
 
 		case 7:
@@ -148,17 +166,27 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude --resume",
 					"copilot": "copilot --allow-all-tools --continue",
+					"google":  "gemini --resume",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded ID 7 to tool-agnostic Resume card")
+			} else if _, ok := cmd.ToolVariants["google"]; !ok {
+				commands[i].ToolVariants["google"] = "gemini --resume"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google ToolVariant to ID 7")
 			}
 			if len(commands[i].DescriptionVariants) == 0 {
 				commands[i].DescriptionVariants = map[string]string{
 					"claude":  "🔄 Claude (Resume)",
 					"copilot": "🔄 Copilot (Resume)",
+					"google":  "🔄 Google (Resume)",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 7")
+			} else if _, ok := commands[i].DescriptionVariants["google"]; !ok {
+				commands[i].DescriptionVariants["google"] = "🔄 Google (Resume)"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google DescriptionVariant to ID 7")
 			}
 			if len(commands[i].MacroVariants) == 0 {
 				copilotMacro := cmd.MacroPayload
@@ -168,9 +196,14 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants = map[string]string{
 					"claude":  ClaudeAwarenessMacro,
 					"copilot": copilotMacro,
+					"google":  GoogleWorkflowMacro,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 7")
+			} else if _, ok := commands[i].MacroVariants["google"]; !ok {
+				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+				changed = true
+				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 7")
 			}
 
 		case 8:
@@ -184,17 +217,27 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude",
 					"copilot": "copilot --allow-all-tools",
+					"google":  "gemini",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded existing ID 8 to tool-agnostic Enforced card")
+			} else if _, ok := cmd.ToolVariants["google"]; !ok {
+				commands[i].ToolVariants["google"] = "gemini"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google ToolVariant to ID 8")
 			}
 			if len(commands[i].DescriptionVariants) == 0 {
 				commands[i].DescriptionVariants = map[string]string{
 					"claude":  "🛡 Claude (Enforced)",
 					"copilot": "🛡 Copilot (Enforced)",
+					"google":  "🛡 Google (Enforced)",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 8")
+			} else if _, ok := commands[i].DescriptionVariants["google"]; !ok {
+				commands[i].DescriptionVariants["google"] = "🛡 Google (Enforced)"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google DescriptionVariant to ID 8")
 			}
 			if len(commands[i].MacroVariants) == 0 {
 				copilotMacro := cmd.MacroPayload
@@ -204,9 +247,14 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants = map[string]string{
 					"claude":  ClaudeEnforcedMacro,
 					"copilot": copilotMacro,
+					"google":  GoogleWorkflowMacro,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 8")
+			} else if _, ok := commands[i].MacroVariants["google"]; !ok {
+				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+				changed = true
+				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 8")
 			}
 		}
 	}
@@ -222,14 +270,17 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 			ToolVariants: map[string]string{
 				"claude":  "claude",
 				"copilot": "copilot --allow-all-tools",
+				"google":  "gemini",
 			},
 			DescriptionVariants: map[string]string{
 				"claude":  "🛡 Claude (Enforced)",
 				"copilot": "🛡 Copilot (Enforced)",
+				"google":  "🛡 Google (Enforced)",
 			},
 			MacroVariants: map[string]string{
 				"claude":  ClaudeEnforcedMacro,
 				"copilot": CopilotWorkflowMacro,
+				"google":  GoogleWorkflowMacro,
 			},
 		}
 		commands = append(commands, enforced)

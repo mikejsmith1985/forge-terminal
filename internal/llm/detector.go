@@ -14,6 +14,7 @@ const (
 	ProviderGitHubCopilot Provider = "github-copilot"
 	ProviderClaude        Provider = "claude"
 	ProviderAider         Provider = "aider"
+	ProviderGoogle        Provider = "google"
 	ProviderUnknown       Provider = "unknown"
 )
 
@@ -103,6 +104,20 @@ func NewDetector() *Detector {
 					return ProviderAider, CommandCode
 				},
 			},
+			{
+				Name:  "gemini-standalone",
+				Regex: regexp.MustCompile(`(?i)^gemini\s*$`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGoogle, CommandChat
+				},
+			},
+			{
+				Name:  "gemini-args",
+				Regex: regexp.MustCompile(`(?i)^gemini(\s|$)`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGoogle, CommandChat
+				},
+			},
 			// Path-based patterns (fallback for shell-resolved commands)
 			{
 				Name:  "copilot-path",
@@ -123,6 +138,13 @@ func NewDetector() *Detector {
 				Regex: regexp.MustCompile(`(?i)/aider(\s|$)`),
 				Extract: func(cmd string) (Provider, CommandType) {
 					return ProviderAider, CommandCode
+				},
+			},
+			{
+				Name:  "gemini-path",
+				Regex: regexp.MustCompile(`(?i)/gemini(\s|$)`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGoogle, CommandChat
 				},
 			},
 		},

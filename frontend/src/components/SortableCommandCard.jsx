@@ -121,9 +121,9 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
                     {isToolAware && (
                         <span
                             className={`tool-badge tool-badge-${preferredCliTool}`}
-                            title={`Running with ${preferredCliTool === 'claude' ? 'Claude Code' : 'GitHub Copilot'}: ${resolvedCommand}`}
+                            title={`Running with ${preferredCliTool === 'claude' ? 'Claude Code' : preferredCliTool === 'google' ? 'Google' : 'GitHub Copilot'}: ${resolvedCommand}`}
                         >
-                            {preferredCliTool === 'claude' ? 'Claude' : 'Copilot'}
+                            {preferredCliTool === 'claude' ? 'Claude' : preferredCliTool === 'google' ? 'Google' : 'Copilot'}
                         </span>
                     )}
                 </div>

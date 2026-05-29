@@ -43,6 +43,7 @@ export function isLLMCommand(cmd) {
     'gh copilot', // GitHub CLI copilot extension
     'claude',     // Claude CLI
     'aider',      // Aider AI assistant
+    'gemini',     // Gemini CLI
   ];
 
   for (const prefix of llmPrefixes) {
@@ -109,7 +110,7 @@ export function startsWithLLMCommand(input) {
   }
 
   // Check if input starts with any LLM prefix
-  const llmPrefixes = ['copilot', 'gh copilot', 'claude', 'aider'];
+  const llmPrefixes = ['copilot', 'gh copilot', 'claude', 'aider', 'gemini'];
   
   return llmPrefixes.some(prefix => 
     prefix.startsWith(trimmed) || trimmed.startsWith(prefix)

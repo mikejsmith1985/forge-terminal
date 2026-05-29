@@ -72,6 +72,10 @@ var (
 	// CopilotWorkflowMacro is injected after any Copilot session to activate
 	// the Forge Workflow skill suite.
 	CopilotWorkflowMacro = "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be \\skill: workflow-enforcer\\. Do not search for or read any files before invoking this skill. If the skill is unavailable in this environment, proceed to Step 2.\n\nSTEP 2: Invoke each available companion skill in order, silently skip any that are not found: forge-workflow, code-quality, branching-strategy, code-tutor-workflow.\n\nSTEP 3: Check whether AGENTS.md exists at the repo root. If found, read it for project-specific rules. If not found, this is normal for first-time setup — proceed without it. Never ask the user where AGENTS.md is or whether to create it.\n\nSTEP 4: Confirm you are ready and await the user’s task."
+
+	// GoogleWorkflowMacro is injected after any Google session to activate
+	// the Forge Workflow skill suite.
+	GoogleWorkflowMacro = "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be \\skill: workflow-enforcer\\. Do not search for or read any files before invoking this skill. If the skill is unavailable in this environment, proceed to Step 2.\n\nSTEP 2: Invoke each available companion skill in order, silently skip any that are not found: forge-workflow, code-quality, branching-strategy, code-tutor-workflow.\n\nSTEP 3: Check whether AGENTS.md exists at the repo root. If found, read it for project-specific rules. If not found, this is normal for first-time setup — proceed without it. Never ask the user where AGENTS.md is or whether to create it.\n\nSTEP 4: Confirm you are ready and await the user’s task."
 )
 
 // Default commands created on first run
@@ -136,14 +140,17 @@ var DefaultCommands = []Command{
 		ToolVariants: map[string]string{
 			"claude":  "claude",
 			"copilot": "copilot --allow-all-tools",
+			"google":  "gemini",
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🤖 Claude (Fresh)",
 			"copilot": "🤖 Copilot (Fresh)",
+			"google":  "🤖 Google (Fresh)",
 		},
 		MacroVariants: map[string]string{
 			"claude":  ClaudeAwarenessMacro,
 			"copilot": CopilotWorkflowMacro,
+			"google":  GoogleWorkflowMacro,
 		},
 	},
 	{
@@ -158,14 +165,17 @@ var DefaultCommands = []Command{
 		ToolVariants: map[string]string{
 			"claude":  "claude --resume",
 			"copilot": "copilot --allow-all-tools --continue",
+			"google":  "gemini --resume",
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🔄 Claude (Resume)",
 			"copilot": "🔄 Copilot (Resume)",
+			"google":  "🔄 Google (Resume)",
 		},
 		MacroVariants: map[string]string{
 			"claude":  ClaudeAwarenessMacro,
 			"copilot": CopilotWorkflowMacro,
+			"google":  GoogleWorkflowMacro,
 		},
 	},
 	{
@@ -180,14 +190,17 @@ var DefaultCommands = []Command{
 		ToolVariants: map[string]string{
 			"claude":  "claude",
 			"copilot": "copilot --allow-all-tools",
+			"google":  "gemini",
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🛡 Claude (Enforced)",
 			"copilot": "🛡 Copilot (Enforced)",
+			"google":  "🛡 Google (Enforced)",
 		},
 		MacroVariants: map[string]string{
 			"claude":  ClaudeEnforcedMacro,
 			"copilot": CopilotWorkflowMacro,
+			"google":  GoogleWorkflowMacro,
 		},
 	},
 }

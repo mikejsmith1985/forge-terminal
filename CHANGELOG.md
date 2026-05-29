@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Google CLI tool support for command cards** — Added "Google" as an option to the "Run with" selector. Workflow command cards (`🚀 Fresh Session`, `🔄 Resume`, `🛡 Enforced`) now dynamically resolve to run `gemini` or `gemini --resume` commands with the workflow macro injection when Google is selected.
+- **Gemini CLI command detection** — Updated Go backend patterns and frontend utility functions to recognize the `gemini` command as an LLM CLI tool, enabling smart context injection and system process tracking.
+
 ### Fixed
 - **Background Release Manager: polling no longer uses the wrong project after tab switch** — `readReleaseJobStatus` previously closed over `releaseRepoPath`, a live-computed value derived from `cwd`. When the user switched tabs mid-release, `cwd` changed, `releaseRepoPath` updated to the new project, and all subsequent poll requests sent the old job ID paired with the new project path — causing 404 errors and corrupted job state. Fix: `activeJobRepoPath` state is now snapshot from `releaseRepoPath` the moment a job starts and frozen for the lifetime of that job. The fetch helper is a pure function with empty dependency array that accepts explicit `(jobId, jobRepoPath)` parameters; it never closes over live CWD-derived values.
 - **Background Release Manager: stale in-flight poll responses no longer corrupt state** — The old callback called `setActiveReleaseJob` internally, before the polling effect could check `shouldContinuePolling`. A response in-flight during a tab switch could therefore overwrite state with data from the previous project. Fix: `fetchReleaseJobStatus` now returns data only; all state mutations happen inside the polling effect, after the `shouldContinuePolling` guard.
