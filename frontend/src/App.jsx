@@ -39,7 +39,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName, isTempOrSystemPath } from './utils/projectFolder'
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName, isTempOrSystemPath, isSystemProfilePath } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
@@ -1190,6 +1190,16 @@ function App() {
     // the release manager card, workflow card, git panel, and other features
     // that depend on currentDirectory pointing at the actual project root.
     if (fullPath && isTempOrSystemPath(fullPath)) {
+      return;
+    }
+    // Guard: a bare home/profile directory (e.g. /home/mikejsmith1985 or
+    // C:\Users\mike) is where WSL/PowerShell shells land on startup — it is
+    // never a meaningful project name. Update the stored directory so that
+    // other features (git panel, workflow card) know where the shell actually
+    // is, but do NOT rename the tab. The title will update correctly once the
+    // shell navigates into a real project directory.
+    if (fullPath && isSystemProfilePath(fullPath)) {
+      updateTabDirectory(tabId, fullPath);
       return;
     }
     // Static strategies: never auto-rename on directory change

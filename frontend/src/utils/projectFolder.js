@@ -7,7 +7,10 @@ const KNOWN_DOCUMENT_FILE_EXTENSIONS = /\.(html?|css|json|md|markdown|txt|xml|ya
 // Narrow set of common project-collection folder names.
 // Intentionally kept small — generic names like "code", "dev", "work" are
 // also common INSIDE projects, so anchoring on them causes false positives.
-const KNOWN_ROOT_FOLDER_NAMES = new Set(['projectswin', 'repos', 'workspace', 'workspaces']);
+// "projects" is included because it is the standard Linux/WSL convention
+// (~/projects/<project-name>) and is the source of the "mikejsmith1985" bug
+// where the positional fallback fires on /home/<user> paths.
+const KNOWN_ROOT_FOLDER_NAMES = new Set(['projectswin', 'repos', 'workspace', 'workspaces', 'projects']);
 
 /**
  * Returns true if the segment looks like a document, web, image, archive,
@@ -76,8 +79,10 @@ export function extractProjectFolder(rawPath, rootFolder) {
   }
 
   // 2. Auto-detect from the narrow set of known root folder names.
-  //    Only search the first half of the path to avoid anchoring inside a project.
-  const searchLimit = Math.ceil(parts.length / 2);
+  //    Search up to 5 segments from the root — deep enough to cover common
+  //    layouts (/home/user/projects/…) while avoiding false positives from
+  //    sub-project folders that happen to share a known name.
+  const searchLimit = Math.min(parts.length - 1, 5);
   for (let i = 0; i < searchLimit; i++) {
     if (KNOWN_ROOT_FOLDER_NAMES.has(parts[i].toLowerCase()) && i + 1 < parts.length) {
       return parts[i + 1];
@@ -94,11 +99,10 @@ export function extractProjectFolder(rawPath, rootFolder) {
   }
 
   // 4. Unix absolute path: /home/user/project/…
+  //    Require at least 3 parts so we never return a username from a bare
+  //    home-directory path like /home/mikejsmith1985 (parts.length === 2).
   if (isUnixAbsolute && parts.length >= 3) {
     return parts[2];
-  }
-  if (isUnixAbsolute && parts.length >= 2) {
-    return parts[1];
   }
 
   // 5. Last resort: deepest segment
@@ -157,7 +161,44 @@ export function isTempOrSystemPath(rawPath) {
 }
 
 /**
- * Returns true for strategies whose tab title is set once at creation and
+ * Returns true when a path is the bare root of a user's home or profile
+ * directory — a transient shell starting point, NOT a project directory.
+ *
+ * Examples that return true:
+ *   /home/mikejsmith1985          (WSL / Linux home dir, 2 segments)
+ *   C:\Users\mike                 (Windows user profile root, 3 segments)
+ *
+ * Examples that return false (deeper paths are treated as real locations):
+ *   /home/user/projects/forge-terminal
+ *   C:\Users\mike\Documents\my-project
+ *
+ * This guard prevents OSC 9;9 events fired at shell startup from overwriting
+ * a pinned "project-root" tab title with a username like "mikejsmith1985".
+ *
+ * @param {string} rawPath - A filesystem path (backslashes or forward slashes).
+ * @returns {boolean}
+ */
+export function isSystemProfilePath(rawPath) {
+  if (!rawPath || typeof rawPath !== 'string') return false;
+  const normalized = rawPath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const parts = normalized.split('/').filter(Boolean);
+
+  // Unix: /home/<user> has exactly 2 meaningful parts after splitting.
+  // The shell starts here before cd-ing to the project — never a useful title.
+  if (normalized.startsWith('/') && parts.length === 2 && parts[0] === 'home') {
+    return true;
+  }
+
+  // Windows: C:\Users\<user> has exactly 3 parts (drive letter, "Users", username).
+  if (!normalized.startsWith('/') && parts.length === 3 && parts[1].toLowerCase() === 'users') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Returns true for naming strategies whose tab title is set once at creation
  * should NOT be auto-updated when the user changes directory.
  *
  * @param {string} strategy

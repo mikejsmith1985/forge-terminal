@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v7.10.26] - 2026-05-29
+
+### Fixed
+- **Tab naming: "project-root" no longer shows username instead of project name** — WSL/Linux shells fire an OSC 9;9 event at startup with the bare home directory path (`/home/<user>`) before navigating to the project. The new `isSystemProfilePath()` guard detects these bare home/profile paths and updates the stored directory without overwriting the tab title. This is applied consistently in `handleDirectoryChange`, session restore, and the retitle-all-from-settings path.
+- **`extractProjectFolder` now recognises the Linux `projects` convention** — Added `'projects'` to `KNOWN_ROOT_FOLDER_NAMES` so `/home/<user>/projects/<project-name>` and `~/projects/<project-name>` are correctly anchored to the project name rather than falling through to a positional guess. Tilde paths (e.g. `~/projects/forge-terminal`) also benefit.
+- **Extended KNOWN_ROOT_FOLDER_NAMES search depth** — The search limit was raised from `ceil(len/2)` to `min(len-1, 5)`, allowing anchor detection at the third path segment (`/home/user/projects/…`) while capping at 5 to prevent false positives from nested folders with the same name.
+- **Removed hardcoded `title === 'forge-terminal'` session restore trigger** — This was a project-specific hack that caused unnecessary re-derivation of any tab already titled 'forge-terminal', which could overwrite the correct title with a system path like 'mikejsmith1985'. Tabs with real project names are now preserved as-is during session restore.
+
 ## [7.10.25] - 2026-05-28
 
 ---

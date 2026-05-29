@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
 import { logger } from '../utils/logger';
-import { extractProjectFolder, getTabTitle, getShellLabel, isStaticNamingStrategy, isFileLikeName } from '../utils/projectFolder';
+import { extractProjectFolder, getTabTitle, getShellLabel, isStaticNamingStrategy, isFileLikeName, isSystemProfilePath } from '../utils/projectFolder';
 
 const MAX_TABS = 20;
 
@@ -274,8 +274,11 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
 
           // Re-derive title from saved directory when using a dynamic strategy.
           // Also re-derive if the saved title is a filename that leaked in from a prior session.
+          // Skip derivation for bare home/profile directories (/home/<user>, C:\Users\<user>) —
+          // those are transient shell starting points that cannot yield a meaningful project name.
           if (!isStaticNamingStrategy(strategy) && tabState.currentDirectory &&
-              (title.startsWith('Terminal ') || title === 'forge-terminal' || title === '~' || !title || isFileLikeName(title))) {
+              !isSystemProfilePath(tabState.currentDirectory) &&
+              (title.startsWith('Terminal ') || title === '~' || !title || isFileLikeName(title))) {
             const derived = getTabTitle(tabState.currentDirectory, strategy, {
               tabNumber: index + 1,
               prefix: namingPrefixRef.current || 'Dev',
@@ -556,7 +559,8 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
             prefix: prefix || 'Dev',
             fallback: `Terminal ${tabNumber}`,
           });
-        } else if (tab.currentDirectory) {
+        } else if (tab.currentDirectory && !isSystemProfilePath(tab.currentDirectory)) {
+          // Skip bare home/profile directories — they cannot yield a meaningful project name.
           derived = getTabTitle(tab.currentDirectory, strategy, {
             tabNumber,
             prefix: prefix || 'Dev',
