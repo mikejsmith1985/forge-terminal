@@ -1181,6 +1181,26 @@ body {
   }
 }
 
+@keyframes release-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.tab-release-indicator {
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  color: #f97316;
+  animation: release-pulse 1.5s infinite ease-in-out;
+  vertical-align: middle;
+}
+
 @keyframes tab-bead-of-light {
   0% {
     background-position: 0% 0%;

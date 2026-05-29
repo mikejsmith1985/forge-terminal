@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Antigravity CLI (agy) integration for Google provider** — Migrated Google tool variant commands from the old `gemini` CLI to the active `agy` CLI. Fresh session and Enforced workflow cards now execute `agy --dangerously-skip-permissions`, and the Resume card executes `agy --dangerously-skip-permissions --continue` to correctly resume the most recent conversation.
 - **Agy command and process detection** — Added pattern matching for `agy` CLI commands and processes in the Go backend and frontend utility libraries to support proper persistent context injection and system process tracking.
+- **Persistent visual indicator for background release jobs** — Implemented a pulsing active release job indicator tag on tab headers when a background release is active in their directory.
+- **Global background release status polling and notifications** — Added a centralized polling mechanism in `App.jsx` using React refs and local storage synchronization to cheap-poll active job statuses globally, ensuring users receive success/failure toasts even if they navigate away or switch tabs from the initiating project panel.
+- **Auto-syncing release job logs and status** — Connected `OwnerReleaseCard` to the global release registry so that navigating back to a tab with an active release dynamically resumes log tracking and high-fidelity output.
 
 ### Fixed
 - **Command Card Edit Modal Tool-Awareness** — Fixed a bug where editing a tool-aware card (like Fresh, Resume, or Enforced) would default to displaying Claude commands regardless of the active "Run with" tool selection. The edit modal now dynamically displays and updates the command, description, and macro payload for the currently active CLI tool variant and successfully saves edits back to the respective variant maps.
