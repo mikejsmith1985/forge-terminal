@@ -20,6 +20,7 @@ Each card appears in the Forge sidebar and can:
 - **Paste** text/prompts into the terminal without executing (useful for AI prompts)
 - **Auto-inject** a follow-up macro payload seconds after execution (Zero-Click mode)
 - **Switch behaviour** per AI tool (Claude vs Copilot) using `toolVariants`
+- **Toggle on/off** a service with two buttons (Start + Stop) using `cardType: "toggle"`
 
 ---
 
@@ -42,7 +43,9 @@ Every card is a JSON object. The full schema (from `internal/commands/storage.go
   "macro_delay":   1500,
   "toolVariants":        {},
   "descriptionVariants": {},
-  "macroVariants":       {}
+  "macroVariants":       {},
+  "cardType":            "",
+  "toggle":              null
 }
 ```
 
@@ -64,6 +67,8 @@ Every card is a JSON object. The full schema (from `internal/commands/storage.go
 | `toolVariants` | Optional | `{"claude": "...", "copilot": "..."}` — different commands per tool |
 | `descriptionVariants` | Optional | Different card label per tool |
 | `macroVariants` | Optional | Different macro text per tool |
+| `cardType` | Optional | `"toggle"` turns the card into an on/off Start + Stop pair (see below) |
+| `toggle` | Optional | The "off" (Stop) action + button labels; required when `cardType` is `"toggle"` |
 
 ---
 
@@ -175,6 +180,42 @@ Use `macro_delay ≥ 4000 ms` when the process needs time to start before the ma
 }
 ```
 
+### On/Off Toggle Card (one card, Start + Stop buttons)
+
+Set `cardType: "toggle"` and add a `toggle` object. The top-level `command`
+(plus its `macro_payload`/`delay`/`macro_delay`) is the **Start** action; the
+`toggle` object holds the **Stop** action and optional button labels.
+
+```json
+{
+  "description": "🐳 DBAI POC",
+  "command":     "Set-Location C:\\ProjectsWin\\DBAI; docker compose up -d",
+  "icon":        "🐳",
+  "favorite":    true,
+  "cardType":    "toggle",
+  "toggle": {
+    "onLabel":         "Start",
+    "offLabel":        "Stop",
+    "offCommand":      "Set-Location C:\\ProjectsWin\\DBAI; docker compose stop",
+    "offMacroPayload": "",
+    "offMacroDelay":   1500
+  }
+}
+```
+
+| `toggle` field | Required? | Notes |
+|---|---|---|
+| `offCommand` | ✅ Yes | The teardown command run by the Stop button |
+| `onLabel` | Optional | Start button text (default `"Start"`) |
+| `offLabel` | Optional | Stop button text (default `"Stop"`) |
+| `offMacroPayload` | Optional | Zero-Click macro injected after the Stop command starts |
+| `offMacroDelay` | Optional | Delay before the Stop macro fires (default 1500 ms) |
+
+**Behavior:** both buttons are always clickable. After a click, that side stays
+highlighted in-memory until the other is clicked — this reflects the last action
+taken, NOT verified process state, and resets when Forge restarts. The Stop
+action reuses the same execution + Zero-Click macro pipeline as Start.
+
 ---
 
 ## Decision Tree: Which Fields Do I Need?
@@ -193,6 +234,10 @@ Does the card behave differently for Claude vs Copilot?
 
 Should it always be prepended to AI prompts?
   └─ YES → set alwaysAppend = true
+
+Does the card both START and STOP something (a server, container, tunnel)?
+  └─ YES → set cardType = "toggle", put the start command in `command`,
+           and the teardown command in `toggle.offCommand`
 ```
 
 ---

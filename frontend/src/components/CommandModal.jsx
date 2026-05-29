@@ -19,7 +19,15 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
         icon: null,
         delay: 0,
         macro_payload: '',
-        macro_delay: 1500
+        macro_delay: 1500,
+        // On/off toggle fields. Held flat in the form for easy editing and
+        // reassembled into a nested `toggle` object on submit (see handleSubmit).
+        isToggle: false,
+        onLabel: '',
+        offLabel: '',
+        offCommand: '',
+        offMacroPayload: '',
+        offMacroDelay: 1500
     });
     const [showIconPicker, setShowIconPicker] = useState(false);
     const [keybindingError, setKeybindingError] = useState(null);
@@ -37,10 +45,19 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                 icon: null,
                 delay: 0,
                 macro_payload: '',
-                macro_delay: 1500
+                macro_delay: 1500,
+                isToggle: false,
+                onLabel: '',
+                offLabel: '',
+                offCommand: '',
+                offMacroPayload: '',
+                offMacroDelay: 1500
             };
 
             if (initialData) {
+                // Flatten a saved toggle card's nested config back into the form's
+                // flat fields so an existing toggle card can be edited in place.
+                const savedToggle = initialData.toggle || {};
                 setFormData({
                     ...defaults,
                     ...initialData,
@@ -49,7 +66,13 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     // Use ?? (nullish coalescing) so a saved macro_delay of 0 ms is
                     // preserved. The || operator incorrectly treats 0 as falsy,
                     // silently replacing it with the 1500 ms default.
-                    macro_delay: initialData.macro_delay ?? 1500
+                    macro_delay: initialData.macro_delay ?? 1500,
+                    isToggle: initialData.cardType === 'toggle',
+                    onLabel: savedToggle.onLabel || '',
+                    offLabel: savedToggle.offLabel || '',
+                    offCommand: savedToggle.offCommand || '',
+                    offMacroPayload: savedToggle.offMacroPayload || '',
+                    offMacroDelay: savedToggle.offMacroDelay ?? 1500
                 });
             } else {
                 setFormData(defaults);
@@ -83,7 +106,31 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave(formData);
+
+        // Pull the flat toggle helper fields out of the form data; whatever
+        // remains in `rest` is the normal command card payload.
+        const { isToggle, onLabel, offLabel, offCommand, offMacroPayload, offMacroDelay, ...rest } = formData;
+
+        const payload = { ...rest };
+        if (isToggle) {
+            // Mark the card as a toggle and pack the "off" action + labels into
+            // the nested config the backend (ToggleConfig) and renderer expect.
+            payload.cardType = 'toggle';
+            payload.toggle = {
+                onLabel: onLabel || '',
+                offLabel: offLabel || '',
+                offCommand: offCommand || '',
+                offMacroPayload: offMacroPayload || '',
+                offMacroDelay: offMacroDelay ?? 1500
+            };
+        } else {
+            // Clear any prior toggle config so editing a card back to a normal
+            // command does not leave an orphaned (and now ignored) toggle block.
+            payload.cardType = '';
+            payload.toggle = null;
+        }
+
+        onSave(payload);
     };
 
     // Handle emoji vs lucide icon rendering
@@ -154,12 +201,12 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                     )}
 
                     <div className="form-group">
-                        <label>Command</label>
+                        <label>{formData.isToggle ? 'Start (On) Command' : 'Command'}</label>
                         <textarea
                             name="command"
                             value={formData.command}
                             onChange={handleChange}
-                            placeholder="The command to execute..."
+                            placeholder={formData.isToggle ? 'Command that launches the service...' : 'The command to execute...'}
                             rows={4}
                             required
                         />
@@ -264,6 +311,16 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                             📌 Always Append (add to every prompt)
                         </label>
 
+                        <label className="checkbox-label">
+                            <input
+                                type="checkbox"
+                                name="isToggle"
+                                checked={formData.isToggle}
+                                onChange={handleChange}
+                            />
+                            🔀 On/Off Toggle (Start + Stop buttons)
+                        </label>
+
                         {formData.alwaysAppend && (
                             <div style={{ marginLeft: '24px', marginTop: '8px', padding: '12px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '4px', borderLeft: '3px solid #f59e0b' }}>
                                 <p style={{ fontSize: '13px', margin: 0, color: '#f59e0b' }}>
@@ -276,6 +333,77 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [] }) =
                             </div>
                         )}
                     </div>
+
+                    {/* Toggle config — only shown when the card is an on/off toggle.
+                        The Start action reuses the Command/Macro fields above; these
+                        fields define the matching Stop (teardown) action + labels. */}
+                    {formData.isToggle && (
+                        <div style={{ marginTop: '8px', padding: '12px', background: 'rgba(34, 197, 94, 0.08)', borderRadius: '4px', borderLeft: '3px solid #22c55e' }}>
+                            <p style={{ fontSize: '13px', margin: '0 0 10px', color: '#22c55e' }}>
+                                <strong>🔀 On/Off Toggle</strong> — the card shows two buttons. The command above runs on <em>Start</em>; the fields below define <em>Stop</em>.
+                            </p>
+
+                            <div className="form-row" style={{ gap: '12px' }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Start Button Label</label>
+                                    <input
+                                        type="text"
+                                        name="onLabel"
+                                        value={formData.onLabel}
+                                        onChange={handleChange}
+                                        placeholder="Start"
+                                    />
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Stop Button Label</label>
+                                    <input
+                                        type="text"
+                                        name="offLabel"
+                                        value={formData.offLabel}
+                                        onChange={handleChange}
+                                        placeholder="Stop"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Stop (Off) Command</label>
+                                <textarea
+                                    name="offCommand"
+                                    value={formData.offCommand}
+                                    onChange={handleChange}
+                                    placeholder="Command that tears the service down..."
+                                    rows={3}
+                                    required={formData.isToggle}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Stop Macro Payload (Zero-Click, optional)</label>
+                                <textarea
+                                    name="offMacroPayload"
+                                    value={formData.offMacroPayload}
+                                    onChange={handleChange}
+                                    placeholder="# Text to auto-inject after the stop command runs..."
+                                    rows={2}
+                                    style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                                />
+                            </div>
+
+                            <div className="form-group" style={{ width: '150px' }}>
+                                <label>Stop Macro Delay (ms)</label>
+                                <input
+                                    type="number"
+                                    name="offMacroDelay"
+                                    value={formData.offMacroDelay ?? 1500}
+                                    onChange={handleChange}
+                                    placeholder="1500"
+                                    min="0"
+                                    step="100"
+                                />
+                            </div>
+                        </div>
+                    )}
                     </form>
                 </div>
 

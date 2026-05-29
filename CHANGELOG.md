@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [7.10.27] - 2026-05-29
+### Added
+- **On/off toggle command cards** — A new generic card type (`cardType: "toggle"`) renders a single card with two buttons: a green **Start** that launches a service and a red **Stop** that tears it down. The Start action reuses the card's existing `command`/`macro_payload`/`delay` fields; a new nested `toggle` config (`offCommand`, `offMacroPayload`, `offMacroDelay`, `offDelay`, `onLabel`, `offLabel`) drives the Stop action. The last-clicked side stays highlighted in-memory (it reflects the last action taken, not verified process state, and resets on restart). Toggle cards are first-class in the add/edit modal (a "🔀 On/Off Toggle" checkbox reveals the Stop fields) and require no backend execution or migration changes — every new field is `omitempty`, so existing cards serialize unchanged. Use case: combining a "Launch POC" and "Stop POC" pair into one card.
 
 ---
 
