@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.10.29] - 2026-05-29
+
+---
+
+## [v7.10.29] - 2026-05-29
+
 ### Added
 - **Antigravity CLI (agy) integration for Google provider** — Migrated Google tool variant commands from the old `gemini` CLI to the active `agy` CLI. Fresh session and Enforced workflow cards now execute `agy --dangerously-skip-permissions`, and the Resume card executes `agy --dangerously-skip-permissions --continue` to correctly resume the most recent conversation.
 - **Agy command and process detection** — Added pattern matching for `agy` CLI commands and processes in the Go backend and frontend utility libraries to support proper persistent context injection and system process tracking.
