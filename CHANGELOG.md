@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Vault API now requires authentication on every route — closes an unauthenticated local-read vulnerability.** Previously all `/api/vault/*` routes passed through `AuthMiddleware`, which is a no-op whenever the global remote-access token is unset (the default on a localhost install). That left the entire vault readable by any local process with no credentials: `GET /api/vault/entries` returned all entry metadata, and `GET /api/vault/entries/value?id=...` returned the **decrypted plaintext secret value**. A dedicated vault session token (256-bit, stored `0600` at `~/.forge/vault-session-token`, mirroring the mobile-token pattern) is now enforced on every vault route regardless of the global token. The secret-exposing routes (`reveal`, `inject`) accept the token only via the `Authorization: Bearer` header — never a cookie — making them immune to CSRF, and all vault routes reject cross-site `Origin`s. The token is injected into the same-origin served page so the desktop UI keeps working with no user-visible change.
+- **Secret-in-description detection (advisory).** The vault now heuristically detects when a secret has been pasted into an entry's *description* field (a URL with an embedded password, known key prefixes such as `sk-`/`ghp_`, or a high-entropy token). The Add/Edit form shows an inline, non-blocking warning as you type, and existing entries whose description looks like it holds a secret are flagged with a badge so they can be rotated and cleaned up. Descriptions are metadata, not secret values, so this nudges the value into the encrypted secret field instead.
+
 ## [7.10.27] - 2026-05-29
 
 ---

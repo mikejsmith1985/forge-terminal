@@ -18,6 +18,27 @@ import { API_CONFIG } from '../config'
 const ERROR_AUTO_CLEAR_MS = 5000
 const API_BASE_STORAGE_KEY = 'forge_api_base'
 
+/**
+ * Reads the vault session token used to authenticate /api/vault/* calls.
+ *
+ * The backend injects the token into the served page as window.__forgeVaultToken
+ * (see injectVaultTokenIntoHTML in cmd/forge/main.go). Every vault route now
+ * requires this token — without it the API returns 401 — so attaching it is what
+ * keeps the legitimate UI working after the auth gate was added. Falls back to the
+ * shared forge-auth-token in localStorage for parity with the other API hooks.
+ *
+ * @returns {string} the token, or '' when none is available
+ */
+const getVaultAuthToken = () => {
+  if (typeof window !== 'undefined' && window.__forgeVaultToken) {
+    return window.__forgeVaultToken
+  }
+  if (typeof localStorage !== 'undefined') {
+    return localStorage.getItem('forge-auth-token') || ''
+  }
+  return ''
+}
+
 const getVaultApiBaseCandidates = () => {
   const configuredBase = API_CONFIG.base
   const sameOriginBase = typeof window !== 'undefined' ? window.location.origin : configuredBase
@@ -45,6 +66,14 @@ const vaultFetch = async (path, options = {}) => {
   const requestHeaders = {
     'Content-Type': 'application/json',
     ...options.headers,
+  }
+
+  // Attach the vault session token so the request passes the auth gate. The
+  // secret-exposing routes (reveal/inject) accept the token ONLY via this header,
+  // never a cookie, which is what makes them immune to CSRF.
+  const vaultAuthToken = getVaultAuthToken()
+  if (vaultAuthToken && !requestHeaders.Authorization) {
+    requestHeaders.Authorization = `Bearer ${vaultAuthToken}`
   }
 
   const candidateBases = getVaultApiBaseCandidates()

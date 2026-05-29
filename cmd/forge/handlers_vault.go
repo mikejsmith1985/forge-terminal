@@ -58,6 +58,9 @@ func handleVaultStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !requireVaultAuth(w, r) {
+		return
+	}
 	if !requireVault(w) {
 		return
 	}
@@ -74,6 +77,9 @@ func handleVaultStatus(w http.ResponseWriter, r *http.Request) {
 func handleVaultListEntries(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuth(w, r) {
 		return
 	}
 	if !requireVault(w) {
@@ -96,6 +102,9 @@ func handleVaultListEntries(w http.ResponseWriter, r *http.Request) {
 func handleVaultAddEntry(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuth(w, r) {
 		return
 	}
 	if !requireVault(w) {
@@ -148,6 +157,9 @@ func handleVaultAddEntry(w http.ResponseWriter, r *http.Request) {
 func handleVaultUpdateEntry(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuth(w, r) {
 		return
 	}
 	if !requireVault(w) {
@@ -216,6 +228,9 @@ func handleVaultDeleteEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !requireVaultAuth(w, r) {
+		return
+	}
 	if !requireVault(w) {
 		return
 	}
@@ -242,6 +257,9 @@ func handleVaultDeleteEntry(w http.ResponseWriter, r *http.Request) {
 func handleVaultToggleAutoInject(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuth(w, r) {
 		return
 	}
 	if !requireVault(w) {
@@ -278,6 +296,9 @@ func handleVaultToggleAutoInject(w http.ResponseWriter, r *http.Request) {
 func handleVaultInject(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuthBearerOnly(w, r) {
 		return
 	}
 	if !requireVault(w) {
@@ -356,6 +377,9 @@ func normalizeOptionalURL(rawURL string) (string, error) {
 func handleVaultRevealValue(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuthBearerOnly(w, r) {
 		return
 	}
 	if !requireVault(w) {
