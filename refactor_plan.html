@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- refactor_plan.html is the single dashboard for the Google CLI tool variant implementation. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Google CLI Tool Integration Plan</title>
+  <style>
+    body { background: #0b1020; color: #f8fafc; font-family: Segoe UI, Arial, sans-serif; margin: 32px; }
+    main { max-width: 1100px; margin: 0 auto; }
+    h1, h2 { color: #fb923c; }
+    .card { border: 1px solid #334155; border-radius: 12px; padding: 18px; margin: 16px 0; background: #111827; }
+    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-weight: 700; margin-right: 8px; }
+    .pending { background: #3f3f46; }
+    .progress { background: #1d4ed8; }
+    .done { background: #15803d; }
+    pre { background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Google CLI Tool Integration Dashboard</h1>
+    <div class="card">
+      <span class="badge done">[COMPLETED]</span>
+      Add Google as an option to the "Run With" options in Forge Terminal to enable starting and resuming sessions using the Gemini CLI.
+    </div>
+    <div class="card">
+      <h2>Architecture</h2>
+      <pre class="mermaid">
+graph TD
+  "CommandCards UI" -->|Run with Selector| "Preferred Tool (Google)"
+  "SortableCommandCard" -->|Badge & Action| "gemini / gemini --resume"
+  "Go Backend Storage" -->|Default Commands| "google variant mappings"
+  "Go Backend Migration" -->|AutoMigrateOnLoad| "Upgrade commands.json maps"
+  "LLM Detector/Parser" -->|Pattern Matching| "Detect gemini command"
+      </pre>
+    </div>
+    <div class="card">
+      <h2>Task Status</h2>
+      <p><span class="badge done">[COMPLETED]</span> Branch created: feature/add-google-tool-variant</p>
+      <p><span class="badge done">[COMPLETED]</span> Update default command cards and macro payloads in Go backend.</p>
+      <p><span class="badge done">[COMPLETED]</span> Update Go backend migrations to transparently upgrade existing cards.</p>
+      <p><span class="badge done">[COMPLETED]</span> Implement frontend UI selector option, badges, styles, and command resolver.</p>
+      <p><span class="badge done">[COMPLETED]</span> Implement frontend llmDetection support and vitest tests.</p>
+      <p><span class="badge done">[COMPLETED]</span> Verify Go unit tests and vitest tests pass.</p>
+      <p><span class="badge progress">[IN_PROGRESS]</span> Run full project verification tests.</p>
+    </div>
+  </main>
+</body>
+</html>

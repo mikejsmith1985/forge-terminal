@@ -8,7 +8,9 @@ package mcp_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/mcp"
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
@@ -52,8 +54,8 @@ func newSuccessRunner(executable string) *testCommandRunner {
 func buildEnvServer(t *testing.T, runner mcp.CommandRunner) *mcp.Server {
 	t.Helper()
 	return mcp.NewServer("tok", mcp.Dependencies{
-		ProjectPath:             t.TempDir(),
-		WorkflowConfig:          workflow.WorkflowConfig{},
+		ProjectPath:              t.TempDir(),
+		WorkflowConfig:           workflow.WorkflowConfig{},
 		EnvironmentCommandRunner: runner,
 	})
 }
@@ -305,16 +307,127 @@ func TestEnvironmentRunTool_NonZeroExitCode_IsNotAnError(t *testing.T) {
 	}
 }
 
+func TestEnvironmentRunTool_DetachReturnsRecoverableJob(t *testing.T) {
+	runner := &testCommandRunner{
+		responsesByExecutable: map[string]mcp.RunOutput{
+			"cmd":  {ExitCode: 0, Stdout: "detached build complete"},
+			"bash": {ExitCode: 0, Stdout: "detached build complete"},
+		},
+	}
+	srv := buildEnvServer(t, runner)
+
+	result := callTool(t, srv, "environment_run", map[string]any{
+		"command":     "echo detached",
+		"environment": "native",
+		"detach":      true,
+	})
+	if result.IsError {
+		t.Fatalf("expected detach start to succeed, got: %v", result.Content)
+	}
+
+	var startResponse map[string]any
+	if err := json.Unmarshal([]byte(result.Content[0].Text), &startResponse); err != nil {
+		t.Fatalf("detach response is not valid JSON: %v", err)
+	}
+	jobID, hasJobID := startResponse["job_id"].(string)
+	if !hasJobID || jobID == "" {
+		t.Fatalf("expected detach response to include job_id, got: %v", startResponse)
+	}
+	if startResponse["detached"] != true {
+		t.Fatalf("expected detached=true in response, got: %v", startResponse["detached"])
+	}
+
+	readResponse := waitForEnvironmentReadToolStatus(t, srv, jobID, "completed")
+	logText, hasLogText := readResponse["log"].(string)
+	if !hasLogText || logText == "" {
+		t.Fatalf("expected environment_read_job to return captured log text, got: %v", readResponse)
+	}
+	if !strings.Contains(logText, "detached build complete") {
+		t.Fatalf("expected log to include command output, got: %q", logText)
+	}
+}
+
+func TestEnvironmentJobsTool_ListsDetachedJobsForRecovery(t *testing.T) {
+	runner := &testCommandRunner{
+		responsesByExecutable: map[string]mcp.RunOutput{
+			"cmd":  {ExitCode: 0, Stdout: "recovered build complete"},
+			"bash": {ExitCode: 0, Stdout: "recovered build complete"},
+		},
+	}
+	srv := buildEnvServer(t, runner)
+	startResult := callTool(t, srv, "environment_run", map[string]any{
+		"command":     "echo recover",
+		"environment": "native",
+		"detach":      true,
+	})
+
+	var startResponse map[string]any
+	if err := json.Unmarshal([]byte(startResult.Content[0].Text), &startResponse); err != nil {
+		t.Fatalf("detach response is not valid JSON: %v", err)
+	}
+	jobID := startResponse["job_id"].(string)
+	waitForEnvironmentReadToolStatus(t, srv, jobID, "completed")
+
+	listResult := callTool(t, srv, "environment_jobs", map[string]any{})
+	if listResult.IsError {
+		t.Fatalf("expected environment_jobs to succeed, got: %v", listResult.Content)
+	}
+	var listResponse map[string]any
+	if err := json.Unmarshal([]byte(listResult.Content[0].Text), &listResponse); err != nil {
+		t.Fatalf("environment_jobs response is not valid JSON: %v", err)
+	}
+	jobs, hasJobs := listResponse["jobs"].([]any)
+	if !hasJobs || len(jobs) == 0 {
+		t.Fatalf("expected jobs list to include detached job, got: %v", listResponse)
+	}
+}
+
 func TestEnvironmentRunTool_ToolsListIncludesNewTools(t *testing.T) {
 	srv := buildEnvServer(t, newDockerAvailableRunner())
 
-	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`
-	result := callTool(t, srv, "environment_detect", map[string]any{})
-
-	// If environment_detect is callable it must be registered — this also
-	// verifies environment_run implicitly since they're registered together.
-	if result == nil {
-		t.Fatal("expected environment_detect to be registered in the tool list")
+	status := srv.GetUIStatus()
+	requiredTools := []string{
+		"environment_detect",
+		"environment_run",
+		"environment_jobs",
+		"environment_read_job",
 	}
-	_ = body
+	for _, requiredTool := range requiredTools {
+		if !sliceContainsString(status.ActiveTools, requiredTool) {
+			t.Fatalf("expected tool list to include %q; got %v", requiredTool, status.ActiveTools)
+		}
+	}
+}
+
+func waitForEnvironmentReadToolStatus(t *testing.T, srv *mcp.Server, jobID string, expectedStatus string) map[string]any {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		readResult := callTool(t, srv, "environment_read_job", map[string]any{
+			"job_id": jobID,
+		})
+		if readResult.IsError {
+			t.Fatalf("environment_read_job returned error: %v", readResult.Content)
+		}
+		var readResponse map[string]any
+		if err := json.Unmarshal([]byte(readResult.Content[0].Text), &readResponse); err != nil {
+			t.Fatalf("environment_read_job response is not valid JSON: %v", err)
+		}
+		job, hasJob := readResponse["job"].(map[string]any)
+		if hasJob && job["status"] == expectedStatus {
+			return readResponse
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("job %s did not reach status %q", jobID, expectedStatus)
+	return nil
+}
+
+func sliceContainsString(values []string, expectedValue string) bool {
+	for _, value := range values {
+		if value == expectedValue {
+			return true
+		}
+	}
+	return false
 }

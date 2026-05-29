@@ -47,6 +47,9 @@ func TestAddEntryRequestFields(t *testing.T) {
 		SecretName:       "GitHub Token",
 		EnvVarName:       "GITHUB_TOKEN",
 		SecretValue:      "ghp_test123",
+		URL:              "https://github.com/settings/tokens",
+		BundleID:         "github-credential",
+		BundleType:       "password",
 		ShouldAutoInject: true,
 	}
 
@@ -58,6 +61,15 @@ func TestAddEntryRequestFields(t *testing.T) {
 	}
 	if req.SecretValue != "ghp_test123" {
 		t.Errorf("unexpected SecretValue: %q", req.SecretValue)
+	}
+	if req.URL != "https://github.com/settings/tokens" {
+		t.Errorf("unexpected URL: %q", req.URL)
+	}
+	if req.BundleID != "github-credential" {
+		t.Errorf("unexpected BundleID: %q", req.BundleID)
+	}
+	if req.BundleType != "password" {
+		t.Errorf("unexpected BundleType: %q", req.BundleType)
 	}
 	if !req.ShouldAutoInject {
 		t.Error("expected ShouldAutoInject to be true")

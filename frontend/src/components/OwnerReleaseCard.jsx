@@ -35,6 +35,17 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   // v3.17.9: Custom version support
   const [customVersion, setCustomVersion] = useState('');
   const [useCustomVersion, setUseCustomVersion] = useState(false);
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [releaseNotes, setReleaseNotes] = useState('');
+  const [includeUncommittedChanges, setIncludeUncommittedChanges] = useState(false);
+  const [shouldProceedWithWarnings, setShouldProceedWithWarnings] = useState(false);
+  const [activeReleaseJob, setActiveReleaseJob] = useState(null);
+  // activeJobRepoPath is frozen at the moment a job starts so that polling always
+  // targets the original repo regardless of which tab is active while the job runs.
+  const [activeJobRepoPath, setActiveJobRepoPath] = useState(null);
+  const [releaseJobLog, setReleaseJobLog] = useState('');
+  const [releaseJobError, setReleaseJobError] = useState(null);
+  const [isSubmittingRelease, setIsSubmittingRelease] = useState(false);
 
   const { incrementMajor, incrementMinor, incrementFix, getReleaseType } = useVersionIncrement();
 
@@ -228,6 +239,8 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
 
   const next = nextVersion();
   const releaseType = getReleaseType(currentVersion, next);
+  const releaseRepoPath = (isExternalRepo && externalRepoPath) ? externalRepoPath : cwd;
+  const releaseVersionNumber = next ? next.replace(/^v/, '') : '';
 
   // Generate complete release command (commit, push, merge to main, tag, push tag, gh release create — no GH Actions needed)
   const generateReleaseCommand = useCallback(() => {
@@ -258,7 +271,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       }
     }
 
-    const msg = commitMessage.trim() || `Release ${next}`;
+    const releaseCommitMessage = commitMessage.trim() || `chore: release ${next}`;
     
     // Auto-update package.json if it exists
     let versionBump = '';
@@ -269,9 +282,9 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
     }
 
     if (shellType === 'powershell') {
-      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${msg}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { gh release delete ${next} --yes 2>$null; gh release create ${next} --title "Release ${next}" --notes "Release ${next}" --latest; git checkout $b; Write-Host "Release ${next} published on GitHub." -ForegroundColor Green } } } } } } } } } }`;
+      return `${cmdPrefix}${versionBump}$b = git branch --show-current; git add -A; if ($?) { git commit -m "${releaseCommitMessage}" --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { gh release delete ${next} --yes 2>$null; gh release create ${next} --title "Release ${next}" --notes "Release ${next}" --latest; git checkout $b; Write-Host "Release ${next} published on GitHub." -ForegroundColor Green } } } } } } } } } }`;
     } else {
-      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${msg}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && (gh release delete ${next} --yes 2>/dev/null; gh release create ${next} --title "Release ${next}" --notes "Release ${next}" --latest) && git checkout $b && echo "Release ${next} published on GitHub."`;
+      return `${cmdPrefix}${versionBump}b=$(git branch --show-current) && git add -A && git commit -m "${releaseCommitMessage}" --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && (gh release delete ${next} --yes 2>/dev/null; gh release create ${next} --title "Release ${next}" --notes "Release ${next}" --latest) && git checkout $b && echo "Release ${next} published on GitHub."`;
     }
   }, [next, shellType, commitMessage, isExternalRepo, externalRepoPath, hasLocalScript, selectedIncrement]);
 
@@ -298,6 +311,12 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   }, [releaseCommand, onToast]);
 
   const handleExecute = useCallback(() => {
+    if (hasLocalScript && releaseRepoPath) {
+      setReleaseNotes((currentNotes) => currentNotes || `Release ${next}`);
+      setShowReleaseModal(true);
+      return;
+    }
+
     if (onExecuteCommand && releaseCommand) {
       onExecuteCommand({
         id: 'owner-release',
@@ -305,7 +324,115 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         description: `Release ${next}`,
       });
     }
-  }, [releaseCommand, next, onExecuteCommand]);
+  }, [hasLocalScript, releaseRepoPath, releaseCommand, next, onExecuteCommand]);
+
+  // fetchReleaseJobStatus is a pure fetch helper with no state mutations.
+  // It deliberately does NOT close over `releaseRepoPath` — callers must pass the
+  // repo path explicitly so that stale closures from a previous tab never corrupt state.
+  const fetchReleaseJobStatus = useCallback(async (jobId, jobRepoPath) => {
+    if (!jobRepoPath || !jobId) return null;
+    const query = new URLSearchParams({
+      repoPath: jobRepoPath,
+      jobId,
+      maxLogBytes: '20000',
+    });
+    const response = await fetch(`/api/project/release-jobs?${query.toString()}`);
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(body.error || 'Failed to read release job status');
+    }
+    return { job: body.job, log: body.log || '' };
+  }, []); // Empty deps — never changes, never closes over live CWD-derived values
+
+  useEffect(() => {
+    if (!activeReleaseJob || !activeReleaseJob.job_id) return undefined;
+    if (activeReleaseJob.status === 'completed' || activeReleaseJob.status === 'failed') return undefined;
+    if (!activeJobRepoPath) return undefined;
+
+    // Freeze the job context at effect-creation time.
+    // If the user switches tabs while this job runs, cwd changes but these frozen
+    // values stay correct for the duration of this particular effect invocation.
+    const frozenJobId = activeReleaseJob.job_id;
+    const frozenRepoPath = activeJobRepoPath;
+
+    let shouldContinuePolling = true;
+    let failedPollCount = 0;
+    const pollReleaseJob = async () => {
+      try {
+        const result = await fetchReleaseJobStatus(frozenJobId, frozenRepoPath);
+        // Guard: discard result if polling was cancelled during the async fetch.
+        if (!shouldContinuePolling || !result) return;
+        setActiveReleaseJob(result.job);
+        setReleaseJobLog(result.log);
+        failedPollCount = 0;
+        if (result.job.status === 'completed') {
+          if (onToast) onToast(`Release ${result.job.version} completed`, 'success', 5000);
+          shouldContinuePolling = false;
+          setActiveJobRepoPath(null);
+        }
+        if (result.job.status === 'failed') {
+          if (onToast) onToast(`Release ${result.job.version} failed`, 'error', 6000);
+          shouldContinuePolling = false;
+          setActiveJobRepoPath(null);
+        }
+      } catch (err) {
+        failedPollCount += 1;
+        setReleaseJobError(err.message);
+        if (failedPollCount >= 3) {
+          shouldContinuePolling = false;
+          if (onToast) onToast(`Release status polling paused`, 'warning', 5000);
+        }
+      }
+    };
+    const pollTimer = setInterval(pollReleaseJob, 1000);
+    pollReleaseJob();
+    return () => {
+      shouldContinuePolling = false;
+      clearInterval(pollTimer);
+    };
+  }, [activeReleaseJob?.job_id, activeReleaseJob?.status, activeJobRepoPath, fetchReleaseJobStatus, onToast]);
+
+  const startBackgroundRelease = useCallback(async () => {
+    if (!releaseRepoPath || !releaseVersionNumber || !releaseNotes.trim()) {
+      setReleaseJobError('Release notes are required for background releases.');
+      return;
+    }
+
+    // Snapshot the repo path NOW, before any async work.
+    // This frozen value travels with the job so that polling never drifts to the
+    // current tab's CWD when the user switches tabs while the release is running.
+    const frozenRepoPath = releaseRepoPath;
+
+    setIsSubmittingRelease(true);
+    setReleaseJobError(null);
+    try {
+      const response = await fetch('/api/project/release-jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath: frozenRepoPath,
+          version: releaseVersionNumber,
+          releaseNotes,
+          includeUncommittedChanges,
+          shouldProceedWithWarnings,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.error || 'Failed to start release job');
+      }
+      setActiveReleaseJob(body.job);
+      setActiveJobRepoPath(frozenRepoPath);
+      setReleaseJobLog(body.log || '');
+      setShowReleaseModal(false);
+      if (onToast) onToast(`Release ${next} started in the background`, 'info', 3000);
+    } catch (err) {
+      setReleaseJobError(err.message);
+      if (onToast) onToast(err.message, 'error', 5000);
+    } finally {
+      setIsSubmittingRelease(false);
+    }
+  }, [releaseRepoPath, releaseVersionNumber, releaseNotes, includeUncommittedChanges, shouldProceedWithWarnings, onToast, next]);
 
   const getReleaseTypeDisplay = () => {
     if (!releaseType) return { label: 'BUG FIXES', color: 'green', icon: '🐛' };
@@ -545,7 +672,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
           <input
             type="text"
             className="orc-commit-input"
-            placeholder={`Release ${next}`}
+            placeholder={`chore: release ${next}`}
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             data-testid="commit-message-input"
@@ -556,9 +683,9 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         <div className="orc-workflow">
           {hasLocalScript ? (
             <>
-              <div className="orc-step"><Play size={14} /> Run local-release.ps1</div>
+              <div className="orc-step"><Play size={14} /> Start background release job</div>
               <div className="orc-step-arrow">↓</div>
-              <div className="orc-step"><Upload size={14} /> Builds & publishes GitHub Release</div>
+              <div className="orc-step"><Upload size={14} /> Builds & publishes with toast notification</div>
             </>
           ) : (
             <>
@@ -568,10 +695,25 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
               <div className="orc-step-arrow">↓</div>
               <div className="orc-step"><Tag size={14} /> Create & push tag {next}</div>
               <div className="orc-step-arrow">↓</div>
-              <div className="orc-step"><Upload size={14} /> GitHub Actions builds release</div>
+              <div className="orc-step"><Upload size={14} /> GitHub Release created locally</div>
             </>
           )}
         </div>
+
+        {activeReleaseJob && (
+          <div className={`orc-release-job-panel ${activeReleaseJob.status}`} data-testid="release-job-panel">
+            <div className="orc-release-job-header">
+              <span>Background release</span>
+              <strong>{activeReleaseJob.status}</strong>
+            </div>
+            <div className="orc-release-job-meta">
+              Job {activeReleaseJob.job_id} · v{activeReleaseJob.version || releaseVersionNumber}
+            </div>
+            {releaseJobLog && (
+              <pre className="orc-release-job-log">{releaseJobLog}</pre>
+            )}
+          </div>
+        )}
 
         {/* Command Toggle */}
         <div className="orc-command-section">
@@ -607,7 +749,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
           data-testid="release-execute-btn"
         >
           <Play size={18} />
-          Release {next}
+          {hasLocalScript ? `Prepare Release ${next}` : `Release ${next}`}
         </button>
 
         {error && (
@@ -616,7 +758,72 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
             {error}
           </div>
         )}
+        {releaseJobError && (
+          <div className="orc-error">
+            <AlertCircle size={16} />
+            {releaseJobError}
+          </div>
+        )}
       </div>
+
+      {showReleaseModal && (
+        <div className="modal-overlay">
+          <div className="modal orc-release-modal" role="dialog" aria-modal="true" aria-label="Prepare background release">
+            <div className="modal-header">
+              <h3>Prepare Release {next}</h3>
+              <button className="btn-close" onClick={() => setShowReleaseModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="orc-release-summary">
+                <span className="orc-version-label">Repository</span>
+                <code>{releaseRepoPath}</code>
+              </div>
+              <div className="form-group">
+                <label htmlFor="release-notes">Release notes</label>
+                <textarea
+                  id="release-notes"
+                  value={releaseNotes}
+                  onChange={(event) => setReleaseNotes(event.target.value)}
+                  rows={5}
+                  placeholder={`Release ${next}`}
+                />
+              </div>
+              <label className="orc-release-checkbox">
+                <input
+                  type="checkbox"
+                  checked={includeUncommittedChanges}
+                  onChange={(event) => setIncludeUncommittedChanges(event.target.checked)}
+                />
+                Include uncommitted changes in this release
+              </label>
+              <label className="orc-release-checkbox">
+                <input
+                  type="checkbox"
+                  checked={shouldProceedWithWarnings}
+                  onChange={(event) => setShouldProceedWithWarnings(event.target.checked)}
+                />
+                Proceed despite warnings from non-blocking preflight checks
+              </label>
+              <p className="orc-release-help">
+                The release runs with local-release.ps1 in non-interactive mode. If required choices are missing, the job fails safely instead of hanging in the background.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="orc-action-button" onClick={() => setShowReleaseModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="orc-execute-button"
+                onClick={startBackgroundRelease}
+                disabled={isSubmittingRelease || !releaseNotes.trim()}
+              >
+                <Play size={16} />
+                {isSubmittingRelease ? 'Starting...' : 'Start Background Release'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

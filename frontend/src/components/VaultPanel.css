@@ -26,7 +26,7 @@
 
 .vault-panel {
   width: 100%;
-  max-width: 480px;
+  max-width: 840px;
   max-height: 85vh;
   background: #0d1117;
   border: 1px solid rgba(48, 54, 61, 1);
@@ -183,6 +183,48 @@
   letter-spacing: 0.05em;
 }
 
+.vp-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.vp-search-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 220px;
+  padding: 6px 8px;
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 8px;
+  color: #8b949e;
+}
+
+.vp-search-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #e6edf3;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.vp-search-input::placeholder {
+  color: rgba(139, 148, 158, 0.55);
+}
+
+.vp-sort-select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(48, 54, 61, 1);
+  background: #161b22;
+  color: #e6edf3;
+  font-size: 0.78rem;
+}
+
 /* ─── Entry List ──────────────────────────────────────────────────────────── */
 
 .vp-entry-list {
@@ -294,6 +336,54 @@
   font-size: 0.72rem;
   color: #39d353;
   margin-top: 1px;
+}
+
+.vp-entry-url {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 0.68rem;
+  color: #58a6ff;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.vp-entry-url:hover {
+  text-decoration: underline;
+}
+
+.vp-bundle-card {
+  background: rgba(88, 166, 255, 0.04);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.vp-bundle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.vp-bundle-url {
+  font-size: 0.68rem;
+  color: #58a6ff;
+  text-decoration: none;
+  max-width: 50%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vp-bundle-url:hover {
+  text-decoration: underline;
+}
+
+.vp-bundle-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .vp-entry-card-actions {

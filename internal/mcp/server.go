@@ -58,7 +58,7 @@ type ToolHandler interface {
 // new forge.toml allowed_tools list without restarting the process.
 type Server struct {
 	authToken string
-	deps      Dependencies  // retained so ReloadAllowedTools can rebuild handlers
+	deps      Dependencies // retained so ReloadAllowedTools can rebuild handlers
 	toolsMu   sync.RWMutex // guards the tools map for concurrent reload safety
 	tools     map[string]ToolHandler
 	broker    *TaskBroker
@@ -84,6 +84,10 @@ type Dependencies struct {
 	// environment_detect and environment_run tools. Set this in tests to inject a
 	// mock without spawning real WSL or Docker processes. Nil means use the real runner.
 	EnvironmentCommandRunner CommandRunner
+
+	// EnvironmentJobStore overrides where detached adaptive build jobs are persisted.
+	// Tests inject a temp-backed store; production defaults to ProjectPath/.forge.
+	EnvironmentJobStore *EnvironmentJobStore
 }
 
 // NewServer creates a fully initialised MCP server.
@@ -311,6 +315,11 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 	if environmentRunner == nil {
 		environmentRunner = &realCommandRunner{}
 	}
+	environmentJobStore := srv.deps.EnvironmentJobStore
+	if environmentJobStore == nil {
+		environmentJobStore = NewEnvironmentJobStore(srv.deps.ProjectPath)
+	}
+	environmentJobManager := NewEnvironmentJobManager(environmentRunner, environmentJobStore)
 
 	candidates := []ToolHandler{
 		newTerminalSessionsTool(srv.deps.TermHandler),
@@ -324,7 +333,9 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newWorkflowGateRecordTool(srv.deps.ProjectPath),
 		newWorkflowPreflightTool(srv.deps.ProjectPath),
 		newEnvironmentDetectTool(environmentRunner),
-		newEnvironmentRunTool(environmentRunner),
+		newEnvironmentRunTool(environmentRunner, environmentJobManager),
+		newEnvironmentJobsTool(environmentJobManager),
+		newEnvironmentReadJobTool(environmentJobManager),
 	}
 
 	registry := make(map[string]ToolHandler, len(candidates))

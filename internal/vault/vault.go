@@ -25,11 +25,11 @@ import (
 // Obtain an instance by calling Open; use GetGlobal to retrieve the
 // application-wide singleton after initialization.
 type Vault struct {
-	mu          sync.RWMutex
-	isOpen      bool
-	vaultPath   string  // absolute path to vault.enc
-	masterKey   []byte  // 32-byte AES-256 key held in memory while running
-	entries     []*diskEntry
+	mu        sync.RWMutex
+	isOpen    bool
+	vaultPath string // absolute path to vault.enc
+	masterKey []byte // 32-byte AES-256 key held in memory while running
+	entries   []*diskEntry
 }
 
 // globalVaultInstance is the application-wide singleton set by Open.
@@ -100,7 +100,10 @@ func (v *Vault) AddEntry(request AddEntryRequest) (*VaultEntry, error) {
 		SecretName:       request.SecretName,
 		EnvVarName:       request.EnvVarName,
 		SecretValue:      request.SecretValue,
+		URL:              request.URL,
 		Description:      request.Description,
+		BundleID:         request.BundleID,
+		BundleType:       request.BundleType,
 		ShouldAutoInject: request.ShouldAutoInject,
 		CreatedAt:        time.Now().UTC(),
 	}
@@ -172,6 +175,7 @@ func (v *Vault) UpdateEntry(request UpdateEntryRequest) (*VaultEntry, error) {
 	originalSecretName := targetEntry.SecretName
 	originalEnvVarName := targetEntry.EnvVarName
 	originalSecretValue := targetEntry.SecretValue
+	originalURL := targetEntry.URL
 	originalDescription := targetEntry.Description
 
 	// If the caller is changing the env var name, reject duplicates against other entries.
@@ -194,6 +198,9 @@ func (v *Vault) UpdateEntry(request UpdateEntryRequest) (*VaultEntry, error) {
 	if request.SecretValue != "" {
 		targetEntry.SecretValue = request.SecretValue
 	}
+	if request.URL != "" {
+		targetEntry.URL = request.URL
+	}
 	if request.Description != "" {
 		targetEntry.Description = request.Description
 	}
@@ -203,6 +210,7 @@ func (v *Vault) UpdateEntry(request UpdateEntryRequest) (*VaultEntry, error) {
 		targetEntry.SecretName = originalSecretName
 		targetEntry.EnvVarName = originalEnvVarName
 		targetEntry.SecretValue = originalSecretValue
+		targetEntry.URL = originalURL
 		targetEntry.Description = originalDescription
 		return nil, fmt.Errorf("saving vault after update: %w", saveErr)
 	}
@@ -408,7 +416,10 @@ func diskEntryToPublic(entry *diskEntry) *VaultEntry {
 		ID:               entry.ID,
 		SecretName:       entry.SecretName,
 		EnvVarName:       entry.EnvVarName,
+		URL:              entry.URL,
 		Description:      entry.Description,
+		BundleID:         entry.BundleID,
+		BundleType:       entry.BundleType,
 		ShouldAutoInject: entry.ShouldAutoInject,
 		CreatedAt:        entry.CreatedAt,
 		LastUsedAt:       entry.LastUsedAt,

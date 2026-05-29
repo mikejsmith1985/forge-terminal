@@ -22,6 +22,8 @@ const ACTIVE_MCP_STATUS_RESPONSE = {
   active_tools: [
     'environment_detect',
     'environment_run',
+    'environment_jobs',
+    'environment_read_job',
     'file_read',
     'file_write',
     'file_list',
@@ -31,7 +33,7 @@ const ACTIVE_MCP_STATUS_RESPONSE = {
     'terminal_sessions',
     'workflow_status',
   ],
-  tool_count: 10,
+  tool_count: 12,
   token_path: '/Users/mike/.forge/mcp-token',
 }
 
@@ -59,7 +61,7 @@ describe('MCPSetupCard — collapsed header', () => {
   it('shows tool count in subtitle after fetching', async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => expect(screen.getByText('10 tools · Auto Environment')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('12 tools · Auto Environment')).toBeInTheDocument())
   })
 
   it('shows Active badge when MCP is enabled', async () => {
@@ -90,14 +92,14 @@ describe('MCPSetupCard — expand / collapse', () => {
   it('does not render body by default', async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => screen.getByText('10 tools · Auto Environment'))
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
     expect(screen.queryByText('MCP Token')).not.toBeInTheDocument()
   })
 
   it('shows body after clicking the header', async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => screen.getByText('10 tools · Auto Environment'))
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
 
     fireEvent.click(screen.getByText('Adaptive Build Environments'))
     expect(screen.getByText('MCP Token')).toBeInTheDocument()
@@ -106,7 +108,7 @@ describe('MCPSetupCard — expand / collapse', () => {
   it('hides body again after a second header click', async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => screen.getByText('10 tools · Auto Environment'))
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
 
     const header = screen.getByText('Adaptive Build Environments')
     fireEvent.click(header)
@@ -129,7 +131,7 @@ describe('MCPSetupCard — status row', () => {
 
   it('shows active message when enabled', async () => {
     await openCard(ACTIVE_MCP_STATUS_RESPONSE)
-    expect(screen.getByText('Active · 10 tools registered')).toBeInTheDocument()
+    expect(screen.getByText('Active · 12 tools registered')).toBeInTheDocument()
   })
 
   it('shows inactive message when disabled', async () => {
@@ -144,7 +146,7 @@ describe('MCPSetupCard — token section', () => {
   beforeEach(async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => screen.getByText('10 tools · Auto Environment'))
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
     fireEvent.click(screen.getByText('Adaptive Build Environments'))
   })
 
@@ -171,7 +173,7 @@ describe('MCPSetupCard — client tabs', () => {
   beforeEach(async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => screen.getByText('10 tools · Auto Environment'))
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
     fireEvent.click(screen.getByText('Adaptive Build Environments'))
   })
 
@@ -216,7 +218,7 @@ describe('MCPSetupCard — build callout', () => {
   it('shows the Windows build callout when expanded', async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => screen.getByText('10 tools · Auto Environment'))
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
     fireEvent.click(screen.getByText('Adaptive Build Environments'))
     expect(screen.getByText(/Hitting Windows build issues/i)).toBeInTheDocument()
   })
@@ -224,9 +226,24 @@ describe('MCPSetupCard — build callout', () => {
   it('shows the environment_run agent prompt quote', async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => screen.getByText('10 tools · Auto Environment'))
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
     fireEvent.click(screen.getByText('Adaptive Build Environments'))
     expect(screen.getByText(/environment_run with auto strategy/i)).toBeInTheDocument()
+  })
+})
+
+// ── Vault Guidance ─────────────────────────────────────────────────────────────
+
+describe('MCPSetupCard — vault guidance', () => {
+  it('explains how the repo-root vault config and Jira metadata fit together', async () => {
+    mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
+    render(<MCPSetupCard />)
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
+    fireEvent.click(screen.getByText('Adaptive Build Environments'))
+
+    expect(screen.getByText(/Forge Vault proxy stays available in every clone/i)).toBeInTheDocument()
+    expect(screen.getByText(/Associated URL/i)).toBeInTheDocument()
+    expect(screen.getByText(/JIRA_URL/i)).toBeInTheDocument()
   })
 })
 
@@ -236,7 +253,7 @@ describe('MCPSetupCard — tools list', () => {
   beforeEach(async () => {
     mockFetch.mockResolvedValueOnce({ json: async () => ACTIVE_MCP_STATUS_RESPONSE })
     render(<MCPSetupCard />)
-    await waitFor(() => screen.getByText('10 tools · Auto Environment'))
+    await waitFor(() => screen.getByText('12 tools · Auto Environment'))
     fireEvent.click(screen.getByText('Adaptive Build Environments'))
   })
 
@@ -244,12 +261,14 @@ describe('MCPSetupCard — tools list', () => {
     // environment_run also appears in the Copilot tab description, so use getAllByText
     expect(screen.getByText('environment_detect')).toBeInTheDocument()
     expect(screen.getAllByText('environment_run').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('environment_jobs')).toBeInTheDocument()
+    expect(screen.getByText('environment_read_job')).toBeInTheDocument()
     expect(screen.getByText('file_read')).toBeInTheDocument()
   })
 
   it('shows star icons for featured tools', () => {
     const stars = screen.getAllByTitle('Adaptive Build Environment tool')
-    expect(stars).toHaveLength(2)
+    expect(stars).toHaveLength(4)
   })
 
   it('shows description for environment_detect', () => {
@@ -258,6 +277,11 @@ describe('MCPSetupCard — tools list', () => {
 
   it('shows description for environment_run', () => {
     expect(screen.getByText(/Run builds in native, WSL2, or Docker/i)).toBeInTheDocument()
+  })
+
+  it('shows description for environment job recovery tools', () => {
+    expect(screen.getByText(/recovered after session resume/i)).toBeInTheDocument()
+    expect(screen.getByText(/persisted log output/i)).toBeInTheDocument()
   })
 })
 

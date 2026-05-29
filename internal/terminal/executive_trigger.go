@@ -144,6 +144,9 @@ func (eth *ExecutiveTriggerHandler) detectExpectedTierFromCommand(cmd string) ll
 	if strings.Contains(cmdLower, "claude") {
 		return llm.TierOpus
 	}
+	if strings.Contains(cmdLower, "gemini") {
+		return llm.TierSonnet
+	}
 
 	return llm.TierSonnet // Default to middle tier
 }
@@ -208,6 +211,7 @@ func (eth *ExecutiveTriggerHandler) checkSystemProcesses() *ActiveProcessInfo {
 		{"gh.exe", llm.ProviderGitHubCopilot, llm.TierHaiku}, // Windows
 		{"gh", llm.ProviderGitHubCopilot, llm.TierHaiku},     // Unix
 		{"copilot", llm.ProviderGitHubCopilot, llm.TierHaiku},
+		{"gemini", llm.ProviderGoogle, llm.TierSonnet},
 	}
 
 	for _, proc := range llmProcesses {

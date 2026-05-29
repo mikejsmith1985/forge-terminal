@@ -72,6 +72,7 @@ invoke skill: multi-agent             # tasks spanning 3+ files
 invoke skill: testing-standards       # test creation or modification
 invoke skill: pr-workflow             # PR creation or review
 invoke skill: forge-release-process   # release, publish, bump version, create a release
+invoke skill: add-command-card        # create command card, launch POC, add sidebar shortcut
 ```
 
 ---

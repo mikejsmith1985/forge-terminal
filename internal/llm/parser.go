@@ -105,6 +105,8 @@ func ParseLLMOutput(raw string, provider Provider) string {
 		return ParseCopilotOutput(raw)
 	case ProviderClaude:
 		return ParseClaudeOutput(raw)
+	case ProviderGoogle:
+		return CleanANSI(raw)
 	default:
 		return CleanANSI(raw)
 	}

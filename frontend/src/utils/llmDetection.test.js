@@ -43,6 +43,20 @@ describe('isLLMCommand', () => {
     });
   });
 
+  describe('Gemini commands', () => {
+    it('detects gemini with arguments', () => {
+      expect(isLLMCommand('gemini chat hello')).toBe(true);
+    });
+
+    it('detects bare gemini command', () => {
+      expect(isLLMCommand('gemini')).toBe(true);
+    });
+
+    it('handles whitespace', () => {
+      expect(isLLMCommand('  gemini  ')).toBe(true);
+    });
+  });
+
   describe('Subagent commands', () => {
     it('detects @reviewer commands', () => {
       expect(isLLMCommand('@reviewer check this PR')).toBe(true);
@@ -125,6 +139,11 @@ describe('startsWithLLMCommand', () => {
   it('detects partial copilot typing', () => {
     expect(startsWithLLMCommand('copi')).toBe(true);
     expect(startsWithLLMCommand('copil')).toBe(true);
+  });
+
+  it('detects partial gemini typing', () => {
+    expect(startsWithLLMCommand('gem')).toBe(true);
+    expect(startsWithLLMCommand('gemin')).toBe(true);
   });
 
   it('detects full copilot command', () => {

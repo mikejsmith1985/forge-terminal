@@ -99,6 +99,9 @@ func TestHandleVaultAddAndDeleteEntry_Roundtrip(t *testing.T) {
 		SecretName:  "Test Token",
 		EnvVarName:  "TEST_TOKEN",
 		SecretValue: "tok_12345",
+		URL:         "https://example.com/token",
+		BundleID:    "example-credential",
+		BundleType:  "password",
 	})
 	addReq := httptest.NewRequest(http.MethodPost, "/api/vault/entries", bytes.NewReader(addBody))
 	addReq.Header.Set("Content-Type", "application/json")
@@ -118,6 +121,15 @@ func TestHandleVaultAddAndDeleteEntry_Roundtrip(t *testing.T) {
 	}
 	if created.EnvVarName != "TEST_TOKEN" {
 		t.Errorf("expected EnvVarName 'TEST_TOKEN', got %q", created.EnvVarName)
+	}
+	if created.URL != "https://example.com/token" {
+		t.Errorf("expected URL to be persisted, got %q", created.URL)
+	}
+	if created.BundleID != "example-credential" {
+		t.Errorf("expected BundleID to be persisted, got %q", created.BundleID)
+	}
+	if created.BundleType != "password" {
+		t.Errorf("expected BundleType to be persisted, got %q", created.BundleType)
 	}
 
 	// Delete the entry
@@ -147,6 +159,26 @@ func TestHandleVaultAddEntry_MissingFields(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for missing required fields, got %d", rec.Code)
+	}
+}
+
+// TestHandleVaultAddEntry_InvalidURL verifies URL validation for POST /api/vault/entries.
+func TestHandleVaultAddEntry_InvalidURL(t *testing.T) {
+	openTestVault(t)
+
+	addBody, _ := json.Marshal(vault.AddEntryRequest{
+		SecretName:  "Bad URL Secret",
+		EnvVarName:  "BAD_URL_SECRET",
+		SecretValue: "value",
+		URL:         "not-a-url",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/vault/entries", bytes.NewReader(addBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handleVaultAddEntry(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid URL, got %d", rec.Code)
 	}
 }
 

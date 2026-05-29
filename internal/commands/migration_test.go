@@ -98,7 +98,7 @@ func TestMigrateCommands_LeavesGoodPayloadsAlone(t *testing.T) {
 
 // TestMigrateToolVariants_AddsDescriptionVariantsToID6 confirms that a
 // legacy "Copilot (Fresh)" card (ID 6) without DescriptionVariants gets
-// both the claude and copilot description variants injected.
+// claude, copilot, and google description variants injected.
 func TestMigrateToolVariants_AddsDescriptionVariantsToID6(t *testing.T) {
 	original := []Command{{
 		ID:           6,
@@ -109,7 +109,7 @@ func TestMigrateToolVariants_AddsDescriptionVariantsToID6(t *testing.T) {
 
 	migrated, changed := migrateToolVariants(original)
 	if !changed {
-		t.Fatal("expected migrateToolVariants to report a change for missing DescriptionVariants")
+		t.Fatal("expected migrateToolVariants to report a change for missing DescriptionVariants/Google variant")
 	}
 	dv := migrated[0].DescriptionVariants
 	if dv["claude"] == "" {
@@ -118,15 +118,18 @@ func TestMigrateToolVariants_AddsDescriptionVariantsToID6(t *testing.T) {
 	if dv["copilot"] == "" {
 		t.Error("copilot description variant must not be empty")
 	}
+	if dv["google"] == "" {
+		t.Error("google description variant must not be empty")
+	}
 	if dv["claude"] == dv["copilot"] {
 		t.Errorf("claude and copilot description variants should differ; both are %q", dv["claude"])
 	}
 }
 
 // TestMigrateToolVariants_AddsMacroVariantsToID7 confirms that a legacy
-// Resume card (ID 7) gets both a claude and copilot macro variant injected,
-// with the claude variant containing "SYSTEM INJECTION" and the copilot
-// variant retaining workflow-enforcer skill invocation language.
+// Resume card (ID 7) gets claude, copilot, and google macro variants injected,
+// with the claude variant containing "SYSTEM INJECTION" and the copilot/google
+// variants retaining workflow-enforcer skill invocation language.
 func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
 	original := []Command{{
 		ID:           7,
@@ -138,7 +141,7 @@ func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
 
 	migrated, changed := migrateToolVariants(original)
 	if !changed {
-		t.Fatal("expected migrateToolVariants to report a change for missing MacroVariants")
+		t.Fatal("expected migrateToolVariants to report a change for missing MacroVariants/Google variant")
 	}
 	mv := migrated[0].MacroVariants
 	if !strings.Contains(mv["claude"], "SYSTEM INJECTION") {
@@ -146,6 +149,9 @@ func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
 	}
 	if !strings.Contains(mv["copilot"], "workflow") {
 		t.Errorf("copilot macro variant should contain 'workflow'; got %q", mv["copilot"])
+	}
+	if !strings.Contains(mv["google"], "workflow") {
+		t.Errorf("google macro variant should contain 'workflow'; got %q", mv["google"])
 	}
 }
 
@@ -169,7 +175,7 @@ func TestMigrateToolVariants_UpgradesExistingID8(t *testing.T) {
 	if len(card.ToolVariants) == 0 {
 		t.Error("ID 8 should have ToolVariants after migration")
 	}
-	if card.ToolVariants["claude"] == "" || card.ToolVariants["copilot"] == "" {
+	if card.ToolVariants["claude"] == "" || card.ToolVariants["copilot"] == "" || card.ToolVariants["google"] == "" {
 		t.Errorf("ID 8 ToolVariants incomplete: %v", card.ToolVariants)
 	}
 	if len(card.DescriptionVariants) == 0 {

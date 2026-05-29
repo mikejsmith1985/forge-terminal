@@ -23,13 +23,15 @@ const CLIENT_TABS = [
   { tabId: CLIENT_TAB_CLAUDE,  tabLabel: 'Claude Code' },
 ]
 
-// These two tools are sorted to the top of the tool list and highlighted with a star.
-const FEATURED_TOOL_NAMES = ['environment_detect', 'environment_run']
+// These tools are sorted to the top so agents notice detection, execution, and recovery together.
+const FEATURED_TOOL_NAMES = ['environment_detect', 'environment_run', 'environment_jobs', 'environment_read_job']
 
 // Short descriptions shown only for the featured (Adaptive Build Environment) tools.
 const FEATURED_TOOL_DESCRIPTIONS = {
   environment_detect: 'Probe WSL2 & Docker availability before choosing a strategy',
   environment_run:    'Run builds in native, WSL2, or Docker — auto-selects on Windows',
+  environment_jobs:   'List detached adaptive builds that can be recovered after session resume',
+  environment_read_job: 'Read a detached build job and its persisted log output',
 }
 
 // Config snippets copied to clipboard from the VS Code and Claude tabs.
@@ -48,12 +50,17 @@ const VSCODE_CONFIG_JSON = JSON.stringify(
 )
 
 // Claude Code connects via a local Node process rather than an HTTP endpoint.
+const FORGE_VAULT_PROXY_PATH = 'mcp-forge-vault/index.js'
+
+// Jira entries usually pair a base URL with username/password credentials.
+const JIRA_URL_ENV_VAR_NAME = 'JIRA_URL'
+
 const CLAUDE_CONFIG_JSON = JSON.stringify(
   {
     mcpServers: {
       forge: {
         command: 'node',
-        args: ['<path-to-forge>/mcp-forge-vault/index.js'],
+        args: [FORGE_VAULT_PROXY_PATH],
       },
     },
   },
@@ -168,6 +175,7 @@ const MCPSetupCard = () => {
             onCopyConfig={copyClientConfig}
           />
 
+          <VaultCallout />
           <BuildCallout />
 
           <ToolsList activeTools={mcpStatus?.active_tools || []} />
@@ -283,7 +291,7 @@ function ClientTabContent({ activeClientTab, hasCopiedConfig, onCopyConfig }) {
         </p>
         <p className="msc-tab-description">
           Forge MCP tools are available in this terminal session automatically.
-          Use <code>environment_run</code> to run builds in WSL2 or Docker.
+          Use <code>environment_run</code> to run builds in WSL2 or Docker; add <code>detach: true</code> for recoverable jobs.
         </p>
       </div>
     )
@@ -339,6 +347,28 @@ function CopyConfigButton({ hasCopied, onCopy }) {
 }
 
 /**
+ * VaultCallout — Explains how the repo-root MCP config keeps Forge Vault
+ * discoverable and how Jira URLs are stored alongside vault credentials.
+ */
+function VaultCallout() {
+  return (
+    <div className="msc-callout">
+      <Info size={14} className="msc-callout-icon" />
+      <div className="msc-callout-body">
+        <strong className="msc-callout-title">🔐 Vault and Jira metadata</strong>
+        <p className="msc-callout-text">
+          The repo-root <code>.mcp.json</code> uses a relative path so the Forge Vault proxy stays available in every clone.
+        </p>
+        <p className="msc-callout-text">
+          Store Jira base URLs in Vault&apos;s <code>Associated URL</code> field and keep the Jira metadata as
+          <code>{JIRA_URL_ENV_VAR_NAME}</code>, <code>JIRA_USERNAME</code>, and <code>JIRA_PASSWORD</code> when a project needs Jira access.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/**
  * BuildCallout — Teal-accented tip box explaining when to reach for environment_run.
  * Shown whenever the card is expanded, regardless of MCP enabled state.
  */
@@ -364,7 +394,7 @@ function BuildCallout() {
 
 /**
  * ToolsList — Compact list of all registered MCP tools.
- * The two Adaptive Build Environment tools are sorted first and highlighted with ★.
+ * Adaptive Build Environment tools are sorted first and highlighted with ★.
  *
  * @param {Object}   props
  * @param {string[]} props.activeTools - Tool names returned by GET /api/mcp/ui-status

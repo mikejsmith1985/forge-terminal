@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Wrench, Plug, Tag, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Wrench, Plug, Tag, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock, RefreshCw } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import ForgeAssist from './components/ForgeAssist'
@@ -39,7 +39,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName, isTempOrSystemPath } from './utils/projectFolder'
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName, isTempOrSystemPath, isSystemProfilePath } from './utils/projectFolder'
 import { useTabNaming } from './hooks/useTabNaming'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
@@ -1192,6 +1192,16 @@ function App() {
     if (fullPath && isTempOrSystemPath(fullPath)) {
       return;
     }
+    // Guard: a bare home/profile directory (e.g. /home/mikejsmith1985 or
+    // C:\Users\mike) is where WSL/PowerShell shells land on startup — it is
+    // never a meaningful project name. Update the stored directory so that
+    // other features (git panel, workflow card) know where the shell actually
+    // is, but do NOT rename the tab. The title will update correctly once the
+    // shell navigates into a real project directory.
+    if (fullPath && isSystemProfilePath(fullPath)) {
+      updateTabDirectory(tabId, fullPath);
+      return;
+    }
     // Static strategies: never auto-rename on directory change
     if (isStaticNamingStrategy(namingStrategy)) {
       if (fullPath) updateTabDirectory(tabId, fullPath);
@@ -1365,54 +1375,55 @@ function App() {
   
   // Workflow handlers - REMOVED v3.9.0: Workflows deleted
 
-  const loadCommands = () => {
+  const loadCommands = useCallback(() => {
     setCommandsLoading(true);
     setCommandsError(null);
-    
-    // Set a timeout to detect hanging requests
-    let timeoutId = setTimeout(() => {
+
+    // Use a mutable flag instead of reading stale `commandsLoading` from a closure.
+    // Without this, a second call to loadCommands (e.g. the refresh button) would
+    // capture commandsLoading=false from the previous render and the guard below
+    // would be false, silently discarding the fetched cards and leaving the sidebar
+    // frozen on "Loading command cards..." forever.
+    let isRequestActive = true;
+
+    const timeoutId = setTimeout(() => {
+      if (!isRequestActive) return;
+      isRequestActive = false;
       setCommandsError('Request timeout - server may be unresponsive');
       setCommandsLoading(false);
       addToast('Failed to load command cards - timeout', 'error', 5000);
-      timeoutId = null; // Mark as fired
-    }, 10000); // 10 second timeout
-    
+    }, 10000);
+
     fetch('/api/commands')
       .then(r => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
+        // Abort if the timeout already fired
+        if (!isRequestActive) return null;
+        clearTimeout(timeoutId);
         if (!r.ok) {
           throw new Error(`HTTP ${r.status}: ${r.statusText}`);
         }
         return r.json();
       })
       .then(data => {
-        // Only update if timeout hasn't fired
-        if (timeoutId !== null || commandsLoading) {
-          // Ensure data is an array; filter out legacy Release Manager card (id: -1)
-          // which now lives permanently in the Tools tab
-          const cards = (Array.isArray(data) ? data : []).filter(c => c.id !== -1);
+        if (data === null) return; // Request was already handled by the timeout
+        if (!isRequestActive) return;
+        isRequestActive = false;
 
-          setCommands(cards);
-          setCommandsLoading(false);
-        }
+        // Filter out the legacy Release Manager card (id: -1) which lives in the Tools tab
+        const cards = (Array.isArray(data) ? data : []).filter(c => c.id !== -1);
+        setCommands(cards);
+        setCommandsLoading(false);
       })
       .catch(err => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-        // Only show error if not already timed out
-        if (commandsLoading) {
-          console.error('Failed to load commands:', err);
-          setCommandsError(err.message);
-          setCommandsLoading(false);
-          addToast(`Failed to load command cards: ${err.message}`, 'error', 5000);
-        }
-      })
-  }
+        clearTimeout(timeoutId);
+        if (!isRequestActive) return;
+        isRequestActive = false;
+        console.error('Failed to load commands:', err);
+        setCommandsError(err.message);
+        setCommandsLoading(false);
+        addToast(`Failed to load command cards: ${err.message}`, 'error', 5000);
+      });
+  }, [addToast])
 
   const handleShutdown = async () => {
     addToast('Shutting down Forge Terminal...', 'warning', 3000);
@@ -1715,6 +1726,21 @@ function App() {
                   <Folder size={14} />
                 </button>
               )}
+              {/* Reload cards from the server without a full page refresh.
+                  Useful when an agent has added new command cards via the API
+                  and you want to see them immediately. */}
+              <button
+                className="btn btn-secondary"
+                onClick={loadCommands}
+                disabled={commandsLoading}
+                title="Reload command cards"
+                style={{ padding: '5px 8px' }}
+              >
+                <RefreshCw
+                  size={14}
+                  style={commandsLoading ? { animation: 'spin 1s linear infinite' } : undefined}
+                />
+              </button>
               <button className="btn btn-primary" onClick={handleAdd}>
                 <Plus size={16} /> Add
               </button>

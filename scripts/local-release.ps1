@@ -17,16 +17,24 @@
 .PARAMETER Force
     Skip non-blocking preflight warnings without prompting.
 
+.PARAMETER IncludeUncommittedChanges
+    Stage and release current working tree changes without prompting.
+
+.PARAMETER NonInteractive
+    Fail fast instead of prompting when a required release decision is missing.
+
 .EXAMPLE
     .\scripts\local-release.ps1 patch
     .\scripts\local-release.ps1 minor
     .\scripts\local-release.ps1 3.19.0
-    .\scripts\local-release.ps1 7.10.4 -Force -ReleaseNotes "Bug fixes and improvements"
+    .\scripts\local-release.ps1 7.10.4 -NonInteractive -IncludeUncommittedChanges -Force -ReleaseNotes "Bug fixes and improvements"
 #>
 param(
     [Parameter(Position=0)]
     [string]$VersionType = "patch",
     [switch]$Force,
+    [switch]$IncludeUncommittedChanges,
+    [switch]$NonInteractive,
     [string]$ReleaseNotes = ""
 )
 
@@ -70,8 +78,14 @@ $dirty = git status --porcelain 2>$null
 if ($dirty) {
     Write-Warn "Uncommitted changes detected:"
     git status --short
-    $confirm = Read-Host "`n  Stage and include all changes in this release? (y/N)"
-    if ($confirm -notmatch '^[Yy]$') { Write-Fail "Release cancelled" }
+    if ($IncludeUncommittedChanges) {
+        Write-Warn "Including uncommitted changes (-IncludeUncommittedChanges)"
+    } elseif ($NonInteractive) {
+        Write-Fail "Uncommitted changes detected. Re-run with -IncludeUncommittedChanges or clean the working tree."
+    } else {
+        $confirm = Read-Host "`n  Stage and include all changes in this release? (y/N)"
+        if ($confirm -notmatch '^[Yy]$') { Write-Fail "Release cancelled" }
+    }
 }
 Write-OK "Git status checked"
 
@@ -177,8 +191,12 @@ if ($preflightBlockers.Count -gt 0) {
 
 if ($preflightWarnings.Count -gt 0 -and $preflightBlockers.Count -eq 0) {
     if (-not $Force) {
-        $proceed = Read-Host "`n  Proceed with warnings? (y/N)"
-        if ($proceed -notmatch '^[Yy]$') { Write-Fail "Release cancelled by user" }
+        if ($NonInteractive) {
+            Write-Fail "Release preflight warnings require -Force in non-interactive mode"
+        } else {
+            $proceed = Read-Host "`n  Proceed with warnings? (y/N)"
+            if ($proceed -notmatch '^[Yy]$') { Write-Fail "Release cancelled by user" }
+        }
     } else {
         Write-Warn "Proceeding with warnings (-Force)"
     }
@@ -386,13 +404,12 @@ if (Test-Path $changelogPath) {
 # ── Commit version bump ───────────────────────────────────────────────────────
 Write-Banner "Committing version bump"
 git add -A
-# --no-verify bypasses pre-commit and commit-msg hooks intentionally:
+# --no-verify bypasses pre-commit hooks intentionally:
 # release commits are automated pipeline meta-commits (version bumps + built
-# assets) — not feature commits — and "Release vX.Y.Z" is not a conventional
-# commit type.  The CHANGELOG was already updated in feature commits.
-git commit -m "Release $TAG" --allow-empty --no-verify
+# assets), not feature commits. The CHANGELOG was already updated in feature commits.
+git commit -m "chore: release $TAG" --allow-empty --no-verify
 if ($LASTEXITCODE -ne 0) { Write-Fail "git commit failed" }
-Write-OK "Committed: Release $TAG"
+Write-OK "Committed: chore: release $TAG"
 
 git push origin HEAD
 if ($LASTEXITCODE -ne 0) { Write-Fail "git push failed" }
@@ -430,6 +447,8 @@ if ($ReleaseNotes) {
     # This allows the script to run in automated/CI contexts without Read-Host.
     $RELEASE_NOTES = $ReleaseNotes
     Write-OK "Using provided release notes"
+} elseif ($NonInteractive) {
+    Write-Fail "Release notes are required in non-interactive mode. Provide -ReleaseNotes."
 } else {
     Write-Host "  Enter release notes (press Enter twice to finish):" -ForegroundColor Yellow
     $lines = @()

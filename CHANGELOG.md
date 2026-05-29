@@ -7,8 +7,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **On/off toggle command cards** — A new generic card type (`cardType: "toggle"`) renders a single card with two buttons: a green **Start** that launches a service and a red **Stop** that tears it down. The Start action reuses the card's existing `command`/`macro_payload`/`delay` fields; a new nested `toggle` config (`offCommand`, `offMacroPayload`, `offMacroDelay`, `offDelay`, `onLabel`, `offLabel`) drives the Stop action. The last-clicked side stays highlighted in-memory (it reflects the last action taken, not verified process state, and resets on restart). Toggle cards are first-class in the add/edit modal (a "🔀 On/Off Toggle" checkbox reveals the Stop fields) and require no backend execution or migration changes — every new field is `omitempty`, so existing cards serialize unchanged. Use case: combining a "Launch POC" and "Stop POC" pair into one card.
+
+---
+
+## [v7.10.27] - 2026-05-29
+
+### Added
+- **Google CLI tool support for command cards** — Added "Google" as an option to the "Run with" selector. Workflow command cards (`🚀 Fresh Session`, `🔄 Resume`, `🛡 Enforced`) now dynamically resolve to run `gemini` or `gemini --resume` commands with the workflow macro injection when Google is selected.
+- **Gemini CLI command detection** — Updated Go backend patterns and frontend utility functions to recognize the `gemini` command as an LLM CLI tool, enabling smart context injection and system process tracking.
+
+### Fixed
+- **Background Release Manager: polling no longer uses the wrong project after tab switch** — `readReleaseJobStatus` previously closed over `releaseRepoPath`, a live-computed value derived from `cwd`. When the user switched tabs mid-release, `cwd` changed, `releaseRepoPath` updated to the new project, and all subsequent poll requests sent the old job ID paired with the new project path — causing 404 errors and corrupted job state. Fix: `activeJobRepoPath` state is now snapshot from `releaseRepoPath` the moment a job starts and frozen for the lifetime of that job. The fetch helper is a pure function with empty dependency array that accepts explicit `(jobId, jobRepoPath)` parameters; it never closes over live CWD-derived values.
+- **Background Release Manager: stale in-flight poll responses no longer corrupt state** — The old callback called `setActiveReleaseJob` internally, before the polling effect could check `shouldContinuePolling`. A response in-flight during a tab switch could therefore overwrite state with data from the previous project. Fix: `fetchReleaseJobStatus` now returns data only; all state mutations happen inside the polling effect, after the `shouldContinuePolling` guard.
+- **Background Release Manager: toast completion/failure messages now use the job's own version** — Previously used the live `next` version computed from the current tab, which diverged after a tab switch. Now uses `result.job.version` from the polled response.
+- **Background Release Manager: concurrent write/read race on job.json eliminated** — Each HTTP request previously created a new `ReleaseJobStore` with a fresh `sync.RWMutex`, so the background release goroutine and HTTP poll handlers never actually shared a lock. A poll arriving mid-write could read a partially written file, producing "unexpected end of JSON input". Fix: a package-level `sync.Map` registry now ensures all `ReleaseJobStore` instances for the same canonical project root share one `*sync.RWMutex`. Path canonicalisation uses `filepath.Abs` + `filepath.Clean` + lowercase normalisation on Windows so that case variants and relative paths resolve to the same lock.
+
+## [7.10.26] - 2026-05-28
+
+---
+
+## [v7.10.26] - 2026-05-28
+
+## [v7.10.26] - 2026-05-29
+
+### Fixed
+- **Tab naming: "project-root" no longer shows username instead of project name** — WSL/Linux shells fire an OSC 9;9 event at startup with the bare home directory path (`/home/<user>`) before navigating to the project. The new `isSystemProfilePath()` guard detects these bare home/profile paths and updates the stored directory without overwriting the tab title. This is applied consistently in `handleDirectoryChange`, session restore, and the retitle-all-from-settings path.
+- **`extractProjectFolder` now recognises the Linux `projects` convention** — Added `'projects'` to `KNOWN_ROOT_FOLDER_NAMES` so `/home/<user>/projects/<project-name>` and `~/projects/<project-name>` are correctly anchored to the project name rather than falling through to a positional guess. Tilde paths (e.g. `~/projects/forge-terminal`) also benefit.
+- **Extended KNOWN_ROOT_FOLDER_NAMES search depth** — The search limit was raised from `ceil(len/2)` to `min(len-1, 5)`, allowing anchor detection at the third path segment (`/home/user/projects/…`) while capping at 5 to prevent false positives from nested folders with the same name.
+- **Removed hardcoded `title === 'forge-terminal'` session restore trigger** — This was a project-specific hack that caused unnecessary re-derivation of any tab already titled 'forge-terminal', which could overwrite the correct title with a system path like 'mikejsmith1985'. Tabs with real project names are now preserved as-is during session restore.
+
+## [7.10.25] - 2026-05-28
+
+---
+
+## [v7.10.25] - 2026-05-28
+
+### Fixed
+- **Background release manager compatibility** — The background runner now uses parameter introspection (`Get-Command`) before invoking `local-release.ps1`, so forge-specific flags (`-NonInteractive`, `-Force`, `-IncludeUncommittedChanges`) are only passed when the target script declares them. Previously, running the Release Manager against any project whose script did not declare `-NonInteractive` caused an immediate `ParameterBindingException` failure.
+
+## [7.10.24] - 2026-05-28
+
+---
+
+## [v7.10.24] - 2026-05-28
+
+### Added
+- **Release Manager background jobs** — Local release scripts can now be started from a pre-run modal and executed by the Forge backend with persistent `.forge/release-jobs` logs, status polling, and completion toasts so the active CLI terminal stays usable.
+
+### Changed
+- **`local-release.ps1` supports explicit non-interactive choices** — Added `-NonInteractive` and `-IncludeUncommittedChanges` so background releases fail safely instead of waiting on `Read-Host`, while `-ReleaseNotes` and `-Force` cover release notes and warning prompts.
+
+## [7.10.23] - 2026-05-27
+
+---
+
+## [v7.10.23] - 2026-05-27
+
+### Added
+- **`add-command-card` skill** — New agent skill that teaches any Copilot session how to build and register a Command Card in Forge Terminal. Covers the full data schema, POC/dev-server templates, Zero-Click macro patterns, tool-variant cards, the read→append→POST workflow, and a validation checklist. Registered in `workflow-enforcer` and `copilot-instructions.md` as a conditionally-loaded skill (activates on keywords: command card, launch POC, add shortcut, sidebar button).
+- **Refresh button on the ⚡ Commands ribbon** — A `RefreshCw` icon button in the command-card sidebar header lets you pull in cards added by agents without a full browser page refresh. The icon spins while the fetch is in-flight and is disabled to prevent double-fetches.
+
+### Fixed
+- **`loadCommands` stale-closure bug** — The previous implementation guarded the state update with `timeoutId !== null || commandsLoading`, where `commandsLoading` was read from the render-time closure. On any call after the first successful load, `commandsLoading` was `false` in the closure, causing the guard to silently discard the fetched cards and leave the sidebar frozen on "Loading command cards…" permanently. Replaced with a mutable `isRequestActive` flag that is owned by each individual request and is not subject to React's asynchronous state batching.
+
+## [7.10.22] - 2026-05-27
+
+---
+
+## [v7.10.22] - 2026-05-27
+
+### Fixed
+- **Release Manager now resolves external repo versions from global highest semver tags** — NodeToolbox-style repositories with newer tags on non-ancestor branches now report the correct CURRENT version by using sorted `git tag` lookup instead of ancestry-limited `git describe`.
+
+## [7.10.21] - 2026-05-26
+
+---
+
+## [v7.10.21] - 2026-05-26
+
+### Fixed
+- **Release commands now use conventional commit messages** — External release commands and Release Manager defaults now use `chore: release vX.Y.Z`, preventing Forge-generated `commit-msg` hooks from blocking releases in repositories such as GitDiscord.
+
+## [7.10.20] - 2026-05-26
+
+---
+
+## [v7.10.20] - 2026-05-26
+- **Forge Vault setup now uses portable repo-relative paths and calls out Jira metadata** — The repo-root MCP config no longer hardcodes a machine-specific vault proxy path, and the MCP setup/discovery docs now explain how to store Jira base URLs alongside vault credentials so every project in the repo can discover the same setup.
+
+## [7.10.19] - 2026-05-26
+
+---
+
+## [v7.10.19] - 2026-05-26
+
+### Fixed
+- **Forge Vault modal is now wider so toolbar actions stay readable** — Increased the modal max width from 480px to 840px, which gives the search, sort, and add controls enough horizontal room in the header ribbon without clipping.
+
+## [7.10.18] - 2026-05-26
+
+---
+
+## [v7.10.18] - 2026-05-26
+
+### Added
+- **Adaptive build environments now support recoverable detached jobs** — `environment_run` accepts `detach: true`, persists job metadata and logs under `.forge/adaptive-build-jobs/`, and exposes `environment_jobs` plus `environment_read_job` so resumed agent sessions can rediscover build status and logs instead of losing long-running work.
+
 ### Fixed
 - **Release Manager card now passes explicit version to `local-release.ps1`** — When a project has `scripts/local-release.ps1`, the card was sending a relative bump type (`patch`/`minor`/`major`) rather than the explicit next-version shown in the UI. If a previous release attempt had partially bumped `package.json` before failing, the script would compute a *different* version than the card displayed, creating a double-bump. The card now always passes the exact version string (e.g. `0.0.14`), ensuring the script releases precisely what was shown.
+- **Vault credential management now keeps related records together and easier to find** — Added optional URL metadata and credential bundle metadata to Vault entries, grouped username/password pairs into a single bundled card in the UI, and added search + sort modes (`Commonly used`, `Alphabetical`, `Recently added`) so entries are no longer stuck in insertion order. Vault API calls in the frontend now also fall back to same-origin automatically when a stale configured API base cannot reach `/api/vault/*` endpoints.
 
 ## [7.10.11] - 2026-05-03
 
