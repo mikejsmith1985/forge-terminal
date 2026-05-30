@@ -1484,6 +1484,45 @@
   opacity: 0.7;
 }
 
+/* ── Secret-in-description warnings ──────────────────────────────────────────
+   Amber, non-blocking advisories shown when a description looks like it holds a
+   secret: inline beneath the form textarea, and as a badge on existing entries. */
+.vp-description-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 7px 9px;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: #f0c674;
+  background: rgba(187, 128, 9, 0.12);
+  border: 1px solid rgba(187, 128, 9, 0.35);
+  border-radius: 6px;
+}
+
+.vp-description-warning-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #f0c674;
+}
+
+.vp-entry-warning {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #f0c674;
+  cursor: help;
+}
+
+.vp-entry-warning-icon {
+  flex-shrink: 0;
+  color: #f0c674;
+}
+
 .vp-form-input {
   padding: 9px 12px;
   background: #21262d;

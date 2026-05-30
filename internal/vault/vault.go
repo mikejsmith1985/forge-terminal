@@ -411,17 +411,24 @@ func (v *Vault) findEntryIndexLocked(entryID string) int {
 
 // diskEntryToPublic converts the internal disk representation to the API-safe
 // VaultEntry type. The SecretValue field is intentionally not copied.
+//
+// It also recomputes DescriptionWarning on every read (rather than persisting it),
+// so descriptions that contain secret material — including those stored before this
+// check existed — are flagged to the user without any data migration.
 func diskEntryToPublic(entry *diskEntry) *VaultEntry {
+	_, descriptionWarning := ScanForSecretInText(entry.Description)
+
 	return &VaultEntry{
-		ID:               entry.ID,
-		SecretName:       entry.SecretName,
-		EnvVarName:       entry.EnvVarName,
-		URL:              entry.URL,
-		Description:      entry.Description,
-		BundleID:         entry.BundleID,
-		BundleType:       entry.BundleType,
-		ShouldAutoInject: entry.ShouldAutoInject,
-		CreatedAt:        entry.CreatedAt,
-		LastUsedAt:       entry.LastUsedAt,
+		ID:                 entry.ID,
+		SecretName:         entry.SecretName,
+		EnvVarName:         entry.EnvVarName,
+		URL:                entry.URL,
+		Description:        entry.Description,
+		BundleID:           entry.BundleID,
+		BundleType:         entry.BundleType,
+		ShouldAutoInject:   entry.ShouldAutoInject,
+		CreatedAt:          entry.CreatedAt,
+		LastUsedAt:         entry.LastUsedAt,
+		DescriptionWarning: descriptionWarning,
 	}
 }
