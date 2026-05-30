@@ -25,6 +25,7 @@ function TabBar({
   isVaultOpen = false,
   disableNewTab = false,
   waitingTabs = {},
+  activeReleaseJobs = {},
   mode = 'dark',
   devMode = false,
 }) {
@@ -113,6 +114,15 @@ function TabBar({
             onDragEnd={handleDragEnd}
             isDragOver={dragOverIndex === index}
             isDragging={dragSourceIndex.current === index}
+            hasActiveReleaseJob={
+              Object.keys(activeReleaseJobs || {}).some(repoPath => {
+                const tabDir = tab.currentDirectory;
+                if (!tabDir) return false;
+                const normTabDir = tabDir.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
+                const normRepoPath = repoPath.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
+                return normTabDir === normRepoPath;
+              })
+            }
           />
         ))}
       </div>

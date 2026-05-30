@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Sun, Moon, Palette } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Sun, Moon, Palette, Tag } from 'lucide-react';
 import { themes, themeOrder } from '../themes';
 
 /**
@@ -32,7 +32,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragOver = false, isDragging = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragOver = false, isDragging = false, hasActiveReleaseJob = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -204,6 +204,15 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggle
           />
         ) : (
           <span className="tab-title">{tab.title}</span>
+        )}
+
+        {hasActiveReleaseJob && (
+          <span 
+            className="tab-release-indicator" 
+            title="Active release job running in background"
+          >
+            <Tag size={12} fill="currentColor" />
+          </span>
         )}
 
         <button

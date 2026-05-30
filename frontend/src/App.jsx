@@ -347,6 +347,93 @@ function App() {
   const terminalRefs = useRef({});
   const { toasts, addToast, removeToast } = useToast()
 
+  // Active background release jobs mapping: repoPath -> { jobId, version, status }
+  const [activeReleaseJobs, setActiveReleaseJobs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('forge_active_release_jobs');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error('Failed to parse active release jobs', e);
+      return {};
+    }
+  });
+
+  const handleJobStatusChange = useCallback((repoPath, job) => {
+    if (!repoPath) return;
+    setActiveReleaseJobs(prev => {
+      const updated = { ...prev };
+      if (!job) {
+        delete updated[repoPath];
+      } else {
+        updated[repoPath] = {
+          jobId: job.job_id,
+          version: job.version,
+          status: job.status
+        };
+      }
+      localStorage.setItem('forge_active_release_jobs', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const activeReleaseJobsRef = useRef(activeReleaseJobs);
+  useEffect(() => {
+    activeReleaseJobsRef.current = activeReleaseJobs;
+  }, [activeReleaseJobs]);
+
+  useEffect(() => {
+    let shouldContinue = true;
+
+    const pollAllJobs = async () => {
+      const currentJobs = activeReleaseJobsRef.current;
+      const activePaths = Object.keys(currentJobs);
+      if (activePaths.length === 0) return;
+
+      for (const repoPath of activePaths) {
+        const jobInfo = currentJobs[repoPath];
+        if (!jobInfo || !jobInfo.jobId) continue;
+
+        try {
+          const query = new URLSearchParams({
+            repoPath,
+            jobId: jobInfo.jobId,
+            maxLogBytes: '100', // Cheap status check
+          });
+          const response = await fetch(`/api/project/release-jobs?${query.toString()}`);
+          if (!shouldContinue) return;
+
+          if (response.ok) {
+            const body = await response.json();
+            const updatedJob = body.job;
+            if (updatedJob) {
+              if (updatedJob.status === 'completed') {
+                addToast(`Release v${updatedJob.version} completed successfully!`, 'success', 5000);
+                handleJobStatusChange(repoPath, null);
+              } else if (updatedJob.status === 'failed') {
+                addToast(`Release v${updatedJob.version} failed.`, 'error', 6000);
+                handleJobStatusChange(repoPath, null);
+              } else if (updatedJob.status !== jobInfo.status) {
+                // Status changed (e.g. queued -> running)
+                handleJobStatusChange(repoPath, updatedJob);
+              }
+            }
+          } else if (response.status === 404) {
+            // Job not found, clear it
+            handleJobStatusChange(repoPath, null);
+          }
+        } catch (err) {
+          console.error('[GlobalReleasePoll] Failed to poll status for', repoPath, err);
+        }
+      }
+    };
+
+    const timer = setInterval(pollAllJobs, 2000);
+    return () => {
+      shouldContinue = false;
+      clearInterval(timer);
+    };
+  }, [handleJobStatusChange, addToast]);
+
   const DEFAULT_FONT_SIZE = 14;
   const MIN_FONT_SIZE = 8;
   const MAX_FONT_SIZE = 30;
@@ -1627,8 +1714,38 @@ function App() {
     let newCommands;
     if (editingCommand) {
       // Update existing
+      const isToolAware = !!editingCommand.toolVariants && Object.keys(editingCommand.toolVariants).length > 0;
+      let finalCommandData = { ...commandData, id: editingCommand.id };
+
+      if (isToolAware) {
+        // Save the edited values back to the active tool's variant maps
+        const updatedToolVariants = {
+          ...editingCommand.toolVariants,
+          [preferredCliTool]: commandData.command
+        };
+        const updatedDescriptionVariants = {
+          ...editingCommand.descriptionVariants,
+          [preferredCliTool]: commandData.description
+        };
+        const updatedMacroVariants = {
+          ...editingCommand.macroVariants,
+          [preferredCliTool]: commandData.macro_payload
+        };
+
+        finalCommandData = {
+          ...finalCommandData,
+          toolVariants: updatedToolVariants,
+          descriptionVariants: updatedDescriptionVariants,
+          macroVariants: updatedMacroVariants,
+          // Preserve base values for non-active tools/fallbacks
+          command: editingCommand.command,
+          description: editingCommand.description,
+          macro_payload: editingCommand.macro_payload
+        };
+      }
+
       newCommands = commands.map(c =>
-        c.id === editingCommand.id ? { ...commandData, id: c.id } : c
+        c.id === editingCommand.id ? finalCommandData : c
       )
     } else {
       // Add new with smart keybinding
@@ -1913,6 +2030,8 @@ function App() {
                 onToast={addToast}
                 shellType={shellConfig.shellType}
                 cwd={activeTab?.currentDirectory}
+                activeReleaseJobs={activeReleaseJobs}
+                onJobStatusChange={handleJobStatusChange}
               />
               <ForgeWorkflowCard onExecuteCommand={handleExecute} onToast={addToast} cwd={activeTab?.currentDirectory} />
               <WebAppDebuggerCard />
@@ -1975,6 +2094,7 @@ function App() {
             isVaultOpen={isVaultOpen}
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
+            activeReleaseJobs={activeReleaseJobs}
             mode={theme}
             devMode={devMode}
           />
@@ -2150,6 +2270,7 @@ function App() {
         onSave={handleSaveCommand}
         initialData={editingCommand}
         commands={commands}
+        preferredCliTool={preferredCliTool}
       />
 
       <FeedbackModal

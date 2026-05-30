@@ -7,8 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.1] - 2026-05-30
+
+---
+
+## [v7.11.1] - 2026-05-30
+
+### Changed
+- **Redesigned the command card "Options" section in the Add/Edit modal.** The four options (Paste Only, Favorite, Always Append, On/Off Toggle) were unstyled inline checkboxes that crammed together and wrapped mid-label, because `.checkbox-label` and `.form-row` had no CSS at all. They are now clean, padded option rows — each with a bold title and a one-line description — that highlight when active (pure-CSS `:has()`), matching the polished inputs above them. Fixing `.form-row` to be an actual flex container (it is used only in this modal) also restores the intended side-by-side layout of the Key Binding + Delay and Start/Stop label fields, whose inline `gap`/`align-items` were previously dead. The Always-Append and Toggle info boxes now use shared callout classes instead of inline styles.
+
+## [7.11.0] - 2026-05-29
+
+---
+
+## [v7.11.0] - 2026-05-29
+
+### Fixed
+- **Release pipeline no longer ships the wrong binary in non-interactive runs.** `scripts/local-release.ps1` prompted for release notes via `Read-Host`, which throws in any non-interactive shell (agent/CI/background) — the script then died *after* pushing the tag but *before* `gh release create`. Completing the release by hand from the repo root once uploaded a stale binary to the GitHub Release. The script now resolves release notes in priority order — `-ReleaseNotes` → the CHANGELOG `[Unreleased]` section (captured before stamping) → a safe default when no TTY is present — so the full pipeline (including `gh release create`, which uploads from `bin/`) runs unattended and always publishes the freshly built binaries.
+
+### Changed
+- **Stale cross-compiled binaries removed from the repo root and git-ignored.** `forge-linux-amd64`, `forge-darwin-amd64`, and `forge-darwin-arm64` were committed in the repo root (the `*.exe` ignore rule missed these extension-less files) and were the stale artifacts a manual release accidentally shipped. They are now removed from tracking and ignored; release binaries live only in `bin/`, on the GitHub Release, and in R2.
+
+## [7.10.33] - 2026-05-29
+
+---
+
+## [v7.10.33] - 2026-05-29
+
 ### Added
 - **On/off toggle command cards** — A new generic card type (`cardType: "toggle"`) renders a single card with two buttons: a green **Start** that launches a service and a red **Stop** that tears it down. The Start action reuses the card's existing `command`/`macro_payload`/`delay` fields; a new nested `toggle` config (`offCommand`, `offMacroPayload`, `offMacroDelay`, `offDelay`, `onLabel`, `offLabel`) drives the Stop action. The last-clicked side stays highlighted in-memory (it reflects the last action taken, not verified process state, and resets on restart). Toggle cards are first-class in the add/edit modal (a "🔀 On/Off Toggle" checkbox reveals the Stop fields) and require no backend execution or migration changes — every new field is `omitempty`, so existing cards serialize unchanged. Use case: combining a "Launch POC" and "Stop POC" pair into one card.
+
+### Security
+- **Vault API now requires authentication on every route — closes an unauthenticated local-read vulnerability.** Previously all `/api/vault/*` routes passed through `AuthMiddleware`, which is a no-op whenever the global remote-access token is unset (the default on a localhost install). That left the entire vault readable by any local process with no credentials: `GET /api/vault/entries` returned all entry metadata, and `GET /api/vault/entries/value?id=...` returned the **decrypted plaintext secret value**. A dedicated vault session token (256-bit, stored `0600` at `~/.forge/vault-session-token`, mirroring the mobile-token pattern) is now enforced on every vault route regardless of the global token. The secret-exposing routes (`reveal`, `inject`) accept the token only via the `Authorization: Bearer` header — never a cookie — making them immune to CSRF, and all vault routes reject cross-site `Origin`s. The token is injected into the same-origin served page so the desktop UI keeps working with no user-visible change.
+- **Secret-in-description detection (advisory).** The vault now heuristically detects when a secret has been pasted into an entry's *description* field (a URL with an embedded password, known key prefixes such as `sk-`/`ghp_`, or a high-entropy token). The Add/Edit form shows an inline, non-blocking warning as you type, and existing entries whose description looks like it holds a secret are flagged with a badge so they can be rotated and cleaned up. Descriptions are metadata, not secret values, so this nudges the value into the encrypted secret field instead.
+
+## [7.10.32] - 2026-05-29
+
+---
+
+## [v7.10.32] - 2026-05-29
+
+### Fixed
+- **Release Manager typed the release command into a running Claude Code session instead of starting a background job** — Forge infers the active tab's working directory by scraping shell prompts out of terminal output. A live Claude Code session draws a box-framed input prompt containing a Windows path and a `>` chevron, which the prompt parser mistook for the shell's current directory. That corrupted the tab directory, so the Release Manager card could no longer locate `scripts/local-release.ps1` and fell back to typing the full release command into the agent. Prompt-based directory detection is now suppressed whenever a full-screen TUI owns the terminal — both the alternate screen buffer (vim, htop) and a box-drawn frame in the normal buffer (Claude Code, lazygit) — so the last real shell directory is preserved and the release always runs as a background job. Copilot and agy were unaffected because their UIs do not render `C:\…>`-shaped lines.
+
+## [7.10.31] - 2026-05-29
+
+---
+
+## [v7.10.31] - 2026-05-29
+
+## [7.10.30] - 2026-05-29
+
+---
+
+## [v7.10.30] - 2026-05-29
+
+### Fixed
+- **Release script parameter binding error on external projects** — Fixed a ParameterBindingException when executing release scripts in repositories that name the version parameter `BumpType` or `Version` instead of `VersionType`. Introspection now dynamically resolves the correct version parameter name from the script's `Get-Command` metadata (falling back to the first positional parameter) to ensure compatibility across all repositories.
+
+## [7.10.29] - 2026-05-29
+
+---
+
+## [v7.10.29] - 2026-05-29
+
+### Added
+- **Antigravity CLI (agy) integration for Google provider** — Migrated Google tool variant commands from the old `gemini` CLI to the active `agy` CLI. Fresh session and Enforced workflow cards now execute `agy --dangerously-skip-permissions`, and the Resume card executes `agy --dangerously-skip-permissions --continue` to correctly resume the most recent conversation.
+- **Agy command and process detection** — Added pattern matching for `agy` CLI commands and processes in the Go backend and frontend utility libraries to support proper persistent context injection and system process tracking.
+- **Persistent visual indicator for background release jobs** — Implemented a pulsing active release job indicator tag on tab headers when a background release is active in their directory.
+- **Global background release status polling and notifications** — Added a centralized polling mechanism in `App.jsx` using React refs and local storage synchronization to cheap-poll active job statuses globally, ensuring users receive success/failure toasts even if they navigate away or switch tabs from the initiating project panel.
+- **Auto-syncing release job logs and status** — Connected `OwnerReleaseCard` to the global release registry so that navigating back to a tab with an active release dynamically resumes log tracking and high-fidelity output.
+
+### Fixed
+- **Command Card Edit Modal Tool-Awareness** — Fixed a bug where editing a tool-aware card (like Fresh, Resume, or Enforced) would default to displaying Claude commands regardless of the active "Run with" tool selection. The edit modal now dynamically displays and updates the command, description, and macro payload for the currently active CLI tool variant and successfully saves edits back to the respective variant maps.
+
+## [7.10.28] - 2026-05-29
+
+---
+
+## [v7.10.28] - 2026-05-29
+
+## [7.10.27] - 2026-05-29
 
 ---
 
@@ -428,8 +507,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Tab Controls "Save" did not retitle existing tabs.** Changing naming strategy / projects root folder and clicking Save only updated the preferences for *future* tabs and *future* `cd` events. Restored tabs whose shell never emitted OSC 9;9 (no shell integration installed, or simply the user hadn't `cd`'d since restart) kept their old, often-wrong titles forever — most visibly: a `forge-terminal` tab stuck on a stale name like `mikejsmith1985` that was never present in the actual cwd. Save now calls a new `retitleAllTabsFromCwd` action that re-derives every open tab's title from its persisted `currentDirectory` using the freshly-saved strategy. Static strategies (numbered/shell-type/custom-prefix) recompute from the tab's index + shell type instead. The action refuses to overwrite a real title with a generic `Terminal N` placeholder or a file-like name, so a tab whose `currentDirectory` is null still keeps whatever name it had.
 - **Number/letter keys silently dropped on tabs restored after an update.** Restored tabs all mounted in parallel and each ran `term.focus()` unconditionally. Because hidden tabs use `visibility:hidden` (not `display:none`), their `xterm-helper-textarea` elements remained focusable — so whichever hidden tab mounted last stole focus from the active tab, sending keystrokes into the wrong PTY. Most visibly: typing `1`/`2`/`3` to answer a Copilot CLI menu prompt would do nothing on the active tab. The two mount-time `term.focus()` calls in `ForgeTerminal.jsx` now check `isVisible` first; the existing `useLayoutEffect([isVisible])` already handles focus when a tab becomes visible, so visible-tab behaviour is unchanged.
-
->>>>>>> origin/main
 
 ## [7.6.32] - 2026-04-24
 

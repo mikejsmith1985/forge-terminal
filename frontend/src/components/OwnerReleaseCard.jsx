@@ -11,7 +11,7 @@ const getRepoNameFromPath = (path) => {
   return parts.length > 0 ? parts[parts.length - 1] : null;
 };
 
-const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
+const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd, activeReleaseJobs = {}, onJobStatusChange }) => {
   const [currentVersion, setCurrentVersion] = useState('v1.0.0');
   const [selectedIncrement, setSelectedIncrement] = useState('fix');
   const [showCommand, setShowCommand] = useState(false);
@@ -242,6 +242,26 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
   const releaseRepoPath = (isExternalRepo && externalRepoPath) ? externalRepoPath : cwd;
   const releaseVersionNumber = next ? next.replace(/^v/, '') : '';
 
+  // Sync global activeReleaseJobs with local state activeReleaseJob when this component mounts or path changes
+  useEffect(() => {
+    if (!releaseRepoPath) return;
+    const globalJob = activeReleaseJobs[releaseRepoPath];
+    if (globalJob) {
+      // Sync it locally if we don't have one or if it's a different job
+      if (!activeReleaseJob || activeReleaseJob.job_id !== globalJob.jobId) {
+        setActiveReleaseJob({
+          job_id: globalJob.jobId,
+          version: globalJob.version,
+          status: globalJob.status,
+        });
+        setActiveJobRepoPath(releaseRepoPath);
+        // Clear log so it loads fresh log for the new active job
+        setReleaseJobLog('');
+        setReleaseJobError(null);
+      }
+    }
+  }, [releaseRepoPath, activeReleaseJobs, activeReleaseJob]);
+
   // Generate complete release command (commit, push, merge to main, tag, push tag, gh release create — no GH Actions needed)
   const generateReleaseCommand = useCallback(() => {
     if (!next) return '';
@@ -365,15 +385,26 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
         setActiveReleaseJob(result.job);
         setReleaseJobLog(result.log);
         failedPollCount = 0;
+
+        if (onJobStatusChange) {
+          onJobStatusChange(frozenRepoPath, result.job);
+        }
+
         if (result.job.status === 'completed') {
           if (onToast) onToast(`Release ${result.job.version} completed`, 'success', 5000);
           shouldContinuePolling = false;
           setActiveJobRepoPath(null);
+          if (onJobStatusChange) {
+            onJobStatusChange(frozenRepoPath, null);
+          }
         }
         if (result.job.status === 'failed') {
           if (onToast) onToast(`Release ${result.job.version} failed`, 'error', 6000);
           shouldContinuePolling = false;
           setActiveJobRepoPath(null);
+          if (onJobStatusChange) {
+            onJobStatusChange(frozenRepoPath, null);
+          }
         }
       } catch (err) {
         failedPollCount += 1;
@@ -390,7 +421,7 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       shouldContinuePolling = false;
       clearInterval(pollTimer);
     };
-  }, [activeReleaseJob?.job_id, activeReleaseJob?.status, activeJobRepoPath, fetchReleaseJobStatus, onToast]);
+  }, [activeReleaseJob?.job_id, activeReleaseJob?.status, activeJobRepoPath, fetchReleaseJobStatus, onToast, onJobStatusChange]);
 
   const startBackgroundRelease = useCallback(async () => {
     if (!releaseRepoPath || !releaseVersionNumber || !releaseNotes.trim()) {
@@ -426,13 +457,16 @@ const OwnerReleaseCard = ({ onExecuteCommand, onToast, shellType, cwd }) => {
       setReleaseJobLog(body.log || '');
       setShowReleaseModal(false);
       if (onToast) onToast(`Release ${next} started in the background`, 'info', 3000);
+      if (onJobStatusChange) {
+        onJobStatusChange(frozenRepoPath, body.job);
+      }
     } catch (err) {
       setReleaseJobError(err.message);
       if (onToast) onToast(err.message, 'error', 5000);
     } finally {
       setIsSubmittingRelease(false);
     }
-  }, [releaseRepoPath, releaseVersionNumber, releaseNotes, includeUncommittedChanges, shouldProceedWithWarnings, onToast, next]);
+  }, [releaseRepoPath, releaseVersionNumber, releaseNotes, includeUncommittedChanges, shouldProceedWithWarnings, onToast, next, onJobStatusChange]);
 
   const getReleaseTypeDisplay = () => {
     if (!releaseType) return { label: 'BUG FIXES', color: 'green', icon: '🐛' };

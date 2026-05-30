@@ -144,7 +144,7 @@ func (eth *ExecutiveTriggerHandler) detectExpectedTierFromCommand(cmd string) ll
 	if strings.Contains(cmdLower, "claude") {
 		return llm.TierOpus
 	}
-	if strings.Contains(cmdLower, "gemini") {
+	if strings.Contains(cmdLower, "gemini") || strings.Contains(cmdLower, "agy") {
 		return llm.TierSonnet
 	}
 
@@ -212,6 +212,8 @@ func (eth *ExecutiveTriggerHandler) checkSystemProcesses() *ActiveProcessInfo {
 		{"gh", llm.ProviderGitHubCopilot, llm.TierHaiku},     // Unix
 		{"copilot", llm.ProviderGitHubCopilot, llm.TierHaiku},
 		{"gemini", llm.ProviderGoogle, llm.TierSonnet},
+		{"agy.exe", llm.ProviderGoogle, llm.TierSonnet},
+		{"agy", llm.ProviderGoogle, llm.TierSonnet},
 	}
 
 	for _, proc := range llmProcesses {

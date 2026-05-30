@@ -33,7 +33,25 @@ import {
 } from 'lucide-react'
 import { useVault } from '../hooks/useVault'
 import { buildVaultDisplayItems } from './vaultEntryGrouping'
+import { detectSecretInDescription } from '../utils/secretDetector'
 import './VaultPanel.css'
+
+// DescriptionSecretWarning renders an inline, non-blocking warning when the given
+// description text appears to contain a secret. It nudges the user to store the
+// value in the encrypted secret field instead of the plaintext description. The
+// authoritative check also runs server-side on save (internal/vault/secretscan.go).
+function DescriptionSecretWarning({ text }) {
+  const { isSuspicious, reason } = detectSecretInDescription(text)
+  if (!isSuspicious) {
+    return null
+  }
+  return (
+    <div className="vp-description-warning" role="alert">
+      <AlertCircle size={13} className="vp-description-warning-icon" />
+      <span>{reason} Store the value in the secret field above, not the description.</span>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -200,6 +218,15 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
         <a className="vp-entry-url" href={entry.url} target="_blank" rel="noreferrer" title={entry.url}>
           {entry.url}
         </a>
+      )}
+      {entry.descriptionWarning && (
+        <div
+          className="vp-entry-warning"
+          title={`${entry.descriptionWarning} Rotate this credential and remove the secret from its description.`}
+        >
+          <AlertCircle size={12} className="vp-entry-warning-icon" />
+          <span>Possible secret in description — rotate &amp; remove</span>
+        </div>
       )}
 
       {/* Auto-inject toggle pill */}
@@ -741,6 +768,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
             onChange={(changeEvent) => setDescription(changeEvent.target.value)}
             placeholder="Used for code generation tasks"
           />
+          <DescriptionSecretWarning text={description} />
         </div>
 
         {/* Auto-inject toggle */}
@@ -953,6 +981,7 @@ function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
             onChange={(changeEvent) => setDescription(changeEvent.target.value)}
             placeholder="Used for code generation tasks"
           />
+          <DescriptionSecretWarning text={description} />
         </div>
 
         <div className="vp-form-actions">

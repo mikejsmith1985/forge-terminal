@@ -5,6 +5,15 @@ bin/
 *.dll
 *.so
 *.dylib
+# Cross-compiled release binaries built into the repo root (extension-less, so
+# the *.exe rule above misses them). These are release artifacts — they belong
+# in bin/ and on the GitHub Release/R2, never committed. Leaving stale copies in
+# the root once caused a release to ship the wrong (old) binary.
+/forge-linux-amd64
+/forge-darwin-amd64
+/forge-darwin-arm64
+/forge-windows-amd64.exe
+/forge
 
 # Windows resource files (generated)
 *.syso
