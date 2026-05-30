@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.1] - 2026-05-30
+
+---
+
+## [v7.11.1] - 2026-05-30
+
 ### Changed
 - **Redesigned the command card "Options" section in the Add/Edit modal.** The four options (Paste Only, Favorite, Always Append, On/Off Toggle) were unstyled inline checkboxes that crammed together and wrapped mid-label, because `.checkbox-label` and `.form-row` had no CSS at all. They are now clean, padded option rows — each with a bold title and a one-line description — that highlight when active (pure-CSS `:has()`), matching the polished inputs above them. Fixing `.form-row` to be an actual flex container (it is used only in this modal) also restores the intended side-by-side layout of the Key Binding + Delay and Start/Stop label fields, whose inline `gap`/`align-items` were previously dead. The Always-Append and Toggle info boxes now use shared callout classes instead of inline styles.
 
