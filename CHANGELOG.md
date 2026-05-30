@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Release pipeline no longer ships the wrong binary in non-interactive runs.** `scripts/local-release.ps1` prompted for release notes via `Read-Host`, which throws in any non-interactive shell (agent/CI/background) — the script then died *after* pushing the tag but *before* `gh release create`. Completing the release by hand from the repo root once uploaded a stale binary to the GitHub Release. The script now resolves release notes in priority order — `-ReleaseNotes` → the CHANGELOG `[Unreleased]` section (captured before stamping) → a safe default when no TTY is present — so the full pipeline (including `gh release create`, which uploads from `bin/`) runs unattended and always publishes the freshly built binaries.
+
+### Changed
+- **Stale cross-compiled binaries removed from the repo root and git-ignored.** `forge-linux-amd64`, `forge-darwin-amd64`, and `forge-darwin-arm64` were committed in the repo root (the `*.exe` ignore rule missed these extension-less files) and were the stale artifacts a manual release accidentally shipped. They are now removed from tracking and ignored; release binaries live only in `bin/`, on the GitHub Release, and in R2.
+
 ## [7.10.33] - 2026-05-29
 
 ---

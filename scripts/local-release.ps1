@@ -235,6 +235,22 @@ if ($VersionType -match '^\d+\.\d+\.\d+$') {
 Write-OK "New version: v$NEW_VERSION"
 $TAG = "v$NEW_VERSION"
 
+# Capture the CHANGELOG [Unreleased] section NOW, before the stamping steps
+# below rename it to the versioned heading. These become the GitHub Release
+# notes when -ReleaseNotes is not supplied, so automated runs never need the
+# interactive Read-Host prompt (which throws in a non-interactive shell).
+function Get-UnreleasedNotes {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return "" }
+    $text = [System.IO.File]::ReadAllText($Path)
+    # Text between "## [Unreleased]" and the next "## [" version heading.
+    $match = [regex]::Match($text, '(?ms)^##\s*\[Unreleased\]\s*(.*?)(?=^##\s*\[)')
+    if (-not $match.Success) { return "" }
+    # Strip a leading "---" separator that the stamping format inserts.
+    return ($match.Groups[1].Value -replace '(?m)^\s*-{3,}\s*$', '').Trim()
+}
+$AUTO_NOTES = Get-UnreleasedNotes "$ROOT\CHANGELOG.md"
+
 # ── Update version in source files ───────────────────────────────────────────
 Write-Banner "Updating version files"
 $utf8NoBOM = [System.Text.UTF8Encoding]::new($false)
@@ -442,13 +458,27 @@ Write-OK "Tag $TAG pushed to origin"
 
 # ── Release notes ─────────────────────────────────────────────────────────────
 Write-Banner "Release notes"
+# Release-notes resolution order (most specific wins):
+#   1. -ReleaseNotes parameter          → explicit caller-supplied notes
+#   2. CHANGELOG [Unreleased] section    → auto-derived (captured pre-stamp)
+#   3. no TTY (-NonInteractive / piped)  → safe default, never hang on Read-Host
+#   4. interactive human                 → prompt
+$inputIsRedirected = $false
+try { $inputIsRedirected = [Console]::IsInputRedirected } catch { $inputIsRedirected = $true }
+
 if ($ReleaseNotes) {
-    # Non-interactive path: caller supplied notes via -ReleaseNotes parameter.
-    # This allows the script to run in automated/CI contexts without Read-Host.
     $RELEASE_NOTES = $ReleaseNotes
     Write-OK "Using provided release notes"
-} elseif ($NonInteractive) {
-    Write-Fail "Release notes are required in non-interactive mode. Provide -ReleaseNotes."
+} elseif ($AUTO_NOTES) {
+    # The CHANGELOG already documents what changed — reuse it verbatim so the
+    # GitHub Release matches the changelog and no prompt is needed.
+    $RELEASE_NOTES = $AUTO_NOTES
+    Write-OK "Derived release notes from CHANGELOG [Unreleased] section"
+} elseif ($NonInteractive -or $inputIsRedirected) {
+    # No notes and no interactive terminal to ask — fall back to a default
+    # rather than blocking on Read-Host (which throws in non-interactive shells).
+    $RELEASE_NOTES = "Release $TAG"
+    Write-Warn "No -ReleaseNotes and empty CHANGELOG [Unreleased] — using default notes '$RELEASE_NOTES'"
 } else {
     Write-Host "  Enter release notes (press Enter twice to finish):" -ForegroundColor Yellow
     $lines = @()
