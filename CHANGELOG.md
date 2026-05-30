@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Update checker stale-cache**: When the Cloudflare Worker proxy at license.rootlevellabs.tech
+  returns a cached v7.11.1 as "latest" after v7.11.2 was published, CheckForUpdate() now
+  cross-checks against GitHub's full releases list (/releases?per_page=5) before reporting
+  "You're up to date." The cross-check result is cached for 10 minutes to stay within the
+  60 req/hr unauthenticated GitHub rate limit. (internal/updater/updater.go)
+
+### Added
+- **Global Claude skill sync**: sync-skills.ps1 now copies all Forge workflow skills
+  (.claude/commands/*.md) to ~/.claude/commands/ so they are available in every Claude Code
+  project on this machine — not just forge-terminal. Commands like /add-command-card,
+  /forge-workflow, /workflow-enforcer etc now work from any project directory.
+  (scripts/sync-skills.ps1)
+
 ## [7.11.2] - 2026-05-30
 
 ---

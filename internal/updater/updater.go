@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -24,6 +25,18 @@ var Version = "7.11.2"
 // signed R2 URL instead of using the public GitHub release asset URL.
 // Signature: func(version, platform string) (downloadURL string, err error)
 var DownloadURLResolver func(version, platform string) (string, error)
+
+// crossCheckCacheTTL is how long we cache the fallback releases-list result.
+// The SSE ticker fires every 30 s; a 10-min TTL means at most 6 GitHub API calls
+// per hour when the worker cache is stale — safely within the 60-req/hr limit.
+const crossCheckCacheTTL = 10 * time.Minute
+
+// crossCheckCache guards the fallback releases-list call used to detect stale worker cache.
+var (
+	crossCheckCacheMu       sync.Mutex
+	crossCheckCachedRelease *Release
+	crossCheckLastFetched   time.Time
+)
 
 // GitHub repo info
 const (
@@ -96,11 +109,24 @@ func CheckForUpdate() (*UpdateInfo, error) {
 	isNewer := compareVersions(latestVersion, currentVersion) > 0
 
 	if !isNewer {
-		return &UpdateInfo{
-			Available:      false,
-			CurrentVersion: Version,
-			LatestVersion:  release.TagName,
-		}, nil
+		// The worker proxy may have a stale cache — cross-check against the full
+		// releases list before telling the user they are up to date.
+		crossCheckRelease, crossCheckErr := fetchNewerReleaseFromList(currentVersion)
+		if crossCheckErr != nil {
+			log.Printf("[Updater] Cross-check against releases list failed: %v", crossCheckErr)
+		}
+		if crossCheckRelease != nil {
+			// A newer release exists that the worker didn't know about.
+			release = crossCheckRelease
+			latestVersion = strings.TrimPrefix(release.TagName, "v")
+			isNewer = true
+		} else {
+			return &UpdateInfo{
+				Available:      false,
+				CurrentVersion: Version,
+				LatestVersion:  release.TagName,
+			}, nil
+		}
 	}
 
 	// Find the right asset for this platform
@@ -524,6 +550,75 @@ func parseVersion(v string) []int {
 	}
 
 	return result
+}
+
+// fetchNewerReleaseFromList queries GitHub's full releases list (not releases/latest)
+// and returns the highest-versioned release that is strictly newer than currentVersion.
+// It exists because the Cloudflare Worker proxy caches releases/latest and can return
+// a stale tag, causing CheckForUpdate to falsely report "no update available."
+// Results are cached for crossCheckCacheTTL to protect the unauthenticated rate limit.
+func fetchNewerReleaseFromList(currentVersion string) (*Release, error) {
+	crossCheckCacheMu.Lock()
+	isCacheValid := !crossCheckLastFetched.IsZero() && time.Since(crossCheckLastFetched) < crossCheckCacheTTL
+	cachedRelease := crossCheckCachedRelease
+	crossCheckCacheMu.Unlock()
+
+	if isCacheValid {
+		if cachedRelease == nil {
+			return nil, nil
+		}
+		candidateVersion := strings.TrimPrefix(cachedRelease.TagName, "v")
+		if compareVersions(candidateVersion, currentVersion) > 0 {
+			return cachedRelease, nil
+		}
+		return nil, nil
+	}
+
+	releasesURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases?per_page=5", repoOwner, repoName)
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", releasesURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building releases-list request: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "Forge-Terminal-Updater")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching releases list: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("releases list endpoint returned status %d", resp.StatusCode)
+	}
+
+	var allReleases []Release
+	if err := json.NewDecoder(resp.Body).Decode(&allReleases); err != nil {
+		return nil, fmt.Errorf("decoding releases list: %w", err)
+	}
+
+	var newestCandidate *Release
+	for releaseIndex := range allReleases {
+		candidateVersion := strings.TrimPrefix(allReleases[releaseIndex].TagName, "v")
+		if compareVersions(candidateVersion, currentVersion) <= 0 {
+			continue
+		}
+		if newestCandidate == nil {
+			newestCandidate = &allReleases[releaseIndex]
+			continue
+		}
+		if compareVersions(candidateVersion, strings.TrimPrefix(newestCandidate.TagName, "v")) > 0 {
+			newestCandidate = &allReleases[releaseIndex]
+		}
+	}
+
+	crossCheckCacheMu.Lock()
+	crossCheckCachedRelease = newestCandidate
+	crossCheckLastFetched = time.Now()
+	crossCheckCacheMu.Unlock()
+
+	return newestCandidate, nil
 }
 
 func copyFile(src, dst string) error {

@@ -240,6 +240,31 @@ if (Test-Path $aiderConf) {
     }
 }
 
+# ── Step 6: Sync to global Claude Code commands directory ─────────────────────
+
+Write-SectionHeader 'Syncing to global Claude Code commands (~/.claude/commands/)'
+
+$globalClaudeCommandsDir = Join-Path $env:USERPROFILE '.claude\commands'
+
+if (-not (Test-Path $globalClaudeCommandsDir)) {
+    if ($DryRun) {
+        Write-Status '~' "[DRY RUN] Would create directory: $globalClaudeCommandsDir" 'Yellow'
+    } else {
+        New-Item -ItemType Directory -Path $globalClaudeCommandsDir -Force | Out-Null
+        Write-Status '+' "Created global Claude commands directory: $globalClaudeCommandsDir"
+    }
+}
+
+foreach ($skill in $skills) {
+    $destinationPath = Join-Path $globalClaudeCommandsDir "$($skill.Name).md"
+    if ($DryRun) {
+        Write-Status '~' "[DRY RUN] Would copy: $($skill.Name).md -> $destinationPath" 'Yellow'
+    } else {
+        Set-Content -Path $destinationPath -Value $skill.Content -Encoding UTF8 -NoNewline
+        Write-Status '^' "Synced to global Claude: $($skill.Name).md"
+    }
+}
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 Write-Host ''
@@ -251,10 +276,12 @@ Write-Host "  Skill names     : $($skills | ForEach-Object { $_.Name } | Join-St
 Write-Host "  Copilot target  : .github/copilot-instructions.md" -ForegroundColor Gray
 Write-Host "  Aider target    : .aider/forge-system-prompt.md" -ForegroundColor Gray
 Write-Host "  Aider config    : .aider.conf.yml" -ForegroundColor Gray
+Write-Host "  Global Claude   : $globalClaudeCommandsDir" -ForegroundColor Gray
 Write-Host '─────────────────────────────────────────────' -ForegroundColor DarkGray
 Write-Host ''
 Write-Host 'Next steps:' -ForegroundColor Cyan
 Write-Host '  1. Review the diff: git diff .github/copilot-instructions.md'
 Write-Host '  2. Commit: git add .github/copilot-instructions.md .aider/ .aider.conf.yml'
 Write-Host '  3. Run again after editing any .claude/commands/*.md file'
+Write-Host '     (All skills are now available in every Claude Code project on this machine)'
 Write-Host ''
