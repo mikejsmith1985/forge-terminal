@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Update checker stale-cache**: When the Cloudflare Worker proxy at license.rootlevellabs.tech
+  returns a cached v7.11.1 as "latest" after v7.11.2 was published, CheckForUpdate() now
+  cross-checks against GitHub's full releases list (/releases?per_page=5) before reporting
+  "You're up to date." The cross-check result is cached for 10 minutes to stay within the
+  60 req/hr unauthenticated GitHub rate limit. (internal/updater/updater.go)
+
+### Added
+- **Global Claude skill sync**: sync-skills.ps1 now copies all Forge workflow skills
+  (.claude/commands/*.md) to ~/.claude/commands/ so they are available in every Claude Code
+  project on this machine — not just forge-terminal. Commands like /add-command-card,
+  /forge-workflow, /workflow-enforcer etc now work from any project directory.
+  (scripts/sync-skills.ps1)
+
+## [7.11.2] - 2026-05-30
+
+---
+
+## [v7.11.2] - 2026-05-30
+
+### Added
+- **Universal skill bridge for Copilot and Aider.** The six workflow enforcement skills in `.claude/commands/` were only visible to Claude Code. GitHub Copilot and Aider had no access to the branching rules, code quality standards, or 5-phase workflow, meaning those tools could silently bypass every guard that Claude Code enforces. `scripts/sync-skills.ps1` now reads every `.claude/commands/*.md` file and writes the full skill content into two adapter targets: `.github/copilot-instructions.md` (between `<!-- FORGE-SKILLS-START -->` / `<!-- FORGE-SKILLS-END -->` HTML-comment markers that Copilot's context window sees on every request) and `.aider/forge-system-prompt.md` (loaded automatically via `.aider.conf.yml`). The script is idempotent, preserves everything outside the markers in `copilot-instructions.md`, and supports a `-DryRun` flag. Edit a skill file once, run `.\scripts\sync-skills.ps1`, and all three tools are updated with no manual copy-paste.
+
 ## [7.11.1] - 2026-05-30
 
 ---
