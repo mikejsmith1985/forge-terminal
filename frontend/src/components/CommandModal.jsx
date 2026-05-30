@@ -307,67 +307,82 @@ const CommandModal = ({ isOpen, onClose, onSave, initialData, commands = [], pre
                         />
                     </div>
 
-                    <div className="form-row">
-                        <label className="checkbox-label">
+                    {/* Options — each toggle is a self-describing row instead of a
+                        cramped inline checkbox, so the choices read clearly and
+                        match the styled fields above. */}
+                    <div className="cmd-options">
+                        <span className="cmd-options-label">Options</span>
+
+                        <label className="cmd-option">
                             <input
                                 type="checkbox"
                                 name="pasteOnly"
                                 checked={formData.pasteOnly}
                                 onChange={handleChange}
                             />
-                            Paste Only (don't press Enter)
+                            <span className="cmd-option-text">
+                                <span className="cmd-option-title">Paste Only</span>
+                                <span className="cmd-option-desc">Send the text without pressing Enter</span>
+                            </span>
                         </label>
 
-                        <label className="checkbox-label">
+                        <label className="cmd-option">
                             <input
                                 type="checkbox"
                                 name="favorite"
                                 checked={formData.favorite}
                                 onChange={handleChange}
                             />
-                            Favorite (show at top)
+                            <span className="cmd-option-text">
+                                <span className="cmd-option-title">★ Favorite</span>
+                                <span className="cmd-option-desc">Pin this card to the top of the list</span>
+                            </span>
                         </label>
 
-                        <label className="checkbox-label">
+                        <label className="cmd-option">
                             <input
                                 type="checkbox"
                                 name="alwaysAppend"
                                 checked={formData.alwaysAppend}
                                 onChange={handleChange}
                             />
-                            📌 Always Append (add to every prompt)
+                            <span className="cmd-option-text">
+                                <span className="cmd-option-title">📌 Always Append</span>
+                                <span className="cmd-option-desc">Add this card's text to every prompt you send</span>
+                            </span>
                         </label>
 
-                        <label className="checkbox-label">
+                        <label className="cmd-option">
                             <input
                                 type="checkbox"
                                 name="isToggle"
                                 checked={formData.isToggle}
                                 onChange={handleChange}
                             />
-                            🔀 On/Off Toggle (Start + Stop buttons)
+                            <span className="cmd-option-text">
+                                <span className="cmd-option-title">🔀 On/Off Toggle</span>
+                                <span className="cmd-option-desc">Show Start + Stop buttons instead of Run</span>
+                            </span>
                         </label>
-
-                        {formData.alwaysAppend && (
-                            <div style={{ marginLeft: '24px', marginTop: '8px', padding: '12px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '4px', borderLeft: '3px solid #f59e0b' }}>
-                                <p style={{ fontSize: '13px', margin: 0, color: '#f59e0b' }}>
-                                    <strong>⚡ Always Append Mode</strong>
-                                </p>
-                                <p style={{ fontSize: '12px', marginTop: '8px', opacity: 0.8 }}>
-                                    This card's text will be automatically appended to every prompt you send to AI agents. 
-                                    Use this for persistent instructions like coding standards, project context, or response formatting.
-                                </p>
-                            </div>
-                        )}
                     </div>
+
+                    {formData.alwaysAppend && (
+                        <div className="cmd-callout cmd-callout-append">
+                            <p className="cmd-callout-title">⚡ Always Append Mode</p>
+                            <p className="cmd-callout-text">
+                                This card's text is automatically appended to every prompt you send to AI agents.
+                                Use it for persistent instructions like coding standards, project context, or response formatting.
+                            </p>
+                        </div>
+                    )}
 
                     {/* Toggle config — only shown when the card is an on/off toggle.
                         The Start action reuses the Command/Macro fields above; these
                         fields define the matching Stop (teardown) action + labels. */}
                     {formData.isToggle && (
-                        <div style={{ marginTop: '8px', padding: '12px', background: 'rgba(34, 197, 94, 0.08)', borderRadius: '4px', borderLeft: '3px solid #22c55e' }}>
-                            <p style={{ fontSize: '13px', margin: '0 0 10px', color: '#22c55e' }}>
-                                <strong>🔀 On/Off Toggle</strong> — the card shows two buttons. The command above runs on <em>Start</em>; the fields below define <em>Stop</em>.
+                        <div className="cmd-callout cmd-callout-toggle">
+                            <p className="cmd-callout-text" style={{ marginBottom: '12px' }}>
+                                <strong style={{ color: '#22c55e' }}>🔀 On/Off Toggle</strong> — the card shows two buttons. The command above runs on <em>Start</em>; the fields below define <em>Stop</em>.
                             </p>
 
                             <div className="form-row" style={{ gap: '12px' }}>
