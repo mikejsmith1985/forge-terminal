@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.2] - 2026-05-30
+
+---
+
+## [v7.11.2] - 2026-05-30
+
 ### Added
 - **Universal skill bridge for Copilot and Aider.** The six workflow enforcement skills in `.claude/commands/` were only visible to Claude Code. GitHub Copilot and Aider had no access to the branching rules, code quality standards, or 5-phase workflow, meaning those tools could silently bypass every guard that Claude Code enforces. `scripts/sync-skills.ps1` now reads every `.claude/commands/*.md` file and writes the full skill content into two adapter targets: `.github/copilot-instructions.md` (between `<!-- FORGE-SKILLS-START -->` / `<!-- FORGE-SKILLS-END -->` HTML-comment markers that Copilot's context window sees on every request) and `.aider/forge-system-prompt.md` (loaded automatically via `.aider.conf.yml`). The script is idempotent, preserves everything outside the markers in `copilot-instructions.md`, and supports a `-DryRun` flag. Edit a skill file once, run `.\scripts\sync-skills.ps1`, and all three tools are updated with no manual copy-paste.
 
