@@ -6,6 +6,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Play, Clipboard, Edit2, Trash2, GripVertical, Zap } from 'lucide-react';
 import { iconMap, getEmojiFromIcon } from './IconPicker';
+import ToggleCardFooter from './ToggleCardFooter';
 
 export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDelete, preferredCliTool = 'claude' }) {
     const {
@@ -44,6 +45,11 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
     const activeCmd = isToolAware
         ? { ...command, command: resolvedCommand, macro_payload: resolvedMacro }
         : command
+
+    // Toggle cards swap the Paste/Run footer for a Start/Stop pair (see
+    // ToggleCardFooter). Tool-variant resolution above does not apply to them —
+    // a toggle card's on/off commands are fixed, not per-CLI-tool.
+    const isToggle = command.cardType === 'toggle'
 
     return (
         <div
@@ -128,25 +134,29 @@ export function SortableCommandCard({ command, onExecute, onPaste, onEdit, onDel
                     )}
                 </div>
 
-                {/* Paste + Run buttons */}
-                <div className={`card-footer ${command.pasteOnly ? 'paste-only' : ''}`}>
-                    <button
-                        className="btn-action btn-paste"
-                        onClick={() => onPaste(activeCmd)}
-                        title="Paste to Terminal"
-                    >
-                        <Clipboard size={14} /> Paste
-                    </button>
-                    {!command.pasteOnly && (
+                {/* Footer: Start/Stop for toggle cards, otherwise Paste + Run */}
+                {isToggle ? (
+                    <ToggleCardFooter command={command} onExecute={onExecute} />
+                ) : (
+                    <div className={`card-footer ${command.pasteOnly ? 'paste-only' : ''}`}>
                         <button
-                            className="btn-action btn-run"
-                            onClick={() => onExecute(activeCmd)}
-                            title="Run in Terminal"
+                            className="btn-action btn-paste"
+                            onClick={() => onPaste(activeCmd)}
+                            title="Paste to Terminal"
                         >
-                            <Play size={14} /> Run
+                            <Clipboard size={14} /> Paste
                         </button>
-                    )}
-                </div>
+                        {!command.pasteOnly && (
+                            <button
+                                className="btn-action btn-run"
+                                onClick={() => onExecute(activeCmd)}
+                                title="Run in Terminal"
+                            >
+                                <Play size={14} /> Run
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
