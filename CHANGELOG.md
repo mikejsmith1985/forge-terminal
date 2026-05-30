@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   60 req/hr unauthenticated GitHub rate limit. (internal/updater/updater.go)
 
 ### Added
+- **vault_inject MCP tool — zero-knowledge agent secret injection**: Agents can now
+  call `vault_inject` with a list of vault entry names to obtain a self-deleting
+  platform script (PowerShell on Windows, POSIX sh elsewhere) and a ready-to-use
+  source command for `terminal_execute`. Secret values flow directly from vault memory
+  to the temp script file and never appear in the agent's response or conversation
+  context. This fixes the "agent as courier" anti-pattern where agents previously had
+  to ask users to copy-paste secrets through the conversation.
+  - New `VaultSecretInjector` interface in `internal/mcp/tools_vault.go`
+  - New `BuildInjectionScriptForNames` method on `*vault.Vault` (`internal/vault/vault.go`)
+  - Tool registered in `internal/mcp/server.go` alongside all other MCP tools
+  - `VaultAccess` field added to `mcp.Dependencies`; wired in `cmd/forge/handlers_mcp.go`
+  - 12 unit tests covering definition, nil-vault guard, zero-knowledge guarantee,
+    argument forwarding, and vault error propagation (`internal/mcp/tools_vault_test.go`)
+- **vault-operations skill**: New `.claude/commands/vault-operations.md` skill documents
+  the zero-knowledge injection pattern, the agent decision tree, and the forbidden
+  actions (copy-paste couriering, reading script file contents, storing secrets in task
+  descriptions). Synced to copilot-instructions.md and all global Claude commands via
+  sync-skills.ps1 (7 skills total, was 6).
 - **Global Claude skill sync**: sync-skills.ps1 now copies all Forge workflow skills
   (.claude/commands/*.md) to ~/.claude/commands/ so they are available in every Claude Code
   project on this machine — not just forge-terminal. Commands like /add-command-card,

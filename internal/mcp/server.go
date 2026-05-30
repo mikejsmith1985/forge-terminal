@@ -88,6 +88,11 @@ type Dependencies struct {
 	// EnvironmentJobStore overrides where detached adaptive build jobs are persisted.
 	// Tests inject a temp-backed store; production defaults to ProjectPath/.forge.
 	EnvironmentJobStore *EnvironmentJobStore
+
+	// VaultAccess provides the vault_inject tool with zero-knowledge secret injection.
+	// Nil means vault_inject is registered but returns an error when called (vault not ready).
+	// In production this is vault.GetGlobal(); in tests it is a mock VaultSecretInjector.
+	VaultAccess VaultSecretInjector
 }
 
 // NewServer creates a fully initialised MCP server.
@@ -336,6 +341,7 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newEnvironmentRunTool(environmentRunner, environmentJobManager),
 		newEnvironmentJobsTool(environmentJobManager),
 		newEnvironmentReadJobTool(environmentJobManager),
+		newVaultInjectTool(srv.deps.VaultAccess),
 	}
 
 	registry := make(map[string]ToolHandler, len(candidates))

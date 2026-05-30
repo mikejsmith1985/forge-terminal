@@ -4,7 +4,7 @@
 > To use: aider --system-prompt .aider/forge-system-prompt.md
 > Or add `system-prompt: .aider/forge-system-prompt.md` to .aider.conf.yml
 >
-> Last synced: 2026-05-30 10:21:05 | Skills: 6
+> Last synced: 2026-05-30 19:10:34 | Skills: 7
 
 ---
 
@@ -535,5 +535,146 @@ All code written for command cards is subject to:
 - `branching-strategy` — you are on a feature branch before the first file edit
 
 Do not deliver a new default card without a unit test that asserts the card's ID, Description, and Command fields are populated correctly.
+
+---
+
+## SKILL: vault-operations
+
+# Vault Operations — Zero-Knowledge Agent Secret Injection
+
+This skill governs how agents interact with the Forge Vault. Read every section
+before writing any code that involves secrets, credentials, tokens, or API keys.
+
+---
+
+## The Prime Directive
+
+**An agent is a director, not a courier.**
+
+The agent tells the vault WHERE to put a secret. The vault resolves, decrypts,
+and delivers the secret directly to the destination. The agent never reads the
+plaintext value. The secret never enters the conversation context.
+
+---
+
+## The Two Safe Paths
+
+### Path 1 — vault_inject (agent-triggered, recommended for MCP agents)
+
+Call the `vault_inject` MCP tool with the vault entry names you need:
+
+```json
+{
+  "tool": "vault_inject",
+  "arguments": {
+    "secret_names": ["DBAI_TESTBOT", "OPENAI_KEY"]
+  }
+}
+```
+
+The tool:
+1. Resolves names → decrypts values → writes a self-deleting platform script
+2. Returns **only the script path and source command** — no plaintext values
+3. Script self-deletes after being sourced (< 1 second lifetime)
+
+Follow up with `terminal_execute` to source the script:
+
+```json
+{
+  "tool": "terminal_execute",
+  "arguments": {
+    "command": ". 'C:\\Users\\...\\forge-vault-abc123.ps1'"
+  }
+}
+```
+
+The secrets are now live in the terminal session. The agent never saw their values.
+
+### Path 2 — Auto-inject (zero agent involvement, recommended for persistent sessions)
+
+The user opens the Forge Vault UI, finds the entry, and enables "Auto-Inject".
+On the next PTY session spawn, Forge injects the values directly into `cmd.Env`
+before the shell process starts. No agent action required. Values never appear
+in any output or log.
+
+**Use this path for secrets needed in every terminal session** (e.g. a default
+API key). Use `vault_inject` when an agent needs a secret for a one-off task.
+
+---
+
+## What Agents Must NEVER Do
+
+| Forbidden action | Why it is dangerous |
+|---|---|
+| Ask the user to copy-paste a vault value into the conversation | Secret enters conversation context — logged, potentially cached |
+| Call `vault_inject` and then try to read the script file contents | Defeats zero-knowledge guarantee; script is 0600 and self-deletes |
+| Write a secret received from the user into a file via `file_write` | Secret transits agent context and lands on disk without self-delete |
+| Store a secret value in a task description or note | Task descriptions are stored in plaintext in `.forge` state |
+| Infer or guess what a secret value might be | Never. If the vault doesn't have it, tell the user to add it. |
+
+---
+
+## Agent Decision Tree for "I need a secret"
+
+```
+Need a secret in this task?
+    │
+    ├── Is the secret already in the Forge Vault UI?
+    │       ├── YES → call vault_inject with the secret name
+    │       │          → follow up with terminal_execute to source the script
+    │       │          → done (agent never sees the value)
+    │       │
+    │       └── NO → tell the user:
+    │                  "Please add <SECRET_NAME> to the Forge Vault UI,
+    │                   then I will inject it via vault_inject."
+    │                  Do NOT ask the user to paste the value here.
+    │
+    └── Is the secret needed for every session, not just this task?
+            └── Recommend the user enable Auto-Inject for that vault entry.
+```
+
+---
+
+## vault_inject Tool Reference
+
+| Field | Type | Description |
+|---|---|---|
+| `secret_names` | `string[]` | Names exactly as shown in the Forge Vault UI. Case-sensitive. |
+
+**Returns:**
+- `scriptPath` — absolute path to the self-deleting injection script
+- `sourceCommand` — the exact `. '<path>'` command to pass to `terminal_execute`
+- Error message (IsError=true) if any name is not found in the vault
+
+**Error cases:**
+- `vault is not initialised` — Forge Terminal is not running or vault is locked
+- `vault entries not found: [NAME]` — the secret name is not in the vault; ask the user to add it
+
+---
+
+## Implementation Notes (for Forge developers)
+
+The `vault_inject` tool is registered in `internal/mcp/server.go` alongside all
+other MCP tools. It is backed by the `VaultSecretInjector` interface
+(`internal/mcp/tools_vault.go`) which `*vault.Vault` satisfies via the
+`BuildInjectionScriptForNames` method (`internal/vault/vault.go`).
+
+The interface boundary is intentionally narrow (one method) so:
+1. The mcp package does not import vault types — no import cycle risk
+2. Tests mock the interface with a two-field struct — no real AES vault needed
+3. A future vault backend swap only requires updating one method on `*vault.Vault`
+
+The script itself is written by `internal/vault/inject.go::BuildInjectionScript`,
+which is shared between this MCP path and the existing "Inject Now" UI button.
+
+---
+
+## Standards That Apply
+
+All code written for vault operations is subject to:
+- `code-quality` — naming conventions, comment standards
+- `forge-workflow` — Phase 3 TDD: write the failing test before implementation
+- `branching-strategy` — on a feature branch before the first file edit
+- Never expose secret values in MCP tool responses, logs, or `refactor_plan.html`
 
 ---
