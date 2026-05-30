@@ -11,6 +11,7 @@ import { logger } from '../utils/logger';
 import { diagnosticCore } from '../utils/diagnosticCore';
 import { isLLMCommand } from '../utils/llmDetection';
 import { extractProjectFolder, isFileLikeName, isTempOrSystemPath } from '../utils/projectFolder';
+import { shouldDetectDirectoryFromText } from '../utils/terminalTuiState';
 
 // Paste error logger
 const logPasteError = (error, context = {}) => {
@@ -2006,19 +2007,29 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Directory detection (also uses regex)
-          const detectedDir = extractDirectory(buf.data);
-          if (detectedDir && detectedDir !== lastDirectoryRef.current) {
-            lastDirectoryRef.current = detectedDir;
-            // Defense-in-depth: skip temp/system paths detected via text patterns.
-            // handleDirectoryChange (App.jsx) also guards these, but blocking here
-            // avoids a spurious callback and keeps lastDirectoryRef free of
-            // non-project values (e.g. %TEMP% after an AI agent processes a
-            // pasted clipboard image and changes to that directory).
-            if (!isTempOrSystemPath(detectedDir)) {
-              const folderName = getFolderName(detectedDir);
-              if (folderName && onDirectoryChangeRef.current) {
-                onDirectoryChangeRef.current(folderName, detectedDir);
+          // Directory detection (also uses regex).
+          //
+          // Skip it entirely while a full-screen TUI owns the terminal — either
+          // via the alternate screen buffer (vim, htop) or a box-drawn frame in
+          // the normal buffer (Claude Code, lazygit). Those apps render Windows
+          // paths and ">" chevrons inside their UI that the prompt parser would
+          // mistake for the shell's CWD. That corruption is what made the Release
+          // Manager card lose track of the repo and type the release command into
+          // a running Claude Code session instead of starting a background job.
+          if (shouldDetectDirectoryFromText(buf.data, term.buffer.active.type)) {
+            const detectedDir = extractDirectory(buf.data);
+            if (detectedDir && detectedDir !== lastDirectoryRef.current) {
+              lastDirectoryRef.current = detectedDir;
+              // Defense-in-depth: skip temp/system paths detected via text patterns.
+              // handleDirectoryChange (App.jsx) also guards these, but blocking here
+              // avoids a spurious callback and keeps lastDirectoryRef free of
+              // non-project values (e.g. %TEMP% after an AI agent processes a
+              // pasted clipboard image and changes to that directory).
+              if (!isTempOrSystemPath(detectedDir)) {
+                const folderName = getFolderName(detectedDir);
+                if (folderName && onDirectoryChangeRef.current) {
+                  onDirectoryChangeRef.current(folderName, detectedDir);
+                }
               }
             }
           }

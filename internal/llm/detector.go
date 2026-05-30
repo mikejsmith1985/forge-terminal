@@ -118,6 +118,20 @@ func NewDetector() *Detector {
 					return ProviderGoogle, CommandChat
 				},
 			},
+			{
+				Name:  "agy-standalone",
+				Regex: regexp.MustCompile(`(?i)^agy\s*$`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGoogle, CommandChat
+				},
+			},
+			{
+				Name:  "agy-args",
+				Regex: regexp.MustCompile(`(?i)^agy(\s|$)`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGoogle, CommandChat
+				},
+			},
 			// Path-based patterns (fallback for shell-resolved commands)
 			{
 				Name:  "copilot-path",
@@ -143,6 +157,13 @@ func NewDetector() *Detector {
 			{
 				Name:  "gemini-path",
 				Regex: regexp.MustCompile(`(?i)/gemini(\s|$)`),
+				Extract: func(cmd string) (Provider, CommandType) {
+					return ProviderGoogle, CommandChat
+				},
+			},
+			{
+				Name:  "agy-path",
+				Regex: regexp.MustCompile(`(?i)/agy(\s|$)`),
 				Extract: func(cmd string) (Provider, CommandType) {
 					return ProviderGoogle, CommandChat
 				},

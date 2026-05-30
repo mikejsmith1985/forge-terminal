@@ -267,6 +267,12 @@ func main() {
 	// Initialize Forge Vault (AES-256-GCM encrypted secret store)
 	initVault(storage.GetVaultDir())
 
+	// Load the vault session token BEFORE routes register, so it is available to
+	// inject into the served page (serveIndexWithVersion). Every /api/vault/*
+	// route requires this token even on a tokenless localhost install — without
+	// it the vault would be readable by any local process (see vault_auth.go).
+	initVaultSessionToken()
+
 	// Check license at startup — gates all /api/* routes via LicenseMiddleware.
 	activeLicenseStatus, activeLicenseInfo = license.CheckLicense()
 	licenseGated = activeLicenseStatus != license.StatusOK && activeLicenseStatus != license.StatusGrace
@@ -2532,6 +2538,12 @@ func serveIndexWithVersion(w http.ResponseWriter, r *http.Request, webFS fs.FS) 
 		return
 	}
 
+	// Embed the vault session token so the same-origin frontend can authenticate
+	// its /api/vault/* calls. Safe to inject here: this page is served only over
+	// the same-origin, AuthMiddleware-wrapped root handler, and the no-store
+	// headers below keep the token out of any cache.
+	content = injectVaultTokenIntoHTML(content)
+
 	// Set headers - rely on Vite's content hashing for cache busting
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -2539,4 +2551,31 @@ func serveIndexWithVersion(w http.ResponseWriter, r *http.Request, webFS fs.FS) 
 	w.Header().Set("Expires", "0")
 
 	w.Write(content)
+}
+
+// injectVaultTokenIntoHTML embeds the active vault session token into the served
+// page as the window.__forgeVaultToken global so the same-origin frontend can
+// attach it as a bearer token on /api/vault/* requests. The token is URL-safe
+// hex, but it is JSON-encoded to produce a safely-quoted JS string literal as a
+// defensive measure against any future change to the token alphabet. Returns the
+// content unchanged when no token is loaded (the vault then fails closed).
+func injectVaultTokenIntoHTML(content []byte) []byte {
+	if activeVaultSessionToken == "" {
+		return content
+	}
+
+	encodedToken, marshalErr := json.Marshal(activeVaultSessionToken)
+	if marshalErr != nil {
+		return content
+	}
+	scriptTag := []byte("<script>window.__forgeVaultToken=" + string(encodedToken) + ";</script>")
+
+	headCloseTag := []byte("</head>")
+	if bytes.Contains(content, headCloseTag) {
+		return bytes.Replace(content, headCloseTag, append(scriptTag, headCloseTag...), 1)
+	}
+
+	// Fallback for an unexpected page without a </head>: prepend the script so the
+	// global still exists before the app bundle runs.
+	return append(scriptTag, content...)
 }

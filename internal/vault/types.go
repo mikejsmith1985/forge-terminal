@@ -32,6 +32,12 @@ type VaultEntry struct {
 	ShouldAutoInject bool       `json:"shouldAutoInject"`     // Inject into every new PTY session
 	CreatedAt        time.Time  `json:"createdAt"`
 	LastUsedAt       *time.Time `json:"lastUsedAt,omitempty"`
+
+	// DescriptionWarning is a heuristic, non-persisted advisory: when non-empty,
+	// the description looks like it contains a secret (e.g. a password embedded in
+	// a URL) that should be rotated and moved into the encrypted value field. It is
+	// recomputed on every read so existing entries are flagged without migration.
+	DescriptionWarning string `json:"descriptionWarning,omitempty"`
 }
 
 // AddEntryRequest is the body of POST /api/vault/entries.

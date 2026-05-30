@@ -64,3 +64,28 @@ describe('CommandModal toggle authoring', () => {
     expect(payload.toggle).toBeNull()
   })
 })
+
+describe('CommandModal options section', () => {
+  // The redesigned options section gives each toggle a one-line description so
+  // the choices are self-explanatory (the old cramped checkbox row had none).
+  it('renders a helper description under each option', () => {
+    renderModal(vi.fn())
+    expect(screen.getByText(/Send the text without pressing Enter/i)).toBeInTheDocument()
+    expect(screen.getByText(/Pin this card to the top of the list/i)).toBeInTheDocument()
+    expect(screen.getByText(/Add this card's text to every prompt you send/i)).toBeInTheDocument()
+    expect(screen.getByText(/Show Start \+ Stop buttons instead of Run/i)).toBeInTheDocument()
+  })
+
+  // Restyling must not break the label/input wiring: every option stays an
+  // accessible checkbox that toggles on click (handleChange keys off `name`).
+  it('keeps every option an accessible, clickable checkbox', () => {
+    renderModal(vi.fn())
+    const optionNames = [/Paste Only/i, /Favorite/i, /Always Append/i, /On\/Off Toggle/i]
+    for (const optionName of optionNames) {
+      const checkbox = screen.getByRole('checkbox', { name: optionName })
+      expect(checkbox).not.toBeChecked()
+      fireEvent.click(checkbox)
+      expect(checkbox).toBeChecked()
+    }
+  })
+})

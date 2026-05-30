@@ -448,17 +448,25 @@ func buildIntrospectingReleaseCommand(job *ReleaseJob) string {
 	var commandBuilder strings.Builder
 	// Load the script's parameter metadata without executing it.
 	commandBuilder.WriteString(fmt.Sprintf("$scriptPath = '%s'; ", escapedScriptPath))
-	commandBuilder.WriteString("$availableParameters = (Get-Command $scriptPath).Parameters.Keys; ")
-	// Always pass the version as the positional VersionType argument.
-	commandBuilder.WriteString(fmt.Sprintf("$scriptArguments = @{ VersionType = '%s' }; ", escapedVersion))
+	commandBuilder.WriteString("$availableParameters = (Get-Command $scriptPath).Parameters; ")
+	// Create an empty hashtable for the arguments.
+	commandBuilder.WriteString("$scriptArguments = @{}; ")
+	// Dynamically determine the version/bump type parameter name (since different repositories use different names like VersionType, BumpType, or Version).
+	commandBuilder.WriteString("$versionParam = $null; ")
+	commandBuilder.WriteString("if ('VersionType' -in $availableParameters.Keys) { $versionParam = 'VersionType' } ")
+	commandBuilder.WriteString("elseif ('BumpType' -in $availableParameters.Keys) { $versionParam = 'BumpType' } ")
+	commandBuilder.WriteString("elseif ('Version' -in $availableParameters.Keys) { $versionParam = 'Version' } ")
+	commandBuilder.WriteString("else { foreach ($val in $availableParameters.Values) { foreach ($attr in $val.Attributes) { if ($attr.Position -eq 0) { $versionParam = $val.Name; break } } if ($versionParam) { break } } }; ")
+	// Set the version argument under the detected parameter name if found.
+	commandBuilder.WriteString(fmt.Sprintf("if ($versionParam) { $scriptArguments[$versionParam] = '%s' }; ", escapedVersion))
 	// Pass optional named parameters only when the target script declares them.
-	commandBuilder.WriteString(fmt.Sprintf("if ('ReleaseNotes' -in $availableParameters) { $scriptArguments['ReleaseNotes'] = '%s' }; ", escapedNotes))
-	commandBuilder.WriteString("if ('NonInteractive' -in $availableParameters) { $scriptArguments['NonInteractive'] = [switch]$true }; ")
+	commandBuilder.WriteString(fmt.Sprintf("if ('ReleaseNotes' -in $availableParameters.Keys) { $scriptArguments['ReleaseNotes'] = '%s' }; ", escapedNotes))
+	commandBuilder.WriteString("if ('NonInteractive' -in $availableParameters.Keys) { $scriptArguments['NonInteractive'] = [switch]$true }; ")
 	if job.IncludeUncommittedChanges {
-		commandBuilder.WriteString("if ('IncludeUncommittedChanges' -in $availableParameters) { $scriptArguments['IncludeUncommittedChanges'] = [switch]$true }; ")
+		commandBuilder.WriteString("if ('IncludeUncommittedChanges' -in $availableParameters.Keys) { $scriptArguments['IncludeUncommittedChanges'] = [switch]$true }; ")
 	}
 	if job.ShouldProceedWithWarnings {
-		commandBuilder.WriteString("if ('Force' -in $availableParameters) { $scriptArguments['Force'] = [switch]$true }; ")
+		commandBuilder.WriteString("if ('Force' -in $availableParameters.Keys) { $scriptArguments['Force'] = [switch]$true }; ")
 	}
 	// Invoke the script via splatting and propagate its exit code to the parent process.
 	commandBuilder.WriteString("& $scriptPath @scriptArguments; exit $LASTEXITCODE")
