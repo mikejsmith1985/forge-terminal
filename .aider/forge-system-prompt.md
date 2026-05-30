@@ -4,7 +4,7 @@
 > To use: aider --system-prompt .aider/forge-system-prompt.md
 > Or add `system-prompt: .aider/forge-system-prompt.md` to .aider.conf.yml
 >
-> Last synced: 2026-05-30 10:21:05 | Skills: 6
+> Last synced: 2026-05-30 13:06:45 | Skills: 6
 
 ---
 

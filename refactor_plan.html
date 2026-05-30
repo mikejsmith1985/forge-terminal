@@ -1,49 +1,280 @@
-<!doctype html>
-<!-- refactor_plan.html is the single dashboard for the Google CLI tool variant implementation. -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Google CLI Tool Integration Plan</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forge Terminal — Task Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
-    body { background: #0b1020; color: #f8fafc; font-family: Segoe UI, Arial, sans-serif; margin: 32px; }
-    main { max-width: 1100px; margin: 0 auto; }
-    h1, h2 { color: #fb923c; }
-    .card { border: 1px solid #334155; border-radius: 12px; padding: 18px; margin: 16px 0; background: #111827; }
-    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-weight: 700; margin-right: 8px; }
-    .pending { background: #3f3f46; }
-    .progress { background: #1d4ed8; }
-    .done { background: #15803d; }
-    pre { background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; overflow: auto; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    header {
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #00ff88;
+      letter-spacing: 0.02em;
+    }
+
+    header p {
+      margin-top: 0.4rem;
+      font-size: 0.9rem;
+      color: #8b949e;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 800px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .task-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: #0d1117;
+      border-radius: 6px;
+      border-left: 3px solid transparent;
+    }
+
+    .task-item.completed  { border-left-color: #00ff88; }
+    .task-item.in-progress { border-left-color: #ffaa00; }
+    .task-item.blocked     { border-left-color: #ff4444; }
+    .task-item.pending     { border-left-color: #444c56; }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .badge.completed  { background: rgba(0,255,136,0.12); color: #00ff88; }
+    .badge.in-progress { background: rgba(255,170,0,0.12);  color: #ffaa00; }
+    .badge.blocked     { background: rgba(255,68,68,0.12);   color: #ff4444; }
+    .badge.pending     { background: rgba(68,76,86,0.25);    color: #8b949e; }
+
+    .task-label {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #c9d1d9;
+    }
+
+    .diagram-card {
+      grid-column: 1 / -1;
+    }
+
+    .mermaid {
+      background: #0d1117;
+      border-radius: 6px;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    .summary-bar {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .stat-value.completed  { color: #00ff88; }
+    .stat-value.in-progress { color: #ffaa00; }
+    .stat-value.blocked     { color: #ff4444; }
   </style>
 </head>
 <body>
-  <main>
-    <h1>Google CLI Tool Integration Dashboard</h1>
-    <div class="card">
-      <span class="badge done">[COMPLETED]</span>
-      Add Google as an option to the "Run With" options in Forge Terminal to enable starting and resuming sessions using the Gemini CLI.
+
+  <header>
+    <h1>Forge Terminal — Session Task Dashboard</h1>
+    <p>Three bugs fixed in this session &bull; Generated 2026-05-30</p>
+  </header>
+
+  <div style="max-width:1200px;margin:0 auto;">
+
+    <div class="summary-bar">
+      <div class="stat">
+        <span class="stat-value completed">4</span>
+        <span class="stat-label">Completed</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value in-progress">1</span>
+        <span class="stat-label">In Progress</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value blocked">0</span>
+        <span class="stat-label">Blocked</span>
+      </div>
     </div>
-    <div class="card">
-      <h2>Architecture</h2>
-      <pre class="mermaid">
-graph TD
-  "CommandCards UI" -->|Run with Selector| "Preferred Tool (Google)"
-  "SortableCommandCard" -->|Badge & Action| "gemini / gemini --resume"
-  "Go Backend Storage" -->|Default Commands| "google variant mappings"
-  "Go Backend Migration" -->|AutoMigrateOnLoad| "Upgrade commands.json maps"
-  "LLM Detector/Parser" -->|Pattern Matching| "Detect gemini command"
-      </pre>
+
+    <div class="grid">
+
+      <!-- Tasks card -->
+      <div class="card">
+        <h2>Bug Fixes</h2>
+        <ul class="task-list">
+
+          <li class="task-item completed">
+            <span class="badge completed">COMPLETED</span>
+            <span class="task-label">Fix: Update checker stale-cache fallback
+              <br><small style="color:#8b949e">updater.go — cross-check GET /releases when cache says up-to-date</small>
+            </span>
+          </li>
+
+          <li class="task-item completed">
+            <span class="badge completed">COMPLETED</span>
+            <span class="task-label">Fix: Global Claude skill sync
+              <br><small style="color:#8b949e">sync-skills.ps1 Step 6 — copy skills to ~/.claude/commands/</small>
+            </span>
+          </li>
+
+        </ul>
+      </div>
+
+      <!-- Verifications card -->
+      <div class="card">
+        <h2>Verifications</h2>
+        <ul class="task-list">
+
+          <li class="task-item completed">
+            <span class="badge completed">COMPLETED</span>
+            <span class="task-label">Verify: go build ./cmd/forge/ passes
+              <br><small style="color:#8b949e">Clean build with no errors</small>
+            </span>
+          </li>
+
+          <li class="task-item completed">
+            <span class="badge completed">COMPLETED</span>
+            <span class="task-label">Verify: Skills synced to ~/.claude/commands/
+              <br><small style="color:#8b949e">All workflow skills confirmed present</small>
+            </span>
+          </li>
+
+        </ul>
+      </div>
+
+      <!-- Delivery card -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <h2>Delivery</h2>
+        <ul class="task-list">
+
+          <li class="task-item in-progress">
+            <span class="badge in-progress">IN_PROGRESS</span>
+            <span class="task-label">Deliver: CHANGELOG + commit + PR + release
+              <br><small style="color:#8b949e">Pending final changelog entry, git commit, PR creation, and local-release.ps1 run</small>
+            </span>
+          </li>
+
+        </ul>
+      </div>
+
+      <!-- Architecture diagram -->
+      <div class="card diagram-card">
+        <h2>Architecture — New Update Check Flow</h2>
+        <div class="mermaid">
+flowchart TD
+    A["User clicks Check Now"] --> B["Worker proxy\n(license.rootlevellabs.tech)"]
+    B --> C["Compare versions"]
+    C -- "isNewer=true" --> D["Show update available"]
+    C -- "isNewer=false" --> E["Cross-check: GET /releases?per_page=5"]
+    E -- "newer found" --> D
+    E -- "none newer" --> F["Show up to date"]
+    E --> G["Cache result 10 min"]
+
+    style A fill:#161b22,stroke:#444c56,color:#c9d1d9
+    style B fill:#161b22,stroke:#00ff88,color:#00ff88
+    style C fill:#161b22,stroke:#ffaa00,color:#ffaa00
+    style D fill:#161b22,stroke:#00ff88,color:#00ff88
+    style E fill:#161b22,stroke:#ffaa00,color:#ffaa00
+    style F fill:#161b22,stroke:#8b949e,color:#8b949e
+    style G fill:#161b22,stroke:#444c56,color:#8b949e
+        </div>
+      </div>
+
     </div>
-    <div class="card">
-      <h2>Task Status</h2>
-      <p><span class="badge done">[COMPLETED]</span> Branch created: feature/add-google-tool-variant</p>
-      <p><span class="badge done">[COMPLETED]</span> Update default command cards and macro payloads in Go backend.</p>
-      <p><span class="badge done">[COMPLETED]</span> Update Go backend migrations to transparently upgrade existing cards.</p>
-      <p><span class="badge done">[COMPLETED]</span> Implement frontend UI selector option, badges, styles, and command resolver.</p>
-      <p><span class="badge done">[COMPLETED]</span> Implement frontend llmDetection support and vitest tests.</p>
-      <p><span class="badge done">[COMPLETED]</span> Verify Go unit tests and vitest tests pass.</p>
-      <p><span class="badge progress">[IN_PROGRESS]</span> Run full project verification tests.</p>
-    </div>
-  </main>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        background: '#0d1117',
+        primaryColor: '#161b22',
+        primaryTextColor: '#c9d1d9',
+        primaryBorderColor: '#21262d',
+        lineColor: '#444c56',
+        secondaryColor: '#161b22',
+        tertiaryColor: '#0d1117'
+      }
+    });
+  </script>
+
 </body>
 </html>
