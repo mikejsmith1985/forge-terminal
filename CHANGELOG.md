@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.4] - 2026-05-30
+
+---
+
+## [v7.11.4] - 2026-05-30
+
 ### Fixed
 - **Update checker stale-cache**: When the Cloudflare Worker proxy at license.rootlevellabs.tech
   returns a cached v7.11.1 as "latest" after v7.11.2 was published, CheckForUpdate() now
