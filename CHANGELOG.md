@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.5] - 2026-05-31
+
+---
+
+## [v7.11.5] - 2026-05-31
+
 ### Fixed
 - **terminal_execute active-session guard**: `terminal_execute` now refuses to inject
   commands into PTY sessions where `connectedClients > 0` (i.e. the user has the tab open
