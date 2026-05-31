@@ -106,6 +106,9 @@ RELEASE_SUMMARY_*.md
 CHANGELOG_*.md
 V*.md
 v*.md
+# Re-include shared Claude skill files — the v*.md rule above would otherwise
+# block vault-operations.md and any future skill whose name starts with 'v'.
+!.claude/commands/*.md
 *_RELEASE_*.md
 *_FIX_*.md
 *_VALIDATION*.md
