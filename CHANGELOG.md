@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+- **vault-operations skill — vault_run_script and active-session guard documented**:
+  Updated `.claude/commands/vault-operations.md` (the canonical skill source) to reflect the
+  two changes shipped in PR #139: the `terminal_execute` active-session guard
+  (`connectedClients > 0` → error) and the new `vault_run_script` tool.
+  "The Two Safe Paths" is now "The Three Safe Paths" with Path 2 covering `vault_run_script`,
+  the decision tree has a `connectedClients` branch, the forbidden-actions table has a new
+  row for injecting into live sessions, and both tool reference tables are present.
+  Re-synced to `.github/copilot-instructions.md`, `.aider/forge-system-prompt.md`, and
+  `~/.claude/commands/` via `scripts/sync-skills.ps1`.
+
 ## [7.11.4] - 2026-05-30
 
 ---
