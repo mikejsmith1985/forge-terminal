@@ -90,6 +90,28 @@ func writeCommandToPTY(session *TerminalSession, command string) error {
 	return nil
 }
 
+// GetSessionConnectedClientCount returns the number of WebSocket clients
+// currently watching the given session, and whether the session is registered
+// at all. Detached sessions are still alive but always return 0 clients.
+//
+// terminal_execute uses this to refuse keystroke injection into live tabs —
+// a user watching the tab would see commands appear as typed text, not executed output.
+func (h *Handler) GetSessionConnectedClientCount(sessionID string) (connectedClientCount int, isFound bool) {
+	// Check active (connected) sessions — these can have watching clients.
+	if _, isActive := h.sessions.Load(sessionID); isActive {
+		clientCount := 0
+		if hubRaw, ok := h.hubs.Load(sessionID); ok {
+			clientCount = hubRaw.(*sessionHub).size()
+		}
+		return clientCount, true
+	}
+	// Detached sessions are alive (PTY running) but have no WebSocket viewers.
+	if _, isDetached := h.detachedSessions.Load(sessionID); isDetached {
+		return 0, true
+	}
+	return 0, false
+}
+
 // GetSessionScrollback returns a copy of the ring-buffered terminal output for
 // a session. The buffer holds approximately the last 64 KiB of PTY output.
 // Returns nil, false when the session or its hub is not found.

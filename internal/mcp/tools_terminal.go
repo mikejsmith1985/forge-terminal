@@ -117,6 +117,30 @@ func (t *terminalExecuteTool) Execute(args map[string]any) (*CallToolResult, err
 		return errorContent("terminal handler not initialised — no PTY sessions available"), nil
 	}
 
+	// Guard: refuse to inject into sessions that have an active user watching.
+	//
+	// When connectedClients > 0 the user can see the terminal tab. Keystrokes
+	// written to the PTY appear on screen as typed text — alarming, confusing,
+	// and potentially exposing vault commands. This is safe ONLY for background
+	// sessions (connectedClients == 0). Use vault_run_script to bypass PTY
+	// sessions entirely when a background session is not available.
+	connectedClientCount, isSessionFound := t.termHandler.GetSessionConnectedClientCount(sessionID)
+	if !isSessionFound {
+		return errorContent(fmt.Sprintf(
+			"no active session with ID %q — call terminal_sessions to list available session IDs",
+			sessionID,
+		)), nil
+	}
+	if connectedClientCount > 0 {
+		return errorContent(fmt.Sprintf(
+			"session %q has %d active user(s) watching — commands injected into a live terminal "+
+				"appear as visible keystrokes, not executed commands. "+
+				"Use terminal_sessions to find a background session (connectedClients: 0), "+
+				"or use vault_run_script to execute scripts without a terminal session.",
+			sessionID, connectedClientCount,
+		)), nil
+	}
+
 	// Snapshot the ring buffer length before writing the command.
 	// This gives us a baseline for isolating command output from history.
 	startOffset := t.termHandler.GetSessionScrollbackOffset(sessionID)

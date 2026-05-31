@@ -93,6 +93,11 @@ type Dependencies struct {
 	// Nil means vault_inject is registered but returns an error when called (vault not ready).
 	// In production this is vault.GetGlobal(); in tests it is a mock VaultSecretInjector.
 	VaultAccess VaultSecretInjector
+
+	// VaultScriptRunner provides vault_run_script with a PTY-free subprocess executor.
+	// Nil means vault_run_script is registered but returns an error when called.
+	// In production this is &realVaultScriptRunner{}; in tests it is a mock VaultScriptRunner.
+	VaultScriptRunner VaultScriptRunner
 }
 
 // NewServer creates a fully initialised MCP server.
@@ -326,6 +331,13 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 	}
 	environmentJobManager := NewEnvironmentJobManager(environmentRunner, environmentJobStore)
 
+	// Use the injected VaultScriptRunner if provided (for tests), otherwise use
+	// the real subprocess runner that shells out to pwsh / sh.
+	vaultScriptRunner := srv.deps.VaultScriptRunner
+	if vaultScriptRunner == nil {
+		vaultScriptRunner = &realVaultScriptRunner{}
+	}
+
 	candidates := []ToolHandler{
 		newTerminalSessionsTool(srv.deps.TermHandler),
 		newTerminalExecuteTool(srv.deps.TermHandler),
@@ -342,6 +354,7 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newEnvironmentJobsTool(environmentJobManager),
 		newEnvironmentReadJobTool(environmentJobManager),
 		newVaultInjectTool(srv.deps.VaultAccess),
+		newVaultRunScriptTool(vaultScriptRunner),
 	}
 
 	registry := make(map[string]ToolHandler, len(candidates))

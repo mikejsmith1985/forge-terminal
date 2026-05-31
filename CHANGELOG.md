@@ -7,16 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **terminal_execute active-session guard**: `terminal_execute` now refuses to inject
+  commands into PTY sessions where `connectedClients > 0` (i.e. the user has the tab open
+  and visible). Previously, keystrokes were sent directly to the PTY input buffer and
+  appeared on screen as if typed by the user — alarming and potentially confusing.
+  The tool now returns a descriptive error naming the session and directing agents to use
+  either a background session (`connectedClients: 0`) or the new `vault_run_script` tool.
+  Background-session behavior (`connectedClients = 0`) is entirely unchanged.
+
+### Added
+- **vault_run_script MCP tool — PTY-free vault script execution**: Agents can now call
+  `vault_run_script(script_path)` with the path returned by `vault_inject` to source the
+  vault injection script in a fresh non-interactive subprocess (`pwsh -NonInteractive` on
+  Windows, `sh` on Unix) without needing any terminal session at all. An optional `command`
+  parameter runs a follow-up shell command in the same subprocess after secrets are loaded,
+  enabling one-call patterns like "inject database credentials then run migrations."
+  Secret values never appear in the tool response — only subprocess stdout/stderr is
+  returned. This is the correct path when all terminal sessions are being watched by a user.
+
 ### Docs
 - **vault-operations skill — vault_run_script and active-session guard documented**:
   Updated `.claude/commands/vault-operations.md` (the canonical skill source) to reflect the
-  two changes shipped in PR #139: the `terminal_execute` active-session guard
-  (`connectedClients > 0` → error) and the new `vault_run_script` tool.
-  "The Two Safe Paths" is now "The Three Safe Paths" with Path 2 covering `vault_run_script`,
-  the decision tree has a `connectedClients` branch, the forbidden-actions table has a new
-  row for injecting into live sessions, and both tool reference tables are present.
-  Re-synced to `.github/copilot-instructions.md`, `.aider/forge-system-prompt.md`, and
-  `~/.claude/commands/` via `scripts/sync-skills.ps1`.
+  two changes above: the `terminal_execute` active-session guard (`connectedClients > 0` →
+  error) and the new `vault_run_script` tool. "The Two Safe Paths" is now "The Three Safe
+  Paths" with Path 2 covering `vault_run_script`, the decision tree has a `connectedClients`
+  branch, the forbidden-actions table has a new row for injecting into live sessions, and both
+  tool reference tables are present. Re-synced via `scripts/sync-skills.ps1`.
 
 ## [7.11.4] - 2026-05-30
 
