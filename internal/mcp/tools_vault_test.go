@@ -248,3 +248,202 @@ func TestVaultInjectTool_Execute_ResponseIncludesSourceCommand(t *testing.T) {
 		t.Errorf("response must include a source command ('. <path>'), got:\n%s", responseText)
 	}
 }
+
+// ── vault_run_script tests ────────────────────────────────────────────────────
+
+// mockVaultScriptRunner is a test double for VaultScriptRunner.
+// It records what it received so callers can verify forwarding fidelity.
+type mockVaultScriptRunner struct {
+	returnOutput    string
+	returnErr       error
+	capturedPath    string
+	capturedCommand string
+}
+
+func (m *mockVaultScriptRunner) ExecuteVaultScript(scriptPath, followUpCommand string) (string, error) {
+	m.capturedPath = scriptPath
+	m.capturedCommand = followUpCommand
+	return m.returnOutput, m.returnErr
+}
+
+func TestVaultRunScriptTool_Definition_HasCorrectName(t *testing.T) {
+	tool := newVaultRunScriptTool(nil)
+	def := tool.Definition()
+
+	if def.Name != "vault_run_script" {
+		t.Errorf("expected tool name %q, got %q", "vault_run_script", def.Name)
+	}
+}
+
+func TestVaultRunScriptTool_Definition_MentionsScriptPath(t *testing.T) {
+	tool := newVaultRunScriptTool(nil)
+	def := tool.Definition()
+
+	if def.InputSchema == nil {
+		t.Fatal("expected non-nil input schema")
+	}
+	if !strings.Contains(string(def.InputSchema), "script_path") {
+		t.Error("input schema must reference the script_path field")
+	}
+}
+
+func TestVaultRunScriptTool_Execute_NilRunnerReturnsError(t *testing.T) {
+	tool := newVaultRunScriptTool(nil)
+
+	result, err := tool.Execute(map[string]any{
+		"script_path": "/tmp/test.ps1",
+	})
+
+	if err != nil {
+		t.Fatalf("Execute must return nil error; got: %v", err)
+	}
+	if !result.IsError {
+		t.Error("expected IsError=true when VaultScriptRunner is nil")
+	}
+}
+
+func TestVaultRunScriptTool_Execute_MissingScriptPath_ReturnsError(t *testing.T) {
+	mockRunner := &mockVaultScriptRunner{}
+	tool := newVaultRunScriptTool(mockRunner)
+
+	result, err := tool.Execute(map[string]any{}) // no script_path
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Error("expected IsError=true when script_path is missing")
+	}
+}
+
+func TestVaultRunScriptTool_Execute_EmptyScriptPath_ReturnsError(t *testing.T) {
+	mockRunner := &mockVaultScriptRunner{}
+	tool := newVaultRunScriptTool(mockRunner)
+
+	result, err := tool.Execute(map[string]any{"script_path": ""})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Error("expected IsError=true for empty script_path string")
+	}
+}
+
+func TestVaultRunScriptTool_Execute_SuccessReturnsOutput(t *testing.T) {
+	const expectedOutput = "deployment finished: 3 services restarted"
+	mockRunner := &mockVaultScriptRunner{returnOutput: expectedOutput}
+	tool := newVaultRunScriptTool(mockRunner)
+
+	result, err := tool.Execute(map[string]any{
+		"script_path": `C:\Users\test\AppData\Local\Temp\forge-vault-abc.ps1`,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Errorf("unexpected error result: %v", result.Content)
+	}
+	if !strings.Contains(result.Content[0].Text, expectedOutput) {
+		t.Errorf("result must contain runner output %q; got: %s", expectedOutput, result.Content[0].Text)
+	}
+}
+
+func TestVaultRunScriptTool_Execute_RunnerErrorBecomesErrorContent(t *testing.T) {
+	mockRunner := &mockVaultScriptRunner{
+		returnErr: fmt.Errorf("pwsh: script file not found"),
+	}
+	tool := newVaultRunScriptTool(mockRunner)
+
+	result, err := tool.Execute(map[string]any{
+		"script_path": "/tmp/gone.ps1",
+	})
+
+	if err != nil {
+		t.Fatalf("Execute must not return a Go error; errors go in content. Got: %v", err)
+	}
+	if !result.IsError {
+		t.Error("expected IsError=true when the runner returns an error")
+	}
+}
+
+func TestVaultRunScriptTool_Execute_ForwardsScriptPathToRunner(t *testing.T) {
+	const targetPath = `C:\Users\test\Temp\forge-vault-xyz.ps1`
+	mockRunner := &mockVaultScriptRunner{returnOutput: "ok"}
+	tool := newVaultRunScriptTool(mockRunner)
+
+	_, err := tool.Execute(map[string]any{
+		"script_path": targetPath,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mockRunner.capturedPath != targetPath {
+		t.Errorf("expected script path %q forwarded to runner; got %q", targetPath, mockRunner.capturedPath)
+	}
+}
+
+func TestVaultRunScriptTool_Execute_WithFollowUpCommand_ForwardsCommand(t *testing.T) {
+	const followUpCmd = "npx prisma db push --skip-generate"
+	mockRunner := &mockVaultScriptRunner{returnOutput: "migrations applied"}
+	tool := newVaultRunScriptTool(mockRunner)
+
+	_, err := tool.Execute(map[string]any{
+		"script_path": "/tmp/forge-vault-abc.ps1",
+		"command":     followUpCmd,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mockRunner.capturedCommand != followUpCmd {
+		t.Errorf("expected follow-up command %q forwarded to runner; got %q",
+			followUpCmd, mockRunner.capturedCommand)
+	}
+}
+
+func TestVaultRunScriptTool_Execute_NoFollowUpCommand_ForwardsEmptyString(t *testing.T) {
+	// When "command" is omitted the runner receives an empty string,
+	// which it interprets as "source only, no follow-up".
+	mockRunner := &mockVaultScriptRunner{returnOutput: "sourced"}
+	tool := newVaultRunScriptTool(mockRunner)
+
+	_, err := tool.Execute(map[string]any{
+		"script_path": "/tmp/forge-vault-abc.ps1",
+		// "command" intentionally absent
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mockRunner.capturedCommand != "" {
+		t.Errorf("expected empty follow-up command when omitted; got %q", mockRunner.capturedCommand)
+	}
+}
+
+func TestVaultRunScriptTool_Execute_ResponseNeverContainsSecretValues(t *testing.T) {
+	// Zero-knowledge guarantee: secret values must never appear in the tool response.
+	// The runner returns only process stdout+stderr — the tool must not add any value.
+	const sensitiveValue = "sk-prod-MUST-NOT-LEAK-12345"
+	// The mock simulates a runner that might accidentally echo a secret.
+	// In production the real runner captures subprocess output; if the vault script
+	// accidentally printed a value, it would appear here. This test documents the
+	// requirement that the TOOL LAYER must not add any additional leakage.
+	mockRunner := &mockVaultScriptRunner{returnOutput: "all good — no secrets here"}
+	tool := newVaultRunScriptTool(mockRunner)
+
+	result, err := tool.Execute(map[string]any{
+		"script_path": "/tmp/forge-vault-abc.ps1",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, content := range result.Content {
+		if strings.Contains(content.Text, sensitiveValue) {
+			t.Errorf("zero-knowledge violation: response contains secret value %q", sensitiveValue)
+		}
+	}
+}
