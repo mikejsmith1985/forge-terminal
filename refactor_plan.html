@@ -1,49 +1,50 @@
-<!doctype html>
-<!-- refactor_plan.html is the single dashboard for the Google CLI tool variant implementation. -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Google CLI Tool Integration Plan</title>
-  <style>
-    body { background: #0b1020; color: #f8fafc; font-family: Segoe UI, Arial, sans-serif; margin: 32px; }
-    main { max-width: 1100px; margin: 0 auto; }
-    h1, h2 { color: #fb923c; }
-    .card { border: 1px solid #334155; border-radius: 12px; padding: 18px; margin: 16px 0; background: #111827; }
-    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-weight: 700; margin-right: 8px; }
-    .pending { background: #3f3f46; }
-    .progress { background: #1d4ed8; }
-    .done { background: #15803d; }
-    pre { background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; overflow: auto; }
-  </style>
+<meta charset="UTF-8">
+<title>Forge — vault_list + Discovery</title>
+<style>
+  body { background:#0d1117; color:#e6edf3; font-family:monospace; padding:2rem; }
+  h1 { color:#58a6ff; }
+  h2 { color:#79c0ff; border-bottom:1px solid #30363d; padding-bottom:.4rem; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:.75rem; font-weight:bold; margin-right:.5rem; }
+  .pending  { background:#161b22; color:#8b949e; border:1px solid #30363d; }
+  .progress { background:#1f3a5f; color:#79c0ff; border:1px solid #388bfd; }
+  .done     { background:#0d2b1e; color:#3fb950; border:1px solid #238636; }
+  table { border-collapse:collapse; width:100%; margin-bottom:1.5rem; }
+  td, th { border:1px solid #30363d; padding:.5rem .75rem; text-align:left; }
+  th { background:#161b22; color:#8b949e; }
+  code { background:#161b22; padding:2px 6px; border-radius:3px; color:#ff7b72; }
+</style>
 </head>
 <body>
-  <main>
-    <h1>Google CLI Tool Integration Dashboard</h1>
-    <div class="card">
-      <span class="badge done">[COMPLETED]</span>
-      Add Google as an option to the "Run With" options in Forge Terminal to enable starting and resuming sessions using the Gemini CLI.
-    </div>
-    <div class="card">
-      <h2>Architecture</h2>
-      <pre class="mermaid">
-graph TD
-  "CommandCards UI" -->|Run with Selector| "Preferred Tool (Google)"
-  "SortableCommandCard" -->|Badge & Action| "gemini / gemini --resume"
-  "Go Backend Storage" -->|Default Commands| "google variant mappings"
-  "Go Backend Migration" -->|AutoMigrateOnLoad| "Upgrade commands.json maps"
-  "LLM Detector/Parser" -->|Pattern Matching| "Detect gemini command"
-      </pre>
-    </div>
-    <div class="card">
-      <h2>Task Status</h2>
-      <p><span class="badge done">[COMPLETED]</span> Branch created: feature/add-google-tool-variant</p>
-      <p><span class="badge done">[COMPLETED]</span> Update default command cards and macro payloads in Go backend.</p>
-      <p><span class="badge done">[COMPLETED]</span> Update Go backend migrations to transparently upgrade existing cards.</p>
-      <p><span class="badge done">[COMPLETED]</span> Implement frontend UI selector option, badges, styles, and command resolver.</p>
-      <p><span class="badge done">[COMPLETED]</span> Implement frontend llmDetection support and vitest tests.</p>
-      <p><span class="badge done">[COMPLETED]</span> Verify Go unit tests and vitest tests pass.</p>
-      <p><span class="badge progress">[IN_PROGRESS]</span> Run full project verification tests.</p>
-    </div>
-  </main>
+<h1>Feature: vault_list MCP Tool + Discovery Improvements</h1>
+<p><strong>Branch:</strong> <code>feature/vault-list-tool-and-discovery</code> &nbsp;|&nbsp; <strong>Date:</strong> 2026-06-01</p>
+
+<h2>Problem Statement</h2>
+<p>Agents calling <code>vault_inject</code> must know the exact entry name in advance. When they guess wrong (e.g. <code>DBAI_TESTBOT</code> vs the real name <code>DBAI-TestBot</code>), they get a silent dead-end error with no hint of available names. This forces users to screenshot the Vault UI every session.</p>
+
+<h2>Solution</h2>
+<table>
+  <tr><th>Change</th><th>Impact</th></tr>
+  <tr><td>Add <code>vault_list</code> MCP tool</td><td>Agent proactively discovers all entry names before calling vault_inject</td></tr>
+  <tr><td>Improve vault_inject error message</td><td>Failed injection now lists available names so agent self-corrects immediately</td></tr>
+  <tr><td>Add <code>ListEntryNames()</code> to vault.go</td><td>Names-only read — no values, no UUIDs, zero-knowledge-safe</td></tr>
+</table>
+
+<h2>Task Tracker</h2>
+<table>
+  <tr><th>Task</th><th>File</th><th>Status</th></tr>
+  <tr><td>Failing tests — vaultListTool</td><td>internal/mcp/tools_vault_test.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Failing test — improved error message</td><td>internal/vault/vault_test.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Add <code>ListEntryNames()</code></td><td>internal/vault/vault.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Improve resolveEnvVarsForNames error</td><td>internal/vault/vault.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Add VaultNameLister + vaultListTool</td><td>internal/mcp/tools_vault.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Add VaultNameLister to Dependencies</td><td>internal/mcp/server.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Wire VaultNameLister in handlers_mcp.go</td><td>cmd/forge/handlers_mcp.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>go build passes</td><td>—</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>All tests pass</td><td>—</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Phase 5 delivery</td><td>CHANGELOG + PR + Release</td><td><span class="badge pending">PENDING</span></td></tr>
+</table>
 </body>
 </html>

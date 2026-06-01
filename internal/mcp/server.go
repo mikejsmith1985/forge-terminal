@@ -98,6 +98,13 @@ type Dependencies struct {
 	// Nil means vault_run_script is registered but returns an error when called.
 	// In production this is &realVaultScriptRunner{}; in tests it is a mock VaultScriptRunner.
 	VaultScriptRunner VaultScriptRunner
+
+	// VaultNameLister provides vault_list with the names of all vault entries.
+	// Nil means vault_list is registered but returns an error when called (vault not ready).
+	// In production this is vault.GetGlobal(); in tests it is a mock VaultNameLister.
+	// *vault.Vault satisfies this interface in addition to VaultSecretInjector —
+	// both VaultAccess and VaultNameLister can point to the same vault singleton.
+	VaultNameLister VaultNameLister
 }
 
 // NewServer creates a fully initialised MCP server.
@@ -355,6 +362,7 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newEnvironmentReadJobTool(environmentJobManager),
 		newVaultInjectTool(srv.deps.VaultAccess),
 		newVaultRunScriptTool(vaultScriptRunner),
+		newVaultListTool(srv.deps.VaultNameLister),
 	}
 
 	registry := make(map[string]ToolHandler, len(candidates))
