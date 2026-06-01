@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.6] - 2026-06-01
+
+---
+
+## [v7.11.6] - 2026-06-01
+
 ### Added
 - **vault_list MCP tool — vault entry discovery**: Agents can now call `vault_list` (no
   arguments) to receive the names of every secret stored in the Forge Vault before calling
