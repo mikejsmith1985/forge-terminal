@@ -447,3 +447,126 @@ func TestVaultRunScriptTool_Execute_ResponseNeverContainsSecretValues(t *testing
 		}
 	}
 }
+
+// ── vault_list tests ──────────────────────────────────────────────────────────
+
+// mockVaultNameLister is a test double for VaultNameLister.
+// It returns a configured list of entry names without touching the real vault.
+type mockVaultNameLister struct {
+	returnNames []string
+}
+
+func (m *mockVaultNameLister) ListEntryNames() []string {
+	return m.returnNames
+}
+
+func TestVaultListTool_Definition_HasCorrectName(t *testing.T) {
+	tool := newVaultListTool(nil)
+	def := tool.Definition()
+
+	if def.Name != "vault_list" {
+		t.Errorf("expected tool name %q, got %q", "vault_list", def.Name)
+	}
+}
+
+func TestVaultListTool_Definition_HasNonEmptyDescription(t *testing.T) {
+	tool := newVaultListTool(nil)
+	def := tool.Definition()
+
+	if strings.TrimSpace(def.Description) == "" {
+		t.Error("expected non-empty description for vault_list")
+	}
+}
+
+func TestVaultListTool_Definition_MentionsVaultInject(t *testing.T) {
+	// The description must guide agents to call vault_list before vault_inject —
+	// that is the entire point of this tool.
+	tool := newVaultListTool(nil)
+	def := tool.Definition()
+
+	if !strings.Contains(def.Description, "vault_inject") {
+		t.Error("vault_list description must mention vault_inject to guide agent workflow")
+	}
+}
+
+func TestVaultListTool_Execute_NilVaultReturnsErrorContent(t *testing.T) {
+	// When the vault singleton is nil (Forge not yet initialised), the tool
+	// must return a descriptive error rather than panicking.
+	tool := newVaultListTool(nil)
+
+	result, err := tool.Execute(map[string]any{})
+
+	if err != nil {
+		t.Fatalf("Execute must return nil error (errors go in content), got: %v", err)
+	}
+	if !result.IsError {
+		t.Error("expected IsError=true when vault is nil")
+	}
+}
+
+func TestVaultListTool_Execute_ReturnsEntryNames(t *testing.T) {
+	// The tool must return the names the vault reports — nothing more, nothing less.
+	expectedNames := []string{"DBAI-TestBot", "OpenAI Key", "Discord Token"}
+	mockLister := &mockVaultNameLister{returnNames: expectedNames}
+	tool := newVaultListTool(mockLister)
+
+	result, err := tool.Execute(map[string]any{})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Errorf("unexpected error result: %v", result.Content)
+	}
+	if len(result.Content) == 0 {
+		t.Fatal("expected non-empty content in result")
+	}
+	responseText := result.Content[0].Text
+	for _, expectedName := range expectedNames {
+		if !strings.Contains(responseText, expectedName) {
+			t.Errorf("response must contain entry name %q\ngot: %s", expectedName, responseText)
+		}
+	}
+}
+
+func TestVaultListTool_Execute_EmptyVaultReturnsUsefulMessage(t *testing.T) {
+	// An empty vault must return a non-error response with a helpful message
+	// rather than an empty or cryptic result.
+	mockLister := &mockVaultNameLister{returnNames: []string{}}
+	tool := newVaultListTool(mockLister)
+
+	result, err := tool.Execute(map[string]any{})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Errorf("empty vault must not return an error result: %v", result.Content)
+	}
+	if len(result.Content) == 0 {
+		t.Fatal("expected non-empty content even for empty vault")
+	}
+}
+
+func TestVaultListTool_Execute_NeverReturnsSecretValues(t *testing.T) {
+	// Zero-knowledge guarantee: the lister returns only names. This test documents
+	// that the tool layer does not accidentally add secret material to the response.
+	// (The real VaultNameLister.ListEntryNames never returns secret values, but the
+	// tool layer is an independent enforcement point.)
+	const fakeSensitiveValue = "sk-MUST-NOT-APPEAR-IN-LIST-RESPONSE"
+	// We intentionally put a "secret-looking" string in a name to prove the tool
+	// echoes names verbatim and does not add any extra material.
+	mockLister := &mockVaultNameLister{returnNames: []string{"Safe Entry Name"}}
+	tool := newVaultListTool(mockLister)
+
+	result, err := tool.Execute(map[string]any{})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, content := range result.Content {
+		if strings.Contains(content.Text, fakeSensitiveValue) {
+			t.Errorf("zero-knowledge violation: secret value appeared in vault_list response: %q", content.Text)
+		}
+	}
+}

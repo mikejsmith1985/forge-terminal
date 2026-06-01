@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **vault_list MCP tool — vault entry discovery**: Agents can now call `vault_list` (no
+  arguments) to receive the names of every secret stored in the Forge Vault before calling
+  `vault_inject`. Previously, agents had to guess entry names exactly — a wrong guess
+  produced a silent dead-end error, forcing users to screenshot the Vault UI every session.
+  `vault_list` returns only entry names (no secret values, no UUIDs), preserving the
+  zero-knowledge guarantee. The tool description explicitly guides agents to call
+  `vault_list` first, then use the returned names with `vault_inject`.
+
+### Fixed
+- **vault_inject error now includes available names**: When `vault_inject` is called with
+  an entry name that does not exist in the vault, the error message now includes the full
+  list of available entry names. For example, an agent guessing `DBAI_TESTBOT` when the
+  real name is `DBAI-TestBot` will now receive `vault entries not found: [DBAI_TESTBOT].
+  Available entry names: [DBAI-TestBot, ...]` and can self-correct on the next call without
+  requiring user intervention.
+
 ## [7.11.5] - 2026-05-31
 
 ---

@@ -170,6 +170,90 @@ func buildVaultInjectResponse(scriptPath, sourceCommand string, secretNames []st
 	)
 }
 
+// ── vault_list ────────────────────────────────────────────────────────────────
+
+// VaultNameLister is the interface vault_list requires from the vault layer.
+//
+// Defined here (the consumer) rather than in the vault package so the vault
+// package stays independent of the mcp package — no import cycle. The
+// single-method design makes mocking trivial in unit tests.
+type VaultNameLister interface {
+	// ListEntryNames returns the SecretName of every vault entry. Only names
+	// are returned — secret values and UUIDs are never included.
+	ListEntryNames() []string
+}
+
+// vaultListTool implements the vault_list MCP tool.
+// It holds a VaultNameLister so tests can inject a mock without touching
+// the real AES-encrypted vault.
+type vaultListTool struct {
+	vaultLister VaultNameLister
+}
+
+// newVaultListTool creates a new vault_list tool backed by the given lister.
+// Passing nil is valid — Execute returns a descriptive error rather than panicking.
+func newVaultListTool(vaultLister VaultNameLister) ToolHandler {
+	return &vaultListTool{vaultLister: vaultLister}
+}
+
+// Definition returns the MCP tool schema for vault_list.
+func (t *vaultListTool) Definition() ToolDefinition {
+	return ToolDefinition{
+		Name: "vault_list",
+		Description: "List the names of all secrets currently stored in the Forge Vault. " +
+			"Call this FIRST to discover available entry names before calling vault_inject — " +
+			"this eliminates guessing and the need for users to screenshot the Vault UI. " +
+			"Only secret names are returned; values are never included in the response. " +
+			"Use the exact name from this list as the secret_names argument to vault_inject.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {},
+			"required": []
+		}`),
+	}
+}
+
+// Execute runs the vault_list tool.
+// It returns a human-readable list of all vault entry names — no secrets, no IDs.
+// The agent should use the returned names as arguments to vault_inject.
+func (t *vaultListTool) Execute(args map[string]any) (*CallToolResult, error) {
+	if t.vaultLister == nil {
+		return errorContent(
+			"Forge Vault is not initialised — ensure Forge Terminal has started and the vault is unlocked before calling vault_list",
+		), nil
+	}
+
+	entryNames := t.vaultLister.ListEntryNames()
+	return textContent(buildVaultListResponse(entryNames)), nil
+}
+
+// buildVaultListResponse formats the vault_list success message.
+// The names are presented both as a numbered list (human-readable) and
+// as a JSON array (machine-parseable) so agents can use either form.
+func buildVaultListResponse(entryNames []string) string {
+	namesJSON, _ := json.Marshal(entryNames)
+
+	if len(entryNames) == 0 {
+		return "Forge Vault contains no entries. Add secrets via the Vault UI before calling vault_inject."
+	}
+
+	var responseBuilder strings.Builder
+	responseBuilder.WriteString(fmt.Sprintf("Forge Vault contains %d entr", len(entryNames)))
+	if len(entryNames) == 1 {
+		responseBuilder.WriteString("y")
+	} else {
+		responseBuilder.WriteString("ies")
+	}
+	responseBuilder.WriteString(".\n\nEntry names (use these exactly with vault_inject):\n")
+
+	for listIndex, entryName := range entryNames {
+		responseBuilder.WriteString(fmt.Sprintf("  %d. %s\n", listIndex+1, entryName))
+	}
+
+	responseBuilder.WriteString(fmt.Sprintf("\nJSON array: %s", string(namesJSON)))
+	return responseBuilder.String()
+}
+
 // ── vault_run_script ──────────────────────────────────────────────────────────
 
 // VaultScriptRunner executes a Forge Vault injection script in a fresh,

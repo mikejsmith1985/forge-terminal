@@ -239,6 +239,21 @@ func (v *Vault) SetAutoInject(entryID string, shouldAutoInject bool) error {
 
 // ── Read operations ──────────────────────────────────────────────────────────
 
+// ListEntryNames returns the SecretName of every vault entry in insertion order.
+// This is the discovery method exposed to MCP agents via the vault_list tool.
+// Only names are returned — secret values and UUIDs are intentionally excluded
+// so agents can learn what is available without receiving sensitive material.
+func (v *Vault) ListEntryNames() []string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+
+	entryNames := make([]string, 0, len(v.entries))
+	for _, entry := range v.entries {
+		entryNames = append(entryNames, entry.SecretName)
+	}
+	return entryNames
+}
+
 // ListEntries returns public metadata for all vault entries.
 // Secret values are intentionally excluded from the returned structs.
 func (v *Vault) ListEntries() []*VaultEntry {
@@ -356,12 +371,18 @@ func (v *Vault) resolveEnvVarsForNames(secretNames []string) (map[string]string,
 	}
 
 	// Any name remaining in pendingNames was not present in the vault.
+	// Include the full list of available names in the error so agents can
+	// self-correct on the next call without requiring user intervention.
 	if len(pendingNames) > 0 {
 		missingNames := make([]string, 0, len(pendingNames))
 		for missingName := range pendingNames {
 			missingNames = append(missingNames, missingName)
 		}
-		return nil, fmt.Errorf("vault entries not found: %v", missingNames)
+		availableNames := make([]string, 0, len(v.entries))
+		for _, entry := range v.entries {
+			availableNames = append(availableNames, entry.SecretName)
+		}
+		return nil, fmt.Errorf("vault entries not found: %v. Available entry names: %v", missingNames, availableNames)
 	}
 
 	// Persist updated LastUsedAt timestamps before releasing the lock.

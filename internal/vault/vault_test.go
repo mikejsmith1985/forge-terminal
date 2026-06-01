@@ -597,6 +597,142 @@ func TestUpdateEntryAllowsSameEnvVarOnSelf(t *testing.T) {
 	}
 }
 
+// ── ListEntryNames tests ──────────────────────────────────────────────────────
+
+// TestListEntryNames_ReturnsAllNames verifies that ListEntryNames returns the
+// SecretName for every entry currently in the vault.
+func TestListEntryNames_ReturnsAllNames(t *testing.T) {
+	tempDir, mkdirErr := os.MkdirTemp("", "forge-vault-listnames-*")
+	if mkdirErr != nil {
+		t.Fatalf("creating temp dir: %v", mkdirErr)
+	}
+	defer os.RemoveAll(tempDir)
+
+	testVault, openErr := Open(tempDir)
+	if openErr != nil {
+		t.Fatalf("opening vault: %v", openErr)
+	}
+
+	entryNames := []string{"DBAI-TestBot", "OpenAI Key", "Discord Token"}
+	for idx, secretName := range entryNames {
+		_, addErr := testVault.AddEntry(AddEntryRequest{
+			SecretName:  secretName,
+			EnvVarName:  fmt.Sprintf("ENV_VAR_%d", idx),
+			SecretValue: fmt.Sprintf("secret-value-%d", idx),
+		})
+		if addErr != nil {
+			t.Fatalf("AddEntry %q returned unexpected error: %v", secretName, addErr)
+		}
+	}
+
+	returnedNames := testVault.ListEntryNames()
+
+	if len(returnedNames) != len(entryNames) {
+		t.Fatalf("expected %d names, got %d: %v", len(entryNames), len(returnedNames), returnedNames)
+	}
+	nameSet := make(map[string]bool, len(returnedNames))
+	for _, name := range returnedNames {
+		nameSet[name] = true
+	}
+	for _, expectedName := range entryNames {
+		if !nameSet[expectedName] {
+			t.Errorf("expected name %q to appear in ListEntryNames result", expectedName)
+		}
+	}
+}
+
+// TestListEntryNames_EmptyVaultReturnsEmptySlice verifies that an empty vault
+// returns an empty (non-nil) slice rather than nil.
+func TestListEntryNames_EmptyVaultReturnsEmptySlice(t *testing.T) {
+	tempDir, mkdirErr := os.MkdirTemp("", "forge-vault-listnames-empty-*")
+	if mkdirErr != nil {
+		t.Fatalf("creating temp dir: %v", mkdirErr)
+	}
+	defer os.RemoveAll(tempDir)
+
+	emptyVault, openErr := Open(tempDir)
+	if openErr != nil {
+		t.Fatalf("opening vault: %v", openErr)
+	}
+
+	returnedNames := emptyVault.ListEntryNames()
+
+	if returnedNames == nil {
+		t.Error("ListEntryNames must return an empty slice, not nil")
+	}
+	if len(returnedNames) != 0 {
+		t.Errorf("expected 0 names for empty vault, got %d: %v", len(returnedNames), returnedNames)
+	}
+}
+
+// TestListEntryNames_NeverExposesSecretValues verifies that none of the entries'
+// secret values appear anywhere in the ListEntryNames output.
+func TestListEntryNames_NeverExposesSecretValues(t *testing.T) {
+	tempDir, mkdirErr := os.MkdirTemp("", "forge-vault-listnames-zerok-*")
+	if mkdirErr != nil {
+		t.Fatalf("creating temp dir: %v", mkdirErr)
+	}
+	defer os.RemoveAll(tempDir)
+
+	testVault, openErr := Open(tempDir)
+	if openErr != nil {
+		t.Fatalf("opening vault: %v", openErr)
+	}
+
+	const sensitiveToken = "ghp_SHOULD-NOT-APPEAR-IN-NAMES-LIST"
+	_, addErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "GitHub Token",
+		EnvVarName:  "GITHUB_TOKEN",
+		SecretValue: sensitiveToken,
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	returnedNames := testVault.ListEntryNames()
+
+	for _, name := range returnedNames {
+		if strings.Contains(name, sensitiveToken) {
+			t.Errorf("zero-knowledge violation: secret value appeared in ListEntryNames output: %q", name)
+		}
+	}
+}
+
+// TestResolveEnvVarsForNames_ErrorIncludesAvailableNames verifies that when
+// vault_inject is called with an unknown name, the error message lists the
+// names that ARE available so the agent can self-correct without user intervention.
+func TestResolveEnvVarsForNames_ErrorIncludesAvailableNames(t *testing.T) {
+	tempDir, mkdirErr := os.MkdirTemp("", "forge-vault-errnames-*")
+	if mkdirErr != nil {
+		t.Fatalf("creating temp dir: %v", mkdirErr)
+	}
+	defer os.RemoveAll(tempDir)
+
+	testVault, openErr := Open(tempDir)
+	if openErr != nil {
+		t.Fatalf("opening vault: %v", openErr)
+	}
+
+	_, addErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "DBAI-TestBot",
+		EnvVarName:  "DBAI_TESTBOT_TOKEN",
+		SecretValue: "real-secret-value",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	// Agent guesses the wrong name — the error must tell it the correct one.
+	_, injectErr := testVault.BuildInjectionScriptForNames([]string{"DBAI_TESTBOT"})
+
+	if injectErr == nil {
+		t.Fatal("expected an error for unknown entry name, got nil")
+	}
+	if !strings.Contains(injectErr.Error(), "DBAI-TestBot") {
+		t.Errorf("error message must include available entry names so the agent can self-correct\ngot: %v", injectErr)
+	}
+}
+
 // TestUpdateEntryPersistsAcrossReopen verifies that an updated secret value
 // survives a vault close/reopen cycle (i.e. the update was saved to disk).
 func TestUpdateEntryPersistsAcrossReopen(t *testing.T) {
