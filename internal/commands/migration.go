@@ -157,6 +157,13 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
 				changed = true
 				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 6")
+			} else if !strings.Contains(commands[i].MacroVariants["claude"], "framework-first") {
+				// Installs from before the framework-first skill (2026-06-05) have a
+				// Claude macro that omits the architecture-fidelity gate from the skill
+				// cascade. Refresh to the current macro so the gate fires on session start.
+				commands[i].MacroVariants["claude"] = ClaudeAwarenessMacro
+				changed = true
+				log.Printf("[Commands] Migration: Updated Claude MacroVariant in ID 6 to include framework-first skill")
 			}
 
 		case 7:
@@ -204,6 +211,12 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
 				changed = true
 				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 7")
+			} else if !strings.Contains(commands[i].MacroVariants["claude"], "framework-first") {
+				// Same gap as ID 6 — resume sessions on pre-2026-06-05 installs need
+				// the architecture-fidelity gate added to the Claude session macro.
+				commands[i].MacroVariants["claude"] = ClaudeAwarenessMacro
+				changed = true
+				log.Printf("[Commands] Migration: Updated Claude MacroVariant in ID 7 to include framework-first skill")
 			}
 
 		case 8:
@@ -255,6 +268,13 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
 				changed = true
 				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 8")
+			} else if !strings.Contains(commands[i].MacroVariants["claude"], "framework-first") {
+				// Enforced card on pre-2026-06-05 installs carries the old ClaudeEnforcedMacro
+				// which does not name framework-first. The enforced mode is the strictest gate
+				// and must include the architecture-fidelity skill explicitly.
+				commands[i].MacroVariants["claude"] = ClaudeEnforcedMacro
+				changed = true
+				log.Printf("[Commands] Migration: Updated Claude MacroVariant in ID 8 to include framework-first skill")
 			}
 		}
 	}

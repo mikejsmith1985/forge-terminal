@@ -1,9 +1,14 @@
 #Requires -Version 7.0
-# sync-skills.ps1 — Canonical skill bridge for Forge Terminal
+# sync-skills.ps1 — FORGE-TERMINAL-LOCAL skill bridge.
 #
-# Reads every .md file from .claude/commands/ and syncs their full content into:
+# Embeds forge-terminal's OWN language-tuned skills (.claude/commands/*.md) into forge-terminal's own
 #   1. .github/copilot-instructions.md  (between <!-- FORGE-SKILLS-START/END --> markers)
 #   2. .aider/forge-system-prompt.md    (full concatenation for --system-prompt injection)
+#
+# Scope is forge-terminal itself ONLY. It deliberately does NOT push to the global
+# ~/.claude/commands directory: skills are distributed PER-REPO (each repo's .github/skills/ is the
+# single source for all its tools — see deploy-skills.ps1), so forge-terminal's Go/React-tuned skills
+# never leak into other projects' Claude sessions.
 #
 # Idempotent: safe to run multiple times. Only replaces the marked skill section;
 # everything else in copilot-instructions.md is preserved.
@@ -36,6 +41,7 @@ $skillOrder = @(
     'workflow-enforcer',
     'forge-workflow',
     'code-quality',
+    'framework-first',
     'branching-strategy',
     'code-tutor-workflow',
     'add-command-card'
@@ -240,30 +246,9 @@ if (Test-Path $aiderConf) {
     }
 }
 
-# ── Step 6: Sync to global Claude Code commands directory ─────────────────────
-
-Write-SectionHeader 'Syncing to global Claude Code commands (~/.claude/commands/)'
-
-$globalClaudeCommandsDir = Join-Path $env:USERPROFILE '.claude\commands'
-
-if (-not (Test-Path $globalClaudeCommandsDir)) {
-    if ($DryRun) {
-        Write-Status '~' "[DRY RUN] Would create directory: $globalClaudeCommandsDir" 'Yellow'
-    } else {
-        New-Item -ItemType Directory -Path $globalClaudeCommandsDir -Force | Out-Null
-        Write-Status '+' "Created global Claude commands directory: $globalClaudeCommandsDir"
-    }
-}
-
-foreach ($skill in $skills) {
-    $destinationPath = Join-Path $globalClaudeCommandsDir "$($skill.Name).md"
-    if ($DryRun) {
-        Write-Status '~' "[DRY RUN] Would copy: $($skill.Name).md -> $destinationPath" 'Yellow'
-    } else {
-        Set-Content -Path $destinationPath -Value $skill.Content -Encoding UTF8 -NoNewline
-        Write-Status '^' "Synced to global Claude: $($skill.Name).md"
-    }
-}
+# NOTE: There is intentionally NO global ~/.claude/commands push. Per-repo distribution
+# (deploy-skills.ps1) is the single mechanism that gives each repo its skills, so a project only ever
+# sees the skills appropriate to it — not forge-terminal's language-tuned set.
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
@@ -273,15 +258,13 @@ Write-Host ' Sync complete' -ForegroundColor Green -NoNewline
 if ($DryRun) { Write-Host ' [DRY RUN — no files written]' -ForegroundColor Yellow } else { Write-Host '' }
 Write-Host "  Skills embedded : $($skills.Count)" -ForegroundColor Gray
 Write-Host "  Skill names     : $($skills | ForEach-Object { $_.Name } | Join-String -Separator ', ')" -ForegroundColor Gray
-Write-Host "  Copilot target  : .github/copilot-instructions.md" -ForegroundColor Gray
-Write-Host "  Aider target    : .aider/forge-system-prompt.md" -ForegroundColor Gray
+Write-Host "  Copilot target  : .github/copilot-instructions.md (forge-terminal only)" -ForegroundColor Gray
+Write-Host "  Aider target    : .aider/forge-system-prompt.md (forge-terminal only)" -ForegroundColor Gray
 Write-Host "  Aider config    : .aider.conf.yml" -ForegroundColor Gray
-Write-Host "  Global Claude   : $globalClaudeCommandsDir" -ForegroundColor Gray
 Write-Host '─────────────────────────────────────────────' -ForegroundColor DarkGray
 Write-Host ''
 Write-Host 'Next steps:' -ForegroundColor Cyan
 Write-Host '  1. Review the diff: git diff .github/copilot-instructions.md'
 Write-Host '  2. Commit: git add .github/copilot-instructions.md .aider/ .aider.conf.yml'
-Write-Host '  3. Run again after editing any .claude/commands/*.md file'
-Write-Host '     (All skills are now available in every Claude Code project on this machine)'
+Write-Host '  3. To distribute skills to OTHER repos, run scripts/deploy-skills.ps1 (per-repo).'
 Write-Host ''
