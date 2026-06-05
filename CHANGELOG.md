@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Claude session macros now name `framework-first` explicitly**: `ClaudeAwarenessMacro`
+  (injected by Fresh Session and Resume cards) and `ClaudeEnforcedMacro` (injected by the
+  Enforced card) previously pointed only to `@.github/copilot-instructions.md` without spelling
+  out the skill order. The file's own top-level pre-flight list did not yet enumerate
+  `framework-first`, so a Claude agent following that list exactly would skip the
+  architecture-fidelity gate. Both macros now state the full 6-skill cascade:
+  `workflow-enforcer → forge-workflow → code-quality → framework-first → branching-strategy →
+  code-tutor-workflow`. A migration rule in `migrateToolVariants` refreshes existing
+  `~/.forge/commands.json` installs on next boot. `TestWorkflowMacrosIncludeFrameworkFirst`
+  is extended to cover all four tool macros (Copilot, Google, Claude Awareness, Claude Enforced)
+  so this gap cannot re-open silently.
+
 ### Added
 - **framework-first skill — architecture-fidelity gate**: A new companion skill that fires on
   every code task and forces one question before building infrastructure: *does the project's

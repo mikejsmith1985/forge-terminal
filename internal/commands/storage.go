@@ -103,10 +103,17 @@ type CardHistory struct {
 // identical text — no risk of the two drifting apart.
 var (
 	// ClaudeAwarenessMacro is injected after a fresh or resume Claude session.
-	ClaudeAwarenessMacro = "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md"
+	// The skill order is spelled out explicitly here — pointing only to the
+	// instructions file is insufficient for resumed sessions where Claude may
+	// not re-read the file, and the file's own top-level pre-flight list does
+	// not yet enumerate framework-first directly.
+	ClaudeAwarenessMacro = "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read @.github/copilot-instructions.md before starting.\n# MANDATORY skill invocation order: workflow-enforcer → forge-workflow → code-quality → framework-first → branching-strategy → code-tutor-workflow"
 
 	// ClaudeEnforcedMacro is injected after an enforced Claude session.
-	ClaudeEnforcedMacro = "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change."
+	// Enforced mode applies the full quality gate on every task — framework-first
+	// is listed explicitly so the architecture-fidelity check cannot be skipped
+	// even when the agent does not re-read the instructions file.
+	ClaudeEnforcedMacro = "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# MANDATORY skill invocation order: workflow-enforcer → forge-workflow → code-quality → framework-first → branching-strategy → code-tutor-workflow\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change."
 
 	// CopilotWorkflowMacro is injected after any Copilot session to activate
 	// the Forge Workflow skill suite.

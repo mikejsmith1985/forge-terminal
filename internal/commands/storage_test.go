@@ -110,15 +110,24 @@ func TestCommandsEqual_DetectsToggleChange(t *testing.T) {
 	}
 }
 
-// TestWorkflowMacrosIncludeFrameworkFirst guards the session-start skill cascade:
-// the Copilot and Google workflow macros must name framework-first as a companion
-// skill so the architecture-fidelity gate fires on every agent session. If a future
-// edit drops it from the cascade, agents would silently stop checking the framework
-// before rebuilding infrastructure — the exact drift this skill prevents.
+// TestWorkflowMacrosIncludeFrameworkFirst guards the session-start skill cascade
+// across ALL four tool macros. Each macro is injected into the terminal immediately
+// after a CLI session starts and must explicitly name framework-first so the
+// architecture-fidelity gate fires before any code is written.
+//
+// Copilot and Google use step-numbered STEP 2 lists; Claude uses a # comment block
+// that points back to copilot-instructions.md. In the Claude case the macro MUST
+// spell out framework-first directly — relying on the agent to read through to the
+// workflow-enforcer skill body is too fragile a guarantee.
+//
+// If a future edit drops framework-first from any macro, agents will silently skip
+// the architecture gate — the exact failure mode this skill was added to prevent.
 func TestWorkflowMacrosIncludeFrameworkFirst(t *testing.T) {
 	macrosUnderTest := map[string]string{
 		"CopilotWorkflowMacro": CopilotWorkflowMacro,
 		"GoogleWorkflowMacro":  GoogleWorkflowMacro,
+		"ClaudeAwarenessMacro": ClaudeAwarenessMacro,
+		"ClaudeEnforcedMacro":  ClaudeEnforcedMacro,
 	}
 
 	for macroName, macroText := range macrosUnderTest {
