@@ -45,6 +45,7 @@ Invoke co-skills in the order listed. Behavior on failure differs by mode:
 These must load successfully in every project. If missing, report ❌ and stop.
 ```
 invoke skill: code-quality
+invoke skill: framework-first
 ```
 
 ### Forge Terminal Project Only (load when AGENTS.md is present)

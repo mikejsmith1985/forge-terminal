@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **framework-first skill — architecture-fidelity gate**: A new companion skill that fires on
+  every code task and forces one question before building infrastructure: *does the project's
+  framework already provide this?* It carries a "smell list" (persistence/checkpointing, state
+  machines, retries, human-in-the-loop pause/resume, routing, serialization, tool-calling,
+  streaming, caching, DI, pub-sub), a three-step gate (recon → decide → record a drift
+  justification), and reads a per-project `FRAMEWORK-CAPABILITIES.md` ledger as its concrete
+  checklist. It complements `code-quality`/`workflow-enforcer` (which govern *how* code is
+  written) by answering a different question — *should this be custom code at all?* The skill is
+  distributed through the live paths: `.claude/commands/framework-first.md` (synced to Claude
+  Code globally, Copilot via `copilot-instructions.md`, and Aider) and
+  `.github/skills/framework-first/SKILL.md` (per-repo deploy). It is wired into the
+  `workflow-enforcer` cascade, the `AGENTS.md` mandatory sequence, the `sync-skills.ps1` skill
+  order, and the Copilot/Google session-start macros so it loads automatically on every session.
+
 - **vault_list MCP tool — vault entry discovery**: Agents can now call `vault_list` (no
   arguments) to receive the names of every secret stored in the Forge Vault before calling
   `vault_inject`. Previously, agents had to guess entry names exactly — a wrong guess

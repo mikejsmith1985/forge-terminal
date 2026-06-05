@@ -110,6 +110,24 @@ func TestCommandsEqual_DetectsToggleChange(t *testing.T) {
 	}
 }
 
+// TestWorkflowMacrosIncludeFrameworkFirst guards the session-start skill cascade:
+// the Copilot and Google workflow macros must name framework-first as a companion
+// skill so the architecture-fidelity gate fires on every agent session. If a future
+// edit drops it from the cascade, agents would silently stop checking the framework
+// before rebuilding infrastructure — the exact drift this skill prevents.
+func TestWorkflowMacrosIncludeFrameworkFirst(t *testing.T) {
+	macrosUnderTest := map[string]string{
+		"CopilotWorkflowMacro": CopilotWorkflowMacro,
+		"GoogleWorkflowMacro":  GoogleWorkflowMacro,
+	}
+
+	for macroName, macroText := range macrosUnderTest {
+		if !contains(macroText, "framework-first") {
+			t.Errorf("%s does not mention the framework-first companion skill", macroName)
+		}
+	}
+}
+
 // contains is a tiny helper to keep the round-trip assertions readable without
 // pulling in strings.Contains at every call site.
 func contains(haystack, needle string) bool {
