@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.7] - 2026-06-05
+
+---
+
+## [v7.11.7] - 2026-06-05
+
 ### Fixed
 - **Claude session macros now name `framework-first` explicitly**: `ClaudeAwarenessMacro`
   (injected by Fresh Session and Resume cards) and `ClaudeEnforcedMacro` (injected by the
