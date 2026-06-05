@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Tab naming strategy now applied on startup**: On every app launch, Forge now
+  fetches `/api/tab-defaults` after session restore and calls `retitleAllTabsFromCwd`
+  with the server-authoritative strategy. Previously, `useTabNaming` read only from
+  `localStorage`, which could be stale or missing; if `localStorage` defaulted to
+  `'project-root'`, any tabs saved with `"Terminal N"` titles (from a prior numbered
+  session) would be re-derived into directory-based project names — showing "3D Repos",
+  "3D Printing", etc. instead of the user's configured strategy.
+
 ## [7.11.7] - 2026-06-05
 
 ---

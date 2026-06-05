@@ -233,7 +233,26 @@ function App() {
     reorderTabs,
     retitleAllTabsFromCwd,
   } = useTabManager(shellConfig, defaultTabTheme, namingStrategy, namingPrefix, namingRootFolder);
-  
+
+  // On startup, sync the tab naming strategy from the server after session
+  // restore completes. localStorage may be stale or missing — the server's
+  // tab-defaults.json is authoritative. Without this, session restore runs
+  // with the default 'project-root' strategy and re-derives any "Terminal N"
+  // saved titles (from a prior 'numbered' session) into directory-based names.
+  useEffect(() => {
+    if (!sessionLoaded) return;
+    fetch('/api/tab-defaults')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.namingStrategy) return;
+        setNamingStrategy(data.namingStrategy);
+        setNamingPrefix(data.namingPrefix || 'Dev');
+        setNamingRootFolder(data.namingRootFolder || '');
+        retitleAllTabsFromCwd(data.namingStrategy, data.namingPrefix || 'Dev', data.namingRootFolder || '');
+      })
+      .catch(() => {});
+  }, [sessionLoaded, setNamingStrategy, setNamingPrefix, setNamingRootFolder, retitleAllTabsFromCwd]);
+
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
   
