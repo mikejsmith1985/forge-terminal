@@ -8,9 +8,12 @@
 #   2. .claude/commands/<name>.md       — Claude Code reads these as project skills
 #   3. .github/copilot-instructions.md  — the FORGE-SKILLS marked section (GitHub Copilot)
 #
-# This deliberately does NOT touch the global ~/.claude/commands directory: skills are per-repo so a
-# Python project gets the generic skills, not another project's language-tuned ones. forge-terminal's
-# own language-tuned .claude/commands skills stay forge-local (see sync-skills.ps1).
+# Machine-wide skills: the project-AGNOSTIC subset ($globalSkills) is ALSO hoisted into the user-level
+# ~/.claude/skills directory, so every Claude Code project on this machine inherits the core workflow
+# skills WITHOUT per-repo replication (Claude Code natively resolves user-level skills). Forge-specific
+# skills — e.g. forge-workflow, which hardcodes Forge Terminal's build commands — are deliberately NOT
+# hoisted; they stay per-repo so they never override the workflow in unrelated projects. Use -GlobalOnly
+# to refresh just the user-level set without touching any repo.
 #
 # Usage:
 #   .\scripts\deploy-skills.ps1                  # deploy to all sibling git repos
@@ -21,7 +24,8 @@
 
 param(
     [string]$Target = "",
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$GlobalOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,6 +52,43 @@ $curatedSkills = @(
 $markerStart = '<!-- FORGE-SKILLS-START -->'
 $markerEnd   = '<!-- FORGE-SKILLS-END -->'
 
+# The subset of curated skills that are project-AGNOSTIC and safe to install machine-wide in
+# ~/.claude/skills (Claude Code user-level skills, inherited by every project without replication).
+# forge-workflow is deliberately excluded: it hardcodes Forge Terminal's build commands and must stay
+# project-local. workflow-enforcer self-detects project mode, so it degrades gracefully in any repo.
+$globalSkills = @(
+    'workflow-enforcer',
+    'code-quality',
+    'framework-first',
+    'branching-strategy',
+    'code-tutor-workflow'
+)
+
+# Write-GlobalUserSkills copies the project-agnostic skills into the user-level ~/.claude/skills
+# directory. This is what makes the core workflow skills appear in EVERY Claude Code project on the
+# machine with no per-repo copy — Claude Code natively resolves user-level skills, so we defer to that
+# mechanism instead of replicating files into each repo.
+function Write-GlobalUserSkills {
+    $globalSkillsDir = Join-Path $HOME ".claude\skills"
+    Write-Host "  --> ~/.claude/skills (machine-wide)" -ForegroundColor White
+    $hoistedCount = 0
+    foreach ($skillName in $globalSkills) {
+        $sourceFile = Join-Path $skillsSource "$skillName\SKILL.md"
+        if (-not (Test-Path $sourceFile)) {
+            Write-Host "      [--] $skillName missing from .github/skills - skipped" -ForegroundColor DarkGray
+            continue
+        }
+        $destDir  = Join-Path $globalSkillsDir $skillName
+        $destFile = Join-Path $destDir "SKILL.md"
+        if (-not $DryRun) {
+            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            Copy-Item -Path $sourceFile -Destination $destFile -Force
+        }
+        $hoistedCount++
+    }
+    Write-Host "      [OK] $hoistedCount generic skill(s) hoisted to user level" -ForegroundColor Green
+}
+
 Write-Host ""
 Write-Host "+================================================+" -ForegroundColor Cyan
 Write-Host "|   Forge Terminal - Deploy Skills (per-repo)    |" -ForegroundColor Cyan
@@ -57,6 +98,16 @@ Write-Host ""
 if ($DryRun) {
     Write-Host "  [DRY RUN] No files will be written." -ForegroundColor Yellow
     Write-Host ""
+}
+
+# -GlobalOnly refreshes the machine-wide user-level skills and skips the per-repo deploy entirely.
+# Use it after editing a skill master when you only need ~/.claude/skills brought up to date.
+if ($GlobalOnly) {
+    Write-GlobalUserSkills
+    Write-Host ""
+    Write-Host "  Global skill hoist complete$(if ($DryRun) { ' [DRY RUN]' })." -ForegroundColor Green
+    Write-Host ""
+    exit 0
 }
 
 # ── Collect target repos ───────────────────────────────────────────────────────
@@ -186,6 +237,10 @@ foreach ($repoPath in $targetRepos) {
     $successCount++
     Write-Host ""
 }
+
+# Keep the machine-wide user-level skills in sync on every full deploy, not just on -GlobalOnly.
+Write-GlobalUserSkills
+Write-Host ""
 
 Write-Host "+================================================+" -ForegroundColor Cyan
 Write-Host "  Skills deployed to $successCount repo(s)$(if ($DryRun) { ' [DRY RUN]' })" -ForegroundColor Green
