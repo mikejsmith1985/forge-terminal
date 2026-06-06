@@ -964,10 +964,19 @@ var prePushPS1Template = "#!/usr/bin/env pwsh\n" +
 	"\n" +
 	"# ── Go Build + Test ─────────────────────────────────────────────────────\n" +
 	"if (Test-Path \"go.mod\") {\n" +
+	"    # Projects using a-h/templ generate Go source from .templ files that are\n" +
+	"    # gitignored (*_templ.go); regenerate them first so a clean build does not fail.\n" +
+	"    # Guarded on the templ tool directive so this is a no-op in non-templ projects.\n" +
+	"    if (Select-String -Path go.mod -Pattern \"tool github.com/a-h/templ\" -Quiet) {\n" +
+	"        Write-Host \"  [Go] Generating templ files...\" -ForegroundColor Cyan\n" +
+	"        go tool templ generate *> $null\n" +
+	"    }\n" +
 	"    Write-Host \"  [Go] Building...\" -ForegroundColor Cyan\n" +
-	"    $buildOutput = go build ./cmd/forge/ 2>&1\n" +
+	"    # Build every package, not a single hardcoded entrypoint, so this hook stays\n" +
+	"    # correct regardless of the project's cmd/ layout.\n" +
+	"    $buildOutput = go build ./... 2>&1\n" +
 	"    if ($LASTEXITCODE -ne 0) {\n" +
-	"        $failures += \"GO BUILD: go build ./cmd/forge/ failed\"\n" +
+	"        $failures += \"GO BUILD: go build ./... failed\"\n" +
 	"        Write-Host \"  [Go] Build FAILED\" -ForegroundColor Red\n" +
 	"        Write-Host $buildOutput -ForegroundColor Red\n" +
 	"    } else {\n" +
@@ -1030,10 +1039,19 @@ var prePushSHTemplate = "#!/usr/bin/env bash\n" +
 	"\n" +
 	"# ── Go Build + Test ─────────────────────────────────────────────────────\n" +
 	"if [[ -f \"go.mod\" ]]; then\n" +
+	"    # Projects using a-h/templ generate Go source from .templ files that are\n" +
+	"    # gitignored (*_templ.go); regenerate them first so a clean build does not fail.\n" +
+	"    # Guarded on the templ tool directive so this is a no-op in non-templ projects.\n" +
+	"    if grep -q \"tool github.com/a-h/templ\" go.mod 2>/dev/null; then\n" +
+	"        echo -e \"  \\033[36m[Go] Generating templ files...\\033[0m\"\n" +
+	"        go tool templ generate > /dev/null 2>&1\n" +
+	"    fi\n" +
 	"    echo -e \"  \\033[36m[Go] Building...\\033[0m\"\n" +
-	"    build_output=$(go build ./cmd/forge/ 2>&1)\n" +
+	"    # Build every package, not a single hardcoded entrypoint, so this hook stays\n" +
+	"    # correct regardless of the project's cmd/ layout.\n" +
+	"    build_output=$(go build ./... 2>&1)\n" +
 	"    if [[ $? -ne 0 ]]; then\n" +
-	"        failures+=(\"GO BUILD: go build ./cmd/forge/ failed\")\n" +
+	"        failures+=(\"GO BUILD: go build ./... failed\")\n" +
 	"        echo -e \"  \\033[31m[Go] Build FAILED\\033[0m\"\n" +
 	"        echo \"$build_output\"\n" +
 	"    else\n" +
