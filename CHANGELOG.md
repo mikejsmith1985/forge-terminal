@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Core workflow skills now install machine-wide**: `scripts/deploy-skills.ps1`
+  hoists the five project-agnostic skills (`workflow-enforcer`, `code-quality`,
+  `framework-first`, `branching-strategy`, `code-tutor-workflow`) into the user-level
+  `~/.claude/skills/` directory, so every Claude Code project inherits them with no
+  per-repo copy (Claude Code resolves user-level skills natively). `forge-workflow` is
+  deliberately excluded — it hardcodes Forge Terminal's build commands and must stay
+  project-local. A new `-GlobalOnly` switch refreshes just the user-level set; a normal
+  full deploy keeps it in sync. This closes the gap where freshly scaffolded projects
+  (e.g. created from the Projects card) started with no workflow skills at all.
+
 ### Fixed
 - **Tab naming strategy now applied on startup**: On every app launch, Forge now
   fetches `/api/tab-defaults` after session restore and calls `retitleAllTabsFromCwd`
