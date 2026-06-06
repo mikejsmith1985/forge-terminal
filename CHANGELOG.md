@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.10] - 2026-06-06
+
+---
+
+## [v7.11.10] - 2026-06-06
+
 ### Changed
 - **Core workflow skills now install machine-wide**: `scripts/deploy-skills.ps1`
   hoists the five project-agnostic skills (`workflow-enforcer`, `code-quality`,
