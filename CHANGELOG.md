@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (e.g. created from the Projects card) started with no workflow skills at all.
 
 ### Fixed
+- **Scaffolded pre-push hooks build the whole module, not Forge's entrypoint**:
+  `forge workflow init` previously generated a pre-push hook hardcoded to
+  `go build ./cmd/forge/` (Forge Terminal's own entrypoint), so every other
+  scaffolded Go repo's hook false-failed on every push and forced
+  `git push --no-verify`. The `prePushSHTemplate` / `prePushPS1Template` in
+  `internal/workflow/templates.go` now build `go build ./...` (entrypoint-agnostic)
+  and regenerate `templ` output first — guarded on the `tool github.com/a-h/templ`
+  directive so it is a no-op in non-templ projects. Existing repos must re-scaffold
+  or update the hook by hand; new ones get the corrected hook automatically.
 - **Tab naming strategy now applied on startup**: On every app launch, Forge now
   fetches `/api/tab-defaults` after session restore and calls `retitleAllTabsFromCwd`
   with the server-authoritative strategy. Previously, `useTabNaming` read only from
