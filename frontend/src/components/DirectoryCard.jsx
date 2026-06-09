@@ -107,11 +107,16 @@ const DirectoryCard = ({ onExecute, onHide }) => {
       setNewProjectName('');
       fetchDirectories(rootPath);
       if (onExecute) onExecute({ command: `cd "${data.path}"`, delay: 0 });
-      setTimeout(() => {
-        setShowNewProject(false);
-        setCreateResult(null);
-        setCreateError(null);
-      }, 2500);
+      // Only auto-close when everything succeeded cleanly. If the GitHub repo
+      // creation failed, keep the panel open so the user can read the error —
+      // a 2.5 s timeout is not enough time to diagnose a gh auth or PATH issue.
+      if (!data.github?.error) {
+        setTimeout(() => {
+          setShowNewProject(false);
+          setCreateResult(null);
+          setCreateError(null);
+        }, 2500);
+      }
     } catch (err) {
       setCreateError(err.message);
     } finally {
@@ -222,7 +227,16 @@ const DirectoryCard = ({ onExecute, onHide }) => {
                     </a>
                   )}
                   {createResult.github?.error && (
-                    <span className="directory-card-gh-warn">⚠ {createResult.github.error}</span>
+                    <div className="directory-card-gh-error-row">
+                      <span className="directory-card-gh-warn">⚠ {createResult.github.error}</span>
+                      <button
+                        className="directory-card-btn-cancel"
+                        title="Dismiss"
+                        onClick={() => { setShowNewProject(false); setCreateResult(null); setCreateError(null); }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **New project: errors now readable** — Two bugs in the "Create Project" flow
+  were swallowing error messages before the user could read them:
+  1. The Go handler was returning errors as `text/plain`, causing the frontend's
+     `res.json()` call to throw a SyntaxError that replaced the real message
+     (e.g. "git init failed: …") with a cryptic JSON parse error. All error
+     paths in `handleProjectCreate` now return `application/json` via the
+     existing `writeJSON` helper so the frontend receives a structured
+     `{"error": "…"}` object it can display correctly.
+  2. When GitHub repo creation failed gracefully (e.g. `gh` auth missing), the
+     success panel auto-closed after 2.5 s, taking the error with it. The panel
+     now stays open when `data.github.error` is set, and a dismiss button lets
+     the user close it manually once they've read the message.
+
 ## [7.11.11] - 2026-06-09
 
 ---

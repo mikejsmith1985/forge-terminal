@@ -372,3 +372,12 @@
   font-size: 11px;
   color: #fab387;
 }
+
+/* Wraps the GitHub error text and its dismiss button side-by-side.
+   Keeps the error visible until the user actively dismisses it. */
+.directory-card-gh-error-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+}

@@ -36,57 +36,61 @@ type githubResult struct {
 // and optionally creates a GitHub repository via the gh CLI.
 func handleProjectCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
 		return
 	}
 
 	var req projectCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 		return
 	}
 
 	// Validate name: must be non-empty and contain no path separators or traversal
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name is required"})
 		return
 	}
 	if strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") {
-		http.Error(w, "name must not contain path separators or '..'", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name must not contain path separators or '..'"})
 		return
 	}
 
 	rootPath := strings.TrimSpace(req.RootPath)
 	if rootPath == "" {
-		http.Error(w, "rootPath is required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "rootPath is required"})
 		return
 	}
 
 	// Resolve absolute paths and guard against traversal
 	absRoot, err := filepath.Abs(rootPath)
 	if err != nil {
-		http.Error(w, "invalid rootPath", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid rootPath"})
 		return
 	}
 	fullPath := filepath.Join(absRoot, name)
 	absProject, err := filepath.Abs(fullPath)
 	if err != nil || !strings.HasPrefix(absProject, absRoot+string(filepath.Separator)) {
-		http.Error(w, "resolved project path escapes rootPath", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "resolved project path escapes rootPath"})
 		return
 	}
 
 	// Create the directory
 	if err := os.MkdirAll(absProject, 0o755); err != nil {
-		http.Error(w, fmt.Sprintf("failed to create directory: %s", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("failed to create directory: %s", err),
+		})
 		return
 	}
 
-	// git init
+	// git init — runs headless (hideWindow suppresses the console flash on Windows)
 	gitCmd := exec.Command("git", "init", absProject)
 	hideWindow(gitCmd)
 	if out, err := gitCmd.CombinedOutput(); err != nil {
-		http.Error(w, fmt.Sprintf("git init failed: %s — %s", err, string(out)), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("git init failed: %s — %s", err, strings.TrimSpace(string(out))),
+		})
 		return
 	}
 
@@ -96,7 +100,9 @@ func handleProjectCreate(w http.ResponseWriter, r *http.Request) {
 	cfg.ConflictStrategy = workflow.ConflictSkip
 	result, err := workflow.ScaffoldProject(absProject, cfg)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("scaffold failed: %s", err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("scaffold failed: %s", err),
+		})
 		return
 	}
 
