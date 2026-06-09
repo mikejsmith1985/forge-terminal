@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.11.11] - 2026-06-09
+
+---
+
+## [v7.11.11] - 2026-06-09
+
 ### Added
 - **File viewer: Copy Path button** — A "Copy Path" button now appears in the
   MonacoEditor toolbar next to Save. Clicking it writes the full file path to
