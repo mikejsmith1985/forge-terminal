@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -197,20 +198,62 @@ func formatInsightSummary(insight *vision.Insight) string {
 	return buf.String()
 }
 
-func buildChatPrompt(userMessage string, context string) string {
-	var prompt strings.Builder
-
-	prompt.WriteString("You are Forge Terminal's AI assistant. You help developers with terminal commands, debugging, and code questions.\n\n")
-
-	if context != "" {
-		prompt.WriteString("=== CONTEXT ===\n")
-		prompt.WriteString(context)
-		prompt.WriteString("\n\n=== USER MESSAGE ===\n")
+// loadProjectInstructions reads .github/copilot-instructions.md from the current
+// working directory and strips the auto-generated FORGE-SKILLS block to keep the
+// injected payload lean. Returns an empty string when the file does not exist so
+// callers can fall back to a generic system prompt without failing.
+func loadProjectInstructions() string {
+	instructionPath := filepath.Join(".github", "copilot-instructions.md")
+	rawBytes, err := os.ReadFile(instructionPath)
+	if err != nil {
+		// File absent is expected outside the forge-terminal repo — not an error.
+		return ""
 	}
 
-	prompt.WriteString(userMessage)
+	instructionText := string(rawBytes)
 
-	return prompt.String()
+	// Strip the auto-generated skills block; it can exceed 70 KB and is not
+	// useful in a chat prompt (the skills are for pre-flight, not runtime).
+	const skillsStartMarker = "<!-- FORGE-SKILLS-START -->"
+	const skillsEndMarker = "<!-- FORGE-SKILLS-END -->"
+	skillsStart := strings.Index(instructionText, skillsStartMarker)
+	skillsEnd := strings.Index(instructionText, skillsEndMarker)
+	if skillsStart != -1 && skillsEnd != -1 && skillsEnd > skillsStart {
+		instructionText = instructionText[:skillsStart] + instructionText[skillsEnd+len(skillsEndMarker):]
+	}
+
+	// Cap at 50 KB to prevent runaway prompt sizes if the file grows unexpectedly.
+	const maxInstructionBytes = 50 * 1024
+	if len(instructionText) > maxInstructionBytes {
+		instructionText = instructionText[:maxInstructionBytes] + "\n... [project instructions truncated]"
+	}
+
+	return strings.TrimSpace(instructionText)
+}
+
+func buildChatPrompt(userMessage string, context string) string {
+	var promptBuilder strings.Builder
+
+	// Inject project-level instructions so the AI respects the same engineering
+	// standards, workflow rules, and naming conventions the team has configured.
+	projectInstructions := loadProjectInstructions()
+	if projectInstructions != "" {
+		promptBuilder.WriteString(projectInstructions)
+		promptBuilder.WriteString("\n\n")
+	} else {
+		// Fallback for environments without a copilot-instructions.md file.
+		promptBuilder.WriteString("You are Forge Terminal's AI assistant. You help developers with terminal commands, debugging, and code questions.\n\n")
+	}
+
+	if context != "" {
+		promptBuilder.WriteString("=== CONTEXT ===\n")
+		promptBuilder.WriteString(context)
+		promptBuilder.WriteString("\n\n=== USER MESSAGE ===\n")
+	}
+
+	promptBuilder.WriteString(userMessage)
+
+	return promptBuilder.String()
 }
 
 // streamChatResponse sends the prompt to an LLM and streams the response.

@@ -104,6 +104,9 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
   const [isValueVisible, setIsValueVisible] = useState(false)
   const [isCopied, setIsCopied]             = useState(false)
   const [isRevealing, setIsRevealing]       = useState(false)
+  // Separate loading state for the copy-without-reveal path so the Reveal
+  // button's spinner is not affected when the user just wants a silent copy.
+  const [isCopyFetching, setIsCopyFetching] = useState(false)
   const autoHideTimerRef = useRef(null)
 
   // Cancel the auto-hide timer on unmount so there are no dangling state updates.
@@ -159,21 +162,43 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
     }
   }, [revealedValue, onReveal, entry.id, startAutoHideTimer])
 
-  /** Writes the revealed value to the clipboard and shows a brief confirmation. */
+  /**
+   * Copies the secret value to the clipboard without requiring the user to
+   * reveal it first. If the value is already in memory (post-reveal), it copies
+   * directly. Otherwise it fetches silently — the value never appears in the UI.
+   */
   const handleCopyClick = useCallback(async (clickEvent) => {
     clickEvent.stopPropagation()
-    if (!revealedValue) return
+
+    // Fast path: value already in memory from a prior reveal.
+    if (revealedValue !== null) {
+      try {
+        await navigator.clipboard.writeText(revealedValue)
+        setIsCopied(true)
+        startAutoHideTimer()
+        setTimeout(() => setIsCopied(false), 2000)
+      } catch (copyErr) {
+        console.error('[Vault] clipboard write failed:', copyErr)
+      }
+      return
+    }
+
+    // Silent fetch path: retrieve the value purely for clipboard — don't
+    // update revealedValue so nothing is displayed in the card.
+    setIsCopyFetching(true)
+    const fetchedValue = await onReveal(entry.id)
+    setIsCopyFetching(false)
+
+    if (fetchedValue === null) return
 
     try {
-      await navigator.clipboard.writeText(revealedValue)
+      await navigator.clipboard.writeText(fetchedValue)
       setIsCopied(true)
-      // Reset auto-hide so the user has the full window after copying
-      startAutoHideTimer()
       setTimeout(() => setIsCopied(false), 2000)
     } catch (copyErr) {
       console.error('[Vault] clipboard write failed:', copyErr)
     }
-  }, [revealedValue, startAutoHideTimer])
+  }, [revealedValue, onReveal, entry.id, startAutoHideTimer])
 
   const handleVisibilityToggle = useCallback((clickEvent) => {
     clickEvent.stopPropagation()
@@ -244,7 +269,10 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
         </span>
       </button>
 
-      {/* Reveal / Copy action row */}
+      {/* Reveal / Copy action row.
+          Copy is always visible so the user can silently copy without ever
+          seeing the value. Reveal is kept for the rare case where the raw
+          value must be inspected. */}
       <div className="vp-entry-reveal-actions">
         <button
           className={`vp-reveal-btn${isRevealed ? ' is-active' : ''}`}
@@ -261,19 +289,20 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
           )}
         </button>
 
-        {isRevealed && (
-          <button
-            className={`vp-copy-btn${isCopied ? ' is-copied' : ''}`}
-            onClick={handleCopyClick}
-            aria-label={isCopied ? 'Copied!' : `Copy value for ${entry.secretName}`}
-          >
-            {isCopied ? (
-              <><CheckCircle size={12} /> Copied!</>
-            ) : (
-              <><Copy size={12} /> Copy</>
-            )}
-          </button>
-        )}
+        <button
+          className={`vp-copy-btn${isCopied ? ' is-copied' : ''}`}
+          onClick={handleCopyClick}
+          disabled={isCopyFetching}
+          aria-label={isCopied ? 'Copied!' : `Copy value for ${entry.secretName}`}
+        >
+          {isCopyFetching ? (
+            <span className="vp-spinner">⟳</span>
+          ) : isCopied ? (
+            <><CheckCircle size={12} /> Copied!</>
+          ) : (
+            <><Copy size={12} /> Copy</>
+          )}
+        </button>
       </div>
 
       {/* Revealed value — only rendered while active */}
