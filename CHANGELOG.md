@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **File viewer: Copy Path button** — A "Copy Path" button now appears in the
+  MonacoEditor toolbar next to Save. Clicking it writes the full file path to
+  the clipboard and shows a brief "Copied!" confirmation. No reveal step needed.
+- **Vault: Copy always visible** — The Copy button on each vault entry card is
+  now shown at all times rather than only after Reveal. Clicking Copy silently
+  fetches and copies the secret without displaying it in the UI. Reveal remains
+  available for the rare case where the raw value must be inspected.
+
+### Fixed
+- **Chat: project instructions now injected** — `buildChatPrompt` now reads
+  `.github/copilot-instructions.md` from the working directory and prepends it
+  to every chat prompt, so the AI respects the project's engineering standards.
+  The auto-generated FORGE-SKILLS block is stripped before injection to keep
+  prompt sizes reasonable. `--no-custom-instructions` is preserved on the
+  Copilot CLI call to prevent pollution from unrelated repos; the injection is
+  done at the prompt level instead.
+
 ## [7.11.10] - 2026-06-06
 
 ---
