@@ -1,0 +1,5 @@
+# Shell scripts must keep LF line endings so they execute correctly under bash
+# on every platform — including Windows via git-bash, where Forge runs them.
+# Without this, core.autocrlf=true would rewrite them to CRLF on checkout and
+# break the shebang / `set -e` behaviour of the vendored Spec Kit scripts.
+*.sh text eol=lf
