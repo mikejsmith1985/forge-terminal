@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **`workflow-enforcer` is now constitution- and Spec-Kit-aware (SDD Phase C1)** —
+  The circuit-breaker skill detects `.specify/memory/constitution.md` (a new Phase 0A
+  check) and treats it as the authoritative source of binding rules, and names the
+  `speckit-*` pipeline (`specify → plan → tasks → implement`) as the workflow when a
+  `.specify/` directory is present. `forge-workflow` is annotated as superseded but
+  still loads (removed in C3). Also reconciles a three-way drift: the canonical
+  `.github/skills/workflow-enforcer/SKILL.md` and the derived
+  `.claude/commands/workflow-enforcer.md` had diverged into different content; the
+  command copy is now regenerated from the canonical so they match. (Machine-wide
+  `~/.claude/skills` propagation via `deploy-skills.ps1 -GlobalOnly` follows once the
+  skill-set collapse in C2 lands.)
 - **Constitution now a proven superset of the legacy rules (SDD Phase C gate)** —
   Audited the 1124-line `copilot-instructions.md` monolith against the constitution's
   Articles ahead of retiring it. One gap was found and closed: Article IV (Code
