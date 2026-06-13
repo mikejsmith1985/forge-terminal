@@ -194,6 +194,19 @@
   box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
 }
 
+/* Global constitution install — full-width, distinct teal accent so it reads as
+   a machine-wide action separate from the project-scoped buttons below it. */
+.fwc-btn-global {
+  width: 100%;
+  justify-content: center;
+  background: rgba(20, 184, 166, 0.14);
+  color: #5eead4;
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  margin-bottom: 12px;
+}
+.fwc-btn-global:hover { background: rgba(20, 184, 166, 0.22); }
+.fwc-btn-global:disabled { opacity: 0.6; cursor: default; }
+
 /* ─── Unconfigured State ──────────────────────────────────────────────────── */
 
 .fwc-unconfigured-body {

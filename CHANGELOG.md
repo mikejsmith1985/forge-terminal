@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **"Install Constitution Globally" button** — The Forge Workflow sidebar card now
+  has a one-click action to install the constitution machine-wide (calling
+  `POST /api/workflow/global-install`). It asks for confirmation first, since it
+  writes the user's global CLI instruction files (`~/.claude`, `~/.copilot`,
+  `~/.gemini`), then reports how many tools were updated via a toast. Also fixes
+  a frontend/backend drift: the wizard's default module list now includes the
+  `constitution` and `speckit-pipeline` modules, matching the Go `DefaultConfig`.
 - **New projects ship with the Spec Kit pipeline** — Project scaffolding now lays
   down the full GitHub Spec Kit pipeline: the `speckit-*` agent skills
   (`specify → plan → tasks → implement`, plus clarify/analyze/checklist/etc.) and
