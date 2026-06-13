@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Skill set collapsed toward SDD (Phase C2)** — `AGENTS.md`'s mandatory cascade is
+  rewritten Spec-Driven-Development-first: it now names reading
+  `.specify/memory/constitution.md` and the `speckit-*` pipeline as the workflow, and
+  demotes `forge-workflow` to a transitional legacy note (removed in C3). The
+  `sequential-tasks` skill is dropped entirely — superseded by `speckit-tasks` — and
+  removed from the `workflow-enforcer` cascade, its status table, and the skills tree.
 - **`workflow-enforcer` is now constitution- and Spec-Kit-aware (SDD Phase C1)** —
   The circuit-breaker skill detects `.specify/memory/constitution.md` (a new Phase 0A
   check) and treats it as the authoritative source of binding rules, and names the
