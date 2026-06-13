@@ -4,132 +4,258 @@
 > To use: aider --system-prompt .aider/forge-system-prompt.md
 > Or add `system-prompt: .aider/forge-system-prompt.md` to .aider.conf.yml
 >
-> Last synced: 2026-06-05 08:15:14 | Skills: 8
+> Last synced: 2026-06-13 19:20:13 | Skills: 7
 
 ---
 
 ## SKILL: workflow-enforcer
 
-# Workflow Enforcer — Circuit Breaker
+# Workflow Enforcer
 
-You have invoked the Forge Workflow circuit breaker. This skill is the gatekeeper for ALL code changes in this repository. Read every word before proceeding.
+> ⚠️ This skill is MANDATORY. It applies to EVERY coding task in every project.
+> However, it adapts its requirements based on whether the project uses the
+> full Forge Forge Workflow or a standard workflow.
 
-## What you MUST do right now (in this order)
 
-1. **Invoke `forge-workflow`** — loads the 5-Phase execution plan you will follow for this task
-2. **Invoke `code-quality`** — loads naming conventions and comment standards that apply to every line you write
-3. **Invoke `framework-first`** — the architecture-fidelity gate: before building any infrastructure, confirm the project's framework does not already provide it
-4. **Invoke `branching-strategy`** — enforces branch creation before the first file edit
-5. **Invoke `code-tutor-workflow`** — user expects a clear walkthrough of every change you make
+## PHASE 0A: PROJECT DETECTION (Run First — Before Any Co-Skills)
 
-Do not read any files, write any code, or run any commands until all five companion skills are loaded.
+Before loading any co-skills, determine the **project mode** by checking two things:
 
-## Hard rules that apply after skills are loaded
+**Check 1 — Does `AGENTS.md` exist in the repository root?**
+```powershell
+Test-Path "AGENTS.md"
+```
 
-- **Branch before code.** If `git branch --show-current` outputs `main`, STOP. You have not created your branch yet.
-- **Phase 1 before Phase 3.** You must articulate a plan before touching any source file.
-- **No shortcuts.** "It compiles" is not proof. "The test passes" is not proof unless it is a real integration test against real infrastructure.
-- **Never kill forge by wildcard.** The production binary is `fterm.exe`. Use `Stop-Process -Id <PID>` with a specific PID only.
-- **Phase 5 is mandatory.** Every task ends with: CHANGELOG entry → commit → `gh pr create` → merge → `.\scripts\local-release.ps1`.
+**Check 2 — Does `.specify/memory/constitution.md` exist?**
+```powershell
+Test-Path ".specify/memory/constitution.md"
+```
+If present, the project is in **Spec-Driven Development (SDD) mode**. The constitution at
+`.specify/memory/constitution.md` is the AUTHORITATIVE source of binding rules — read it FIRST,
+before any co-skill. Its Articles supersede any duplicated standards elsewhere, and the `speckit-*`
+pipeline (Phase 0B) is the workflow.
 
-## If you skipped this skill
+### Mode Decision Table
 
-If you are reading this after already writing code:
+| AGENTS.md | constitution | Detected Mode |
+|-----------|--------------|---------------|
+| ✅ Found  | ✅ Found      | **Forge Enterprise (SDD)** |
+| ❌ Missing | ✅ Found      | **Enterprise (SDD)** |
+| ✅ Found  | ❌ Missing    | **Enterprise** |
+| ❌ Missing | ❌ Missing    | **Standard** |
 
-1. STOP immediately
-2. Tell the user you violated pre-flight
-3. Ask whether to revert and restart, or course-correct in place
-4. Do not rationalize or continue
+Store the detected mode. It controls which co-skills are **required** vs **optional**.
 
-The pre-flight sequence exists because the failure mode is: analyze → plan → code → *remember skills too late*. This rule breaks that pattern.
 
----
+## PHASE 0B: CO-SKILL CASCADE
 
-## SKILL: forge-workflow
+Invoke co-skills in the order listed. Behavior on failure differs by mode:
 
-# Forge Workflow — 5-Phase Execution Plan
+### Always Required (all modes)
+These must load successfully in every project. If missing, report ❌ and stop.
+```
+invoke skill: code-quality
+invoke skill: framework-first
+```
 
-You are an Elite AI Architect and Principal Engineer working on Forge, an agentic IDE. You ruthlessly pursue correctness and production-readiness. The fastest route is forbidden if a better route exists.
+### Spec-Driven Development pipeline (load when `.specify/` exists)
+When the project has a `.specify/` directory, the GitHub Spec Kit pipeline IS the workflow. Use the
+`speckit-*` skills to drive execution, reading `.specify/memory/constitution.md` as the binding rules:
+```
+speckit-specify  →  speckit-plan  →  speckit-tasks  →  speckit-implement
+```
+Quality gates (load as the task warrants): `speckit-clarify` (de-risk before plan),
+`speckit-analyze` (cross-artifact consistency before implement), `speckit-checklist`.
 
-Execute every task through these five phases. Do not announce the phase names in your response — execute them as internal logic and only surface results to the user.
+### Forge Terminal Project Only (load when AGENTS.md is present)
+These skills are specific to the Forge Terminal codebase. Load them automatically
+when `AGENTS.md` exists — they teach the agent about project-specific systems.
+If a skill is missing, report ⚠️ and continue.
+```
+invoke skill: forge-vault
+```
+(The former `sequential-tasks` skill is superseded by `speckit-tasks` in the SDD pipeline.)
 
----
+### Enterprise-Only (required in Forge Enterprise / Enterprise mode; optional in Standard)
+Attempt to load these in every project. If the project is in **Standard mode** and
+a skill is not found, mark it ⚠️ and continue — do NOT block the task.
+If the project is in **Enterprise mode** and a skill is not found, mark it ❌ and stop.
+```
+invoke skill: branching-strategy
+invoke skill: code-tutor-workflow
+```
 
-## Phase 1 — Deep Understanding, Planning & Dashboarding
+### Conditionally Required (invoke when the task warrants it)
+```
+invoke skill: multi-agent             # tasks spanning 3+ files
+invoke skill: testing-standards       # test creation or modification
+invoke skill: pr-workflow             # PR creation or review
+invoke skill: forge-release-process   # release, publish, bump version, create a release
+invoke skill: add-command-card        # create command card, launch POC, add sidebar shortcut
+```
 
-**Listen:** Restate the user's goal in one sentence to confirm you understand it.
 
-**Plan:** Produce a concrete technical plan before touching any file:
-- Which files change and why
-- What the failure mode of the current code is
-- What invariants the fix must preserve
+## PHASE 0C: PRE-FLIGHT STATUS TABLE
 
-**Dashboard:** Maintain exactly one dashboard file: `refactor_plan.html`.
-- On your first write of the day, DELETE any stale dashboard from a previous session
-- Use Mermaid.js for architecture diagrams (wrap all node labels in double quotes)
-- Track tasks with `[PENDING]`, `[IN_PROGRESS]`, `[COMPLETED]` badges
-- Open the dashboard immediately after generating it: `start refactor_plan.html`
+After attempting all loads, output the following table. The `AGENTS.md` row
+reflects the Check 1 result from Phase 0A.
 
----
+```
+⛳ PRE-FLIGHT COMPLETE
 
-## Phase 2 — Zero-Compromise Audit
+┌─────────────────────────┬────────────────────────────────────────────┐
+│ Item                    │ Status                                     │
+├─────────────────────────┼────────────────────────────────────────────┤
+│ code-quality            │ ✅ Loaded                                  │
+│ forge-vault             │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
+│ branching-strategy      │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
+│ code-tutor-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
+│ AGENTS.md               │ ✅ Found   /  ⚠️ Not present (standard mode) │
+├─────────────────────────┼────────────────────────────────────────────┤
+│ Active mode             │ Forge Enterprise  /  Enterprise  /  Standard │
+│ Quality mode            │ BEST (enterprise)  /  FAST (standard)      │
+│ Audit focus             │ naming · complexity · comments             │
+└─────────────────────────┴────────────────────────────────────────────┘
+```
 
-Before writing a single line of code, verify your plan against:
+Use only the applicable status value for each row — do not show all three options.
 
-- **Process safety:** Does anything risk killing `fterm.exe`? If so, rewrite the plan.
-- **Testing separation:** Are unit tests fully mocked? Are integration tests using real infrastructure (not mocks)?
-- **No shortcuts:** If the plan relies on `sleep()`, DOM scraping, or "checking the terminal output," rewrite it.
-- **Scope creep:** Are you changing more than the task requires? If so, cut it.
+### Status key
+- ✅ **Loaded / Found** — skill or file is present and active
+- ⚠️ **Not configured (optional)** — skill is absent but the project is in Standard mode; enforcement continues without it
+- ❌ **Required but missing** — skill is absent in a project that requires it; STOP and notify the user
 
----
 
-## Phase 3 — TDD Execution
+## PHASE 0D: BRANCH CHECK
 
-Write the failing test BEFORE writing implementation code. No exceptions.
+After the status table, confirm a feature branch exists:
 
-**Unit tests:** Pure logic, 100% mocked dependencies, must run in under 10ms. Use Go `testing` package or Vitest.
+```powershell
+git branch --show-current
+```
 
-**Integration tests:** Real infrastructure only. Use `testcontainers-go` for Go. Never mock the database driver or repository layer.
+If the output is `main` or `master`: create a branch before writing any code.
 
-**UX tests:** Use Cypress with `cypress-real-events`. Never use synthetic events (`.trigger()`). Launch the app via `.\run-dev-clean.ps1 -Port 9999`, never by building `fterm.exe` directly.
+```powershell
+git checkout -b fix/<descriptive-name>      # bug fixes
+git checkout -b feature/<descriptive-name>  # new functionality
+git checkout -b chore/<descriptive-name>    # maintenance / cleanup
+git checkout -b docs/<descriptive-name>     # documentation only
+```
 
-Cycle: Red → Green → Refactor. Do not move to Phase 4 until the test is green.
+**Only after the branch is confirmed: proceed to Phase 1.**
 
----
 
-## Phase 4 — Deterministic Verification & Visual Proof
+## PHASE 1: WHILE CODING (Active Standards)
 
-"It compiles" is not proof. "The API returns 200" is not proof. You must generate evidence.
+These apply in all modes. Adjust strictness based on quality mode:
+- **BEST mode (Enterprise)**: zero tolerance — every rule is enforced
+- **FAST mode (Standard)**: best-effort — flag violations but don't block delivery
 
-**Visual Proof Protocol:**
-1. Use Puppeteer or Cypress to capture screenshots of the actual UI state after your change
-2. Programmatically highlight changed elements (red/neon border) in the screenshot
-3. Convert screenshots to Base64 and embed them in `refactor_plan.html` — do not link, embed
-4. Open the dashboard automatically: `start refactor_plan.html`
+### Naming
+- No single-letter variables (except `i`/`j`/`k` in loops, `w`/`r` in HTTP handlers)
+- All booleans prefixed with `is`, `has`, `can`, `should`, or `was`
+- All functions are verb-first: `createSession`, `validateToken`
+- A non-developer can understand every name without context
 
-**Terminal output:** Read `window.term.buffer.active` (xterm.js model), never the DOM.
+### Comments
+- New files get a top-level purpose comment
+- Exported/public functions get a doc comment
+- Complex logic blocks get "why" comments, not "what" comments
+- Comments are readable by a technical project manager
 
-Do not ask the user to "test it yourself" until you have generated this visual proof.
+### Structure
+- No function exceeds 40 lines — extract helpers if needed
+- Guard clauses instead of deep nesting
+- No magic numbers or strings — use named constants
+- Imports are logically grouped
 
----
 
-## Phase 5 — Delivery
+## PHASE 2: PRE-DELIVERY CHECKLIST
 
-Do not create Markdown summaries or documentation files unless explicitly asked.
+### ✅ Always check (all modes)
+- [ ] On a feature branch (not `main` / `master`) — `git branch --show-current`
+- [ ] Tests written or updated for changed code
+- [ ] Commit message follows format: `type(scope): description`
 
-Required delivery steps — all five, in order:
+### ✅ Check when CHANGELOG.md exists in the project
+- [ ] CHANGELOG.md updated if user-visible behavior changed
 
-1. **CHANGELOG.md** — add an entry under `[Unreleased]` describing what changed and why
-2. **Commit** — descriptive message, `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` trailer
-3. **PR** — `gh pr create` with a body that explains the approach and the tradeoffs considered
-4. **Merge** — merge the PR to main
-5. **Release** — run `.\scripts\local-release.ps1 [patch|minor|major]`
+### ✅ Enterprise mode only
+- [ ] Sub-agents used for parallelizable work (3+ independent files)
+- [ ] Task classified and appropriate model tier selected
 
-**Release rule (absolute):** Never use GitHub Actions for releases. Detection order:
-1. If `scripts/local-release.ps1` exists → run it
-2. Otherwise → `git tag` → `gh release create` directly
+### ✅ Build and test — use the project's own commands
+Do NOT hardcode build or test commands. Discover them from:
+- `package.json` scripts → use `npm run build`, `npm test`
+- `Makefile` → use `make build`, `make test`
+- `go.mod` → use `go build ./...`, `go test ./...`
+- CI config (`.github/workflows/`) → mirror what CI runs
 
-The `release.yml` workflow in this repo is a legacy artifact (workflow_dispatch only). Do not reference or enable it.
+If this is the **Forge Terminal** project specifically:
+- Go build: `go build ./cmd/forge/`
+- Frontend build: `cd frontend && npx vite build`
+- Go tests: `go test ./...`
+- Frontend tests: `cd frontend && npx vitest run`
+
+
+## PHASE 3: RUNTIME GATE LEDGER (HARD ENFORCEMENT)
+
+Skills alone cannot stop a non-compliant commit — only runtime hooks can.
+Forge Terminal ships a pre-commit hook that reads `.forge/workflow-ticket.json`
+and BLOCKS any commit whose ledger is missing a required gate.
+
+**Required gates the hook checks:**
+- `branch-created` — proves a feature branch was created before code
+- `tests-written` — proves at least one test was added or updated
+- `tests-passed` — proves the test run succeeded
+
+**Record gates as you complete them via the MCP tool:**
+```
+workflow_gate_record({
+  taskId:   "<stable id for this task>",
+  gate:     "branch-created" | "tests-written" | "tests-passed" | ...,
+  evidence: "<short proof, e.g. 'feature/foo created at HEAD ac04dbc'>",
+  branch:   "<branch name, optional>"
+})
+```
+
+**Verify the hook will allow your commit before running git:**
+```
+workflow_preflight_check()
+```
+or shell-equivalent:
+```
+forge workflow preflight
+```
+
+**One-time install of the hook in any new repo:**
+The hook is **installed automatically** the first time `workflow_gate_record` is called
+in a project (i.e., when the very first ticket is created).  No manual step is required.
+
+If for any reason you need to force-reinstall or install without recording a gate:
+```powershell
+.\scripts\install-workflow-hooks.ps1   # Windows
+./scripts/install-workflow-hooks.sh    # macOS / Linux
+```
+
+**Bypass (last resort, audited):** set `FORGE_BYPASS=1` and
+`FORGE_BYPASS_REASON="..."` in the environment for one commit.  Bypasses
+are appended to `.forge/bypasses.log` so reviewers can spot abuse.
+
+
+## ENFORCEMENT
+
+### Enterprise mode
+All Phase 2 items are hard requirements. If any are unchecked before delivery:
+1. STOP
+2. Fix the violation
+3. Re-verify the full checklist
+4. Only then deliver
+
+### Standard mode
+Phase 2 items are best-practice reminders. Flag any unchecked items in your
+delivery summary, but do not block the user from receiving the result.
 
 ---
 

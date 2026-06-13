@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **`forge-workflow` skill dissolved (SDD Phase C3a)** — The legacy bespoke 5-phase
+  workflow skill is removed from the skill system: the `.github/skills/forge-workflow/`
+  and `.claude/commands/forge-workflow.md` files are deleted, it's dropped from the
+  `workflow-enforcer` cascade and the `sync-skills.ps1` / `deploy-skills.ps1` skill
+  lists, and the embedded `FORGE-SKILLS` block in `copilot-instructions.md` is
+  regenerated without it (8 → 7 skills). The `workflow-enforcer` mode detection is
+  re-based on the constitution (`.specify/memory/constitution.md`) instead of the
+  now-deleted skill. Non-breaking: the runtime awareness macros say "silently skip any
+  skill not found", so sessions degrade gracefully. (The macros in
+  `internal/commands/storage.go` and the duplicated prose in `copilot-instructions.md`
+  are slimmed in a follow-up that needs fresh-session verification, since they drive
+  live agent injection.)
+
 ## [7.12.0] - 2026-06-13
 
 ---

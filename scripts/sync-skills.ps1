@@ -39,7 +39,6 @@ $markerEnd   = '<!-- FORGE-SKILLS-END -->'
 # Canonical skill order — determines embedding sequence in both outputs
 $skillOrder = @(
     'workflow-enforcer',
-    'forge-workflow',
     'code-quality',
     'framework-first',
     'branching-strategy',
