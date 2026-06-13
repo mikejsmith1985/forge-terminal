@@ -25,6 +25,14 @@ Test-Path "AGENTS.md"
 Test-Path ".github/skills/forge-workflow"
 ```
 
+**Check 3 — Does `.specify/memory/constitution.md` exist?**
+```powershell
+Test-Path ".specify/memory/constitution.md"
+```
+If present, the project is in **Spec-Driven Development (SDD) mode**. The constitution at
+`.specify/memory/constitution.md` is the AUTHORITATIVE source of binding rules — read it FIRST,
+before any co-skill. Its Articles supersede any duplicated standards elsewhere.
+
 ### Mode Decision Table
 
 | AGENTS.md | forge-workflow skill | Detected Mode |
@@ -33,7 +41,9 @@ Test-Path ".github/skills/forge-workflow"
 | ❌ Missing | ✅ Found             | **Enterprise** |
 | ❌ Missing | ❌ Missing           | **Standard** |
 
-Store the detected mode. It controls which co-skills are **required** vs **optional**.
+Store the detected mode. It controls which co-skills are **required** vs **optional**. SDD mode (Check 3)
+overlays the detected mode: when a constitution is present, its Articles are the binding rules and the
+`speckit-*` pipeline (Phase 0B) is the workflow.
 
 ---
 
@@ -47,6 +57,15 @@ These must load successfully in every project. If missing, report ❌ and stop.
 invoke skill: code-quality
 invoke skill: framework-first
 ```
+
+### Spec-Driven Development pipeline (load when `.specify/` exists)
+When the project has a `.specify/` directory, the GitHub Spec Kit pipeline IS the workflow. Use the
+`speckit-*` skills to drive execution, reading `.specify/memory/constitution.md` as the binding rules:
+```
+speckit-specify  →  speckit-plan  →  speckit-tasks  →  speckit-implement
+```
+Quality gates (load as the task warrants): `speckit-clarify` (de-risk before plan),
+`speckit-analyze` (cross-artifact consistency before implement), `speckit-checklist`.
 
 ### Forge Terminal Project Only (load when AGENTS.md is present)
 These skills are specific to the Forge Terminal codebase. Load them automatically
@@ -62,7 +81,7 @@ Attempt to load these in every project. If the project is in **Standard mode** a
 a skill is not found, mark it ⚠️ and continue — do NOT block the task.
 If the project is in **Enterprise mode** and a skill is not found, mark it ❌ and stop.
 ```
-invoke skill: forge-workflow
+invoke skill: forge-workflow         # superseded by the constitution + speckit pipeline; retained until Phase C3
 invoke skill: branching-strategy
 invoke skill: code-tutor-workflow
 ```
