@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Global constitution install — every CLI tool inherits the rules** — New
+  `POST /api/workflow/global-install` writes the Forge constitution machine-wide:
+  a master copy at `~/.forge/constitution.md` plus an idempotent, marker-fenced
+  block (`<!-- FORGE-CONSTITUTION-START/END -->`) embedded into each supported
+  CLI tool's global instructions file — `~/.claude/CLAUDE.md`,
+  `~/.copilot/copilot-instructions.md`, and `~/.gemini/GEMINI.md`. Re-running
+  replaces the managed block in place and never touches the user's own
+  surrounding instructions. This is the cross-CLI hoist that lets every tool, in
+  every project, inherit the binding rules without per-project reconstruction.
+  Only the constitution is hoisted globally — the `speckit-*` skills stay
+  per-project because they depend on a project-local `.specify/` tree.
 - **Spec Kit pipeline vendored — forge-terminal is now a Spec Kit project** —
   The real GitHub Spec Kit payload (`specify` CLI v0.10.3) is vendored into the
   repo: ten `speckit-*` agent skills under `.claude/skills/` (constitution,
