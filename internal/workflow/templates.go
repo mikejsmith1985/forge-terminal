@@ -1194,8 +1194,9 @@ Branch names are lowercase, hyphenated, and descriptive — scoped to one concer
 
 Names must be self-documenting: no single-letter variables (except ` + "`i`/`j`/`k`" + ` loop iterators
 and ` + "`w`/`r`" + ` HTTP handler parameters). Booleans are prefixed ` + "`is`/`has`/`can`/`should`/`was`" + `.
-Functions are verb-first. No magic numbers. Comments explain the "why," readable by a non-developer.
-Functions stay under 40 lines; prefer guard clauses over deep nesting.
+Functions are verb-first. No magic numbers. Comments explain the "why," readable by a non-developer:
+every file opens with a one-line purpose comment, and every exported/public function carries a doc
+comment. Functions stay under 40 lines; prefer guard clauses over deep nesting.
 
 ## Article V — Testing (Three-Layer Separation)
 
