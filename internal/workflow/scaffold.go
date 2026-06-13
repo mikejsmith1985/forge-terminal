@@ -38,6 +38,15 @@ func scaffoldManifest() []scaffoldEntry {
 			category: "config",
 			render:   RenderClaudeMD,
 		},
+		// Project Constitution — the GitHub Spec Kit (Spec-Driven Development)
+		// source of truth, read first by every speckit stage. Emitted natively so
+		// new projects get Forge's merged rules without per-repo reconstruction.
+		{
+			moduleID: ModuleConstitution,
+			relPath:  filepath.Join(".specify", "memory", "constitution.md"),
+			category: "config",
+			render:   RenderConstitution,
+		},
 		// Workflow config
 		{
 			moduleID: ModuleCopilotInstructions, // Tied to core module

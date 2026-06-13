@@ -40,6 +40,13 @@ type ModuleID string
 
 const (
 	ModuleCopilotInstructions ModuleID = "copilot-instructions"
+	// ModuleConstitution generates .specify/memory/constitution.md — the single
+	// source of truth for this project's binding rules, in the GitHub Spec Kit
+	// (Spec-Driven Development) layout. It merges Forge's hard-won standards
+	// (process protection, branching, release policy, vault handling) into the
+	// constitution that every Spec Kit stage (specify → plan → tasks → implement)
+	// reads first.
+	ModuleConstitution        ModuleID = "constitution"
 	ModuleBranchingStrategy   ModuleID = "branching-strategy"
 	ModuleCodeQuality         ModuleID = "code-quality"
 	ModuleTestingStandards    ModuleID = "testing-standards"
@@ -60,6 +67,7 @@ const (
 func AllModules() []ModuleID {
 	return []ModuleID{
 		ModuleCopilotInstructions,
+		ModuleConstitution,
 		ModuleBranchingStrategy,
 		ModuleCodeQuality,
 		ModuleTestingStandards,
@@ -90,6 +98,13 @@ func ModuleCatalog() []ModuleInfo {
 			ID:          ModuleCopilotInstructions,
 			Name:        "Agent Instructions",
 			Description: "AI agent behavior directives, coding standards, naming conventions, and quality mode configuration. Generates .github/copilot-instructions.md and CLAUDE.md.",
+			Category:    "core",
+			Required:    true,
+		},
+		{
+			ID:          ModuleConstitution,
+			Name:        "Project Constitution (SDD)",
+			Description: "Single source of truth for binding project rules in GitHub Spec Kit layout. Generates .specify/memory/constitution.md, merging Forge's process-protection, branching, release, and vault standards for the Spec-Driven Development pipeline.",
 			Category:    "core",
 			Required:    true,
 		},
@@ -241,6 +256,7 @@ func DefaultConfig() WorkflowConfig {
 		QualityMode: QualityBest,
 		EnabledModules: []ModuleID{
 			ModuleCopilotInstructions,
+			ModuleConstitution,
 			ModuleBranchingStrategy,
 			ModuleCodeQuality,
 			ModuleTestingStandards,

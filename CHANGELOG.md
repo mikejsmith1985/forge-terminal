@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Spec-Driven Development base (GitHub Spec Kit)** — Every newly scaffolded
+  project now receives `.specify/memory/constitution.md`, the GitHub Spec Kit
+  source of truth read first by every speckit stage. The constitution merges
+  Forge's hard-won, non-negotiable rules into eleven numbered Articles (process
+  protection, GitHub Flow, code quality, three-layer testing, local-release-only,
+  vault zero-knowledge, framework-first, and more), so new projects inherit the
+  base requirements without per-repo reconstruction. `CLAUDE.md` now imports the
+  constitution alongside the existing instructions. Emitted natively in Go (no
+  Python/`uv`/`specify` CLI dependency) so project creation works offline — the
+  first additive phase of re-orchestrating the Forge workflow around SDD.
 - **File viewer: Copy Path button** — A "Copy Path" button now appears in the
   MonacoEditor toolbar next to Save. Clicking it writes the full file path to
   the clipboard and shows a brief "Copied!" confirmation. No reveal step needed.
