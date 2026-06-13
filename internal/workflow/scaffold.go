@@ -315,6 +315,22 @@ func ScaffoldProject(projectPath string, config WorkflowConfig) (*ScaffoldResult
 		}
 	}
 
+	// Replay the embedded Spec Kit pipeline (.specify/ payload + speckit-* skills)
+	// so the project can run Spec-Driven Development offline. Done outside the
+	// manifest loop because it writes a whole embedded directory tree rather than
+	// a single rendered file. The constitution is excluded from the payload — the
+	// manifest's RenderConstitution owns .specify/memory/constitution.md.
+	if config.HasModule(ModuleSpecKit) {
+		specKitPaths, specKitErr := ScaffoldSpecKit(absolutePath, config.ConflictStrategy)
+		if specKitErr != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("speckit pipeline: %s", specKitErr))
+			result.Success = false
+		} else {
+			result.FilesCreated = append(result.FilesCreated, specKitPaths...)
+			log.Printf("[Workflow] Spec Kit pipeline: %d files written", len(specKitPaths))
+		}
+	}
+
 	// Configure git hooks path if git hooks module is enabled and git is present
 	if config.HasModule(ModuleGitHooks) {
 		configureGitHooks(absolutePath)
