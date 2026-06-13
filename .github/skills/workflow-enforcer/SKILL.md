@@ -20,30 +20,25 @@ Before loading any co-skills, determine the **project mode** by checking two thi
 Test-Path "AGENTS.md"
 ```
 
-**Check 2 — Does `.github/skills/forge-workflow/` exist?**
-```powershell
-Test-Path ".github/skills/forge-workflow"
-```
-
-**Check 3 — Does `.specify/memory/constitution.md` exist?**
+**Check 2 — Does `.specify/memory/constitution.md` exist?**
 ```powershell
 Test-Path ".specify/memory/constitution.md"
 ```
 If present, the project is in **Spec-Driven Development (SDD) mode**. The constitution at
 `.specify/memory/constitution.md` is the AUTHORITATIVE source of binding rules — read it FIRST,
-before any co-skill. Its Articles supersede any duplicated standards elsewhere.
+before any co-skill. Its Articles supersede any duplicated standards elsewhere, and the `speckit-*`
+pipeline (Phase 0B) is the workflow.
 
 ### Mode Decision Table
 
-| AGENTS.md | forge-workflow skill | Detected Mode |
-|-----------|----------------------|---------------|
-| ✅ Found  | ✅ Found             | **Forge Enterprise** |
-| ❌ Missing | ✅ Found             | **Enterprise** |
-| ❌ Missing | ❌ Missing           | **Standard** |
+| AGENTS.md | constitution | Detected Mode |
+|-----------|--------------|---------------|
+| ✅ Found  | ✅ Found      | **Forge Enterprise (SDD)** |
+| ❌ Missing | ✅ Found      | **Enterprise (SDD)** |
+| ✅ Found  | ❌ Missing    | **Enterprise** |
+| ❌ Missing | ❌ Missing    | **Standard** |
 
-Store the detected mode. It controls which co-skills are **required** vs **optional**. SDD mode (Check 3)
-overlays the detected mode: when a constitution is present, its Articles are the binding rules and the
-`speckit-*` pipeline (Phase 0B) is the workflow.
+Store the detected mode. It controls which co-skills are **required** vs **optional**.
 
 ---
 
@@ -81,7 +76,6 @@ Attempt to load these in every project. If the project is in **Standard mode** a
 a skill is not found, mark it ⚠️ and continue — do NOT block the task.
 If the project is in **Enterprise mode** and a skill is not found, mark it ❌ and stop.
 ```
-invoke skill: forge-workflow         # superseded by the constitution + speckit pipeline; retained until Phase C3
 invoke skill: branching-strategy
 invoke skill: code-tutor-workflow
 ```
@@ -110,7 +104,6 @@ reflects the Check 1 result from Phase 0A.
 ├─────────────────────────┼────────────────────────────────────────────┤
 │ code-quality            │ ✅ Loaded                                  │
 │ forge-vault             │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
-│ forge-workflow          │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ branching-strategy      │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ code-tutor-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ AGENTS.md               │ ✅ Found   /  ⚠️ Not present (standard mode) │

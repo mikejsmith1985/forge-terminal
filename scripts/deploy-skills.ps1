@@ -11,8 +11,8 @@
 # Machine-wide skills: the project-AGNOSTIC subset ($globalSkills) is ALSO hoisted into the user-level
 # ~/.claude/skills directory, so every Claude Code project on this machine inherits the core workflow
 # skills WITHOUT per-repo replication (Claude Code natively resolves user-level skills). Forge-specific
-# skills — e.g. forge-workflow, which hardcodes Forge Terminal's build commands — are deliberately NOT
-# hoisted; they stay per-repo so they never override the workflow in unrelated projects. Use -GlobalOnly
+# skills — e.g. forge-vault and add-command-card, which assume Forge Terminal's own systems — are
+# deliberately NOT hoisted; they stay per-repo so they never override unrelated projects. Use -GlobalOnly
 # to refresh just the user-level set without touching any repo.
 #
 # Usage:
@@ -40,7 +40,6 @@ $projectsRoot      = Split-Path $forgeTerminalRoot -Parent
 # are not surfaced as per-repo commands. Order controls the Copilot embedding sequence.
 $curatedSkills = @(
     'workflow-enforcer',
-    'forge-workflow',
     'code-quality',
     'framework-first',
     'branching-strategy',
@@ -54,8 +53,8 @@ $markerEnd   = '<!-- FORGE-SKILLS-END -->'
 
 # The subset of curated skills that are project-AGNOSTIC and safe to install machine-wide in
 # ~/.claude/skills (Claude Code user-level skills, inherited by every project without replication).
-# forge-workflow is deliberately excluded: it hardcodes Forge Terminal's build commands and must stay
-# project-local. workflow-enforcer self-detects project mode, so it degrades gracefully in any repo.
+# workflow-enforcer self-detects project mode (SDD via .specify/memory/constitution.md), so it
+# degrades gracefully in any repo.
 $globalSkills = @(
     'workflow-enforcer',
     'code-quality',
