@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Spec Kit pipeline vendored — forge-terminal is now a Spec Kit project** —
+  The real GitHub Spec Kit payload (`specify` CLI v0.10.3) is vendored into the
+  repo: ten `speckit-*` agent skills under `.claude/skills/` (constitution,
+  specify, clarify, plan, tasks, analyze, implement, checklist, taskstoissues,
+  agent-context-update) plus the supporting `.specify/` tree (bash scripts,
+  spec/plan/tasks/constitution/checklist templates, extensions, workflows). This
+  makes the Spec-Driven Development pipeline directly runnable here without each
+  developer installing the CLI. `.specify/memory/constitution.md` is populated
+  with forge-terminal's own constitution, generated from the same template that
+  scaffolded projects receive (PR #152), so the two never drift. A `.gitattributes`
+  rule pins `*.sh` to LF so the vendored scripts run under bash on Windows.
 - **Spec-Driven Development base (GitHub Spec Kit)** — Every newly scaffolded
   project now receives `.specify/memory/constitution.md`, the GitHub Spec Kit
   source of truth read first by every speckit stage. The constitution merges
