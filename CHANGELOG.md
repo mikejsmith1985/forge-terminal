@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.12.0] - 2026-06-13
+
+---
+
+## [v7.12.0] - 2026-06-13
+
 ### Changed
 - **Skill set collapsed toward SDD (Phase C2)** — `AGENTS.md`'s mandatory cascade is
   rewritten Spec-Driven-Development-first: it now names reading
