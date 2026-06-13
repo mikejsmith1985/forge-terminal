@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **New projects ship with the Spec Kit pipeline** — Project scaffolding now lays
+  down the full GitHub Spec Kit pipeline: the `speckit-*` agent skills
+  (`specify → plan → tasks → implement`, plus clarify/analyze/checklist/etc.) and
+  the supporting `.specify/` scripts and templates. The payload is embedded in the
+  Forge binary (`go:embed`) and replayed natively, so every project created through
+  Forge Terminal gets Spec-Driven Development **offline** — no Python, `uv`, or
+  `specify` CLI required. The per-project constitution stays owned by
+  `RenderConstitution` (it is excluded from the embedded payload), so each project's
+  rules are freshly generated rather than copied. Honors the conflict strategy, so
+  re-scaffolding never clobbers a developer's edited pipeline files.
 - **Global constitution install — every CLI tool inherits the rules** — New
   `POST /api/workflow/global-install` writes the Forge constitution machine-wide:
   a master copy at `~/.forge/constitution.md` plus an idempotent, marker-fenced

@@ -47,6 +47,10 @@ const (
 	// constitution that every Spec Kit stage (specify → plan → tasks → implement)
 	// reads first.
 	ModuleConstitution        ModuleID = "constitution"
+	// ModuleSpecKit replays the embedded GitHub Spec Kit pipeline (the .specify/
+	// payload and speckit-* agent skills) into the project, so every new project
+	// can run the Spec-Driven Development workflow offline.
+	ModuleSpecKit             ModuleID = "speckit-pipeline"
 	ModuleBranchingStrategy   ModuleID = "branching-strategy"
 	ModuleCodeQuality         ModuleID = "code-quality"
 	ModuleTestingStandards    ModuleID = "testing-standards"
@@ -68,6 +72,7 @@ func AllModules() []ModuleID {
 	return []ModuleID{
 		ModuleCopilotInstructions,
 		ModuleConstitution,
+		ModuleSpecKit,
 		ModuleBranchingStrategy,
 		ModuleCodeQuality,
 		ModuleTestingStandards,
@@ -107,6 +112,13 @@ func ModuleCatalog() []ModuleInfo {
 			Description: "Single source of truth for binding project rules in GitHub Spec Kit layout. Generates .specify/memory/constitution.md, merging Forge's process-protection, branching, release, and vault standards for the Spec-Driven Development pipeline.",
 			Category:    "core",
 			Required:    true,
+		},
+		{
+			ID:          ModuleSpecKit,
+			Name:        "Spec Kit Pipeline (SDD)",
+			Description: "Installs the GitHub Spec Kit pipeline — the speckit-* agent skills (specify → plan → tasks → implement) and the supporting .specify/ scripts and templates — so the project can run Spec-Driven Development offline without the specify CLI.",
+			Category:    "core",
+			Required:    false,
 		},
 		{
 			ID:          ModuleBranchingStrategy,
@@ -257,6 +269,7 @@ func DefaultConfig() WorkflowConfig {
 		EnabledModules: []ModuleID{
 			ModuleCopilotInstructions,
 			ModuleConstitution,
+			ModuleSpecKit,
 			ModuleBranchingStrategy,
 			ModuleCodeQuality,
 			ModuleTestingStandards,
