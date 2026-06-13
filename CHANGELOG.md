@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Constitution now a proven superset of the legacy rules (SDD Phase C gate)** —
+  Audited the 1124-line `copilot-instructions.md` monolith against the constitution's
+  Articles ahead of retiring it. One gap was found and closed: Article IV (Code
+  Quality) now states the explicit comment mandate — every file opens with a
+  one-line purpose comment and every exported function carries a doc comment —
+  matching the monolith. forge-terminal's own `.specify/memory/constitution.md` was
+  regenerated from the template so the two stay byte-identical. This makes the
+  constitution safe to use as the single source of truth when the monolith is
+  dissolved.
+
 ### Added
 - **"Install Constitution Globally" button** — The Forge Workflow sidebar card now
   has a one-click action to install the constitution machine-wide (calling
