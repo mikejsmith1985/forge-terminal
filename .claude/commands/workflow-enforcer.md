@@ -66,8 +66,8 @@ when `AGENTS.md` exists — they teach the agent about project-specific systems.
 If a skill is missing, report ⚠️ and continue.
 ```
 invoke skill: forge-vault
-invoke skill: sequential-tasks
 ```
+(The former `sequential-tasks` skill is superseded by `speckit-tasks` in the SDD pipeline.)
 
 ### Enterprise-Only (required in Forge Enterprise / Enterprise mode; optional in Standard)
 Attempt to load these in every project. If the project is in **Standard mode** and
@@ -102,7 +102,6 @@ reflects the Check 1 result from Phase 0A.
 ├─────────────────────────┼────────────────────────────────────────────┤
 │ code-quality            │ ✅ Loaded                                  │
 │ forge-vault             │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
-│ sequential-tasks        │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
 │ forge-workflow          │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ branching-strategy      │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ code-tutor-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
