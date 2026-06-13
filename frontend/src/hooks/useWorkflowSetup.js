@@ -84,6 +84,7 @@ export function useWorkflowSetup() {
   const [isDetecting, setIsDetecting] = useState(false)
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [isApplying, setIsApplying] = useState(false)
+  const [isInstallingGlobal, setIsInstallingGlobal] = useState(false)
 
   // Watcher state
   const [watcherNotifications, setWatcherNotifications] = useState([])
@@ -286,6 +287,28 @@ export function useWorkflowSetup() {
   }, [config, setErrorWithAutoDismiss])
 
   /**
+   * Install the Forge constitution machine-wide so every CLI tool (Claude,
+   * Copilot, Gemini) inherits the project's binding rules without per-project
+   * reconstruction. This is project-independent — it writes the user's global
+   * instruction files, not the current project. Returns the install result
+   * (with targetsWritten) on success, or null on failure.
+   */
+  const installGlobalConstitution = useCallback(async () => {
+    setIsInstallingGlobal(true)
+    setError(null)
+    try {
+      return await workflowFetch('/api/workflow/global-install', {
+        method: 'POST',
+      })
+    } catch (fetchError) {
+      setErrorWithAutoDismiss(`Global install failed: ${fetchError.message}`)
+      return null
+    } finally {
+      setIsInstallingGlobal(false)
+    }
+  }, [setErrorWithAutoDismiss])
+
+  /**
    * Check the workflow status for a project (configured, preset, compliance).
    */
   const checkStatus = useCallback(async (projectPath) => {
@@ -451,6 +474,7 @@ export function useWorkflowSetup() {
     isDetecting,
     isPreviewing,
     isApplying,
+    isInstallingGlobal,
     error,
     watcherNotifications,
     isWatcherActive,
@@ -465,6 +489,7 @@ export function useWorkflowSetup() {
     setQualityMode,
     generatePreview,
     applyWorkflow,
+    installGlobalConstitution,
     checkStatus,
     scanCompliance,
     clearError,
@@ -486,6 +511,8 @@ function defaultConfig() {
     qualityMode: 'best',
     enabledModules: [
       'copilot-instructions',
+      'constitution',
+      'speckit-pipeline',
       'branching-strategy',
       'code-quality',
       'testing-standards',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle, Copy, Eye, EyeOff, Info } from 'lucide-react'
+import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle, Copy, Eye, EyeOff, Info, Globe } from 'lucide-react'
 import { useWorkflowSetup } from '../hooks/useWorkflowSetup'
 import WorkflowWizard from './WorkflowWizard'
 import './ForgeWorkflowCard.css'
@@ -27,6 +27,8 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
     compliance,
     checkStatus,
     scanCompliance,
+    installGlobalConstitution,
+    isInstallingGlobal,
   } = workflow
 
   // Auto-check status when cwd changes
@@ -71,6 +73,26 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
     }
   }, [cwd, checkStatus])
 
+  // Install the Forge constitution into the user's global CLI instruction files.
+  // Confirmed first because it writes outside the current project (~/.claude,
+  // ~/.copilot, ~/.gemini) — though only inside a managed marker block.
+  const handleInstallGlobal = useCallback(async () => {
+    const confirmed = window.confirm(
+      'Install the Forge constitution globally?\n\n' +
+      'This writes it into your global CLI instruction files (~/.claude/CLAUDE.md, ' +
+      '~/.copilot/copilot-instructions.md, ~/.gemini/GEMINI.md) inside a managed ' +
+      'marker block. Your own instructions outside that block are preserved.'
+    )
+    if (!confirmed) return
+
+    const result = await installGlobalConstitution()
+    if (result) {
+      onToast?.(`Constitution installed to ${result.targetsWritten?.length || 0} CLI tool(s)`, 'success')
+    } else {
+      onToast?.('Global constitution install failed', 'error')
+    }
+  }, [installGlobalConstitution, onToast])
+
   // Determine compliance badge
   const complianceBadge = getComplianceBadge(compliance)
 
@@ -100,6 +122,18 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
         {/* Expanded View */}
         {isExpanded && (
           <div className="fwc-body">
+            {/* Global action — independent of the current project. Installs the
+                constitution into every CLI tool's machine-wide instructions. */}
+            <button
+              className="fwc-btn fwc-btn-global"
+              onClick={handleInstallGlobal}
+              disabled={isInstallingGlobal}
+              title="Write the Forge constitution into ~/.claude, ~/.copilot and ~/.gemini"
+            >
+              <Globe size={14} className={isInstallingGlobal ? 'fwc-spin' : ''} />
+              {isInstallingGlobal ? 'Installing…' : 'Install Constitution Globally'}
+            </button>
+
             {status?.configured ? (
               <>
                 {/* Compliance Summary */}
