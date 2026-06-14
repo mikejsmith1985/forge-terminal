@@ -1286,46 +1286,22 @@ function App() {
     }));
   }, []);
 
-  // Handle directory change from terminal - auto-rename tab and save directory.
-  // Respects the user's chosen tab naming strategy: static strategies (numbered,
-  // shell-type, custom-prefix) never auto-rename; dynamic strategies update on cd.
+  // Handle directory change from the terminal: track the shell's current directory
+  // for features that depend on it (git panel, release/workflow cards), but NEVER
+  // rename the tab. The tab label is set once at tab creation (see tabLabel.js) and
+  // is deliberately immune to navigation — this is the tab-naming rebuild's core
+  // rule, and the reason the label no longer drifts (or corrupts) as an agent
+  // navigates deep into a project.
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
-    // Guard: skip all updates when the shell navigates into a temp or system
-    // directory. AI tools that open pasted images from %TEMP% (or /tmp) would
-    // otherwise overwrite the tab's project name AND currentDirectory, breaking
-    // the release manager card, workflow card, git panel, and other features
-    // that depend on currentDirectory pointing at the actual project root.
+    // Skip temp/system directories so currentDirectory keeps pointing at the real
+    // project root rather than a transient %TEMP% path (used by other features).
     if (fullPath && isTempOrSystemPath(fullPath)) {
       return;
-    }
-    // Guard: a bare home/profile directory (e.g. /home/mikejsmith1985 or
-    // C:\Users\mike) is where WSL/PowerShell shells land on startup — it is
-    // never a meaningful project name. Update the stored directory so that
-    // other features (git panel, workflow card) know where the shell actually
-    // is, but do NOT rename the tab. The title will update correctly once the
-    // shell navigates into a real project directory.
-    if (fullPath && isSystemProfilePath(fullPath)) {
-      updateTabDirectory(tabId, fullPath);
-      return;
-    }
-    // Static strategies: never auto-rename on directory change
-    if (isStaticNamingStrategy(namingStrategy)) {
-      if (fullPath) updateTabDirectory(tabId, fullPath);
-      return;
-    }
-    if (folderName || fullPath) {
-      const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix, rootFolder: namingRootFolder }) || '';
-      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title, namingStrategy });
-      // Guard: skip rename if title looks like a file or fell back to a generic "Terminal N".
-      // Overwriting a real project name with "Terminal 1" is worse than leaving it unchanged.
-      if (title && !title.startsWith('Terminal ') && !isFileLikeName(title)) {
-        updateTabTitle(tabId, title);
-      }
     }
     if (fullPath) {
       updateTabDirectory(tabId, fullPath);
     }
-  }, [namingStrategy, namingPrefix, namingRootFolder, updateTabTitle, updateTabDirectory]);
+  }, [updateTabDirectory]);
 
   // Helper to get folder name from a path
   const getFolderNameFromPath = (path) => {

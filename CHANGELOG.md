@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Terminal tab name no longer drifts or corrupts on deep navigation (tab-naming
+  rebuild, US1)** — The tab label is now computed **once at tab creation** from the
+  project root (`computeTabLabel`) and the directory-change path is **severed from
+  naming**: `handleDirectoryChange` (App.jsx) updates `currentDirectory` only — it no
+  longer recomputes/rewrites the tab title — so the OSC 9;9 (`cd`) notifications that
+  used to rename the tab (and leak raw escape characters into it) can't touch the
+  label anymore. Session restore keeps the saved label and self-heals only a
+  legacy/corrupted one (empty, file-like, generic `Terminal N`, or carrying control
+  characters). 297/297 frontend tests pass. Remaining cleanup (delete the 6-strategy
+  settings system + backend naming fields) follows in the same feature branch.
+
 ### Added
 - **Tab label producer — foundation of the tab-naming rebuild** — New
   `frontend/src/utils/tabLabel.js` with `computeTabLabel(cwd)` and

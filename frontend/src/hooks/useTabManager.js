@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
 import { logger } from '../utils/logger';
 import { extractProjectFolder, getTabTitle, getShellLabel, isStaticNamingStrategy, isFileLikeName, isSystemProfilePath } from '../utils/projectFolder';
+import { computeTabLabel } from '../utils/tabLabel';
 
 const MAX_TABS = 20;
 
@@ -72,27 +73,11 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
 
   const newTab = {
     id: generateId(),
-    title: (() => {
-      if (options.title) return options.title;
-      const strategy    = options.namingStrategy    || 'project-root';
-      const prefix      = options.namingPrefix      || 'Dev';
-      const rootFolder  = options.namingRootFolder  || '';
-      if (strategy === 'shell-type') {
-        return `${getShellLabel(shellConfig?.shellType)} ${tabNumber}`;
-      }
-      if (strategy === 'custom-prefix') {
-        return `${prefix} ${tabNumber}`;
-      }
-      if (strategy === 'numbered') {
-        return `Terminal ${tabNumber}`;
-      }
-      // Dynamic strategies (project-root, current-dir, parent-child):
-      // seed from currentDirectory if available, otherwise generic placeholder
-      if (currentDirectory) {
-        return getTabTitle(currentDirectory, strategy, { tabNumber, prefix, rootFolder, fallback: `Terminal ${tabNumber}` });
-      }
-      return `Terminal ${tabNumber}`;
-    })(),
+    // Tab naming rebuild: one fixed rule — the project-root name from the initial
+    // directory, computed ONCE here. An explicit options.title (e.g. a manual
+    // rename or a restored label) always wins. De-duplication (` #N`) is applied
+    // by the caller against the open tabs' labels.
+    title: options.title || computeTabLabel(currentDirectory),
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
@@ -268,34 +253,19 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       if (session && session.tabs && session.tabs.length > 0) {
         // Restore tabs from session
         const restoredTabs = session.tabs.map((tabState, index) => {
-          const strategy    = namingStrategyRef.current    || 'project-root';
-          const rootFolder  = namingRootFolderRef.current  || '';
-          let title = tabState.title || `Terminal ${index + 1}`;
-
-          // Re-derive title from saved directory when using a dynamic strategy.
-          // Also re-derive if the saved title is a filename that leaked in from a prior session.
-          // Skip derivation for bare home/profile directories (/home/<user>, C:\Users\<user>) —
-          // those are transient shell starting points that cannot yield a meaningful project name.
-          if (!isStaticNamingStrategy(strategy) && tabState.currentDirectory &&
-              !isSystemProfilePath(tabState.currentDirectory) &&
-              (title.startsWith('Terminal ') || title === '~' || !title || isFileLikeName(title))) {
-            const derived = getTabTitle(tabState.currentDirectory, strategy, {
-              tabNumber: index + 1,
-              prefix: namingPrefixRef.current || 'Dev',
-              rootFolder,
-              fallback: `Terminal ${index + 1}`,
+          // Tab naming rebuild: labels are write-once, so restore the saved title
+          // as-is. Self-heal only a legacy/corrupted title (empty, file-like, or
+          // carrying control characters from the old rename bug) by recomputing it
+          // once from the saved directory.
+          let title = tabState.title;
+          const isCorruptTitle = !title || title === '~' || title.startsWith('Terminal ') || isFileLikeName(title) || Array.from(title).some(function (ch) { return ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127; });
+          if (isCorruptTitle) {
+            title = computeTabLabel(tabState.currentDirectory);
+            logger.session('Self-healed a corrupted tab title', {
+              tabId: tabState.id,
+              directory: tabState.currentDirectory,
+              healedTitle: title,
             });
-            // Guard against saved paths ending in a document or binary filename.
-            // Uses the centralized isFileLikeName check from projectFolder.js.
-            if (derived && !isFileLikeName(derived) && derived !== '~') {
-              title = derived;
-              logger.session('Derived tab title from directory', {
-                tabId: tabState.id,
-                directory: tabState.currentDirectory,
-                strategy,
-                derivedTitle: title,
-              });
-            }
           }
           
           return {

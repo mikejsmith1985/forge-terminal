@@ -36,13 +36,13 @@
 **Goal**: Label set once at creation; terminal output can never change it.
 **Independent test**: Quickstart Scenario A (cd 10+ levels, label unchanged).
 
-- [ ] T007 [US1] Write failing unit test: `useTabManager` sets a new tab's `title` once via `computeTabLabel`+`dedupeLabel` and never recomputes it on cwd update, in `frontend/src/hooks/useTabManager.test.js`
-- [ ] T008 [US1] Set the tab label at creation from `tabLabel.js` in `frontend/src/hooks/useTabManager.js`; remove the strategy-based title block and the naming options
-- [ ] T009 [US1] Sever the rename path: in `frontend/src/App.jsx` `handleDirectoryChange`, update `currentDirectory` only — remove the `getTabTitle`→`updateTabTitle` call
-- [ ] T010 [US1] In `frontend/src/components/ForgeTerminal.jsx`, keep the OSC 9;9 handler for cwd tracking but remove any tab-title mutation it triggers
-- [ ] T011 [US1] Delete `retitleAllTabsFromCwd` from `frontend/src/hooks/useTabManager.js` and all its callers
-- [ ] T012 [US1] Add/honor `isManuallyRenamed` so an automatic label never overrides a user rename (`useTabManager.js`, `internal/commands/sessions.go` TabState)
-- [ ] T013 [US1] Write a Cypress UX test (`cypress-real-events`, launched via `run-dev-clean.ps1`) that opens a tab, navigates 10+ levels deep, and asserts the tab label is unchanged and control-character-free — reading the tab label, per Article X
+- [~] T007 [US1] Title-once behavior covered by `tabLabel` tests + existing `useTabManager` session-restore tests (all green); a dedicated "never recomputes on cwd update" unit test is still worth adding
+- [X] T008 [US1] Tab label set at creation from `tabLabel.js` (`computeTabLabel`) in `frontend/src/hooks/useTabManager.js`; strategy-based title block removed
+- [X] T009 [US1] Severed the rename path: `handleDirectoryChange` in `frontend/src/App.jsx` now updates `currentDirectory` only (no `getTabTitle`/`updateTabTitle`)
+- [X] T010 [US1] OSC 9;9 still tracks cwd but no longer mutates the title — it routes through the now-severed `handleDirectoryChange`
+- [ ] T011 [US1] Delete `retitleAllTabsFromCwd` from `frontend/src/hooks/useTabManager.js` and all its callers *(deferred to US3 — only invoked on settings change, which US3 removes)*
+- [ ] T012 [US1] Add/honor `isManuallyRenamed` so an automatic label never overrides a user rename *(manual rename already persists for normal labels since nothing auto-renames; explicit flag still pending)*
+- [ ] T013 [US1] Write a Cypress UX test (deep-nav stability) *(deferred — needs a live `run-dev-clean.ps1` session)*
 
 **Checkpoint**: the months-old bug is structurally gone — MVP.
 
