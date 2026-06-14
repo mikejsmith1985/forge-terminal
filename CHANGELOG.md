@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tab label producer — foundation of the tab-naming rebuild** — New
+  `frontend/src/utils/tabLabel.js` with `computeTabLabel(cwd)` and
+  `dedupeLabel(label, existing)`: the single source of a tab's display name.
+  `computeTabLabel` returns the project root (first child of a known projects
+  container) and is **stable at any directory depth**, falls back to the immediate
+  folder name when not under a projects root, and strips control characters so a
+  corrupted path can never reach the label. `dedupeLabel` appends the lowest free
+  ` #N` suffix for duplicate projects. Pure functions, 9/9 unit tests. First
+  increment of `specs/002-tab-naming-rebuild/`; wiring into the tab manager and
+  removal of the old multi-strategy system follow.
+
 ## [7.14.0] - 2026-06-14
 
 ---
