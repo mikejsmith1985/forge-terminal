@@ -28,12 +28,12 @@ Single Go project (Forge Terminal). Feature code lives in `internal/workflow/`; 
 
 **Purpose**: The single-source projection engine every user story depends on. MUST complete before US1–US3.
 
-- [ ] T003 Write failing unit test for stage enumeration over the embedded `speckit/claude-skills/*` payload in `internal/workflow/speckit_project_test.go`
-- [ ] T004 Implement `PipelineStage` enumeration (read embedded source, parse frontmatter) in `internal/workflow/speckit_project.go`
-- [ ] T005 Write failing unit test for `StageProjection` path resolution per tool + idempotency in `internal/workflow/speckit_project_test.go`
-- [ ] T006 Implement the per-tool projection function (destination + transform per `contracts/pipeline-install.md`) in `internal/workflow/speckit_project.go`, with a one-line Article VII drift justification comment
-- [ ] T007 Write failing unit test that `ConflictSkip` preserves an existing destination file in `internal/workflow/speckit_project_test.go`
-- [ ] T008 Implement conflict-honoring write by reusing `FileConflictStrategy` in `internal/workflow/speckit_project.go`
+- [X] T003 Write failing unit test for stage enumeration over the embedded `speckit/claude-skills/*` payload in `internal/workflow/speckit_project_test.go`
+- [X] T004 Implement `SpecKitStage` enumeration (`EnumerateSpecKitStages`, reads embedded source) in `internal/workflow/speckit_project.go`
+- [X] T005 Write failing unit test for stage path resolution per tool in `internal/workflow/speckit_project_test.go`
+- [X] T006 Implement the per-tool projection function (`ProjectSpecKitForTool` + `specKitStageDestPath`) in `internal/workflow/speckit_project.go`, with the Article VII drift justification comment
+- [X] T007 Write failing unit test that `ConflictSkip` preserves an existing destination file in `internal/workflow/speckit_project_test.go`
+- [X] T008 Implement conflict-honoring write by reusing `FileConflictStrategy`/`writeFileEnsuringDir` in `internal/workflow/speckit_project.go`
 
 **Checkpoint**: projection engine is unit-tested and conflict-safe.
 
@@ -44,11 +44,11 @@ Single Go project (Forge Terminal). Feature code lives in `internal/workflow/`; 
 **Goal**: A Copilot user can run specify→plan→tasks→implement and get the same artifacts as Claude.
 **Independent test**: Quickstart Scenario A — invoke `skill: speckit-specify` under Copilot, confirm `spec.md` structure matches Claude's.
 
-- [ ] T009 [US1] Write failing integration test asserting stages project to `.github/skills/speckit-*/SKILL.md` in `internal/workflow/speckit_project_test.go`
-- [ ] T010 [US1] Implement Copilot skill-directory projection (`.github/skills/<stage>/SKILL.md`) in `internal/workflow/speckit_project.go`
-- [ ] T011 [US1] Embed the speckit stages into the `.github/copilot-instructions.md` FORGE-SKILLS marker block, reusing the marker-block upsert logic in `internal/workflow/speckit_project.go`
-- [ ] T012 [US1] Write failing test asserting the FORGE-SKILLS block lists each stage and the `skill: speckit-specify` invocation in `internal/workflow/speckit_project_test.go`
-- [ ] T013 [US1] Verify per Quickstart Scenario A: run the pipeline under Copilot in a scratch project and read the produced artifacts (Article X evidence)
+- [X] T009 [US1] Write failing integration test asserting stages project to `.github/skills/speckit-*/SKILL.md` in `internal/workflow/speckit_project_test.go`
+- [X] T010 [US1] Implement Copilot skill-directory projection (`.github/skills/<stage>/SKILL.md`) in `internal/workflow/speckit_project.go`
+- [X] T011 [US1] Embed the speckit stages into `.github/copilot-instructions.md` via a dedicated `FORGE-SPECKIT` marker block (kept separate from the PS-managed FORGE-SKILLS block), reusing `upsertMarkerBlock` in `internal/workflow/speckit_project.go`
+- [X] T012 [US1] Write failing test asserting the FORGE-SPECKIT block lists each stage and the `skill: speckit-specify` invocation in `internal/workflow/speckit_project_test.go`
+- [ ] T013 [US1] Verify per Quickstart Scenario A: run the pipeline under Copilot in a scratch project and read the produced artifacts (Article X evidence) *(manual — requires a live Copilot session)*
 
 **Checkpoint**: Copilot pipeline is runnable end-to-end — MVP deliverable.
 
@@ -73,8 +73,8 @@ Single Go project (Forge Terminal). Feature code lives in `internal/workflow/`; 
 **Goal**: Scaffolding and existing-project setup install the runnable pipeline for all three tools, honoring conflict strategy.
 **Independent test**: Quickstart Scenarios C and E.
 
-- [ ] T018 [US3] Write failing integration test: `ScaffoldSpecKit` writes per-tool stage files for claude+copilot+google into a temp project in `internal/workflow/speckit_scaffold_test.go`
-- [ ] T019 [US3] Extend `ScaffoldSpecKit` (`internal/workflow/speckit_scaffold.go`) and the `ModuleSpecKit` replay (`internal/workflow/scaffold.go`) to call the per-tool projection
+- [X] T018 [US3] Write failing integration test: scaffolding writes Copilot stage files + the FORGE-SPECKIT block (`TestScaffoldProject_ProjectsCopilotSpecKit`) in `internal/workflow/speckit_scaffold_test.go` *(Google deferred to US2)*
+- [X] T019 [US3] Extend the `ModuleSpecKit` replay (`internal/workflow/scaffold.go`) to call `ProjectSpecKitForTool` for Copilot after the Claude payload
 - [ ] T020 [US3] Write failing test: re-scaffold under `ConflictSkip` preserves an edited stage file in `internal/workflow/speckit_scaffold_test.go`
 - [ ] T021 [US3] Wire the existing-project workflow-setup path to install the per-tool pipeline without disturbing installed Claude files in `internal/workflow/scaffold.go`
 - [ ] T022 [US3] Implement `InstallResult.warnings` for absent/partial tool surfaces (FR-009) in `internal/workflow/scaffold.go`

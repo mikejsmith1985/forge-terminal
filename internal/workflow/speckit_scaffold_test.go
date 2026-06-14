@@ -3,6 +3,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -81,5 +82,30 @@ func TestScaffoldProject_IncludesSpecKitPipeline(t *testing.T) {
 	// Forge constitution present (from the manifest, not the embedded payload)
 	if _, err := os.Stat(filepath.Join(projectDir, ".specify", "memory", "constitution.md")); err != nil {
 		t.Error("scaffolded project missing Forge-rendered constitution.md")
+	}
+}
+
+// TestScaffoldProject_ProjectsCopilotSpecKit proves scaffolding installs the
+// pipeline for Copilot too (FR-006 / US3), not just Claude: the .github/skills/
+// stage files are written and the FORGE-SPECKIT invocation block is embedded in
+// copilot-instructions.md so a Copilot user can discover and run the pipeline.
+func TestScaffoldProject_ProjectsCopilotSpecKit(t *testing.T) {
+	projectDir := t.TempDir()
+	config := DefaultConfig()
+	config.ProjectName = "speckit-copilot-test"
+
+	if _, err := ScaffoldProject(projectDir, config); err != nil {
+		t.Fatalf("ScaffoldProject() error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(projectDir, ".github", "skills", "speckit-plan", "SKILL.md")); err != nil {
+		t.Error("scaffolded project missing Copilot speckit-plan skill")
+	}
+	instructions, err := os.ReadFile(filepath.Join(projectDir, ".github", "copilot-instructions.md"))
+	if err != nil {
+		t.Fatalf("scaffolded project missing copilot-instructions.md: %v", err)
+	}
+	if !strings.Contains(string(instructions), "FORGE-SPECKIT-START") {
+		t.Error("copilot-instructions.md missing the FORGE-SPECKIT invocation block")
 	}
 }
