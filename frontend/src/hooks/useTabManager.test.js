@@ -43,6 +43,93 @@ describe('useTabManager — session restore', () => {
     expect(tab?.title).toBe('3d-repos')
   })
 
+  it('relabels a tab when the shell switches to a different project root', async () => {
+    const session = makeSession([
+      {
+        id: 'tab-1',
+        title: 'AzureWorkflow',
+        currentDirectory: 'C:/ProjectsWin/AzureWorkflow/AzureWorkflowPOC',
+        shellConfig: { shellType: 'powershell', wslDistro: '', wslHomePath: '' },
+      },
+    ])
+
+    global.fetch = vi.fn((url) =>
+      url === '/api/sessions'
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(session) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve(null) })
+    )
+
+    const { result } = renderHook(() => useTabManager({ shellType: 'powershell' }, 'auto-cycle'))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    act(() => {
+      result.current.updateTabDirectory('tab-1', 'C:/ProjectsWin/forge-terminal')
+    })
+
+    expect(result.current.tabs.find((t) => t.id === 'tab-1')?.title).toBe('forge-terminal')
+  })
+
+  it('does NOT relabel during deep navigation within the same project', async () => {
+    const session = makeSession([
+      {
+        id: 'tab-1',
+        title: 'forge-terminal',
+        currentDirectory: 'C:/ProjectsWin/forge-terminal',
+        shellConfig: { shellType: 'powershell', wslDistro: '', wslHomePath: '' },
+      },
+    ])
+
+    global.fetch = vi.fn((url) =>
+      url === '/api/sessions'
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(session) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve(null) })
+    )
+
+    const { result } = renderHook(() => useTabManager({ shellType: 'powershell' }, 'auto-cycle'))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    act(() => {
+      result.current.updateTabDirectory('tab-1', 'C:/ProjectsWin/forge-terminal/internal/commands')
+    })
+
+    expect(result.current.tabs.find((t) => t.id === 'tab-1')?.title).toBe('forge-terminal')
+  })
+
+  it('never relabels over a manual rename, even on a project switch', async () => {
+    const session = makeSession([
+      {
+        id: 'tab-1',
+        title: 'AzureWorkflow',
+        currentDirectory: 'C:/ProjectsWin/AzureWorkflow/AzureWorkflowPOC',
+        shellConfig: { shellType: 'powershell', wslDistro: '', wslHomePath: '' },
+      },
+    ])
+
+    global.fetch = vi.fn((url) =>
+      url === '/api/sessions'
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(session) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve(null) })
+    )
+
+    const { result } = renderHook(() => useTabManager({ shellType: 'powershell' }, 'auto-cycle'))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    act(() => {
+      result.current.updateTabTitle('tab-1', 'My Build')
+    })
+    act(() => {
+      result.current.updateTabDirectory('tab-1', 'C:/ProjectsWin/forge-terminal')
+    })
+
+    expect(result.current.tabs.find((t) => t.id === 'tab-1')?.title).toBe('My Build')
+  })
+
   it('keeps a real saved label untouched on restore (labels are write-once)', async () => {
     const session = makeSession([
       {
