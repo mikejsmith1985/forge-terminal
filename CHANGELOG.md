@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.13.0] - 2026-06-14
+
+---
+
+## [v7.13.0] - 2026-06-14
+
 ### Changed
 - **Monolith retired & runtime macros updated (SDD Phase C3b)** — Finishes the
   `forge-workflow` dissolution across the surfaces that drive live agent sessions.
