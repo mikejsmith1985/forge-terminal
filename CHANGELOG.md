@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cross-tool Spec Kit projection engine + Copilot pipeline (cross-tool SDD,
+  Phase 2 + US1)** — New `internal/workflow/speckit_project.go` projects the single
+  embedded Spec Kit stage source onto each tool's native skill surface instead of
+  hand-maintaining a copy per tool (the drift the constitution's single-source
+  discipline forbids). `EnumerateSpecKitStages` reads the 10 authored stages;
+  `ProjectSpecKitForTool` writes them to a tool's skill directory honoring the
+  conflict strategy, and for Copilot embeds a dedicated `FORGE-SPECKIT` marker
+  block into `.github/copilot-instructions.md` listing each `skill: <stage>`
+  invocation (kept separate from the PS-managed FORGE-SKILLS block). Scaffolding now
+  projects the pipeline for Copilot in addition to Claude, so a Copilot user gets a
+  runnable SDD pipeline. Guarded by 5 new tests in `speckit_project_test.go` plus
+  `TestScaffoldProject_ProjectsCopilotSpecKit`. Google projection and the live
+  end-to-end verification are the next increments.
+
+### Fixed
+- **Claude's project context file routes to the constitution, not Copilot's file
+  (cross-tool SDD, FR-011)** — `RenderClaudeMD` generated a `CLAUDE.md` that imported
+  `@.github/copilot-instructions.md`, routing a Claude session through Copilot's
+  instruction file — the same cross-tool contamination removed from the session
+  macros in PR #162. The generated `CLAUDE.md` now imports only the tool-agnostic
+  `@.specify/memory/constitution.md`, and carries the `<!-- SPECKIT START/END -->`
+  markers so the Spec Kit agent-context step has a real target instead of being
+  silently inert. Added forge-terminal's own root `CLAUDE.md` (the repo was missing
+  the very file its scaffolder generates for every other project). Guarded by
+  `TestRenderClaudeMD_RoutesToConstitutionNotCopilotInstructions` and
+  `TestRenderClaudeMD_IncludesAgentContextMarkers`. First increment of the
+  cross-tool Spec-Driven Development feature (`specs/001-cross-tool-speckit/`); the
+  per-tool pipeline projection (Copilot/Google) follows.
+
 ## [7.13.0] - 2026-06-14
 
 ---
