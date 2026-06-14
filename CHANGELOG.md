@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **"Install Constitution Globally" uses a styled in-app confirmation, not a native
+  browser popup** — The Workflow card's global-install button previously triggered a
+  native `window.confirm` dialog (the jarring `localhost:3005 says…` box). It now opens
+  a styled in-card confirmation panel (Install / Cancel) consistent with the rest of
+  the UI; the install still confirms first (it writes to `~/.claude`, `~/.copilot`,
+  `~/.gemini`) and reports the result via a toast. Tests updated to drive the new flow
+  and assert `window.confirm` is no longer used.
+
 ### Removed
 - **The 6-strategy tab-naming system is deleted (tab-naming rebuild, US3)** — Tab
   naming is no longer configurable. Removed `useTabNaming.js`, the entire Tab Naming
@@ -42,7 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ` #N` suffix for duplicate projects. Pure functions, 9/9 unit tests. First
   increment of `specs/002-tab-naming-rebuild/`; wiring into the tab manager and
   removal of the old multi-strategy system follow.
-
 ## [7.14.0] - 2026-06-14
 
 ---

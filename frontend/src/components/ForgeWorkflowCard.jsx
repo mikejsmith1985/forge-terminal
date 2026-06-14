@@ -20,6 +20,9 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [showFindings, setShowFindings] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  // Drives the styled in-app confirmation for the global install, replacing the
+  // jarring native window.confirm browser dialog.
+  const [isConfirmingGlobalInstall, setIsConfirmingGlobalInstall] = useState(false)
   const workflow = useWorkflowSetup()
 
   const {
@@ -73,18 +76,21 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
     }
   }, [cwd, checkStatus])
 
-  // Install the Forge constitution into the user's global CLI instruction files.
-  // Confirmed first because it writes outside the current project (~/.claude,
-  // ~/.copilot, ~/.gemini) — though only inside a managed marker block.
-  const handleInstallGlobal = useCallback(async () => {
-    const confirmed = window.confirm(
-      'Install the Forge constitution globally?\n\n' +
-      'This writes it into your global CLI instruction files (~/.claude/CLAUDE.md, ' +
-      '~/.copilot/copilot-instructions.md, ~/.gemini/GEMINI.md) inside a managed ' +
-      'marker block. Your own instructions outside that block are preserved.'
-    )
-    if (!confirmed) return
+  // Installing the constitution writes outside the current project (~/.claude,
+  // ~/.copilot, ~/.gemini), so we confirm first — but with a styled in-app panel,
+  // not a native window.confirm popup. requestGlobalInstall opens that panel.
+  const requestGlobalInstall = useCallback(() => {
+    setIsConfirmingGlobalInstall(true)
+  }, [])
 
+  const cancelGlobalInstall = useCallback(() => {
+    setIsConfirmingGlobalInstall(false)
+  }, [])
+
+  // Run the global install after the user confirms in the styled panel, then
+  // report the outcome via a toast (success or failure).
+  const confirmGlobalInstall = useCallback(async () => {
+    setIsConfirmingGlobalInstall(false)
     const result = await installGlobalConstitution()
     if (result) {
       onToast?.(`Constitution installed to ${result.targetsWritten?.length || 0} CLI tool(s)`, 'success')
@@ -126,13 +132,32 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
                 constitution into every CLI tool's machine-wide instructions. */}
             <button
               className="fwc-btn fwc-btn-global"
-              onClick={handleInstallGlobal}
-              disabled={isInstallingGlobal}
+              onClick={requestGlobalInstall}
+              disabled={isInstallingGlobal || isConfirmingGlobalInstall}
               title="Write the Forge constitution into ~/.claude, ~/.copilot and ~/.gemini"
             >
               <Globe size={14} className={isInstallingGlobal ? 'fwc-spin' : ''} />
               {isInstallingGlobal ? 'Installing…' : 'Install Constitution Globally'}
             </button>
+
+            {/* Styled in-app confirmation — replaces the native window.confirm dialog. */}
+            {isConfirmingGlobalInstall && (
+              <div className="fwc-confirm" role="alertdialog" aria-label="Confirm global constitution install">
+                <p className="fwc-confirm-message">
+                  Install the Forge constitution globally? This writes it into your global CLI
+                  instruction files (<code>~/.claude</code>, <code>~/.copilot</code>, <code>~/.gemini</code>)
+                  inside a managed marker block — your own instructions outside that block are preserved.
+                </p>
+                <div className="fwc-confirm-actions">
+                  <button className="fwc-btn fwc-btn-primary" onClick={confirmGlobalInstall}>
+                    Install
+                  </button>
+                  <button className="fwc-btn fwc-btn-secondary" onClick={cancelGlobalInstall}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {status?.configured ? (
               <>
