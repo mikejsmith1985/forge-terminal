@@ -36,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TestRenderClaudeMD_IncludesAgentContextMarkers`. First increment of the
   cross-tool Spec-Driven Development feature (`specs/001-cross-tool-speckit/`); the
   per-tool pipeline projection (Copilot/Google) follows.
+- **Claude session macros no longer point at Copilot's instruction file** — The
+  `ClaudeAwarenessMacro` and `ClaudeEnforcedMacro` injected after a Claude session
+  start (`internal/commands/storage.go`) told Claude to `Read @.github/copilot-instructions.md`.
+  That is CLI-specific verbiage in a Claude-facing macro, which contradicts the SDD
+  globalization goal of enforcing from one tool-agnostic source. Both macros now name
+  only `@.specify/memory/constitution.md` as the binding-rules source; the inline skill
+  cascade is unchanged. The Copilot/Google macros are untouched (they legitimately
+  reference their own tools' files). Guarded by a new
+  `TestClaudeMacrosOmitCopilotInstructions`.
 
 ## [7.13.0] - 2026-06-14
 
