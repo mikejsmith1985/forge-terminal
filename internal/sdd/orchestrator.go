@@ -33,6 +33,7 @@ type Options struct {
 	HistoryBaseDir string
 	Injector       CommandInjector
 	Broadcaster    GateBroadcaster
+	Waiter         CompletionWaiter
 	Summarize      func(PhaseName) PhaseSummary
 	Now            func() time.Time
 	NewCardID      func(PhaseName) string
@@ -46,6 +47,7 @@ type Orchestrator struct {
 	historyBaseDir string
 	injector       CommandInjector
 	broadcaster    GateBroadcaster
+	waiter         CompletionWaiter
 	newSummary     func(PhaseName) PhaseSummary
 	now            func() time.Time
 	newCardID      func(PhaseName) string
@@ -61,6 +63,7 @@ func NewOrchestrator(opts Options) *Orchestrator {
 		historyBaseDir: opts.HistoryBaseDir,
 		injector:       opts.Injector,
 		broadcaster:    opts.Broadcaster,
+		waiter:         opts.Waiter,
 		newSummary:     opts.Summarize,
 		now:            opts.Now,
 		newCardID:      opts.NewCardID,
@@ -148,7 +151,7 @@ func (o *Orchestrator) presentCard(phase PhaseName, _ string) {
 // to history, inject the next command) outside the lock so a blocking injection cannot stall
 // the state machine.
 func (o *Orchestrator) SubmitDecision(decision Decision) (PipelineStatus, error) {
-	command, sessionID, status, err := o.planDecision(decision)
+	command, sessionID, nextPhase, status, err := o.planDecision(decision)
 	if err != nil {
 		return "", err
 	}
@@ -160,43 +163,59 @@ func (o *Orchestrator) SubmitDecision(decision Decision) (PipelineStatus, error)
 			return "", injectErr
 		}
 	}
+	o.scheduleQuietDetection(sessionID, nextPhase)
 	return status, nil
 }
 
+// scheduleQuietDetection gates a phase that writes no artifact (Validate/Implement): once its
+// command has been injected, wait (off the request goroutine) for the terminal to settle, then
+// fire the shared completion seam. A no-op for file-detected phases and when no waiter is wired.
+func (o *Orchestrator) scheduleQuietDetection(sessionID string, nextPhase PhaseName) {
+	phase, found := PhaseByName(nextPhase)
+	if !found || phase.CompletionSignal != signalPTYQuiet || o.waiter == nil {
+		return
+	}
+	go func() {
+		o.waiter.WaitForPhase(sessionID, nextPhase)
+		o.HandlePhaseComplete(nextPhase, "")
+	}()
+}
+
 // planDecision validates the decision against the pending card and mutates state under the
-// lock, returning the command to inject (empty for reject/terminal) and the target session.
-func (o *Orchestrator) planDecision(decision Decision) (command, sessionID string, status PipelineStatus, err error) {
+// lock, returning the command to inject (empty for reject/terminal), the target session, and
+// the phase being advanced to (empty for reject/terminal).
+func (o *Orchestrator) planDecision(decision Decision) (command, sessionID string, nextPhase PhaseName, status PipelineStatus, err error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
 	card := o.state.PendingCard
 	if card == nil {
-		return "", "", "", ErrNoPendingCard
+		return "", "", "", "", ErrNoPendingCard
 	}
 	if card.Phase != decision.Phase {
-		return "", "", "", ErrCardMismatch
+		return "", "", "", "", ErrCardMismatch
 	}
 
 	if decision.Action == ActionReject {
 		o.state.PendingCard = nil
 		o.state.Status = StatusRejected
-		return "", "", StatusRejected, nil
+		return "", "", "", StatusRejected, nil
 	}
 	if decision.Action != ActionApprove && decision.Action != ActionClarify {
-		return "", "", "", ErrUnknownAction
+		return "", "", "", "", ErrUnknownAction
 	}
 	if decision.Action == ActionClarify && strings.TrimSpace(decision.ClarifyText) == "" {
-		return "", "", "", ErrEmptyClarify
+		return "", "", "", "", ErrEmptyClarify
 	}
 
 	next, hasNext := NextPhaseAfter(decision.Phase)
 	o.state.PendingCard = nil
 	if !hasNext {
 		o.state.Status = StatusComplete
-		return "", "", StatusComplete, nil
+		return "", "", "", StatusComplete, nil
 	}
 	o.state.Status = StatusAdvancing
-	return nextCommand(next, decision), o.state.SessionID, StatusAdvancing, nil
+	return nextCommand(next, decision), o.state.SessionID, next.Name, StatusAdvancing, nil
 }
 
 // nextCommand returns the command that starts the next phase, appending the clarify steer

@@ -43,7 +43,7 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 - [x] T007 [P] Unit test (write FIRST, must FAIL): history round-trip + append in `internal/sdd/history_test.go`
 - [x] T008 Implement the **file-based** completion detector (Specify/Clarify/Plan via `tutor.Watcher` + content-marker for Clarify; ignore non-artifact files, FR-016) in `internal/sdd/detector.go`
 - [x] T009 [P] Unit test (write FIRST, must FAIL): file detector per-phase signal + non-artifact ignore using a mock watcher in `internal/sdd/detector_test.go`
-- [ ] T010 Implement the **PTY-quiet** completion detector for Validate/Implement (reuse `waitForPTYQuiet`) in `internal/sdd/detector_ptyquiet.go` (U2)
+- [x] T010 Implement the **PTY-quiet** completion detector for Validate/Implement (reuse `waitForPTYQuiet`) in `internal/sdd/detector_ptyquiet.go` (U2)
 - [x] T011 Implement orchestrator skeleton + **shared completion seam**: `HandlePhaseComplete(phase, artifact)` records the completion and emits it to registered subscribers (no card/notify logic yet) in `internal/sdd/orchestrator.go` (I1 — both US1 and US3 subscribe here)
 - [x] T012 Implement pipeline-to-session binding — frontend-driven `POST /api/sdd/bind` resolves the feature from `.specify/feature.json` and binds the session (backend has no per-session cwd; see research R9) in `cmd/forge/sdd_wiring.go` (U3)
 - [x] T013 Implement the `SDD_PHASE_GATE` broadcast helper (`GateBroadcaster` interface + real impl calling the terminal hub `broadcastJSON`) in `internal/sdd/gate.go`

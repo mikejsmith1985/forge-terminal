@@ -155,6 +155,48 @@ func TestSubmitDecision_PhaseMismatch(t *testing.T) {
 	}
 }
 
+func TestSubmitDecision_AdvanceToPtyQuietPhaseGatesAfterWait(t *testing.T) {
+	gatedPhases := make(chan PhaseName, 4)
+	waiterCalls := make(chan PhaseName, 4)
+	orchestrator := NewOrchestrator(Options{
+		Feature:        "demo",
+		SessionID:      "sess-1",
+		HistoryBaseDir: t.TempDir(),
+		Injector:       InjectorFunc(func(string, string) error { return nil }),
+		Broadcaster:    BroadcasterFunc(func(card DecisionCard) error { gatedPhases <- card.Phase; return nil }),
+		Waiter:         WaiterFunc(func(_ string, phase PhaseName) { waiterCalls <- phase }),
+		Summarize:      func(PhaseName) PhaseSummary { return PhaseSummary{Headline: "H"} },
+		NewCardID:      func(phase PhaseName) string { return "card-" + string(phase) },
+	})
+
+	// Gate Plan (file-detected), then approve it — advancing to Validate, which is pty-quiet.
+	orchestrator.HandlePhaseComplete(PhasePlan, "plan.md")
+	if got := <-gatedPhases; got != PhasePlan {
+		t.Fatalf("first gate = %s, want plan", got)
+	}
+	if _, err := orchestrator.SubmitDecision(Decision{Phase: PhasePlan, Action: ActionApprove}); err != nil {
+		t.Fatalf("approve plan failed: %v", err)
+	}
+
+	// The waiter must be asked to wait for Validate, and once it returns, Validate gates.
+	select {
+	case phase := <-waiterCalls:
+		if phase != PhaseValidate {
+			t.Errorf("waiter asked for %s, want validate", phase)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter was not scheduled for the pty-quiet Validate phase")
+	}
+	select {
+	case phase := <-gatedPhases:
+		if phase != PhaseValidate {
+			t.Errorf("gated %s after wait, want validate", phase)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Validate did not gate after the pty-quiet wait returned")
+	}
+}
+
 func TestSubmitDecision_RecordsHistory(t *testing.T) {
 	orchestrator, _, _ := newTestOrchestrator(t)
 	orchestrator.HandlePhaseComplete(PhasePlan, "plan.md")

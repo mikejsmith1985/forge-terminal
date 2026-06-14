@@ -21,6 +21,15 @@ import (
 // sddWatcher is the active feature-directory watcher, replaced on each bind.
 var sddWatcher *tutor.Watcher
 
+// PTY-quiet detection tuning for artifact-less phases (Validate/Implement). These are
+// heuristics: "the terminal was silent for sddPhaseQuietMs" stands in for "the phase command
+// finished," which is reliable for a quick analyze but only best-effort for a long Implement.
+const (
+	sddPhaseFloorMs = 4000           // let the injected command start before watching for quiet
+	sddPhaseQuietMs = 8000           // 8s of terminal silence => the phase command finished
+	sddPhaseMaxMs   = 30 * 60 * 1000 // 30-minute safety cap (Implement can run long)
+)
+
 // sddGateEnvelope is the on-the-wire SDD_PHASE_GATE message. Embedding DecisionCard flattens
 // its fields (cardId, sessionId, phase, summary, actions) alongside the type discriminator.
 type sddGateEnvelope struct {
@@ -93,6 +102,7 @@ func startSddPipeline(sessionID, repoRoot, featureDir string) {
 		HistoryBaseDir: sddStateDir(),
 		Injector:       newSddInjector(),
 		Broadcaster:    newSddBroadcaster(),
+		Waiter:         newSddWaiter(),
 	})
 
 	// US3 (FR-011/012): subscribe a best-effort notifier to the shared completion seam.
@@ -186,6 +196,26 @@ func injectSddCommand(sessionID, text string) {
 	if _, err := writeMacro(session, text, mode); err != nil {
 		log.Printf("[sdd] inject failed for session %s: %v", sessionID, err)
 	}
+}
+
+// newSddWaiter detects completion of an artifact-less phase (Validate/Implement) by waiting
+// for the terminal to go quiet after the phase's command was injected — reusing the macro
+// subsystem's quiet-detection. The floor delay lets the command begin so an idle prompt right
+// after the decision is not mistaken for completion.
+func newSddWaiter() sdd.CompletionWaiter {
+	return sdd.WaiterFunc(func(sessionID string, phase sdd.PhaseName) {
+		if termHandler == nil {
+			return
+		}
+		session, found := termHandler.GetSession(sessionID)
+		if !found {
+			return
+		}
+		startedAt := time.Now()
+		time.Sleep(time.Duration(sddPhaseFloorMs) * time.Millisecond)
+		waitForPTYQuiet(session, sddPhaseQuietMs, sddPhaseMaxMs, startedAt, time.Now())
+		log.Printf("[sdd] pty-quiet detected for phase %s (session %s)", phase, sessionID)
+	})
 }
 
 // newSddBroadcaster pushes the decision card to the session's WebSocket clients as an
