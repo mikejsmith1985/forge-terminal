@@ -27,9 +27,9 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Create `internal/sdd/` package with `doc.go` carrying the one-line purpose comment (Article IV)
-- [ ] T002 [P] Add config (env `FORGE_SDD_NOTIFY_URL` default `http://localhost:7000/sdd/phase`, 5s client timeout, `~/.forge/sdd/` path) as named constants in `internal/sdd/config.go`
-- [ ] T003 [P] Add an `[Unreleased]` stub entry for the orchestrator in `CHANGELOG.md`
+- [x] T001 Create `internal/sdd/` package with `doc.go` carrying the one-line purpose comment (Article IV)
+- [x] T002 [P] Add config (env `FORGE_SDD_NOTIFY_URL` default `http://localhost:7000/sdd/phase`, 5s client timeout, `~/.forge/sdd/` path) as named constants in `internal/sdd/config.go`
+- [x] T003 [P] Add an `[Unreleased]` stub entry for the orchestrator in `CHANGELOG.md`
 
 ---
 
@@ -37,18 +37,18 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Define core domain types + status enums (`Phase`, `PhaseArtifact`, `PhaseSummary`, `Flag`, `DecisionCard`, `Decision`, `NotificationEvent`, `PipelineState`) per `data-model.md` in `internal/sdd/types.go`
-- [ ] T005 [P] Define the five-phase table (name, order, `nextCommand`, `completionSignal`, `expectedArtifact`, `isTerminal`; Validate & Implement = `pty-quiet`) per research R3 in `internal/sdd/phases.go`
-- [ ] T006 [P] Implement decision-history persistence (append to `~/.forge/sdd/<feature>.json`) in `internal/sdd/history.go`
-- [ ] T007 [P] Unit test (write FIRST, must FAIL): history round-trip + append in `internal/sdd/history_test.go`
-- [ ] T008 Implement the **file-based** completion detector (Specify/Clarify/Plan via `tutor.Watcher` + content-marker for Clarify; ignore non-artifact files, FR-016) in `internal/sdd/detector.go`
-- [ ] T009 [P] Unit test (write FIRST, must FAIL): file detector per-phase signal + non-artifact ignore using a mock watcher in `internal/sdd/detector_test.go`
+- [x] T004 Define core domain types + status enums (`Phase`, `PhaseArtifact`, `PhaseSummary`, `Flag`, `DecisionCard`, `Decision`, `NotificationEvent`, `PipelineState`) per `data-model.md` in `internal/sdd/types.go`
+- [x] T005 [P] Define the five-phase table (name, order, `nextCommand`, `completionSignal`, `expectedArtifact`, `isTerminal`; Validate & Implement = `pty-quiet`) per research R3 in `internal/sdd/phases.go`
+- [x] T006 [P] Implement decision-history persistence (append to `~/.forge/sdd/<feature>.json`) in `internal/sdd/history.go`
+- [x] T007 [P] Unit test (write FIRST, must FAIL): history round-trip + append in `internal/sdd/history_test.go`
+- [x] T008 Implement the **file-based** completion detector (Specify/Clarify/Plan via `tutor.Watcher` + content-marker for Clarify; ignore non-artifact files, FR-016) in `internal/sdd/detector.go`
+- [x] T009 [P] Unit test (write FIRST, must FAIL): file detector per-phase signal + non-artifact ignore using a mock watcher in `internal/sdd/detector_test.go`
 - [ ] T010 Implement the **PTY-quiet** completion detector for Validate/Implement (reuse `waitForPTYQuiet`) in `internal/sdd/detector_ptyquiet.go` (U2)
-- [ ] T011 Implement orchestrator skeleton + **shared completion seam**: `HandlePhaseComplete(phase, artifact)` records the completion and emits it to registered subscribers (no card/notify logic yet) in `internal/sdd/orchestrator.go` (I1 — both US1 and US3 subscribe here)
-- [ ] T012 Implement pipeline-to-session binding (resolve the session whose cwd is the repo root holding the active feature; record `sessionId` on first gate) in `internal/sdd/binding.go` (U3)
-- [ ] T013 Implement the `SDD_PHASE_GATE` broadcast helper (`GateBroadcaster` interface + real impl calling the terminal hub `broadcastJSON`) in `internal/sdd/gate.go`
-- [ ] T014 Add `POST /api/sdd/decision` handler skeleton in `cmd/forge/handlers_sdd.go` and register via `WrapWithMiddleware` in `cmd/forge/main.go`
-- [ ] T015 Construct the orchestrator at startup and wire both detectors → `HandlePhaseComplete` in `cmd/forge/main.go`
+- [x] T011 Implement orchestrator skeleton + **shared completion seam**: `HandlePhaseComplete(phase, artifact)` records the completion and emits it to registered subscribers (no card/notify logic yet) in `internal/sdd/orchestrator.go` (I1 — both US1 and US3 subscribe here)
+- [x] T012 Implement pipeline-to-session binding — frontend-driven `POST /api/sdd/bind` resolves the feature from `.specify/feature.json` and binds the session (backend has no per-session cwd; see research R9) in `cmd/forge/sdd_wiring.go` (U3)
+- [x] T013 Implement the `SDD_PHASE_GATE` broadcast helper (`GateBroadcaster` interface + real impl calling the terminal hub `broadcastJSON`) in `internal/sdd/gate.go`
+- [x] T014 Add `POST /api/sdd/decision` handler skeleton in `cmd/forge/handlers_sdd.go` and register via `WrapWithMiddleware` in `cmd/forge/main.go`
+- [x] T015 Construct the orchestrator at startup and wire both detectors → `HandlePhaseComplete` in `cmd/forge/main.go`
 
 **Checkpoint**: Detection (both modes), the shared completion seam, persistence, transport, binding, and the endpoint exist — stories can begin and subscribe independently.
 
@@ -62,22 +62,22 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 
 ### Tests for User Story 1 (write FIRST, ensure they FAIL)
 
-- [ ] T016 [P] [US1] Unit test orchestrator `approve`→advancing and `reject`→rejected transitions (mock injector) in `internal/sdd/orchestrator_test.go`
-- [ ] T017 [P] [US1] Unit test deterministic summarizer against golden artifacts (checklist counts, `[NEEDS CLARIFICATION]`, missing-artifact `block` flag) in `internal/sdd/summary_test.go`
-- [ ] T018 [P] [US1] Unit test `POST /api/sdd/decision` for approve + reject (200/409 on stale cardId) in `cmd/forge/handlers_sdd_test.go`
-- [ ] T019 [P] [US1] vitest: `PhaseDecisionCard` renders status/headline/flags and fires `onAction` in `frontend/src/components/PhaseDecisionCard.test.jsx`
-- [ ] T020 [P] [US1] vitest: `useSddGate` dispatches `SDD_PHASE_GATE` and POSTs the decision in `frontend/src/hooks/useSddGate.test.js`
+- [x] T016 [P] [US1] Unit test orchestrator `approve`→advancing and `reject`→rejected transitions (mock injector) in `internal/sdd/orchestrator_test.go`
+- [x] T017 [P] [US1] Unit test deterministic summarizer against golden artifacts (checklist counts, `[NEEDS CLARIFICATION]`, missing-artifact `block` flag) in `internal/sdd/summary_test.go`
+- [x] T018 [P] [US1] Unit test `POST /api/sdd/decision` for approve + reject (200/409 on stale cardId) in `cmd/forge/handlers_sdd_test.go`
+- [x] T019 [P] [US1] vitest: `PhaseDecisionCard` renders status/headline/flags and fires `onAction` in `frontend/src/components/PhaseDecisionCard.test.jsx`
+- [x] T020 [P] [US1] vitest: `useSddGate` dispatches `SDD_PHASE_GATE` and POSTs the decision in `frontend/src/hooks/useSddGate.test.js`
 - [ ] T021 [US1] Cypress UX (real events): phase completes → card → Approve injects next command, asserted via `window.term.buffer.active`, in `cypress/e2e/sdd-phase-gate.cy.js`
 
 ### Implementation for User Story 1
 
-- [ ] T022 [P] [US1] Implement the deterministic summarizer (FR-017: headline + produced items + flags from artifacts; missing-artifact = block, FR-013) in `internal/sdd/summary.go`
-- [ ] T023 [US1] Implement `approve` (advance by injecting next phase command via the macro path) and `reject` (stop) transitions in `internal/sdd/orchestrator.go` (depends on T011, T022)
-- [ ] T024 [US1] Subscribe to the completion seam → build summary → broadcast `SDD_PHASE_GATE` → set the single `pendingCard` (FR-014) in `internal/sdd/orchestrator.go` (depends on T011, T013, T022)
-- [ ] T025 [US1] Implement handler approve/reject forwarding to the orchestrator + record to history in `cmd/forge/handlers_sdd.go` (depends on T014, T023, T006)
-- [ ] T026 [P] [US1] Build `PhaseDecisionCard.jsx` (status · headline · produced items · flag chips · Approve/Reject/Clarify buttons) + `PhaseDecisionCard.css` in `frontend/src/components/`
-- [ ] T027 [US1] Build `useSddGate.js` (subscribe to `SDD_PHASE_GATE` for the active session; POST to `/api/sdd/decision`) in `frontend/src/hooks/useSddGate.js`
-- [ ] T028 [US1] Mount the card beside the active terminal keyed by `activeTabId` in `frontend/src/App.jsx` (depends on T026, T027)
+- [x] T022 [P] [US1] Implement the deterministic summarizer (FR-017: headline + produced items + flags from artifacts; missing-artifact = block, FR-013) in `internal/sdd/summary.go`
+- [x] T023 [US1] Implement `approve` (advance by injecting next phase command via the macro path) and `reject` (stop) transitions in `internal/sdd/orchestrator.go` (depends on T011, T022)
+- [x] T024 [US1] Subscribe to the completion seam → build summary → broadcast `SDD_PHASE_GATE` → set the single `pendingCard` (FR-014) in `internal/sdd/orchestrator.go` (depends on T011, T013, T022)
+- [x] T025 [US1] Implement handler approve/reject forwarding to the orchestrator + record to history in `cmd/forge/handlers_sdd.go` (depends on T014, T023, T006)
+- [x] T026 [P] [US1] Build `PhaseDecisionCard.jsx` (status · headline · produced items · flag chips · Approve/Reject/Clarify buttons) + `PhaseDecisionCard.css` in `frontend/src/components/`
+- [x] T027 [US1] Build `useSddGate.js` (subscribe to `SDD_PHASE_GATE` for the active session; POST to `/api/sdd/decision`) in `frontend/src/hooks/useSddGate.js`
+- [x] T028 [US1] Mount the card beside the active terminal keyed by `activeTabId` in `frontend/src/App.jsx` (depends on T026, T027)
 
 **Checkpoint**: MVP — cards appear and Approve/Reject work end-to-end and independently.
 
@@ -89,14 +89,14 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 
 ### Tests for User Story 2 (write FIRST, ensure they FAIL)
 
-- [ ] T029 [P] [US2] Unit test `clarify` transition (steer appended; empty text → stays pending) extending `internal/sdd/orchestrator_test.go`
-- [ ] T030 [P] [US2] vitest: clarify input + confirm/cancel flow extending `frontend/src/components/PhaseDecisionCard.test.jsx`
+- [x] T029 [P] [US2] Unit test `clarify` transition (steer appended; empty text → stays pending) extending `internal/sdd/orchestrator_test.go`
+- [x] T030 [P] [US2] vitest: clarify input + confirm/cancel flow extending `frontend/src/components/PhaseDecisionCard.test.jsx`
 
 ### Implementation for User Story 2
 
-- [ ] T031 [US2] Implement `clarify` transition (inject next phase command with steer; reject empty steer) in `internal/sdd/orchestrator.go` (depends on T023)
-- [ ] T032 [US2] Add clarify-text input + confirm/cancel to `PhaseDecisionCard.jsx` and POST the clarify action in `useSddGate.js` (depends on T026, T027)
-- [ ] T033 [US2] Handle clarify (400 on empty steer, FR-009 cancel path) in `cmd/forge/handlers_sdd.go` (depends on T025, T031)
+- [x] T031 [US2] Implement `clarify` transition (inject next phase command with steer; reject empty steer) in `internal/sdd/orchestrator.go` (depends on T023)
+- [x] T032 [US2] Add clarify-text input + confirm/cancel to `PhaseDecisionCard.jsx` and POST the clarify action in `useSddGate.js` (depends on T026, T027)
+- [x] T033 [US2] Handle clarify (400 on empty steer, FR-009 cancel path) in `cmd/forge/handlers_sdd.go` (depends on T025, T031)
 
 **Checkpoint**: US1 + US2 both work independently.
 
@@ -108,12 +108,12 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 
 ### Tests for User Story 3 (write FIRST, ensure they FAIL)
 
-- [ ] T034 [P] [US3] Unit test notifier (payload per contract; non-blocking; error swallowed — FR-012) with a mock transport in `internal/sdd/notifier_test.go`
+- [x] T034 [P] [US3] Unit test notifier (payload per contract; non-blocking; error swallowed — FR-012) with a mock transport in `internal/sdd/notifier_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T035 [US3] Implement the best-effort notifier (goroutine POST, dedicated 5s client modeled on `notifyHTTPClient`, log failures) in `internal/sdd/notifier.go` (depends on T002)
-- [ ] T036 [US3] Subscribe to the completion seam → fire the `NotificationEvent` exactly once in `internal/sdd/orchestrator.go` (depends on T011, T035 — **independent of US1** via the shared seam, I1)
+- [x] T035 [US3] Implement the best-effort notifier (goroutine POST, dedicated 5s client modeled on `notifyHTTPClient`, log failures) in `internal/sdd/notifier.go` (depends on T002)
+- [x] T036 [US3] Subscribe to the completion seam → fire the `NotificationEvent` exactly once in `internal/sdd/orchestrator.go` (depends on T011, T035 — **independent of US1** via the shared seam, I1)
 
 **Checkpoint**: All three stories independently functional.
 
@@ -122,11 +122,11 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [ ] T037 [P] Integration test (C1): real file writes drive the real file detector; the notifier hits a real local stub server — closes the three-layer gap (Article V) in `internal/sdd/integration_test.go`
-- [ ] T038 [P] Finalize the `CHANGELOG.md` `[Unreleased]` entry (Article VI)
-- [ ] T039 [P] Add "why" comments + structured gate-lifecycle logging across `internal/sdd/` (Article IV)
+- [x] T038 [P] Finalize the `CHANGELOG.md` `[Unreleased]` entry (Article VI)
+- [x] T039 [P] Add "why" comments + structured gate-lifecycle logging across `internal/sdd/` (Article IV)
 - [ ] T040 Run `quickstart.md` V1–V7 validation via `run-dev-clean.ps1` (Article X: assert via xterm buffer model)
-- [ ] T041 [P] Verify green: `go build ./cmd/forge/`, `go test ./internal/sdd/...`, `cd frontend && npx vitest run`, `go vet ./internal/sdd/...`
-- [ ] T042 Refresh the `SPECKIT` agent-context note in `CLAUDE.md` if scope changed
+- [x] T041 [P] Verify green: `go build ./cmd/forge/`, `go test ./internal/sdd/...`, `cd frontend && npx vitest run`, `go vet ./internal/sdd/...`
+- [x] T042 Refresh the `SPECKIT` agent-context note in `CLAUDE.md` if scope changed
 
 ---
 

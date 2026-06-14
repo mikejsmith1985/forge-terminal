@@ -179,3 +179,67 @@
 .phase-decision-card-button-clarify:hover {
   background: #312e81;
 }
+
+/* Inline clarify steer mode: replaces the action row with a textarea and a
+   Confirm/Cancel pair while the user composes a steer for the next phase. */
+.phase-decision-card-clarify {
+  border-top: 1px solid #333;
+  background: #141414;
+}
+
+.phase-decision-card-clarify-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 72px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: #e5e5e5;
+  font-family: inherit;
+  font-size: 0.9em;
+  margin: 14px 20px 0;
+  width: calc(100% - 40px);
+}
+
+.phase-decision-card-clarify-input::placeholder {
+  color: #6b7280;
+}
+
+.phase-decision-card-clarify-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+}
+
+.phase-decision-card-clarify .phase-decision-card-actions {
+  border-top: none;
+}
+
+.phase-decision-card-button-confirm {
+  background: #1e1b4b;
+  border-color: #8b5cf6;
+  color: #ddd6fe;
+}
+
+.phase-decision-card-button-confirm:hover {
+  background: #312e81;
+}
+
+.phase-decision-card-button-confirm:disabled {
+  background: #222;
+  border-color: #333;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.phase-decision-card-button-cancel {
+  background: #222;
+  border-color: #333;
+  color: #cbd5e1;
+}
+
+.phase-decision-card-button-cancel:hover {
+  border-color: #555;
+}

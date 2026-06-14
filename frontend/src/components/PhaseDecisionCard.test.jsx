@@ -109,4 +109,71 @@ describe('PhaseDecisionCard', () => {
     expect(onAction).toHaveBeenCalledTimes(1)
     expect(onAction).toHaveBeenCalledWith('reject')
   })
+
+  it('does not call onAction when Clarify is clicked; reveals clarify input mode', () => {
+    const { onAction } = renderCard()
+
+    fireEvent.click(screen.getByRole('button', { name: /clarify/i }))
+
+    // Clarify is a two-step interaction: clicking it must not advance the gate.
+    expect(onAction).not.toHaveBeenCalled()
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirm/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
+  })
+
+  it('disables Confirm while the clarify textarea is empty or whitespace', () => {
+    renderCard()
+
+    fireEvent.click(screen.getByRole('button', { name: /clarify/i }))
+
+    // Empty by default.
+    expect(screen.getByRole('button', { name: /confirm/i })).toBeDisabled()
+
+    // Whitespace-only must also keep Confirm disabled (backend rejects empty clarify).
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '   ' } })
+    expect(screen.getByRole('button', { name: /confirm/i })).toBeDisabled()
+  })
+
+  it('calls onAction with "clarify" and the trimmed steer when Confirm is clicked', () => {
+    const { onAction } = renderCard()
+
+    fireEvent.click(screen.getByRole('button', { name: /clarify/i }))
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: '  tighten the auth scope  ' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+
+    expect(onAction).toHaveBeenCalledTimes(1)
+    expect(onAction).toHaveBeenCalledWith('clarify', 'tighten the auth scope')
+  })
+
+  it('returns to the normal actions without calling onAction when Cancel is clicked', () => {
+    const { onAction } = renderCard()
+
+    fireEvent.click(screen.getByRole('button', { name: /clarify/i }))
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'some steer' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(onAction).not.toHaveBeenCalled()
+    // Back to the normal action buttons; the clarify input is gone.
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^clarify$/i })).toBeInTheDocument()
+  })
+
+  it('clears the textarea when re-entering clarify mode after Cancel', () => {
+    renderCard()
+
+    fireEvent.click(screen.getByRole('button', { name: /clarify/i }))
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'discarded steer' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: /clarify/i }))
+    expect(screen.getByRole('textbox')).toHaveValue('')
+  })
 })

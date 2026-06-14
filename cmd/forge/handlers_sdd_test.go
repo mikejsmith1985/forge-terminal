@@ -62,6 +62,29 @@ func TestHandleSddDecision_RejectReturns200(t *testing.T) {
 	}
 }
 
+func TestHandleSddDecision_ClarifyReturns200(t *testing.T) {
+	setupSddHandler(t)
+
+	recorder := postDecision(t, `{"cardId":"card-plan","phase":"plan","action":"clarify","clarifyText":"narrow scope"}`)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "advancing") {
+		t.Errorf("body = %s, want status advancing", recorder.Body.String())
+	}
+}
+
+func TestHandleSddDecision_EmptyClarifyReturns400(t *testing.T) {
+	setupSddHandler(t)
+
+	recorder := postDecision(t, `{"cardId":"card-plan","phase":"plan","action":"clarify","clarifyText":"   "}`)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestHandleSddDecision_StaleCardIdReturns409(t *testing.T) {
 	setupSddHandler(t)
 

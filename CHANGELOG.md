@@ -19,9 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Now wired end-to-end: `POST /api/sdd/bind` starts a feature-directory watcher; phase
   completions broadcast over the session WebSocket (`BroadcastJSONToSession`) and render
   the `PhaseDecisionCard` beside the terminal; Approve injects the next command via the
-  macro path. 357 tests green (Go + vitest), both builds clean. Remaining: interactive
-  run-dev-clean QA (quickstart V1–V7), the Cypress UX test, and US2 (clarify input) / US3
-  (notifier).
+  macro path. **US2** (Clarify) adds an inline steer input that carries into the next phase,
+  and **US3** adds a best-effort `Notifier` that POSTs each completion to AzureWorkflowPOC
+  (fire-and-forget, never blocks the card) by subscribing to the same completion seam as the
+  card. 364 tests green (Go + vitest), both builds clean. Remaining: the PTY-quiet detector
+  for Validate/Implement, the Cypress UX test, an integration test, and interactive QA.
 
 ### Fixed
 - **A tab now relabels when the shell switches to a different project root** — After

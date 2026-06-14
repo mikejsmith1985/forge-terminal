@@ -2328,7 +2328,7 @@ function App() {
         phase={sddGate.card?.phase}
         summary={sddGate.card?.summary}
         actions={sddGate.card?.actions}
-        onAction={(action) => sddGate.submitDecision(action)}
+        onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />

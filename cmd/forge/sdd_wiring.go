@@ -85,13 +85,21 @@ func startSddPipeline(sessionID, repoRoot, featureDir string) {
 		sddWatcher = nil
 	}
 
+	feature := filepath.Base(featureDir)
 	sddOrchestrator = sdd.NewOrchestrator(sdd.Options{
-		Feature:        filepath.Base(featureDir),
+		Feature:        feature,
 		FeatureDir:     featureDir,
 		SessionID:      sessionID,
 		HistoryBaseDir: sddStateDir(),
 		Injector:       newSddInjector(),
 		Broadcaster:    newSddBroadcaster(),
+	})
+
+	// US3 (FR-011/012): subscribe a best-effort notifier to the shared completion seam.
+	// It is independent of the card subscriber (US1) — both observe the same event.
+	notifier := sdd.NewNotifier()
+	sddOrchestrator.Subscribe(func(phase sdd.PhaseName, artifactPath string) {
+		notifier.Notify(feature, phase, artifactPath)
 	})
 
 	watcher := tutor.NewWatcher(repoRoot, "sdd")

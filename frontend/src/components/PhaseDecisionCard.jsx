@@ -1,6 +1,6 @@
 // Presentational decision card for an SDD (Spec Kit) phase gate: shows a scannable
 // summary of a completed phase and the actions a user can take to advance the pipeline.
-import React from 'react'
+import React, { useCallback, useState } from 'react'
 import { CheckCircle2, XCircle, MessageSquare, FileText } from 'lucide-react'
 
 import './PhaseDecisionCard.css'
@@ -22,15 +22,58 @@ const SEVERITY_MODIFIER = {
 
 const DEFAULT_SEVERITY = 'info'
 
+// Placeholder steer shown in the clarify textarea so the user knows what to write.
+const CLARIFY_PLACEHOLDER = 'Add a steer for the next phase…'
+
 /**
  * PhaseDecisionCard renders a single SDD phase gate as a modal decision card.
  * Returns null while closed. Each entry in `actions` becomes a button that
- * invokes `onAction(action)` with the backend action string.
+ * invokes `onAction(action)` with the backend action string. Clarify is a
+ * two-step interaction: the first click opens an inline steer input, and
+ * Confirm invokes `onAction('clarify', trimmedSteer)`.
  */
 export default function PhaseDecisionCard({ phase, summary, actions, onAction, isOpen }) {
+  // Whether the inline clarify steer input is showing instead of the action buttons.
+  const [isClarifying, setIsClarifying] = useState(false)
+  // The raw steer text the user is typing for a clarify action.
+  const [clarifyText, setClarifyText] = useState('')
+
+  // Opening clarify mode swaps the action row for the steer input; it must not
+  // advance the gate, so onAction is deliberately not called here.
+  const handleClarifyOpen = useCallback(() => {
+    setClarifyText('')
+    setIsClarifying(true)
+  }, [])
+
+  // Cancel discards the steer and returns to the normal action buttons.
+  const handleClarifyCancel = useCallback(() => {
+    setIsClarifying(false)
+    setClarifyText('')
+  }, [])
+
+  // Confirm sends the trimmed steer; an empty/whitespace steer is blocked by the
+  // disabled Confirm button so this always carries a non-empty value.
+  const handleClarifyConfirm = useCallback(() => {
+    onAction('clarify', clarifyText.trim())
+  }, [onAction, clarifyText])
+
+  // Route each action button: clarify opens the inline input; everything else
+  // (approve/reject) advances the gate immediately with no second argument.
+  const handleActionClick = useCallback(
+    (action) => {
+      if (action === 'clarify') {
+        handleClarifyOpen()
+        return
+      }
+      onAction(action)
+    },
+    [onAction, handleClarifyOpen]
+  )
+
   if (!isOpen) return null
 
   const { headline, producedItems = [], flags = [] } = summary ?? {}
+  const hasClarifyText = clarifyText.trim().length > 0
 
   return (
     <div className="phase-decision-card-overlay">
@@ -75,23 +118,53 @@ export default function PhaseDecisionCard({ phase, summary, actions, onAction, i
           </div>
         </div>
 
-        <div className="phase-decision-card-actions">
-          {actions.map((action) => {
-            const presentation = ACTION_PRESENTATION[action] ?? { label: action, Icon: null }
-            const { label, Icon } = presentation
-            return (
+        {isClarifying ? (
+          <div className="phase-decision-card-clarify">
+            <textarea
+              className="phase-decision-card-clarify-input"
+              placeholder={CLARIFY_PLACEHOLDER}
+              value={clarifyText}
+              onChange={(event) => setClarifyText(event.target.value)}
+              autoFocus
+            />
+            <div className="phase-decision-card-actions">
               <button
-                key={action}
                 type="button"
-                className={`phase-decision-card-button phase-decision-card-button-${action}`}
-                onClick={() => onAction(action)}
+                className="phase-decision-card-button phase-decision-card-button-cancel"
+                onClick={handleClarifyCancel}
               >
-                {Icon && <Icon size={16} className="phase-decision-card-button-icon" />}
-                {label}
+                Cancel
               </button>
-            )
-          })}
-        </div>
+              <button
+                type="button"
+                className="phase-decision-card-button phase-decision-card-button-confirm"
+                onClick={handleClarifyConfirm}
+                disabled={!hasClarifyText}
+              >
+                <MessageSquare size={16} className="phase-decision-card-button-icon" />
+                Confirm
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="phase-decision-card-actions">
+            {actions.map((action) => {
+              const presentation = ACTION_PRESENTATION[action] ?? { label: action, Icon: null }
+              const { label, Icon } = presentation
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  className={`phase-decision-card-button phase-decision-card-button-${action}`}
+                  onClick={() => handleActionClick(action)}
+                >
+                  {Icon && <Icon size={16} className="phase-decision-card-button-icon" />}
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
