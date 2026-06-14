@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.15.0] - 2026-06-14
+
+---
+
+## [v7.15.0] - 2026-06-14
+
 ### Changed
 - **"Install Constitution Globally" uses a styled in-app confirmation, not a native
   browser popup** — The Workflow card's global-install button previously triggered a
