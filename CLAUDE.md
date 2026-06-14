@@ -9,4 +9,10 @@
 @.specify/memory/constitution.md
 
 <!-- SPECKIT START -->
+## Active Spec Kit feature
+
+- **003-sdd-phase-orchestrator** — In-terminal HITL decision cards that gate each SDD phase.
+  Plan: `specs/003-sdd-phase-orchestrator/plan.md`. Reuses the macro injector (advance),
+  `tutor/watcher.go` (detect), the WebSocket hub (card push), and the styled-modal pattern
+  (card UI). Next: `/speckit-tasks`.
 <!-- SPECKIT END -->

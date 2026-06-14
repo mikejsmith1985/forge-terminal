@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SDD phase orchestrator — in-terminal HITL decision cards (US1 core, specs/003)** — New
+  `internal/sdd` package that gates the Spec-Driven Development pipeline: after a phase
+  completes, a scannable decision card (Approve / Reject / Clarify) is presented and the
+  pipeline advances by injecting the next `/speckit-*` command, stops, or is steered. Card
+  content is derived **deterministically** from the phase artifacts (checklist counts,
+  `[NEEDS CLARIFICATION]` markers, missing-artifact flags) — no generative call. Reuses
+  existing Forge subsystems per the framework-first gate: the macro injector (advance), the
+  file watcher (detect), the WebSocket hub (card push), and the styled-modal pattern (UI).
+  This increment ships the fully unit-tested core (state machine, summarizer, history,
+  `POST /api/sdd/decision`, and the `PhaseDecisionCard` + `useSddGate` frontend); the live
+  backend wiring and Cypress UX pass land next.
+
 ### Fixed
 - **A tab now relabels when the shell switches to a different project root** — After
   the tab-naming rebuild, a tab's label was frozen at creation, so `cd`-ing from one
