@@ -155,6 +155,108 @@ func TestMigrateToolVariants_AddsMacroVariantsToID7(t *testing.T) {
 	}
 }
 
+// The stale enforced macro a real install carried: it ALREADY names framework-first
+// (so the old `!Contains(..., "framework-first")` guard skipped it) yet still points a
+// Claude session at Copilot's instruction file and names the retired forge-workflow
+// skill — both FR-011 violations. This is the exact payload that mis-fired in the bug.
+const staleEnforcedClaudeMacro = "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# MANDATORY skill invocation order: workflow-enforcer → forge-workflow → code-quality → framework-first → branching-strategy → code-tutor-workflow\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change."
+
+const staleAwarenessClaudeMacro = "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read @.github/copilot-instructions.md before starting.\n# MANDATORY skill invocation order: workflow-enforcer → forge-workflow → code-quality → framework-first → branching-strategy → code-tutor-workflow"
+
+// fullyPopulatedVariants returns the variant maps a current card has, so a test can
+// isolate the Claude-macro heal from the unrelated empty/Google upgrade branches.
+func fullyPopulatedVariants(claudeMacro string) (map[string]string, map[string]string, map[string]string) {
+	toolVariants := map[string]string{"claude": "claude", "copilot": "copilot --allow-all-tools", "google": "agy --dangerously-skip-permissions"}
+	descriptionVariants := map[string]string{"claude": "🛡 Claude (Enforced)", "copilot": "🛡 Copilot (Enforced)", "google": "🛡 Google (Enforced)"}
+	macroVariants := map[string]string{"claude": claudeMacro, "copilot": CopilotWorkflowMacro, "google": GoogleWorkflowMacro}
+	return toolVariants, descriptionVariants, macroVariants
+}
+
+// TestMigrateToolVariants_HealsStaleEnforcedClaudeMacro is the regression test for the
+// reported bug: an Enforced card (ID 8) whose Claude macro still points at Copilot's
+// instruction file must be rewritten to the canonical constitution-based macro, even
+// though the stale text already contains "framework-first".
+func TestMigrateToolVariants_HealsStaleEnforcedClaudeMacro(t *testing.T) {
+	toolVariants, descriptionVariants, macroVariants := fullyPopulatedVariants(staleEnforcedClaudeMacro)
+	original := []Command{{
+		ID:                  8,
+		Description:         "🛡 Enforced",
+		Command:             "claude",
+		ToolVariants:        toolVariants,
+		DescriptionVariants: descriptionVariants,
+		MacroVariants:       macroVariants,
+	}}
+
+	migrated, changed := migrateToolVariants(original)
+	if !changed {
+		t.Fatal("expected migrateToolVariants to heal a stale Claude enforced macro")
+	}
+	claudeMacro := migrated[0].MacroVariants["claude"]
+	if claudeMacro != ClaudeEnforcedMacro {
+		t.Fatalf("Claude macro was not reset to canonical ClaudeEnforcedMacro; got %q", claudeMacro)
+	}
+	if strings.Contains(claudeMacro, "copilot-instructions") {
+		t.Fatalf("FR-011 violation: healed Claude macro still references Copilot's instruction file: %q", claudeMacro)
+	}
+	if !strings.Contains(claudeMacro, ".specify/memory/constitution.md") {
+		t.Fatalf("healed Claude macro must point at the constitution; got %q", claudeMacro)
+	}
+}
+
+// TestMigrateToolVariants_HealsStaleAwarenessClaudeMacro is the same regression for the
+// Fresh (ID 6) and Resume (ID 7) cards, which use the awareness (non-enforced) macro.
+func TestMigrateToolVariants_HealsStaleAwarenessClaudeMacro(t *testing.T) {
+	for _, id := range []int{6, 7} {
+		toolVariants, descriptionVariants, macroVariants := fullyPopulatedVariants(staleAwarenessClaudeMacro)
+		original := []Command{{
+			ID:                  id,
+			Description:         "🤖 Fresh",
+			Command:             "claude",
+			ToolVariants:        toolVariants,
+			DescriptionVariants: descriptionVariants,
+			MacroVariants:       macroVariants,
+		}}
+
+		migrated, changed := migrateToolVariants(original)
+		if !changed {
+			t.Fatalf("ID %d: expected migrateToolVariants to heal a stale awareness macro", id)
+		}
+		claudeMacro := migrated[0].MacroVariants["claude"]
+		if claudeMacro != ClaudeAwarenessMacro {
+			t.Fatalf("ID %d: Claude macro was not reset to canonical ClaudeAwarenessMacro; got %q", id, claudeMacro)
+		}
+		if strings.Contains(claudeMacro, "copilot-instructions") {
+			t.Fatalf("ID %d: FR-011 violation: healed macro still references Copilot's file: %q", id, claudeMacro)
+		}
+	}
+}
+
+// TestMigrateToolVariants_LeavesCanonicalAndCustomMacrosAlone guards against two false
+// positives: a card already carrying the canonical macro must not be rewritten (no
+// churn on every boot), and a genuinely user-authored macro (no Forge awareness
+// header) must never be clobbered.
+func TestMigrateToolVariants_LeavesCanonicalAndCustomMacrosAlone(t *testing.T) {
+	toolVariants, descriptionVariants, macroVariants := fullyPopulatedVariants(ClaudeEnforcedMacro)
+	canonical := []Command{{
+		ID: 8, Description: "🛡 Enforced", Command: "claude",
+		ToolVariants: toolVariants, DescriptionVariants: descriptionVariants, MacroVariants: macroVariants,
+	}}
+	if _, changed := migrateToolVariants(canonical); changed {
+		t.Fatal("a card already carrying the canonical Claude macro must not be rewritten")
+	}
+
+	customMacro := "My own Claude bootstrap. Read project.md. No Forge header here."
+	tv, dv, mv := fullyPopulatedVariants(customMacro)
+	custom := []Command{{
+		ID: 8, Description: "🛡 Enforced", Command: "claude",
+		ToolVariants: tv, DescriptionVariants: dv, MacroVariants: mv,
+	}}
+	migrated, _ := migrateToolVariants(custom)
+	if migrated[0].MacroVariants["claude"] != customMacro {
+		t.Fatalf("a user-authored Claude macro must be left untouched; got %q", migrated[0].MacroVariants["claude"])
+	}
+}
+
 // TestMigrateToolVariants_UpgradesExistingID8 verifies that when ID 8 is
 // present but lacks ToolVariants, the migration adds ToolVariants,
 // DescriptionVariants, and MacroVariants — fixing the silent upgrade gap

@@ -100,6 +100,41 @@ func inferProviderFromCommand(command, description string) string {
 	return ""
 }
 
+// forgeAwarenessHeader marks a Claude session macro as Forge-managed (an awareness or
+// enforced macro), as opposed to one a user wrote by hand. Older generations of the
+// Forge macro carry this same header, which is what lets the heal below recognise — and
+// safely replace — a drifted Forge macro without clobbering a deliberate customisation.
+const forgeAwarenessHeader = "SYSTEM INJECTION: FORGE AWARENESS"
+
+// healClaudeMacroVariant rewrites a default card's Claude macro variant to the canonical
+// text whenever the stored value has drifted from it. Per FR-011 a Claude session must
+// be driven only by the tool-agnostic constitution and the current skill order — never
+// by an older generation that points at .github/copilot-instructions.md, names the
+// retired forge-workflow skill, or omits framework-first. Healing against the canonical
+// CONSTANT (rather than a per-symptom Contains check) means every future drift
+// self-heals; the previous code only caught the single "missing framework-first" case
+// and silently let the copilot-instructions reference survive. To avoid reverting an
+// intentional customisation, it heals only a missing/empty variant or one still carrying
+// the Forge awareness header. Returns true if it changed the card.
+func healClaudeMacroVariant(cmd *Command, canonicalClaudeMacro string) bool {
+	if cmd.MacroVariants == nil {
+		return false
+	}
+
+	current, exists := cmd.MacroVariants["claude"]
+	if current == canonicalClaudeMacro {
+		return false
+	}
+
+	isForgeManaged := !exists || current == "" || strings.Contains(current, forgeAwarenessHeader)
+	if !isForgeManaged {
+		return false
+	}
+
+	cmd.MacroVariants["claude"] = canonicalClaudeMacro
+	return true
+}
+
 // migrateToolVariants upgrades the legacy Copilot-specific cards (IDs 6, 7, 8)
 // to tool-agnostic cards with ToolVariants, DescriptionVariants, and
 // MacroVariants, and injects the Enforced card (ID 8) if it is missing.
@@ -153,17 +188,19 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 6")
-			} else if _, ok := commands[i].MacroVariants["google"]; !ok {
-				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
-				changed = true
-				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 6")
-			} else if !strings.Contains(commands[i].MacroVariants["claude"], "framework-first") {
-				// Installs from before the framework-first skill (2026-06-05) have a
-				// Claude macro that omits the architecture-fidelity gate from the skill
-				// cascade. Refresh to the current macro so the gate fires on session start.
-				commands[i].MacroVariants["claude"] = ClaudeAwarenessMacro
-				changed = true
-				log.Printf("[Commands] Migration: Updated Claude MacroVariant in ID 6 to include framework-first skill")
+			} else {
+				if _, ok := commands[i].MacroVariants["google"]; !ok {
+					commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+					changed = true
+					log.Printf("[Commands] Migration: Added Google MacroVariant to ID 6")
+				}
+				// Heal a drifted Claude macro (e.g. one that still references Copilot's
+				// instruction file) back to the canonical awareness macro — independently
+				// of the Google check above, so a card can be missing neither yet still stale.
+				if healClaudeMacroVariant(&commands[i], ClaudeAwarenessMacro) {
+					changed = true
+					log.Printf("[Commands] Migration: Reset stale Claude MacroVariant in ID 6 to canonical awareness macro (FR-011)")
+				}
 			}
 
 		case 7:
@@ -207,16 +244,18 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 7")
-			} else if _, ok := commands[i].MacroVariants["google"]; !ok {
-				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
-				changed = true
-				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 7")
-			} else if !strings.Contains(commands[i].MacroVariants["claude"], "framework-first") {
-				// Same gap as ID 6 — resume sessions on pre-2026-06-05 installs need
-				// the architecture-fidelity gate added to the Claude session macro.
-				commands[i].MacroVariants["claude"] = ClaudeAwarenessMacro
-				changed = true
-				log.Printf("[Commands] Migration: Updated Claude MacroVariant in ID 7 to include framework-first skill")
+			} else {
+				if _, ok := commands[i].MacroVariants["google"]; !ok {
+					commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+					changed = true
+					log.Printf("[Commands] Migration: Added Google MacroVariant to ID 7")
+				}
+				// Same heal as ID 6 — a resume card's Claude macro must point at the
+				// constitution, never Copilot's instruction file.
+				if healClaudeMacroVariant(&commands[i], ClaudeAwarenessMacro) {
+					changed = true
+					log.Printf("[Commands] Migration: Reset stale Claude MacroVariant in ID 7 to canonical awareness macro (FR-011)")
+				}
 			}
 
 		case 8:
@@ -264,17 +303,19 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 8")
-			} else if _, ok := commands[i].MacroVariants["google"]; !ok {
-				commands[i].MacroVariants["google"] = GoogleWorkflowMacro
-				changed = true
-				log.Printf("[Commands] Migration: Added Google MacroVariant to ID 8")
-			} else if !strings.Contains(commands[i].MacroVariants["claude"], "framework-first") {
-				// Enforced card on pre-2026-06-05 installs carries the old ClaudeEnforcedMacro
-				// which does not name framework-first. The enforced mode is the strictest gate
-				// and must include the architecture-fidelity skill explicitly.
-				commands[i].MacroVariants["claude"] = ClaudeEnforcedMacro
-				changed = true
-				log.Printf("[Commands] Migration: Updated Claude MacroVariant in ID 8 to include framework-first skill")
+			} else {
+				if _, ok := commands[i].MacroVariants["google"]; !ok {
+					commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+					changed = true
+					log.Printf("[Commands] Migration: Added Google MacroVariant to ID 8")
+				}
+				// Enforced mode is the strictest gate, so its Claude macro must be exactly
+				// canonical. Heal any drifted generation — including the reported one that
+				// already named framework-first but still pointed at copilot-instructions.md.
+				if healClaudeMacroVariant(&commands[i], ClaudeEnforcedMacro) {
+					changed = true
+					log.Printf("[Commands] Migration: Reset stale Claude MacroVariant in ID 8 to canonical enforced macro (FR-011)")
+				}
 			}
 		}
 	}
