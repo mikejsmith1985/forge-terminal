@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.14.0] - 2026-06-14
+
+---
+
+## [v7.14.0] - 2026-06-14
+
 ### Added
 - **Cross-tool Spec Kit projection engine + Copilot pipeline (cross-tool SDD,
   Phase 2 + US1)** — New `internal/workflow/speckit_project.go` projects the single
