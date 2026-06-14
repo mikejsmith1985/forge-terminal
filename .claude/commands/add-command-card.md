@@ -184,7 +184,7 @@ Before delivering a new command card, verify all of these:
 
 All code written for command cards is subject to:
 - `code-quality` — naming conventions, comment standards, no magic numbers
-- `forge-workflow` — Phase 3 TDD: write the test before the implementation
+- Testing (constitution Article V) — write the test before the implementation
 - `branching-strategy` — you are on a feature branch before the first file edit
 
 Do not deliver a new default card without a unit test that asserts the card's ID, Description, and Command fields are populated correctly.
