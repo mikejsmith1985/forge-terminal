@@ -329,6 +329,20 @@ func ScaffoldProject(projectPath string, config WorkflowConfig) (*ScaffoldResult
 			result.FilesCreated = append(result.FilesCreated, specKitPaths...)
 			log.Printf("[Workflow] Spec Kit pipeline: %d files written", len(specKitPaths))
 		}
+
+		// Project the pipeline onto the other tools' skill surfaces so SDD is
+		// runnable cross-tool, not just under Claude. ScaffoldSpecKit above already
+		// wrote Claude's .claude/skills/ via the embedded payload mapping, so only
+		// the additional tools are projected here. (Google's instruction-based
+		// surface is added in a later increment.)
+		copilotPaths, copilotErr := ProjectSpecKitForTool(absolutePath, "copilot", config.ConflictStrategy)
+		if copilotErr != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("speckit copilot projection: %s", copilotErr))
+			result.Success = false
+		} else {
+			result.FilesCreated = append(result.FilesCreated, copilotPaths...)
+			log.Printf("[Workflow] Spec Kit Copilot projection: %d files written", len(copilotPaths))
+		}
 	}
 
 	// Configure git hooks path if git hooks module is enabled and git is present
