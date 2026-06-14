@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A tab now relabels when the shell switches to a different project root** — After
+  the tab-naming rebuild, a tab's label was frozen at creation, so `cd`-ing from one
+  project into another (e.g. `AzureWorkflow` → `forge-terminal`) left the tab showing
+  the old project's name. Tabs now update their label on a genuine project-root switch
+  while staying frozen during deep navigation within a project and during temp/home
+  detours — so the old title-drift/corruption bug cannot return. A manually renamed
+  tab is never relabeled (the rename is now persisted across restarts). New
+  `resolveProjectRoot` / `shouldRelabelForDirectory` helpers in `tabLabel.js` make the
+  switch-only trigger drift-proof by construction.
+
 ## [7.15.0] - 2026-06-14
 
 ---

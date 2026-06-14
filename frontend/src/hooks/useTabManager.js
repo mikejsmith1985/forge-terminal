@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
 import { logger } from '../utils/logger';
 import { isFileLikeName } from '../utils/projectFolder';
-import { computeTabLabel, dedupeLabel } from '../utils/tabLabel';
+import { computeTabLabel, dedupeLabel, shouldRelabelForDirectory } from '../utils/tabLabel';
 
 const MAX_TABS = 20;
 
@@ -123,6 +123,9 @@ function tabsToSession(tabs, activeTabId) {
       // v3.12.3: amEnabled removed
       visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
+      // Persisted so a manual rename stays immune to relabel-on-project-switch
+      // across restarts (see updateTabTitle / updateTabDirectory).
+      isManuallyRenamed: tab.isManuallyRenamed || false,
 
     })),
     activeTabId: activeTabId,
@@ -263,6 +266,10 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
             // v3.12.3: amEnabled removed
             visionEnabled: tabState.visionEnabled || false,
             currentDirectory: tabState.currentDirectory || null,
+            // Preserve a manual rename across restarts. A self-healed (formerly
+            // corrupt) title is NOT treated as manual, so it can still relabel on a
+            // later project switch.
+            isManuallyRenamed: isCorruptTitle ? false : (tabState.isManuallyRenamed || false),
 
             createdAt: Date.now(),
           };
@@ -454,7 +461,9 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
-   * Update a tab's title
+   * Update a tab's title. This is the explicit user-rename path, so the tab is
+   * marked as manually renamed — which makes its label permanent and immune to the
+   * automatic relabel-on-project-switch in updateTabDirectory.
    * @param {string} tabId - ID of tab to update
    * @param {string} title - New title
    */
@@ -466,7 +475,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       }
 
       const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], title };
+      newTabs[tabIndex] = { ...newTabs[tabIndex], title, isManuallyRenamed: true };
       return {
         ...prev,
         tabs: newTabs,
@@ -690,9 +699,27 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
         return prev;
       }
 
+      const targetTab = prev.tabs[tabIndex];
+      const updatedTab = { ...targetTab, currentDirectory };
+
+      // Tab-naming rebuild kept labels write-once to stop title drift. The single
+      // sanctioned exception lives here: when the shell moves to a *different
+      // project root* (not just a deeper folder), relabel the tab to match — but
+      // never over a user's manual rename. shouldRelabelForDirectory returns null
+      // for deep navigation and temp detours, so this cannot reintroduce drift.
+      if (!targetTab.isManuallyRenamed) {
+        const switchedRootLabel = shouldRelabelForDirectory(targetTab.currentDirectory, currentDirectory);
+        if (switchedRootLabel) {
+          const otherTabLabels = prev.tabs
+            .filter((_, index) => index !== tabIndex)
+            .map(tab => tab.title);
+          updatedTab.title = dedupeLabel(switchedRootLabel, otherTabLabels);
+        }
+      }
+
       const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], currentDirectory };
-      
+      newTabs[tabIndex] = updatedTab;
+
       return {
         ...prev,
         tabs: newTabs,
