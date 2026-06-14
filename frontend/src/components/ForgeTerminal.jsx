@@ -526,6 +526,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onConnectionChange = null,
   onWaitingChange = null, // Callback when prompt waiting state changes
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
+  onSddGate = null, // Callback with the raw SDD_PHASE_GATE message JSON (specs/003 decision card)
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
   onFileOpen = null, // Callback when file path is double-clicked to open in editor
@@ -559,6 +560,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const tabNameRef = useRef(tabName);
   const lastDirectoryRef = useRef(null);
   const onDirectoryChangeRef = useRef(onDirectoryChange);
+  const onSddGateRef = useRef(onSddGate);
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
   const onFileOpenRef = useRef(onFileOpen);
@@ -696,6 +698,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onDirectoryChangeRef.current = onDirectoryChange;
   }, [onDirectoryChange]);
+
+  // Keep onSddGate ref updated so the WebSocket handler always calls the latest callback.
+  useEffect(() => {
+    onSddGateRef.current = onSddGate;
+  }, [onSddGate]);
 
   // Keep onCopy ref updated
   useEffect(() => {
@@ -1873,7 +1880,14 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           if (str.length > 0 && str[0] === '{') {
             try {
               const msg = JSON.parse(str);
-              
+
+              // SDD orchestrator (specs/003): surface phase-gate messages to the in-app
+              // decision card and stop — this message is not terminal output.
+              if (msg.type === 'SDD_PHASE_GATE') {
+                if (onSddGateRef.current) onSddGateRef.current(str);
+                return;
+              }
+
               // Handle server errors (e.g. failed to start PTY)
               if (msg.error) {
                 console.error('[Terminal] Server error:', msg.error);

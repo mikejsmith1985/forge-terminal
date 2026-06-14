@@ -10,6 +10,14 @@ import "strings"
 // both phases write the same file.
 const clarificationsMarker = "## Clarifications"
 
+// DetectCompletedPhase classifies a changed feature artifact (feature-relative path plus its
+// content) to the phase whose completion it signals, returning false for any file that is
+// not a recognized phase artifact. It is the exported entry point the wiring layer calls
+// from the file-watcher loop.
+func DetectCompletedPhase(featureRelPath, content string) (PhaseName, bool) {
+	return classifyArtifact(featureRelPath, content)
+}
+
 // classifyArtifact maps a changed file (feature-relative path + its content) to the phase
 // it signals completion for. It returns false for any file that is not a recognized phase
 // artifact, so editor noise and unrelated files never trigger a card (FR-016).

@@ -16,9 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `[NEEDS CLARIFICATION]` markers, missing-artifact flags) — no generative call. Reuses
   existing Forge subsystems per the framework-first gate: the macro injector (advance), the
   file watcher (detect), the WebSocket hub (card push), and the styled-modal pattern (UI).
-  This increment ships the fully unit-tested core (state machine, summarizer, history,
-  `POST /api/sdd/decision`, and the `PhaseDecisionCard` + `useSddGate` frontend); the live
-  backend wiring and Cypress UX pass land next.
+  Now wired end-to-end: `POST /api/sdd/bind` starts a feature-directory watcher; phase
+  completions broadcast over the session WebSocket (`BroadcastJSONToSession`) and render
+  the `PhaseDecisionCard` beside the terminal; Approve injects the next command via the
+  macro path. 357 tests green (Go + vitest), both builds clean. Remaining: interactive
+  run-dev-clean QA (quickstart V1–V7), the Cypress UX test, and US2 (clarify input) / US3
+  (notifier).
 
 ### Fixed
 - **A tab now relabels when the shell switches to a different project root** — After
