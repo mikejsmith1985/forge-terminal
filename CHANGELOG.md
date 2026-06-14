@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Claude's project context file routes to the constitution, not Copilot's file
+  (cross-tool SDD, FR-011)** — `RenderClaudeMD` generated a `CLAUDE.md` that imported
+  `@.github/copilot-instructions.md`, routing a Claude session through Copilot's
+  instruction file — the same cross-tool contamination removed from the session
+  macros in PR #162. The generated `CLAUDE.md` now imports only the tool-agnostic
+  `@.specify/memory/constitution.md`, and carries the `<!-- SPECKIT START/END -->`
+  markers so the Spec Kit agent-context step has a real target instead of being
+  silently inert. Added forge-terminal's own root `CLAUDE.md` (the repo was missing
+  the very file its scaffolder generates for every other project). Guarded by
+  `TestRenderClaudeMD_RoutesToConstitutionNotCopilotInstructions` and
+  `TestRenderClaudeMD_IncludesAgentContextMarkers`. First increment of the
+  cross-tool Spec-Driven Development feature (`specs/001-cross-tool-speckit/`); the
+  per-tool pipeline projection (Copilot/Google) follows.
+
 ## [7.13.0] - 2026-06-14
 
 ---

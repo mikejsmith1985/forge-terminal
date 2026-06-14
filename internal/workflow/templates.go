@@ -103,8 +103,10 @@ func RenderCopilotAgentSetup(config WorkflowConfig) (string, error) {
 }
 
 // RenderClaudeMD generates CLAUDE.md, which Claude Code reads automatically
-// at every session start. It imports the canonical agent instructions file so
-// both Claude Code and GitHub Copilot share a single source of truth.
+// at every session start. It imports ONLY the tool-agnostic constitution
+// (.specify/memory/constitution.md) — never Copilot's copilot-instructions.md,
+// which is CLI-specific and must not route a Claude session through another
+// tool's file (FR-011, consistent with the session-macro fix in PR #162).
 func RenderClaudeMD(config WorkflowConfig) (string, error) {
 	return renderTemplate("claude-md", claudeMDTemplate, config)
 }
@@ -1144,8 +1146,8 @@ var prTemplateContent = `## Description
 // ──────────────────────────────────────────────────────────────────────────────
 // Template: CLAUDE.md
 // Claude Code reads this file automatically at every session start.
-// It imports the canonical agent instructions so Claude Code and GitHub Copilot
-// share a single source of truth without duplicating content.
+// It imports ONLY the tool-agnostic constitution — never copilot-instructions.md —
+// so a Claude session is never routed through another tool's instruction file.
 // ──────────────────────────────────────────────────────────────────────────────
 
 var claudeMDTemplate = `# {{.ProjectName}} — Forge Agent Instructions
@@ -1156,7 +1158,8 @@ var claudeMDTemplate = `# {{.ProjectName}} — Forge Agent Instructions
 
 @.specify/memory/constitution.md
 
-@.github/copilot-instructions.md
+<!-- SPECKIT START -->
+<!-- SPECKIT END -->
 `
 
 // ──────────────────────────────────────────────────────────────────────────────
