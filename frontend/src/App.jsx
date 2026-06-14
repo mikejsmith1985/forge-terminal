@@ -39,8 +39,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName, isTempOrSystemPath, isSystemProfilePath } from './utils/projectFolder'
-import { useTabNaming } from './hooks/useTabNaming'
+import { isTempOrSystemPath } from './utils/projectFolder'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
 import { TOUR_STEPS } from './config/tourSteps'
@@ -97,7 +96,6 @@ function App() {
   const [defaultTabTheme, setDefaultTabTheme] = useState(() => {
     return localStorage.getItem('defaultTabTheme') || 'auto-cycle-dark';
   })
-  const { namingStrategy, namingPrefix, namingRootFolder, setNamingStrategy, setNamingPrefix, setNamingRootFolder } = useTabNaming();
   const [sidebarPosition, setSidebarPosition] = useState(() => {
     return localStorage.getItem('sidebarPosition') || 'right';
   })
@@ -231,27 +229,7 @@ function App() {
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
-    retitleAllTabsFromCwd,
-  } = useTabManager(shellConfig, defaultTabTheme, namingStrategy, namingPrefix, namingRootFolder);
-
-  // On startup, sync the tab naming strategy from the server after session
-  // restore completes. localStorage may be stale or missing — the server's
-  // tab-defaults.json is authoritative. Without this, session restore runs
-  // with the default 'project-root' strategy and re-derives any "Terminal N"
-  // saved titles (from a prior 'numbered' session) into directory-based names.
-  useEffect(() => {
-    if (!sessionLoaded) return;
-    fetch('/api/tab-defaults')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data?.namingStrategy) return;
-        setNamingStrategy(data.namingStrategy);
-        setNamingPrefix(data.namingPrefix || 'Dev');
-        setNamingRootFolder(data.namingRootFolder || '');
-        retitleAllTabsFromCwd(data.namingStrategy, data.namingPrefix || 'Dev', data.namingRootFolder || '');
-      })
-      .catch(() => {});
-  }, [sessionLoaded, setNamingStrategy, setNamingPrefix, setNamingRootFolder, retitleAllTabsFromCwd]);
+  } = useTabManager(shellConfig, defaultTabTheme);
 
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
@@ -1286,46 +1264,22 @@ function App() {
     }));
   }, []);
 
-  // Handle directory change from terminal - auto-rename tab and save directory.
-  // Respects the user's chosen tab naming strategy: static strategies (numbered,
-  // shell-type, custom-prefix) never auto-rename; dynamic strategies update on cd.
+  // Handle directory change from the terminal: track the shell's current directory
+  // for features that depend on it (git panel, release/workflow cards), but NEVER
+  // rename the tab. The tab label is set once at tab creation (see tabLabel.js) and
+  // is deliberately immune to navigation — this is the tab-naming rebuild's core
+  // rule, and the reason the label no longer drifts (or corrupts) as an agent
+  // navigates deep into a project.
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
-    // Guard: skip all updates when the shell navigates into a temp or system
-    // directory. AI tools that open pasted images from %TEMP% (or /tmp) would
-    // otherwise overwrite the tab's project name AND currentDirectory, breaking
-    // the release manager card, workflow card, git panel, and other features
-    // that depend on currentDirectory pointing at the actual project root.
+    // Skip temp/system directories so currentDirectory keeps pointing at the real
+    // project root rather than a transient %TEMP% path (used by other features).
     if (fullPath && isTempOrSystemPath(fullPath)) {
       return;
-    }
-    // Guard: a bare home/profile directory (e.g. /home/mikejsmith1985 or
-    // C:\Users\mike) is where WSL/PowerShell shells land on startup — it is
-    // never a meaningful project name. Update the stored directory so that
-    // other features (git panel, workflow card) know where the shell actually
-    // is, but do NOT rename the tab. The title will update correctly once the
-    // shell navigates into a real project directory.
-    if (fullPath && isSystemProfilePath(fullPath)) {
-      updateTabDirectory(tabId, fullPath);
-      return;
-    }
-    // Static strategies: never auto-rename on directory change
-    if (isStaticNamingStrategy(namingStrategy)) {
-      if (fullPath) updateTabDirectory(tabId, fullPath);
-      return;
-    }
-    if (folderName || fullPath) {
-      const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix, rootFolder: namingRootFolder }) || '';
-      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title, namingStrategy });
-      // Guard: skip rename if title looks like a file or fell back to a generic "Terminal N".
-      // Overwriting a real project name with "Terminal 1" is worse than leaving it unchanged.
-      if (title && !title.startsWith('Terminal ') && !isFileLikeName(title)) {
-        updateTabTitle(tabId, title);
-      }
     }
     if (fullPath) {
       updateTabDirectory(tabId, fullPath);
     }
-  }, [namingStrategy, namingPrefix, namingRootFolder, updateTabTitle, updateTabDirectory]);
+  }, [updateTabDirectory]);
 
   // Helper to get folder name from a path
   const getFolderNameFromPath = (path) => {
@@ -2323,18 +2277,6 @@ function App() {
         onDefaultTabThemeChange={(newTheme) => {
           setDefaultTabTheme(newTheme);
           localStorage.setItem('defaultTabTheme', newTheme);
-        }}
-        onNamingChange={(strategy, prefix, rootFolder) => {
-          setNamingStrategy(strategy);
-          setNamingPrefix(prefix);
-          setNamingRootFolder(rootFolder ?? '');
-          // Apply the new strategy to all currently-open tabs immediately,
-          // re-deriving each title from the tab's stored currentDirectory.
-          // Without this, the change wouldn't take effect until the user
-          // happens to `cd` and the shell's OSC 9;9 integration fires —
-          // restored tabs from a prior session would keep stale titles
-          // forever even after the user explicitly saves new settings.
-          retitleAllTabsFromCwd(strategy, prefix, rootFolder ?? '');
         }}
         onRestartTour={() => {
           setIsSettingsModalOpen(false);
