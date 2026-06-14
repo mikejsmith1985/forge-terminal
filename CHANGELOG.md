@@ -24,8 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (fire-and-forget, never blocks the card) by subscribing to the same completion seam as the
   card. All five phases now gate: Specify/Clarify/Plan via the file watcher, and
   Validate/Implement via PTY-quiet detection (after the phase command settles), reusing the
-  macro subsystem's quiet-detection. 366 tests green (Go + vitest), both builds clean.
-  Remaining: the Cypress UX test, an integration test, and interactive QA.
+  macro subsystem's quiet-detection. Adds an integration test (real file reads through the
+  summarizer + a real HTTP POST through the notifier) closing the three-layer test gap, and a
+  Cypress UX spec (`sdd-phase-gate.cy.js`). 369 tests green (Go + vitest), both builds clean;
+  the backend pipeline was verified end-to-end against a running dev build (bind → file
+  change → watcher → gate → decision). Remaining: run the Cypress UX spec against the dev
+  build and the visual card confirmation.
 
 ### Fixed
 - **A tab now relabels when the shell switches to a different project root** — After

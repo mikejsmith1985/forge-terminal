@@ -67,7 +67,7 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 - [x] T018 [P] [US1] Unit test `POST /api/sdd/decision` for approve + reject (200/409 on stale cardId) in `cmd/forge/handlers_sdd_test.go`
 - [x] T019 [P] [US1] vitest: `PhaseDecisionCard` renders status/headline/flags and fires `onAction` in `frontend/src/components/PhaseDecisionCard.test.jsx`
 - [x] T020 [P] [US1] vitest: `useSddGate` dispatches `SDD_PHASE_GATE` and POSTs the decision in `frontend/src/hooks/useSddGate.test.js`
-- [ ] T021 [US1] Cypress UX (real events): phase completes → card → Approve injects next command, asserted via `window.term.buffer.active`, in `cypress/e2e/sdd-phase-gate.cy.js`
+- [ ] T021 [US1] Cypress UX (real events): phase completes → card → Approve injects next command, asserted via `window.term.buffer.active`, in `cypress/e2e/sdd-phase-gate.cy.js` — **written; validate by running against the dev build (`run-dev-clean -Port 9999`), per Article V UX tests are not headless**
 
 ### Implementation for User Story 1
 
@@ -121,7 +121,7 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T037 [P] Integration test (C1): real file writes drive the real file detector; the notifier hits a real local stub server — closes the three-layer gap (Article V) in `internal/sdd/integration_test.go`
+- [x] T037 [P] Integration test (C1): real file reads through the summarizer + a real HTTP POST through the notifier (real local server) — closes the three-layer gap (Article V) in `internal/sdd/integration_test.go`
 - [x] T038 [P] Finalize the `CHANGELOG.md` `[Unreleased]` entry (Article VI)
 - [x] T039 [P] Add "why" comments + structured gate-lifecycle logging across `internal/sdd/` (Article IV)
 - [ ] T040 Run `quickstart.md` V1–V7 validation via `run-dev-clean.ps1` (Article X: assert via xterm buffer model)
