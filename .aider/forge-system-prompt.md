@@ -4,7 +4,7 @@
 > To use: aider --system-prompt .aider/forge-system-prompt.md
 > Or add `system-prompt: .aider/forge-system-prompt.md` to .aider.conf.yml
 >
-> Last synced: 2026-06-13 19:20:13 | Skills: 7
+> Last synced: 2026-06-14 05:57:46 | Skills: 7
 
 ---
 
@@ -432,7 +432,7 @@ git branch --show-current   # confirm — must NOT output "main"
 
 ## Step 3 — Confirm before proceeding
 
-After creating the branch, output the branch name to the user so they can see it was created. Then proceed to Phase 1 of the forge-workflow.
+After creating the branch, output the branch name to the user so they can see it was created. Then proceed with planning (the SDD specify/plan stage).
 
 ---
 
@@ -451,7 +451,7 @@ After creating the branch, output the branch name to the user so they can see it
 2. Stash the changes: `git stash`
 3. Create the correct branch: `git checkout -b fix/<name>`
 4. Apply the stash: `git stash pop`
-5. Continue from Phase 2 of forge-workflow.
+5. Continue with the task.
 
 ---
 
@@ -708,7 +708,7 @@ Before delivering a new command card, verify all of these:
 
 All code written for command cards is subject to:
 - `code-quality` — naming conventions, comment standards, no magic numbers
-- `forge-workflow` — Phase 3 TDD: write the test before the implementation
+- Testing (constitution Article V) — write the test before the implementation
 - `branching-strategy` — you are on a feature branch before the first file edit
 
 Do not deliver a new default card without a unit test that asserts the card's ID, Description, and Command fields are populated correctly.
@@ -941,7 +941,7 @@ which is shared between the MCP path and the existing "Inject Now" UI button.
 
 All code written for vault operations is subject to:
 - `code-quality` — naming conventions, comment standards
-- `forge-workflow` — Phase 3 TDD: write the failing test before implementation
+- Testing (constitution Article V) — write the failing test before implementation
 - `branching-strategy` — on a feature branch before the first file edit
 - Never expose secret values in MCP tool responses, logs, or `refactor_plan.html`
 

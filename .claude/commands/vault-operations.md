@@ -222,6 +222,6 @@ which is shared between the MCP path and the existing "Inject Now" UI button.
 
 All code written for vault operations is subject to:
 - `code-quality` — naming conventions, comment standards
-- `forge-workflow` — Phase 3 TDD: write the failing test before implementation
+- Testing (constitution Article V) — write the failing test before implementation
 - `branching-strategy` — on a feature branch before the first file edit
 - Never expose secret values in MCP tool responses, logs, or `refactor_plan.html`

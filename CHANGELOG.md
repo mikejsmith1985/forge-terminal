@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Monolith retired & runtime macros updated (SDD Phase C3b)** — Finishes the
+  `forge-workflow` dissolution across the surfaces that drive live agent sessions.
+  The session-start awareness macros in `internal/commands/storage.go` (Claude,
+  Copilot, Google) no longer name `forge-workflow` in their skill order, and the
+  Claude macros now also point at `.specify/memory/constitution.md`. The
+  `.github/copilot-instructions.md` monolith is slimmed from 1250 → ~1000 lines:
+  the duplicated 5-phase / naming / testing / enforcement prose (now in the
+  constitution) is replaced by a lean pre-flight + an SDD section pointing at the
+  constitution; `framework-first` (previously missing from the pre-flight list)
+  is added; the GitHub-issue-images section and the canonical `FORGE-SKILLS`
+  skill block (Copilot's inline rules) are kept. Cosmetic "Phase N of
+  forge-workflow" references in sibling skills are rephrased to the constitution.
+  Guarded by a new `TestWorkflowMacrosOmitForgeWorkflow`. **Verify in a fresh
+  session** that pre-flight still fires and rules resolve from the constitution.
+
 ### Removed
 - **`forge-workflow` skill dissolved (SDD Phase C3a)** — The legacy bespoke 5-phase
   workflow skill is removed from the skill system: the `.github/skills/forge-workflow/`

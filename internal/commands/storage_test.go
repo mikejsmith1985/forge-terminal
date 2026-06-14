@@ -137,6 +137,25 @@ func TestWorkflowMacrosIncludeFrameworkFirst(t *testing.T) {
 	}
 }
 
+// TestWorkflowMacrosOmitForgeWorkflow guards the SDD migration: the legacy
+// forge-workflow skill has been dissolved into the constitution + speckit
+// pipeline, so no session-start macro may still name it — otherwise agents would
+// be told to invoke a skill that no longer exists.
+func TestWorkflowMacrosOmitForgeWorkflow(t *testing.T) {
+	macrosUnderTest := map[string]string{
+		"CopilotWorkflowMacro": CopilotWorkflowMacro,
+		"GoogleWorkflowMacro":  GoogleWorkflowMacro,
+		"ClaudeAwarenessMacro": ClaudeAwarenessMacro,
+		"ClaudeEnforcedMacro":  ClaudeEnforcedMacro,
+	}
+
+	for macroName, macroText := range macrosUnderTest {
+		if contains(macroText, "forge-workflow") {
+			t.Errorf("%s still names the dissolved forge-workflow skill", macroName)
+		}
+	}
+}
+
 // contains is a tiny helper to keep the round-trip assertions readable without
 // pulling in strings.Contains at every call site.
 func contains(haystack, needle string) bool {

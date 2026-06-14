@@ -41,8 +41,8 @@ workflow. The full required sequence is:
 | 8 | `testing-standards` | Any test creation or modification |
 | 9 | `pr-workflow` | Creating or reviewing pull requests |
 
-> `forge-workflow` (the legacy bespoke 5-phase skill) is **superseded** by the constitution + the
-> speckit pipeline. It still loads during the transition and is removed in the final migration step.
+> The legacy bespoke `forge-workflow` 5-phase skill has been **removed** — its standards now live in
+> the constitution (`.specify/memory/constitution.md`) and its orchestration is the speckit pipeline.
 
 ---
 
