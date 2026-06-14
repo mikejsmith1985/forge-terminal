@@ -17,6 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tab is never relabeled (the rename is now persisted across restarts). New
   `resolveProjectRoot` / `shouldRelabelForDirectory` helpers in `tabLabel.js` make the
   switch-only trigger drift-proof by construction.
+- **Claude "Enforced/Fresh/Resume" cards no longer inject Copilot's instruction file
+  into a Claude session** — Existing installs carried a stale Claude macro variant in
+  `~/.forge/commands.json` that pointed Claude at `@.github/copilot-instructions.md`
+  (and named the retired `forge-workflow` skill), violating FR-011 (a Claude session is
+  never routed through another tool's instruction file). The default cards in code were
+  already correct, but the migration only healed the *one* older generation that was
+  missing `framework-first`; the newer stale generation — which already contained
+  `framework-first` yet still referenced Copilot's file — slipped through. The migration
+  now heals the Claude macro variant of cards 6/7/8 against the **canonical** constant
+  (`ClaudeAwarenessMacro` / `ClaudeEnforcedMacro`, both pointing only at
+  `@.specify/memory/constitution.md`), so any drift self-heals on next launch, while a
+  user-authored macro (one without the Forge awareness header) is left untouched. New
+  `healClaudeMacroVariant` helper centralizes the rule.
 
 ## [7.15.0] - 2026-06-14
 
