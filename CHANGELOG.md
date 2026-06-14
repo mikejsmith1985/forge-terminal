@@ -16,6 +16,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `~/.gemini`) and reports the result via a toast. Tests updated to drive the new flow
   and assert `window.confirm` is no longer used.
 
+### Removed
+- **The 6-strategy tab-naming system is deleted (tab-naming rebuild, US3)** — Tab
+  naming is no longer configurable. Removed `useTabNaming.js`, the entire Tab Naming
+  section of the Tab Controls settings panel (Project Root / Current Directory /
+  Parent-Child / Shell Type / Numbered / Custom Prefix), `retitleAllTabsFromCwd` and
+  the startup naming-sync, the `forge:tabNaming*` localStorage keys, and the
+  `NamingStrategy`/`NamingPrefix`/`NamingRootFolder` fields from the backend
+  `TabDefaults`. Tabs now always show the project-root name, fixed at creation, with
+  ` #N` for duplicates — no settings, nothing to misconfigure. New
+  `TabControlsPanel.test.jsx` asserts zero naming options render. 297/297 frontend
+  tests + Go tests green.
+
+### Fixed
+- **Terminal tab name no longer drifts or corrupts on deep navigation (tab-naming
+  rebuild, US1)** — The tab label is now computed **once at tab creation** from the
+  project root (`computeTabLabel`) and the directory-change path is **severed from
+  naming**: `handleDirectoryChange` (App.jsx) updates `currentDirectory` only — it no
+  longer recomputes/rewrites the tab title — so the OSC 9;9 (`cd`) notifications that
+  used to rename the tab (and leak raw escape characters into it) can't touch the
+  label anymore. Session restore keeps the saved label and self-heals only a
+  legacy/corrupted one (empty, file-like, generic `Terminal N`, or carrying control
+  characters). 297/297 frontend tests pass. Remaining cleanup (delete the 6-strategy
+  settings system + backend naming fields) follows in the same feature branch.
+
+### Added
+- **Tab label producer — foundation of the tab-naming rebuild** — New
+  `frontend/src/utils/tabLabel.js` with `computeTabLabel(cwd)` and
+  `dedupeLabel(label, existing)`: the single source of a tab's display name.
+  `computeTabLabel` returns the project root (first child of a known projects
+  container) and is **stable at any directory depth**, falls back to the immediate
+  folder name when not under a projects root, and strips control characters so a
+  corrupted path can never reach the label. `dedupeLabel` appends the lowest free
+  ` #N` suffix for duplicate projects. Pure functions, 9/9 unit tests. First
+  increment of `specs/002-tab-naming-rebuild/`; wiring into the tab manager and
+  removal of the old multi-strategy system follow.
 ## [7.14.0] - 2026-06-14
 
 ---
