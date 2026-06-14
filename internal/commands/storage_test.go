@@ -116,7 +116,7 @@ func TestCommandsEqual_DetectsToggleChange(t *testing.T) {
 // architecture-fidelity gate fires before any code is written.
 //
 // Copilot and Google use step-numbered STEP 2 lists; Claude uses a # comment block
-// that points back to copilot-instructions.md. In the Claude case the macro MUST
+// that points at the tool-agnostic constitution. In the Claude case the macro MUST
 // spell out framework-first directly — relying on the agent to read through to the
 // workflow-enforcer skill body is too fragile a guarantee.
 //
@@ -152,6 +152,32 @@ func TestWorkflowMacrosOmitForgeWorkflow(t *testing.T) {
 	for macroName, macroText := range macrosUnderTest {
 		if contains(macroText, "forge-workflow") {
 			t.Errorf("%s still names the dissolved forge-workflow skill", macroName)
+		}
+	}
+}
+
+// TestClaudeMacrosOmitCopilotInstructions guards the cross-tool boundary created by
+// the SDD migration: a macro injected into a Claude session must NOT tell Claude to
+// read Copilot's instruction file (.github/copilot-instructions.md). The binding
+// rules now live in the tool-agnostic .specify/memory/constitution.md, which is the
+// only rules file a Claude macro should name. Naming Copilot's file inside a Claude
+// macro is CLI-specific verbiage that breaks the "enforce from Forge Terminal, one
+// source of truth" model — the exact regression this test exists to prevent.
+//
+// Only the Claude macros are asserted: the Copilot and Google macros legitimately
+// reference their own tools' files and are out of scope for this boundary.
+func TestClaudeMacrosOmitCopilotInstructions(t *testing.T) {
+	claudeMacros := map[string]string{
+		"ClaudeAwarenessMacro": ClaudeAwarenessMacro,
+		"ClaudeEnforcedMacro":  ClaudeEnforcedMacro,
+	}
+
+	for macroName, macroText := range claudeMacros {
+		if contains(macroText, "copilot-instructions") {
+			t.Errorf("%s tells Claude to read Copilot's instruction file; a Claude macro must point only at the tool-agnostic constitution", macroName)
+		}
+		if !contains(macroText, ".specify/memory/constitution.md") {
+			t.Errorf("%s must name the constitution as its binding-rules source", macroName)
 		}
 	}
 }
