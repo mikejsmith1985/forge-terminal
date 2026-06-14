@@ -40,7 +40,7 @@
 - [X] T008 [US1] Tab label set at creation from `tabLabel.js` (`computeTabLabel`) in `frontend/src/hooks/useTabManager.js`; strategy-based title block removed
 - [X] T009 [US1] Severed the rename path: `handleDirectoryChange` in `frontend/src/App.jsx` now updates `currentDirectory` only (no `getTabTitle`/`updateTabTitle`)
 - [X] T010 [US1] OSC 9;9 still tracks cwd but no longer mutates the title — it routes through the now-severed `handleDirectoryChange`
-- [ ] T011 [US1] Delete `retitleAllTabsFromCwd` from `frontend/src/hooks/useTabManager.js` and all its callers *(deferred to US3 — only invoked on settings change, which US3 removes)*
+- [X] T011 [US1] Deleted `retitleAllTabsFromCwd` from `useTabManager.js` and all callers (App.jsx effect + onNamingChange); obsolete tests removed
 - [ ] T012 [US1] Add/honor `isManuallyRenamed` so an automatic label never overrides a user rename *(manual rename already persists for normal labels since nothing auto-renames; explicit flag still pending)*
 - [ ] T013 [US1] Write a Cypress UX test (deep-nav stability) *(deferred — needs a live `run-dev-clean.ps1` session)*
 
@@ -53,8 +53,8 @@
 **Goal**: Same-project tabs are distinguishable.
 **Independent test**: Quickstart Scenario C.
 
-- [ ] T014 [US2] Write failing test: opening two same-project tabs yields `name` and `name #2`; reopening after closing `#2` reuses `#2`, in `frontend/src/hooks/useTabManager.test.js`
-- [ ] T015 [US2] Wire `dedupeLabel` against current open-tab labels into tab creation in `frontend/src/hooks/useTabManager.js`
+- [~] T014 [US2] `dedupeLabel` lowest-free-suffix behavior unit-tested in `tabLabel.test.js`; a hook-level two-tab integration test is still worth adding
+- [X] T015 [US2] Wired `dedupeLabel` against open-tab labels into tab creation (`createTabAction` in `frontend/src/hooks/useTabManager.js`)
 
 **Checkpoint**: duplicates always disambiguated.
 
@@ -65,12 +65,12 @@
 **Goal**: Delete the strategy system and its persistence entirely.
 **Independent test**: Quickstart Scenario D.
 
-- [ ] T016 [US3] Delete `frontend/src/hooks/useTabNaming.js` and remove its import/usage in `frontend/src/App.jsx`
-- [ ] T017 [US3] Remove the Tab Naming strategy section (the 6 radios, prefix/root inputs) from `frontend/src/components/TabControlsPanel.jsx`
-- [ ] T017a [US3] Write a vitest asserting `TabControlsPanel` renders **zero** tab-naming strategy options (no "Project Root"/"Current Directory"/etc.) in `frontend/src/components/TabControlsPanel.test.jsx` — automates SC-004
-- [ ] T018 [US3] Remove the startup naming-sync effect and `onNamingChange` plumbing from `frontend/src/App.jsx` and `TabControlsPanel.jsx`
-- [ ] T019 [US3] Write failing Go test then remove `NamingStrategy`/`NamingPrefix`/`NamingRootFolder` from `TabDefaults` in `cmd/forge/handlers_tab_defaults.go` (+ `handlers_tab_defaults` test); keep theme fields
-- [ ] T020 [US3] Remove the `forge:tabNamingStrategy|Prefix|RootFolder` localStorage reads/writes everywhere they remain
+- [X] T016 [US3] Deleted `frontend/src/hooks/useTabNaming.js` and removed its import/usage in `frontend/src/App.jsx`
+- [X] T017 [US3] Removed the Tab Naming strategy section (6 radios, prefix/root inputs) + `NAMING_STRATEGIES` from `frontend/src/components/TabControlsPanel.jsx`
+- [X] T017a [US3] Added `TabControlsPanel.test.jsx` asserting zero naming options render (SC-004) — green
+- [X] T018 [US3] Removed the startup naming-sync effect and all `onNamingChange` plumbing from `App.jsx` and `TabControlsPanel.jsx`
+- [X] T019 [US3] Removed `NamingStrategy`/`NamingPrefix`/`NamingRootFolder` from `TabDefaults` (`cmd/forge/handlers_tab_defaults.go`); go build + tests green
+- [X] T020 [US3] No `forge:tabNaming*` localStorage reads/writes remain (verified by grep)
 
 **Checkpoint**: zero tab-naming configuration anywhere.
 

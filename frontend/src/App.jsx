@@ -39,8 +39,7 @@ import { useDevMode } from './hooks/useDevMode'
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName, isTempOrSystemPath, isSystemProfilePath } from './utils/projectFolder'
-import { useTabNaming } from './hooks/useTabNaming'
+import { isTempOrSystemPath } from './utils/projectFolder'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
 import { TOUR_STEPS } from './config/tourSteps'
@@ -97,7 +96,6 @@ function App() {
   const [defaultTabTheme, setDefaultTabTheme] = useState(() => {
     return localStorage.getItem('defaultTabTheme') || 'auto-cycle-dark';
   })
-  const { namingStrategy, namingPrefix, namingRootFolder, setNamingStrategy, setNamingPrefix, setNamingRootFolder } = useTabNaming();
   const [sidebarPosition, setSidebarPosition] = useState(() => {
     return localStorage.getItem('sidebarPosition') || 'right';
   })
@@ -231,27 +229,7 @@ function App() {
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
-    retitleAllTabsFromCwd,
-  } = useTabManager(shellConfig, defaultTabTheme, namingStrategy, namingPrefix, namingRootFolder);
-
-  // On startup, sync the tab naming strategy from the server after session
-  // restore completes. localStorage may be stale or missing — the server's
-  // tab-defaults.json is authoritative. Without this, session restore runs
-  // with the default 'project-root' strategy and re-derives any "Terminal N"
-  // saved titles (from a prior 'numbered' session) into directory-based names.
-  useEffect(() => {
-    if (!sessionLoaded) return;
-    fetch('/api/tab-defaults')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data?.namingStrategy) return;
-        setNamingStrategy(data.namingStrategy);
-        setNamingPrefix(data.namingPrefix || 'Dev');
-        setNamingRootFolder(data.namingRootFolder || '');
-        retitleAllTabsFromCwd(data.namingStrategy, data.namingPrefix || 'Dev', data.namingRootFolder || '');
-      })
-      .catch(() => {});
-  }, [sessionLoaded, setNamingStrategy, setNamingPrefix, setNamingRootFolder, retitleAllTabsFromCwd]);
+  } = useTabManager(shellConfig, defaultTabTheme);
 
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
@@ -2299,18 +2277,6 @@ function App() {
         onDefaultTabThemeChange={(newTheme) => {
           setDefaultTabTheme(newTheme);
           localStorage.setItem('defaultTabTheme', newTheme);
-        }}
-        onNamingChange={(strategy, prefix, rootFolder) => {
-          setNamingStrategy(strategy);
-          setNamingPrefix(prefix);
-          setNamingRootFolder(rootFolder ?? '');
-          // Apply the new strategy to all currently-open tabs immediately,
-          // re-deriving each title from the tab's stored currentDirectory.
-          // Without this, the change wouldn't take effect until the user
-          // happens to `cd` and the shell's OSC 9;9 integration fires —
-          // restored tabs from a prior session would keep stale titles
-          // forever even after the user explicitly saves new settings.
-          retitleAllTabsFromCwd(strategy, prefix, rootFolder ?? '');
         }}
         onRestartTour={() => {
           setIsSettingsModalOpen(false);

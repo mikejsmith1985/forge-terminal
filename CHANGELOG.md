@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **The 6-strategy tab-naming system is deleted (tab-naming rebuild, US3)** — Tab
+  naming is no longer configurable. Removed `useTabNaming.js`, the entire Tab Naming
+  section of the Tab Controls settings panel (Project Root / Current Directory /
+  Parent-Child / Shell Type / Numbered / Custom Prefix), `retitleAllTabsFromCwd` and
+  the startup naming-sync, the `forge:tabNaming*` localStorage keys, and the
+  `NamingStrategy`/`NamingPrefix`/`NamingRootFolder` fields from the backend
+  `TabDefaults`. Tabs now always show the project-root name, fixed at creation, with
+  ` #N` for duplicates — no settings, nothing to misconfigure. New
+  `TabControlsPanel.test.jsx` asserts zero naming options render. 297/297 frontend
+  tests + Go tests green.
+
 ### Fixed
 - **Terminal tab name no longer drifts or corrupts on deep navigation (tab-naming
   rebuild, US1)** — The tab label is now computed **once at tab creation** from the
