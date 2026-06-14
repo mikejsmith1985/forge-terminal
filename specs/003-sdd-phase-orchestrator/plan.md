@@ -78,6 +78,7 @@ specs/003-sdd-phase-orchestrator/
 ├── data-model.md        # Phase 1 — entities & state
 ├── quickstart.md        # Phase 1 — runnable validation guide
 ├── contracts/           # Phase 1 — interface contracts
+│   ├── sdd-bind-endpoint.md         # POST /api/sdd/bind (frontend → backend; binds session+repo)
 │   ├── sdd-decision-endpoint.md     # POST /api/sdd/decision (frontend → backend)
 │   ├── sdd-phase-gate-event.md      # WebSocket SDD_PHASE_GATE message (backend → frontend)
 │   └── azureworkflowpoc-notify.md   # POST to the external local service
@@ -101,10 +102,12 @@ internal/sdd/                         # NEW — orchestrator domain package
 cmd/forge/
 ├── handlers_sdd.go                   # NEW — POST /api/sdd/decision; wires HTTP → orchestrator
 ├── handlers_sdd_test.go              # NEW — handler unit tests
-└── main.go                           # MODIFIED — register /api/sdd/decision; construct orchestrator
+├── sdd_wiring.go                     # NEW — live ports (injector/broadcaster/watcher) + POST /api/sdd/bind
+├── sdd_wiring_test.go                # NEW — bind/feature-resolution/envelope unit tests
+└── main.go                           # MODIFIED — register /api/sdd/bind + /api/sdd/decision
 
 internal/terminal/                    # MODIFIED (minimal)
-└── hub.go                            # Reuse broadcastJSON for SDD_PHASE_GATE (no structural change)
+└── mcp_bridge.go                     # ADD BroadcastJSONToSession(sessionID, payload) — reuses the hub's broadcastJSON
 
 frontend/src/
 ├── components/

@@ -18,6 +18,12 @@ This guide proves the feature works end-to-end. It is a run/validation guide —
 $env:FORGE_SDD_NOTIFY_URL = "http://localhost:7000/sdd/phase"
 ```
 
+**Binding**: the pipeline must be bound to a session before gates fire. The frontend does this
+automatically — when the active terminal's working directory is known it `POST`s
+`/api/sdd/bind { sessionId, repoRoot }` (see `contracts/sdd-bind-endpoint.md`). To bind manually
+for a test, issue that POST with the active session id and the repo root; a repo without
+`.specify/feature.json` returns `409` and no pipeline starts.
+
 ## Validation scenarios
 
 Each scenario cites the spec acceptance criterion it proves. Verify terminal output via the xterm buffer model (`window.term.buffer.active`), never the DOM (Article X).

@@ -89,13 +89,13 @@ The summary is a count-and-headline (e.g., "Plan ready · 3 contracts · 0 open 
 
 **Alternatives considered**: Writing history into the feature directory — rejected: mixes runtime audit data into version-controlled spec artifacts.
 
-## R9 — Pipeline-to-session binding
+## R9 — Pipeline-to-session binding (frontend-driven)
 
-**Decision**: v1 tracks a single active pipeline bound to one terminal session — the session whose current directory is the repository root containing the active `specs/NNN-*` feature (resolved from `.specify/feature.json`). The orchestrator records that `sessionId` when the first phase gate fires and injects subsequent advances into it.
+**Decision**: Binding is **frontend-driven** via `POST /api/sdd/bind { sessionId, repoRoot }` (see `contracts/sdd-bind-endpoint.md`). The frontend knows the active terminal session and its working directory; it sends both, and the backend resolves the active feature from `repoRoot/.specify/feature.json`, constructs the orchestrator, and starts the watcher. v1 tracks a single active pipeline; a new bind replaces the previous one.
 
-**Rationale**: Matches the single-active-pipeline assumption (spec) and the existing per-session model. Avoids cross-session ambiguity in v1.
+**Rationale**: The original design assumed the backend could identify the pipeline's session by matching the session's current directory to the repo root. **Implementation revealed the backend does not track a per-session working directory** (the only `cwd` it has is the server process's `os.Getwd`, not the PTY's). The frontend is the only place that knows both the active `sessionId` and its directory, so binding must originate there. This is the correct ownership boundary, not a workaround.
 
-**Alternatives considered**: Multi-pipeline / multi-session orchestration — deferred (out of scope per spec assumptions).
+**Alternatives considered**: (a) Backend cwd inference — **rejected: infeasible**, the data does not exist server-side. (b) Plumbing PTY cwd up to the backend (OSC-9 parsing server-side) — heavier, and duplicates the frontend's existing directory tracking. (c) Multi-pipeline / multi-session orchestration — deferred (out of scope per spec assumptions).
 
 ## R10 — Reject and resume semantics (Edge Case)
 
