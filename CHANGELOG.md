@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passes (card renders, Approve injects the next command, Reject stops), confirming the
   decision card paints in the browser and the advance reaches the live terminal. Only T040
   (manual visual spot-check) is optional-remaining.
+- **Spec Kit hub-and-spoke install — no per-repo replication** — `scripts/deploy-speckit-hub.ps1`
+  publishes forge-terminal's canonical speckit machinery to a central hub (`~/.forge/speckit/`:
+  scripts, templates, extensions) and installs the global `speckit-*` skills with their script
+  paths rewritten to call the hub. A repo becomes a thin **spoke** carrying only
+  `.specify/memory/constitution.md` (via `scripts/speckit-spoke-init.ps1`) — every script and
+  template resolves from the hub, so a speckit change is made once and all spokes pick it up, and
+  onboarding a new repo is a single file. `common.sh` gains a Priority-5 template tier that falls
+  back to the templates co-located with the scripts (the hub), so a spoke needs no local
+  templates. Verified end-to-end: a constitution-only repo runs `/speckit-specify` → `setup-plan`
+  with templates served from the hub.
 
 ### Fixed
 - **A tab now relabels when the shell switches to a different project root** — After

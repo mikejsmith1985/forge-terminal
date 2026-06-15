@@ -349,9 +349,20 @@ except Exception:
         done
     fi
 
-    # Priority 4: Core templates
+    # Priority 4: Core templates (repo-local)
     local core="$base/${template_name}.md"
     [ -f "$core" ] && echo "$core" && return 0
+
+    # Priority 5: Hub core templates — co-located with these scripts. This is the hub-and-spoke
+    # tier: a thin "spoke" repo (a .specify/ with only a constitution and no local templates)
+    # resolves core templates from the central hub these scripts live in. Skipped when the hub
+    # IS the repo (e.g. forge-terminal, the canonical source) — there Priority 4 already matched.
+    local hub_templates
+    hub_templates="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../templates" 2>/dev/null && pwd)" || hub_templates=""
+    if [ -n "$hub_templates" ] && [ "$hub_templates" != "$base" ]; then
+        local hub_core="$hub_templates/${template_name}.md"
+        [ -f "$hub_core" ] && echo "$hub_core" && return 0
+    fi
 
     # Template not found in any location.
     # Return 1 so callers can distinguish "not found" from "found".
