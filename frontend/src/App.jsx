@@ -5,6 +5,7 @@ import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import PhaseDecisionCard from './components/PhaseDecisionCard'
+import SddPipelinePanel from './components/SddPipelinePanel'
 import ForgeAssist from './components/ForgeAssist'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -2210,6 +2211,11 @@ function App() {
             isSubmitting={sddGate.isSubmitting}
           />
         </div>
+        {/* US1: persistent phase status panel below the terminal, inside terminal-pane column */}
+        <SddPipelinePanel
+          phases={sddGate.phaseStatuses}
+          isVisible={sddGate.phaseStatuses.length > 0}
+        />
       </div>
       {showEditor && editorFile && (
         <div className="editor-panel">

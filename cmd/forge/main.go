@@ -615,9 +615,10 @@ func main() {
 	http.HandleFunc("/api/workflow/watch/poll", WrapWithMiddleware(handleWorkflowWatchPoll))
 	http.HandleFunc("/api/workflow/watch/stop", WrapWithMiddleware(handleWorkflowWatchStop))
 
-	// ── SDD phase orchestrator (specs/003) — HITL decision endpoints ─────
+	// ── SDD phase orchestrator (specs/003 + 004) — HITL decision + dashboard endpoints ──
 	http.HandleFunc("/api/sdd/bind", WrapWithMiddleware(handleSddBind))
 	http.HandleFunc("/api/sdd/decision", WrapWithMiddleware(handleSddDecision))
+	http.HandleFunc("/api/sdd/status", WrapWithMiddleware(handleSddStatus))
 
 	// ── MCP Server routes (own auth, no standard middleware) ──────────────
 	// Must be initialised AFTER termHandler is set (line ~282 above).

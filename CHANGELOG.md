@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added (internal)
 - `PhaseDisplayStatus` enum and `PhaseStatusEntry` struct in `internal/sdd/types.go`
 - `PhaseTable()` exported function in `internal/sdd/phases.go`
+- `buildPhaseStatuses`, `derivePhaseDisplayStatus`, `broadcastPhaseStatus` in `cmd/forge/sdd_wiring.go`
+- `handleSddStatus` GET handler + `POST /api/sdd/decision` now re-broadcasts phase state
+- `SddPipelinePanel` React component with `useSddGate.phaseStatuses` live binding
 
 ## [7.16.1] - 2026-06-15
 

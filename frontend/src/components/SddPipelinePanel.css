@@ -1,0 +1,120 @@
+/* SddPipelinePanel — collapsible bottom panel showing all 5 SDD pipeline phases.
+   Mounted as a flex child of div.terminal-pane (column direction) below terminal-pane-content.
+   specs/004-sdd-pipeline-dashboard, US1. */
+
+.sdd-pipeline-panel {
+  flex-shrink: 0;
+  width: 100%;
+  border-top: 1px solid #2a2a2a;
+  background: #0e0e0e;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: height 0.15s ease;
+}
+
+/* Collapsed state: a single 32px header row with toggle button and badge. */
+.sdd-pipeline-panel--collapsed {
+  height: 32px;
+}
+
+/* Expanded state: full panel showing all 5 phase rows. */
+.sdd-pipeline-panel--expanded {
+  height: 120px;
+}
+
+/* Header row — always visible; contains the toggle and (when collapsed) a badge. */
+.sdd-pipeline-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+.sdd-pipeline-panel__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #8a8a8a;
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.sdd-pipeline-panel__toggle:hover {
+  color: #d0d0d0;
+}
+
+/* Badge shown on the toggle while collapsed and a phase is awaiting-decision. */
+.sdd-pipeline-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #8b5cf6;
+  color: #fff;
+  font-size: 0.7em;
+  font-weight: 700;
+}
+
+/* Phase rows container — scrolls if content overflows (shouldn't with 5 phases). */
+.sdd-pipeline-panel__rows {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 10px 4px;
+}
+
+/* One row per pipeline phase. */
+.sdd-pipeline-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 17px;
+  font-size: 0.78em;
+}
+
+.sdd-pipeline-panel__icon {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  font-family: var(--font-mono, monospace);
+}
+
+.sdd-pipeline-panel__phase-name {
+  text-transform: capitalize;
+  color: #c8c8c8;
+}
+
+.sdd-pipeline-panel__artifact {
+  margin-left: auto;
+  color: #5a5a5a;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+/* Per-status colour coding on the icon and phase name. */
+.sdd-pipeline-panel__row--pending    .sdd-pipeline-panel__icon { color: #4a4a4a; }
+.sdd-pipeline-panel__row--active     .sdd-pipeline-panel__icon { color: #60a5fa; }
+.sdd-pipeline-panel__row--awaiting-decision .sdd-pipeline-panel__icon { color: #f59e0b; }
+.sdd-pipeline-panel__row--complete   .sdd-pipeline-panel__icon { color: #22c55e; }
+.sdd-pipeline-panel__row--rejected   .sdd-pipeline-panel__icon { color: #ef4444; }
+
+.sdd-pipeline-panel__row--awaiting-decision .sdd-pipeline-panel__phase-name { color: #fde68a; }
+.sdd-pipeline-panel__row--complete   .sdd-pipeline-panel__phase-name { color: #86efac; }
+.sdd-pipeline-panel__row--rejected   .sdd-pipeline-panel__phase-name { color: #fca5a5; }

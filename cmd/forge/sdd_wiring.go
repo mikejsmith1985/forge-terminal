@@ -122,8 +122,12 @@ func startSddPipeline(sessionID, repoRoot string) {
 		Waiter:         newSddWaiter(),
 	})
 
-	// US3 (FR-011/012): best-effort notifier on the shared completion seam. It reads the feature
-	// label from the orchestrator at fire time, since the feature is learned lazily.
+	// Broadcast phase status after every phase completion so the SddPipelinePanel updates live.
+	orchestrator.Subscribe(func(_ sdd.PhaseName, _ string) {
+		broadcastPhaseStatus(sessionID)
+	})
+
+	// Best-effort notifier on the shared completion seam (FR-011/012).
 	notifier := sdd.NewNotifier()
 	orchestrator.Subscribe(func(phase sdd.PhaseName, artifactPath string) {
 		notifier.Notify(filepath.Base(orchestrator.State().FeatureDir), phase, artifactPath)
@@ -250,6 +254,92 @@ func newSddBroadcaster() sdd.GateBroadcaster {
 		}
 		termHandler.BroadcastJSONToSession(card.SessionID, sddGateEnvelope{Type: "SDD_PHASE_GATE", DecisionCard: card})
 		return nil
+	})
+}
+
+// sddPhaseStatusEnvelope is the SDD_PHASE_STATUS on-wire message pushed after every
+// phase completion and after every decision, so the status panel stays current.
+type sddPhaseStatusEnvelope struct {
+	Type      string               `json:"type"`
+	SessionID string               `json:"sessionId"`
+	Feature   string               `json:"feature"`
+	Phases    []sdd.PhaseStatusEntry `json:"phases"`
+}
+
+// buildPhaseStatuses derives the display status for every pipeline phase from the
+// orchestrator's live state. It reads no history file — status is inferred from
+// the current phase, the pipeline status, and the phase order in the table.
+func buildPhaseStatuses(pipeline *sddPipeline) []sdd.PhaseStatusEntry {
+	state := pipeline.orchestrator.State()
+
+	currentOrder := 0
+	if state.CurrentPhase != "" {
+		if cp, ok := sdd.PhaseByName(state.CurrentPhase); ok {
+			currentOrder = cp.Order
+		}
+	}
+
+	phases := sdd.PhaseTable()
+	entries := make([]sdd.PhaseStatusEntry, 0, len(phases))
+	for _, phase := range phases {
+		displayStatus := derivePhaseDisplayStatus(phase.Order, currentOrder, state.Status)
+		entries = append(entries, sdd.PhaseStatusEntry{
+			Phase:         phase.Name,
+			Order:         phase.Order,
+			DisplayStatus: displayStatus,
+			ArtifactPath:  phase.ExpectedArtifact,
+			DecidedAt:     nil,
+		})
+	}
+	return entries
+}
+
+// derivePhaseDisplayStatus maps a phase's position in the pipeline to its UI display status.
+func derivePhaseDisplayStatus(phaseOrder, currentOrder int, pipelineStatus sdd.PipelineStatus) sdd.PhaseDisplayStatus {
+	switch {
+	case currentOrder == 0:
+		// No phases have started yet.
+		return sdd.PhaseDisplayPending
+
+	case phaseOrder < currentOrder:
+		// Phases before the current one were all approved to get here.
+		return sdd.PhaseDisplayComplete
+
+	case phaseOrder == currentOrder:
+		switch pipelineStatus {
+		case sdd.StatusAwaitingDecision:
+			return sdd.PhaseDisplayAwaitingDecision
+		case sdd.StatusRejected:
+			return sdd.PhaseDisplayRejected
+		case sdd.StatusAdvancing, sdd.StatusComplete:
+			// The current phase was just approved.
+			return sdd.PhaseDisplayComplete
+		default:
+			return sdd.PhaseDisplayPending
+		}
+
+	case phaseOrder == currentOrder+1 && pipelineStatus == sdd.StatusAdvancing:
+		// The phase immediately after the approved one is now starting.
+		return sdd.PhaseDisplayActive
+
+	default:
+		return sdd.PhaseDisplayPending
+	}
+}
+
+// broadcastPhaseStatus pushes the full phase status array to all WebSocket clients
+// in the session. Called after every HandlePhaseComplete and after every decision.
+func broadcastPhaseStatus(sessionID string) {
+	pipeline, ok := sddPipelineFor(sessionID)
+	if !ok || termHandler == nil {
+		return
+	}
+	state := pipeline.orchestrator.State()
+	termHandler.BroadcastJSONToSession(sessionID, sddPhaseStatusEnvelope{
+		Type:      "SDD_PHASE_STATUS",
+		SessionID: sessionID,
+		Feature:   filepath.Base(state.FeatureDir),
+		Phases:    buildPhaseStatuses(pipeline),
 	})
 }
 

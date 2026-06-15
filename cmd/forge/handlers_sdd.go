@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"path/filepath"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/sdd"
 )
@@ -68,7 +69,39 @@ func handleSddDecision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Broadcast updated phase statuses so the SddPipelinePanel reflects the decision immediately.
+	broadcastPhaseStatus(request.SessionID)
 	writeSddJSON(w, http.StatusOK, map[string]string{"status": string(status)})
+}
+
+// handleSddStatus returns the current phase status for a session (used by the
+// SddPipelinePanel on mount for cold-start recovery after a page reload; the
+// WebSocket SDD_PHASE_STATUS event maintains live state thereafter).
+func handleSddStatus(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("sessionId")
+	if sessionID == "" {
+		writeSddError(w, http.StatusBadRequest, "sessionId is required")
+		return
+	}
+
+	pipeline, ok := sddPipelineFor(sessionID)
+	if !ok {
+		// No active pipeline — return an empty envelope so the panel shows idle state.
+		// 200 (not 404) keeps the frontend simple: no special error handling needed.
+		writeSddJSON(w, http.StatusOK, map[string]any{
+			"sessionId": sessionID,
+			"feature":   "",
+			"phases":    []any{},
+		})
+		return
+	}
+
+	state := pipeline.orchestrator.State()
+	writeSddJSON(w, http.StatusOK, map[string]any{
+		"sessionId": sessionID,
+		"feature":   filepath.Base(state.FeatureDir),
+		"phases":    buildPhaseStatuses(pipeline),
+	})
 }
 
 // writeSddDecisionError maps orchestrator errors to precise HTTP status codes.
