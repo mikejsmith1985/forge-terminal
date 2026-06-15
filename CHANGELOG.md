@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `buildPhaseStatuses`, `derivePhaseDisplayStatus`, `broadcastPhaseStatus` in `cmd/forge/sdd_wiring.go`
 - `handleSddStatus` GET handler + `POST /api/sdd/decision` now re-broadcasts phase state
 - `SddPipelinePanel` React component with `useSddGate.phaseStatuses` live binding
+- Cypress tests: `sdd-phase-gate.cy.js` non-blocking regression (T007); `sdd-pipeline-dashboard.cy.js` US1 status-panel suite (T019)
 
 ## [7.16.1] - 2026-06-15
 
