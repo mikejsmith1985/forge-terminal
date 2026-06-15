@@ -31,6 +31,28 @@
   background: #141414;
 }
 
+/* Failsafe exit ✕ pinned to the right of the header. Subtle until hovered;
+   never disabled, so the user can always escape a stuck decision. */
+.phase-decision-card-dismiss {
+  margin-left: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8a8a8a;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.phase-decision-card-dismiss:hover {
+  background: #2a2a2a;
+  color: #f0f0f0;
+}
+
 .phase-decision-card-status {
   font-size: 0.72em;
   letter-spacing: 0.08em;
@@ -119,13 +141,57 @@
   color: #fca5a5;
 }
 
+/* Decision failure block: reuses the warn-severity color feel so a failed
+   POST is unmistakable, and reminds the user the card can be dismissed. */
+.phase-decision-card-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  background: #422006;
+  color: #fed7aa;
+}
+
+.phase-decision-card-error-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #f59e0b;
+}
+
+.phase-decision-card-error-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.phase-decision-card-error-message {
+  font-size: 0.88em;
+  font-weight: 600;
+}
+
+.phase-decision-card-error-hint {
+  font-size: 0.8em;
+  color: #fdba74;
+}
+
 .phase-decision-card-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 10px;
   padding: 14px 20px;
   border-top: 1px solid #333;
   background: #141414;
+}
+
+/* Subtle in-flight indicator pinned to the left of the action row. */
+.phase-decision-card-pending {
+  margin-right: auto;
+  font-size: 0.82em;
+  color: #9ca3af;
 }
 
 .phase-decision-card-button {
@@ -144,6 +210,17 @@
 
 .phase-decision-card-button:hover {
   border-color: #555;
+}
+
+/* Pending state: while a decision is in flight the action buttons are disabled
+   to prevent double-submits. Dismiss/Cancel are deliberately never disabled. */
+.phase-decision-card-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.phase-decision-card-button:disabled:hover {
+  border-color: #333;
 }
 
 .phase-decision-card-button-icon {

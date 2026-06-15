@@ -18,6 +18,9 @@ const renderCard = (overrides = {}) => {
     summary: buildSummary(),
     actions: ['approve', 'reject', 'clarify'],
     onAction: vi.fn(),
+    onDismiss: vi.fn(),
+    decisionError: null,
+    isSubmitting: false,
     isOpen: true,
     ...overrides,
   }
@@ -175,5 +178,36 @@ describe('PhaseDecisionCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /clarify/i }))
     expect(screen.getByRole('textbox')).toHaveValue('')
+  })
+
+  it('calls onDismiss (and not onAction) when the dismiss control is clicked', () => {
+    const { onAction, onDismiss } = renderCard()
+
+    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
+
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+    expect(onAction).not.toHaveBeenCalled()
+  })
+
+  it('calls onDismiss when Escape is pressed', () => {
+    const { onDismiss } = renderCard()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the decision error and keeps the dismiss control enabled', () => {
+    renderCard({ decisionError: 'Decision request failed: 500' })
+
+    expect(screen.getByText(/decision request failed: 500/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /dismiss/i })).toBeEnabled()
+  })
+
+  it('disables Approve but keeps Dismiss enabled while submitting', () => {
+    renderCard({ isSubmitting: true })
+
+    expect(screen.getByRole('button', { name: /approve/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /dismiss/i })).toBeEnabled()
   })
 })

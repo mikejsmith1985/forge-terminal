@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SDD decision cards now fire reliably, never trap the session, and work across multiple
+  tabs** — Three real-world defects in the phase orchestrator:
+  - **Failsafe exit (was trapping users).** A failed decision (e.g. a stale `cardId` after a
+    re-bind) used to leave the card open with no way out — the Approve button silently did
+    nothing and the only escape was killing the terminal session. The card now has an
+    always-available dismiss (✕ / `Escape`) that closes it locally with no backend dependency,
+    surfaces decision errors inline instead of failing silently, and disables action buttons
+    while a decision is in flight. The decision endpoint is also lenient: a stale `cardId`/phase
+    is applied to the on-screen pending card rather than rejected, so Approve can't dead-end.
+  - **Reliable activation (cards rarely fired before).** Binding was once-per-tab and the
+    backend 409'd if `.specify/feature.json` didn't already exist — but you normally *create*
+    the feature by running `/speckit-specify` during the session, after binding had already
+    given up. Binding is now **eager** (a session binds to its repo with no feature required)
+    and the watcher **lazily** learns the active feature the moment the first phase artifact
+    appears, so the card fires every time rather than by lucky timing.
+  - **Per-session pipelines (multi-tab clobbering).** A single global orchestrator meant
+    multiple terminal tabs fought over one pipeline. Each session now has its own pipeline
+    (keyed by session id), so tabs gate independently; re-binding the same repo is a no-op that
+    no longer invalidates an open card. Verified end-to-end against a running build.
+
 ## [7.16.0] - 2026-06-15
 
 ---

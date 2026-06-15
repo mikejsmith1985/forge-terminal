@@ -6,14 +6,11 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/sdd"
 )
-
-// sddOrchestrator is the active pipeline orchestrator, wired at startup. Nil means no
-// pipeline is active, which the handler reports as a conflict rather than a crash.
-var sddOrchestrator *sdd.Orchestrator
 
 // sddDecisionRequest is the POST /api/sdd/decision body (contract: sdd-decision-endpoint.md).
 type sddDecisionRequest struct {
@@ -24,14 +21,15 @@ type sddDecisionRequest struct {
 	ClarifyText string `json:"clarifyText"`
 }
 
-// handleSddDecision applies one decision to the active pipeline and returns the new status.
+// handleSddDecision applies one decision to the session's pipeline and returns the new status.
+//
+// It is deliberately LENIENT so the card can never trap the user (the original bug: a stale
+// cardId after a re-bind made Approve silently 409, leaving the user stuck enough to kill the
+// session). As long as the session has a pending card, the decision is applied to THAT card —
+// the one the user is actually looking at — rather than rejected on a cardId/phase mismatch.
 func handleSddDecision(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeSddError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-	if sddOrchestrator == nil {
-		writeSddError(w, http.StatusConflict, "no active SDD pipeline")
 		return
 	}
 
@@ -41,20 +39,27 @@ func handleSddDecision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Reject a decision aimed at a card that is no longer current, so a stale UI cannot
-	// act on a superseded gate (contract: 409 on cardId mismatch).
-	state := sddOrchestrator.State()
+	pipeline, found := sddPipelineFor(request.SessionID)
+	if !found {
+		writeSddError(w, http.StatusConflict, "no active SDD pipeline for this session")
+		return
+	}
+	orchestrator := pipeline.orchestrator
+
+	state := orchestrator.State()
 	if state.PendingCard == nil {
 		writeSddError(w, http.StatusConflict, sdd.ErrNoPendingCard.Error())
 		return
 	}
+	// Lenient: a mismatched cardId is logged, not rejected — acting on the on-screen card beats
+	// trapping the user. The frontend's local dismiss is the ultimate escape hatch.
 	if request.CardID != "" && request.CardID != state.PendingCard.ID {
-		writeSddError(w, http.StatusConflict, "stale or unknown cardId")
-		return
+		log.Printf("[sdd] decision cardId mismatch (got %q, pending %q) — proceeding on the pending card", request.CardID, state.PendingCard.ID)
 	}
 
-	status, err := sddOrchestrator.SubmitDecision(sdd.Decision{
-		Phase:       sdd.PhaseName(request.Phase),
+	// Use the pending card's phase (not the request's) so a phase mismatch can't trap the user.
+	status, err := orchestrator.SubmitDecision(sdd.Decision{
+		Phase:       state.PendingCard.Phase,
 		Action:      sdd.Action(request.Action),
 		ClarifyText: request.ClarifyText,
 	})

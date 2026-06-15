@@ -140,4 +140,91 @@ describe('useSddGate', () => {
 
     expect(result.current.isCardOpen).toBe(true)
   })
+
+  it('dismiss() clears the card locally with no fetch call', () => {
+    const fetchSpy = vi.spyOn(global, 'fetch')
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+    expect(result.current.isCardOpen).toBe(true)
+
+    act(() => {
+      result.current.dismiss()
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+    expect(result.current.card).toBeNull()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('on a 500 sets decisionError, keeps the card open, and clears isSubmitting', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+
+    expect(result.current.isCardOpen).toBe(true)
+    expect(result.current.decisionError).toEqual(expect.stringContaining('500'))
+    expect(result.current.isSubmitting).toBe(false)
+  })
+
+  it('clears decisionError and the card on a successful decision', async () => {
+    // First fail to populate decisionError, then succeed.
+    const fetchSpy = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({ ok: true })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+    expect(result.current.decisionError).not.toBeNull()
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(result.current.isCardOpen).toBe(false))
+    expect(result.current.card).toBeNull()
+    expect(result.current.decisionError).toBeNull()
+  })
+
+  it('clears a prior decisionError when a new SDD_PHASE_GATE arrives', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+    expect(result.current.decisionError).not.toBeNull()
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ cardId: 'gate-plan-next' }))
+    })
+
+    expect(result.current.decisionError).toBeNull()
+    expect(result.current.isCardOpen).toBe(true)
+  })
 })

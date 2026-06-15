@@ -197,6 +197,18 @@ func TestSubmitDecision_AdvanceToPtyQuietPhaseGatesAfterWait(t *testing.T) {
 	}
 }
 
+func TestSetFeatureDir_UpdatesStateForLazyActivation(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+
+	if orchestrator.State().FeatureDir != "" {
+		t.Fatalf("expected empty feature dir before lazy activation, got %q", orchestrator.State().FeatureDir)
+	}
+	orchestrator.SetFeatureDir("specs/003-demo")
+	if got := orchestrator.State().FeatureDir; got != "specs/003-demo" {
+		t.Errorf("feature dir = %q, want specs/003-demo after SetFeatureDir", got)
+	}
+}
+
 func TestSubmitDecision_RecordsHistory(t *testing.T) {
 	orchestrator, _, _ := newTestOrchestrator(t)
 	orchestrator.HandlePhaseComplete(PhasePlan, "plan.md")

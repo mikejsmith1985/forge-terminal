@@ -1,7 +1,7 @@
 // Presentational decision card for an SDD (Spec Kit) phase gate: shows a scannable
 // summary of a completed phase and the actions a user can take to advance the pipeline.
-import React, { useCallback, useState } from 'react'
-import { CheckCircle2, XCircle, MessageSquare, FileText } from 'lucide-react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { CheckCircle2, XCircle, MessageSquare, FileText, X, AlertTriangle } from 'lucide-react'
 
 import './PhaseDecisionCard.css'
 
@@ -31,8 +31,22 @@ const CLARIFY_PLACEHOLDER = 'Add a steer for the next phase…'
  * invokes `onAction(action)` with the backend action string. Clarify is a
  * two-step interaction: the first click opens an inline steer input, and
  * Confirm invokes `onAction('clarify', trimmedSteer)`.
+ *
+ * `onDismiss` is the failsafe exit: a header ✕ and the Escape key both call it,
+ * and it stays enabled regardless of backend state so the user is never trapped.
+ * `decisionError` (when set) renders a visible error block, and `isSubmitting`
+ * disables the action buttons while a decision is in flight.
  */
-export default function PhaseDecisionCard({ phase, summary, actions, onAction, isOpen }) {
+export default function PhaseDecisionCard({
+  phase,
+  summary,
+  actions,
+  onAction,
+  onDismiss,
+  decisionError,
+  isSubmitting,
+  isOpen,
+}) {
   // Whether the inline clarify steer input is showing instead of the action buttons.
   const [isClarifying, setIsClarifying] = useState(false)
   // The raw steer text the user is typing for a clarify action.
@@ -70,10 +84,22 @@ export default function PhaseDecisionCard({ phase, summary, actions, onAction, i
     [onAction, handleClarifyOpen]
   )
 
+  // Escape is a failsafe exit alongside the header ✕: while the card is open,
+  // pressing Escape dismisses it locally so a stuck backend can never trap the user.
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onDismiss()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onDismiss])
+
   if (!isOpen) return null
 
   const { headline, producedItems = [], flags = [] } = summary ?? {}
   const hasClarifyText = clarifyText.trim().length > 0
+  const hasDecisionError = Boolean(decisionError)
 
   return (
     <div className="phase-decision-card-overlay">
@@ -81,6 +107,16 @@ export default function PhaseDecisionCard({ phase, summary, actions, onAction, i
         <div className="phase-decision-card-header">
           <span className="phase-decision-card-status">Phase Gate</span>
           <h3 className="phase-decision-card-phase">{phase}</h3>
+          {/* Failsafe exit: never disabled, no backend call — guaranteed escape. */}
+          <button
+            type="button"
+            className="phase-decision-card-dismiss"
+            onClick={onDismiss}
+            aria-label="Dismiss"
+            title="Dismiss (Esc)"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="phase-decision-card-body">
@@ -116,6 +152,18 @@ export default function PhaseDecisionCard({ phase, summary, actions, onAction, i
               })
             )}
           </div>
+
+          {hasDecisionError && (
+            <div className="phase-decision-card-error" role="alert">
+              <AlertTriangle size={16} className="phase-decision-card-error-icon" />
+              <div className="phase-decision-card-error-text">
+                <span className="phase-decision-card-error-message">{decisionError}</span>
+                <span className="phase-decision-card-error-hint">
+                  Retry, or dismiss this card to continue.
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {isClarifying ? (
@@ -148,6 +196,11 @@ export default function PhaseDecisionCard({ phase, summary, actions, onAction, i
           </div>
         ) : (
           <div className="phase-decision-card-actions">
+            {isSubmitting && (
+              <span className="phase-decision-card-pending" aria-live="polite">
+                Submitting…
+              </span>
+            )}
             {actions.map((action) => {
               const presentation = ACTION_PRESENTATION[action] ?? { label: action, Icon: null }
               const { label, Icon } = presentation
@@ -157,6 +210,7 @@ export default function PhaseDecisionCard({ phase, summary, actions, onAction, i
                   type="button"
                   className={`phase-decision-card-button phase-decision-card-button-${action}`}
                   onClick={() => handleActionClick(action)}
+                  disabled={isSubmitting}
                 >
                   {Icon && <Icon size={16} className="phase-decision-card-button-icon" />}
                   {label}

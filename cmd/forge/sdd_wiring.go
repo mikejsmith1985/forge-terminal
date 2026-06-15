@@ -1,8 +1,14 @@
 // sdd_wiring.go — wires the SDD orchestrator (internal/sdd) to live Forge subsystems:
 // the macro-injection path (advance), the WebSocket hub (card push), and the tutor file
-// watcher (detect). Binding is frontend-driven (POST /api/sdd/bind) because the backend
-// does not track a per-session working directory; the frontend, which knows the active
-// session and its repo, tells us which session runs the pipeline and where.
+// watcher (detect).
+//
+// Binding model (per-session, eager): each terminal session gets its OWN pipeline (orchestrator
+// + watcher), keyed by sessionId, so multiple sessions gate independently instead of clobbering a
+// single global. Binding is EAGER — a session is bound to its repo as soon as the frontend knows
+// the working directory, WITHOUT requiring .specify/feature.json to exist yet. The watcher then
+// LAZILY learns the active feature the moment a phase artifact (specs/<feature>/spec.md, plan.md…)
+// is written — which is exactly when the developer runs /speckit-specify. This fixes the original
+// failure where binding happened once, 409'd because no feature existed yet, and never retried.
 package main
 
 import (
@@ -12,14 +18,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/sdd"
 	"github.com/mikejsmith1985/forge-terminal/internal/tutor"
 )
-
-// sddWatcher is the active feature-directory watcher, replaced on each bind.
-var sddWatcher *tutor.Watcher
 
 // PTY-quiet detection tuning for artifact-less phases (Validate/Implement). These are
 // heuristics: "the terminal was silent for sddPhaseQuietMs" stands in for "the phase command
@@ -29,6 +33,27 @@ const (
 	sddPhaseQuietMs = 8000           // 8s of terminal silence => the phase command finished
 	sddPhaseMaxMs   = 30 * 60 * 1000 // 30-minute safety cap (Implement can run long)
 )
+
+// sddPipeline is one session's bound pipeline: its orchestrator, the repo watcher feeding it,
+// and the repo root it watches. One per terminal session.
+type sddPipeline struct {
+	orchestrator *sdd.Orchestrator
+	watcher      *tutor.Watcher
+	repoRoot     string
+}
+
+// sddPipelines maps sessionId -> *sddPipeline. A sync.Map because binds (HTTP), decisions (HTTP),
+// and the watcher goroutines all touch it concurrently.
+var sddPipelines sync.Map
+
+// sddPipelineFor returns the bound pipeline for a session, if any.
+func sddPipelineFor(sessionID string) (*sddPipeline, bool) {
+	value, ok := sddPipelines.Load(sessionID)
+	if !ok {
+		return nil, false
+	}
+	return value.(*sddPipeline), true
+}
 
 // sddGateEnvelope is the on-the-wire SDD_PHASE_GATE message. Embedding DecisionCard flattens
 // its fields (cardId, sessionId, phase, summary, actions) alongside the type discriminator.
@@ -43,9 +68,10 @@ type sddBindRequest struct {
 	RepoRoot  string `json:"repoRoot"`
 }
 
-// handleSddBind starts (or restarts) the orchestrator for a session + repo. It resolves the
-// active feature directory from the repo's .specify/feature.json and begins watching for
-// phase artifacts.
+// handleSddBind binds (eagerly) a terminal session to its repository so the orchestrator watches
+// for phase artifacts. It does NOT require a feature to exist yet — the feature is learned lazily
+// when the first artifact appears. Binding the same session to the same repo again is a no-op, so
+// routine re-binds (e.g. tab switches) never tear down a pipeline or invalidate an on-screen card.
 func handleSddBind(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeSddError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -62,42 +88,33 @@ func handleSddBind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	featureDir, ok := resolveSddFeatureDir(request.RepoRoot)
-	if !ok {
-		writeSddError(w, http.StatusConflict, "no active feature (.specify/feature.json not found)")
+	// Idempotent: already watching this exact repo for this session — leave it (and its pending
+	// card) untouched.
+	if existing, ok := sddPipelineFor(request.SessionID); ok && sameSddRepo(existing.repoRoot, request.RepoRoot) {
+		writeSddJSON(w, http.StatusOK, map[string]string{"status": "bound"})
 		return
 	}
 
-	startSddPipeline(request.SessionID, request.RepoRoot, featureDir)
-	writeSddJSON(w, http.StatusOK, map[string]string{"status": "bound", "feature": filepath.Base(featureDir)})
+	startSddPipeline(request.SessionID, request.RepoRoot)
+	writeSddJSON(w, http.StatusOK, map[string]string{"status": "bound"})
 }
 
-// resolveSddFeatureDir reads the active feature directory from repoRoot/.specify/feature.json.
-func resolveSddFeatureDir(repoRoot string) (string, bool) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot, ".specify", "feature.json"))
-	if err != nil {
-		return "", false
-	}
-	var meta struct {
-		FeatureDirectory string `json:"feature_directory"`
-	}
-	if err := json.Unmarshal(raw, &meta); err != nil || meta.FeatureDirectory == "" {
-		return "", false
-	}
-	return filepath.Join(repoRoot, filepath.FromSlash(meta.FeatureDirectory)), true
+// sameSddRepo compares two repo roots for binding idempotency, tolerant of separator/casing diffs.
+func sameSddRepo(left, right string) bool {
+	normalize := func(path string) string { return strings.ToLower(filepath.ToSlash(strings.TrimRight(path, "/\\"))) }
+	return normalize(left) == normalize(right)
 }
 
-// startSddPipeline constructs the orchestrator with live ports and starts the watcher loop.
-func startSddPipeline(sessionID, repoRoot, featureDir string) {
-	if sddWatcher != nil {
-		sddWatcher.Stop()
-		sddWatcher = nil
+// startSddPipeline creates (or replaces, if the repo changed) the pipeline for a session and
+// starts its watcher. Eager: no feature is required up front.
+func startSddPipeline(sessionID, repoRoot string) {
+	// Replace any prior pipeline for this session (e.g. the session moved to a different repo).
+	if old, ok := sddPipelineFor(sessionID); ok {
+		old.watcher.Stop()
+		sddPipelines.Delete(sessionID)
 	}
 
-	feature := filepath.Base(featureDir)
-	sddOrchestrator = sdd.NewOrchestrator(sdd.Options{
-		Feature:        feature,
-		FeatureDir:     featureDir,
+	orchestrator := sdd.NewOrchestrator(sdd.Options{
 		SessionID:      sessionID,
 		HistoryBaseDir: sddStateDir(),
 		Injector:       newSddInjector(),
@@ -105,36 +122,40 @@ func startSddPipeline(sessionID, repoRoot, featureDir string) {
 		Waiter:         newSddWaiter(),
 	})
 
-	// US3 (FR-011/012): subscribe a best-effort notifier to the shared completion seam.
-	// It is independent of the card subscriber (US1) — both observe the same event.
+	// US3 (FR-011/012): best-effort notifier on the shared completion seam. It reads the feature
+	// label from the orchestrator at fire time, since the feature is learned lazily.
 	notifier := sdd.NewNotifier()
-	sddOrchestrator.Subscribe(func(phase sdd.PhaseName, artifactPath string) {
-		notifier.Notify(feature, phase, artifactPath)
+	orchestrator.Subscribe(func(phase sdd.PhaseName, artifactPath string) {
+		notifier.Notify(filepath.Base(orchestrator.State().FeatureDir), phase, artifactPath)
 	})
 
-	watcher := tutor.NewWatcher(repoRoot, "sdd")
+	watcher := tutor.NewWatcher(repoRoot, "sdd-"+sessionID)
 	if err := watcher.Start(); err != nil {
 		log.Printf("[sdd] failed to start watcher on %s: %v", repoRoot, err)
 		return
 	}
-	sddWatcher = watcher
-	go runSddDetector(watcher, repoRoot, featureDir, sessionID)
-	log.Printf("[sdd] pipeline bound: session=%s feature=%s", sessionID, filepath.Base(featureDir))
+
+	pipeline := &sddPipeline{orchestrator: orchestrator, watcher: watcher, repoRoot: repoRoot}
+	sddPipelines.Store(sessionID, pipeline)
+	go runSddDetector(pipeline, sessionID)
+	log.Printf("[sdd] pipeline bound (eager): session=%s repo=%s", sessionID, repoRoot)
 }
 
 // runSddDetector consumes watcher notifications and gates each recognized phase artifact.
-func runSddDetector(watcher *tutor.Watcher, repoRoot, featureDir, sessionID string) {
-	for notification := range watcher.Notifications() {
+func runSddDetector(pipeline *sddPipeline, sessionID string) {
+	for notification := range pipeline.watcher.Notifications() {
 		for _, change := range notification.Files {
-			gateSddArtifact(change.Path, repoRoot, featureDir, sessionID)
+			gateSddArtifact(pipeline, sessionID, change.Path)
 		}
 	}
 }
 
-// gateSddArtifact classifies one changed file and, if it is a phase artifact, fires the
-// shared completion seam. Files outside the feature directory or unrecognized are ignored.
-func gateSddArtifact(changedPath, repoRoot, featureDir, sessionID string) {
-	featureRel, ok := sddFeatureRel(changedPath, repoRoot, featureDir)
+// gateSddArtifact classifies one changed file and, if it is a phase artifact, points the
+// orchestrator at the feature it belongs to and fires the completion seam. The feature directory
+// is derived from the artifact's own path (specs/<feature>/…), so no .specify/feature.json is
+// required and switching to a new feature later "just works".
+func gateSddArtifact(pipeline *sddPipeline, sessionID, changedPath string) {
+	featureDir, featureRel, ok := deriveSddFeature(changedPath, pipeline.repoRoot)
 	if !ok {
 		return
 	}
@@ -143,30 +164,32 @@ func gateSddArtifact(changedPath, repoRoot, featureDir, sessionID string) {
 		return
 	}
 	phase, recognized := sdd.DetectCompletedPhase(featureRel, string(content))
-	if !recognized || sddOrchestrator == nil {
+	if !recognized {
 		return
 	}
-	sddOrchestrator.BindSession(sessionID)
-	sddOrchestrator.HandlePhaseComplete(phase, featureRel)
+	pipeline.orchestrator.BindSession(sessionID)
+	pipeline.orchestrator.SetFeatureDir(featureDir)
+	pipeline.orchestrator.HandlePhaseComplete(phase, featureRel)
 }
 
-// sddFeatureRel returns the path of a changed file relative to the feature directory,
-// handling both absolute and repo-relative watcher paths. It returns false when the file
-// lies outside the feature directory.
-func sddFeatureRel(changedPath, repoRoot, featureDir string) (string, bool) {
-	absolute := changedPath
-	if !filepath.IsAbs(absolute) {
-		absolute = filepath.Join(repoRoot, changedPath)
+// deriveSddFeature splits a changed file path into the feature directory it belongs to and the
+// path relative to that feature dir, recognizing the conventional specs/<feature>/<rel> layout.
+// Returns false for any path not under a specs/<feature>/ tree.
+func deriveSddFeature(changedPath, repoRoot string) (featureDir, featureRel string, ok bool) {
+	relative := changedPath
+	if filepath.IsAbs(relative) {
+		if rebased, err := filepath.Rel(repoRoot, relative); err == nil {
+			relative = rebased
+		}
 	}
-	relative, err := filepath.Rel(featureDir, absolute)
-	if err != nil {
-		return "", false
+	parts := strings.Split(filepath.ToSlash(relative), "/")
+	// Need at least specs/<feature>/<file>.
+	if len(parts) < 3 || parts[0] != "specs" || parts[1] == "" {
+		return "", "", false
 	}
-	relative = filepath.ToSlash(relative)
-	if relative == ".." || strings.HasPrefix(relative, "../") {
-		return "", false
-	}
-	return relative, true
+	featureDir = filepath.Join(repoRoot, "specs", parts[1])
+	featureRel = strings.Join(parts[2:], "/")
+	return featureDir, featureRel, true
 }
 
 // newSddInjector advances the pipeline by injecting the next command, reusing the macro

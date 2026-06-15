@@ -102,6 +102,16 @@ func (o *Orchestrator) BindSession(sessionID string) {
 	o.mu.Unlock()
 }
 
+// SetFeatureDir points the orchestrator at the feature directory whose artifacts it should
+// summarize. This supports eager-bind/lazy-watch: a pipeline can be bound to a repo before any
+// feature exists, then have its feature directory set the moment the watcher detects the first
+// phase artifact (and re-set if the developer later moves on to a new feature).
+func (o *Orchestrator) SetFeatureDir(featureDir string) {
+	o.mu.Lock()
+	o.state.FeatureDir = featureDir
+	o.mu.Unlock()
+}
+
 // State returns a snapshot of the current pipeline state (for the HTTP layer and tests).
 func (o *Orchestrator) State() PipelineState {
 	o.mu.Lock()

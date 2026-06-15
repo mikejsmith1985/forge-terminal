@@ -1,13 +1,12 @@
-// sdd_wiring_test.go — verifies the SDD wiring helpers: feature-dir resolution, mapping a
-// watcher path to a feature-relative path, the SDD_PHASE_GATE envelope shape, and bind
-// request validation. The watcher-starting success path is exercised by the live app, not here.
+// sdd_wiring_test.go — verifies the per-session/eager wiring helpers: deriving a feature from an
+// artifact path, repo-equality for bind idempotency, the SDD_PHASE_GATE envelope shape, and eager
+// bind behavior (a session binds even with no feature yet, and re-binding the same repo is a no-op).
 package main
 
 import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,42 +14,52 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/sdd"
 )
 
-func TestResolveSddFeatureDir(t *testing.T) {
-	repo := t.TempDir()
-	specifyDir := filepath.Join(repo, ".specify")
-	if err := os.MkdirAll(specifyDir, 0o755); err != nil {
-		t.Fatal(err)
+func TestDeriveSddFeature(t *testing.T) {
+	repo := t.TempDir() // genuine absolute path (drive-qualified on Windows)
+	cases := []struct {
+		name        string
+		changed     string
+		wantFeature string // basename of the feature dir
+		wantRel     string
+		wantOK      bool
+	}{
+		{"repo-relative spec", filepath.Join("specs", "003-feat", "spec.md"), "003-feat", "spec.md", true},
+		{"absolute plan", filepath.Join(repo, "specs", "003-feat", "plan.md"), "003-feat", "plan.md", true},
+		{"nested artifact", filepath.Join("specs", "003-feat", "contracts", "x.md"), "003-feat", "contracts/x.md", true},
+		{"outside specs", "README.md", "", "", false},
+		{"feature dir only (no file)", filepath.Join("specs", "003-feat"), "", "", false},
 	}
-	if err := os.WriteFile(filepath.Join(specifyDir, "feature.json"),
-		[]byte(`{"feature_directory":"specs/003-sdd-phase-orchestrator"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	dir, ok := resolveSddFeatureDir(repo)
-	if !ok {
-		t.Fatalf("expected to resolve feature dir")
-	}
-	if filepath.Base(dir) != "003-sdd-phase-orchestrator" {
-		t.Errorf("feature dir = %q, want it to end with the feature name", dir)
-	}
-
-	if _, ok := resolveSddFeatureDir(t.TempDir()); ok {
-		t.Errorf("a repo without .specify/feature.json must not resolve")
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			featureDir, featureRel, ok := deriveSddFeature(testCase.changed, repo)
+			if ok != testCase.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, testCase.wantOK)
+			}
+			if !ok {
+				return
+			}
+			if filepath.Base(featureDir) != testCase.wantFeature || featureRel != testCase.wantRel {
+				t.Errorf("got (%q, %q), want feature %q rel %q", filepath.Base(featureDir), featureRel, testCase.wantFeature, testCase.wantRel)
+			}
+		})
 	}
 }
 
-func TestSddFeatureRel(t *testing.T) {
-	repo := t.TempDir() // a genuine absolute path (with a volume on Windows)
-	feature := filepath.Join(repo, "specs", "003-feat")
-
-	if rel, ok := sddFeatureRel(filepath.Join("specs", "003-feat", "spec.md"), repo, feature); !ok || rel != "spec.md" {
-		t.Errorf("repo-relative change = (%q, %v), want (spec.md, true)", rel, ok)
+func TestSameSddRepo(t *testing.T) {
+	cases := []struct {
+		left, right string
+		want        bool
+	}{
+		{"C:/a/b", "C:/a/b", true},
+		{"C:/a/b", "C:/a/b/", true},          // trailing slash tolerated
+		{`C:\a\b`, "C:/a/b", true},            // separator-insensitive
+		{"C:/A/B", "c:/a/b", true},            // case-insensitive (Windows)
+		{"C:/a/b", "C:/a/c", false},
 	}
-	if rel, ok := sddFeatureRel(filepath.Join(feature, "plan.md"), repo, feature); !ok || rel != "plan.md" {
-		t.Errorf("absolute change = (%q, %v), want (plan.md, true)", rel, ok)
-	}
-	if _, ok := sddFeatureRel(filepath.Join("README.md"), repo, feature); ok {
-		t.Errorf("a file outside the feature dir must be rejected")
+	for _, testCase := range cases {
+		if got := sameSddRepo(testCase.left, testCase.right); got != testCase.want {
+			t.Errorf("sameSddRepo(%q,%q) = %v, want %v", testCase.left, testCase.right, got, testCase.want)
+		}
 	}
 }
 
@@ -75,17 +84,46 @@ func TestSddGateEnvelope_FlattensWithType(t *testing.T) {
 	}
 }
 
-func TestHandleSddBind_Validation(t *testing.T) {
-	missing := httptest.NewRecorder()
-	handleSddBind(missing, httptest.NewRequest(http.MethodPost, "/api/sdd/bind", strings.NewReader(`{}`)))
-	if missing.Code != http.StatusBadRequest {
-		t.Errorf("missing fields status = %d, want 400", missing.Code)
+func TestHandleSddBind_RequiresFields(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	handleSddBind(recorder, httptest.NewRequest(http.MethodPost, "/api/sdd/bind", strings.NewReader(`{}`)))
+	if recorder.Code != http.StatusBadRequest {
+		t.Errorf("missing fields status = %d, want 400", recorder.Code)
+	}
+}
+
+// Eager bind: a session binds even when the repo has no .specify/feature.json yet (the feature
+// is learned lazily when an artifact appears). And re-binding the same repo is a no-op that
+// reuses the existing pipeline rather than replacing it (which would invalidate an open card).
+func TestHandleSddBind_EagerAndIdempotent(t *testing.T) {
+	repo := t.TempDir() // no .specify/feature.json — eager bind must still succeed
+	sessionID := "bind-test-session"
+	body := `{"sessionId":"` + sessionID + `","repoRoot":"` + strings.ReplaceAll(repo, `\`, `\\`) + `"}`
+
+	first := httptest.NewRecorder()
+	handleSddBind(first, httptest.NewRequest(http.MethodPost, "/api/sdd/bind", strings.NewReader(body)))
+	t.Cleanup(func() {
+		if pipeline, ok := sddPipelineFor(sessionID); ok {
+			pipeline.watcher.Stop()
+			sddPipelines.Delete(sessionID)
+		}
+	})
+	if first.Code != http.StatusOK || !strings.Contains(first.Body.String(), "bound") {
+		t.Fatalf("eager bind status = %d body = %s, want 200 bound", first.Code, first.Body.String())
+	}
+	pipelineOne, ok := sddPipelineFor(sessionID)
+	if !ok {
+		t.Fatalf("expected a pipeline registered for %s", sessionID)
 	}
 
-	noFeature := httptest.NewRecorder()
-	body := `{"sessionId":"s1","repoRoot":"` + strings.ReplaceAll(t.TempDir(), `\`, `\\`) + `"}`
-	handleSddBind(noFeature, httptest.NewRequest(http.MethodPost, "/api/sdd/bind", strings.NewReader(body)))
-	if noFeature.Code != http.StatusConflict {
-		t.Errorf("no-feature status = %d, want 409", noFeature.Code)
+	// Second identical bind must reuse the same pipeline (no replacement → no card invalidation).
+	second := httptest.NewRecorder()
+	handleSddBind(second, httptest.NewRequest(http.MethodPost, "/api/sdd/bind", strings.NewReader(body)))
+	if second.Code != http.StatusOK {
+		t.Fatalf("re-bind status = %d, want 200", second.Code)
+	}
+	pipelineTwo, _ := sddPipelineFor(sessionID)
+	if pipelineOne != pipelineTwo {
+		t.Errorf("re-binding the same repo must reuse the pipeline, not replace it")
 	}
 }
