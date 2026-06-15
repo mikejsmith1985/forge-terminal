@@ -67,7 +67,7 @@ Web app within the Forge monorepo: Go backend in `internal/` + `cmd/forge/`, Rea
 - [x] T018 [P] [US1] Unit test `POST /api/sdd/decision` for approve + reject (200/409 on stale cardId) in `cmd/forge/handlers_sdd_test.go`
 - [x] T019 [P] [US1] vitest: `PhaseDecisionCard` renders status/headline/flags and fires `onAction` in `frontend/src/components/PhaseDecisionCard.test.jsx`
 - [x] T020 [P] [US1] vitest: `useSddGate` dispatches `SDD_PHASE_GATE` and POSTs the decision in `frontend/src/hooks/useSddGate.test.js`
-- [ ] T021 [US1] Cypress UX (real events): phase completes → card → Approve injects next command, asserted via `window.term.buffer.active`, in `cypress/e2e/sdd-phase-gate.cy.js` — **written; validate by running against the dev build (`run-dev-clean -Port 9999`), per Article V UX tests are not headless**
+- [x] T021 [US1] Cypress UX (real events): phase completes → card → Approve injects next command, asserted via `window.term.buffer.active`, in `cypress/e2e/sdd-phase-gate.cy.js` — **validated: both tests pass against the dev build; opens a fresh tab so the pipeline binds a live PTY (a reused restored session's PTY is detached)**
 
 ### Implementation for User Story 1
 

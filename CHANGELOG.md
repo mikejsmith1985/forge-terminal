@@ -27,9 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   macro subsystem's quiet-detection. Adds an integration test (real file reads through the
   summarizer + a real HTTP POST through the notifier) closing the three-layer test gap, and a
   Cypress UX spec (`sdd-phase-gate.cy.js`). 369 tests green (Go + vitest), both builds clean;
-  the backend pipeline was verified end-to-end against a running dev build (bind → file
-  change → watcher → gate → decision). Remaining: run the Cypress UX spec against the dev
-  build and the visual card confirmation.
+  the full flow was verified end-to-end against a running dev build: the Cypress UX spec
+  passes (card renders, Approve injects the next command, Reject stops), confirming the
+  decision card paints in the browser and the advance reaches the live terminal. Only T040
+  (manual visual spot-check) is optional-remaining.
 
 ### Fixed
 - **A tab now relabels when the shell switches to a different project root** — After

@@ -25,9 +25,15 @@ describe('SDD phase orchestrator — in-terminal decision card', () => {
       },
     })
 
-    // The terminal must be live: the frontend auto-binds the active session + repo to the
-    // pipeline once its working directory is known (POST /api/sdd/bind), so no manual bind.
     cy.waitForTerminal()
+
+    // Open a FRESH tab so the pipeline binds to a live PTY. A reused/restored session's
+    // backend PTY is detached, so an injected command would write successfully but never
+    // render in the replayed view. A fresh tab is also what real macro cards inject into.
+    // The frontend auto-binds the active session + repo once its cwd is known (POST /api/sdd/bind).
+    cy.get('.new-tab-btn').click()
+    cy.waitForTerminal()
+    cy.wait(3000) // let the new shell connect and report its cwd so auto-bind fires
 
     // Trigger a phase completion by touching spec.md's modification time (no content change).
     // The real tutor.Watcher polls (2s) and debounces (3s), so the gate arrives within ~6s.
@@ -52,6 +58,11 @@ describe('SDD phase orchestrator — in-terminal decision card', () => {
       },
     })
     cy.waitForTerminal()
+
+    // Fresh tab → live PTY (see the note in the first test).
+    cy.get('.new-tab-btn').click()
+    cy.waitForTerminal()
+    cy.wait(3000)
 
     cy.exec(`powershell -NoProfile -Command "(Get-Item '${SPEC_FILE}').LastWriteTime = Get-Date"`)
     cy.get('.phase-decision-card', { timeout: 15000 }).should('be.visible')
