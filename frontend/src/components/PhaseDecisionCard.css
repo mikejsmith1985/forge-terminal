@@ -323,3 +323,64 @@
 .phase-decision-card-button-cancel:hover {
   border-color: #555;
 }
+
+/* ── Artifact preview section (US3) ────────────────────────────────────── */
+
+/* <details> wrapper that defaults collapsed and sits between flags and actions. */
+.phase-decision-card-artifact {
+  border-top: 1px solid #2a2a2a;
+  padding: 10px 20px;
+}
+
+/* <summary> toggle label for the collapsible preview block. */
+.phase-decision-card-artifact-summary {
+  font-size: 0.8em;
+  color: #9ca3af;
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.03em;
+  list-style: none;
+}
+
+.phase-decision-card-artifact-summary::-webkit-details-marker {
+  display: none;
+}
+
+.phase-decision-card-artifact-summary::before {
+  content: '▶ ';
+  font-size: 0.75em;
+}
+
+details[open] .phase-decision-card-artifact-summary::before {
+  content: '▼ ';
+}
+
+/* Scrollable monospace block for artifact content. */
+.phase-decision-card-artifact-pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8em;
+  background: #0d0d0d;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #c8c8c8;
+}
+
+/* Truncation notice shown below the scrollable block when the file was cut. */
+.phase-decision-card-artifact-truncated {
+  margin: 4px 0 0;
+  font-size: 0.75em;
+  color: #6b7280;
+}
+
+/* Fallback shown when the artifact exists in the envelope but has no content yet. */
+.phase-decision-card-artifact-missing {
+  margin: 0;
+  font-size: 0.82em;
+  color: #6b7280;
+  font-style: italic;
+}

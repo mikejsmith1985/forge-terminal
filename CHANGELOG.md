@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `buildPhaseStatuses`, `derivePhaseDisplayStatus`, `broadcastPhaseStatus` in `cmd/forge/sdd_wiring.go`
 - `handleSddStatus` GET handler + `POST /api/sdd/decision` now re-broadcasts phase state
 - `SddPipelinePanel` React component with `useSddGate.phaseStatuses` live binding
-- Cypress tests: `sdd-phase-gate.cy.js` non-blocking regression (T007); `sdd-pipeline-dashboard.cy.js` US1 status-panel suite (T019)
+- Cypress tests: `sdd-phase-gate.cy.js` non-blocking regression (T007); `sdd-pipeline-dashboard.cy.js` US1 status-panel suite (T019) + US3 artifact preview suite (T027)
+- **SDD gate card includes artifact preview** — `readSddArtifactPreview` reads first 200 lines of the phase artifact; embedded in `SDD_PHASE_GATE` as `artifactPreview`; rendered as a collapsible `<details>` block below the flags row in `PhaseDecisionCard`; pty-quiet phases (Validate/Implement) show no preview
 
 ## [7.16.1] - 2026-06-15
 

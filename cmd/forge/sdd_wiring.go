@@ -29,10 +29,43 @@ import (
 // heuristics: "the terminal was silent for sddPhaseQuietMs" stands in for "the phase command
 // finished," which is reliable for a quick analyze but only best-effort for a long Implement.
 const (
-	sddPhaseFloorMs = 4000           // let the injected command start before watching for quiet
-	sddPhaseQuietMs = 8000           // 8s of terminal silence => the phase command finished
-	sddPhaseMaxMs   = 30 * 60 * 1000 // 30-minute safety cap (Implement can run long)
+	sddPhaseFloorMs    = 4000           // let the injected command start before watching for quiet
+	sddPhaseQuietMs    = 8000           // 8s of terminal silence => the phase command finished
+	sddPhaseMaxMs      = 30 * 60 * 1000 // 30-minute safety cap (Implement can run long)
+	sddArtifactMaxLines = 200           // line cap for artifact preview embedded in SDD_PHASE_GATE
 )
+
+// sddArtifactPreview carries the embedded artifact preview sent inside SDD_PHASE_GATE.
+// Content is empty (not nil) when the file could not be read, allowing callers to use
+// `preview.Content != ""` as a readiness check without a nil dereference.
+type sddArtifactPreview struct {
+	Content    string `json:"content"`
+	FilePath   string `json:"filePath"`
+	TotalLines int    `json:"totalLines"`
+	IsTruncated bool  `json:"isTruncated"`
+}
+
+// readSddArtifactPreview reads absPath and returns the first maxLines lines as a preview.
+// Returns a zero-value preview (Content:"") on any read error so the gate envelope
+// is always safe to marshal even when the artifact file is missing or unreadable.
+func readSddArtifactPreview(absPath string, maxLines int) sddArtifactPreview {
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		return sddArtifactPreview{FilePath: absPath}
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	total := len(lines)
+	isTruncated := total > maxLines
+	if isTruncated {
+		lines = lines[:maxLines]
+	}
+	return sddArtifactPreview{
+		Content:     strings.Join(lines, "\n"),
+		FilePath:    absPath,
+		TotalLines:  total,
+		IsTruncated: isTruncated,
+	}
+}
 
 // sddPipeline is one session's bound pipeline: its orchestrator, the repo watcher feeding it,
 // and the repo root it watches. One per terminal session.
@@ -57,8 +90,11 @@ func sddPipelineFor(sessionID string) (*sddPipeline, bool) {
 
 // sddGateEnvelope is the on-the-wire SDD_PHASE_GATE message. Embedding DecisionCard flattens
 // its fields (cardId, sessionId, phase, summary, actions) alongside the type discriminator.
+// ArtifactPreview carries the first sddArtifactMaxLines lines of the phase artifact for
+// file-detected phases; it is omitted (omitempty) for pty-quiet phases (Validate/Implement).
 type sddGateEnvelope struct {
-	Type string `json:"type"`
+	Type            string              `json:"type"`
+	ArtifactPreview *sddArtifactPreview `json:"artifactPreview,omitempty"`
 	sdd.DecisionCard
 }
 
@@ -246,13 +282,26 @@ func newSddWaiter() sdd.CompletionWaiter {
 }
 
 // newSddBroadcaster pushes the decision card to the session's WebSocket clients as an
-// SDD_PHASE_GATE message over the existing hub.
+// SDD_PHASE_GATE message over the existing hub. For file-detected phases it also embeds
+// a preview of the phase artifact (first sddArtifactMaxLines lines) so the frontend can
+// render it inline without a separate fetch. Pty-quiet phases have no artifact to preview.
 func newSddBroadcaster() sdd.GateBroadcaster {
 	return sdd.BroadcasterFunc(func(card sdd.DecisionCard) error {
 		if termHandler == nil {
 			return nil
 		}
-		termHandler.BroadcastJSONToSession(card.SessionID, sddGateEnvelope{Type: "SDD_PHASE_GATE", DecisionCard: card})
+		envelope := sddGateEnvelope{Type: "SDD_PHASE_GATE", DecisionCard: card}
+
+		// Attach artifact preview for file-detected phases only.
+		if phase, ok := sdd.PhaseByName(card.Phase); ok && phase.ExpectedArtifact != "" {
+			if pipeline, bound := sddPipelineFor(card.SessionID); bound {
+				absPath := filepath.Join(pipeline.orchestrator.State().FeatureDir, phase.ExpectedArtifact)
+				preview := readSddArtifactPreview(absPath, sddArtifactMaxLines)
+				envelope.ArtifactPreview = &preview
+			}
+		}
+
+		termHandler.BroadcastJSONToSession(card.SessionID, envelope)
 		return nil
 	})
 }

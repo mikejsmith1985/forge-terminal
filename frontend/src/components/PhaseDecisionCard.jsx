@@ -26,6 +26,41 @@ const DEFAULT_SEVERITY = 'info'
 const CLARIFY_PLACEHOLDER = 'Add a steer for the next phase…'
 
 /**
+ * ArtifactPreviewSection renders a collapsible <details> block with the first
+ * sddArtifactMaxLines lines of the phase artifact embedded in the gate event.
+ * Omitted entirely when artifactPreview is null/undefined (pty-quiet phases).
+ * Shows a "not yet available" fallback when content is present but empty.
+ */
+function ArtifactPreviewSection({ artifactPreview }) {
+  if (!artifactPreview) return null
+
+  const { content, filePath, totalLines, isTruncated } = artifactPreview
+  const fileName = filePath ? filePath.replace(/^.*[\\/]/, '') : 'artifact'
+
+  if (!content) {
+    return (
+      <div className="phase-decision-card-artifact">
+        <p className="phase-decision-card-artifact-missing">Artifact not yet available</p>
+      </div>
+    )
+  }
+
+  return (
+    <details className="phase-decision-card-artifact">
+      <summary className="phase-decision-card-artifact-summary">
+        {fileName}{isTruncated ? ` (first 200 of ${totalLines} lines)` : ''}
+      </summary>
+      <pre className="phase-decision-card-artifact-pre">{content}</pre>
+      {isTruncated && (
+        <p className="phase-decision-card-artifact-truncated">
+          Showing first 200 lines — {totalLines - 200} more lines not shown
+        </p>
+      )}
+    </details>
+  )
+}
+
+/**
  * PhaseDecisionCard renders a single SDD phase gate as a modal decision card.
  * Returns null while closed. Each entry in `actions` becomes a button that
  * invokes `onAction(action)` with the backend action string. Clarify is a
@@ -36,6 +71,8 @@ const CLARIFY_PLACEHOLDER = 'Add a steer for the next phase…'
  * and it stays enabled regardless of backend state so the user is never trapped.
  * `decisionError` (when set) renders a visible error block, and `isSubmitting`
  * disables the action buttons while a decision is in flight.
+ * `artifactPreview` (optional) carries the first 200 lines of the phase artifact
+ * for file-detected phases; omitted for pty-quiet phases (Validate/Implement).
  */
 export default function PhaseDecisionCard({
   phase,
@@ -46,6 +83,7 @@ export default function PhaseDecisionCard({
   decisionError,
   isSubmitting,
   isOpen,
+  artifactPreview,
 }) {
   // Whether the inline clarify steer input is showing instead of the action buttons.
   const [isClarifying, setIsClarifying] = useState(false)
@@ -152,6 +190,8 @@ export default function PhaseDecisionCard({
               })
             )}
           </div>
+
+          <ArtifactPreviewSection artifactPreview={artifactPreview} />
 
           {hasDecisionError && (
             <div className="phase-decision-card-error" role="alert">

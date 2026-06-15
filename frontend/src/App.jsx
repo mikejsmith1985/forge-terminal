@@ -2209,6 +2209,7 @@ function App() {
             onDismiss={sddGate.dismiss}
             decisionError={sddGate.decisionError}
             isSubmitting={sddGate.isSubmitting}
+            artifactPreview={sddGate.card?.artifactPreview ?? null}
           />
         </div>
         {/* US1: persistent phase status panel below the terminal, inside terminal-pane column */}

@@ -210,4 +210,62 @@ describe('PhaseDecisionCard', () => {
     expect(screen.getByRole('button', { name: /approve/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /dismiss/i })).toBeEnabled()
   })
+
+  // ── US3: artifact preview section ─────────────────────────────────────
+
+  it('renders no artifact preview section when artifactPreview is null', () => {
+    const { container } = render(
+      <PhaseDecisionCard
+        phase="plan"
+        summary={buildSummary()}
+        actions={['approve']}
+        onAction={vi.fn()}
+        onDismiss={vi.fn()}
+        isOpen
+        artifactPreview={null}
+      />
+    )
+
+    expect(container.querySelector('.phase-decision-card-artifact')).toBeNull()
+  })
+
+  it('renders the fallback when artifactPreview has empty content', () => {
+    renderCard({
+      artifactPreview: { content: '', filePath: '/path/to/spec.md', totalLines: 0, isTruncated: false },
+    })
+
+    expect(screen.getByText(/artifact not yet available/i)).toBeInTheDocument()
+    expect(document.querySelector('.phase-decision-card-artifact-pre')).toBeNull()
+  })
+
+  it('renders a collapsed details element with artifact content', () => {
+    renderCard({
+      artifactPreview: {
+        content: '# Spec\nLine one\nLine two',
+        filePath: '/path/to/spec.md',
+        totalLines: 3,
+        isTruncated: false,
+      },
+    })
+
+    const details = document.querySelector('.phase-decision-card-artifact')
+    expect(details).not.toBeNull()
+    expect(details).not.toHaveAttribute('open')
+    expect(document.querySelector('.phase-decision-card-artifact-pre')).toBeInTheDocument()
+    expect(screen.getByText(/# Spec/)).toBeInTheDocument()
+  })
+
+  it('shows truncation notice when isTruncated is true', () => {
+    renderCard({
+      artifactPreview: {
+        content: 'first 200 lines…',
+        filePath: '/path/to/plan.md',
+        totalLines: 350,
+        isTruncated: true,
+      },
+    })
+
+    expect(screen.getByText(/350/)).toBeInTheDocument()
+    expect(document.querySelector('.phase-decision-card-artifact-truncated')).toBeInTheDocument()
+  })
 })

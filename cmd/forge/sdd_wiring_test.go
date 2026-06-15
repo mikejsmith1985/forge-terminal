@@ -5,8 +5,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -184,6 +186,71 @@ func TestBuildPhaseStatuses_PhaseRejected_PipelineStopped(t *testing.T) {
 }
 
 // --- end T016 ---
+
+// --- T023: readSddArtifactPreview unit tests (Red: fails until T020 implements the function) ---
+
+func TestReadSddArtifactPreview_ShortFile_NotTruncated(t *testing.T) {
+	dir := t.TempDir()
+	content := "line one\nline two\nline three\n"
+	path := filepath.Join(dir, "spec.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	preview := readSddArtifactPreview(path, 200)
+
+	if preview.IsTruncated {
+		t.Errorf("short file should not be truncated, got IsTruncated=true")
+	}
+	if preview.TotalLines != 3 {
+		t.Errorf("TotalLines = %d, want 3", preview.TotalLines)
+	}
+	if !strings.Contains(preview.Content, "line one") {
+		t.Errorf("content missing 'line one': %q", preview.Content)
+	}
+	if preview.FilePath != path {
+		t.Errorf("FilePath = %q, want %q", preview.FilePath, path)
+	}
+}
+
+func TestReadSddArtifactPreview_LongFile_Truncated(t *testing.T) {
+	dir := t.TempDir()
+	var sb strings.Builder
+	for i := 1; i <= 250; i++ {
+		fmt.Fprintf(&sb, "line %d\n", i)
+	}
+	path := filepath.Join(dir, "plan.md")
+	if err := os.WriteFile(path, []byte(sb.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	preview := readSddArtifactPreview(path, 200)
+
+	if !preview.IsTruncated {
+		t.Errorf("long file should be truncated, got IsTruncated=false")
+	}
+	if preview.TotalLines != 250 {
+		t.Errorf("TotalLines = %d, want 250", preview.TotalLines)
+	}
+	// Content must contain exactly maxLines lines (200).
+	got := strings.Count(strings.TrimRight(preview.Content, "\n"), "\n") + 1
+	if got != 200 {
+		t.Errorf("truncated content has %d lines, want 200", got)
+	}
+}
+
+func TestReadSddArtifactPreview_MissingFile_EmptyContent(t *testing.T) {
+	preview := readSddArtifactPreview("/no/such/file.md", 200)
+
+	if preview.Content != "" {
+		t.Errorf("missing file should yield empty content, got %q", preview.Content)
+	}
+	if preview.IsTruncated {
+		t.Errorf("missing file should not be truncated, got IsTruncated=true")
+	}
+}
+
+// --- end T023 ---
 
 func TestHandleSddBind_EagerAndIdempotent(t *testing.T) {
 	repo := t.TempDir() // no .specify/feature.json — eager bind must still succeed
