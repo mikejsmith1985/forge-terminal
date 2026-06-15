@@ -2329,6 +2329,9 @@ function App() {
         summary={sddGate.card?.summary}
         actions={sddGate.card?.actions}
         onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
+        onDismiss={sddGate.dismiss}
+        decisionError={sddGate.decisionError}
+        isSubmitting={sddGate.isSubmitting}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />

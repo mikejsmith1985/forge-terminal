@@ -81,4 +81,23 @@ describe('SDD phase orchestrator — in-terminal decision card', () => {
       expect(text).to.not.include(NEXT_COMMAND)
     })
   })
+
+  it('failsafe: the dismiss control always closes the card so the session is never trapped', () => {
+    cy.visit(`${DEV_URL}/`, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('tour_disabled', 'true')
+      },
+    })
+    cy.waitForTerminal()
+    cy.get('.new-tab-btn').click()
+    cy.waitForTerminal()
+    cy.wait(3000)
+
+    cy.exec(`powershell -NoProfile -Command "(Get-Item '${SPEC_FILE}').LastWriteTime = Get-Date"`)
+    cy.get('.phase-decision-card', { timeout: 15000 }).should('be.visible')
+
+    // The ✕ is the guaranteed local escape — it must close the card with no backend dependency.
+    cy.get('.phase-decision-card-dismiss').click()
+    cy.get('.phase-decision-card').should('not.exist')
+  })
 })
