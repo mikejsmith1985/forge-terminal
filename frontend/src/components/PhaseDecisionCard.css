@@ -1,25 +1,28 @@
-/* Styling for the SDD phase gate decision card. Reuses the dark modal/overlay
-   look used elsewhere in Forge Terminal; classes are prefixed phase-decision-card. */
+/* Styling for the SDD phase gate decision card. Rendered as a right-side drawer
+   inside terminal-pane-content so the terminal remains fully interactive while
+   a gate decision is pending (specs/004-sdd-pipeline-dashboard, US2). */
 
-.phase-decision-card-overlay {
-  position: fixed;
-  inset: 0;
+/* US2: flex child of terminal-pane-content — width-fixed right panel, no backdrop.
+   The terminal-container alongside it stays scrollable and accepts keyboard input. */
+.phase-decision-card-drawer {
+  flex-shrink: 0;
+  width: 380px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 10001;
+  flex-direction: column;
+  border-left: 1px solid #2a2a2a;
+  background: #111;
+  overflow-y: auto;
+  transition: width 0.2s ease;
 }
 
 .phase-decision-card {
   width: 100%;
-  max-width: 520px;
   background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  border: none;
+  box-shadow: none;
   color: #e5e5e5;
   overflow: hidden;
+  flex: 1;
 }
 
 .phase-decision-card-header {

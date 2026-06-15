@@ -102,7 +102,7 @@ export default function PhaseDecisionCard({
   const hasDecisionError = Boolean(decisionError)
 
   return (
-    <div className="phase-decision-card-overlay">
+    <div className="phase-decision-card-drawer">
       <div className="phase-decision-card">
         <div className="phase-decision-card-header">
           <span className="phase-decision-card-status">Phase Gate</span>

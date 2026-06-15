@@ -11,6 +11,14 @@ var phaseTable = []Phase{
 	{Name: PhaseImplement, Order: 5, StartCommand: "/speckit-implement", CompletionSignal: signalPTYQuiet, ExpectedArtifact: "", IsTerminal: true},
 }
 
+// PhaseTable returns an ordered copy of all five pipeline phases. Callers must
+// not mutate the returned slice; it is a defensive copy of the package-level table.
+func PhaseTable() []Phase {
+	out := make([]Phase, len(phaseTable))
+	copy(out, phaseTable)
+	return out
+}
+
 // PhaseByName returns the phase definition for a name, or false if unknown.
 func PhaseByName(name PhaseName) (Phase, bool) {
 	for _, phase := range phaseTable {

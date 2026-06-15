@@ -2198,6 +2198,17 @@ function App() {
               </div>
             ))}
           </div>
+          {/* US2: side drawer — no backdrop, terminal remains scrollable and interactive */}
+          <PhaseDecisionCard
+            isOpen={sddGate.isCardOpen}
+            phase={sddGate.card?.phase}
+            summary={sddGate.card?.summary}
+            actions={sddGate.card?.actions}
+            onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
+            onDismiss={sddGate.dismiss}
+            decisionError={sddGate.decisionError}
+            isSubmitting={sddGate.isSubmitting}
+          />
         </div>
       </div>
       {showEditor && editorFile && (
@@ -2320,18 +2331,6 @@ function App() {
       <FileAccessPrompt
         isOpen={showFileAccessPrompt}
         onChoice={handleFileAccessChoice}
-      />
-
-      {/* SDD phase orchestrator (specs/003): in-terminal HITL decision card */}
-      <PhaseDecisionCard
-        isOpen={sddGate.isCardOpen}
-        phase={sddGate.card?.phase}
-        summary={sddGate.card?.summary}
-        actions={sddGate.card?.actions}
-        onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
-        onDismiss={sddGate.dismiss}
-        decisionError={sddGate.decisionError}
-        isSubmitting={sddGate.isSubmitting}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />

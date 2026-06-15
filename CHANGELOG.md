@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SDD pipeline status panel** — persistent collapsible bottom panel showing all 5 speckit phases with live status via WebSocket; recovers on page reload via `GET /api/sdd/status`
+- **SDD gate card is now a non-blocking side drawer** — terminal remains fully scrollable and interactive while a phase decision is pending; backdrop and fixed overlay removed
+- **SDD gate card includes artifact preview** — first 200 lines of the phase artifact embedded in the `SDD_PHASE_GATE` event for file-detected phases; truncation notice + graceful fallback for missing files
+
+### Added (internal)
+- `PhaseDisplayStatus` enum and `PhaseStatusEntry` struct in `internal/sdd/types.go`
+- `PhaseTable()` exported function in `internal/sdd/phases.go`
+
 ## [7.16.1] - 2026-06-15
 
 ---
