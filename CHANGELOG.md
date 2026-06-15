@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.16.1] - 2026-06-15
+
+---
+
+## [v7.16.1] - 2026-06-15
+
 ### Fixed
 - **SDD decision cards now fire reliably, never trap the session, and work across multiple
   tabs** — Three real-world defects in the phase orchestrator:
