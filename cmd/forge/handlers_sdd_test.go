@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -128,3 +129,64 @@ func TestHandleSddDecision_NoPipelineReturns409(t *testing.T) {
 		t.Fatalf("status = %d, want 409 (no pipeline for session)", recorder.Code)
 	}
 }
+
+// --- T017: handleSddStatus unit tests (Red: fails until T009 implements the handler) ---
+
+func getStatus(t *testing.T, sessionID string) *httptest.ResponseRecorder {
+	t.Helper()
+	target := "/api/sdd/status"
+	if sessionID != "" {
+		target += "?sessionId=" + sessionID
+	}
+	recorder := httptest.NewRecorder()
+	handleSddStatus(recorder, httptest.NewRequest(http.MethodGet, target, nil))
+	return recorder
+}
+
+func TestHandleSddStatus_NoPipelineBound_ReturnsEmptyPhases(t *testing.T) {
+	recorder := getStatus(t, "ghost-session")
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["feature"] != "" {
+		t.Errorf("feature = %q, want empty string for no pipeline", body["feature"])
+	}
+	phases, ok := body["phases"].([]any)
+	if !ok || len(phases) != 0 {
+		t.Errorf("phases should be empty array for no pipeline, got %v", body["phases"])
+	}
+}
+
+func TestHandleSddStatus_ActivePipeline_ReturnsPhasesArray(t *testing.T) {
+	sessionID := "status-active-sess"
+	bindTestPipeline(t, sessionID, sdd.PhasePlan)
+
+	recorder := getStatus(t, sessionID)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	phases, ok := body["phases"].([]any)
+	if !ok || len(phases) != 5 {
+		t.Errorf("want 5 phases, got %v", body["phases"])
+	}
+}
+
+func TestHandleSddStatus_MissingSessionId_Returns400(t *testing.T) {
+	recorder := getStatus(t, "")
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 for missing sessionId; body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+// --- end T017 ---

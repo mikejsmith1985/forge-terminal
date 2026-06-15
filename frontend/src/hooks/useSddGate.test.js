@@ -88,8 +88,10 @@ describe('useSddGate', () => {
       await result.current.submitDecision('approve')
     })
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-    const [calledUrl, calledOptions] = fetchSpy.mock.calls[0]
+    // mount fires a recovery fetch to /api/sdd/status (FR-012), so total is 2
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    const decisionCall = fetchSpy.mock.calls.find(([url]) => url === '/api/sdd/decision')
+    const [calledUrl, calledOptions] = decisionCall
     expect(calledUrl).toBe('/api/sdd/decision')
     expect(calledOptions.method).toBe('POST')
     expect(calledOptions.credentials).toBe('same-origin')
@@ -120,7 +122,9 @@ describe('useSddGate', () => {
       await result.current.submitDecision('clarify', 'Please clarify the data model')
     })
 
-    const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+    // calls[0] is the mount-time recovery fetch; decision POST is the /api/sdd/decision call
+    const decisionCall = fetchSpy.mock.calls.find(([url]) => url === '/api/sdd/decision')
+    const body = JSON.parse(decisionCall[1].body)
     expect(body.action).toBe('clarify')
     expect(body.clarifyText).toBe('Please clarify the data model')
   })
@@ -142,7 +146,8 @@ describe('useSddGate', () => {
   })
 
   it('dismiss() clears the card locally with no fetch call', () => {
-    const fetchSpy = vi.spyOn(global, 'fetch')
+    // Provide a stub so the mount-time recovery fetch (FR-012) doesn't hit the network.
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
 
     const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
 
@@ -157,7 +162,9 @@ describe('useSddGate', () => {
 
     expect(result.current.isCardOpen).toBe(false)
     expect(result.current.card).toBeNull()
-    expect(fetchSpy).not.toHaveBeenCalled()
+    // The decision endpoint must never be called; only the recovery fetch is permitted.
+    const decisionCalls = fetchSpy.mock.calls.filter(([url]) => url === '/api/sdd/decision')
+    expect(decisionCalls).toHaveLength(0)
   })
 
   it('on a 500 sets decisionError, keeps the card open, and clears isSubmitting', async () => {
@@ -180,10 +187,12 @@ describe('useSddGate', () => {
 
   it('clears decisionError and the card on a successful decision', async () => {
     // First fail to populate decisionError, then succeed.
+    // mockResolvedValueOnce order: (1) mount recovery fetch, (2) first decision → 503, (3) second decision → ok
     const fetchSpy = vi
       .spyOn(global, 'fetch')
-      .mockResolvedValueOnce({ ok: false, status: 503 })
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false })              // mount-time /api/sdd/status recovery
+      .mockResolvedValueOnce({ ok: false, status: 503 }) // first submitDecision → error
+      .mockResolvedValueOnce({ ok: true })               // second submitDecision → success
 
     const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
 
@@ -200,7 +209,7 @@ describe('useSddGate', () => {
       await result.current.submitDecision('approve')
     })
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(fetchSpy).toHaveBeenCalledTimes(3) // recovery + two decisions
     await waitFor(() => expect(result.current.isCardOpen).toBe(false))
     expect(result.current.card).toBeNull()
     expect(result.current.decisionError).toBeNull()

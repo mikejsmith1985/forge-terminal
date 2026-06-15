@@ -1,25 +1,28 @@
-/* Styling for the SDD phase gate decision card. Reuses the dark modal/overlay
-   look used elsewhere in Forge Terminal; classes are prefixed phase-decision-card. */
+/* Styling for the SDD phase gate decision card. Rendered as a right-side drawer
+   inside terminal-pane-content so the terminal remains fully interactive while
+   a gate decision is pending (specs/004-sdd-pipeline-dashboard, US2). */
 
-.phase-decision-card-overlay {
-  position: fixed;
-  inset: 0;
+/* US2: flex child of terminal-pane-content — width-fixed right panel, no backdrop.
+   The terminal-container alongside it stays scrollable and accepts keyboard input. */
+.phase-decision-card-drawer {
+  flex-shrink: 0;
+  width: 380px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 10001;
+  flex-direction: column;
+  border-left: 1px solid #2a2a2a;
+  background: #111;
+  overflow-y: auto;
+  transition: width 0.2s ease;
 }
 
 .phase-decision-card {
   width: 100%;
-  max-width: 520px;
   background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  border: none;
+  box-shadow: none;
   color: #e5e5e5;
   overflow: hidden;
+  flex: 1;
 }
 
 .phase-decision-card-header {
@@ -319,4 +322,65 @@
 
 .phase-decision-card-button-cancel:hover {
   border-color: #555;
+}
+
+/* ── Artifact preview section (US3) ────────────────────────────────────── */
+
+/* <details> wrapper that defaults collapsed and sits between flags and actions. */
+.phase-decision-card-artifact {
+  border-top: 1px solid #2a2a2a;
+  padding: 10px 20px;
+}
+
+/* <summary> toggle label for the collapsible preview block. */
+.phase-decision-card-artifact-summary {
+  font-size: 0.8em;
+  color: #9ca3af;
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.03em;
+  list-style: none;
+}
+
+.phase-decision-card-artifact-summary::-webkit-details-marker {
+  display: none;
+}
+
+.phase-decision-card-artifact-summary::before {
+  content: '▶ ';
+  font-size: 0.75em;
+}
+
+details[open] .phase-decision-card-artifact-summary::before {
+  content: '▼ ';
+}
+
+/* Scrollable monospace block for artifact content. */
+.phase-decision-card-artifact-pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8em;
+  background: #0d0d0d;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #c8c8c8;
+}
+
+/* Truncation notice shown below the scrollable block when the file was cut. */
+.phase-decision-card-artifact-truncated {
+  margin: 4px 0 0;
+  font-size: 0.75em;
+  color: #6b7280;
+}
+
+/* Fallback shown when the artifact exists in the envelope but has no content yet. */
+.phase-decision-card-artifact-missing {
+  margin: 0;
+  font-size: 0.82em;
+  color: #6b7280;
+  font-style: italic;
 }

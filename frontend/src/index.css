@@ -143,11 +143,13 @@ body {
   border-left: 1px solid var(--border-color);
 }
 
+/* US2: flex-direction changed from column to row so the terminal and the
+   PhaseDecisionCard drawer occupy the same horizontal band. */
 .terminal-pane-content {
   flex: 1;
   padding: 8px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   overflow: hidden;
 }
 

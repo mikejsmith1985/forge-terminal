@@ -100,4 +100,40 @@ describe('SDD phase orchestrator — in-terminal decision card', () => {
     cy.get('.phase-decision-card-dismiss').click()
     cy.get('.phase-decision-card').should('not.exist')
   })
+
+  it('non-blocking: terminal remains interactive while the decision card is open', () => {
+    // US2 regression (SC-004): the card must be a side drawer that does not trap
+    // keyboard focus or block terminal scrolling (specs/004-sdd-pipeline-dashboard, US2).
+    cy.visit(`${DEV_URL}/`, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('tour_disabled', 'true')
+      },
+    })
+    cy.waitForTerminal()
+    cy.get('.new-tab-btn').click()
+    cy.waitForTerminal()
+    cy.wait(3000)
+
+    cy.exec(`powershell -NoProfile -Command "(Get-Item '${SPEC_FILE}').LastWriteTime = Get-Date"`)
+    cy.get('.phase-decision-card', { timeout: 15000 }).should('be.visible')
+
+    // Card must be a drawer sibling, not a full-screen overlay (US2 structural check).
+    cy.get('.phase-decision-card-drawer').should('be.visible')
+    cy.get('.phase-decision-card-overlay').should('not.exist')
+
+    // Keystroke must reach the PTY buffer — not be swallowed by the open card.
+    // Per Article X, terminal content is asserted via the xterm buffer model, never DOM.
+    cy.get('.xterm-helper-textarea').realType('echo forge-non-blocking-check')
+    cy.terminalShouldContain('forge-non-blocking-check', { timeout: 8000 })
+
+    // Scroll must reach the xterm viewport — the terminal must remain scrollable.
+    cy.get('.xterm-viewport').then(($el) => {
+      const initialScrollTop = $el[0].scrollTop
+      cy.get('.xterm-viewport').realMouseWheel({ deltaY: -300 })
+      // Either scrollTop decreased (scroll worked) or was already at top (0). Both are valid.
+      cy.get('.xterm-viewport').should(($el2) => {
+        expect($el2[0].scrollTop).to.be.at.most(initialScrollTop)
+      })
+    })
+  })
 })

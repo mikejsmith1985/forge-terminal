@@ -5,8 +5,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -95,6 +97,161 @@ func TestHandleSddBind_RequiresFields(t *testing.T) {
 // Eager bind: a session binds even when the repo has no .specify/feature.json yet (the feature
 // is learned lazily when an artifact appears). And re-binding the same repo is a no-op that
 // reuses the existing pipeline rather than replacing it (which would invalidate an open card).
+// --- T016: buildPhaseStatuses unit tests (Red: fails until T008 implements the function) ---
+
+// newTestPipeline creates a fresh sddPipeline with a mocked orchestrator for unit tests.
+// The orchestrator uses a temp dir for history so no real ~/.forge/sdd is touched.
+func newTestPipeline(t *testing.T, sessionID string) *sddPipeline {
+	t.Helper()
+	orchestrator := sdd.NewOrchestrator(sdd.Options{
+		SessionID:      sessionID,
+		HistoryBaseDir: t.TempDir(),
+		Injector:       sdd.InjectorFunc(func(string, string) error { return nil }),
+		Broadcaster:    sdd.BroadcasterFunc(func(sdd.DecisionCard) error { return nil }),
+		Summarize:      func(sdd.PhaseName) sdd.PhaseSummary { return sdd.PhaseSummary{Headline: "H"} },
+		NewCardID:      func(p sdd.PhaseName) string { return "card-" + string(p) },
+	})
+	return &sddPipeline{orchestrator: orchestrator, repoRoot: t.TempDir()}
+}
+
+func TestBuildPhaseStatuses_NoPhasesStarted_AllPending(t *testing.T) {
+	pipeline := newTestPipeline(t, "idle-sess")
+
+	statuses := buildPhaseStatuses(pipeline)
+
+	if len(statuses) != 5 {
+		t.Fatalf("expected 5 phase statuses, got %d", len(statuses))
+	}
+	for _, entry := range statuses {
+		if entry.DisplayStatus != sdd.PhaseDisplayPending {
+			t.Errorf("phase %s: expected pending, got %s", entry.Phase, entry.DisplayStatus)
+		}
+	}
+}
+
+func TestBuildPhaseStatuses_TwoPhasesComplete_CorrectStatuses(t *testing.T) {
+	pipeline := newTestPipeline(t, "two-done-sess")
+	// Complete specify → approve → complete clarify → approve leaves Status=Advancing, CurrentPhase=clarify
+	pipeline.orchestrator.HandlePhaseComplete(sdd.PhaseSpecify, "spec.md")
+	if _, err := pipeline.orchestrator.SubmitDecision(sdd.Decision{Phase: sdd.PhaseSpecify, Action: sdd.ActionApprove}); err != nil {
+		t.Fatalf("approve specify: %v", err)
+	}
+	pipeline.orchestrator.HandlePhaseComplete(sdd.PhaseClarify, "spec.md")
+	if _, err := pipeline.orchestrator.SubmitDecision(sdd.Decision{Phase: sdd.PhaseClarify, Action: sdd.ActionApprove}); err != nil {
+		t.Fatalf("approve clarify: %v", err)
+	}
+
+	statuses := buildPhaseStatuses(pipeline)
+
+	wantStatuses := map[sdd.PhaseName]sdd.PhaseDisplayStatus{
+		sdd.PhaseSpecify:   sdd.PhaseDisplayComplete,
+		sdd.PhaseClarify:   sdd.PhaseDisplayComplete,
+		sdd.PhasePlan:      sdd.PhaseDisplayActive,
+		sdd.PhaseValidate:  sdd.PhaseDisplayPending,
+		sdd.PhaseImplement: sdd.PhaseDisplayPending,
+	}
+	for _, entry := range statuses {
+		if want, ok := wantStatuses[entry.Phase]; ok && entry.DisplayStatus != want {
+			t.Errorf("phase %s: got %s, want %s", entry.Phase, entry.DisplayStatus, want)
+		}
+	}
+}
+
+func TestBuildPhaseStatuses_PhaseRejected_PipelineStopped(t *testing.T) {
+	pipeline := newTestPipeline(t, "reject-sess")
+	// Approve specify, then reject clarify
+	pipeline.orchestrator.HandlePhaseComplete(sdd.PhaseSpecify, "spec.md")
+	if _, err := pipeline.orchestrator.SubmitDecision(sdd.Decision{Phase: sdd.PhaseSpecify, Action: sdd.ActionApprove}); err != nil {
+		t.Fatalf("approve specify: %v", err)
+	}
+	pipeline.orchestrator.HandlePhaseComplete(sdd.PhaseClarify, "spec.md")
+	if _, err := pipeline.orchestrator.SubmitDecision(sdd.Decision{Phase: sdd.PhaseClarify, Action: sdd.ActionReject}); err != nil {
+		t.Fatalf("reject clarify: %v", err)
+	}
+
+	statuses := buildPhaseStatuses(pipeline)
+
+	wantStatuses := map[sdd.PhaseName]sdd.PhaseDisplayStatus{
+		sdd.PhaseSpecify:   sdd.PhaseDisplayComplete,
+		sdd.PhaseClarify:   sdd.PhaseDisplayRejected,
+		sdd.PhasePlan:      sdd.PhaseDisplayPending,
+		sdd.PhaseValidate:  sdd.PhaseDisplayPending,
+		sdd.PhaseImplement: sdd.PhaseDisplayPending,
+	}
+	for _, entry := range statuses {
+		if want, ok := wantStatuses[entry.Phase]; ok && entry.DisplayStatus != want {
+			t.Errorf("phase %s: got %s, want %s", entry.Phase, entry.DisplayStatus, want)
+		}
+	}
+}
+
+// --- end T016 ---
+
+// --- T023: readSddArtifactPreview unit tests (Red: fails until T020 implements the function) ---
+
+func TestReadSddArtifactPreview_ShortFile_NotTruncated(t *testing.T) {
+	dir := t.TempDir()
+	content := "line one\nline two\nline three\n"
+	path := filepath.Join(dir, "spec.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	preview := readSddArtifactPreview(path, 200)
+
+	if preview.IsTruncated {
+		t.Errorf("short file should not be truncated, got IsTruncated=true")
+	}
+	if preview.TotalLines != 3 {
+		t.Errorf("TotalLines = %d, want 3", preview.TotalLines)
+	}
+	if !strings.Contains(preview.Content, "line one") {
+		t.Errorf("content missing 'line one': %q", preview.Content)
+	}
+	if preview.FilePath != path {
+		t.Errorf("FilePath = %q, want %q", preview.FilePath, path)
+	}
+}
+
+func TestReadSddArtifactPreview_LongFile_Truncated(t *testing.T) {
+	dir := t.TempDir()
+	var sb strings.Builder
+	for i := 1; i <= 250; i++ {
+		fmt.Fprintf(&sb, "line %d\n", i)
+	}
+	path := filepath.Join(dir, "plan.md")
+	if err := os.WriteFile(path, []byte(sb.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	preview := readSddArtifactPreview(path, 200)
+
+	if !preview.IsTruncated {
+		t.Errorf("long file should be truncated, got IsTruncated=false")
+	}
+	if preview.TotalLines != 250 {
+		t.Errorf("TotalLines = %d, want 250", preview.TotalLines)
+	}
+	// Content must contain exactly maxLines lines (200).
+	got := strings.Count(strings.TrimRight(preview.Content, "\n"), "\n") + 1
+	if got != 200 {
+		t.Errorf("truncated content has %d lines, want 200", got)
+	}
+}
+
+func TestReadSddArtifactPreview_MissingFile_EmptyContent(t *testing.T) {
+	preview := readSddArtifactPreview("/no/such/file.md", 200)
+
+	if preview.Content != "" {
+		t.Errorf("missing file should yield empty content, got %q", preview.Content)
+	}
+	if preview.IsTruncated {
+		t.Errorf("missing file should not be truncated, got IsTruncated=true")
+	}
+}
+
+// --- end T023 ---
+
 func TestHandleSddBind_EagerAndIdempotent(t *testing.T) {
 	repo := t.TempDir() // no .specify/feature.json — eager bind must still succeed
 	sessionID := "bind-test-session"

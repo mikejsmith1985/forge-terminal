@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v7.17.0] - 2026-06-15
+
+### Added
+- **SDD pipeline status panel (US1)** — persistent collapsible bottom panel (120px expanded / 32px collapsed) showing all 5 speckit phases with live status icons (`· ◌ ⏳ ✓ ✗`); updates within 2s of a phase completing via WebSocket (`SDD_PHASE_STATUS`); recovers on page reload via `GET /api/sdd/status`; awaiting-decision badge visible while collapsed; collapse state persisted to localStorage
+- **Non-blocking SDD gate card drawer (US2)** — decision card converted from a blocking full-screen overlay to a right-side drawer (`flex-shrink: 0; width: 380px`) inside `terminal-pane-content`; terminal remains fully scrollable and interactive while a gate decision is pending; no backdrop; Escape and ✕ still dismiss the card
+- **Artifact preview in gate card (US3)** — `SDD_PHASE_GATE` WebSocket event now carries the first 200 lines of the phase artifact (`artifactPreview`); rendered as a collapsible `<details>` block below the flags row; truncation notice when file exceeds 200 lines; graceful "not yet available" fallback when content is empty; pty-quiet phases (Validate/Implement) emit no preview
+
 ## [7.16.1] - 2026-06-15
 
 ---

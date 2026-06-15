@@ -5,6 +5,7 @@ import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
 import PhaseDecisionCard from './components/PhaseDecisionCard'
+import SddPipelinePanel from './components/SddPipelinePanel'
 import ForgeAssist from './components/ForgeAssist'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -2198,7 +2199,24 @@ function App() {
               </div>
             ))}
           </div>
+          {/* US2: side drawer — no backdrop, terminal remains scrollable and interactive */}
+          <PhaseDecisionCard
+            isOpen={sddGate.isCardOpen}
+            phase={sddGate.card?.phase}
+            summary={sddGate.card?.summary}
+            actions={sddGate.card?.actions}
+            onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
+            onDismiss={sddGate.dismiss}
+            decisionError={sddGate.decisionError}
+            isSubmitting={sddGate.isSubmitting}
+            artifactPreview={sddGate.card?.artifactPreview ?? null}
+          />
         </div>
+        {/* US1: persistent phase status panel below the terminal, inside terminal-pane column */}
+        <SddPipelinePanel
+          phases={sddGate.phaseStatuses}
+          isVisible={sddGate.phaseStatuses.length > 0}
+        />
       </div>
       {showEditor && editorFile && (
         <div className="editor-panel">
@@ -2320,18 +2338,6 @@ function App() {
       <FileAccessPrompt
         isOpen={showFileAccessPrompt}
         onChoice={handleFileAccessChoice}
-      />
-
-      {/* SDD phase orchestrator (specs/003): in-terminal HITL decision card */}
-      <PhaseDecisionCard
-        isOpen={sddGate.isCardOpen}
-        phase={sddGate.card?.phase}
-        summary={sddGate.card?.summary}
-        actions={sddGate.card?.actions}
-        onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
-        onDismiss={sddGate.dismiss}
-        decisionError={sddGate.decisionError}
-        isSubmitting={sddGate.isSubmitting}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />

@@ -138,3 +138,25 @@ type PipelineState struct {
 	PendingCard  *DecisionCard
 	Status       PipelineStatus
 }
+
+// PhaseDisplayStatus is the UI-facing status of a single pipeline phase shown in
+// the SddPipelinePanel (specs/004-sdd-pipeline-dashboard).
+type PhaseDisplayStatus string
+
+const (
+	PhaseDisplayPending          PhaseDisplayStatus = "pending"
+	PhaseDisplayActive           PhaseDisplayStatus = "active"
+	PhaseDisplayAwaitingDecision PhaseDisplayStatus = "awaiting-decision"
+	PhaseDisplayComplete         PhaseDisplayStatus = "complete"
+	PhaseDisplayRejected         PhaseDisplayStatus = "rejected"
+)
+
+// PhaseStatusEntry is one row in the SDD_PHASE_STATUS WebSocket event, representing
+// the current display state of a single pipeline phase.
+type PhaseStatusEntry struct {
+	Phase         PhaseName          `json:"phase"`
+	Order         int                `json:"order"`
+	DisplayStatus PhaseDisplayStatus `json:"displayStatus"`
+	ArtifactPath  string             `json:"artifactPath"`
+	DecidedAt     *time.Time         `json:"decidedAt"`
+}
