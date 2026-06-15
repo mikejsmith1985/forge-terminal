@@ -112,6 +112,19 @@ func (h *Handler) GetSessionConnectedClientCount(sessionID string) (connectedCli
 	return 0, false
 }
 
+// BroadcastJSONToSession sends a JSON message to every WebSocket client of a session.
+// It returns false when the session has no hub (no connected viewers), so callers can tell
+// a delivered push from a no-op. Features like the SDD orchestrator use this to push
+// structured events (e.g. a phase decision card) to the frontend over the existing socket.
+func (h *Handler) BroadcastJSONToSession(sessionID string, payload any) bool {
+	hubRaw, exists := h.hubs.Load(sessionID)
+	if !exists {
+		return false
+	}
+	hubRaw.(*sessionHub).broadcastJSON(payload)
+	return true
+}
+
 // GetSessionScrollback returns a copy of the ring-buffered terminal output for
 // a session. The buffer holds approximately the last 64 KiB of PTY output.
 // Returns nil, false when the session or its hub is not found.

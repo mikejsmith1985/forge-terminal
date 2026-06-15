@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SDD phase orchestrator — in-terminal HITL decision cards (US1 core, specs/003)** — New
+  `internal/sdd` package that gates the Spec-Driven Development pipeline: after a phase
+  completes, a scannable decision card (Approve / Reject / Clarify) is presented and the
+  pipeline advances by injecting the next `/speckit-*` command, stops, or is steered. Card
+  content is derived **deterministically** from the phase artifacts (checklist counts,
+  `[NEEDS CLARIFICATION]` markers, missing-artifact flags) — no generative call. Reuses
+  existing Forge subsystems per the framework-first gate: the macro injector (advance), the
+  file watcher (detect), the WebSocket hub (card push), and the styled-modal pattern (UI).
+  Now wired end-to-end: `POST /api/sdd/bind` starts a feature-directory watcher; phase
+  completions broadcast over the session WebSocket (`BroadcastJSONToSession`) and render
+  the `PhaseDecisionCard` beside the terminal; Approve injects the next command via the
+  macro path. **US2** (Clarify) adds an inline steer input that carries into the next phase,
+  and **US3** adds a best-effort `Notifier` that POSTs each completion to AzureWorkflowPOC
+  (fire-and-forget, never blocks the card) by subscribing to the same completion seam as the
+  card. All five phases now gate: Specify/Clarify/Plan via the file watcher, and
+  Validate/Implement via PTY-quiet detection (after the phase command settles), reusing the
+  macro subsystem's quiet-detection. Adds an integration test (real file reads through the
+  summarizer + a real HTTP POST through the notifier) closing the three-layer test gap, and a
+  Cypress UX spec (`sdd-phase-gate.cy.js`). 369 tests green (Go + vitest), both builds clean;
+  the full flow was verified end-to-end against a running dev build: the Cypress UX spec
+  passes (card renders, Approve injects the next command, Reject stops), confirming the
+  decision card paints in the browser and the advance reaches the live terminal. Only T040
+  (manual visual spot-check) is optional-remaining.
+
 ### Fixed
 - **A tab now relabels when the shell switches to a different project root** — After
   the tab-naming rebuild, a tab's label was frozen at creation, so `cd`-ing from one

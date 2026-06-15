@@ -4,6 +4,7 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Wrench, Plug, Tag, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock, RefreshCw } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
+import PhaseDecisionCard from './components/PhaseDecisionCard'
 import ForgeAssist from './components/ForgeAssist'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -34,6 +35,7 @@ import VaultPanel from './components/VaultPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
+import { useSddGate } from './hooks/useSddGate'
 import { useDevMode } from './hooks/useDevMode'
 // useWorkflowManager REMOVED - v3.9.0: Workflows deleted
 import { logger } from './utils/logger'
@@ -439,6 +441,26 @@ function App() {
   const getActiveTerminalRef = useCallback(() => {
     return activeTabId ? terminalRefs.current[activeTabId] : null;
   }, [activeTabId]);
+
+  // SDD phase orchestrator (specs/003): the decision-card gate for the active session.
+  const sddGate = useSddGate({ activeSessionId: activeTabId });
+
+  // Bind the active session + its repo to the SDD pipeline once the working directory is
+  // known. The backend resolves the active feature from .specify/feature.json and returns
+  // 409 for repos not running a Spec Kit pipeline, so this is safe to call broadly.
+  const lastSddBindRef = useRef(null);
+  useEffect(() => {
+    const repoRoot = activeTab?.currentDirectory;
+    const bindKey = `${activeTabId}:${repoRoot}`;
+    if (!activeTabId || !repoRoot || lastSddBindRef.current === bindKey) return;
+    lastSddBindRef.current = bindKey;
+    fetch('/api/sdd/bind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ sessionId: activeTabId, repoRoot }),
+    }).catch(() => { /* best-effort: a failed bind never blocks the terminal */ });
+  }, [activeTabId, activeTab?.currentDirectory]);
 
   const handleFontSizeChange = (delta) => {
     if (fontTarget === 'terminal') {
@@ -2139,6 +2161,7 @@ function App() {
                     onSpawnFailed={handleSpawnFailed}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
+                    onSddGate={tab.id === activeTabId ? sddGate.handleWsMessage : undefined}
                     onCopy={() => addToast('✓ Copied to clipboard', 'success', 1500)}
                     onFileOpen={handleFileOpen}
                     onPaste={(type, metadata) => {
@@ -2297,6 +2320,15 @@ function App() {
       <FileAccessPrompt
         isOpen={showFileAccessPrompt}
         onChoice={handleFileAccessChoice}
+      />
+
+      {/* SDD phase orchestrator (specs/003): in-terminal HITL decision card */}
+      <PhaseDecisionCard
+        isOpen={sddGate.isCardOpen}
+        phase={sddGate.card?.phase}
+        summary={sddGate.card?.summary}
+        actions={sddGate.card?.actions}
+        onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
       />
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
