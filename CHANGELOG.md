@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.16.0] - 2026-06-15
+
+---
+
+## [v7.16.0] - 2026-06-15
+
 ### Added
 - **SDD phase orchestrator — in-terminal HITL decision cards (US1 core, specs/003)** — New
   `internal/sdd` package that gates the Spec-Driven Development pipeline: after a phase
