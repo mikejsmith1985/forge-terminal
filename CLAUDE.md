@@ -11,8 +11,8 @@
 <!-- SPECKIT START -->
 ## Active Spec Kit feature
 
-- **003-sdd-phase-orchestrator** — In-terminal HITL decision cards that gate each SDD phase.
-  Plan: `specs/003-sdd-phase-orchestrator/plan.md`. Reuses the macro injector (advance),
-  `tutor/watcher.go` (detect), the WebSocket hub (card push), and the styled-modal pattern
-  (card UI). Next: `/speckit-tasks`.
+- **004-sdd-pipeline-dashboard** — Non-blocking gate card (side drawer) + persistent pipeline
+  status panel (bottom, all 5 phases) + artifact preview embedded in the gate event.
+  Plan: `specs/004-sdd-pipeline-dashboard/plan.md`. US delivery order: US2 (non-blocking card)
+  → US1 (status panel) → US3 (artifact preview). Branch: `feature/004-sdd-pipeline-dashboard`.
 <!-- SPECKIT END -->
