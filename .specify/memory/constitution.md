@@ -33,8 +33,9 @@ comment. Functions stay under 40 lines; prefer guard clauses over deep nesting.
 ## Article V — Testing (Three-Layer Separation)
 
 Unit tests are 100% mocked and run in under 10ms. Integration tests use real infrastructure
-(testcontainers), never mocked drivers. UX tests use Cypress with `cypress-real-events` —
-never synthetic events — launched via `run-dev-clean.ps1`, never by building the binary.
+(testcontainers), never mocked drivers. UX tests use Playwright (`@playwright/test`) —
+real browser events via `page.keyboard` / `locator.click()`, never `page.evaluate()` to
+dispatch synthetic events — launched via `run-dev-clean.ps1`, never by building the binary.
 Follow Red → Green → Refactor: the failing test is written before the implementation.
 
 ## Article VI — Documentation Discipline
