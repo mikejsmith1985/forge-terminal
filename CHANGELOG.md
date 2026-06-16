@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.16.2] - 2026-06-16
+
+---
+
+## [v7.16.2] - 2026-06-16
+
 ### Changed
 - **E2E test framework migrated from Cypress to Playwright** — all 32 spec files ported to `tests/e2e/*.spec.js`; `cypress/support/e2e.js` custom commands translated to `tests/fixtures/forge.js` helper functions; `playwright.config.js` replaces `cypress.config.js`; Article V of the project constitution updated accordingly; `cypress` and `cypress-real-events` removed from dependencies
 
