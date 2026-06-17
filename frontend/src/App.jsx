@@ -2212,10 +2212,11 @@ function App() {
             artifactPreview={sddGate.card?.artifactPreview ?? null}
           />
         </div>
-        {/* US1: persistent phase status panel below the terminal, inside terminal-pane column */}
+        {/* US1: persistent phase status panel. Always visible so the idle indicator (FR-010)
+             shows when no feature is bound; the component handles the empty-phases state. */}
         <SddPipelinePanel
           phases={sddGate.phaseStatuses}
-          isVisible={sddGate.phaseStatuses.length > 0}
+          isVisible={true}
         />
       </div>
       {showEditor && editorFile && (
