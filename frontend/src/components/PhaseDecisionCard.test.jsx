@@ -293,6 +293,50 @@ describe('PhaseDecisionCard', () => {
     expect(document.querySelector('.action-prompt-strip')).not.toBeNull()
   })
 
+  // ── C3: gate card stays open during phase-status updates (spec edge case) ───
+  // An in-flight phase transition must not force-close the card — the user must
+  // be able to complete their approve/reject/clarify decision uninterrupted.
+  it('remains open and usable when phaseStatuses update while isOpen=true', () => {
+    const initialPhases = [
+      { phase: 'specify', order: 1, displayStatus: 'awaiting-decision', runCount: 1 },
+    ]
+    const { rerender } = render(
+      <PhaseDecisionCard
+        phase="specify"
+        summary={buildSummary()}
+        actions={['approve', 'reject', 'clarify']}
+        onAction={vi.fn()}
+        onDismiss={vi.fn()}
+        isOpen
+        phases={initialPhases}
+      />
+    )
+
+    // Card is open and actions are visible.
+    expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument()
+
+    // Simulate a concurrent phase update arriving while the card is open.
+    const updatedPhases = [
+      { phase: 'specify', order: 1, displayStatus: 'iterating', runCount: 2 },
+    ]
+    rerender(
+      <PhaseDecisionCard
+        phase="specify"
+        summary={buildSummary()}
+        actions={['approve', 'reject', 'clarify']}
+        onAction={vi.fn()}
+        onDismiss={vi.fn()}
+        isOpen
+        phases={updatedPhases}
+      />
+    )
+
+    // Card must still be open — phase update alone must never close it.
+    expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument()
+    // Prompt strip updates to reflect the new iterating state.
+    expect(screen.getByText('Approve this iteration, or Reject to try again.')).toBeInTheDocument()
+  })
+
   it('renders a first-run prompt when phases has awaiting-decision and card is open', () => {
     const phases = [
       { phase: 'specify', order: 1, displayStatus: 'awaiting-decision', runCount: 1 },

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **005 spec accuracy** — `↻ Iterating` definition corrected: fires when the gate reopens after a second run, not while re-executing; acceptance scenario 5 now matches the implementation
+- **005 FR-006 annotation** — "prose output" defined explicitly; notes that FR-006 was satisfied by spec-004's clean BEM panel, requiring no removal task
+- **005 card-open invariant** — added `PhaseDecisionCard` test asserting the card stays open and the prompt updates when `phaseStatuses` change while `isOpen=true`
+
 ## [v7.18.0] - 2026-06-17
 
 ### Added

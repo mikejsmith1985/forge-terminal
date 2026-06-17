@@ -89,7 +89,7 @@ Playwright E2E in Polish phase per constitution (real browser, `run-dev-clean.ps
 
 **Purpose**: E2E proof, regression sweep, CHANGELOG.
 
-- [x] T020 [P] Write Playwright E2E test file `e2e/sdd-phase-ux.spec.js` covering Scenarios A (six distinct icons, including `⟳ Running` intermediate state), B (single action sentence), and C (iteration counter) from `specs/005-sdd-phase-ux/quickstart.md`; use `page.keyboard` / `locator.click()` real events only; assert icon text and CSS class via `locator.getAttribute`; assert no second sentence in prompt strip via text content length check
+- [x] T020 [P] Write Playwright E2E test file `tests/e2e/sdd-phase-ux.spec.js` covering Scenarios A (six distinct icons, including `⟳ Running` intermediate state), B (single action sentence), and C (iteration counter) from `specs/005-sdd-phase-ux/quickstart.md`; use `page.keyboard` / `locator.click()` real events only; assert icon text and CSS class via `locator.getAttribute`; assert no second sentence in prompt strip via text content length check
 - [x] T021 Run full test suite: `go test ./...` (all Go unit tests green); `npx vitest run` (all React unit tests green); `npx playwright test e2e/sdd-phase-ux.spec.js --headed` against `run-dev-clean.ps1` dev server
 - [x] T022 Update `CHANGELOG.md`: add entry for the next release describing the five-state panel icons, `×N` iteration counter, and single-sentence action prompt strip; reference spec `005-sdd-phase-ux`
 
