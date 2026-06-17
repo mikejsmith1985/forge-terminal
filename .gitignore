@@ -57,6 +57,10 @@ issue-images/
 # Copilot session documentation (temporary)
 docs/sessions/
 
+# Playwright test artefacts (screenshots, traces, results)
+test-results/
+playwright-report/
+
 # Test artifacts
 frontend/test-results/
 
