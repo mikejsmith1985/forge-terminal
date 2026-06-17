@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v7.18.0] - 2026-06-17
+
+### Added
+- **Glanceable phase state (US1)** — SDD pipeline panel now renders six visually distinct states per phase: `◌ Pending`, `⟳ Running` (blue spinner), `⏳ Awaiting` (gate open, first run), `✓ Complete` (green), `⚠ Rejected` (amber), `↻ Iterating` (amber spinner, gate open for re-run); unknown future status values fall back to `?` with a `--unknown` class; CSS `transition: color 200ms ease` on every row so all status swaps animate automatically
+- **Iteration counter (US3)** — `×N` counter appears next to a phase name whenever `runCount ≥ 2`; the backend now tracks `phaseRunCounts map[PhaseName]int` on the orchestrator (incremented inside `HandlePhaseComplete` under the existing mutex) and surfaces it as `runCount` on each `PhaseStatusEntry` in the `SDD_PHASE_STATUS` WebSocket event (backward-compatible: omitted when zero); `artifactPath` column removed from the panel row
+- **Action-prompt strip (US2)** — new `ActionPromptStrip` component (pure function of `phases` + `isCardOpen`) renders exactly one imperative sentence in the panel footer and the gate-card footer, guiding the developer to their next action without any prose; eight named constant prompts covering all pipeline states from "no feature bound" to "pipeline complete"
+- **Iterating display status** — new `PhaseDisplayIterating = "iterating"` constant in `internal/sdd/types.go`; `derivePhaseDisplayStatus` promotes a phase from `awaiting-decision` to `iterating` when `runCount ≥ 2` and the gate card is open, disambiguating re-runs from first-run gate opens; state table documented in `specs/005-sdd-phase-ux/plan.md`
+- **Idle indicator (FR-010)** — when `phases` is empty and the panel is visible, a compact "No active feature — run /speckit-specify to start" row is shown instead of a blank panel
+
 ## [7.16.2] - 2026-06-16
 
 ---

@@ -268,4 +268,49 @@ describe('PhaseDecisionCard', () => {
     expect(screen.getByText(/350/)).toBeInTheDocument()
     expect(document.querySelector('.phase-decision-card-artifact-truncated')).toBeInTheDocument()
   })
+
+  // ── T013: ActionPromptStrip in card footer ────────────────────────────────
+
+  it('renders an action-prompt-strip in the card footer when phases contain an iterating phase', () => {
+    const phases = [
+      { phase: 'specify', order: 1, displayStatus: 'complete', runCount: 2 },
+      { phase: 'clarify', order: 2, displayStatus: 'iterating', runCount: 2 },
+    ]
+    render(
+      <PhaseDecisionCard
+        phase="clarify"
+        summary={buildSummary()}
+        actions={['approve', 'reject']}
+        onAction={vi.fn()}
+        onDismiss={vi.fn()}
+        isOpen
+        phases={phases}
+      />
+    )
+
+    // isCardOpen is true inside a card, so iterating prompt should show.
+    expect(screen.getByText('Approve this iteration, or Reject to try again.')).toBeInTheDocument()
+    expect(document.querySelector('.action-prompt-strip')).not.toBeNull()
+  })
+
+  it('renders a first-run prompt when phases has awaiting-decision and card is open', () => {
+    const phases = [
+      { phase: 'specify', order: 1, displayStatus: 'awaiting-decision', runCount: 1 },
+    ]
+    render(
+      <PhaseDecisionCard
+        phase="specify"
+        summary={buildSummary()}
+        actions={['approve', 'reject', 'clarify']}
+        onAction={vi.fn()}
+        onDismiss={vi.fn()}
+        isOpen
+        phases={phases}
+      />
+    )
+
+    expect(
+      screen.getByText('Review the artifact above, then Approve, Reject, or Clarify.')
+    ).toBeInTheDocument()
+  })
 })
