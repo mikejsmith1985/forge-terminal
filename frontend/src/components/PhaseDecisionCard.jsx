@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { CheckCircle2, XCircle, MessageSquare, FileText, X, AlertTriangle } from 'lucide-react'
 
 import './PhaseDecisionCard.css'
+import ActionPromptStrip from './ActionPromptStrip'
 
 // Display metadata per action: a human label and an icon, keyed by the
 // backend action string so no magic strings leak into the markup.
@@ -84,6 +85,7 @@ export default function PhaseDecisionCard({
   isSubmitting,
   isOpen,
   artifactPreview,
+  phases = [],
 }) {
   // Whether the inline clarify steer input is showing instead of the action buttons.
   const [isClarifying, setIsClarifying] = useState(false)
@@ -260,6 +262,7 @@ export default function PhaseDecisionCard({
           </div>
         )}
       </div>
+      <ActionPromptStrip phases={phases} isCardOpen={true} />
     </div>
   )
 }

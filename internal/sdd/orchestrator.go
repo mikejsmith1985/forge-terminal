@@ -41,17 +41,20 @@ type Options struct {
 
 // Orchestrator holds the single active pipeline's state and drives its transitions.
 type Orchestrator struct {
-	mu             sync.Mutex
-	state          PipelineState
-	feature        string
-	historyBaseDir string
-	injector       CommandInjector
-	broadcaster    GateBroadcaster
-	waiter         CompletionWaiter
-	newSummary     func(PhaseName) PhaseSummary
-	now            func() time.Time
-	newCardID      func(PhaseName) string
-	subscribers    []CompletionHandler
+	mu              sync.Mutex
+	state           PipelineState
+	feature         string
+	historyBaseDir  string
+	injector        CommandInjector
+	broadcaster     GateBroadcaster
+	waiter          CompletionWaiter
+	newSummary      func(PhaseName) PhaseSummary
+	now             func() time.Time
+	newCardID       func(PhaseName) string
+	subscribers     []CompletionHandler
+	// phaseRunCounts tracks how many times HandlePhaseComplete has fired per phase.
+	// Incremented under mu before fan-out so subscribers see the updated count.
+	phaseRunCounts  map[PhaseName]int
 }
 
 // NewOrchestrator builds an orchestrator with sensible production defaults and registers
@@ -68,6 +71,7 @@ func NewOrchestrator(opts Options) *Orchestrator {
 		now:            opts.Now,
 		newCardID:      opts.NewCardID,
 		state:          PipelineState{FeatureDir: opts.FeatureDir, SessionID: opts.SessionID, Status: StatusIdle},
+		phaseRunCounts: make(map[PhaseName]int),
 	}
 	if orchestrator.now == nil {
 		orchestrator.now = time.Now
@@ -124,12 +128,21 @@ func (o *Orchestrator) State() PipelineState {
 func (o *Orchestrator) HandlePhaseComplete(phase PhaseName, artifactPath string) {
 	o.mu.Lock()
 	o.state.CurrentPhase = phase
+	o.phaseRunCounts[phase]++
 	subscribers := append([]CompletionHandler(nil), o.subscribers...)
 	o.mu.Unlock()
 
 	for _, handler := range subscribers {
 		handler(phase, artifactPath)
 	}
+}
+
+// PhaseRunCount returns the number of times HandlePhaseComplete has fired for phase in
+// this session. Returns 0 before the phase has ever completed.
+func (o *Orchestrator) PhaseRunCount(phase PhaseName) int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.phaseRunCounts[phase]
 }
 
 // presentCard is the US1 subscriber: derive the summary, set the single pending card, and

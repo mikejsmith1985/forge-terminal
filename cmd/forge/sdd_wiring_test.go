@@ -187,6 +187,53 @@ func TestBuildPhaseStatuses_PhaseRejected_PipelineStopped(t *testing.T) {
 
 // --- end T016 ---
 
+// --- T005: derivePhaseDisplayStatus run-count tests (Red until T006 adds runCount param) ---
+
+func TestDerivePhaseDisplayStatus_IteratingWhenRunCountGe2AndAwaiting(t *testing.T) {
+	// phaseOrder == currentOrder, status == AwaitingDecision, runCount >= 2 → iterating
+	got := derivePhaseDisplayStatus(2, 2, sdd.StatusAwaitingDecision, 2)
+	if got != sdd.PhaseDisplayIterating {
+		t.Errorf("runCount=2 awaiting → got %q, want iterating", got)
+	}
+	got = derivePhaseDisplayStatus(2, 2, sdd.StatusAwaitingDecision, 5)
+	if got != sdd.PhaseDisplayIterating {
+		t.Errorf("runCount=5 awaiting → got %q, want iterating", got)
+	}
+}
+
+func TestDerivePhaseDisplayStatus_AwaitingDecisionWhenRunCount1(t *testing.T) {
+	// phaseOrder == currentOrder, status == AwaitingDecision, runCount == 1 → awaiting-decision
+	got := derivePhaseDisplayStatus(2, 2, sdd.StatusAwaitingDecision, 1)
+	if got != sdd.PhaseDisplayAwaitingDecision {
+		t.Errorf("runCount=1 awaiting → got %q, want awaiting-decision", got)
+	}
+}
+
+func TestDerivePhaseDisplayStatus_ExistingCasesUnchanged(t *testing.T) {
+	// Existing behaviour (no phases started, phase before current, rejected) must be unaffected.
+	cases := []struct {
+		phaseOrder, currentOrder int
+		status                   sdd.PipelineStatus
+		runCount                 int
+		want                     sdd.PhaseDisplayStatus
+	}{
+		{1, 0, sdd.StatusIdle, 0, sdd.PhaseDisplayPending},
+		{1, 2, sdd.StatusAwaitingDecision, 0, sdd.PhaseDisplayComplete},
+		{2, 2, sdd.StatusRejected, 1, sdd.PhaseDisplayRejected},
+		{3, 2, sdd.StatusAdvancing, 0, sdd.PhaseDisplayActive},
+		{4, 2, sdd.StatusAdvancing, 0, sdd.PhaseDisplayPending},
+	}
+	for _, tc := range cases {
+		got := derivePhaseDisplayStatus(tc.phaseOrder, tc.currentOrder, tc.status, tc.runCount)
+		if got != tc.want {
+			t.Errorf("derivePhaseDisplayStatus(%d,%d,%q,%d) = %q, want %q",
+				tc.phaseOrder, tc.currentOrder, tc.status, tc.runCount, got, tc.want)
+		}
+	}
+}
+
+// --- end T005 ---
+
 // --- T023: readSddArtifactPreview unit tests (Red: fails until T020 implements the function) ---
 
 func TestReadSddArtifactPreview_ShortFile_NotTruncated(t *testing.T) {

@@ -149,6 +149,9 @@ const (
 	PhaseDisplayAwaitingDecision PhaseDisplayStatus = "awaiting-decision"
 	PhaseDisplayComplete         PhaseDisplayStatus = "complete"
 	PhaseDisplayRejected         PhaseDisplayStatus = "rejected"
+	// PhaseDisplayIterating fires when a gate card re-opens for a phase that has already
+	// completed at least once (RunCount ≥ 2), disambiguating re-runs from first runs.
+	PhaseDisplayIterating PhaseDisplayStatus = "iterating"
 )
 
 // PhaseStatusEntry is one row in the SDD_PHASE_STATUS WebSocket event, representing
@@ -159,4 +162,8 @@ type PhaseStatusEntry struct {
 	DisplayStatus PhaseDisplayStatus `json:"displayStatus"`
 	ArtifactPath  string             `json:"artifactPath"`
 	DecidedAt     *time.Time         `json:"decidedAt"`
+	// RunCount is the total number of times HandlePhaseComplete has fired for this phase
+	// in the current session. 0 = never run; 1 = completed once; ≥2 = iterated.
+	// Frontend shows ×N only when N ≥ 2. Omitted (zero) if absent for backward compat.
+	RunCount int `json:"runCount,omitempty"`
 }

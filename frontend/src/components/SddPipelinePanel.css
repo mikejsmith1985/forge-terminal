@@ -76,13 +76,21 @@
   padding: 2px 10px 4px;
 }
 
-/* One row per pipeline phase. */
+/* Spin keyframe used by --active (blue) and --iterating (amber). Colour alone
+   distinguishes the two; spinning signals "in progress" for both. */
+@keyframes sdd-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* One row per pipeline phase. Transitions animate every status-swap automatically. */
 .sdd-pipeline-panel__row {
   display: flex;
   align-items: center;
   gap: 8px;
   height: 17px;
   font-size: 0.78em;
+  transition: color 200ms ease, background-color 200ms ease;
 }
 
 .sdd-pipeline-panel__icon {
@@ -110,11 +118,21 @@
 
 /* Per-status colour coding on the icon and phase name. */
 .sdd-pipeline-panel__row--pending    .sdd-pipeline-panel__icon { color: #4a4a4a; }
-.sdd-pipeline-panel__row--active     .sdd-pipeline-panel__icon { color: #60a5fa; }
+.sdd-pipeline-panel__row--active     .sdd-pipeline-panel__icon { color: #60a5fa; animation: sdd-spin 0.8s linear infinite; }
 .sdd-pipeline-panel__row--awaiting-decision .sdd-pipeline-panel__icon { color: #f59e0b; }
 .sdd-pipeline-panel__row--complete   .sdd-pipeline-panel__icon { color: #22c55e; }
-.sdd-pipeline-panel__row--rejected   .sdd-pipeline-panel__icon { color: #ef4444; }
+.sdd-pipeline-panel__row--rejected   .sdd-pipeline-panel__icon { color: #f59e0b; }
+.sdd-pipeline-panel__row--iterating  .sdd-pipeline-panel__icon { color: #f59e0b; animation: sdd-spin 0.8s linear infinite; }
+.sdd-pipeline-panel__row--unknown    .sdd-pipeline-panel__icon { color: #6b7280; }
 
 .sdd-pipeline-panel__row--awaiting-decision .sdd-pipeline-panel__phase-name { color: #fde68a; }
 .sdd-pipeline-panel__row--complete   .sdd-pipeline-panel__phase-name { color: #86efac; }
-.sdd-pipeline-panel__row--rejected   .sdd-pipeline-panel__phase-name { color: #fca5a5; }
+.sdd-pipeline-panel__row--rejected   .sdd-pipeline-panel__phase-name { color: #fde68a; }
+.sdd-pipeline-panel__row--iterating  .sdd-pipeline-panel__phase-name { color: #fde68a; }
+
+/* ×N iteration counter — muted, smaller than the phase name. */
+.sdd-pipeline-panel__run-count {
+  font-size: 0.75em;
+  color: #6b7280;
+  margin-left: 0.4em;
+}

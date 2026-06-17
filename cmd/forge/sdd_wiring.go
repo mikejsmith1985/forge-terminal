@@ -317,7 +317,7 @@ type sddPhaseStatusEnvelope struct {
 
 // buildPhaseStatuses derives the display status for every pipeline phase from the
 // orchestrator's live state. It reads no history file — status is inferred from
-// the current phase, the pipeline status, and the phase order in the table.
+// the current phase, the pipeline status, the phase order, and the run count.
 func buildPhaseStatuses(pipeline *sddPipeline) []sdd.PhaseStatusEntry {
 	state := pipeline.orchestrator.State()
 
@@ -331,20 +331,24 @@ func buildPhaseStatuses(pipeline *sddPipeline) []sdd.PhaseStatusEntry {
 	phases := sdd.PhaseTable()
 	entries := make([]sdd.PhaseStatusEntry, 0, len(phases))
 	for _, phase := range phases {
-		displayStatus := derivePhaseDisplayStatus(phase.Order, currentOrder, state.Status)
+		runCount := pipeline.orchestrator.PhaseRunCount(phase.Name)
+		displayStatus := derivePhaseDisplayStatus(phase.Order, currentOrder, state.Status, runCount)
 		entries = append(entries, sdd.PhaseStatusEntry{
 			Phase:         phase.Name,
 			Order:         phase.Order,
 			DisplayStatus: displayStatus,
 			ArtifactPath:  phase.ExpectedArtifact,
 			DecidedAt:     nil,
+			RunCount:      runCount,
 		})
 	}
 	return entries
 }
 
-// derivePhaseDisplayStatus maps a phase's position in the pipeline to its UI display status.
-func derivePhaseDisplayStatus(phaseOrder, currentOrder int, pipelineStatus sdd.PipelineStatus) sdd.PhaseDisplayStatus {
+// derivePhaseDisplayStatus maps a phase's position in the pipeline to its UI display
+// status. runCount is the number of completed runs for this phase; when it is ≥ 2 and
+// the gate card is open, the phase is shown as iterating rather than awaiting-decision.
+func derivePhaseDisplayStatus(phaseOrder, currentOrder int, pipelineStatus sdd.PipelineStatus, runCount int) sdd.PhaseDisplayStatus {
 	switch {
 	case currentOrder == 0:
 		// No phases have started yet.
@@ -357,6 +361,10 @@ func derivePhaseDisplayStatus(phaseOrder, currentOrder int, pipelineStatus sdd.P
 	case phaseOrder == currentOrder:
 		switch pipelineStatus {
 		case sdd.StatusAwaitingDecision:
+			// Re-run: runCount ≥ 2 means the gate has opened at least twice.
+			if runCount >= 2 {
+				return sdd.PhaseDisplayIterating
+			}
 			return sdd.PhaseDisplayAwaitingDecision
 		case sdd.StatusRejected:
 			return sdd.PhaseDisplayRejected

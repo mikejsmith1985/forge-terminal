@@ -197,6 +197,52 @@ func TestSubmitDecision_AdvanceToPtyQuietPhaseGatesAfterWait(t *testing.T) {
 	}
 }
 
+// T003 — run-count tracking (Red until T004 adds phaseRunCounts to Orchestrator).
+
+func TestPhaseRunCount_ZeroBeforeAnyCompletion(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+
+	if got := orchestrator.PhaseRunCount(PhaseSpecify); got != 0 {
+		t.Errorf("PhaseRunCount before any completion = %d, want 0", got)
+	}
+}
+
+func TestPhaseRunCount_OneAfterFirstHandlePhaseComplete(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+
+	if got := orchestrator.PhaseRunCount(PhaseSpecify); got != 1 {
+		t.Errorf("PhaseRunCount after first completion = %d, want 1", got)
+	}
+}
+
+func TestPhaseRunCount_TwoAfterSecondHandlePhaseComplete(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+
+	if got := orchestrator.PhaseRunCount(PhaseSpecify); got != 2 {
+		t.Errorf("PhaseRunCount after second completion = %d, want 2", got)
+	}
+}
+
+func TestPhaseRunCount_IndependentPerPhase(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+	orchestrator.HandlePhaseComplete(PhasePlan, "plan.md")
+
+	if got := orchestrator.PhaseRunCount(PhaseSpecify); got != 2 {
+		t.Errorf("specify run count = %d, want 2", got)
+	}
+	if got := orchestrator.PhaseRunCount(PhasePlan); got != 1 {
+		t.Errorf("plan run count = %d, want 1", got)
+	}
+	if got := orchestrator.PhaseRunCount(PhaseClarify); got != 0 {
+		t.Errorf("clarify run count (never run) = %d, want 0", got)
+	}
+}
+
 func TestSetFeatureDir_UpdatesStateForLazyActivation(t *testing.T) {
 	orchestrator, _, _ := newTestOrchestrator(t)
 

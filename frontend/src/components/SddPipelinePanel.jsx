@@ -3,16 +3,26 @@
 // specs/004-sdd-pipeline-dashboard, US1.
 import { useState } from 'react'
 import './SddPipelinePanel.css'
+import ActionPromptStrip from './ActionPromptStrip'
 
 const COLLAPSED_KEY = 'sdd_panel_collapsed'
 
-// Status icon for each PhaseDisplayStatus value (data-model.md).
+// Status icon for each PhaseDisplayStatus value (data-model.md / specs/005-sdd-phase-ux).
 const STATUS_ICON = {
-  pending:            '·',
-  active:             '◌',
+  pending:             '◌',
+  active:              '⟳',
   'awaiting-decision': '⏳',
-  complete:           '✓',
-  rejected:           '✗',
+  complete:            '✓',
+  rejected:            '⚠',
+  iterating:           '↻',
+}
+
+// BEM modifier class for each PhaseDisplayStatus. Unknown statuses fall back to --unknown
+// so the row is still styled (T007d) and the icon shows '?' to signal a future status value.
+function rowClass(displayStatus) {
+  const known = ['pending', 'active', 'awaiting-decision', 'complete', 'rejected', 'iterating']
+  const suffix = known.includes(displayStatus) ? displayStatus : 'unknown'
+  return `sdd-pipeline-panel__row sdd-pipeline-panel__row--${suffix}`
 }
 
 /**
@@ -28,6 +38,22 @@ export default function SddPipelinePanel({ phases, isVisible }) {
   )
 
   if (!isVisible) return null
+
+  // FR-010: compact idle indicator when no feature is bound (phases array is empty).
+  if (phases.length === 0) {
+    return (
+      <div className="sdd-pipeline-panel sdd-pipeline-panel--idle">
+        <div className="sdd-pipeline-panel__rows">
+          <div className="sdd-pipeline-panel__row sdd-pipeline-panel__row--pending">
+            <span className="sdd-pipeline-panel__icon">◌</span>
+            <span className="sdd-pipeline-panel__phase-name">
+              No active feature — run /speckit-specify to start
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const awaitingCount = phases.filter((p) => p.displayStatus === 'awaiting-decision').length
 
@@ -65,21 +91,20 @@ export default function SddPipelinePanel({ phases, isVisible }) {
           {phases.map((entry) => (
             <div
               key={entry.phase}
-              className={`sdd-pipeline-panel__row sdd-pipeline-panel__row--${entry.displayStatus}`}
+              className={rowClass(entry.displayStatus)}
             >
               <span className="sdd-pipeline-panel__icon">
-                {STATUS_ICON[entry.displayStatus] ?? '·'}
+                {STATUS_ICON[entry.displayStatus] ?? '?'}
               </span>
               <span className="sdd-pipeline-panel__phase-name">{entry.phase}</span>
-              {entry.artifactPath && (
-                <span className="sdd-pipeline-panel__artifact" title={entry.artifactPath}>
-                  {entry.artifactPath}
-                </span>
+              {entry.runCount >= 2 && (
+                <span className="sdd-pipeline-panel__run-count">×{entry.runCount}</span>
               )}
             </div>
           ))}
         </div>
       )}
+      <ActionPromptStrip phases={phases} isCardOpen={false} />
     </div>
   )
 }
