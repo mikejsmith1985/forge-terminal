@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-16
 
-**Status**: Draft
+**Status**: Shipped (v7.16.3 — 2026-06-17)
 
 **Input**: User description: "I hate everything about the SDD Phase and monitoring solution we just implemented. I want to use the speckit and I want to do SDD but the way that the TUI shows me where we are and what we've done I'm never really clear if the current SDD phase is being iterated on again, should be iterated on again, or is complete. I don't read about 90% or more of what you write to me. I have no patience for it. I need punchy details with visuals to show me where I am in the process and guide me to how to respond. Is there any way to do that?"
 
@@ -23,7 +23,7 @@ Each of the five SDD phases displays a distinct icon + short label pair covering
 | `⏳ Awaiting` | Phase complete; gate card open — decision pending |
 | `✓ Done` | Phase completed and approved |
 | `⚠ Redo` | Phase completed but was rejected — must re-run |
-| `↻ Iterating` | Phase is being re-run after a prior rejection |
+| `↻ Iterating` | Phase completed again after a prior rejection — gate is open for the second (or later) time |
 
 **Why this priority**: Without being able to distinguish "running for the first time" from "re-running after rejection" from "complete," every other UX improvement is noise. This is the single root cause of the user's confusion.
 
@@ -35,7 +35,7 @@ Each of the five SDD phases displays a distinct icon + short label pair covering
 2. **Given** a phase is executing for the first time, **When** the user views the panel, **Then** that phase shows `⟳ Running` with a spinner animation.
 3. **Given** a phase completed and was approved, **When** the user views the panel, **Then** that phase shows `✓ Done` (green, static).
 4. **Given** a phase was rejected at the gate, **When** the user views the panel, **Then** that phase immediately changes to `⚠ Redo` (amber, static) without requiring a page action.
-5. **Given** a rejected phase is re-running, **When** the user views the panel, **Then** that phase shows `↻ Iterating` (amber spinner), visually distinct from `⟳ Running`.
+5. **Given** a rejected phase has completed again and the gate is open for the second (or later) time, **When** the user views the panel, **Then** that phase shows `↻ Iterating` (amber spinner), visually distinct from `⟳ Running` (blue spinner). While actually re-running, the phase shows `⟳ Running` — `↻ Iterating` fires at the gate, not during execution, because no "phase started" event exists in the current architecture.
 6. **Given** any state transition occurs, **When** the user's eye is on the panel, **Then** the transition is animated so the change is noticed peripherally — no transition is silent.
 
 ---
@@ -92,11 +92,15 @@ Each phase in the pipeline panel shows how many times it has run. A phase that h
 - **FR-003**: The `↻ Iterating` state MUST be visually distinct from `⟳ Running` — at minimum, different icon and different colour, so a developer who rejected a phase can confirm re-execution at a glance without reading any text.
 - **FR-004**: After every gate event (phase complete, phase rejected, phase running, pipeline idle, pipeline complete), the system MUST display exactly one action sentence in a designated prompt area — never more than one sentence, never zero sentences when an action is available.
 - **FR-005**: The action prompt MUST use the exact command name or button label the user should interact with next (e.g., `/speckit-plan`, "Approve", "Reject") so the user can act without inferring.
-- **FR-006**: Existing prose output (verbose agent narration, phase summaries, multi-paragraph status text) MUST be removed from the pipeline status panel and gate card. Prose belongs to the terminal scrollback only.
+- **FR-006**: "Prose output" — defined as multi-sentence agent narration, phase summary paragraphs, or instructional text blocks outside the `ActionPromptStrip` — MUST NOT appear inside the pipeline panel or gate card body. Prose belongs to the terminal scrollback only. *Implementation note*: satisfied by spec-004's clean BEM-based panel implementation, which never added prose text to the panel body. The only text elements in the panel are state icons, phase name labels, the `×N` counter, and the single `ActionPromptStrip` sentence. No task was required to remove prose because the panel was built fresh without it.
 - **FR-007**: Each phase row MUST display an iteration counter (`×N`) when N ≥ 2 (i.e., the phase has completed at least twice). The counter MUST be omitted when N = 1 (clean first-run).
 - **FR-008**: The iteration counter MUST reflect completed runs only; an in-progress re-run does not increment the counter until it completes.
 - **FR-009**: All state, counter, and action prompt data MUST derive from the existing WebSocket event stream — no polling permitted, no new transport required (extending FR-012 of spec-004).
 - **FR-010**: When the pipeline has no active feature bound (idle state), the panel MUST show a compact idle indicator rather than five Waiting rows, to reduce visual noise.
+
+### Terminology Note
+
+The user-facing state labels in the table above (Waiting, Running, Awaiting, Done, Redo, Iterating) map to code-level enum values (`pending`, `active`, `awaiting-decision`, `complete`, `rejected`, `iterating`). The full label → enum mapping is defined in `specs/005-sdd-phase-ux/data-model.md`.
 
 ### Key Entities
 
