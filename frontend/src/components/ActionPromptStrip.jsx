@@ -6,7 +6,7 @@ import './ActionPromptStrip.css'
 // Named prompt constants — one per priority-ordered condition (data-model.md).
 const PROMPT_COMPLETE    = 'Pipeline complete.'
 const PROMPT_ITERATING   = 'Approve this iteration, or Reject to try again.'
-const PROMPT_FIRST_GATE  = 'Review the artifact above, then Approve, Reject, or Clarify.'
+const PROMPT_FIRST_GATE  = 'Approve to continue, Reject to restart this phase, or Clarify to redirect.'
 const PROMPT_RUNNING     = (phase) => `${capitalise(phase)} is running…`
 export const PROMPT_UNKNOWN = 'Unexpected pipeline state. Check the terminal.'
 

@@ -48,7 +48,12 @@ export function useSddGate({ activeSessionId }) {
   // WebSocket SDD_PHASE_STATUS events maintain live state thereafter.
   useEffect(() => {
     if (!activeSessionId) return
-    // Reset feature name and summaries when the session changes.
+    // Reset ALL session-scoped gate state when the active session changes.
+    // card belongs to a specific session — leaving it set when switching tabs
+    // causes the previous session's gate to appear in the new session's view.
+    setCard(null)
+    setDecisionError(null)
+    setIsSubmitting(false)
     setFeatureName('')
     phaseSummaries.current = {}
     fetch(`${STATUS_ENDPOINT}?sessionId=${encodeURIComponent(activeSessionId)}`, {
@@ -58,6 +63,12 @@ export function useSddGate({ activeSessionId }) {
       .then((data) => {
         if (data?.phases?.length) setPhaseStatuses(data.phases)
         if (data?.feature) setFeatureName(data.feature)
+        // Restore a pending gate card after page reload. SDD_PHASE_GATE events are
+        // not replayed on reconnect, so the status endpoint includes the pending card
+        // when one exists so the decision bar reappears without a new WS event.
+        if (data?.pendingCard) {
+          setCard({ type: 'SDD_PHASE_GATE', ...data.pendingCard })
+        }
       })
       .catch(() => {}) // best-effort; WS events are the live source
   }, [activeSessionId])

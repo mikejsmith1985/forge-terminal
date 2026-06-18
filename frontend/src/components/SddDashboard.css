@@ -64,6 +64,9 @@
 .sdd-dashboard__rail-wrapper {
   position: relative;
   flex: 1;
+  /* min-height prevents the rail from collapsing to 0 in a flex-column parent
+     that has no explicit height (flex:1 on an unconstrained parent = 0px). */
+  min-height: 44px;
 }
 
 /* ── Phase rail — horizontal flex row of phase cells ──────────────────────── */
@@ -82,7 +85,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #4a4a4a;
+  color: #6b7280;
   font-size: 0.9em;
   padding: 4px 0;
 }

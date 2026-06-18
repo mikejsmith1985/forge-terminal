@@ -1881,9 +1881,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             try {
               const msg = JSON.parse(str);
 
-              // SDD orchestrator (specs/003): surface phase-gate messages to the in-app
-              // decision card and stop — this message is not terminal output.
-              if (msg.type === 'SDD_PHASE_GATE') {
+              // SDD orchestrator (specs/003, 006): surface gate and live-status messages to
+              // the dashboard hook and stop — these are not terminal output.
+              if (msg.type === 'SDD_PHASE_GATE' || msg.type === 'SDD_PHASE_STATUS') {
                 if (onSddGateRef.current) onSddGateRef.current(str);
                 return;
               }

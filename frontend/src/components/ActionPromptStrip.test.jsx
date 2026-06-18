@@ -33,7 +33,7 @@ describe('deriveActionPrompt', () => {
   it('returns first-run prompt when card is open and no iterating phase', () => {
     const phases = makePhases({ specify: 'awaiting-decision' })
     expect(deriveActionPrompt(phases, true)).toBe(
-      'Review the artifact above, then Approve, Reject, or Clarify.'
+      'Approve to continue, Reject to restart this phase, or Clarify to redirect.'
     )
   })
 

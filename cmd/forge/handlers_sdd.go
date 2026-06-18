@@ -97,11 +97,17 @@ func handleSddStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state := pipeline.orchestrator.State()
-	writeSddJSON(w, http.StatusOK, map[string]any{
+	response := map[string]any{
 		"sessionId": sessionID,
 		"feature":   filepath.Base(state.FeatureDir),
 		"phases":    buildPhaseStatuses(pipeline),
-	})
+	}
+	// Include the pending card so the frontend can restore the decision bar after a
+	// page reload — SDD_PHASE_GATE events are not replayed on reconnect (FR-012).
+	if state.PendingCard != nil {
+		response["pendingCard"] = state.PendingCard
+	}
+	writeSddJSON(w, http.StatusOK, response)
 }
 
 // writeSddDecisionError maps orchestrator errors to precise HTTP status codes.
