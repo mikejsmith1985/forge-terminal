@@ -9,5 +9,5 @@
 @.specify/memory/constitution.md
 
 <!-- SPECKIT START -->
-Active feature plan: @specs/005-sdd-phase-ux/plan.md
+Active feature plan: @specs/006-sdd-pipeline-dashboard/plan.md
 <!-- SPECKIT END -->

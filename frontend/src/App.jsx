@@ -4,8 +4,7 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Wrench, Plug, Tag, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock, RefreshCw } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
-import PhaseDecisionCard from './components/PhaseDecisionCard'
-import SddPipelinePanel from './components/SddPipelinePanel'
+import SddDashboard from './components/SddDashboard'
 import ForgeAssist from './components/ForgeAssist'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -2199,26 +2198,20 @@ function App() {
               </div>
             ))}
           </div>
-          {/* US2: side drawer — no backdrop, terminal remains scrollable and interactive */}
-          <PhaseDecisionCard
-            isOpen={sddGate.isCardOpen}
-            phase={sddGate.card?.phase}
-            summary={sddGate.card?.summary}
-            actions={sddGate.card?.actions}
-            onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
-            onDismiss={sddGate.dismiss}
-            decisionError={sddGate.decisionError}
-            isSubmitting={sddGate.isSubmitting}
-            artifactPreview={sddGate.card?.artifactPreview ?? null}
-            phases={sddGate.phaseStatuses}
-          />
         </div>
-        {/* US1: persistent phase status panel. Always visible so the idle indicator (FR-010)
-             shows when no feature is bound; the component handles the empty-phases state. */}
-        <SddPipelinePanel
+        {/* spec-006: unified SDD dashboard — always visible, replaces SddPipelinePanel
+             and PhaseDecisionCard with a single inline surface (phase rail + decision bar). */}
+        <SddDashboard
           phases={sddGate.phaseStatuses}
-          isVisible={true}
+          featureName={sddGate.featureName}
+          phaseSummaries={sddGate.phaseSummaries}
           isCardOpen={sddGate.isCardOpen}
+          card={sddGate.card}
+          decisionError={sddGate.decisionError}
+          isSubmitting={sddGate.isSubmitting}
+          onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
+          onDismiss={sddGate.dismiss}
+          onFileOpen={handleFileOpen}
         />
       </div>
       {showEditor && editorFile && (
