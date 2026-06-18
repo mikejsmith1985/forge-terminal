@@ -249,6 +249,48 @@ const buildStatusMessage = (overrides = {}) =>
     ...overrides,
   })
 
+// ── Card recovery from status endpoint (post-spec-006 bug fix) ───────────────
+
+describe('useSddGate — pendingCard recovery', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('restores an open card when the recovery fetch returns pendingCard', async () => {
+    const pendingCard = {
+      cardId:  'gate-specify-999',
+      sessionId: ACTIVE_SESSION_ID,
+      phase:   'specify',
+      summary: { headline: 'Spec done', producedItems: ['spec.md'], flags: [] },
+      actions: ['approve', 'reject', 'clarify'],
+    }
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ phases: [], feature: '', pendingCard }),
+    })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    await waitFor(() => expect(result.current.isCardOpen).toBe(true))
+    expect(result.current.card).toMatchObject({ phase: 'specify', cardId: 'gate-specify-999' })
+  })
+
+  it('does not restore a card when pendingCard is absent from the recovery fetch', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ phases: [], feature: '' }),
+    })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    // Give the fetch time to resolve.
+    await act(async () => {})
+    expect(result.current.isCardOpen).toBe(false)
+  })
+})
+
+// ── T002: featureName and phaseSummaries (spec-006) ─────────────────────────
+
 describe('useSddGate — featureName (spec-006)', () => {
   beforeEach(() => {
     vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })

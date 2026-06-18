@@ -58,6 +58,12 @@ export function useSddGate({ activeSessionId }) {
       .then((data) => {
         if (data?.phases?.length) setPhaseStatuses(data.phases)
         if (data?.feature) setFeatureName(data.feature)
+        // Restore a pending gate card after page reload. SDD_PHASE_GATE events are
+        // not replayed on reconnect, so the status endpoint includes the pending card
+        // when one exists so the decision bar reappears without a new WS event.
+        if (data?.pendingCard) {
+          setCard({ type: 'SDD_PHASE_GATE', ...data.pendingCard })
+        }
       })
       .catch(() => {}) // best-effort; WS events are the live source
   }, [activeSessionId])
