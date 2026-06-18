@@ -48,7 +48,12 @@ export function useSddGate({ activeSessionId }) {
   // WebSocket SDD_PHASE_STATUS events maintain live state thereafter.
   useEffect(() => {
     if (!activeSessionId) return
-    // Reset feature name and summaries when the session changes.
+    // Reset ALL session-scoped gate state when the active session changes.
+    // card belongs to a specific session — leaving it set when switching tabs
+    // causes the previous session's gate to appear in the new session's view.
+    setCard(null)
+    setDecisionError(null)
+    setIsSubmitting(false)
     setFeatureName('')
     phaseSummaries.current = {}
     fetch(`${STATUS_ENDPOINT}?sessionId=${encodeURIComponent(activeSessionId)}`, {

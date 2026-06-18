@@ -249,6 +249,37 @@ const buildStatusMessage = (overrides = {}) =>
     ...overrides,
   })
 
+// ── Tab-switch isolation (Bug 4 root-cause fix) ───────────────────────────────
+
+describe('useSddGate — card isolation on session change', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('clears the card when activeSessionId changes (prevents cross-tab gate bleed)', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+
+    const OTHER_SESSION_ID = 'tab-9-other'
+    const { result, rerender } = renderHook(
+      ({ sid }) => useSddGate({ activeSessionId: sid }),
+      { initialProps: { sid: ACTIVE_SESSION_ID } }
+    )
+
+    // Open a gate on the first session.
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+    expect(result.current.isCardOpen).toBe(true)
+
+    // Simulate switching to a different tab (session change).
+    rerender({ sid: OTHER_SESSION_ID })
+
+    // Card must be cleared immediately so the new tab starts gate-free.
+    expect(result.current.isCardOpen).toBe(false)
+    expect(result.current.card).toBeNull()
+  })
+})
+
 // ── Card recovery from status endpoint (post-spec-006 bug fix) ───────────────
 
 describe('useSddGate — pendingCard recovery', () => {
