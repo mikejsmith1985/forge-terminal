@@ -1,0 +1,433 @@
+/* SddDashboard — unified SDD pipeline surface, always visible below the terminal.
+   Replaces SddPipelinePanel (collapsible bar) and PhaseDecisionCard (floating drawer).
+   specs/006-sdd-pipeline-dashboard. */
+
+/* ── Spin keyframe shared by active (blue) and iterating (amber) cells ──────── */
+@keyframes sdd-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ── Root container ────────────────────────────────────────────────────────────
+   flex-shrink: 0 so the terminal pane gives this space and never squeezes it. */
+.sdd-dashboard {
+  flex-shrink: 0;
+  width: 100%;
+  border-top: 1px solid #2a2a2a;
+  background: #0e0e0e;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8em;
+}
+
+/* ── Header row — feature name and pipeline-level badge ───────────────────── */
+.sdd-dashboard__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 0 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.sdd-dashboard__feature-name {
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sdd-dashboard__badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sdd-dashboard__badge--idle     { background: #1e1e1e; color: #6b7280; }
+.sdd-dashboard__badge--running  { background: #1e3a5f; color: #60a5fa; }
+.sdd-dashboard__badge--awaiting { background: #451a03; color: #fbbf24; }
+.sdd-dashboard__badge--rejected { background: #451a03; color: #fbbf24; }
+.sdd-dashboard__badge--complete { background: #052e16; color: #22c55e; }
+
+/* ── Rail wrapper — relative so the detail strip can float above it ────────── */
+.sdd-dashboard__rail-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+/* ── Phase rail — horizontal flex row of phase cells ──────────────────────── */
+.sdd-dashboard__rail {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  padding: 4px 10px;
+  height: 100%;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+
+/* Idle row shown when phases array is empty */
+.sdd-dashboard__idle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4a4a4a;
+  font-size: 0.9em;
+  padding: 4px 0;
+}
+
+/* ── Phase cell ───────────────────────────────────────────────────────────── */
+.sdd-dashboard__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 4px;
+  gap: 1px;
+  transition: background-color 200ms ease, color 200ms ease;
+  background: #141414;
+  position: relative;
+}
+
+.sdd-dashboard__cell--clickable {
+  cursor: pointer;
+}
+
+.sdd-dashboard__cell--clickable:hover {
+  background: #1e1e1e;
+}
+
+.sdd-dashboard__cell--selected {
+  background: #1e2a1e;
+  box-shadow: 0 0 0 1px #22c55e44;
+}
+
+/* ── Cell icon — status glyph, animated for active/iterating ─────────────── */
+.sdd-dashboard__cell-icon {
+  font-family: var(--font-mono, monospace);
+  font-size: 1em;
+  line-height: 1;
+  width: 14px;
+  text-align: center;
+}
+
+.sdd-dashboard__cell--pending     .sdd-dashboard__cell-icon { color: #4a4a4a; }
+.sdd-dashboard__cell--active      .sdd-dashboard__cell-icon { color: #60a5fa; animation: sdd-spin 0.8s linear infinite; }
+.sdd-dashboard__cell--awaiting-decision .sdd-dashboard__cell-icon { color: #fbbf24; }
+.sdd-dashboard__cell--iterating   .sdd-dashboard__cell-icon { color: #f59e0b; animation: sdd-spin 0.8s linear infinite; }
+.sdd-dashboard__cell--rejected    .sdd-dashboard__cell-icon { color: #f59e0b; }
+.sdd-dashboard__cell--complete    .sdd-dashboard__cell-icon { color: #22c55e; }
+.sdd-dashboard__cell--unknown     .sdd-dashboard__cell-icon { color: #6b7280; }
+
+/* ── Cell name and status label ──────────────────────────────────────────── */
+.sdd-dashboard__cell-name {
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: capitalize;
+  color: #c8c8c8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
+}
+
+.sdd-dashboard__cell-status {
+  font-size: 0.7em;
+  color: #5a5a5a;
+  white-space: nowrap;
+}
+
+.sdd-dashboard__cell--awaiting-decision .sdd-dashboard__cell-name { color: #fde68a; }
+.sdd-dashboard__cell--iterating         .sdd-dashboard__cell-name { color: #fde68a; }
+.sdd-dashboard__cell--rejected          .sdd-dashboard__cell-name { color: #fde68a; }
+.sdd-dashboard__cell--complete          .sdd-dashboard__cell-name { color: #86efac; }
+
+/* ── ×N run-count badge ───────────────────────────────────────────────────── */
+.sdd-dashboard__cell-badge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.65em;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* ── Chevron indicator for expandable complete cells ─────────────────────── */
+.sdd-dashboard__cell-chevron {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  color: #22c55e66;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Phase detail strip — floats above the rail, no layout reflow ───────────
+   position: absolute; bottom: 100% means it rises above the rail-wrapper
+   without pushing the terminal upward.                                        */
+.sdd-dashboard__detail-strip {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  padding: 8px 10px;
+  z-index: 10;
+}
+
+.sdd-dashboard__detail-headline {
+  margin: 0 0 5px;
+  font-size: 0.82em;
+  font-weight: 600;
+  color: #d0d0d0;
+}
+
+.sdd-dashboard__detail-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.sdd-dashboard__detail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  font-size: 0.75em;
+  color: #a0a0a0;
+  font-family: var(--font-mono, monospace);
+}
+
+.sdd-dashboard__detail-empty {
+  font-size: 0.75em;
+  color: #4a4a4a;
+}
+
+.sdd-dashboard__detail-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.sdd-dashboard__detail-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.72em;
+  font-weight: 600;
+}
+
+.sdd-dashboard__detail-flag--info  { background: #1e3a5f; color: #60a5fa; }
+.sdd-dashboard__detail-flag--warn  { background: #451a03; color: #fbbf24; }
+.sdd-dashboard__detail-flag--block { background: #3b0a0a; color: #f87171; }
+
+.sdd-dashboard__detail-no-flags {
+  font-size: 0.72em;
+  color: #3a3a3a;
+}
+
+.sdd-dashboard__detail-artifact-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.78em;
+  color: #60a5fa;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sdd-dashboard__detail-artifact-link:hover {
+  color: #93c5fd;
+}
+
+/* ── Action prompt strip (from ActionPromptStrip component) ──────────────── */
+/* ActionPromptStrip has its own CSS; the dashboard just provides the slot.   */
+
+/* ── Decision bar — shown only when isCardOpen ───────────────────────────── */
+.sdd-dashboard__decision-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 10px;
+  border-top: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+
+.sdd-dashboard__decision-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76em;
+  color: #f87171;
+}
+
+.sdd-dashboard__decision-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sdd-dashboard__decision-submitting {
+  font-size: 0.78em;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.sdd-dashboard__decision-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 0.8em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.sdd-dashboard__decision-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sdd-dashboard__decision-btn--approve {
+  background: #052e16;
+  color: #22c55e;
+  border-color: #166534;
+}
+.sdd-dashboard__decision-btn--approve:not(:disabled):hover {
+  background: #14532d;
+}
+
+.sdd-dashboard__decision-btn--reject {
+  background: #3b0a0a;
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+.sdd-dashboard__decision-btn--reject:not(:disabled):hover {
+  background: #7f1d1d;
+}
+
+.sdd-dashboard__decision-btn--clarify {
+  background: #1e1e2e;
+  color: #a78bfa;
+  border-color: #4c1d95;
+}
+.sdd-dashboard__decision-btn--clarify:not(:disabled):hover {
+  background: #2d1d5f;
+}
+
+/* ── Clarify modal (native <dialog>) ─────────────────────────────────────── */
+.sdd-dashboard__clarify-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  background: #111;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 16px;
+  width: 380px;
+  max-width: 90vw;
+  color: #d0d0d0;
+  z-index: 1000;
+}
+
+.sdd-dashboard__clarify-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.sdd-dashboard__clarify-prompt {
+  margin: 0 0 10px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #c0c0c0;
+}
+
+.sdd-dashboard__clarify-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0e0e0e;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  color: #d0d0d0;
+  font-size: 0.82em;
+  font-family: var(--font-mono, monospace);
+  padding: 8px;
+  resize: vertical;
+  min-height: 72px;
+  margin-bottom: 10px;
+  outline: none;
+}
+
+.sdd-dashboard__clarify-input:focus {
+  border-color: #60a5fa;
+}
+
+.sdd-dashboard__clarify-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sdd-dashboard__clarify-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 0.8em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sdd-dashboard__clarify-btn--cancel {
+  background: #1e1e1e;
+  color: #8a8a8a;
+  border-color: #3a3a3a;
+}
+.sdd-dashboard__clarify-btn--cancel:hover {
+  background: #2a2a2a;
+}
+
+.sdd-dashboard__clarify-btn--confirm {
+  background: #1e1e2e;
+  color: #a78bfa;
+  border-color: #4c1d95;
+}
+.sdd-dashboard__clarify-btn--confirm:not(:disabled):hover {
+  background: #2d1d5f;
+}
+.sdd-dashboard__clarify-btn--confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

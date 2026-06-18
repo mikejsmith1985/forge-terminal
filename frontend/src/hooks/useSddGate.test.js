@@ -237,3 +237,116 @@ describe('useSddGate', () => {
     expect(result.current.isCardOpen).toBe(true)
   })
 })
+
+// ── T002: featureName and phaseSummaries (spec-006) ─────────────────────────
+
+const buildStatusMessage = (overrides = {}) =>
+  JSON.stringify({
+    type: 'SDD_PHASE_STATUS',
+    sessionId: ACTIVE_SESSION_ID,
+    feature: 'demo-feature',
+    phases: [],
+    ...overrides,
+  })
+
+describe('useSddGate — featureName (spec-006)', () => {
+  beforeEach(() => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('featureName starts as empty string', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+    expect(result.current.featureName).toBe('')
+  })
+
+  it('featureName updates when SDD_PHASE_STATUS arrives for the active session', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildStatusMessage({ feature: 'auth-refresh' }))
+    })
+
+    expect(result.current.featureName).toBe('auth-refresh')
+  })
+
+  it('featureName is not updated for a different sessionId', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildStatusMessage({ sessionId: 'other-sess', feature: 'other-feature' }))
+    })
+
+    expect(result.current.featureName).toBe('')
+  })
+
+  it('featureName updates on each successive SDD_PHASE_STATUS event', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildStatusMessage({ feature: 'first-feature' }))
+    })
+    expect(result.current.featureName).toBe('first-feature')
+
+    act(() => {
+      result.current.handleWsMessage(buildStatusMessage({ feature: 'second-feature' }))
+    })
+    expect(result.current.featureName).toBe('second-feature')
+  })
+})
+
+describe('useSddGate — phaseSummaries (spec-006)', () => {
+  beforeEach(() => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('phaseSummaries is a ref with an empty object initially', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+    expect(result.current.phaseSummaries).toBeDefined()
+    expect(result.current.phaseSummaries.current).toEqual({})
+  })
+
+  it('phaseSummaries.current[phase] is populated when SDD_PHASE_GATE arrives', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+    const expectedSummary = {
+      headline: 'Plan ready',
+      producedItems: ['plan.md'],
+      flags: [],
+    }
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ phase: 'plan', summary: expectedSummary }))
+    })
+
+    expect(result.current.phaseSummaries.current['plan']).toEqual(expectedSummary)
+  })
+
+  it('phaseSummaries accumulates summaries across multiple gate events', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ phase: 'specify', summary: { headline: 'Spec done', producedItems: ['spec.md'], flags: [] } }))
+    })
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ phase: 'plan', summary: { headline: 'Plan done', producedItems: ['plan.md'], flags: [] } }))
+    })
+
+    expect(result.current.phaseSummaries.current['specify']).toMatchObject({ headline: 'Spec done' })
+    expect(result.current.phaseSummaries.current['plan']).toMatchObject({ headline: 'Plan done' })
+  })
+
+  it('phaseSummaries is not populated for a different sessionId', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ sessionId: 'other-sess', phase: 'plan', summary: { headline: 'Should not store', producedItems: [], flags: [] } }))
+    })
+
+    expect(result.current.phaseSummaries.current['plan']).toBeUndefined()
+  })
+})
