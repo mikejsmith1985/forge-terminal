@@ -119,8 +119,8 @@ func TestBuildPhaseStatuses_NoPhasesStarted_AllPending(t *testing.T) {
 
 	statuses := buildPhaseStatuses(pipeline)
 
-	if len(statuses) != 5 {
-		t.Fatalf("expected 5 phase statuses, got %d", len(statuses))
+	if len(statuses) != 6 {
+		t.Fatalf("expected 6 phase statuses, got %d", len(statuses))
 	}
 	for _, entry := range statuses {
 		if entry.DisplayStatus != sdd.PhaseDisplayPending {
