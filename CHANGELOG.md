@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.19.1] - 2026-06-18
+
+---
+
+## [v7.19.1] - 2026-06-18
+
 ### Fixed
 - **SDD Dashboard — decision bar bleeds across tabs** — switching tabs did not clear the current gate card; if a speckit gate fired in Tab A and the user switched to Tab B, Tab B showed the Approve/Reject/Clarify bar even though no speckit commands had run in that session; `useSddGate` now resets `card`, `decisionError`, and `isSubmitting` whenever `activeSessionId` changes
 - **SDD Dashboard — `SDD_PHASE_STATUS` events never reached `useSddGate`** — `ForgeTerminal.jsx` only routed `SDD_PHASE_GATE` to `onSddGateRef`; `SDD_PHASE_STATUS` messages fell through to terminal output, so phase statuses were frozen at the one-time recovery fetch value and never updated live; fixed by also routing `SDD_PHASE_STATUS` in the same guard (`msg.type === 'SDD_PHASE_GATE' || msg.type === 'SDD_PHASE_STATUS'`)
