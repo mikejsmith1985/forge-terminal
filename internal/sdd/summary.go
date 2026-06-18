@@ -26,11 +26,12 @@ const (
 // producedCandidates lists, per phase, the artifacts that phase may have produced. Only
 // those that actually exist are reported, so the list reflects reality, not expectation.
 var producedCandidates = map[PhaseName][]string{
-	PhaseSpecify:   {"spec.md"},
-	PhaseClarify:   {"spec.md"},
-	PhasePlan:      {"plan.md", "research.md", "data-model.md", "quickstart.md", "tasks.md"},
-	PhaseValidate:  {},
-	PhaseImplement: {"tasks.md"},
+	PhaseSpecify:       {"spec.md"},
+	PhaseClarify:       {"spec.md"},
+	PhasePlan:          {"plan.md", "research.md", "data-model.md", "quickstart.md"},
+	PhaseTasksGenerate: {"tasks.md"},
+	PhaseValidate:      {},
+	PhaseImplement:     {},
 }
 
 // summarize builds the scannable card content for a completed phase. A missing expected

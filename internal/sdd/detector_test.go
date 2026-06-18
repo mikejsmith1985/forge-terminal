@@ -18,7 +18,7 @@ func TestClassifyArtifact(t *testing.T) {
 		{"windows path normalizes", ".\\spec.md", "requirements", PhaseSpecify, true},
 		{"checklist is ignored", "checklists/requirements.md", "- [ ] item", "", false},
 		{"unrelated file is ignored", "notes.txt", "scratch", "", false},
-		{"tasks is not a gated artifact", "tasks.md", "- [ ] T001", "", false},
+		{"tasks.md completes the tasks phase", "tasks.md", "- [ ] T001 Do something", PhaseTasksGenerate, true},
 	}
 
 	for _, testCase := range cases {

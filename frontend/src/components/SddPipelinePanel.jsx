@@ -28,11 +28,13 @@ function rowClass(displayStatus) {
 /**
  * SddPipelinePanel renders a collapsible bottom bar showing every phase's status.
  *
- * @param {{ phases: Array, isVisible: boolean }} props
+ * @param {{ phases: Array, isVisible: boolean, isCardOpen: boolean }} props
  *   phases — PhaseStatusEntry[] from the SDD_PHASE_STATUS WebSocket event.
  *   isVisible — false until a pipeline is bound (phases.length > 0).
+ *   isCardOpen — true when a gate decision card is currently shown; passed through
+ *     to ActionPromptStrip so it shows the correct gate-open prompt variant.
  */
-export default function SddPipelinePanel({ phases, isVisible }) {
+export default function SddPipelinePanel({ phases, isVisible, isCardOpen }) {
   const [isCollapsed, setIsCollapsed] = useState(
     () => localStorage.getItem(COLLAPSED_KEY) === 'true'
   )
@@ -104,7 +106,7 @@ export default function SddPipelinePanel({ phases, isVisible }) {
           ))}
         </div>
       )}
-      <ActionPromptStrip phases={phases} isCardOpen={false} />
+      <ActionPromptStrip phases={phases} isCardOpen={isCardOpen} />
     </div>
   )
 }

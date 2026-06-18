@@ -211,9 +211,13 @@ describe('PhaseDecisionCard', () => {
     expect(screen.getByRole('button', { name: /dismiss/i })).toBeEnabled()
   })
 
-  // ── US3: artifact preview section ─────────────────────────────────────
+  // ── Artifact preview: removed from card body (Bug B fix) ─────────────
+  // The raw artifact text caused a wall-of-text problem in the decision card.
+  // The card now shows only the structured summary (headline + items + flags).
+  // The artifactPreview prop is still accepted so the dashboard can reuse the data,
+  // but the card body never renders inline artifact content regardless of the prop value.
 
-  it('renders no artifact preview section when artifactPreview is null', () => {
+  it('never renders the artifact section in the card body when artifactPreview is null', () => {
     const { container } = render(
       <PhaseDecisionCard
         phase="plan"
@@ -229,16 +233,7 @@ describe('PhaseDecisionCard', () => {
     expect(container.querySelector('.phase-decision-card-artifact')).toBeNull()
   })
 
-  it('renders the fallback when artifactPreview has empty content', () => {
-    renderCard({
-      artifactPreview: { content: '', filePath: '/path/to/spec.md', totalLines: 0, isTruncated: false },
-    })
-
-    expect(screen.getByText(/artifact not yet available/i)).toBeInTheDocument()
-    expect(document.querySelector('.phase-decision-card-artifact-pre')).toBeNull()
-  })
-
-  it('renders a collapsed details element with artifact content', () => {
+  it('never renders artifact content inline even when artifactPreview has content', () => {
     renderCard({
       artifactPreview: {
         content: '# Spec\nLine one\nLine two',
@@ -248,14 +243,11 @@ describe('PhaseDecisionCard', () => {
       },
     })
 
-    const details = document.querySelector('.phase-decision-card-artifact')
-    expect(details).not.toBeNull()
-    expect(details).not.toHaveAttribute('open')
-    expect(document.querySelector('.phase-decision-card-artifact-pre')).toBeInTheDocument()
-    expect(screen.getByText(/# Spec/)).toBeInTheDocument()
+    expect(document.querySelector('.phase-decision-card-artifact')).toBeNull()
+    expect(document.querySelector('.phase-decision-card-artifact-pre')).toBeNull()
   })
 
-  it('shows truncation notice when isTruncated is true', () => {
+  it('never renders truncation notice inline even when isTruncated is true', () => {
     renderCard({
       artifactPreview: {
         content: 'first 200 lines…',
@@ -265,8 +257,7 @@ describe('PhaseDecisionCard', () => {
       },
     })
 
-    expect(screen.getByText(/350/)).toBeInTheDocument()
-    expect(document.querySelector('.phase-decision-card-artifact-truncated')).toBeInTheDocument()
+    expect(document.querySelector('.phase-decision-card-artifact-truncated')).toBeNull()
   })
 
   // ── T013: ActionPromptStrip in card footer ────────────────────────────────

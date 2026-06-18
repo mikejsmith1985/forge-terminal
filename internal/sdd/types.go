@@ -12,11 +12,12 @@ import "time"
 type PhaseName string
 
 const (
-	PhaseSpecify   PhaseName = "specify"
-	PhaseClarify   PhaseName = "clarify"
-	PhasePlan      PhaseName = "plan"
-	PhaseValidate  PhaseName = "validate"
-	PhaseImplement PhaseName = "implement"
+	PhaseSpecify        PhaseName = "specify"
+	PhaseClarify        PhaseName = "clarify"
+	PhasePlan           PhaseName = "plan"
+	PhaseTasksGenerate  PhaseName = "tasks"
+	PhaseValidate       PhaseName = "validate"
+	PhaseImplement      PhaseName = "implement"
 )
 
 // CompletionSignal describes how a phase's completion is detected.

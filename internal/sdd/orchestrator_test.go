@@ -68,8 +68,8 @@ func TestSubmitDecision_ApproveAdvancesByInjectingNextCommand(t *testing.T) {
 	if status != StatusAdvancing {
 		t.Errorf("status = %q, want advancing", status)
 	}
-	if len(injector.calls) != 1 || injector.calls[0].text != "/speckit-analyze" {
-		t.Fatalf("expected injection of /speckit-analyze, got %+v", injector.calls)
+	if len(injector.calls) != 1 || injector.calls[0].text != "/speckit-tasks" {
+		t.Fatalf("expected injection of /speckit-tasks, got %+v", injector.calls)
 	}
 	if injector.calls[0].sessionID != "sess-1" {
 		t.Errorf("injected into %q, want sess-1", injector.calls[0].sessionID)
@@ -103,7 +103,7 @@ func TestSubmitDecision_ClarifyAppendsSteer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("clarify failed: %v", err)
 	}
-	want := "/speckit-analyze\nnarrow scope"
+	want := "/speckit-tasks\nnarrow scope"
 	if len(injector.calls) != 1 || injector.calls[0].text != want {
 		t.Fatalf("clarify injection = %+v, want text %q", injector.calls, want)
 	}
@@ -169,16 +169,18 @@ func TestSubmitDecision_AdvanceToPtyQuietPhaseGatesAfterWait(t *testing.T) {
 		NewCardID:      func(phase PhaseName) string { return "card-" + string(phase) },
 	})
 
-	// Gate Plan (file-detected), then approve it — advancing to Validate, which is pty-quiet.
-	orchestrator.HandlePhaseComplete(PhasePlan, "plan.md")
-	if got := <-gatedPhases; got != PhasePlan {
-		t.Fatalf("first gate = %s, want plan", got)
+	// Approve Tasks (file-detected) — the first pty-quiet phase in the pipeline is now Validate.
+	// Manually simulate the file-watcher delivering tasks.md so the orchestrator gates on tasks.
+	orchestrator.HandlePhaseComplete(PhaseTasksGenerate, "tasks.md")
+	if got := <-gatedPhases; got != PhaseTasksGenerate {
+		t.Fatalf("first gate = %s, want tasks", got)
 	}
-	if _, err := orchestrator.SubmitDecision(Decision{Phase: PhasePlan, Action: ActionApprove}); err != nil {
-		t.Fatalf("approve plan failed: %v", err)
+	if _, err := orchestrator.SubmitDecision(Decision{Phase: PhaseTasksGenerate, Action: ActionApprove}); err != nil {
+		t.Fatalf("approve tasks failed: %v", err)
 	}
 
-	// The waiter must be asked to wait for Validate, and once it returns, Validate gates.
+	// The waiter must be asked to wait for Validate (the first pty-quiet phase), and once it
+	// returns the orchestrator gates on Validate.
 	select {
 	case phase := <-waiterCalls:
 		if phase != PhaseValidate {
