@@ -35,6 +35,9 @@ func classifyArtifact(relPath, content string) (PhaseName, bool) {
 		return PhaseSpecify, true
 	case "plan.md":
 		return PhasePlan, true
+	case "tasks.md":
+		// tasks.md is produced by /speckit-tasks, which runs between plan and validate.
+		return PhaseTasksGenerate, true
 	default:
 		return "", false
 	}

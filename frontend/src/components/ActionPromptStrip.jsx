@@ -15,6 +15,7 @@ const START_COMMAND = {
   specify:   '/speckit-specify',
   clarify:   '/speckit-clarify',
   plan:      '/speckit-plan',
+  tasks:     '/speckit-tasks',
   validate:  '/speckit-analyze',
   implement: '/speckit-implement',
 }

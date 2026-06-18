@@ -193,8 +193,6 @@ export default function PhaseDecisionCard({
             )}
           </div>
 
-          <ArtifactPreviewSection artifactPreview={artifactPreview} />
-
           {hasDecisionError && (
             <div className="phase-decision-card-error" role="alert">
               <AlertTriangle size={16} className="phase-decision-card-error-icon" />

@@ -7,8 +7,9 @@ var phaseTable = []Phase{
 	{Name: PhaseSpecify, Order: 1, StartCommand: "/speckit-specify", CompletionSignal: signalArtifactExists, ExpectedArtifact: "spec.md"},
 	{Name: PhaseClarify, Order: 2, StartCommand: "/speckit-clarify", CompletionSignal: signalContentMarker, ExpectedArtifact: "spec.md"},
 	{Name: PhasePlan, Order: 3, StartCommand: "/speckit-plan", CompletionSignal: signalArtifactExists, ExpectedArtifact: "plan.md"},
-	{Name: PhaseValidate, Order: 4, StartCommand: "/speckit-analyze", CompletionSignal: signalPTYQuiet, ExpectedArtifact: ""},
-	{Name: PhaseImplement, Order: 5, StartCommand: "/speckit-implement", CompletionSignal: signalPTYQuiet, ExpectedArtifact: "", IsTerminal: true},
+	{Name: PhaseTasksGenerate, Order: 4, StartCommand: "/speckit-tasks", CompletionSignal: signalArtifactExists, ExpectedArtifact: "tasks.md"},
+	{Name: PhaseValidate, Order: 5, StartCommand: "/speckit-analyze", CompletionSignal: signalPTYQuiet, ExpectedArtifact: ""},
+	{Name: PhaseImplement, Order: 6, StartCommand: "/speckit-implement", CompletionSignal: signalPTYQuiet, ExpectedArtifact: "", IsTerminal: true},
 }
 
 // PhaseTable returns an ordered copy of all five pipeline phases. Callers must

@@ -176,8 +176,8 @@ func TestHandleSddStatus_ActivePipeline_ReturnsPhasesArray(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	phases, ok := body["phases"].([]any)
-	if !ok || len(phases) != 5 {
-		t.Errorf("want 5 phases, got %v", body["phases"])
+	if !ok || len(phases) != 6 {
+		t.Errorf("want 6 phases, got %v", body["phases"])
 	}
 }
 

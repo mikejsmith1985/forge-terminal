@@ -2210,6 +2210,7 @@ function App() {
             decisionError={sddGate.decisionError}
             isSubmitting={sddGate.isSubmitting}
             artifactPreview={sddGate.card?.artifactPreview ?? null}
+            phases={sddGate.phaseStatuses}
           />
         </div>
         {/* US1: persistent phase status panel. Always visible so the idle indicator (FR-010)
@@ -2217,6 +2218,7 @@ function App() {
         <SddPipelinePanel
           phases={sddGate.phaseStatuses}
           isVisible={true}
+          isCardOpen={sddGate.isCardOpen}
         />
       </div>
       {showEditor && editorFile && (
