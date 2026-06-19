@@ -106,6 +106,25 @@ func (o *Orchestrator) BindSession(sessionID string) {
 	o.mu.Unlock()
 }
 
+// MarkPhaseRunning transitions the pipeline to StatusRunning for the given phase, signalling
+// that the phase artifact has been detected but the terminal has not yet gone quiet. The UI
+// shows the active spinner while the pipeline is in this state; the decision gate has not
+// opened yet. Returns true if the transition was applied, or false when the pipeline is already
+// awaiting a decision, already running any phase, or complete — all of which mean the caller
+// must not launch a settlement goroutine (either a duplicate watcher fire or an illegal
+// out-of-order event).
+func (o *Orchestrator) MarkPhaseRunning(phase PhaseName) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	switch o.state.Status {
+	case StatusAwaitingDecision, StatusRunning, StatusComplete:
+		return false
+	}
+	o.state.CurrentPhase = phase
+	o.state.Status = StatusRunning
+	return true
+}
+
 // SetFeatureDir points the orchestrator at the feature directory whose artifacts it should
 // summarize. This supports eager-bind/lazy-watch: a pipeline can be bound to a repo before any
 // feature exists, then have its feature directory set the moment the watcher detects the first

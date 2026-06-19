@@ -255,6 +255,38 @@ func TestDerivePhaseDisplayStatus_AwaitingDecisionWhenRunCount1(t *testing.T) {
 	}
 }
 
+func TestDerivePhaseDisplayStatus_RunningCurrentPhaseIsActive(t *testing.T) {
+	// phaseOrder == currentOrder, status == StatusRunning → active (spinner shown while the
+	// terminal is still producing output, before the decision gate opens).
+	got := derivePhaseDisplayStatus(1, 1, sdd.StatusRunning, 0)
+	if got != sdd.PhaseDisplayActive {
+		t.Errorf("StatusRunning current phase → got %q, want active", got)
+	}
+}
+
+func TestBuildPhaseStatuses_PhaseRunning_ShowsActiveSpinner(t *testing.T) {
+	pipeline := newTestPipeline(t, "running-sess")
+	// Simulate artifact detected but terminal not yet settled (what gateSddArtifact does
+	// synchronously before launching the settlement goroutine).
+	pipeline.orchestrator.MarkPhaseRunning(sdd.PhaseSpecify)
+
+	statuses := buildPhaseStatuses(pipeline)
+
+	for _, entry := range statuses {
+		switch entry.Phase {
+		case sdd.PhaseSpecify:
+			if entry.DisplayStatus != sdd.PhaseDisplayActive {
+				t.Errorf("specify: got %q, want active while running", entry.DisplayStatus)
+			}
+		default:
+			// All phases after specify must remain pending.
+			if entry.DisplayStatus != sdd.PhaseDisplayPending {
+				t.Errorf("phase %s: got %q, want pending (should not advance until specify settles)", entry.Phase, entry.DisplayStatus)
+			}
+		}
+	}
+}
+
 func TestDerivePhaseDisplayStatus_ExistingCasesUnchanged(t *testing.T) {
 	// Existing behaviour (no phases started, phase before current, rejected) must be unaffected.
 	cases := []struct {

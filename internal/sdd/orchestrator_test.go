@@ -245,6 +245,70 @@ func TestPhaseRunCount_IndependentPerPhase(t *testing.T) {
 	}
 }
 
+func TestMarkPhaseRunning_TransitionsFromIdleToRunning(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+
+	wasTransitioned := orchestrator.MarkPhaseRunning(PhaseSpecify)
+
+	if !wasTransitioned {
+		t.Fatal("MarkPhaseRunning should return true when transitioning from idle")
+	}
+	state := orchestrator.State()
+	if state.Status != StatusRunning {
+		t.Errorf("status = %q, want running", state.Status)
+	}
+	if state.CurrentPhase != PhaseSpecify {
+		t.Errorf("CurrentPhase = %q, want specify", state.CurrentPhase)
+	}
+}
+
+func TestMarkPhaseRunning_IdempotentWhenAlreadyRunning(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	orchestrator.MarkPhaseRunning(PhaseSpecify)
+
+	// Duplicate watcher fire for the same (or any) phase must be suppressed.
+	wasTransitioned := orchestrator.MarkPhaseRunning(PhaseSpecify)
+
+	if wasTransitioned {
+		t.Fatal("MarkPhaseRunning should return false when pipeline is already in StatusRunning")
+	}
+	if orchestrator.State().Status != StatusRunning {
+		t.Errorf("status must remain running, got %q", orchestrator.State().Status)
+	}
+}
+
+func TestMarkPhaseRunning_SuppressedWhenAwaitingDecision(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	// Drive orchestrator to AwaitingDecision via the normal completion seam.
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+
+	wasTransitioned := orchestrator.MarkPhaseRunning(PhaseSpecify)
+
+	if wasTransitioned {
+		t.Fatal("MarkPhaseRunning should return false when a gate card is already open")
+	}
+	if orchestrator.State().Status != StatusAwaitingDecision {
+		t.Errorf("gate-open status must not be overwritten, got %q", orchestrator.State().Status)
+	}
+}
+
+func TestMarkPhaseRunning_SuppressedWhenPipelineComplete(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	orchestrator.HandlePhaseComplete(PhaseImplement, "")
+	if _, err := orchestrator.SubmitDecision(Decision{Phase: PhaseImplement, Action: ActionApprove}); err != nil {
+		t.Fatalf("approve terminal phase: %v", err)
+	}
+
+	wasTransitioned := orchestrator.MarkPhaseRunning(PhaseSpecify)
+
+	if wasTransitioned {
+		t.Fatal("MarkPhaseRunning should return false when pipeline is complete")
+	}
+	if orchestrator.State().Status != StatusComplete {
+		t.Errorf("complete status must not be overwritten, got %q", orchestrator.State().Status)
+	}
+}
+
 func TestSetFeatureDir_UpdatesStateForLazyActivation(t *testing.T) {
 	orchestrator, _, _ := newTestOrchestrator(t)
 
