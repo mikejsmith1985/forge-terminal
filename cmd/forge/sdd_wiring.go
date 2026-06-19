@@ -333,11 +333,18 @@ func buildPhaseStatuses(pipeline *sddPipeline) []sdd.PhaseStatusEntry {
 	for _, phase := range phases {
 		runCount := pipeline.orchestrator.PhaseRunCount(phase.Name)
 		displayStatus := derivePhaseDisplayStatus(phase.Order, currentOrder, state.Status, runCount)
+		// Build the absolute artifact path so the frontend can open the file
+		// directly. Phases with no artifact (Validate, Implement) keep an empty
+		// string; filepath.Join(dir, "") would return dir, not a file.
+		artifactPath := ""
+		if phase.ExpectedArtifact != "" {
+			artifactPath = filepath.Join(state.FeatureDir, phase.ExpectedArtifact)
+		}
 		entries = append(entries, sdd.PhaseStatusEntry{
 			Phase:         phase.Name,
 			Order:         phase.Order,
 			DisplayStatus: displayStatus,
-			ArtifactPath:  phase.ExpectedArtifact,
+			ArtifactPath:  artifactPath,
 			DecidedAt:     nil,
 			RunCount:      runCount,
 		})
