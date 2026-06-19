@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SDD gate — premature card while agent still running** — `gateSddArtifact` previously called `HandlePhaseComplete` the instant the filesystem watcher detected an artifact file, causing the decision card to appear while the agent was still generating output or awaiting a permission prompt; the call now fires only after PTY-quiet detection (reusing `sddPhaseFloorMs` / `sddPhaseQuietMs` / `sddPhaseMaxMs`), consistent with how Validate and Implement have always worked
+- **SDD pipeline panel — no spinner while phase is running** — artifact-detected phases (Specify, Clarify, Plan, Tasks) showed as `pending` with a "Run /speckit-… to continue" prompt while actively running; a new `StatusRunning` pipeline state is set by `MarkPhaseRunning` the moment an artifact is first detected, causing `derivePhaseDisplayStatus` to return `PhaseDisplayActive` and the UI to show the blue spinning indicator; the state automatically transitions to `awaiting-decision` once PTY-quiet is detected
+
 ## [7.19.3] - 2026-06-19
 
 ---

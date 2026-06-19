@@ -190,10 +190,12 @@ func runSddDetector(pipeline *sddPipeline, sessionID string) {
 	}
 }
 
-// gateSddArtifact classifies one changed file and, if it is a phase artifact, points the
-// orchestrator at the feature it belongs to and fires the completion seam. The feature directory
-// is derived from the artifact's own path (specs/<feature>/…), so no .specify/feature.json is
-// required and switching to a new feature later "just works".
+// gateSddArtifact classifies one changed file and, if it is a phase artifact, drives the
+// two-step completion: (1) immediately marks the phase as running so the UI spinner appears,
+// (2) waits for PTY silence on a goroutine before firing the completion seam to open the gate.
+// This prevents the decision card from appearing while the agent is still writing output or
+// awaiting a permission prompt. Duplicate watcher fires for an already-running phase are
+// suppressed by MarkPhaseRunning returning false.
 func gateSddArtifact(pipeline *sddPipeline, sessionID, changedPath string) {
 	featureDir, featureRel, ok := deriveSddFeature(changedPath, pipeline.repoRoot)
 	if !ok {
@@ -209,7 +211,39 @@ func gateSddArtifact(pipeline *sddPipeline, sessionID, changedPath string) {
 	}
 	pipeline.orchestrator.BindSession(sessionID)
 	pipeline.orchestrator.SetFeatureDir(featureDir)
-	pipeline.orchestrator.HandlePhaseComplete(phase, featureRel)
+
+	// Step 1 — mark running immediately so the UI spinner appears before the gate opens.
+	// Returns false when the gate is already open (duplicate watcher fire) or the pipeline is
+	// complete; skip in those cases to avoid corrupting orchestrator state.
+	if !pipeline.orchestrator.MarkPhaseRunning(phase) {
+		return
+	}
+	broadcastPhaseStatus(sessionID)
+
+	// Step 2 — wait for PTY silence, then open the gate. The goroutine is the sole writer
+	// of the HandlePhaseComplete transition out of StatusRunning for this phase, so there is
+	// no concurrent completion race to guard against.
+	go func() {
+		settleArtifactPhase(sessionID)
+		pipeline.orchestrator.HandlePhaseComplete(phase, featureRel)
+	}()
+}
+
+// settleArtifactPhase blocks until the terminal goes quiet after an artifact-detected phase
+// finishes writing, using the same floor/quiet/max constants as the PTY-quiet phases
+// (Validate, Implement). This makes gate-open timing consistent across all pipeline phases
+// regardless of their completion signal type.
+func settleArtifactPhase(sessionID string) {
+	if termHandler == nil {
+		return
+	}
+	session, found := termHandler.GetSession(sessionID)
+	if !found {
+		return
+	}
+	startedAt := time.Now()
+	time.Sleep(time.Duration(sddPhaseFloorMs) * time.Millisecond)
+	waitForPTYQuiet(session, sddPhaseQuietMs, sddPhaseMaxMs, startedAt, time.Now())
 }
 
 // deriveSddFeature splits a changed file path into the feature directory it belongs to and the
@@ -367,6 +401,10 @@ func derivePhaseDisplayStatus(phaseOrder, currentOrder int, pipelineStatus sdd.P
 
 	case phaseOrder == currentOrder:
 		switch pipelineStatus {
+		case sdd.StatusRunning:
+			// Artifact detected; waiting for the terminal to go quiet before opening the gate.
+			// The UI shows the active spinner while settlement is pending.
+			return sdd.PhaseDisplayActive
 		case sdd.StatusAwaitingDecision:
 			// Re-run: runCount ≥ 2 means the gate has opened at least twice.
 			if runCount >= 2 {

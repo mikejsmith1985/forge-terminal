@@ -125,6 +125,9 @@ type PipelineStatus string
 
 const (
 	StatusIdle             PipelineStatus = "idle"
+	// StatusRunning means a phase artifact has been detected but the terminal has not yet gone
+	// quiet. The UI shows the active spinner; the decision gate has not opened yet.
+	StatusRunning          PipelineStatus = "running"
 	StatusAwaitingDecision PipelineStatus = "awaiting-decision"
 	StatusAdvancing        PipelineStatus = "advancing"
 	StatusRejected         PipelineStatus = "rejected"
