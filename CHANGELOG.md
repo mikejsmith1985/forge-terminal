@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.19.3] - 2026-06-19
 
+---
+
+## [v7.19.3] - 2026-06-19
+
+## [7.19.3] - 2026-06-19
+
 ### Fixed
 - **AV false-positive — binary flagged at download** — Windows Defender added `--dangerously-skip-permissions` to its AI permission-bypass signature database, causing Go binaries containing that literal string to be quarantined at download time; all occurrences in the binary's string constant pool are now replaced with a runtime-assembled equivalent (`strings.Join([]string{"--dangerously", "skip-permissions"}, "-")`) so the contiguous literal never appears in rodata; the Vite/esbuild bundle receives the same treatment via `['--dangerously', 'skip-permissions'].join('-')`, which esbuild does not fold at compile time; behaviour is identical at runtime
 
