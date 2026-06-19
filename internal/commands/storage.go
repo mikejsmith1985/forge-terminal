@@ -188,8 +188,8 @@ var DefaultCommands = []Command{
 		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude",
-			"copilot": "copilot --allow-all-tools",
-			"google":  "agy --dangerously-skip-permissions",
+			"copilot": CopilotFreshCmd,
+			"google":  AgyFreshCmd,
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🤖 Claude (Fresh)",
@@ -213,8 +213,8 @@ var DefaultCommands = []Command{
 		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude --resume",
-			"copilot": "copilot --allow-all-tools --continue",
-			"google":  "agy --dangerously-skip-permissions --continue",
+			"copilot": CopilotResumeCmd,
+			"google":  AgyResumeCmd,
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🔄 Claude (Resume)",
@@ -238,8 +238,8 @@ var DefaultCommands = []Command{
 		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude",
-			"copilot": "copilot --allow-all-tools",
-			"google":  "agy --dangerously-skip-permissions",
+			"copilot": CopilotFreshCmd,
+			"google":  AgyFreshCmd,
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🛡 Claude (Enforced)",

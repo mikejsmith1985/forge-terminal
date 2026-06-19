@@ -153,13 +153,13 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].Command = "claude"
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude",
-					"copilot": "copilot --allow-all-tools",
-					"google":  "agy --dangerously-skip-permissions",
+					"copilot": CopilotFreshCmd,
+					"google":  AgyFreshCmd,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded ID 6 to tool-agnostic Fresh Session card")
 			} else if cmd.ToolVariants["google"] == "" || cmd.ToolVariants["google"] == "gemini" {
-				commands[i].ToolVariants["google"] = "agy --dangerously-skip-permissions"
+				commands[i].ToolVariants["google"] = AgyFreshCmd
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded Google ToolVariant in ID 6 to agy")
 			}
@@ -209,13 +209,13 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].Command = "claude --resume"
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude --resume",
-					"copilot": "copilot --allow-all-tools --continue",
-					"google":  "agy --dangerously-skip-permissions --continue",
+					"copilot": CopilotResumeCmd,
+					"google":  AgyResumeCmd,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded ID 7 to tool-agnostic Resume card")
 			} else if cmd.ToolVariants["google"] == "" || cmd.ToolVariants["google"] == "gemini --resume" || cmd.ToolVariants["google"] == "gemini" {
-				commands[i].ToolVariants["google"] = "agy --dangerously-skip-permissions --continue"
+				commands[i].ToolVariants["google"] = AgyResumeCmd
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded Google ToolVariant in ID 7 to agy")
 			}
@@ -268,13 +268,13 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].Command = "claude"
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude",
-					"copilot": "copilot --allow-all-tools",
-					"google":  "agy --dangerously-skip-permissions",
+					"copilot": CopilotFreshCmd,
+					"google":  AgyFreshCmd,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded existing ID 8 to tool-agnostic Enforced card")
 			} else if cmd.ToolVariants["google"] == "" || cmd.ToolVariants["google"] == "gemini" {
-				commands[i].ToolVariants["google"] = "agy --dangerously-skip-permissions"
+				commands[i].ToolVariants["google"] = AgyFreshCmd
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded Google ToolVariant in ID 8 to agy")
 			}
@@ -330,8 +330,8 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 			Icon:         "emoji-shield",
 			ToolVariants: map[string]string{
 				"claude":  "claude",
-				"copilot": "copilot --allow-all-tools",
-				"google":  "agy --dangerously-skip-permissions",
+				"copilot": CopilotFreshCmd,
+				"google":  AgyFreshCmd,
 			},
 			DescriptionVariants: map[string]string{
 				"claude":  "🛡 Claude (Enforced)",
