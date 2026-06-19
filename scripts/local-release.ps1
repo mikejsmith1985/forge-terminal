@@ -100,15 +100,11 @@ $preflightWarnings = @()
 $preflightBlockers = @()
 $fixPromptLines = @()
 
-# Check 1: Not on main/master — development should happen on feature branches
+# Check 1: Record current branch for later checks — releasing from a clean main after
+# merging a PR is valid GitHub Flow; the dirty-tree check above already blocks the risky
+# case of uncommitted work, so no separate main/master block is needed here.
 $currentBranch = git branch --show-current 2>$null
-if ($currentBranch -eq "main" -or $currentBranch -eq "master") {
-    $preflightBlockers += "Currently on '$currentBranch' — development should happen on feature branches"
-    $fixPromptLines += "1. Create a feature branch: git checkout -b feature/<name>"
-    $preflightPassed = $false
-} else {
-    Write-OK "On branch '$currentBranch' (not main)"
-}
+Write-OK "On branch '$currentBranch'"
 
 # Check 2: CHANGELOG.md exists
 if (-not (Test-Path "$ROOT\CHANGELOG.md")) {
