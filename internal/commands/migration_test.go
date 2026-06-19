@@ -166,7 +166,7 @@ const staleAwarenessClaudeMacro = "# SYSTEM INJECTION: FORGE AWARENESS\n# You ar
 // fullyPopulatedVariants returns the variant maps a current card has, so a test can
 // isolate the Claude-macro heal from the unrelated empty/Google upgrade branches.
 func fullyPopulatedVariants(claudeMacro string) (map[string]string, map[string]string, map[string]string) {
-	toolVariants := map[string]string{"claude": "claude", "copilot": "copilot --allow-all-tools", "google": "agy --dangerously-skip-permissions"}
+	toolVariants := map[string]string{"claude": "claude", "copilot": CopilotFreshCmd, "google": AgyFreshCmd}
 	descriptionVariants := map[string]string{"claude": "🛡 Claude (Enforced)", "copilot": "🛡 Copilot (Enforced)", "google": "🛡 Google (Enforced)"}
 	macroVariants := map[string]string{"claude": claudeMacro, "copilot": CopilotWorkflowMacro, "google": GoogleWorkflowMacro}
 	return toolVariants, descriptionVariants, macroVariants

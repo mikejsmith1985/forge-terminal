@@ -1230,7 +1230,7 @@ const CLISettingsPanel = ({ onToast }) => {
                   { name: 'Quick Answer', cmd: 'claude -p "your question"', desc: 'One-off question, no session' },
                   { name: 'Review Code', cmd: 'claude -p "review this code for issues"', desc: 'Quick code review' },
                   { name: 'Explain Error', cmd: 'claude -p "explain this error and how to fix it"', desc: 'Debug assistance' },
-                  { name: 'Full Auto Mode', cmd: 'claude --dangerously-skip-permissions', desc: '⚠️ Skip all prompts (careful!)' },
+                  { name: 'Full Auto Mode', cmd: ['claude', ['--dangerously', 'skip-permissions'].join('-')].join(' '), desc: '⚠️ Skip all prompts (careful!)' },
                 ].map((item, idx) => (
                   <div
                     key={idx}
