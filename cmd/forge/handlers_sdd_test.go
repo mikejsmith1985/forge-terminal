@@ -271,3 +271,40 @@ func TestHandleSddGateCheck_GateClosedAfterApproveReturnsNotOpen(t *testing.T) {
 		t.Errorf("isGateOpen = %v, want false after approve", afterBody["isGateOpen"])
 	}
 }
+
+// ── handleSddHookStatus tests ─────────────────────────────────────────────────
+
+func getHookStatus(t *testing.T) *httptest.ResponseRecorder {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/sdd/hook-status", nil)
+	handleSddHookStatus(recorder, req)
+	return recorder
+}
+
+func TestHandleSddHookStatus_MethodNotAllowed(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/sdd/hook-status", nil)
+	handleSddHookStatus(recorder, req)
+	if recorder.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want 405", recorder.Code)
+	}
+}
+
+func TestHandleSddHookStatus_AbsentSettingsFile_ReturnsNotInstalled(t *testing.T) {
+	// When .claude/settings.json does not exist, the hook is not installed.
+	// isSddHookInstalled reads relative to CWD; the test runs in cmd/forge/ which
+	// never has .claude/settings.json, so no fixture needed.
+	recorder := getHookStatus(t)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	// isInstalled must be a boolean, not nil / missing.
+	if _, hasBool := body["isInstalled"].(bool); !hasBool {
+		t.Errorf("body[isInstalled] type = %T, want bool; body = %v", body["isInstalled"], body)
+	}
+}

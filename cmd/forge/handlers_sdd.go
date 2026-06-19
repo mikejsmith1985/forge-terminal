@@ -8,7 +8,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/sdd"
 )
@@ -141,6 +143,34 @@ func handleSddGateCheck(w http.ResponseWriter, r *http.Request) {
 		"isGateOpen": isGateOpen,
 		"phase":      string(openPhase),
 	})
+}
+
+// sddHookScriptName is the unique identifier within .claude/settings.json that proves
+// the SDD gate enforcement hook is installed. We use a substring match so the check
+// is robust to minor path variations in the surrounding JSON.
+const sddHookScriptName = "sdd-gate-check.ps1"
+
+// handleSddHookStatus reports whether the SDD gate enforcement PreToolUse hook is installed
+// in the project-level .claude/settings.json. The frontend calls this on mount to decide
+// whether to show the "install the hook" prompt. Always succeeds — absence of the file
+// simply means the hook is not installed.
+func handleSddHookStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeSddError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeSddJSON(w, http.StatusOK, map[string]any{"isInstalled": isSddHookInstalled()})
+}
+
+// isSddHookInstalled checks .claude/settings.json for the SDD gate enforcement hook command.
+// A substring match on the raw file bytes is intentional — it avoids a full JSON parse while
+// remaining robust to cosmetic whitespace differences.
+func isSddHookInstalled() bool {
+	data, readErr := os.ReadFile(".claude/settings.json")
+	if readErr != nil {
+		return false
+	}
+	return strings.Contains(string(data), sddHookScriptName)
 }
 
 // writeSddDecisionError maps orchestrator errors to precise HTTP status codes.

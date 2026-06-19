@@ -434,3 +434,47 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── Hook install banner (specs/008-sdd-real-enforcement FR-003) ─────────── */
+.sdd-dashboard__hook-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(234, 179, 8, 0.10);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.30);
+  font-size: 11px;
+  color: #fbbf24;
+}
+.sdd-dashboard__hook-banner-icon {
+  flex-shrink: 0;
+  color: #f59e0b;
+}
+.sdd-dashboard__hook-banner-text {
+  flex: 1;
+  line-height: 1.4;
+}
+.sdd-dashboard__hook-banner-cmd {
+  font-family: monospace;
+  background: rgba(0,0,0,0.25);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.sdd-dashboard__hook-banner-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid rgba(234, 179, 8, 0.40);
+  color: #fbbf24;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sdd-dashboard__hook-banner-btn:hover {
+  background: rgba(234, 179, 8, 0.15);
+}
+.sdd-dashboard__hook-banner-btn--dismiss {
+  padding: 2px 6px;
+  border-color: transparent;
+}

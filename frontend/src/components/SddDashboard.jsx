@@ -305,6 +305,51 @@ export function ClarifyModal({ isOpen, onConfirm, onCancel }) {
   )
 }
 
+// ── HookInstallBanner ─────────────────────────────────────────────────────────
+
+// The PowerShell command the user needs to run once to activate gate enforcement.
+const hookInstallCommand = '.\\scripts\\install-sdd-hook.ps1'
+
+/**
+ * One-time dismissible banner shown when the SDD gate enforcement hook is absent.
+ * Provides a copy-to-clipboard button so the user can run the install command immediately.
+ */
+function HookInstallBanner({ onDismiss }) {
+  const [isCopied, setIsCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(hookInstallCommand).catch(() => {})
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 2000)
+  }, [])
+
+  return (
+    <div className="sdd-dashboard__hook-banner" role="alert" data-testid="hook-install-banner">
+      <AlertTriangle className="sdd-dashboard__hook-banner-icon" size={14} aria-hidden="true" />
+      <span className="sdd-dashboard__hook-banner-text">
+        Gate enforcement inactive. Run{' '}
+        <code className="sdd-dashboard__hook-banner-cmd">{hookInstallCommand}</code>
+        {' '}to block the agent from skipping phases.
+      </span>
+      <button
+        type="button"
+        className="sdd-dashboard__hook-banner-btn sdd-dashboard__hook-banner-btn--copy"
+        onClick={handleCopy}
+      >
+        {isCopied ? 'Copied!' : 'Copy command'}
+      </button>
+      <button
+        type="button"
+        className="sdd-dashboard__hook-banner-btn sdd-dashboard__hook-banner-btn--dismiss"
+        onClick={onDismiss}
+        aria-label="Dismiss hook install banner"
+      >
+        ✕
+      </button>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 /**
@@ -333,12 +378,16 @@ export default function SddDashboard({
   card = null,
   decisionError = null,
   isSubmitting = false,
+  // Default true: no banner on initial render before the status fetch resolves.
+  isHookInstalled = true,
   onAction,
   onDismiss,
   onFileOpen,
 }) {
   const [selectedPhase, setSelectedPhase] = useState(null)
   const [isClarifyOpen, setIsClarifyOpen] = useState(false)
+  // Session-only: dismissed banner stays gone until the page reloads.
+  const [isHookBannerDismissed, setIsHookBannerDismissed] = useState(false)
 
   const handleCellClick = useCallback((phaseName) => {
     setSelectedPhase((prev) => (prev === phaseName ? null : phaseName))
@@ -356,6 +405,9 @@ export default function SddDashboard({
 
   return (
     <div className="sdd-dashboard" data-testid="sdd-dashboard">
+      {!isHookInstalled && !isHookBannerDismissed && (
+        <HookInstallBanner onDismiss={() => setIsHookBannerDismissed(true)} />
+      )}
       <DashboardHeader featureName={featureName} phases={phases} />
 
       <div className="sdd-dashboard__rail-wrapper">

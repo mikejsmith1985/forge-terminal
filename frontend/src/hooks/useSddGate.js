@@ -11,6 +11,9 @@ const SDD_PHASE_STATUS_TYPE = 'SDD_PHASE_STATUS'
 const DECISION_ENDPOINT = '/api/sdd/decision'
 // Page-reload recovery endpoint (FR-012: one-time fetch, never polled).
 const STATUS_ENDPOINT = '/api/sdd/status'
+// Hook installation check — fetched once on mount so the dashboard can prompt the developer
+// to run install-sdd-hook.ps1 when the enforcement hook is absent (specs/008 FR-003).
+const HOOK_STATUS_ENDPOINT = '/api/sdd/hook-status'
 
 /**
  * useSddGate tracks the currently open SDD phase gate for `activeSessionId`.
@@ -43,6 +46,20 @@ export function useSddGate({ activeSessionId }) {
   const [featureName, setFeatureName] = useState('')
   // Accumulated gate summaries keyed by phase name. Ref to avoid extra re-renders.
   const phaseSummaries = useRef({})
+  // Default true: avoids a flash-of-banner while the fetch is in flight. The banner only
+  // appears after the endpoint confirms the hook is absent.
+  const [isHookInstalled, setIsHookInstalled] = useState(true)
+
+  // One-time mount check: is the PreToolUse enforcement hook installed? Best-effort —
+  // network failures leave isHookInstalled=true so the banner never nags on offline builds.
+  useEffect(() => {
+    fetch(HOOK_STATUS_ENDPOINT, { credentials: 'same-origin' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data !== null && data.isInstalled === false) setIsHookInstalled(false)
+      })
+      .catch(() => {}) // best-effort; never surface a network error for this check
+  }, [])
 
   // Single best-effort fetch on mount for page-reload recovery (FR-012). The
   // WebSocket SDD_PHASE_STATUS events maintain live state thereafter.
@@ -160,6 +177,7 @@ export function useSddGate({ activeSessionId }) {
     phaseStatuses,
     featureName,
     phaseSummaries,
+    isHookInstalled,
     handleWsMessage,
     submitDecision,
     dismiss,
