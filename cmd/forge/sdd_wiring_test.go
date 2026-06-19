@@ -185,6 +185,52 @@ func TestBuildPhaseStatuses_PhaseRejected_PipelineStopped(t *testing.T) {
 	}
 }
 
+func TestBuildPhaseStatuses_ArtifactPaths_AbsoluteWhenFeatureDirSet(t *testing.T) {
+	pipeline := newTestPipeline(t, "artifact-path-sess")
+	featureDir := filepath.Join(t.TempDir(), "specs", "007-my-feature")
+	pipeline.orchestrator.SetFeatureDir(featureDir)
+
+	statuses := buildPhaseStatuses(pipeline)
+
+	// Phases that produce a file artifact must carry the absolute path so the
+	// frontend can open the file without resolving against the working directory.
+	wantArtifactPaths := map[sdd.PhaseName]string{
+		sdd.PhaseSpecify:       filepath.Join(featureDir, "spec.md"),
+		sdd.PhaseClarify:       filepath.Join(featureDir, "spec.md"),
+		sdd.PhasePlan:          filepath.Join(featureDir, "plan.md"),
+		sdd.PhaseTasksGenerate: filepath.Join(featureDir, "tasks.md"),
+		sdd.PhaseValidate:      "",
+		sdd.PhaseImplement:     "",
+	}
+	for _, entry := range statuses {
+		want, isDefined := wantArtifactPaths[entry.Phase]
+		if !isDefined {
+			t.Errorf("unexpected phase %s in statuses", entry.Phase)
+			continue
+		}
+		if entry.ArtifactPath != want {
+			t.Errorf("phase %s: ArtifactPath = %q, want %q", entry.Phase, entry.ArtifactPath, want)
+		}
+	}
+}
+
+func TestBuildPhaseStatuses_ArtifactPaths_EmptyForNoArtifactPhases(t *testing.T) {
+	pipeline := newTestPipeline(t, "no-artifact-sess")
+	pipeline.orchestrator.SetFeatureDir(filepath.Join(t.TempDir(), "specs", "007-no-art"))
+
+	statuses := buildPhaseStatuses(pipeline)
+
+	noArtifactPhases := map[sdd.PhaseName]bool{
+		sdd.PhaseValidate:  true,
+		sdd.PhaseImplement: true,
+	}
+	for _, entry := range statuses {
+		if noArtifactPhases[entry.Phase] && entry.ArtifactPath != "" {
+			t.Errorf("phase %s: expected empty ArtifactPath for no-artifact phase, got %q", entry.Phase, entry.ArtifactPath)
+		}
+	}
+}
+
 // --- end T016 ---
 
 // --- T005: derivePhaseDisplayStatus run-count tests (Red until T006 adds runCount param) ---
