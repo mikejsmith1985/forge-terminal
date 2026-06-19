@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.19.2] - 2026-06-18
+
+---
+
+## [v7.19.2] - 2026-06-18
+
 ### Fixed
 - **SDD Dashboard — artifact "File not found" on click** — `buildPhaseStatuses` sent `ArtifactPath` as a feature-relative filename (e.g. `"spec.md"`) instead of the absolute path; the frontend resolved it against the working directory and failed when the spec kit writes artifacts to a subdirectory (`specs/<feature>/spec.md`); `ArtifactPath` is now `filepath.Join(state.FeatureDir, phase.ExpectedArtifact)`, matching the path construction already used by the `SDD_PHASE_GATE` broadcaster; phases with no artifact (Validate, Implement) continue to emit an empty string
 
