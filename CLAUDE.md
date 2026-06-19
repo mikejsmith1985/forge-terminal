@@ -9,5 +9,5 @@
 @.specify/memory/constitution.md
 
 <!-- SPECKIT START -->
-Active feature plan: @specs/007-sdd-gate-reconciliation/plan.md
+Active feature spec: @specs/008-sdd-real-enforcement/spec.md
 <!-- SPECKIT END -->

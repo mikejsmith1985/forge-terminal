@@ -190,3 +190,84 @@ func TestHandleSddStatus_MissingSessionId_Returns400(t *testing.T) {
 }
 
 // --- end T017 ---
+
+// ── handleSddGateCheck tests (specs/008 US1 gate enforcement endpoint) ────────
+
+func getGateCheck(t *testing.T) *httptest.ResponseRecorder {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	handleSddGateCheck(recorder, httptest.NewRequest(http.MethodGet, "/api/sdd/gate-check", nil))
+	return recorder
+}
+
+func TestHandleSddGateCheck_NoPipelinesRegistered_ReturnsGateNotOpen(t *testing.T) {
+	recorder := getGateCheck(t)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["isGateOpen"] != false {
+		t.Errorf("isGateOpen = %v, want false when no pipelines registered", body["isGateOpen"])
+	}
+}
+
+func TestHandleSddGateCheck_OpenGateReturnsPhaseAndTrue(t *testing.T) {
+	bindTestPipeline(t, "sess-gate-open", sdd.PhasePlan)
+
+	recorder := getGateCheck(t)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["isGateOpen"] != true {
+		t.Errorf("isGateOpen = %v, want true when a pipeline awaits a decision", body["isGateOpen"])
+	}
+	if body["phase"] != "plan" {
+		t.Errorf("phase = %v, want plan", body["phase"])
+	}
+}
+
+func TestHandleSddGateCheck_MethodNotAllowed(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	handleSddGateCheck(recorder, httptest.NewRequest(http.MethodPost, "/api/sdd/gate-check", nil))
+
+	if recorder.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want 405 for POST on gate-check", recorder.Code)
+	}
+}
+
+func TestHandleSddGateCheck_GateClosedAfterApproveReturnsNotOpen(t *testing.T) {
+	sessionID := "sess-gate-then-approve"
+	orchestrator := bindTestPipeline(t, sessionID, sdd.PhasePlan)
+
+	// Verify gate is open before the decision.
+	recorderBefore := getGateCheck(t)
+	var beforeBody map[string]any
+	_ = json.NewDecoder(recorderBefore.Body).Decode(&beforeBody)
+	if beforeBody["isGateOpen"] != true {
+		t.Fatal("pre-condition failed: gate should be open before approve")
+	}
+
+	// Submit the decision.
+	if _, err := orchestrator.SubmitDecision(sdd.Decision{Phase: sdd.PhasePlan, Action: sdd.ActionApprove}); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+
+	// Gate must be closed now.
+	recorderAfter := getGateCheck(t)
+	var afterBody map[string]any
+	if err := json.NewDecoder(recorderAfter.Body).Decode(&afterBody); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if afterBody["isGateOpen"] != false {
+		t.Errorf("isGateOpen = %v, want false after approve", afterBody["isGateOpen"])
+	}
+}

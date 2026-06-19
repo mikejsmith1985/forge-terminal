@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { API_CONFIG } from '../config'
+import { createWebSocketManager } from '../utils/websocketManager'
 
 // Hook for making API calls with automatic error handling and loading states
 export const useAPI = () => {
@@ -53,66 +54,75 @@ export const useAPI = () => {
   return { apiCall, loading, error, readFile, writeFile }
 }
 
-// Hook for WebSocket connections
+// Maximum reconnect attempts after which the UI shows the manual reconnect button.
+// 50 attempts at exponential backoff (500ms → 10s) covers ~8 minutes of outage,
+// which is more than enough for an app restart or update to complete.
+const maxReconnectAttempts = 50
+
+// Hook for WebSocket connections with automatic exponential-backoff reconnection.
+// Uses the existing WebSocketReconnectionManager so no reconnect logic is duplicated here.
+// The connection survives app updates, crashes, and network blips without any user action.
 export const useWebSocket = (url, onMessage, onOpen, onClose, onError) => {
   const [connected, setConnected] = useState(false)
-  const [ws, setWS] = useState(null)
+  const managerRef = useRef(null)
 
   const connect = useCallback(() => {
-    try {
-      const wsURL = url || API_CONFIG.getWSURL()
-      console.log('[WebSocket] Connecting to:', wsURL)
-      
-      const socket = new WebSocket(wsURL)
-      
-      socket.onopen = () => {
+    const wsURL = url || API_CONFIG.getWSURL()
+    console.log('[WebSocket] Connecting to:', wsURL)
+
+    const manager = createWebSocketManager(wsURL, {
+      maxAttempts:       maxReconnectAttempts,
+      initialDelay:      500,
+      maxDelay:          10000,
+      backoffMultiplier: 2,
+      onConnect: () => {
         console.log('[WebSocket] Connected')
         setConnected(true)
         onOpen && onOpen()
-      }
-
-      socket.onmessage = (event) => {
-        onMessage && onMessage(event.data)
-      }
-
-      socket.onclose = () => {
-        console.log('[WebSocket] Disconnected')
+      },
+      onDisconnect: () => {
+        console.log('[WebSocket] Disconnected — reconnecting…')
         setConnected(false)
         onClose && onClose()
-      }
-
-      socket.onerror = (error) => {
-        console.error('[WebSocket] Error:', error)
+      },
+      onError: (errorDetails) => {
+        console.error('[WebSocket] Error:', errorDetails)
         setConnected(false)
-        onError && onError(error)
-      }
+        onError && onError(errorDetails)
+      },
+      onReconnecting: ({ attemptNumber, nextDelayMs }) => {
+        console.log(`[WebSocket] Reconnect attempt ${attemptNumber}/${maxReconnectAttempts} in ${nextDelayMs}ms`)
+      },
+      onMessage: (data) => {
+        onMessage && onMessage(data)
+      },
+    })
 
-      setWS(socket)
-      return socket
-    } catch (err) {
-      console.error('[WebSocket] Failed to connect:', err)
-      onError && onError(err)
-    }
+    managerRef.current = manager
+    manager.connect().catch((connectError) => {
+      console.warn('[WebSocket] Initial connect failed — will retry automatically:', connectError)
+    })
+
+    return manager
   }, [url, onMessage, onOpen, onClose, onError])
 
   const disconnect = useCallback(() => {
-    if (ws) {
-      ws.close()
-      setWS(null)
-    }
-  }, [ws])
+    managerRef.current?.close()
+    managerRef.current = null
+    setConnected(false)
+  }, [])
 
   const send = useCallback((data) => {
-    if (ws && connected) {
-      ws.send(data)
+    if (managerRef.current && connected) {
+      managerRef.current.send(data)
     } else {
       console.warn('[WebSocket] Not connected, cannot send:', data)
     }
-  }, [ws, connected])
+  }, [connected])
 
   return {
     connected,
-    ws,
+    ws: managerRef.current,
     connect,
     disconnect,
     send,

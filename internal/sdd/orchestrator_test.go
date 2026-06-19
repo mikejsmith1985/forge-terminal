@@ -3,6 +3,8 @@
 package sdd
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -334,5 +336,148 @@ func TestSubmitDecision_RecordsHistory(t *testing.T) {
 	}
 	if len(records) != 1 || records[0].Action != ActionApprove {
 		t.Fatalf("history = %+v, want one approve record", records)
+	}
+}
+
+// ── ReconcileFromDisk tests (specs/008 US2) ───────────────────────────────────
+
+func TestReconcileFromDisk_AdvancesPastExistingArtifacts(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	featureDir := t.TempDir()
+
+	// spec.md and plan.md exist on disk; tasks.md does not.
+	writeArtifact(t, featureDir, "spec.md", "# spec")
+	writeArtifact(t, featureDir, "plan.md", "# plan")
+
+	orchestrator.ReconcileFromDisk(featureDir)
+
+	// Clarify shares spec.md with Specify so the scan advances through both;
+	// it then finds plan.md and stops at tasks.md (missing).
+	state := orchestrator.State()
+	if state.CurrentPhase != PhasePlan {
+		t.Errorf("CurrentPhase = %q, want %q (plan.md exists, tasks.md does not)", state.CurrentPhase, PhasePlan)
+	}
+}
+
+func TestReconcileFromDisk_StopsAtFirstMissingArtifact(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	featureDir := t.TempDir()
+
+	// Only spec.md; plan.md is absent, so scan must stop at Clarify (order 2).
+	writeArtifact(t, featureDir, "spec.md", "# spec")
+
+	orchestrator.ReconcileFromDisk(featureDir)
+
+	state := orchestrator.State()
+	if state.CurrentPhase != PhaseClarify {
+		t.Errorf("CurrentPhase = %q, want %q (stopped at first gap)", state.CurrentPhase, PhaseClarify)
+	}
+}
+
+func TestReconcileFromDisk_IsIdempotent(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	featureDir := t.TempDir()
+	writeArtifact(t, featureDir, "spec.md", "# spec")
+	writeArtifact(t, featureDir, "plan.md", "# plan")
+
+	for iteration := 0; iteration < 10; iteration++ {
+		orchestrator.ReconcileFromDisk(featureDir)
+	}
+
+	state := orchestrator.State()
+	if state.CurrentPhase != PhasePlan {
+		t.Errorf("CurrentPhase = %q after 10 reconciliations, want plan", state.CurrentPhase)
+	}
+}
+
+func TestReconcileFromDisk_NeverRewindsCurrentPhase(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	featureDir := t.TempDir()
+	writeArtifact(t, featureDir, "spec.md", "# spec")
+	writeArtifact(t, featureDir, "plan.md", "# plan")
+
+	orchestrator.ReconcileFromDisk(featureDir)
+	// Delete plan.md — the orchestrator must NOT rewind to Clarify.
+	if err := os.Remove(filepath.Join(featureDir, "plan.md")); err != nil {
+		t.Fatalf("remove plan.md: %v", err)
+	}
+	orchestrator.ReconcileFromDisk(featureDir)
+
+	state := orchestrator.State()
+	if state.CurrentPhase != PhasePlan {
+		t.Errorf("CurrentPhase rewound to %q, want plan (reconcile must never rewind)", state.CurrentPhase)
+	}
+}
+
+func TestReconcileFromDisk_SkipsWhenGateIsOpen(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	featureDir := t.TempDir()
+	writeArtifact(t, featureDir, "spec.md", "# spec")
+	writeArtifact(t, featureDir, "plan.md", "# plan")
+	writeArtifact(t, featureDir, "tasks.md", "# tasks")
+
+	// Open a gate on Specify so status becomes AwaitingDecision.
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+	beforePhase := orchestrator.State().CurrentPhase
+
+	orchestrator.ReconcileFromDisk(featureDir)
+
+	// Reconcile must leave the gate untouched.
+	state := orchestrator.State()
+	if state.Status != StatusAwaitingDecision {
+		t.Errorf("status = %q, want awaiting-decision (gate must remain open)", state.Status)
+	}
+	if state.CurrentPhase != beforePhase {
+		t.Errorf("CurrentPhase changed from %q to %q while gate was open", beforePhase, state.CurrentPhase)
+	}
+}
+
+func TestReconcileFromDisk_SkipsWhenPhaseIsRunning(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	featureDir := t.TempDir()
+	writeArtifact(t, featureDir, "spec.md", "# spec")
+	writeArtifact(t, featureDir, "plan.md", "# plan")
+
+	// Simulate a running phase (artifact detected but PTY not yet quiet).
+	orchestrator.MarkPhaseRunning(PhaseSpecify)
+
+	orchestrator.ReconcileFromDisk(featureDir)
+
+	// Must not advance while the phase is actively running.
+	state := orchestrator.State()
+	if state.Status != StatusRunning {
+		t.Errorf("status = %q, want running", state.Status)
+	}
+}
+
+func TestReconcileFromDisk_EmptyFeatureDirIsNoOp(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+
+	orchestrator.ReconcileFromDisk("")
+
+	state := orchestrator.State()
+	if state.CurrentPhase != "" {
+		t.Errorf("CurrentPhase = %q, want empty (no-op on empty featureDir)", state.CurrentPhase)
+	}
+}
+
+func TestSubmitDecision_ApproveReconcilesBulkPhases(t *testing.T) {
+	// Gate is open on Specify; plan.md and tasks.md already exist. Approving once
+	// should jump CurrentPhase to Tasks (the artifact frontier), not just Clarify.
+	orchestrator, _, _ := newTestOrchestrator(t)
+	featureDir := t.TempDir()
+	writeArtifact(t, featureDir, "spec.md", "# spec")
+	writeArtifact(t, featureDir, "plan.md", "# plan")
+	writeArtifact(t, featureDir, "tasks.md", "# tasks")
+	orchestrator.SetFeatureDir(featureDir)
+
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+	if _, err := orchestrator.SubmitDecision(Decision{Phase: PhaseSpecify, Action: ActionApprove}); err != nil {
+		t.Fatalf("approve specify: %v", err)
+	}
+
+	state := orchestrator.State()
+	if state.CurrentPhase != PhaseTasksGenerate {
+		t.Errorf("CurrentPhase = %q, want tasks (bulk-advance to artifact frontier)", state.CurrentPhase)
 	}
 }

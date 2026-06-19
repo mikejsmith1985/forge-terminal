@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -125,6 +127,50 @@ func (o *Orchestrator) MarkPhaseRunning(phase PhaseName) bool {
 	return true
 }
 
+// ReconcileFromDisk forward-scans the phase table and advances CurrentPhase to the highest
+// phase whose expected artifact exists on disk. It stops at the first missing artifact so that
+// only a contiguous prefix of completed phases is recognised. The method is idempotent and
+// never rewinds CurrentPhase — it can be called on every broadcast cycle without risk.
+//
+// Phases with no ExpectedArtifact (Validate, Implement) are skipped; PTY-quiet is their
+// completion signal, not file existence, so os.Stat cannot prove they completed.
+//
+// ReconcileFromDisk is a no-op when the pipeline is running or awaiting a decision so that
+// an in-progress phase or an open gate is never silently overwritten.
+func (o *Orchestrator) ReconcileFromDisk(featureDir string) {
+	if featureDir == "" {
+		return
+	}
+
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	// Don't advance state while a phase is actively running or a gate is open — either
+	// condition means the state machine is mid-transition and must not be disrupted.
+	if o.state.Status == StatusRunning || o.state.Status == StatusAwaitingDecision {
+		return
+	}
+
+	currentOrder := 0
+	if existing, ok := PhaseByName(o.state.CurrentPhase); ok {
+		currentOrder = existing.Order
+	}
+
+	for _, phase := range phaseTable {
+		if phase.ExpectedArtifact == "" {
+			continue // Validate and Implement have no file artifact to check
+		}
+		artifactPath := filepath.Join(featureDir, phase.ExpectedArtifact)
+		if _, statErr := os.Stat(artifactPath); statErr != nil {
+			break // stop at the first gap — later phases cannot be complete
+		}
+		if phase.Order > currentOrder {
+			o.state.CurrentPhase = phase.Name
+			currentOrder = phase.Order
+		}
+	}
+}
+
 // SetFeatureDir points the orchestrator at the feature directory whose artifacts it should
 // summarize. This supports eager-bind/lazy-watch: a pipeline can be bound to a repo before any
 // feature exists, then have its feature directory set the moment the watcher detects the first
@@ -192,10 +238,24 @@ func (o *Orchestrator) presentCard(phase PhaseName, _ string) {
 // SubmitDecision validates and applies a decision, then performs the side effects (record
 // to history, inject the next command) outside the lock so a blocking injection cannot stall
 // the state machine.
+//
+// On Approve, ReconcileFromDisk is called synchronously after the state advance to jump
+// past any phases whose artifacts already exist on disk, giving bulk-approve semantics:
+// one click resolves all intermediate completed phases without emitting intermediate gate
+// cards. The caller's broadcast fires once after return, capturing the final state.
 func (o *Orchestrator) SubmitDecision(decision Decision) (PipelineStatus, error) {
 	command, sessionID, nextPhase, status, err := o.planDecision(decision)
 	if err != nil {
 		return "", err
+	}
+
+	// Jump to the artifact frontier so phases the agent already completed are not
+	// presented as individual gates the developer must click through one by one.
+	if decision.Action == ActionApprove {
+		featureDir := o.State().FeatureDir
+		if featureDir != "" {
+			o.ReconcileFromDisk(featureDir)
+		}
 	}
 
 	o.record(decision)
