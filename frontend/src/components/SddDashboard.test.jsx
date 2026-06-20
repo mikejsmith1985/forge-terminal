@@ -35,6 +35,7 @@ function DashboardFixture(props) {
       card={props.card ?? null}
       decisionError={props.decisionError ?? null}
       isSubmitting={props.isSubmitting ?? false}
+      isHookInstalled={props.isHookInstalled ?? true}
       onAction={props.onAction ?? vi.fn()}
       onDismiss={props.onDismiss ?? vi.fn()}
       onFileOpen={props.onFileOpen ?? vi.fn()}
@@ -325,5 +326,40 @@ describe('ClarifyModal', () => {
     rerender(<ClarifyModal isOpen={false} onConfirm={vi.fn()} onCancel={vi.fn()} />)
 
     expect(HTMLDialogElement.prototype.close).toHaveBeenCalled()
+  })
+})
+
+// ── HookInstallBanner tests ───────────────────────────────────────────────────
+
+describe('HookInstallBanner', () => {
+  it('is hidden when isHookInstalled=true (default)', () => {
+    render(<DashboardFixture phases={[]} isHookInstalled={true} />)
+    expect(screen.queryByTestId('hook-install-banner')).toBeNull()
+  })
+
+  it('is visible when isHookInstalled=false', () => {
+    render(<DashboardFixture phases={[]} isHookInstalled={false} />)
+    expect(screen.getByTestId('hook-install-banner')).toBeTruthy()
+    expect(screen.getByText(/install-sdd-hook\.ps1/i)).toBeTruthy()
+  })
+
+  it('disappears after the dismiss button is clicked', () => {
+    render(<DashboardFixture phases={[]} isHookInstalled={false} />)
+    const dismissBtn = screen.getByLabelText('Dismiss hook install banner')
+    fireEvent.click(dismissBtn)
+    expect(screen.queryByTestId('hook-install-banner')).toBeNull()
+  })
+
+  it('copy button text resets to "Copy command" after 2s', async () => {
+    // Mock clipboard to avoid jsdom permission errors.
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+
+    render(<DashboardFixture phases={[]} isHookInstalled={false} />)
+    const copyBtn = screen.getByText('Copy command')
+    fireEvent.click(copyBtn)
+
+    await waitFor(() => expect(screen.getByText('Copied!')).toBeTruthy())
+    expect(writeText).toHaveBeenCalledWith('.\\scripts\\install-sdd-hook.ps1')
   })
 })

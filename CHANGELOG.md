@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SDD gate enforcement — real, not advisory** — A `PreToolUse` Claude Code hook (`scripts/sdd-gate-check.ps1`, wired via `.claude/settings.json`) intercepts every speckit Skill invocation before it executes and calls `GET /api/sdd/gate-check`; if any pipeline has an open gate the hook exits non-zero, blocking the agent and showing a clear message naming the open phase and instructing the developer to approve, reject, or clarify in the dashboard before the next phase can run (specs/008 FR-001, FR-002, FR-003)
+- **`/api/sdd/gate-check` endpoint** — New `GET` endpoint that returns `{"isGateOpen": bool, "phase": "..."}` without requiring a session ID; iterated over all active pipelines and returns true on the first one in `StatusAwaitingDecision`; called by the enforcement hook and testable independently
+- **`/api/sdd/hook-status` endpoint + in-app install prompt** — New `GET` endpoint checks whether `sdd-gate-check.ps1` is referenced in `.claude/settings.json`; `useSddGate` fetches this once on mount and passes `isHookInstalled` to `SddDashboard`, which shows a dismissible amber banner with a copy-to-clipboard install command when the hook is absent — no silent failures for new clones
+- **`ReconcileFromDisk` on Orchestrator** — New method that forward-scans the phase table and advances `CurrentPhase` to the highest phase whose artifact file exists on disk; idempotent, never rewinds, skips while a gate is open or a phase is running; called before every status broadcast and after every Approve to give bulk-approve semantics (one click resolves all intermediate completed phases)
+
+### Fixed
+- **SDD dashboard — phases show true disk state** — `buildPhaseStatuses` now checks `os.Stat` for phases beyond the orchestrator's current position; if the artifact exists on disk the phase shows as complete regardless of orchestrator event history, preventing permanent "pending" display caused by missed watcher events
+- **WebSocket reconnection after app update** — `useWebSocket` hook now uses the existing `WebSocketReconnectionManager` (which was fully implemented but never wired in) with 50 attempts and exponential backoff from 500ms to 10s; the frontend reconnects automatically after an update restarts the backend, requiring no user action
+
 ## [7.19.4] - 2026-06-19
 
 ---

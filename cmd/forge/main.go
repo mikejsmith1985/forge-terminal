@@ -615,10 +615,16 @@ func main() {
 	http.HandleFunc("/api/workflow/watch/poll", WrapWithMiddleware(handleWorkflowWatchPoll))
 	http.HandleFunc("/api/workflow/watch/stop", WrapWithMiddleware(handleWorkflowWatchStop))
 
-	// ── SDD phase orchestrator (specs/003 + 004) — HITL decision + dashboard endpoints ──
+	// ── SDD phase orchestrator (specs/003 + 004 + 008) — HITL decision, dashboard, enforcement ──
 	http.HandleFunc("/api/sdd/bind", WrapWithMiddleware(handleSddBind))
 	http.HandleFunc("/api/sdd/decision", WrapWithMiddleware(handleSddDecision))
 	http.HandleFunc("/api/sdd/status", WrapWithMiddleware(handleSddStatus))
+	// gate-check is polled by the PreToolUse hook before each speckit Skill run to enforce that
+	// the developer approves each phase before the agent advances (specs/008-sdd-real-enforcement).
+	http.HandleFunc("/api/sdd/gate-check", WrapWithMiddleware(handleSddGateCheck))
+	// hook-status is called by the dashboard on mount so it can show an install prompt when
+	// the gate enforcement hook is absent from .claude/settings.json (specs/008 FR-003).
+	http.HandleFunc("/api/sdd/hook-status", WrapWithMiddleware(handleSddHookStatus))
 
 	// ── MCP Server routes (own auth, no standard middleware) ──────────────
 	// Must be initialised AFTER termHandler is set (line ~282 above).

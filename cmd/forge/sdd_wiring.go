@@ -349,9 +349,12 @@ type sddPhaseStatusEnvelope struct {
 	Phases    []sdd.PhaseStatusEntry `json:"phases"`
 }
 
-// buildPhaseStatuses derives the display status for every pipeline phase from the
-// orchestrator's live state. It reads no history file — status is inferred from
-// the current phase, the pipeline status, the phase order, and the run count.
+// buildPhaseStatuses derives the display status for every pipeline phase. Orchestrator
+// state is the primary source; disk truth overrides it for phases BEYOND the current
+// position whose artifact file already exists — this prevents stale "pending" display
+// when the watcher missed a completion event or the orchestrator's in-memory state lags
+// the actual filesystem. Phases at or before the current position keep their
+// orchestrator-derived status so open gates are never silently shown as complete.
 func buildPhaseStatuses(pipeline *sddPipeline) []sdd.PhaseStatusEntry {
 	state := pipeline.orchestrator.State()
 
@@ -367,6 +370,17 @@ func buildPhaseStatuses(pipeline *sddPipeline) []sdd.PhaseStatusEntry {
 	for _, phase := range phases {
 		runCount := pipeline.orchestrator.PhaseRunCount(phase.Name)
 		displayStatus := derivePhaseDisplayStatus(phase.Order, currentOrder, state.Status, runCount)
+
+		// Disk truth: a phase beyond the orchestrator's current position shows as complete
+		// when its artifact already exists on disk. The guard `phase.Order > currentOrder`
+		// ensures we never override an open gate or the currently-running phase.
+		if phase.ExpectedArtifact != "" && state.FeatureDir != "" && phase.Order > currentOrder {
+			artifactAbsPath := filepath.Join(state.FeatureDir, phase.ExpectedArtifact)
+			if _, statErr := os.Stat(artifactAbsPath); statErr == nil {
+				displayStatus = sdd.PhaseDisplayComplete
+			}
+		}
+
 		// Build the absolute artifact path so the frontend can open the file
 		// directly. Phases with no artifact (Validate, Implement) keep an empty
 		// string; filepath.Join(dir, "") would return dir, not a file.
@@ -431,12 +445,18 @@ func derivePhaseDisplayStatus(phaseOrder, currentOrder int, pipelineStatus sdd.P
 
 // broadcastPhaseStatus pushes the full phase status array to all WebSocket clients
 // in the session. Called after every HandlePhaseComplete and after every decision.
+// ReconcileFromDisk runs first so the broadcast always reflects disk reality even when
+// the file-system watcher missed a completion event earlier in the session.
 func broadcastPhaseStatus(sessionID string) {
 	pipeline, ok := sddPipelineFor(sessionID)
 	if !ok || termHandler == nil {
 		return
 	}
 	state := pipeline.orchestrator.State()
+	if state.FeatureDir != "" {
+		pipeline.orchestrator.ReconcileFromDisk(state.FeatureDir)
+		state = pipeline.orchestrator.State() // re-read after potential advance
+	}
 	termHandler.BroadcastJSONToSession(sessionID, sddPhaseStatusEnvelope{
 		Type:      "SDD_PHASE_STATUS",
 		SessionID: sessionID,

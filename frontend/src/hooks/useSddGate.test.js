@@ -88,8 +88,8 @@ describe('useSddGate', () => {
       await result.current.submitDecision('approve')
     })
 
-    // mount fires a recovery fetch to /api/sdd/status (FR-012), so total is 2
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    // mount fires two fetches: hook-status check (specs/008) + /api/sdd/status recovery (FR-012); total is 3
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
     const decisionCall = fetchSpy.mock.calls.find(([url]) => url === '/api/sdd/decision')
     const [calledUrl, calledOptions] = decisionCall
     expect(calledUrl).toBe('/api/sdd/decision')
@@ -187,9 +187,10 @@ describe('useSddGate', () => {
 
   it('clears decisionError and the card on a successful decision', async () => {
     // First fail to populate decisionError, then succeed.
-    // mockResolvedValueOnce order: (1) mount recovery fetch, (2) first decision → 503, (3) second decision → ok
+    // mockResolvedValueOnce order: (1) hook-status check, (2) mount recovery fetch, (3) first decision → 503, (4) second decision → ok
     const fetchSpy = vi
       .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: true })               // hook-status check (specs/008) — best-effort on mount
       .mockResolvedValueOnce({ ok: false })              // mount-time /api/sdd/status recovery
       .mockResolvedValueOnce({ ok: false, status: 503 }) // first submitDecision → error
       .mockResolvedValueOnce({ ok: true })               // second submitDecision → success
@@ -209,7 +210,7 @@ describe('useSddGate', () => {
       await result.current.submitDecision('approve')
     })
 
-    expect(fetchSpy).toHaveBeenCalledTimes(3) // recovery + two decisions
+    expect(fetchSpy).toHaveBeenCalledTimes(4) // hook-status + recovery + two decisions
     await waitFor(() => expect(result.current.isCardOpen).toBe(false))
     expect(result.current.card).toBeNull()
     expect(result.current.decisionError).toBeNull()
@@ -295,10 +296,12 @@ describe('useSddGate — pendingCard recovery', () => {
       summary: { headline: 'Spec done', producedItems: ['spec.md'], flags: [] },
       actions: ['approve', 'reject', 'clarify'],
     }
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ phases: [], feature: '', pendingCard }),
-    })
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false }) // hook-status check (specs/008) — best-effort, result ignored
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ phases: [], feature: '', pendingCard }),
+      })
 
     const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
 

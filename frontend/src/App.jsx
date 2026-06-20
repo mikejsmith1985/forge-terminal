@@ -2209,6 +2209,7 @@ function App() {
           card={sddGate.card}
           decisionError={sddGate.decisionError}
           isSubmitting={sddGate.isSubmitting}
+          isHookInstalled={sddGate.isHookInstalled}
           onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
           onDismiss={sddGate.dismiss}
           onFileOpen={handleFileOpen}
