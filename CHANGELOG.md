@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.19.5] - 2026-06-20
+
+---
+
+## [v7.19.5] - 2026-06-20
+
 ### Added
 - **SDD gate enforcement — real, not advisory** — A `PreToolUse` Claude Code hook (`scripts/sdd-gate-check.ps1`, wired via `.claude/settings.json`) intercepts every speckit Skill invocation before it executes and calls `GET /api/sdd/gate-check`; if any pipeline has an open gate the hook exits non-zero, blocking the agent and showing a clear message naming the open phase and instructing the developer to approve, reject, or clarify in the dashboard before the next phase can run (specs/008 FR-001, FR-002, FR-003)
 - **`/api/sdd/gate-check` endpoint** — New `GET` endpoint that returns `{"isGateOpen": bool, "phase": "..."}` without requiring a session ID; iterated over all active pipelines and returns true on the first one in `StatusAwaitingDecision`; called by the enforcement hook and testable independently
