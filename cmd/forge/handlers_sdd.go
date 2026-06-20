@@ -162,15 +162,41 @@ func handleSddHookStatus(w http.ResponseWriter, r *http.Request) {
 	writeSddJSON(w, http.StatusOK, map[string]any{"isInstalled": isSddHookInstalled()})
 }
 
-// isSddHookInstalled checks .claude/settings.json for the SDD gate enforcement hook command.
-// A substring match on the raw file bytes is intentional — it avoids a full JSON parse while
-// remaining robust to cosmetic whitespace differences.
+// isSddHookInstalled checks both the project-level .claude/settings.json and the global
+// ~/.claude/settings.json for the SDD gate enforcement hook command. Either location is
+// sufficient — the hook fires globally when installed in the user directory, which is the
+// recommended install path so it covers all repositories.
 func isSddHookInstalled() bool {
-	data, readErr := os.ReadFile(".claude/settings.json")
-	if readErr != nil {
-		return false
+	return isSddHookInstalledFromPaths(sddHookSettingsPaths())
+}
+
+// isSddHookInstalledFromPaths checks the supplied list of settings file paths for the
+// SDD gate enforcement hook. A substring match on raw bytes is intentional: it avoids a
+// full JSON parse while being robust to cosmetic whitespace differences in the file.
+// Separated from isSddHookInstalled so tests can inject controlled paths without touching
+// the real user home directory.
+func isSddHookInstalledFromPaths(settingsPaths []string) bool {
+	for _, settingsPath := range settingsPaths {
+		rawBytes, readErr := os.ReadFile(settingsPath)
+		if readErr != nil {
+			continue
+		}
+		if strings.Contains(string(rawBytes), sddHookScriptName) {
+			return true
+		}
 	}
-	return strings.Contains(string(data), sddHookScriptName)
+	return false
+}
+
+// sddHookSettingsPaths returns the ordered list of Claude Code settings files to check
+// for the SDD gate enforcement hook. Project-level is checked first; global user-level
+// is the canonical install location when the hook should cover all repositories.
+func sddHookSettingsPaths() []string {
+	paths := []string{filepath.Join(".claude", "settings.json")}
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(homeDir, ".claude", "settings.json"))
+	}
+	return paths
 }
 
 // writeSddDecisionError maps orchestrator errors to precise HTTP status codes.
