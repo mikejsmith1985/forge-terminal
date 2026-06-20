@@ -39,6 +39,7 @@ function DashboardFixture(props) {
       onAction={props.onAction ?? vi.fn()}
       onDismiss={props.onDismiss ?? vi.fn()}
       onFileOpen={props.onFileOpen ?? vi.fn()}
+      onAwaitingPhaseClick={props.onAwaitingPhaseClick ?? vi.fn()}
     />
   )
 }
@@ -135,6 +136,46 @@ describe('SddDashboard', () => {
     render(<DashboardFixture phases={phases} />)
     // The pending cell should have no button role.
     expect(screen.queryByRole('button', { name: /validate/ })).not.toBeInTheDocument()
+  })
+
+  it('awaiting-decision cell is interactive (has role=button)', () => {
+    // A phase with a pending gate must be clickable so the developer can demand-pull
+    // the gate card when the WebSocket event was missed (e.g. after reconnection).
+    const phases = [makePhase({ phase: 'plan', displayStatus: 'awaiting-decision' })]
+    render(<DashboardFixture phases={phases} />)
+    expect(screen.getByRole('button', { name: /plan/ })).toBeInTheDocument()
+  })
+
+  it('clicking an awaiting-decision cell calls onAwaitingPhaseClick', () => {
+    const onAwaitingPhaseClick = vi.fn()
+    render(
+      <DashboardFixture
+        phases={SIX_PHASES}
+        onAwaitingPhaseClick={onAwaitingPhaseClick}
+      />
+    )
+    // plan is the awaiting-decision phase in SIX_PHASES.
+    const planCell = screen.getByRole('button', { name: /plan/ })
+    fireEvent.click(planCell)
+
+    expect(onAwaitingPhaseClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('clicking an awaiting-decision cell does not open the detail strip', () => {
+    // The detail strip shows artifacts for completed phases. Clicking an awaiting
+    // phase should trigger the gate-card demand pull, not open an artifact strip.
+    const onAwaitingPhaseClick = vi.fn()
+    render(
+      <DashboardFixture
+        phases={SIX_PHASES}
+        summaries={{ plan: { headline: 'Plan ready', producedItems: [], flags: [] } }}
+        onAwaitingPhaseClick={onAwaitingPhaseClick}
+      />
+    )
+    const planCell = screen.getByRole('button', { name: /plan/ })
+    fireEvent.click(planCell)
+
+    expect(screen.queryByText('Plan ready')).not.toBeInTheDocument()
   })
 
   // ── Detail strip ─────────────────────────────────────────────────────────

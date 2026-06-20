@@ -2213,6 +2213,7 @@ function App() {
           onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
           onDismiss={sddGate.dismiss}
           onFileOpen={handleFileOpen}
+          onAwaitingPhaseClick={sddGate.fetchPendingGate}
         />
       </div>
       {showEditor && editorFile && (

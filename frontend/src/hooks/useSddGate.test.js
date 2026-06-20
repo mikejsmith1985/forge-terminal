@@ -426,3 +426,78 @@ describe('useSddGate — phaseSummaries (spec-006)', () => {
     expect(result.current.phaseSummaries.current['plan']).toBeUndefined()
   })
 })
+
+// ── fetchPendingGate — demand-pull path (fix: sdd-gate-card-demand-pull) ──────
+// When the developer clicks an awaiting-decision phase cell, the dashboard calls
+// fetchPendingGate() to recover the gate card without waiting for a new WebSocket event.
+
+describe('useSddGate — fetchPendingGate', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('exposes fetchPendingGate as a function', () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+    expect(typeof result.current.fetchPendingGate).toBe('function')
+  })
+
+  it('sets the card when the status endpoint returns a pendingCard', async () => {
+    const pendingCard = {
+      cardId:    'gate-plan-77',
+      sessionId: ACTIVE_SESSION_ID,
+      phase:     'plan',
+      actions:   ['approve', 'reject', 'clarify'],
+    }
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })         // hook-status (mount)
+      .mockResolvedValueOnce({ ok: false })         // status recovery (mount)
+      .mockResolvedValueOnce({                      // fetchPendingGate call
+        ok: true,
+        json: () => Promise.resolve({ pendingCard }),
+      })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    await act(async () => {
+      await result.current.fetchPendingGate()
+    })
+
+    expect(result.current.isCardOpen).toBe(true)
+    expect(result.current.card).toMatchObject({ phase: 'plan', cardId: 'gate-plan-77' })
+  })
+
+  it('leaves card null when the status endpoint returns no pendingCard', async () => {
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })         // hook-status (mount)
+      .mockResolvedValueOnce({ ok: false })         // status recovery (mount)
+      .mockResolvedValueOnce({                      // fetchPendingGate call
+        ok: true,
+        json: () => Promise.resolve({ phases: [], feature: '' }),
+      })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    await act(async () => {
+      await result.current.fetchPendingGate()
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+  })
+
+  it('silently does nothing when the fetch throws', async () => {
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })         // hook-status (mount)
+      .mockResolvedValueOnce({ ok: false })         // status recovery (mount)
+      .mockRejectedValueOnce(new Error('network error')) // fetchPendingGate call
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    // Should not throw.
+    await act(async () => {
+      await result.current.fetchPendingGate()
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+  })
+})
