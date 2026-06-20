@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SDD hook install now targets global `~/.claude/` — works in all repos** — `install-sdd-hook.ps1` previously wrote to the project-level `.claude/settings.json` using a relative path, so the enforcement hook was silently inactive in every repo except `forge-terminal`. The script now copies `sdd-gate-check.ps1` to `~/.claude/scripts/` and registers the hook in `~/.claude/settings.json` with an absolute path, matching the behaviour of all other Forge global skills. The in-app hook-status check (`isSddHookInstalled`) was updated to search both the project-level and global settings files so the install-prompt banner correctly recognises a global install.
+
 ## [7.19.6] - 2026-06-20
 
 ---

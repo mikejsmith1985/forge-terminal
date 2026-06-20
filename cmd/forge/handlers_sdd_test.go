@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -292,19 +294,54 @@ func TestHandleSddHookStatus_MethodNotAllowed(t *testing.T) {
 }
 
 func TestHandleSddHookStatus_AbsentSettingsFile_ReturnsNotInstalled(t *testing.T) {
-	// When .claude/settings.json does not exist, the hook is not installed.
-	// isSddHookInstalled reads relative to CWD; the test runs in cmd/forge/ which
-	// never has .claude/settings.json, so no fixture needed.
-	recorder := getHookStatus(t)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", recorder.Code)
+	// When neither settings file exists (empty path list), the hook is not installed.
+	isInstalled := isSddHookInstalledFromPaths([]string{})
+	if isInstalled {
+		t.Error("isInstalled = true with no settings files, want false")
 	}
-	var body map[string]any
-	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
-		t.Fatalf("decode: %v", err)
+}
+
+func TestIsSddHookInstalledFromPaths_ProjectSettings_Found(t *testing.T) {
+	// A project-level settings file containing the hook script name returns true.
+	settingsDir := t.TempDir()
+	settingsFile := filepath.Join(settingsDir, "settings.json")
+	content := `{"hooks":{"PreToolUse":[{"matcher":"Skill","hooks":[{"type":"command","command":"powershell -File sdd-gate-check.ps1"}]}]}}`
+	if err := os.WriteFile(settingsFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
 	}
-	// isInstalled must be a boolean, not nil / missing.
-	if _, hasBool := body["isInstalled"].(bool); !hasBool {
-		t.Errorf("body[isInstalled] type = %T, want bool; body = %v", body["isInstalled"], body)
+	if !isSddHookInstalledFromPaths([]string{settingsFile}) {
+		t.Error("isInstalled = false with hook present in project settings, want true")
+	}
+}
+
+func TestIsSddHookInstalledFromPaths_GlobalSettings_Found(t *testing.T) {
+	// A global settings file containing the hook script name returns true even when
+	// the project settings file does not contain it.
+	globalDir := t.TempDir()
+	globalFile := filepath.Join(globalDir, "settings.json")
+	content := `{"hooks":{"PreToolUse":[{"matcher":"Skill","hooks":[{"type":"command","command":"C:\\Users\\user\\.claude\\scripts\\sdd-gate-check.ps1"}]}]}}`
+	if err := os.WriteFile(globalFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	missingProjectFile := filepath.Join(globalDir, "nonexistent.json")
+	if !isSddHookInstalledFromPaths([]string{missingProjectFile, globalFile}) {
+		t.Error("isInstalled = false with hook present in global settings, want true")
+	}
+}
+
+func TestIsSddHookInstalledFromPaths_NeitherFile_ReturnsFalse(t *testing.T) {
+	// When both settings files lack the hook script name, isInstalled is false.
+	settingsDir := t.TempDir()
+	projectFile := filepath.Join(settingsDir, "project-settings.json")
+	globalFile := filepath.Join(settingsDir, "global-settings.json")
+	emptyContent := `{"permissions":{}}`
+	if err := os.WriteFile(projectFile, []byte(emptyContent), 0o644); err != nil {
+		t.Fatalf("write project fixture: %v", err)
+	}
+	if err := os.WriteFile(globalFile, []byte(emptyContent), 0o644); err != nil {
+		t.Fatalf("write global fixture: %v", err)
+	}
+	if isSddHookInstalledFromPaths([]string{projectFile, globalFile}) {
+		t.Error("isInstalled = true with hook absent from both settings files, want false")
 	}
 }
