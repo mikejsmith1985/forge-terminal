@@ -123,6 +123,29 @@ export function useSddGate({ activeSessionId }) {
     [activeSessionId]
   )
 
+  // fetchPendingGate is the demand-pull path: when the developer clicks an
+  // awaiting-decision phase cell, the dashboard calls this to recover the gate
+  // card without waiting for a new WebSocket event. This covers the case where
+  // the SDD_PHASE_GATE event was missed (e.g. the connection dropped mid-session
+  // during an update and the card never re-arrived on reconnect).
+  const fetchPendingGate = useCallback(async () => {
+    if (!activeSessionId) return
+    try {
+      const response = await fetch(
+        `${STATUS_ENDPOINT}?sessionId=${encodeURIComponent(activeSessionId)}`,
+        { credentials: 'same-origin' }
+      )
+      if (!response.ok) return
+      const data = await response.json()
+      if (data?.pendingCard) {
+        setCard({ type: 'SDD_PHASE_GATE', ...data.pendingCard })
+      }
+    } catch {
+      // Best-effort: if the backend is unreachable the user will see nothing
+      // change. The next WS reconnect will deliver the card again.
+    }
+  }, [activeSessionId])
+
   // dismiss is the failsafe exit: it clears the card locally with no backend
   // call, so the user can always escape even when the backend is unreachable.
   const dismiss = useCallback(() => {
@@ -179,6 +202,7 @@ export function useSddGate({ activeSessionId }) {
     phaseSummaries,
     isHookInstalled,
     handleWsMessage,
+    fetchPendingGate,
     submitDecision,
     dismiss,
   }

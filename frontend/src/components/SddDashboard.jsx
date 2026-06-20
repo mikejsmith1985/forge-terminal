@@ -82,7 +82,12 @@ function PhaseCell({ entry, isSelected, onClick }) {
   const statusMod = knownStatuses.includes(displayStatus) ? displayStatus : 'unknown'
   const icon = STATUS_ICON[displayStatus] ?? '?'
   const label = STATUS_LABEL[displayStatus] ?? displayStatus
-  const isClickable = displayStatus === 'complete'
+  // awaiting-decision phases are clickable so the developer can demand-pull the
+  // gate card when the WebSocket event was missed (e.g. after reconnection).
+  const isClickable = displayStatus === 'complete' || displayStatus === 'awaiting-decision'
+  const ariaLabel = displayStatus === 'awaiting-decision'
+    ? `${phase} phase — awaiting decision, click to open gate card`
+    : `${phase} phase — ${label}, click to view summary`
 
   return (
     <div
@@ -97,7 +102,7 @@ function PhaseCell({ entry, isSelected, onClick }) {
       tabIndex={isClickable ? 0 : undefined}
       onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick() } : undefined}
       aria-expanded={isClickable ? isSelected : undefined}
-      aria-label={isClickable ? `${phase} phase — ${label}, click to view summary` : undefined}
+      aria-label={isClickable ? ariaLabel : undefined}
     >
       <span className="sdd-dashboard__cell-icon">{icon}</span>
       <span className="sdd-dashboard__cell-name">{phase}</span>
@@ -383,6 +388,10 @@ export default function SddDashboard({
   onAction,
   onDismiss,
   onFileOpen,
+  // Called when the developer clicks a phase in awaiting-decision state.
+  // The parent wires this to useSddGate.fetchPendingGate so the gate card
+  // is demand-pulled from the server without waiting for a new WS event.
+  onAwaitingPhaseClick,
 }) {
   const [selectedPhase, setSelectedPhase] = useState(null)
   const [isClarifyOpen, setIsClarifyOpen] = useState(false)
@@ -390,8 +399,15 @@ export default function SddDashboard({
   const [isHookBannerDismissed, setIsHookBannerDismissed] = useState(false)
 
   const handleCellClick = useCallback((phaseName) => {
+    const phaseEntry = phases.find((p) => p.phase === phaseName)
+    if (phaseEntry?.displayStatus === 'awaiting-decision') {
+      // Demand-pull: fetch the pending gate card from the server rather than
+      // toggling the detail strip, which has no content for a pending gate.
+      onAwaitingPhaseClick?.()
+      return
+    }
     setSelectedPhase((prev) => (prev === phaseName ? null : phaseName))
-  }, [])
+  }, [phases, onAwaitingPhaseClick])
 
   const handleClarifyConfirm = useCallback((steer) => {
     setIsClarifyOpen(false)

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SDD gate card now appears when you click an awaiting-decision phase** — Clicking a phase cell in `awaiting-decision` state demand-pulls the pending gate card from `/api/sdd/status` and opens the Approve/Reject/Clarify bar immediately, without waiting for a new WebSocket event. Previously, if the `SDD_PHASE_GATE` event was missed (e.g. after a reconnect or update), the gate card was gone with no way to recover it by clicking. `awaiting-decision` phase cells are now also styled as interactive buttons so the affordance is visible.
+
 ## [7.19.7] - 2026-06-20
 
 ---
