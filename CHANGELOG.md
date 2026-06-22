@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Per-tab SDD session identity (`FORGE_SESSION_ID`)** — Each terminal session now injects a stable `FORGE_SESSION_ID` (equal to the tab id) into its shell: via `cmd.Env` on Unix and a per-ConPTY write on Windows (never process-wide `os.Setenv`, which could not distinguish concurrent tabs). This is the foundation for scoping SDD phase signals, gate-checks, and dashboard updates to a single session so concurrent pipelines never conflate. Verified by a real two-ConPTY integration test proving each child shell reads its own id with zero cross-session leakage. Phase 2 of `specs/010-sdd-authoritative-state`.
+- **Authoritative SDD phase signals** — New `POST /api/sdd/phase-event` endpoint lets the speckit workflow report phase transitions directly (`started`/`complete`) instead of the dashboard inferring them from file-watch + terminal-quiet heuristics. The PreToolUse hook now emits `started` for each pipeline phase; the file watcher is demoted to a fallback (it stands down when the authoritative signal already opened a gate). Phase state is now reported, not guessed.
+
+### Fixed
+- **Concurrent SDD pipelines no longer conflate** — The gate-check endpoint (`/api/sdd/gate-check`) previously scanned *all* pipelines and returned the first open gate it found, so a gate open in one terminal tab blocked the agent and polluted the dashboard in every other tab. It is now scoped to the requesting session (`?sessionId=`), and the enforcement hook passes `FORGE_SESSION_ID` so each tab sees only its own gate. An unbound session (no identity) is SDD-inactive and never blocked.
 
 ## [7.19.8] - 2026-06-20
 

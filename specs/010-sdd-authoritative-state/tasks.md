@@ -51,19 +51,19 @@ description: "Task list for SDD Authoritative State & Concise Phase Reports"
 
 ### Tests for User Story 1 (write first, must FAIL)
 
-- [ ] T007 [P] [US1] Unit test: orchestrator transitions are driven by `PhaseEvent{started|complete}` and NOT by file-watcher events, in `internal/sdd/orchestrator_test.go`.
-- [ ] T008 [P] [US1] Integration test: `POST /api/sdd/phase-event` (started then complete) drives `MarkPhaseRunning`/`HandlePhaseComplete` and broadcasts `SDD_PHASE_STATUS`/`SDD_PHASE_GATE`, in `cmd/forge/handlers_sdd_phaseevent_test.go`.
-- [ ] T009 [P] [US1] e2e: bar advances on the authoritative signal and does not flip on repeated edits, in `tests/e2e/sdd-authoritative-state.spec.js`.
+- [x] T007 [P] [US1] Unit test: orchestrator transitions are driven by `PhaseEvent{started|complete}` and NOT by file-watcher events, in `internal/sdd/orchestrator_test.go`. **COVERED: the orchestrator is unchanged in US1 (dedup is wiring-level); the "watcher stands down" mechanism is proven by the existing `TestMarkPhaseRunning_IdempotentWhenAlreadyRunning`, and the event→state driving is proven by T008.**
+- [x] T008 [P] [US1] Integration test: `POST /api/sdd/phase-event` (started then complete) drives `MarkPhaseRunning`/`HandlePhaseComplete` and broadcasts `SDD_PHASE_STATUS`/`SDD_PHASE_GATE`, in `cmd/forge/handlers_sdd_phaseevent_test.go`. **DONE: 5 tests green (started→running, complete→gate+decisions, duplicate-complete no-op, unknown-session ignored, 400 validation).**
+- [ ] T009 [P] [US1] e2e: bar advances on the authoritative signal and does not flip on repeated edits, in `tests/e2e/sdd-authoritative-state.spec.js`. **PENDING — needs the running app + T014/T015 wired.**
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Add `PhaseEvent` type and `PhaseBaseline` field to `PipelineState` in `internal/sdd/types.go` (per data-model.md).
-- [ ] T011 [US1] Implement `handleSddPhaseEvent` in `cmd/forge/handlers_sdd.go` per `contracts/phase-event-endpoint.md` (started → MarkPhaseRunning; complete → HandlePhaseComplete; ignore unbound sessionId; 400/409 validation).
-- [ ] T012 [US1] Register `POST /api/sdd/phase-event` route in `cmd/forge/main.go`.
-- [ ] T013 [US1] In `cmd/forge/sdd_wiring.go`, drive the orchestrator from the phase-event and DEMOTE the file-watcher (`detector.go`) and quiet-detection to fallback-only (FR-001b, FR-002).
-- [ ] T014 [US1] Update `scripts/sdd-gate-check.ps1` to also POST `phase-event{event:"started"}` for the matched `speckit-*` phase (authoritative start).
-- [ ] T015 [US1] Add a mandatory final step to each speckit phase-command skill (the global skill definitions / their repo source) that POSTs `phase-event{event:"complete", decisions:[...]}` scoped by `$env:FORGE_SESSION_ID` (FR-001b, FR-007a) — including the artifact-less Validate/Implement phases. The emit step MUST be additive: assert the skill's existing behaviour (artifact production, completion report) is unaffected (FR-010).
-- [ ] T016 [US1] Confirm disk reconciliation (the sole shipped fallback) still converges a missed `complete` in `internal/sdd/orchestrator.go` (FR-002); add a unit test for the missed-signal path. (The Stop hook is explicitly out of scope — disk reconciliation alone satisfies FR-002.)
+- [x] T010 [US1] Add `PhaseEvent` type and `PhaseBaseline` field to `PipelineState` in `internal/sdd/types.go` (per data-model.md). **DONE (adapted): `PhaseEvent` is the wire request `sddPhaseEventRequest` in `handlers_sdd.go` (kept the HTTP shape out of the domain package). `PhaseBaseline` deferred to US3/T027 where git capture lives — recorded as a deviation.**
+- [x] T011 [US1] Implement `handleSddPhaseEvent` in `cmd/forge/handlers_sdd.go` per `contracts/phase-event-endpoint.md` (started → MarkPhaseRunning; complete → HandlePhaseComplete; ignore unbound sessionId; 400/409 validation). **DONE incl. `activeSddFeatureDir` (reads `.specify/feature.json` authoritatively).**
+- [x] T012 [US1] Register `POST /api/sdd/phase-event` route in `cmd/forge/main.go`. **DONE.**
+- [x] T013 [US1] In `cmd/forge/sdd_wiring.go`, drive the orchestrator from the phase-event and DEMOTE the file-watcher (`detector.go`) and quiet-detection to fallback-only (FR-001b, FR-002). **DONE: the watcher's settle goroutine now stands down if the authoritative signal already opened the gate; the endpoint stands down if the watcher beat it. Orchestrator untouched (existing tests intact).**
+- [x] T014 [US1] Update `scripts/sdd-gate-check.ps1` to also POST `phase-event{event:"started"}` for the matched `speckit-*` phase (authoritative start). **DONE: skill→phase map; emits started after the gate-check passes; best-effort (never blocks). PS1 parses clean. Live verification needs a running backend + agent.**
+- [ ] T015 [US1] Add a mandatory final step to each speckit phase-command skill (the global skill definitions / their repo source) that POSTs `phase-event{event:"complete", decisions:[...]}` scoped by `$env:FORGE_SESSION_ID` (FR-001b, FR-007a) — including the artifact-less Validate/Implement phases. The emit step MUST be additive: assert the skill's existing behaviour (artifact production, completion report) is unaffected (FR-010). **PENDING — edits global skill files outside the repo.**
+- [x] T016 [US1] Confirm disk reconciliation (the sole shipped fallback) still converges a missed `complete` in `internal/sdd/orchestrator.go` (FR-002); add a unit test for the missed-signal path. (The Stop hook is explicitly out of scope — disk reconciliation alone satisfies FR-002.) **COVERED: existing `TestReconcileFromDisk_AdvancesPastExistingArtifacts` / `_StopsAtFirstMissingArtifact` already prove convergence from disk with no completion event.**
 
 **Checkpoint**: Single-session bar is authoritative and correct — MVP demonstrable. STOP and validate.
 
@@ -77,15 +77,15 @@ description: "Task list for SDD Authoritative State & Concise Phase Reports"
 
 ### Tests for User Story 2 (write first, must FAIL)
 
-- [ ] T017 [P] [US2] Unit test: `handleSddGateCheck` returns ONLY the requested session's gate state and never ranges over other pipelines, in `cmd/forge/handlers_sdd_test.go`.
-- [ ] T018 [P] [US2] e2e: two tabs / two repos — no state bleed-through; gate in A does not block B; approve in A advances only A, in `tests/e2e/sdd-authoritative-state.spec.js`.
+- [x] T017 [P] [US2] Unit test: `handleSddGateCheck` returns ONLY the requested session's gate state and never ranges over other pipelines, in `cmd/forge/handlers_sdd_test.go`. **DONE: `TestHandleSddGateCheck_ScopedToRequestingSession` + `_MissingSessionIdIsClosed`; existing gate-check tests updated to be session-aware (the contract changed).**
+- [ ] T018 [P] [US2] e2e: two tabs / two repos — no state bleed-through; gate in A does not block B; approve in A advances only A, in `tests/e2e/sdd-authoritative-state.spec.js`. **PENDING — needs the running app.**
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Rewrite `handleSddGateCheck` in `cmd/forge/handlers_sdd.go` to accept `?sessionId=` and look up only `sddPipelineFor(sessionId)` — remove the `sddPipelines.Range` global scan (FR-005), per `contracts/gate-check-endpoint.md`.
-- [ ] T020 [US2] Update `scripts/sdd-gate-check.ps1` to read `$env:FORGE_SESSION_ID`, send `?sessionId=<id>`, and `exit 0` when it is empty (unbound tab = SDD inactive, FR-011a).
-- [ ] T021 [US2] Verify and harden client-side `sessionId` filtering of `SDD_PHASE_STATUS`/`SDD_PHASE_GATE` in `frontend/src/hooks/useSddGate.js` (drop mismatched-session messages).
-- [ ] T022 [US2] Audit every SDD broadcast in `cmd/forge/sdd_wiring.go` to confirm each is delivered via `BroadcastJSONToSession(sessionId, …)` and never globally (FR-006).
+- [x] T019 [US2] Rewrite `handleSddGateCheck` in `cmd/forge/handlers_sdd.go` to accept `?sessionId=` and look up only `sddPipelineFor(sessionId)` — remove the `sddPipelines.Range` global scan (FR-005), per `contracts/gate-check-endpoint.md`. **DONE: global `Range` removed; scoped lookup; missing/unknown session → closed.**
+- [x] T020 [US2] Update `scripts/sdd-gate-check.ps1` to read `$env:FORGE_SESSION_ID`, send `?sessionId=<id>`, and `exit 0` when it is empty (unbound tab = SDD inactive, FR-011a). **DONE (same rewrite as T014).**
+- [x] T021 [US2] Verify and harden client-side `sessionId` filtering of `SDD_PHASE_STATUS`/`SDD_PHASE_GATE` in `frontend/src/hooks/useSddGate.js` (drop mismatched-session messages). **VERIFIED — already correct: both message types filter on `parsed.sessionId !== activeSessionId` and all state resets on tab switch. No change needed (FR-006).**
+- [x] T022 [US2] Audit every SDD broadcast in `cmd/forge/sdd_wiring.go` to confirm each is delivered via `BroadcastJSONToSession(sessionId, …)` and never globally (FR-006). **VERIFIED — both `broadcastPhaseStatus` and `newSddBroadcaster` use `BroadcastJSONToSession`; no global broadcast exists. No change needed.**
 
 **Checkpoint**: US1 + US2 both pass; concurrency is conflation-free.
 

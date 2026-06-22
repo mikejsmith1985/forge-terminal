@@ -195,15 +195,19 @@ func TestHandleSddStatus_MissingSessionId_Returns400(t *testing.T) {
 
 // ── handleSddGateCheck tests (specs/008 US1 gate enforcement endpoint) ────────
 
-func getGateCheck(t *testing.T) *httptest.ResponseRecorder {
+func getGateCheck(t *testing.T, sessionID string) *httptest.ResponseRecorder {
 	t.Helper()
+	target := "/api/sdd/gate-check"
+	if sessionID != "" {
+		target += "?sessionId=" + sessionID
+	}
 	recorder := httptest.NewRecorder()
-	handleSddGateCheck(recorder, httptest.NewRequest(http.MethodGet, "/api/sdd/gate-check", nil))
+	handleSddGateCheck(recorder, httptest.NewRequest(http.MethodGet, target, nil))
 	return recorder
 }
 
 func TestHandleSddGateCheck_NoPipelinesRegistered_ReturnsGateNotOpen(t *testing.T) {
-	recorder := getGateCheck(t)
+	recorder := getGateCheck(t, "no-such-session")
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
@@ -220,7 +224,7 @@ func TestHandleSddGateCheck_NoPipelinesRegistered_ReturnsGateNotOpen(t *testing.
 func TestHandleSddGateCheck_OpenGateReturnsPhaseAndTrue(t *testing.T) {
 	bindTestPipeline(t, "sess-gate-open", sdd.PhasePlan)
 
-	recorder := getGateCheck(t)
+	recorder := getGateCheck(t, "sess-gate-open")
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
@@ -251,7 +255,7 @@ func TestHandleSddGateCheck_GateClosedAfterApproveReturnsNotOpen(t *testing.T) {
 	orchestrator := bindTestPipeline(t, sessionID, sdd.PhasePlan)
 
 	// Verify gate is open before the decision.
-	recorderBefore := getGateCheck(t)
+	recorderBefore := getGateCheck(t, sessionID)
 	var beforeBody map[string]any
 	_ = json.NewDecoder(recorderBefore.Body).Decode(&beforeBody)
 	if beforeBody["isGateOpen"] != true {
@@ -264,13 +268,50 @@ func TestHandleSddGateCheck_GateClosedAfterApproveReturnsNotOpen(t *testing.T) {
 	}
 
 	// Gate must be closed now.
-	recorderAfter := getGateCheck(t)
+	recorderAfter := getGateCheck(t, sessionID)
 	var afterBody map[string]any
 	if err := json.NewDecoder(recorderAfter.Body).Decode(&afterBody); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if afterBody["isGateOpen"] != false {
 		t.Errorf("isGateOpen = %v, want false after approve", afterBody["isGateOpen"])
+	}
+}
+
+// ── gate-check scoping (specs/010-sdd-authoritative-state, US2 / FR-005) ──────
+
+// TestHandleSddGateCheck_ScopedToRequestingSession proves a gate open in one session
+// is NOT returned for another — the fix for the global first-match conflation.
+func TestHandleSddGateCheck_ScopedToRequestingSession(t *testing.T) {
+	bindTestPipeline(t, "gc-a", sdd.PhasePlan)         // gate open on A
+	orchestratorB := bindTestPipeline(t, "gc-b", sdd.PhaseSpecify)
+	// Resolve B's gate so B is idle while A still has one open.
+	if _, err := orchestratorB.SubmitDecision(sdd.Decision{Phase: sdd.PhaseSpecify, Action: sdd.ActionApprove}); err != nil {
+		t.Fatalf("approve B: %v", err)
+	}
+
+	var bodyB map[string]any
+	_ = json.NewDecoder(getGateCheck(t, "gc-b").Body).Decode(&bodyB)
+	if bodyB["isGateOpen"] != false {
+		t.Errorf("session B isGateOpen = %v, want false — must not see A's gate", bodyB["isGateOpen"])
+	}
+
+	var bodyA map[string]any
+	_ = json.NewDecoder(getGateCheck(t, "gc-a").Body).Decode(&bodyA)
+	if bodyA["isGateOpen"] != true || bodyA["phase"] != "plan" {
+		t.Errorf("session A gate-check = %v, want open for plan", bodyA)
+	}
+}
+
+// TestHandleSddGateCheck_MissingSessionIdIsClosed proves a request with no sessionId
+// reports closed rather than scanning all pipelines (the shipped hook always sends one).
+func TestHandleSddGateCheck_MissingSessionIdIsClosed(t *testing.T) {
+	bindTestPipeline(t, "gc-legacy", sdd.PhasePlan) // a gate is open somewhere
+
+	var body map[string]any
+	_ = json.NewDecoder(getGateCheck(t, "").Body).Decode(&body)
+	if body["isGateOpen"] != false {
+		t.Errorf("isGateOpen = %v with no sessionId, want false (no global scan)", body["isGateOpen"])
 	}
 }
 

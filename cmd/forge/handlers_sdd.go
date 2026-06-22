@@ -76,6 +76,118 @@ func handleSddDecision(w http.ResponseWriter, r *http.Request) {
 	writeSddJSON(w, http.StatusOK, map[string]string{"status": string(status)})
 }
 
+// Authoritative phase-event values (specs/010-sdd-authoritative-state).
+const (
+	sddPhaseEventStarted  = "started"
+	sddPhaseEventComplete = "complete"
+)
+
+// sddPhaseEventRequest is the POST /api/sdd/phase-event body — the authoritative
+// phase signal emitted by the speckit skill workflow (contract: phase-event-endpoint.md).
+type sddPhaseEventRequest struct {
+	SessionID string   `json:"sessionId"`
+	Phase     string   `json:"phase"`
+	Event     string   `json:"event"` // "started" | "complete"
+	Decisions []string `json:"decisions"`
+	RepoRoot  string   `json:"repoRoot"`
+}
+
+// handleSddPhaseEvent applies an authoritative phase signal to the requesting session's
+// pipeline: "started" marks the phase running (UI spinner); "complete" opens the decision
+// gate. This is the PRIMARY driver of pipeline state, replacing file-watcher inference
+// (specs/010, FR-001/FR-001b). It is scoped strictly to the requesting session: an unknown
+// sessionId is a no-op (200 "ignored"), never touching another session's state (FR-004/FR-011).
+func handleSddPhaseEvent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeSddError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var request sddPhaseEventRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeSddError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	phase := sdd.PhaseName(request.Phase)
+	if _, known := sdd.PhaseByName(phase); !known {
+		writeSddError(w, http.StatusBadRequest, "unknown phase: "+request.Phase)
+		return
+	}
+	if request.Event != sddPhaseEventStarted && request.Event != sddPhaseEventComplete {
+		writeSddError(w, http.StatusBadRequest, "event must be 'started' or 'complete'")
+		return
+	}
+
+	// Scope to the requesting session only. An unbound session is a no-op so the agent is
+	// never errored and no other session's state is touched (FR-011a graceful degrade).
+	pipeline, found := sddPipelineFor(request.SessionID)
+	if !found {
+		writeSddJSON(w, http.StatusOK, map[string]string{"status": "ignored"})
+		return
+	}
+
+	// Guard against a stale binding: an event for a different repo must not mutate this pipeline.
+	if request.RepoRoot != "" && !sameSddRepo(pipeline.repoRoot, request.RepoRoot) {
+		writeSddError(w, http.StatusConflict, "repoRoot does not match the bound repository")
+		return
+	}
+
+	pipeline.orchestrator.BindSession(request.SessionID)
+	if featureDir := activeSddFeatureDir(pipeline.repoRoot); featureDir != "" {
+		pipeline.orchestrator.SetFeatureDir(featureDir)
+	}
+
+	applySddPhaseEvent(pipeline, request, phase)
+	writeSddJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+}
+
+// applySddPhaseEvent drives the orchestrator from an authoritative phase signal. On "complete"
+// it stands down if the watcher fallback already opened this phase's gate, so the authoritative
+// and fallback paths never double-complete a phase (no duplicate card, no inflated run count).
+func applySddPhaseEvent(pipeline *sddPipeline, request sddPhaseEventRequest, phase sdd.PhaseName) {
+	if request.Event == sddPhaseEventStarted {
+		if pipeline.orchestrator.MarkPhaseRunning(phase) {
+			broadcastPhaseStatus(request.SessionID)
+		}
+		return
+	}
+
+	// Stash the command-emitted decisions for the report card (consumed in US3).
+	pipeline.storeDecisions(phase, request.Decisions)
+
+	state := pipeline.orchestrator.State()
+	if state.Status == sdd.StatusAwaitingDecision && state.PendingCard != nil && state.PendingCard.Phase == phase {
+		return // gate already open for this phase — the fallback beat us; no double-complete.
+	}
+
+	artifactRel := ""
+	if def, ok := sdd.PhaseByName(phase); ok {
+		artifactRel = def.ExpectedArtifact
+	}
+	pipeline.orchestrator.HandlePhaseComplete(phase, artifactRel)
+}
+
+// activeSddFeatureDir reads <repoRoot>/.specify/feature.json and returns the absolute feature
+// directory it records, or "" if it cannot be determined. This is the authoritative active
+// feature: the speckit commands write feature.json, so it never depends on the file watcher.
+func activeSddFeatureDir(repoRoot string) string {
+	if repoRoot == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(repoRoot, ".specify", "feature.json"))
+	if err != nil {
+		return ""
+	}
+	var parsed struct {
+		FeatureDirectory string `json:"feature_directory"`
+	}
+	if jsonErr := json.Unmarshal(data, &parsed); jsonErr != nil || parsed.FeatureDirectory == "" {
+		return ""
+	}
+	return filepath.Join(repoRoot, filepath.FromSlash(parsed.FeatureDirectory))
+}
+
 // handleSddStatus returns the current phase status for a session (used by the
 // SddPipelinePanel on mount for cold-start recovery after a page reload; the
 // WebSocket SDD_PHASE_STATUS event maintains live state thereafter).
@@ -112,13 +224,14 @@ func handleSddStatus(w http.ResponseWriter, r *http.Request) {
 	writeSddJSON(w, http.StatusOK, response)
 }
 
-// handleSddGateCheck reports whether any active SDD pipeline has an open gate awaiting a
-// developer decision. This is the enforcement endpoint called by the PreToolUse hook in
-// .claude/settings.json before any speckit Skill runs. A non-zero exit from the hook
-// physically blocks the agent from executing the next phase command.
+// handleSddGateCheck reports whether the REQUESTING SESSION's pipeline has an open gate
+// awaiting a developer decision. This is the enforcement endpoint called by the PreToolUse
+// hook before any speckit Skill runs; a non-zero exit from the hook blocks the agent.
 //
-// Returns {"isGateOpen": false} when all pipelines are idle, or {"isGateOpen": true,
-// "phase": "<name>"} when any pipeline is in StatusAwaitingDecision. The response is
+// It is scoped to the session named in the `sessionId` query parameter (specs/010, FR-005):
+// a gate open in one session must NEVER block another (the prior global first-match scan was
+// the conflation bug). A missing sessionId or an unbound session reports closed — the shipped
+// hook always sends sessionId, so absence is only a legacy/transition case. The response is
 // always 200 so the hook script can parse it without special HTTP error handling.
 func handleSddGateCheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -126,22 +239,27 @@ func handleSddGateCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var openPhase sdd.PhaseName
-	var isGateOpen bool
-	sddPipelines.Range(func(_, value any) bool {
-		pipeline := value.(*sddPipeline)
-		state := pipeline.orchestrator.State()
-		if state.Status == sdd.StatusAwaitingDecision && state.PendingCard != nil {
-			isGateOpen = true
-			openPhase = state.PendingCard.Phase
-			return false // stop iterating — the first open gate is sufficient
-		}
-		return true
-	})
+	gateClosed := map[string]any{"isGateOpen": false, "phase": ""}
 
+	sessionID := r.URL.Query().Get("sessionId")
+	if sessionID == "" {
+		writeSddJSON(w, http.StatusOK, gateClosed)
+		return
+	}
+	pipeline, found := sddPipelineFor(sessionID)
+	if !found {
+		writeSddJSON(w, http.StatusOK, gateClosed)
+		return
+	}
+
+	state := pipeline.orchestrator.State()
+	if state.Status != sdd.StatusAwaitingDecision || state.PendingCard == nil {
+		writeSddJSON(w, http.StatusOK, gateClosed)
+		return
+	}
 	writeSddJSON(w, http.StatusOK, map[string]any{
-		"isGateOpen": isGateOpen,
-		"phase":      string(openPhase),
+		"isGateOpen": true,
+		"phase":      string(state.PendingCard.Phase),
 	})
 }
 
