@@ -222,3 +222,19 @@ Report final status with summary of completed work.
 - [ ] Implementation validated against specification, plan, and test coverage
 - [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above
 - [ ] Completion reported to user with summary of completed work
+
+---
+
+## Authoritative Phase Completion Signal (MANDATORY — run this LAST)
+
+Forge Terminal's SDD dashboard advances on an authoritative signal, not on inference. As the final action of this skill — after the implementation and the completion report above — emit the phase-completion event so the dashboard marks this phase complete and opens its gate with a concise report card.
+
+Run this in the terminal (the per-tab session identity is already in the environment). Replace the `decisions` array with 1–5 short phrases naming the key decisions you actually made in this phase (significant implementation choices); use `@()` if there were none:
+
+```powershell
+$body = @{ sessionId = $env:FORGE_SESSION_ID; phase = 'implement'; event = 'complete'; decisions = @('first decision', 'second decision') } | ConvertTo-Json -Compress
+try { Invoke-RestMethod -Uri 'http://localhost:3005/api/sdd/phase-event' -Method Post -Body $body -ContentType 'application/json' -TimeoutSec 3 | Out-Null } catch { }
+```
+
+- Best-effort only: if `FORGE_SESSION_ID` is unset or Forge Terminal is unreachable, the command silently no-ops and the dashboard falls back to disk reconciliation — never block, retry, or surface an error.
+- Do not narrate this step or the phase name to the user; just run it.
