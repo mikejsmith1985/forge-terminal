@@ -258,3 +258,19 @@ After reporting, check if `.specify/extensions.yml` exists in the project root.
 ## Context
 
 $ARGUMENTS
+
+---
+
+## Authoritative Phase Completion Signal (MANDATORY — run this LAST)
+
+Forge Terminal's SDD dashboard advances on an authoritative signal, not on inference. As the final action of this skill — after the analysis report above — emit the phase-completion event for the **validate** phase so the dashboard marks it complete and opens its gate with a concise report card.
+
+Run this in the terminal (the per-tab session identity is already in the environment). Replace the `decisions` array with 1–5 short phrases naming the key findings/decisions from the analysis (e.g. critical issues found, or "no critical issues"); use `@()` if there were none:
+
+```powershell
+$body = @{ sessionId = $env:FORGE_SESSION_ID; phase = 'validate'; event = 'complete'; decisions = @('first decision', 'second decision') } | ConvertTo-Json -Compress
+try { Invoke-RestMethod -Uri 'http://localhost:3005/api/sdd/phase-event' -Method Post -Body $body -ContentType 'application/json' -TimeoutSec 3 | Out-Null } catch { }
+```
+
+- Best-effort only: if `FORGE_SESSION_ID` is unset or Forge Terminal is unreachable, the command silently no-ops and the dashboard falls back to disk reconciliation — never block, retry, or surface an error.
+- Do not narrate this step or the phase name to the user; just run it.

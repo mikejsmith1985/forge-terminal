@@ -619,6 +619,10 @@ func main() {
 	http.HandleFunc("/api/sdd/bind", WrapWithMiddleware(handleSddBind))
 	http.HandleFunc("/api/sdd/decision", WrapWithMiddleware(handleSddDecision))
 	http.HandleFunc("/api/sdd/status", WrapWithMiddleware(handleSddStatus))
+	// phase-event is the authoritative phase signal emitted by the speckit skill workflow:
+	// "started" marks a phase running, "complete" opens its gate — replacing file-watcher
+	// inference as the primary state driver (specs/010-sdd-authoritative-state, FR-001).
+	http.HandleFunc("/api/sdd/phase-event", WrapWithMiddleware(handleSddPhaseEvent))
 	// gate-check is polled by the PreToolUse hook before each speckit Skill run to enforce that
 	// the developer approves each phase before the agent advances (specs/008-sdd-real-enforcement).
 	http.HandleFunc("/api/sdd/gate-check", WrapWithMiddleware(handleSddGateCheck))

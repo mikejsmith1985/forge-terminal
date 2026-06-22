@@ -231,6 +231,73 @@ function DecisionBar({ card, isSubmitting, decisionError, onAction, onClarify })
 }
 
 /**
+ * ReportCard renders the concise phase report shown at the gate (specs/010, US3):
+ * a scope line, a grouped file list with +/- counts, and the command-emitted
+ * decisions — replacing the wall of verbose Markdown. The full phase output is an
+ * opt-in "View full output" action, never the default surface (FR-009).
+ *
+ * @param {{ reportCard: object, artifactPreview: object|null, onFileOpen: Function }} props
+ */
+function ReportCard({ reportCard, artifactPreview, onFileOpen }) {
+  if (!reportCard) return null
+  const { files = [], totalFiles = 0, filesTruncated = false, scope = '', decisions = [] } = reportCard
+  const hiddenCount = Math.max(0, totalFiles - files.length)
+  const fullOutputPath = artifactPreview?.filePath
+
+  const formatStat = (file) =>
+    file.added != null || file.removed != null
+      ? `+${file.added ?? 0}/-${file.removed ?? 0}`
+      : '±?' // magnitude unavailable (e.g. binary) — file still listed (FR-013)
+
+  return (
+    <div className="sdd-dashboard__report-card" data-testid="sdd-report-card">
+      <p className="sdd-dashboard__report-scope">{scope}</p>
+
+      {files.length > 0 && (
+        <div className="sdd-dashboard__report-group">
+          <span className="sdd-dashboard__report-group-label">Files</span>
+          <ul className="sdd-dashboard__report-files">
+            {files.map((file, index) => (
+              <li key={`${file.path}-${index}`} className="sdd-dashboard__report-file">
+                <FileText size={11} aria-hidden="true" />
+                <span className="sdd-dashboard__report-file-path" title={file.path}>{baseName(file.path)}</span>
+                <span className="sdd-dashboard__report-file-stat">{formatStat(file)}</span>
+              </li>
+            ))}
+            {filesTruncated && hiddenCount > 0 && (
+              <li className="sdd-dashboard__report-file sdd-dashboard__report-more">
+                +{hiddenCount} more
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {decisions.length > 0 && (
+        <div className="sdd-dashboard__report-group">
+          <span className="sdd-dashboard__report-group-label">Decisions</span>
+          <ul className="sdd-dashboard__report-decisions">
+            {decisions.map((decision, index) => (
+              <li key={index} className="sdd-dashboard__report-decision">{decision}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {fullOutputPath && (
+        <button
+          type="button"
+          className="sdd-dashboard__report-full-output"
+          onClick={() => onFileOpen({ path: fullOutputPath, name: baseName(fullOutputPath) })}
+        >
+          View full output →
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
  * ClarifyModal is a named export for isolated unit testing.
  * Uses the native <dialog> element for a free focus-trap and top-layer rendering.
  *
@@ -442,6 +509,14 @@ export default function SddDashboard({
       </div>
 
       <ActionPromptStrip phases={phases} isCardOpen={isCardOpen} />
+
+      {isCardOpen && card?.reportCard && (
+        <ReportCard
+          reportCard={card.reportCard}
+          artifactPreview={card.artifactPreview}
+          onFileOpen={onFileOpen}
+        />
+      )}
 
       {isCardOpen && (
         <DecisionBar

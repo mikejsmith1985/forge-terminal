@@ -101,6 +101,30 @@ func NewTerminalSession(id string) (*TerminalSession, error) {
 	return NewTerminalSessionWithConfig(id, nil)
 }
 
+// forgeSessionEnv augments the base process environment with the standard Forge
+// variables and the per-tab identity FORGE_SESSION_ID. The identity lets SDD
+// phase signals, gate-checks, and dashboard updates be scoped to exactly one
+// terminal session (specs/010-sdd-authoritative-state, FR-003). Extracted as a
+// pure function so the injection can be unit-tested without spawning a PTY
+// (constitution Article V).
+//
+// An empty sessionID injects no FORGE_SESSION_ID: a session without a real
+// identity is handled by the unbound path (FR-011a), never by a blank variable.
+// The base environment is preserved unchanged — the augmentation is additive.
+func forgeSessionEnv(baseEnv []string, sessionID string) []string {
+	augmented := append([]string{}, baseEnv...)
+	augmented = append(augmented,
+		"TERM=xterm-256color",
+		"COLORTERM=truecolor",
+		fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
+		fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
+	)
+	if sessionID != "" {
+		augmented = append(augmented, fmt.Sprintf("FORGE_SESSION_ID=%s", sessionID))
+	}
+	return augmented
+}
+
 // convertWSLPath converts a Windows UNC path to a Linux path for WSL
 // e.g., "\\wsl.localhost\Ubuntu-24.04\home\mikej\projects" -> "/home/mikej/projects"
 // or "\\wsl$\Ubuntu\home\user" -> "/home/user"
@@ -190,18 +214,15 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 	// Create command (only used on Unix)
 	var cmd *exec.Cmd
 	
-	// Prepare environment variables
-	env := os.Environ()
-	env = append(env,
-		"TERM=xterm-256color",
-		"COLORTERM=truecolor",
-		fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
-		fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
-	)
+	// Prepare environment variables. forgeSessionEnv adds the standard Forge vars
+	// plus the per-tab identity FORGE_SESSION_ID (FR-003), used by the Unix PTY
+	// via cmd.Env below. (On Windows, ConPTY ignores cmd.Env, so the identity is
+	// written into the shell by startPTYWithShell instead.)
+	env := forgeSessionEnv(os.Environ(), id)
 
 	// Inject active debug session ID if present
-	if sessionID := GetActiveDebugSession(); sessionID != "" {
-		env = append(env, fmt.Sprintf("FORGE_DEBUG_SESSION_ID=%s", sessionID))
+	if debugSessionID := GetActiveDebugSession(); debugSessionID != "" {
+		env = append(env, fmt.Sprintf("FORGE_DEBUG_SESSION_ID=%s", debugSessionID))
 	}
 
 	// Inject vault secrets flagged for auto-inject (non-interactive, fully transparent).
@@ -268,7 +289,7 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 			}
 		}
 		
-		ptmx, err = startPTYWithShell(shell, shellArgs, workingDir)
+		ptmx, err = startPTYWithShell(shell, shellArgs, workingDir, id)
 	} else {
 		ptmx, err = startPTY(cmd)
 	}

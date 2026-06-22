@@ -404,3 +404,76 @@ describe('HookInstallBanner', () => {
     expect(writeText).toHaveBeenCalledWith('.\\scripts\\install-sdd-hook.ps1')
   })
 })
+
+// ── Phase report card (specs/010 US3) ─────────────────────────────────────────
+
+describe('SddDashboard report card', () => {
+  const gateCard = (reportCard, artifactPreview = null) => ({
+    type: 'SDD_PHASE_GATE',
+    sessionId: 'sess-1',
+    cardId: 'card-plan',
+    phase: 'plan',
+    actions: ['approve', 'reject', 'clarify'],
+    reportCard,
+    artifactPreview,
+  })
+
+  it('renders scope, files with +/- counts, and decisions as grouped bullets', () => {
+    const card = gateCard({
+      phase: 'plan',
+      scope: '2 file(s) changed (+45/-2)',
+      totalFiles: 2,
+      filesTruncated: false,
+      files: [
+        { path: 'specs/feat/plan.md', added: 40, removed: 2 },
+        { path: 'specs/feat/research.md', added: 5, removed: 0 },
+      ],
+      decisions: ['Chose retrofit over rewrite'],
+      runCount: 1,
+    })
+
+    render(<DashboardFixture phases={SIX_PHASES} isCardOpen card={card} />)
+
+    expect(screen.getByTestId('sdd-report-card')).toBeInTheDocument()
+    expect(screen.getByText('2 file(s) changed (+45/-2)')).toBeInTheDocument()
+    expect(screen.getByText('plan.md')).toBeInTheDocument()
+    expect(screen.getByText('+40/-2')).toBeInTheDocument()
+    expect(screen.getByText('Chose retrofit over rewrite')).toBeInTheDocument()
+  })
+
+  it('shows "+N more" when the file list is truncated', () => {
+    const card = gateCard({
+      phase: 'implement', scope: '10 file(s) changed (+100/-0)',
+      totalFiles: 10, filesTruncated: true,
+      files: Array.from({ length: 8 }, (_, i) => ({ path: `f${i}.go`, added: 10, removed: 0 })),
+      decisions: [], runCount: 1,
+    })
+
+    render(<DashboardFixture phases={SIX_PHASES} isCardOpen card={card} />)
+
+    expect(screen.getByText('+2 more')).toBeInTheDocument()
+  })
+
+  it('shows magnitude-unavailable files and offers View full output', () => {
+    const onFileOpen = vi.fn()
+    const card = gateCard(
+      {
+        phase: 'plan', scope: '1 file(s) changed', totalFiles: 1, filesTruncated: false,
+        files: [{ path: 'assets/logo.png', added: null, removed: null }],
+        decisions: [], runCount: 1,
+      },
+      { filePath: 'specs/feat/plan.md', content: '# Plan', totalLines: 1 }
+    )
+
+    render(<DashboardFixture phases={SIX_PHASES} isCardOpen card={card} onFileOpen={onFileOpen} />)
+
+    expect(screen.getByText('±?')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('View full output →'))
+    expect(onFileOpen).toHaveBeenCalledWith({ path: 'specs/feat/plan.md', name: 'plan.md' })
+  })
+
+  it('does not render the report card when the gate has none', () => {
+    render(<DashboardFixture phases={SIX_PHASES} isCardOpen card={gateCard(null)} />)
+    expect(screen.queryByTestId('sdd-report-card')).not.toBeInTheDocument()
+  })
+})
