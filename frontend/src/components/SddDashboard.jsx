@@ -63,7 +63,7 @@ function baseName(filePath) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function DashboardHeader({ featureName, phases }) {
+function DashboardHeader({ featureName, phases, binding }) {
   const badgeKey = derivePipelineBadge(phases)
   const { label, mod } = PIPELINE_BADGE[badgeKey]
   return (
@@ -72,7 +72,24 @@ function DashboardHeader({ featureName, phases }) {
         {featureName || 'No active feature'}
       </span>
       <span className={`sdd-dashboard__badge sdd-dashboard__badge--${mod}`}>{label}</span>
+      <WorktreeIndicator binding={binding} />
     </div>
+  )
+}
+
+// WorktreeIndicator shows which isolated worktree/branch this tab runs in (specs/011,
+// FR-007). It renders nothing when the tab is on the repository's main checkout, so the
+// common single-pipeline case is visually unchanged (SC-007).
+function WorktreeIndicator({ binding }) {
+  if (!binding?.isolated || !binding.branch) return null
+  return (
+    <span
+      className="sdd-dashboard__worktree"
+      data-testid="sdd-worktree-indicator"
+      title={binding.worktreePath ? `Isolated worktree: ${binding.worktreePath}` : 'Isolated worktree'}
+    >
+      ⑂ worktree: {binding.branch}
+    </span>
   )
 }
 
@@ -445,6 +462,7 @@ function HookInstallBanner({ onDismiss }) {
 export default function SddDashboard({
   phases = [],
   featureName = '',
+  binding = null,
   phaseSummaries,
   isCardOpen = false,
   card = null,
@@ -491,7 +509,7 @@ export default function SddDashboard({
       {!isHookInstalled && !isHookBannerDismissed && (
         <HookInstallBanner onDismiss={() => setIsHookBannerDismissed(true)} />
       )}
-      <DashboardHeader featureName={featureName} phases={phases} />
+      <DashboardHeader featureName={featureName} phases={phases} binding={binding} />
 
       <div className="sdd-dashboard__rail-wrapper">
         <PhaseRail

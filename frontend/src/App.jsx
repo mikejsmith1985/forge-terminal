@@ -2204,6 +2204,7 @@ function App() {
         <SddDashboard
           phases={sddGate.phaseStatuses}
           featureName={sddGate.featureName}
+          binding={sddGate.binding}
           phaseSummaries={sddGate.phaseSummaries}
           isCardOpen={sddGate.isCardOpen}
           card={sddGate.card}

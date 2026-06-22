@@ -106,10 +106,10 @@ Web/desktop split: Go backend in `cmd/forge/`, `internal/git/`, `internal/termin
 - [X] T020 [US3] Implemented `safeCleanupWorktree` in `cmd/forge/sdd_worktree.go`: `IsClean(path) && BranchMerged(branch, base)` ⇒ `WorktreeRemove` + `BranchDelete` + drop binding; else retain and return a warning (FR-011/FR-012).
 - [X] T021 [US3] Implemented the **explicit** tab-close trigger as `POST /api/sdd/worktree-close` (`handleSddWorktreeClose`, registered in `main.go`) calling `cleanupSessionWorktree`. **Design change from the task:** a WebSocket disconnect is deliberately NOT used — Forge supports reconnection, so a dropped socket must never tear down a worktree a reconnecting tab still uses. The frontend calls this on real tab close (frontend wiring tracked with T023–T026); the startup sweep (T022) guarantees no permanent orphans regardless.
 - [X] T022 [US3] Implemented `sweepWorktreesOnStartup`/`sweepOneWorktree` in `cmd/forge/sdd_worktree.go` (enumerate `WorktreeList`, filter to `.forge/worktrees/`, skip bound worktrees via `isWorktreeBound`, evaluate the safe predicate, FR-013); triggered on the first (main-checkout) bind per repo in `startSddPipeline` (a cold start has no repo list, so first-bind is the correct, repo-scoped trigger).
-- [ ] T023 [US3] Carry the `binding` block from the status message into hook state in `frontend/src/hooks/useSddGate.js`. *(Frontend — needs dev server to verify.)*
-- [ ] T024 [US3] Render a concise `worktree: <branch>` indicator (and nothing when `isolated:false`, preserving SC-007) in `frontend/src/components/SddDashboard.jsx`; call `POST /api/sdd/worktree-close` on tab close. *(Frontend.)*
-- [ ] T025 [P] [US3] Frontend test for the indicator (shows branch when isolated; hidden on the main-checkout case) in `frontend/src/components/SddDashboard.test.jsx`. *(Frontend.)*
-- [ ] T026 [P] [US3] Optional: small worktree badge on the tab in `frontend/src/components/TabBar.jsx`. *(Frontend.)*
+- [X] T023 [US3] Carry the `binding` block from the status fetch + `SDD_PHASE_STATUS` into hook state (`binding`) in `frontend/src/hooks/useSddGate.js`; reset on session change.
+- [X] T024 [US3] Render the `⑂ worktree: <branch>` indicator (`WorktreeIndicator`, nothing when not isolated — SC-007) in `frontend/src/components/SddDashboard.jsx` + CSS; threaded `binding` via `App.jsx`; call `POST /api/sdd/worktree-close` on tab close in `frontend/src/hooks/useTabManager.js`.
+- [X] T025 [P] [US3] Frontend tests for the indicator (shows branch when isolated; hidden on main-checkout and on `isolated:false`) in `frontend/src/components/SddDashboard.test.jsx` — 40/40 green; full frontend suite 182/182 green.
+- [ ] T026 [P] [US3] Optional worktree badge on the tab in `frontend/src/components/TabBar.jsx`. *(Skipped — explicitly optional; the dashboard indicator already satisfies FR-007.)*
 
 **Checkpoint**: All three user stories are independently functional; lifecycle is safe and restart-durable.
 
@@ -117,7 +117,7 @@ Web/desktop split: Go backend in `cmd/forge/`, `internal/git/`, `internal/termin
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T027 [P] Playwright e2e in `tests/e2e/worktree-concurrency.spec.js`: US1 isolation (B's prompt inside `.forge/worktrees/…` via `window.term.buffer.active`; A unaffected), US2 per-pipeline report cards, US3 binding indicator + cleanup, and the **SC-007 regression** (single tab ⇒ no worktree/badge/prompt). Real events only (Article V/X).
+- [~] T027 [P] Playwright e2e written in `tests/e2e/worktree-concurrency.spec.js`: US3 binding indicator render + SC-007 regression (no indicator on main checkout) via the WS-injection harness; syntax-valid (`node --check`). **Run pending** (needs `run-dev-clean.ps1` dev server). Provisioning/isolation/cleanup/restart are proven by the real-git Go integration suite, which is the correct layer for on-disk assertions.
 - [X] T028 [P] Updated `CHANGELOG.md` under `[Unreleased]` describing automated worktrees for concurrent same-repo pipelines.
 - [X] T029 Edge: non-git working directory falls back to a single pipeline (FR-014) — guard in `resolveSddWorkspace`, covered by `TestResolveWorkspace_NonGitDirIsNotIsolated`.
 - [ ] T030 Edge: provisioning never disturbs a dirty primary checkout (FR-008) — partially covered (`TestResolveWorkspace_ProvisionsRealWorktree` asserts the main checkout stays clean); a pre-existing-dirty assertion is still worth adding. Concurrency cap remains deferred (default: no cap).
