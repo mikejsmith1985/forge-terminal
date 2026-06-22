@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Per-tab SDD session identity (`FORGE_SESSION_ID`)** — Each terminal session now injects a stable `FORGE_SESSION_ID` (equal to the tab id) into its shell: via `cmd.Env` on Unix and a per-ConPTY write on Windows (never process-wide `os.Setenv`, which could not distinguish concurrent tabs). This is the foundation for scoping SDD phase signals, gate-checks, and dashboard updates to a single session so concurrent pipelines never conflate. Verified by a real two-ConPTY integration test proving each child shell reads its own id with zero cross-session leakage. Phase 2 of `specs/010-sdd-authoritative-state`.
+
 ## [7.19.8] - 2026-06-20
 
 ---

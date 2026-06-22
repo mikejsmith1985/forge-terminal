@@ -9,5 +9,5 @@
 @.specify/memory/constitution.md
 
 <!-- SPECKIT START -->
-Active feature spec: @specs/008-sdd-real-enforcement/spec.md
+Active feature: @specs/010-sdd-authoritative-state/plan.md
 <!-- SPECKIT END -->
