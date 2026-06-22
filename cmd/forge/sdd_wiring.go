@@ -76,6 +76,9 @@ type sddPipeline struct {
 	// decisions holds the command-emitted decisions per phase (sdd.PhaseName -> []string),
 	// carried by the authoritative phase-event so the US3 report card can show them (FR-007a).
 	decisions sync.Map
+	// baselines holds the git work-tree snapshot (SHA) captured at each phase's start
+	// (sdd.PhaseName -> string), so the report card can diff the phase window (FR-014).
+	baselines sync.Map
 }
 
 // storeDecisions records the command-emitted decisions for a phase (FR-007a).
@@ -89,6 +92,19 @@ func (p *sddPipeline) decisionsFor(phase sdd.PhaseName) []string {
 		return value.([]string)
 	}
 	return nil
+}
+
+// storeBaseline records the git work-tree snapshot taken when a phase started (FR-014).
+func (p *sddPipeline) storeBaseline(phase sdd.PhaseName, treeSHA string) {
+	p.baselines.Store(phase, treeSHA)
+}
+
+// baselineFor returns the phase-start work-tree snapshot, or "" if none was captured.
+func (p *sddPipeline) baselineFor(phase sdd.PhaseName) string {
+	if value, ok := p.baselines.Load(phase); ok {
+		return value.(string)
+	}
+	return ""
 }
 
 // sddPipelines maps sessionId -> *sddPipeline. A sync.Map because binds (HTTP), decisions (HTTP),
@@ -111,6 +127,7 @@ func sddPipelineFor(sessionID string) (*sddPipeline, bool) {
 type sddGateEnvelope struct {
 	Type            string              `json:"type"`
 	ArtifactPreview *sddArtifactPreview `json:"artifactPreview,omitempty"`
+	ReportCard      *sddPhaseReportCard `json:"reportCard,omitempty"`
 	sdd.DecisionCard
 }
 
@@ -347,9 +364,13 @@ func newSddBroadcaster() sdd.GateBroadcaster {
 		}
 		envelope := sddGateEnvelope{Type: "SDD_PHASE_GATE", DecisionCard: card}
 
-		// Attach artifact preview for file-detected phases only.
-		if phase, ok := sdd.PhaseByName(card.Phase); ok && phase.ExpectedArtifact != "" {
-			if pipeline, bound := sddPipelineFor(card.SessionID); bound {
+		if pipeline, bound := sddPipelineFor(card.SessionID); bound {
+			// Concise report card (US3): files touched + scope + decisions, the default gate surface.
+			reportCard := buildSddPhaseReportCardForPipeline(pipeline, card.Phase)
+			envelope.ReportCard = &reportCard
+
+			// Artifact preview is the opt-in "view full output" source for file-detected phases (FR-009).
+			if phase, ok := sdd.PhaseByName(card.Phase); ok && phase.ExpectedArtifact != "" {
 				absPath := filepath.Join(pipeline.orchestrator.State().FeatureDir, phase.ExpectedArtifact)
 				preview := readSddArtifactPreview(absPath, sddArtifactMaxLines)
 				envelope.ArtifactPreview = &preview

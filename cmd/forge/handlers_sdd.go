@@ -148,6 +148,9 @@ func handleSddPhaseEvent(w http.ResponseWriter, r *http.Request) {
 func applySddPhaseEvent(pipeline *sddPipeline, request sddPhaseEventRequest, phase sdd.PhaseName) {
 	if request.Event == sddPhaseEventStarted {
 		if pipeline.orchestrator.MarkPhaseRunning(phase) {
+			// Snapshot the working tree now so the report card can diff only this phase's
+			// changes when it completes (FR-014).
+			pipeline.storeBaseline(phase, captureWorkTree(pipeline.repoRoot))
 			broadcastPhaseStatus(request.SessionID)
 		}
 		return

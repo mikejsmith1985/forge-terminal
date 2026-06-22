@@ -99,18 +99,18 @@ description: "Task list for SDD Authoritative State & Concise Phase Reports"
 
 ### Tests for User Story 3 (write first, must FAIL)
 
-- [ ] T023 [P] [US3] Unit test: report-card builder produces files/scope/decisions, enforces the ≤100-word essential target, and handles the empty-files and magnitude-unavailable branches, in `internal/sdd/report_card_test.go`.
-- [ ] T024 [P] [US3] Integration test: `git stash create` baseline + `git diff --numstat` yields only the phase-window file changes (FR-014), in `internal/sdd/report_card_test.go` (or `cmd/forge/handlers_sdd_phaseevent_test.go`).
-- [ ] T025 [P] [US3] e2e: grouped-bullet card render, "No files changed" case, "View full output" opt-in, and the "unbound — SDD inactive" indicator, in `tests/e2e/sdd-authoritative-state.spec.js`.
+- [x] T023 [P] [US3] Unit test: report-card builder produces files/scope/decisions, enforces the ≤100-word essential target, and handles the empty-files and magnitude-unavailable branches. **DONE in `cmd/forge/sdd_report_card_test.go` (deviation: built in cmd/forge from git, not the sdd domain): empty→"No files changed", derived scope, truncation, binary→nil magnitude. Green.**
+- [x] T024 [P] [US3] Integration test: baseline + `git diff --numstat` yields only the phase-window file changes (FR-014). **DONE: real temp-repo test proves NEW untracked files (added=3) AND modified tracked files (added=1) are captured via the work-tree tree-object diff; identical snapshots → empty. Green.**
+- [ ] T025 [P] [US3] e2e: grouped-bullet card render, "No files changed" case, "View full output" opt-in, and the "unbound — SDD inactive" indicator, in `tests/e2e/sdd-authoritative-state.spec.js`. **PENDING — needs the running app.**
 
 ### Implementation for User Story 3
 
-- [ ] T026 [P] [US3] Add `PhaseReportCard` and `FileChange` types in `internal/sdd/types.go` (per data-model.md).
-- [ ] T027 [US3] Capture the git baseline (`git stash create`, or `HEAD` when clean) at the `phase-event{started}` in `cmd/forge/sdd_wiring.go` and store it on `PipelineState.PhaseBaseline`.
-- [ ] T028 [US3] Build the report card by diffing `--numstat` against `PhaseBaseline` on `complete` in `cmd/forge/sdd_wiring.go` (FR-013 magnitude-unavailable fallback; FR-014 window scoping).
-- [ ] T029 [US3] Attach the `PhaseReportCard` to the `SDD_PHASE_GATE` envelope in `cmd/forge/sdd_wiring.go`.
-- [ ] T030 [US3] Render the grouped-bullet card (files / scope / decisions, truncate long file lists) and the "View full output" opt-in action in `frontend/src/components/SddDashboard.jsx` (FR-007, FR-008, FR-009).
-- [ ] T031 [US3] Add the "unbound — SDD inactive" indicator in `frontend/src/components/SddDashboard.jsx` / `frontend/src/components/ActionPromptStrip.jsx` (FR-011a).
+- [x] T026 [P] [US3] Add `PhaseReportCard` and `FileChange` types. **DONE (adapted): `sddPhaseReportCard` + `sddFileChange` in `cmd/forge/sdd_report_card.go` — a presentation/wire concern built from git, kept out of the pure sdd domain.**
+- [x] T027 [US3] Capture the git baseline at the `phase-event{started}` and store it. **DONE: `captureWorkTree` (full tracked+untracked snapshot via a private `GIT_INDEX_FILE`) stored per-phase on `sddPipeline.baselines`. Replaces `git stash create` — it captures NEW files too.**
+- [x] T028 [US3] Build the report card by diffing against the baseline on `complete` (FR-013/FR-014). **DONE: `buildSddPhaseReportCardForPipeline` — work-tree diff + decisions + run count; binary→magnitude unavailable.**
+- [x] T029 [US3] Attach the report card to the `SDD_PHASE_GATE` envelope. **DONE: `reportCard` field on `sddGateEnvelope`; artifact preview retained as the opt-in "view full output" source.**
+- [x] T030 [US3] Render the grouped-bullet card (files / scope / decisions, truncate long file lists) and the "View full output" opt-in action in `frontend/src/components/SddDashboard.jsx` (FR-007, FR-008, FR-009). **DONE: `ReportCard` component + CSS; 4 new vitest cases prove scope/files/+-counts/decisions/"+N more"/"±?" binary/"View full output" — 37/37 green.**
+- [ ] T031 [US3] Add the "unbound — SDD inactive" indicator in `frontend/src/components/SddDashboard.jsx` / `frontend/src/components/ActionPromptStrip.jsx` (FR-011a). **DEFERRED (rationale): the frontend binds via `activeTabId` independently of the shell's `FORGE_SESSION_ID`, so it cannot observe agent-side identity-injection failure without a NEW backend signal (e.g. the backend reporting "no phase-events seen / session unbound"). The visible inactive cases are already covered by the idle "No active feature" state and the "Gate enforcement inactive" hook banner. Full FR-011a indicator needs a backend unbound-detection signal — recommend a follow-up task rather than a misleading frontend-only guess.**
 
 **Checkpoint**: All three user stories independently functional.
 

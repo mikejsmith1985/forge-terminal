@@ -478,3 +478,87 @@
   padding: 2px 6px;
   border-color: transparent;
 }
+
+/* ── Phase report card (specs/010 US3): concise, scannable gate surface ───────── */
+.sdd-dashboard__report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  margin: 4px 0;
+  background: rgba(96, 165, 250, 0.06);
+  border: 1px solid rgba(96, 165, 250, 0.20);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.sdd-dashboard__report-scope {
+  margin: 0;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+.sdd-dashboard__report-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sdd-dashboard__report-group-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.sdd-dashboard__report-files,
+.sdd-dashboard__report-decisions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sdd-dashboard__report-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #94a3b8;
+}
+.sdd-dashboard__report-file-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+.sdd-dashboard__report-file-stat {
+  flex-shrink: 0;
+  font-family: monospace;
+  color: #22c55e;
+}
+.sdd-dashboard__report-more {
+  color: #64748b;
+  font-style: italic;
+}
+.sdd-dashboard__report-decision {
+  position: relative;
+  padding-left: 12px;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+.sdd-dashboard__report-decision::before {
+  content: '•';
+  position: absolute;
+  left: 2px;
+  color: #60a5fa;
+}
+.sdd-dashboard__report-full-output {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  color: #60a5fa;
+  font-size: 11px;
+  cursor: pointer;
+}
+.sdd-dashboard__report-full-output:hover {
+  text-decoration: underline;
+}
