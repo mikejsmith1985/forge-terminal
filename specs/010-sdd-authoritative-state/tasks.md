@@ -53,7 +53,7 @@ description: "Task list for SDD Authoritative State & Concise Phase Reports"
 
 - [x] T007 [P] [US1] Unit test: orchestrator transitions are driven by `PhaseEvent{started|complete}` and NOT by file-watcher events, in `internal/sdd/orchestrator_test.go`. **COVERED: the orchestrator is unchanged in US1 (dedup is wiring-level); the "watcher stands down" mechanism is proven by the existing `TestMarkPhaseRunning_IdempotentWhenAlreadyRunning`, and the event→state driving is proven by T008.**
 - [x] T008 [P] [US1] Integration test: `POST /api/sdd/phase-event` (started then complete) drives `MarkPhaseRunning`/`HandlePhaseComplete` and broadcasts `SDD_PHASE_STATUS`/`SDD_PHASE_GATE`, in `cmd/forge/handlers_sdd_phaseevent_test.go`. **DONE: 5 tests green (started→running, complete→gate+decisions, duplicate-complete no-op, unknown-session ignored, 400 validation).**
-- [ ] T009 [P] [US1] e2e: bar advances on the authoritative signal and does not flip on repeated edits, in `tests/e2e/sdd-authoritative-state.spec.js`. **PENDING — needs the running app + T014/T015 wired.**
+- [~] T009 [P] [US1] e2e: bar advances on the authoritative signal and does not flip on repeated edits, in `tests/e2e/sdd-authoritative-state.spec.js`. **WRITTEN (syntax-valid): "started → phase active, complete → awaiting decision" via the real phase-event endpoint. RUN PENDING — needs `run-dev-clean.ps1` on a build from this branch.**
 
 ### Implementation for User Story 1
 
@@ -78,7 +78,7 @@ description: "Task list for SDD Authoritative State & Concise Phase Reports"
 ### Tests for User Story 2 (write first, must FAIL)
 
 - [x] T017 [P] [US2] Unit test: `handleSddGateCheck` returns ONLY the requested session's gate state and never ranges over other pipelines, in `cmd/forge/handlers_sdd_test.go`. **DONE: `TestHandleSddGateCheck_ScopedToRequestingSession` + `_MissingSessionIdIsClosed`; existing gate-check tests updated to be session-aware (the contract changed).**
-- [ ] T018 [P] [US2] e2e: two tabs / two repos — no state bleed-through; gate in A does not block B; approve in A advances only A, in `tests/e2e/sdd-authoritative-state.spec.js`. **PENDING — needs the running app.**
+- [~] T018 [P] [US2] e2e: two tabs / two repos — no state bleed-through; gate in A does not block B; approve in A advances only A, in `tests/e2e/sdd-authoritative-state.spec.js`. **WRITTEN: "a gate opened in one tab does not appear after switching to a new tab". RUN PENDING — needs the dev server from this branch.**
 
 ### Implementation for User Story 2
 
@@ -101,7 +101,7 @@ description: "Task list for SDD Authoritative State & Concise Phase Reports"
 
 - [x] T023 [P] [US3] Unit test: report-card builder produces files/scope/decisions, enforces the ≤100-word essential target, and handles the empty-files and magnitude-unavailable branches. **DONE in `cmd/forge/sdd_report_card_test.go` (deviation: built in cmd/forge from git, not the sdd domain): empty→"No files changed", derived scope, truncation, binary→nil magnitude. Green.**
 - [x] T024 [P] [US3] Integration test: baseline + `git diff --numstat` yields only the phase-window file changes (FR-014). **DONE: real temp-repo test proves NEW untracked files (added=3) AND modified tracked files (added=1) are captured via the work-tree tree-object diff; identical snapshots → empty. Green.**
-- [ ] T025 [P] [US3] e2e: grouped-bullet card render, "No files changed" case, "View full output" opt-in, and the "unbound — SDD inactive" indicator, in `tests/e2e/sdd-authoritative-state.spec.js`. **PENDING — needs the running app.**
+- [~] T025 [P] [US3] e2e: grouped-bullet card render, "No files changed" case, "View full output" opt-in, and the "unbound — SDD inactive" indicator, in `tests/e2e/sdd-authoritative-state.spec.js`. **WRITTEN (via WS injection): renders scope/files/+-counts/decisions/View-full-output, plus the "No files changed" case. (Unbound indicator excluded — T031 deferred.) RUN PENDING — needs the dev server.**
 
 ### Implementation for User Story 3
 
