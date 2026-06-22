@@ -9,5 +9,5 @@
 @.specify/memory/constitution.md
 
 <!-- SPECKIT START -->
-Active feature: @specs/010-sdd-authoritative-state/plan.md
+Active feature: @specs/011-worktree-concurrency/plan.md
 <!-- SPECKIT END -->

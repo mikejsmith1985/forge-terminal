@@ -162,6 +162,10 @@ func deriveScope(files []sddFileChange) string {
 // buildSddPhaseReportCardForPipeline snapshots the working tree now, diffs it against the
 // baseline captured at phase start, and assembles the card with the pipeline's stashed
 // decisions and run count. Used by the gate broadcaster when a phase completes.
+//
+// All git snapshots are scoped to pipeline.repoRoot, which for a concurrent pipeline is its
+// isolated worktree path (specs/011). This is what guarantees each pipeline's report lists
+// ONLY its own files (FR-006) — do not substitute a main-checkout path here.
 func buildSddPhaseReportCardForPipeline(pipeline *sddPipeline, phase sdd.PhaseName) sddPhaseReportCard {
 	baseline := pipeline.baselineFor(phase)
 	endTree := captureWorkTree(pipeline.repoRoot)
