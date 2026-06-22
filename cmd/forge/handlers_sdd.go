@@ -136,6 +136,9 @@ func handleSddPhaseEvent(w http.ResponseWriter, r *http.Request) {
 	pipeline.orchestrator.BindSession(request.SessionID)
 	if featureDir := activeSddFeatureDir(pipeline.repoRoot); featureDir != "" {
 		pipeline.orchestrator.SetFeatureDir(featureDir)
+		// Promote a provisional worktree branch to feature/<spec-dir-name> now that the
+		// feature is known (specs/011, FR-010); no-op for non-isolated pipelines.
+		reconcileWorktreeBranch(pipeline, featureDir)
 	}
 
 	applySddPhaseEvent(pipeline, request, phase)
@@ -191,6 +194,44 @@ func activeSddFeatureDir(repoRoot string) string {
 	return filepath.Join(repoRoot, filepath.FromSlash(parsed.FeatureDirectory))
 }
 
+// sddWorktreeCloseRequest is the POST /api/sdd/worktree-close body — the explicit
+// "this tab was closed" signal the frontend sends when a user closes a tab.
+type sddWorktreeCloseRequest struct {
+	SessionID string `json:"sessionId"`
+}
+
+// handleSddWorktreeClose evaluates safe cleanup for a closed tab's worktree
+// (specs/011, FR-011). It is deliberately driven by an EXPLICIT close — not a
+// WebSocket disconnect — because Forge supports reconnection, so a dropped socket
+// must never tear down a worktree a reconnecting tab is still using. Cleanup is
+// safe-only: an un-merged or dirty worktree is retained and reported (FR-012).
+func handleSddWorktreeClose(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeSddError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var request sddWorktreeCloseRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeSddError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if request.SessionID == "" {
+		writeSddError(w, http.StatusBadRequest, "sessionId is required")
+		return
+	}
+
+	pipeline, found := sddPipelineFor(request.SessionID)
+	if !found {
+		writeSddJSON(w, http.StatusOK, map[string]any{"removed": false, "status": "no pipeline"})
+		return
+	}
+	removed, warning := safeCleanupWorktree(pipeline)
+	if removed {
+		sddPipelines.Delete(request.SessionID)
+	}
+	writeSddJSON(w, http.StatusOK, map[string]any{"removed": removed, "warning": warning})
+}
+
 // handleSddStatus returns the current phase status for a session (used by the
 // SddPipelinePanel on mount for cold-start recovery after a page reload; the
 // WebSocket SDD_PHASE_STATUS event maintains live state thereafter).
@@ -218,6 +259,7 @@ func handleSddStatus(w http.ResponseWriter, r *http.Request) {
 		"sessionId": sessionID,
 		"feature":   filepath.Base(state.FeatureDir),
 		"phases":    buildPhaseStatuses(pipeline),
+		"binding":   sddBindingInfoFor(pipeline),
 	}
 	// Include the pending card so the frontend can restore the decision bar after a
 	// page reload — SDD_PHASE_GATE events are not replayed on reconnect (FR-012).

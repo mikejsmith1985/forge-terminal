@@ -394,7 +394,17 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
    */
   const closeTab = useCallback((tabId) => {
     logger.tabs('Close tab requested', { tabId });
-    
+
+    // Closing a tab is the explicit signal that its SDD pipeline is done with (specs/011).
+    // Tell the backend so it can safe-clean an isolated worktree (merged + clean only; an
+    // un-merged or dirty worktree is retained). Best-effort: never block tab close on it.
+    fetch('/api/sdd/worktree-close', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: tabId }),
+    }).catch(() => {});
+
     setState(prev => {
       // Don't close the last tab
       if (prev.tabs.length <= 1) {

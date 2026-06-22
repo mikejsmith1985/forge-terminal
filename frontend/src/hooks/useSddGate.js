@@ -44,6 +44,9 @@ export function useSddGate({ activeSessionId }) {
   const [phaseStatuses, setPhaseStatuses] = useState([])
   // Active feature name extracted from SDD_PHASE_STATUS events.
   const [featureName, setFeatureName] = useState('')
+  // Worktree binding for this session (specs/011): { isolated, worktreePath, branch, baseBranch }
+  // or null when the tab runs on the repo's main checkout (no worktree indicator shown).
+  const [binding, setBinding] = useState(null)
   // Accumulated gate summaries keyed by phase name. Ref to avoid extra re-renders.
   const phaseSummaries = useRef({})
   // Default true: avoids a flash-of-banner while the fetch is in flight. The banner only
@@ -72,6 +75,7 @@ export function useSddGate({ activeSessionId }) {
     setDecisionError(null)
     setIsSubmitting(false)
     setFeatureName('')
+    setBinding(null)
     phaseSummaries.current = {}
     fetch(`${STATUS_ENDPOINT}?sessionId=${encodeURIComponent(activeSessionId)}`, {
       credentials: 'same-origin',
@@ -80,6 +84,8 @@ export function useSddGate({ activeSessionId }) {
       .then((data) => {
         if (data?.phases?.length) setPhaseStatuses(data.phases)
         if (data?.feature) setFeatureName(data.feature)
+        // Worktree binding (specs/011) — only meaningful when isolated.
+        if (data?.binding?.isolated) setBinding(data.binding)
         // Restore a pending gate card after page reload. SDD_PHASE_GATE events are
         // not replayed on reconnect, so the status endpoint includes the pending card
         // when one exists so the decision bar reappears without a new WS event.
@@ -105,6 +111,9 @@ export function useSddGate({ activeSessionId }) {
         if (parsed.sessionId !== activeSessionId) return
         setPhaseStatuses(parsed.phases ?? [])
         if (parsed.feature !== undefined) setFeatureName(parsed.feature)
+        // Track the worktree binding so the dashboard can show which worktree/branch this
+        // tab runs in (specs/011, FR-007); isolated:false clears the indicator.
+        if (parsed.binding !== undefined) setBinding(parsed.binding?.isolated ? parsed.binding : null)
         return
       }
 
@@ -199,6 +208,7 @@ export function useSddGate({ activeSessionId }) {
     isSubmitting,
     phaseStatuses,
     featureName,
+    binding,
     phaseSummaries,
     isHookInstalled,
     handleWsMessage,

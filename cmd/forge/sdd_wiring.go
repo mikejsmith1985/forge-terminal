@@ -29,20 +29,20 @@ import (
 // heuristics: "the terminal was silent for sddPhaseQuietMs" stands in for "the phase command
 // finished," which is reliable for a quick analyze but only best-effort for a long Implement.
 const (
-	sddPhaseFloorMs    = 4000           // let the injected command start before watching for quiet
-	sddPhaseQuietMs    = 8000           // 8s of terminal silence => the phase command finished
-	sddPhaseMaxMs      = 30 * 60 * 1000 // 30-minute safety cap (Implement can run long)
-	sddArtifactMaxLines = 200           // line cap for artifact preview embedded in SDD_PHASE_GATE
+	sddPhaseFloorMs     = 4000           // let the injected command start before watching for quiet
+	sddPhaseQuietMs     = 8000           // 8s of terminal silence => the phase command finished
+	sddPhaseMaxMs       = 30 * 60 * 1000 // 30-minute safety cap (Implement can run long)
+	sddArtifactMaxLines = 200            // line cap for artifact preview embedded in SDD_PHASE_GATE
 )
 
 // sddArtifactPreview carries the embedded artifact preview sent inside SDD_PHASE_GATE.
 // Content is empty (not nil) when the file could not be read, allowing callers to use
 // `preview.Content != ""` as a readiness check without a nil dereference.
 type sddArtifactPreview struct {
-	Content    string `json:"content"`
-	FilePath   string `json:"filePath"`
-	TotalLines int    `json:"totalLines"`
-	IsTruncated bool  `json:"isTruncated"`
+	Content     string `json:"content"`
+	FilePath    string `json:"filePath"`
+	TotalLines  int    `json:"totalLines"`
+	IsTruncated bool   `json:"isTruncated"`
 }
 
 // readSddArtifactPreview reads absPath and returns the first maxLines lines as a preview.
@@ -79,6 +79,15 @@ type sddPipeline struct {
 	// baselines holds the git work-tree snapshot (SHA) captured at each phase's start
 	// (sdd.PhaseName -> string), so the report card can diff the phase window (FR-014).
 	baselines sync.Map
+	// Worktree binding (specs/011). gitCommonDir is the per-repo grouping key used to detect
+	// concurrency; when isIsolated, the pipeline runs in worktreePath on its own branch instead
+	// of the repository's main checkout, so repoRoot above already points at the worktree.
+	gitCommonDir string
+	mainRepoRoot string
+	worktreePath string
+	branch       string
+	baseBranch   string
+	isIsolated   bool
 }
 
 // storeDecisions records the command-emitted decisions for a phase (FR-007a).
@@ -157,15 +166,31 @@ func handleSddBind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Idempotent: already watching this exact repo for this session — leave it (and its pending
-	// card) untouched.
-	if existing, ok := sddPipelineFor(request.SessionID); ok && sameSddRepo(existing.repoRoot, request.RepoRoot) {
-		writeSddJSON(w, http.StatusOK, map[string]string{"status": "bound"})
+	// Idempotent: an already-isolated session stays put (the frontend may briefly still report the
+	// pre-cd path), and a re-bind to the same repo leaves the pipeline (and its pending card) intact.
+	if existing, ok := sddPipelineFor(request.SessionID); ok && (existing.isIsolated || sameSddRepo(existing.repoRoot, request.RepoRoot)) {
+		writeSddJSON(w, http.StatusOK, sddBindResponse(existing))
 		return
 	}
 
-	startSddPipeline(request.SessionID, request.RepoRoot)
-	writeSddJSON(w, http.StatusOK, map[string]string{"status": "bound"})
+	// Concurrency detection + worktree provisioning (specs/011): a second pipeline in the same repo
+	// is bound to an isolated worktree; the first/only pipeline keeps the main checkout (FR-005).
+	effectiveRepoRoot, binding := resolveSddWorkspace(request.SessionID, request.RepoRoot)
+	startSddPipeline(request.SessionID, effectiveRepoRoot, binding)
+	pipeline, _ := sddPipelineFor(request.SessionID)
+	writeSddJSON(w, http.StatusOK, sddBindResponse(pipeline))
+}
+
+// sddBindResponse builds the bind reply, carrying the worktree binding additively so existing
+// clients ignore the extra fields while the frontend can show the isolation indicator (FR-007).
+func sddBindResponse(pipeline *sddPipeline) map[string]any {
+	response := map[string]any{"status": "bound"}
+	if pipeline != nil && pipeline.isIsolated {
+		response["isolated"] = true
+		response["worktreePath"] = pipeline.worktreePath
+		response["branch"] = pipeline.branch
+	}
+	return response
 }
 
 // sameSddRepo compares two repo roots for binding idempotency, tolerant of separator/casing diffs.
@@ -175,8 +200,9 @@ func sameSddRepo(left, right string) bool {
 }
 
 // startSddPipeline creates (or replaces, if the repo changed) the pipeline for a session and
-// starts its watcher. Eager: no feature is required up front.
-func startSddPipeline(sessionID, repoRoot string) {
+// starts its watcher. Eager: no feature is required up front. The binding records whether the
+// pipeline runs in an isolated worktree (specs/011); repoRoot is already the worktree path then.
+func startSddPipeline(sessionID, repoRoot string, binding sddWorktreeBinding) {
 	// Replace any prior pipeline for this session (e.g. the session moved to a different repo).
 	if old, ok := sddPipelineFor(sessionID); ok {
 		old.watcher.Stop()
@@ -208,10 +234,27 @@ func startSddPipeline(sessionID, repoRoot string) {
 		return
 	}
 
-	pipeline := &sddPipeline{orchestrator: orchestrator, watcher: watcher, repoRoot: repoRoot}
+	pipeline := &sddPipeline{
+		orchestrator: orchestrator,
+		watcher:      watcher,
+		repoRoot:     repoRoot,
+		gitCommonDir: binding.gitCommonDir,
+		mainRepoRoot: binding.mainRepoRoot,
+		worktreePath: binding.worktreePath,
+		branch:       binding.branch,
+		baseBranch:   binding.baseBranch,
+		isIsolated:   binding.isIsolated,
+	}
 	sddPipelines.Store(sessionID, pipeline)
 	go runSddDetector(pipeline, sessionID)
-	log.Printf("[sdd] pipeline bound (eager): session=%s repo=%s", sessionID, repoRoot)
+	log.Printf("[sdd] pipeline bound (eager): session=%s repo=%s isolated=%t", sessionID, repoRoot, binding.isIsolated)
+
+	// On the first (main-checkout) bind to a repo, reclaim any merged+clean worktrees left over
+	// from a previous run (specs/011, FR-013). Bound worktrees are skipped, so this is safe to run
+	// while other tabs are open. Best-effort and async so the bind response is never blocked.
+	if !binding.isIsolated && binding.gitCommonDir != "" {
+		go sweepWorktreesOnStartup([]string{repoRoot})
+	}
 }
 
 // runSddDetector consumes watcher notifications and gates each recognized phase artifact.
@@ -385,10 +428,11 @@ func newSddBroadcaster() sdd.GateBroadcaster {
 // sddPhaseStatusEnvelope is the SDD_PHASE_STATUS on-wire message pushed after every
 // phase completion and after every decision, so the status panel stays current.
 type sddPhaseStatusEnvelope struct {
-	Type      string               `json:"type"`
-	SessionID string               `json:"sessionId"`
-	Feature   string               `json:"feature"`
+	Type      string                 `json:"type"`
+	SessionID string                 `json:"sessionId"`
+	Feature   string                 `json:"feature"`
 	Phases    []sdd.PhaseStatusEntry `json:"phases"`
+	Binding   sddBindingInfo         `json:"binding"`
 }
 
 // buildPhaseStatuses derives the display status for every pipeline phase. Orchestrator
@@ -504,6 +548,7 @@ func broadcastPhaseStatus(sessionID string) {
 		SessionID: sessionID,
 		Feature:   filepath.Base(state.FeatureDir),
 		Phases:    buildPhaseStatuses(pipeline),
+		Binding:   sddBindingInfoFor(pipeline),
 	})
 }
 

@@ -562,3 +562,19 @@
 .sdd-dashboard__report-full-output:hover {
   text-decoration: underline;
 }
+
+/* Worktree binding indicator (specs/011, FR-007): a quiet chip in the header showing
+   which isolated worktree/branch this tab runs in. Absent on the main checkout. */
+.sdd-dashboard__worktree {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(96, 165, 250, 0.12);
+  color: #93c5fd;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}

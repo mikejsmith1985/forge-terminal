@@ -30,6 +30,7 @@ function DashboardFixture(props) {
     <SddDashboard
       phases={props.phases ?? []}
       featureName={props.featureName ?? ''}
+      binding={props.binding ?? null}
       phaseSummaries={phaseSummaries}
       isCardOpen={props.isCardOpen ?? false}
       card={props.card ?? null}
@@ -475,5 +476,31 @@ describe('SddDashboard report card', () => {
   it('does not render the report card when the gate has none', () => {
     render(<DashboardFixture phases={SIX_PHASES} isCardOpen card={gateCard(null)} />)
     expect(screen.queryByTestId('sdd-report-card')).not.toBeInTheDocument()
+  })
+})
+
+// ── Worktree binding indicator (specs/011, US3 / FR-007) ──────────────────────
+
+describe('SddDashboard worktree indicator', () => {
+  it('shows the worktree branch when the tab runs in an isolated worktree', () => {
+    render(
+      <DashboardFixture
+        phases={SIX_PHASES}
+        binding={{ isolated: true, branch: 'feature/011-worktree-concurrency', worktreePath: 'C:/repo/.forge/worktrees/wt1' }}
+      />
+    )
+    const indicator = screen.getByTestId('sdd-worktree-indicator')
+    expect(indicator).toBeInTheDocument()
+    expect(indicator).toHaveTextContent('feature/011-worktree-concurrency')
+  })
+
+  it('renders no indicator on the main checkout (single-pipeline case unchanged, SC-007)', () => {
+    render(<DashboardFixture phases={SIX_PHASES} binding={null} />)
+    expect(screen.queryByTestId('sdd-worktree-indicator')).not.toBeInTheDocument()
+  })
+
+  it('renders no indicator when binding is present but not isolated', () => {
+    render(<DashboardFixture phases={SIX_PHASES} binding={{ isolated: false }} />)
+    expect(screen.queryByTestId('sdd-worktree-indicator')).not.toBeInTheDocument()
   })
 })

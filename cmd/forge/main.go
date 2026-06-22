@@ -623,6 +623,9 @@ func main() {
 	// "started" marks a phase running, "complete" opens its gate — replacing file-watcher
 	// inference as the primary state driver (specs/010-sdd-authoritative-state, FR-001).
 	http.HandleFunc("/api/sdd/phase-event", WrapWithMiddleware(handleSddPhaseEvent))
+	// worktree-close is the explicit tab-close signal: it safe-cleans the closed tab's isolated
+	// worktree (merged+clean only), never on a transient socket drop (specs/011, FR-011/FR-012).
+	http.HandleFunc("/api/sdd/worktree-close", WrapWithMiddleware(handleSddWorktreeClose))
 	// gate-check is polled by the PreToolUse hook before each speckit Skill run to enforce that
 	// the developer approves each phase before the agent advances (specs/008-sdd-real-enforcement).
 	http.HandleFunc("/api/sdd/gate-check", WrapWithMiddleware(handleSddGateCheck))
