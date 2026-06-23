@@ -26,6 +26,7 @@ type execRunner struct{}
 func (execRunner) Run(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	setSysProcAttr(cmd) // suppress console window on Windows (CREATE_NO_WINDOW)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
