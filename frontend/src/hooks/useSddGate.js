@@ -74,6 +74,8 @@ export function useSddGate({ activeSessionId }) {
     setCard(null)
     setDecisionError(null)
     setIsSubmitting(false)
+    // Reset phases immediately so the new session never briefly shows the old session's pipeline.
+    setPhaseStatuses([])
     setFeatureName('')
     setBinding(null)
     phaseSummaries.current = {}
@@ -82,7 +84,8 @@ export function useSddGate({ activeSessionId }) {
     })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
-        if (data?.phases?.length) setPhaseStatuses(data.phases)
+        // Always update — even an empty array must replace any stale phases from the previous session.
+        setPhaseStatuses(Array.isArray(data?.phases) ? data.phases : [])
         if (data?.feature) setFeatureName(data.feature)
         // Worktree binding (specs/011) — only meaningful when isolated.
         if (data?.binding?.isolated) setBinding(data.binding)

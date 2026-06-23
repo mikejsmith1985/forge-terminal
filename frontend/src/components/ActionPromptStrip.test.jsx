@@ -60,6 +60,13 @@ describe('deriveActionPrompt', () => {
     )
   })
 
+  it('returns start prompt when phases is null (null-safety guard)', () => {
+    // phases can be null during a React re-render race on session switch — must not throw.
+    expect(deriveActionPrompt(null, false)).toBe(
+      'Run /speckit-specify to start a new feature.'
+    )
+  })
+
   it('returns unknown-state fallback for an unrecognised pipeline state', () => {
     // PROMPT_UNKNOWN is the exported constant for the unreachable fallback branch.
     // We verify the constant exists and has the correct value.
@@ -97,6 +104,12 @@ describe('ActionPromptStrip', () => {
 
   it('renders start prompt with empty phases', () => {
     render(<ActionPromptStrip phases={[]} isCardOpen={false} />)
+    expect(screen.getByText('Run /speckit-specify to start a new feature.')).toBeInTheDocument()
+  })
+
+  it('renders without crashing when phases is null (null-safety guard)', () => {
+    // null can arrive briefly during a session-switch re-render; the component must not throw.
+    render(<ActionPromptStrip phases={null} isCardOpen={false} />)
     expect(screen.getByText('Run /speckit-specify to start a new feature.')).toBeInTheDocument()
   })
 })

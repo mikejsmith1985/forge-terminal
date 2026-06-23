@@ -47,7 +47,7 @@ const SEVERITY_MOD = { info: 'info', warn: 'warn', block: 'block' }
 
 /** Derive a pipeline-level badge key from the phases array. */
 function derivePipelineBadge(phases) {
-  if (phases.length === 0) return 'idle'
+  if (!phases || phases.length === 0) return 'idle'
   if (phases.every((p) => p.displayStatus === 'complete')) return 'complete'
   if (phases.some((p) => p.displayStatus === 'iterating')) return 'iterating'
   if (phases.some((p) => p.displayStatus === 'awaiting-decision')) return 'awaiting'
@@ -63,7 +63,7 @@ function baseName(filePath) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function DashboardHeader({ featureName, phases, binding }) {
+function DashboardHeader({ featureName, phases = [], binding }) {
   const badgeKey = derivePipelineBadge(phases)
   const { label, mod } = PIPELINE_BADGE[badgeKey]
   return (
@@ -137,7 +137,7 @@ function PhaseCell({ entry, isSelected, onClick }) {
 }
 
 function PhaseRail({ phases, selectedPhase, onCellClick }) {
-  if (phases.length === 0) {
+  if (!phases || phases.length === 0) {
     return (
       <div className="sdd-dashboard__rail">
         <div className="sdd-dashboard__idle-row">
