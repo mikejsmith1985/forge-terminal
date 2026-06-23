@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **SDD bar phases now advance correctly** — The phase bar was stuck at "pending" for all phases in v7.20.0. Root cause: the PreToolUse hook's `started` signal marks the phase running, but the file watcher then sees `MarkPhaseRunning` return false and exits before launching the settlement goroutine that opens the gate. Added `IsPhaseRunning` to the orchestrator so the watcher can detect "already claimed by the hook" and still settle the phase, making the gate open as expected.
 - **SDD phase bar pending state is more visible** — Pending phase cells were rendered with `#4a4a4a` icon color on a `#0e0e0e` background (near-invisible), making a correctly-idle bar look identical to a broken one. Pending icons now use `#666` for clear visual distinction from active (#60a5fa) and complete (#22c55e) states.
+- **No more blank console windows on tab open or app restart (Windows)** — Every `git` subprocess spawned by the SDD worktree automation (`internal/git`) now sets `CREATE_NO_WINDOW` via `SysProcAttr`. Previously, each `git rev-parse` / `git worktree add` call during bind or the startup sweep briefly opened a visible blank console window on Windows, producing the cascading-window effect shown when a second concurrent tab was opened or when the app restarted after an update.
 
 ## [7.20.0] - 2026-06-22
 
