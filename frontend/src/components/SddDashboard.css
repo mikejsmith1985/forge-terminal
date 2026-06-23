@@ -128,7 +128,7 @@
   text-align: center;
 }
 
-.sdd-dashboard__cell--pending     .sdd-dashboard__cell-icon { color: #4a4a4a; }
+.sdd-dashboard__cell--pending     .sdd-dashboard__cell-icon { color: #666; }
 .sdd-dashboard__cell--active      .sdd-dashboard__cell-icon { color: #60a5fa; animation: sdd-spin 0.8s linear infinite; }
 .sdd-dashboard__cell--awaiting-decision .sdd-dashboard__cell-icon { color: #fbbf24; }
 .sdd-dashboard__cell--iterating   .sdd-dashboard__cell-icon { color: #f59e0b; animation: sdd-spin 0.8s linear infinite; }

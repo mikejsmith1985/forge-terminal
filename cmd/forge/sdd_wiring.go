@@ -289,17 +289,22 @@ func gateSddArtifact(pipeline *sddPipeline, sessionID, changedPath string) {
 	pipeline.orchestrator.SetFeatureDir(featureDir)
 
 	// Step 1 — mark running immediately so the UI spinner appears before the gate opens.
-	// Returns false when the gate is already open (duplicate watcher fire) or the pipeline is
-	// complete; skip in those cases to avoid corrupting orchestrator state.
-	if !pipeline.orchestrator.MarkPhaseRunning(phase) {
-		return
+	// Returns false when the gate is already open (a duplicate watcher fire), the pipeline is
+	// complete, OR this phase was already claimed by the authoritative `started` signal from the
+	// PreToolUse hook (specs/010). In the last case we still need the settlement goroutine — the
+	// hook marks running early but never sends `complete`, so the watcher is the sole gate-opener.
+	isNewTransition := pipeline.orchestrator.MarkPhaseRunning(phase)
+	isAlreadyRunningThisPhase := !isNewTransition && pipeline.orchestrator.IsPhaseRunning(phase)
+	if !isNewTransition && !isAlreadyRunningThisPhase {
+		return // Duplicate fire, gate open, or pipeline complete — nothing to do.
 	}
-	broadcastPhaseStatus(sessionID)
+	if isNewTransition {
+		broadcastPhaseStatus(sessionID) // First transition: push spinner to frontend.
+	}
 
 	// Step 2 — wait for PTY silence, then open the gate. This watcher path is now the FALLBACK
-	// (specs/010, FR-002): the authoritative phase-event is the primary completion signal. If it
-	// already opened this phase's gate while we were settling, the watcher stands down so the
-	// phase is never completed twice.
+	// (specs/010, FR-002): if the authoritative phase-event already opened the gate while we were
+	// settling, the watcher stands down so the phase is never completed twice.
 	go func() {
 		settleArtifactPhase(sessionID)
 		state := pipeline.orchestrator.State()

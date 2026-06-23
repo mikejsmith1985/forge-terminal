@@ -311,6 +311,41 @@ func TestMarkPhaseRunning_SuppressedWhenPipelineComplete(t *testing.T) {
 	}
 }
 
+func TestIsPhaseRunning_TrueWhenStatusRunningAndPhaseMatches(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	orchestrator.MarkPhaseRunning(PhaseSpecify)
+
+	if !orchestrator.IsPhaseRunning(PhaseSpecify) {
+		t.Error("IsPhaseRunning(specify) = false; want true while pipeline is StatusRunning for specify")
+	}
+}
+
+func TestIsPhaseRunning_FalseWhenDifferentPhaseIsRunning(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	orchestrator.MarkPhaseRunning(PhaseSpecify)
+
+	if orchestrator.IsPhaseRunning(PhaseClarify) {
+		t.Error("IsPhaseRunning(clarify) = true; want false when specify is the running phase")
+	}
+}
+
+func TestIsPhaseRunning_FalseWhenAwaitingDecision(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+	orchestrator.HandlePhaseComplete(PhaseSpecify, "spec.md")
+
+	if orchestrator.IsPhaseRunning(PhaseSpecify) {
+		t.Error("IsPhaseRunning(specify) = true; want false when gate is open (AwaitingDecision)")
+	}
+}
+
+func TestIsPhaseRunning_FalseWhenIdle(t *testing.T) {
+	orchestrator, _, _ := newTestOrchestrator(t)
+
+	if orchestrator.IsPhaseRunning(PhaseSpecify) {
+		t.Error("IsPhaseRunning(specify) = true; want false when pipeline is idle")
+	}
+}
+
 func TestSetFeatureDir_UpdatesStateForLazyActivation(t *testing.T) {
 	orchestrator, _, _ := newTestOrchestrator(t)
 
