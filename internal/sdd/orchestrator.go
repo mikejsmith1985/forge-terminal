@@ -127,6 +127,16 @@ func (o *Orchestrator) MarkPhaseRunning(phase PhaseName) bool {
 	return true
 }
 
+// IsPhaseRunning reports whether the pipeline is currently in StatusRunning for the exact
+// given phase. The watcher fallback uses this to determine whether a `started` signal from
+// the PreToolUse hook already claimed the running slot — if so, the watcher must still launch
+// its settlement goroutine even though MarkPhaseRunning returned false (specs/010 interaction fix).
+func (o *Orchestrator) IsPhaseRunning(phase PhaseName) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.state.Status == StatusRunning && o.state.CurrentPhase == phase
+}
+
 // ReconcileFromDisk forward-scans the phase table and advances CurrentPhase to the highest
 // phase whose expected artifact exists on disk. It stops at the first missing artifact so that
 // only a contiguous prefix of completed phases is recognised. The method is idempotent and
