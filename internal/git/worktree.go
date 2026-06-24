@@ -4,7 +4,10 @@
 // merged/clean predicates) is unit-tested without a real repo.
 package git
 
-import "strings"
+import (
+	"path/filepath"
+	"strings"
+)
 
 // Worktree is one entry from `git worktree list --porcelain`.
 type Worktree struct {
@@ -13,11 +16,20 @@ type Worktree struct {
 	Head   string // commit SHA the worktree points at
 }
 
-// GitCommonDir returns `git rev-parse --git-common-dir` for dir — the shared
-// .git directory that uniquely identifies a repository across all its worktrees.
-// It is the grouping key for "is another pipeline already live in this repo?".
+// GitCommonDir returns the absolute path of the shared .git directory for dir —
+// the stable identity key used to decide whether two sessions are in the same repo.
+// git rev-parse --git-common-dir returns a relative path (".git") when called from
+// the main checkout but an absolute path from a linked worktree, so we normalize to
+// absolute here so the grouping key is the same regardless of which entry-point is used.
 func (c *Client) GitCommonDir(dir string) (string, error) {
-	return c.runner.Run(dir, "rev-parse", "--git-common-dir")
+	out, err := c.runner.Run(dir, "rev-parse", "--git-common-dir")
+	if err != nil || out == "" {
+		return out, err
+	}
+	if !filepath.IsAbs(out) {
+		out = filepath.Join(dir, out)
+	}
+	return filepath.Clean(out), nil
 }
 
 // Toplevel returns the working-tree root of dir (`rev-parse --show-toplevel`).

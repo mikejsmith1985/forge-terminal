@@ -5,6 +5,7 @@ package git
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -48,16 +49,30 @@ func (f *fakeRunner) called(joined string) bool {
 }
 
 func TestGitCommonDirAndToplevel(t *testing.T) {
-	fake := newFakeRunner()
-	fake.outputs["rev-parse --git-common-dir"] = "C:/repo/.git"
-	fake.outputs["rev-parse --show-toplevel"] = "C:/repo"
-	client := NewWithRunner(fake)
+	// Absolute output (linked-worktree case): git already returns an absolute path;
+	// GitCommonDir must pass it through unchanged (after filepath.Clean).
+	fakeAbs := newFakeRunner()
+	fakeAbs.outputs["rev-parse --git-common-dir"] = "C:/repo/.git"
+	fakeAbs.outputs["rev-parse --show-toplevel"] = "C:/repo"
+	clientAbs := NewWithRunner(fakeAbs)
 
-	if got, err := client.GitCommonDir("C:/repo"); err != nil || got != "C:/repo/.git" {
-		t.Fatalf("GitCommonDir = %q, %v; want C:/repo/.git, nil", got, err)
+	wantAbs := filepath.Clean("C:/repo/.git")
+	if got, err := clientAbs.GitCommonDir("C:/repo"); err != nil || got != wantAbs {
+		t.Fatalf("GitCommonDir(abs) = %q, %v; want %q, nil", got, err, wantAbs)
 	}
-	if got, err := client.Toplevel("C:/repo"); err != nil || got != "C:/repo" {
+	if got, err := clientAbs.Toplevel("C:/repo"); err != nil || got != "C:/repo" {
 		t.Fatalf("Toplevel = %q, %v; want C:/repo, nil", got, err)
+	}
+
+	// Relative output (main-checkout case): git returns ".git" — GitCommonDir must
+	// join with dir so two sessions in different repos are never treated as the same.
+	fakeRel := newFakeRunner()
+	fakeRel.outputs["rev-parse --git-common-dir"] = ".git"
+	clientRel := NewWithRunner(fakeRel)
+
+	wantRel := filepath.Clean("C:/repo/.git")
+	if got, err := clientRel.GitCommonDir("C:/repo"); err != nil || got != wantRel {
+		t.Fatalf("GitCommonDir(rel) = %q, %v; want %q, nil", got, err, wantRel)
 	}
 }
 

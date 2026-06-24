@@ -257,8 +257,12 @@ function DecisionBar({ card, isSubmitting, decisionError, onAction, onClarify })
  */
 function ReportCard({ reportCard, artifactPreview, onFileOpen }) {
   if (!reportCard) return null
-  const { files = [], totalFiles = 0, filesTruncated = false, scope = '', decisions = [] } = reportCard
-  const hiddenCount = Math.max(0, totalFiles - files.length)
+  const { files, totalFiles = 0, filesTruncated = false, scope = '', decisions } = reportCard
+  // Use ?? [] instead of destructuring defaults: a Go nil slice serialises as JSON
+  // null, and JS destructuring defaults only apply for undefined — not null.
+  const safeFiles = files ?? []
+  const safeDecisions = decisions ?? []
+  const hiddenCount = Math.max(0, totalFiles - safeFiles.length)
   const fullOutputPath = artifactPreview?.filePath
 
   const formatStat = (file) =>
@@ -270,11 +274,11 @@ function ReportCard({ reportCard, artifactPreview, onFileOpen }) {
     <div className="sdd-dashboard__report-card" data-testid="sdd-report-card">
       <p className="sdd-dashboard__report-scope">{scope}</p>
 
-      {files.length > 0 && (
+      {safeFiles.length > 0 && (
         <div className="sdd-dashboard__report-group">
           <span className="sdd-dashboard__report-group-label">Files</span>
           <ul className="sdd-dashboard__report-files">
-            {files.map((file, index) => (
+            {safeFiles.map((file, index) => (
               <li key={`${file.path}-${index}`} className="sdd-dashboard__report-file">
                 <FileText size={11} aria-hidden="true" />
                 <span className="sdd-dashboard__report-file-path" title={file.path}>{baseName(file.path)}</span>
@@ -290,11 +294,11 @@ function ReportCard({ reportCard, artifactPreview, onFileOpen }) {
         </div>
       )}
 
-      {decisions.length > 0 && (
+      {safeDecisions.length > 0 && (
         <div className="sdd-dashboard__report-group">
           <span className="sdd-dashboard__report-group-label">Decisions</span>
           <ul className="sdd-dashboard__report-decisions">
-            {decisions.map((decision, index) => (
+            {safeDecisions.map((decision, index) => (
               <li key={index} className="sdd-dashboard__report-decision">{decision}</li>
             ))}
           </ul>

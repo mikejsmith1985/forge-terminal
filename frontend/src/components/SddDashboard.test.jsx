@@ -477,6 +477,22 @@ describe('SddDashboard report card', () => {
     render(<DashboardFixture phases={SIX_PHASES} isCardOpen card={gateCard(null)} />)
     expect(screen.queryByTestId('sdd-report-card')).not.toBeInTheDocument()
   })
+
+  it('renders without crashing when files or decisions are null (Go nil-slice serialised as JSON null)', () => {
+    // A Go nil []sddFileChange or []string serialises as JSON null, not [].
+    // JS destructuring defaults only guard undefined, so null must be handled explicitly.
+    const card = gateCard({
+      phase: 'specify',
+      scope: 'No files changed',
+      totalFiles: 0,
+      filesTruncated: false,
+      files: null,      // the crash scenario: Go nil slice → JSON null
+      decisions: null,  // same
+      runCount: 1,
+    })
+    expect(() => render(<DashboardFixture phases={SIX_PHASES} isCardOpen card={card} />)).not.toThrow()
+    expect(screen.getByTestId('sdd-report-card')).toBeInTheDocument()
+  })
 })
 
 // ── Worktree binding indicator (specs/011, US3 / FR-007) ──────────────────────
