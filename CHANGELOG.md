@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.21.0] - 2026-06-24
+
+---
+
+## [v7.21.0] - 2026-06-24
+
 ### Changed
 - **e2e tests enforce the xterm-buffer trust boundary (specs/012 T039)** — Added a build-time check (`frontend/src/test/e2eBufferLint.test.js`) that fails if any Playwright e2e spec asserts on terminal *output text* via the DOM instead of the xterm.js buffer model (`window.term.buffer.active`), enforcing Constitution Article X / FR-014. The check is precise — presence/visibility selectors are allowed; only text-extraction on terminal selectors is flagged. It immediately caught and fixed 3 pre-existing violations in `tests/e2e/websocket-recovery.spec.js` (now read the buffer via the shared fixtures).
 
