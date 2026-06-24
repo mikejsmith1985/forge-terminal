@@ -9,5 +9,5 @@
 @.specify/memory/constitution.md
 
 <!-- SPECKIT START -->
-Active feature: @specs/011-worktree-concurrency/plan.md
+Active feature: @specs/012-tdd-sdd-enforcement/plan.md
 <!-- SPECKIT END -->
