@@ -72,12 +72,14 @@ internal/git/
                          #   the authoritative main-checkout resolver replacing Toplevel() for anchoring.
 
 cmd/forge/
-├── sdd_worktree.go      # resolveSddWorkspace/provisionWorktreeForSession: anchor sddWorktreesRoot to
+├── sdd_worktree.go      # resolveSddWorkspace/provisionWorktreeForSession: anchor provisioning to
 │                        #   MainCheckout (NOT Toplevel); add assertNoNesting guard (refuse a path already
-│                        #   under .forge/worktrees/); resume re-attach helper that falls back to main
-│                        #   checkout when a recorded worktree is gone (FR-002,003,004).
-├── sdd_resume.go        # NEW — record/restore the per-session bound directory across restart; re-attach
-│                        #   deterministically (FR-001,005). Small, single-purpose.
+│                        #   under .forge/worktrees/); reattachExistingWorktree — re-attach a session
+│                        #   already inside a worktree, falling back to the main checkout when the
+│                        #   recorded worktree is gone (FR-001–005). [Implemented in US1: the re-attach
+│                        #   logic is consolidated here, not a separate sdd_resume.go — it is ~30 lines
+│                        #   tightly coupled to resolveSddWorkspace, so a separate file would be artificial
+│                        #   separation (Article IV cohesion).]
 ├── sdd_verification.go  # NEW — behavior classification + TDD(Red→Green) + UX-evidence gate evaluation,
 │                        #   invoked at the phase-completion seam; reads the workflow ledger + Playwright
 │                        #   result; produces a PhaseVerificationRecord and a pass/block/exempt GateDecision.
@@ -109,7 +111,7 @@ tests/e2e/
 Ordered by the spec's priorities and risk:
 
 1. **Main-checkout resolver + nesting guard (US1 / P1, highest reuse + highest pain)** — `internal/git/worktree.go` `MainCheckout()` and `cmd/forge/sdd_worktree.go` anchoring + `assertNoNesting`. Unit-tested with a fake runner (worktree-list ordering, worktree-as-input case); integration-tested by provisioning twice against a real temp repo and asserting exactly one `.forge/worktrees/` level. This is the direct fix for the captured bug and must prove out first.
-2. **Deterministic resume / re-attach (US1 / P1)** — `cmd/forge/sdd_resume.go`: record the bound directory per session; on restart re-attach to it, or fall back to the main checkout with one clear message when the recorded worktree is gone (FR-004). Playwright proof that resume lands in the same dir across restarts.
+2. **Deterministic resume / re-attach (US1 / P1)** — in `cmd/forge/sdd_worktree.go` (`reattachExistingWorktree`): when the bind directory is already inside `.forge/worktrees/`, re-attach to it (main checkout resolved from the worktree list), or fall back to the main checkout with one clear message when the recorded worktree is gone (FR-004). Playwright proof that resume lands in the same dir across restarts.
 3. **Behavior classification (US2/US3 foundation)** — `internal/sdd/detector.go` `ClassifyBehavior` over the report-card's already-computed touched-file list. Unit-tested against representative file sets (code vs docs vs test-only vs UI). Everything in the gate depends on this.
 4. **TDD Red→Green gate (US2 / P1)** — `cmd/forge/sdd_verification.go`: for a behavior-changing phase, require ledger evidence of a test observed failing then passing; block otherwise; allow a recorded exemption for docs/refactor. Wired at the completion seam in `handlers_sdd.go`.
 5. **Playwright UX gate (US3 / P1)** — extend `sdd_verification.go`: for a user-facing phase, require a passing Playwright result that exercised the real UI (and, for terminal output, asserted on the xterm buffer); reject non-UX evidence; fail closed when Playwright cannot run (FR-016).
