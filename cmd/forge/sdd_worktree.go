@@ -8,8 +8,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mikejsmith1985/forge-terminal/internal/sdd"
 
 	gitwt "github.com/mikejsmith1985/forge-terminal/internal/git"
 )
@@ -28,6 +31,10 @@ type sddWorktreeBinding struct {
 	branch       string
 	baseBranch   string
 	isIsolated   bool
+	// notice is a one-time, developer-facing message surfaced in the bind response — used
+	// when a recorded worktree is gone and the session falls back to the main checkout
+	// (specs/013 FR-005). It is transient: never persisted, never stored on the pipeline.
+	notice string
 }
 
 // sddWorktreesRoot returns the single, git-ignored location where isolated
@@ -59,11 +66,13 @@ func sddBindingInfoFor(pipeline *sddPipeline) sddBindingInfo {
 	}
 }
 
-// resolveSddWorkspace decides where a binding session's pipeline should run.
-// First pipeline for a repo → its main checkout. A concurrent second pipeline →
-// a freshly provisioned worktree (shell retargeted into it). Any failure degrades
-// safely to the main checkout so a bind is never blocked (FR-014).
-// It returns the effective repoRoot to bind the pipeline to, plus the binding.
+// resolveSddWorkspace decides where a binding session's pipeline should run — RECOVERY-FIRST
+// (specs/013). Priority: (1) a durable recovery record re-attaches the session to the worktree
+// it left, even across a restart that emptied the in-memory map; (2) a bind directory that is
+// ALREADY an isolated worktree re-attaches to it (specs/012); (3) otherwise the session stays on
+// the main checkout. A bind NEVER provisions a worktree — concurrency is no longer a trigger, so
+// opening a second tab can never silently spawn a directory. Isolation happens only via explicit
+// consent (provisionWorktreeOnRequest). It returns the effective repoRoot plus the binding.
 func resolveSddWorkspace(sessionID, repoRoot string) (string, sddWorktreeBinding) {
 	if !sddGitClient.IsGitRepo(repoRoot) {
 		return repoRoot, sddWorktreeBinding{} // non-git: single pipeline, no isolation.
@@ -72,39 +81,105 @@ func resolveSddWorkspace(sessionID, repoRoot string) (string, sddWorktreeBinding
 	if err != nil || commonDir == "" {
 		return repoRoot, sddWorktreeBinding{}
 	}
-	// Deterministic resume (specs/012 US1, FR-001/004/005): when the bind directory is
-	// ALREADY an isolated worktree, re-attach to it instead of provisioning a new one.
-	// This lands a resumed session back in the exact directory it left across restarts
-	// and makes the recursive .forge/worktrees/X/.forge/worktrees/Y nesting impossible.
+	// (1) Durable recovery (specs/013 US2, FR-002/004/005): re-attach from the persisted record.
+	if effectiveRoot, binding, handled := recoverWorktreeBinding(sessionID, repoRoot, commonDir); handled {
+		return effectiveRoot, binding
+	}
+	// (2) Deterministic resume (specs/012 US1, FR-001/004): the bind directory is itself an
+	// isolated worktree → re-attach, never provisioning a new (nested) one.
 	if isForgeWorktreePath(repoRoot) {
 		return reattachExistingWorktree(repoRoot, commonDir)
 	}
-	if !sddHasConcurrentPipeline(sessionID, commonDir) {
-		return repoRoot, sddWorktreeBinding{gitCommonDir: commonDir} // first pipeline (FR-005).
-	}
+	// (3) Recovery-first default (specs/013 US1, FR-001/003): stay on the main checkout. The
+	// removed concurrency→provision branch is exactly what made a second tab spawn a worktree.
+	return repoRoot, sddWorktreeBinding{gitCommonDir: commonDir}
+}
 
-	// Anchor provisioning to the MAIN checkout (worktree-list first entry), never to
-	// `--show-toplevel`, which returns a linked worktree's own root from inside one
-	// and is the original cause of recursive nesting (specs/012 US1, FR-002).
+// recoverWorktreeBinding re-attaches a session to the isolated worktree recorded for it
+// (specs/013 US2). When the recorded worktree no longer exists, it evicts the stale record and
+// falls back to the main checkout with exactly one notice (FR-005) — never recreating or nesting.
+// handled is false when there is no record, so the caller continues the normal resolution order.
+func recoverWorktreeBinding(sessionID, repoRoot, commonDir string) (string, sddWorktreeBinding, bool) {
+	record, ok := lookupWorktreeBinding(sessionID)
+	if !ok {
+		return "", sddWorktreeBinding{}, false
+	}
+	if !isValidWorktree(record.WorktreePath) {
+		evictWorktreeBinding(sessionID)
+		mainRoot := mainCheckoutOrFallback(repoRoot)
+		return mainRoot, sddWorktreeBinding{
+			gitCommonDir: commonDir,
+			mainRepoRoot: mainRoot,
+			notice:       "The isolated worktree for this tab no longer exists; re-attached to the main checkout.",
+		}, true
+	}
+	// Retarget the shell only when the session is not already sitting in the worktree — e.g. the
+	// frontend reported the main checkout after a restart (specs/013 FR-006: recovery, no manual cd).
+	if !sameSddRepo(repoRoot, record.WorktreePath) {
+		retargetSessionShell(sessionID, record.WorktreePath)
+	}
+	return record.WorktreePath, sddWorktreeBinding{
+		gitCommonDir: commonDir,
+		mainRepoRoot: record.MainRepoRoot,
+		worktreePath: record.WorktreePath,
+		branch:       record.Branch,
+		baseBranch:   record.BaseBranch,
+		isIsolated:   true,
+	}, true
+}
+
+// isValidWorktree reports whether path is still one of our isolated worktrees present on disk.
+// Used to decide recovery vs. fallback: a record whose directory is gone is treated as absent,
+// so recovery fails safe to the main checkout, never to provisioning (specs/013 FR-005).
+func isValidWorktree(path string) bool {
+	if !isForgeWorktreePath(path) {
+		return false
+	}
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// provisionWorktreeOnRequest creates an isolated worktree for a session ON EXPLICIT REQUEST only
+// (specs/013 US3, FR-007). This is the ONLY path that creates a worktree. It anchors to the main
+// checkout (never nesting, FR-008/009), retargets the shell, and persists a durable recovery
+// record (US2). Already-isolated callers reuse their current worktree rather than nesting (C9).
+// ok is false on any failure so the caller keeps the tab on the main checkout (FR-011).
+func provisionWorktreeOnRequest(sessionID, repoRoot string) (sddWorktreeBinding, bool) {
+	if !sddGitClient.IsGitRepo(repoRoot) {
+		return sddWorktreeBinding{}, false
+	}
+	commonDir, err := sddGitClient.GitCommonDir(repoRoot)
+	if err != nil || commonDir == "" {
+		return sddWorktreeBinding{}, false
+	}
+	// Invoked from inside a worktree → reuse it; never create a worktree in a worktree (C9).
+	if isForgeWorktreePath(repoRoot) {
+		_, binding := reattachExistingWorktree(repoRoot, commonDir)
+		return binding, true
+	}
 	mainRepoRoot := mainCheckoutOrFallback(repoRoot)
 	if !assertNoNesting(mainRepoRoot) {
-		// The resolved anchor is itself inside a worktree — refuse to nest; degrade safe.
-		return repoRoot, sddWorktreeBinding{gitCommonDir: commonDir}
+		return sddWorktreeBinding{gitCommonDir: commonDir}, false // refuse to nest (FR-009).
 	}
 	worktreePath, branch, base, ok := provisionWorktreeForSession(sessionID, mainRepoRoot)
 	if !ok {
-		// Degrade safe: keep this session on the main checkout rather than block it (FR-014).
-		return repoRoot, sddWorktreeBinding{gitCommonDir: commonDir}
+		return sddWorktreeBinding{gitCommonDir: commonDir}, false // degrade safe (FR-011).
 	}
 	retargetSessionShell(sessionID, worktreePath)
-	return worktreePath, sddWorktreeBinding{
+	saveWorktreeBinding(sessionID, worktreeBindingRecord{
+		WorktreePath: worktreePath,
+		Branch:       branch,
+		BaseBranch:   base,
+		MainRepoRoot: mainRepoRoot,
+	})
+	return sddWorktreeBinding{
 		gitCommonDir: commonDir,
 		mainRepoRoot: mainRepoRoot,
 		worktreePath: worktreePath,
 		branch:       branch,
 		baseBranch:   base,
 		isIsolated:   true,
-	}
+	}, true
 }
 
 // mainCheckoutOrFallback resolves the repository's main checkout via MainCheckout
@@ -141,10 +216,13 @@ func reattachExistingWorktree(worktreePath, commonDir string) (string, sddWorktr
 	}
 }
 
-// sddHasConcurrentPipeline reports whether another bound session already runs a
-// pipeline in the same logical repository (same git common dir) — the concurrency
-// signal that triggers isolation (FR-001).
-func sddHasConcurrentPipeline(sessionID, commonDir string) bool {
+// sddHasActiveConcurrentPipeline reports whether another session is running an ACTIVE SDD
+// pipeline in the same logical repository (same git common dir) — i.e. one that has actually
+// started a phase and is not yet complete. This is the real shared-state collision signal
+// (two pipelines share one .forge/workflow-ticket.json). Unlike a merely-bound idle tab, an
+// active pipeline is the only case that justifies OFFERING isolation, so ordinary tabs are
+// never nagged with the collision prompt (specs/013 FR-003; analysis finding F1).
+func sddHasActiveConcurrentPipeline(sessionID, commonDir string) bool {
 	if commonDir == "" {
 		return false
 	}
@@ -152,7 +230,11 @@ func sddHasConcurrentPipeline(sessionID, commonDir string) bool {
 	sddPipelines.Range(func(key, value any) bool {
 		otherID, _ := key.(string)
 		other, _ := value.(*sddPipeline)
-		if otherID != sessionID && other != nil && other.gitCommonDir == commonDir {
+		if otherID == sessionID || other == nil || other.gitCommonDir != commonDir || other.orchestrator == nil {
+			return true
+		}
+		state := other.orchestrator.State()
+		if state.CurrentPhase != "" && state.Status != sdd.StatusComplete {
 			found = true
 			return false // stop ranging
 		}
@@ -244,6 +326,9 @@ func cleanupSessionWorktree(sessionID string) {
 	}
 	if removed {
 		sddPipelines.Delete(sessionID)
+		// The worktree is gone — drop its durable recovery record so a future bind never
+		// tries to re-attach to a reclaimed directory (specs/013 US2 lifecycle).
+		evictWorktreeBinding(sessionID)
 	}
 }
 
@@ -345,4 +430,20 @@ func retargetSessionShell(sessionID, worktreePath string) {
 	// slashes are accepted by Git Bash and PowerShell on Windows.
 	command := fmt.Sprintf("cd %q", filepath.ToSlash(worktreePath))
 	go injectSddCommand(sessionID, command)
+}
+
+// pushWorktreeCollisionPrompt offers (never forces) isolation to a session that bound to a repo
+// where another ACTIVE pipeline is already running (specs/013 US3, FR-003). It pushes a prompt
+// over the existing WebSocket hub; the developer confirms (→ POST /api/sdd/worktree) or dismisses
+// (→ stay on the shared main checkout). It NEVER provisions anything on its own — opt-in only.
+func pushWorktreeCollisionPrompt(sessionID, repoRoot string) {
+	if termHandler == nil {
+		return
+	}
+	termHandler.BroadcastJSONToSession(sessionID, map[string]any{
+		"type":      "SDD_WORKTREE_COLLISION",
+		"sessionId": sessionID,
+		"repoRoot":  repoRoot,
+		"message":   "This repository already has an active SDD pipeline. Open this tab in an isolated worktree to avoid collisions?",
+	})
 }

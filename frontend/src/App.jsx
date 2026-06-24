@@ -459,8 +459,15 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       body: JSON.stringify({ sessionId: activeTabId, repoRoot }),
-    }).catch(() => { /* best-effort: a failed bind never blocks the terminal */ });
-  }, [activeTabId, activeTab?.currentDirectory]);
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        // Recovery fallback notice (specs/013 FR-005): the recorded worktree was gone, so the
+        // tab re-attached to the main checkout — tell the developer once, never silently.
+        if (data?.notice) addToast(data.notice, 'info', 6000);
+      })
+      .catch(() => { /* best-effort: a failed bind never blocks the terminal */ });
+  }, [activeTabId, activeTab?.currentDirectory, addToast]);
 
   const handleFontSizeChange = (delta) => {
     if (fontTarget === 'terminal') {
@@ -2227,6 +2234,9 @@ function App() {
             decisionError={sddGate.decisionError}
             isSubmitting={sddGate.isSubmitting}
             isHookInstalled={sddGate.isHookInstalled}
+            collisionPrompt={sddGate.collisionPrompt}
+            onRequestWorktree={sddGate.requestWorktree}
+            onDismissCollision={sddGate.dismissCollision}
             onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
             onDismiss={sddGate.dismiss}
             onFileOpen={handleFileOpen}

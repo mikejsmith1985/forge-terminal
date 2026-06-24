@@ -579,6 +579,50 @@
   max-width: 240px;
 }
 
+/* Per-tab "Isolate this tab" control (specs/013 US3, FR-007): the proactive, explicit opt-in to
+   an isolated worktree. Shown only when the tab is on the main checkout (never when isolated). */
+.sdd-dashboard__isolate-btn {
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  border-radius: 10px;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sdd-dashboard__isolate-btn:hover {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+/* Collision offer (specs/013 FR-003): a tab bound to a repo with another ACTIVE pipeline is
+   OFFERED isolation. Confirm provisions; Stay shared dismisses with no side effects. */
+.sdd-dashboard__collision {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.10);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+  font-size: 12px;
+}
+.sdd-dashboard__collision-text { flex: 1; }
+.sdd-dashboard__collision-btn {
+  padding: 2px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.sdd-dashboard__collision-btn--confirm { background: #1e3a5f; color: #93c5fd; }
+.sdd-dashboard__collision-btn--dismiss { background: #1e1e1e; color: #9ca3af; }
+.sdd-dashboard__collision-btn:hover { filter: brightness(1.2); }
+
 /* Verification verdict chip (specs/012 US4): the honest-failure surface. A blocked phase
    shows WHY (TDD / Playwright UX evidence missing); a bypass and an exemption are shown so
    neither is silent. A plain pass renders nothing. */

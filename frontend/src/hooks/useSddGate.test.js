@@ -53,6 +53,77 @@ describe('useSddGate', () => {
     expect(result.current.card).toBeNull()
   })
 
+  // ── Worktree collision offer (specs/013 FR-003) ──────────────────────────────
+
+  const buildCollisionMessage = (overrides = {}) =>
+    JSON.stringify({
+      type: 'SDD_WORKTREE_COLLISION',
+      sessionId: ACTIVE_SESSION_ID,
+      repoRoot: 'C:/repo',
+      message: 'This repository already has an active SDD pipeline.',
+      ...overrides,
+    })
+
+  it('shows a collision offer for a matching SDD_WORKTREE_COLLISION message', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildCollisionMessage())
+    })
+
+    expect(result.current.collisionPrompt).toMatchObject({ repoRoot: 'C:/repo' })
+  })
+
+  it('ignores a collision offer for a different session', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildCollisionMessage({ sessionId: 'tab-9-other' }))
+    })
+
+    expect(result.current.collisionPrompt).toBeNull()
+  })
+
+  it('dismissCollision clears the offer with no side effect', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildCollisionMessage())
+    })
+    expect(result.current.collisionPrompt).not.toBeNull()
+
+    act(() => {
+      result.current.dismissCollision()
+    })
+    expect(result.current.collisionPrompt).toBeNull()
+  })
+
+  it('requestWorktree POSTs to /api/sdd/worktree and clears the offer on success', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ isolated: true, worktreePath: 'C:/repo/.forge/worktrees/wt1' }),
+    })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildCollisionMessage())
+    })
+
+    let response
+    await act(async () => {
+      response = await result.current.requestWorktree()
+    })
+
+    const call = fetchSpy.mock.calls.find(([url]) => url === '/api/sdd/worktree')
+    expect(call).toBeTruthy()
+    const [, options] = call
+    expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body)).toEqual({ sessionId: ACTIVE_SESSION_ID })
+    expect(response).toMatchObject({ isolated: true })
+    await waitFor(() => expect(result.current.collisionPrompt).toBeNull())
+  })
+
   it('ignores non-gate message types', () => {
     const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
 

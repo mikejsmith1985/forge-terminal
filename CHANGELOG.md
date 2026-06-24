@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Opening a tab no longer silently creates a worktree — recovery is now the default (specs/013)** — Despite v7.21.0 (specs/012), opening a second tab on a repository that already had an active SDD pipeline still spawned a fresh `.forge/worktrees/…` directory and moved the shell into it. Root cause: `handleSddBind` eager-binds every tab and `resolveSddWorkspace` auto-provisioned a worktree whenever another pipeline shared the repo — specs/012 only fixed the *already-inside-a-worktree* re-attach case, never this concurrency trigger. Fixed by **inverting the design**: a bind now NEVER provisions. It re-attaches from a durable recovery record, or to the worktree it is already in, or stays on the main checkout. Worktrees are created only on **explicit consent** — a per-tab "Isolate this tab" action or a confirmed collision prompt (`POST /api/sdd/worktree`). Proven by Go unit + real-git integration tests that count worktrees before/after a bind and assert the count is unchanged (`TestResolveWorkspace_ConcurrentSessionStaysOnMainCheckout`, `TestResolveWorkspace_ConcurrentBindDoesNotProvision_RealGit`).
+
+### Added
+- **Durable, server-authoritative session recovery (specs/013 US2)** — A new `~/.forge/sdd/worktree-bindings.json` store records which isolated worktree each tab belongs to, so a reopened tab re-attaches to its exact directory across an app restart — even when the in-memory pipeline map is empty and the frontend reports the main checkout. When the recorded worktree is gone, the tab falls back to the main checkout with one clear notice and the stale record is evicted (FR-005). Recovery no longer depends on the terminal restoring its working directory (the fragile Windows-ConPTY case).
+- **Explicit, consent-only worktree isolation (specs/013 US3)** — A per-tab "⑂ Isolate this tab" control and a reactive collision prompt (shown only when another *actively running* pipeline shares the repo — never for ordinary idle tabs) let a developer opt into an isolated worktree on purpose. Concurrent worktrees remain fully supported; they are simply no longer automatic.
+
 ## [7.21.0] - 2026-06-24
 
 ---

@@ -626,6 +626,9 @@ func main() {
 	// worktree-close is the explicit tab-close signal: it safe-cleans the closed tab's isolated
 	// worktree (merged+clean only), never on a transient socket drop (specs/011, FR-011/FR-012).
 	http.HandleFunc("/api/sdd/worktree-close", WrapWithMiddleware(handleSddWorktreeClose))
+	// worktree (POST) is the EXPLICIT "isolate this tab" request — the only path that creates a
+	// worktree now that binds never auto-provision (specs/013 US3, recovery-first inversion).
+	http.HandleFunc("/api/sdd/worktree", WrapWithMiddleware(handleSddWorktree))
 	// gate-check is polled by the PreToolUse hook before each speckit Skill run to enforce that
 	// the developer approves each phase before the agent advances (specs/008-sdd-real-enforcement).
 	http.HandleFunc("/api/sdd/gate-check", WrapWithMiddleware(handleSddGateCheck))

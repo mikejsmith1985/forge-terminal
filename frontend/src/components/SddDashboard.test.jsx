@@ -42,6 +42,9 @@ function DashboardFixture(props) {
       onDismiss={props.onDismiss ?? vi.fn()}
       onFileOpen={props.onFileOpen ?? vi.fn()}
       onAwaitingPhaseClick={props.onAwaitingPhaseClick ?? vi.fn()}
+      collisionPrompt={props.collisionPrompt ?? null}
+      onRequestWorktree={props.onRequestWorktree ?? vi.fn()}
+      onDismissCollision={props.onDismissCollision ?? vi.fn()}
     />
   )
 }
@@ -556,5 +559,55 @@ describe('SddDashboard worktree indicator', () => {
   it('renders no indicator when binding is present but not isolated', () => {
     render(<DashboardFixture phases={SIX_PHASES} binding={{ isolated: false }} />)
     expect(screen.queryByTestId('sdd-worktree-indicator')).not.toBeInTheDocument()
+  })
+})
+
+// ── Recovery-first opt-in UI (specs/013 US3) ──────────────────────────────────
+
+describe('SddDashboard recovery-first opt-in (specs/013)', () => {
+  it('shows the "Isolate this tab" control on the main checkout (FR-007)', () => {
+    render(<DashboardFixture phases={SIX_PHASES} binding={null} />)
+    expect(screen.getByTestId('sdd-isolate-tab')).toBeInTheDocument()
+  })
+
+  it('hides the isolate control once the tab is already isolated (no double-isolate)', () => {
+    render(<DashboardFixture phases={SIX_PHASES} binding={{ isolated: true, branch: 'forge/wt-x' }} />)
+    expect(screen.queryByTestId('sdd-isolate-tab')).not.toBeInTheDocument()
+  })
+
+  it('clicking the isolate control calls onRequestWorktree (the explicit create path)', () => {
+    const onRequestWorktree = vi.fn()
+    render(<DashboardFixture phases={SIX_PHASES} binding={null} onRequestWorktree={onRequestWorktree} />)
+    fireEvent.click(screen.getByTestId('sdd-isolate-tab'))
+    expect(onRequestWorktree).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the collision offer when one is pending (FR-003)', () => {
+    render(<DashboardFixture phases={SIX_PHASES} collisionPrompt={{ repoRoot: 'C:/repo', message: 'This repository already has an active SDD pipeline.' }} />)
+    const prompt = screen.getByTestId('sdd-collision-prompt')
+    expect(prompt).toBeInTheDocument()
+    expect(prompt.textContent).toContain('active SDD pipeline')
+  })
+
+  it('renders no collision offer when none is pending', () => {
+    render(<DashboardFixture phases={SIX_PHASES} collisionPrompt={null} />)
+    expect(screen.queryByTestId('sdd-collision-prompt')).not.toBeInTheDocument()
+  })
+
+  it('confirming the offer calls onRequestWorktree; "Stay shared" calls onDismissCollision (C11)', () => {
+    const onRequestWorktree = vi.fn()
+    const onDismissCollision = vi.fn()
+    render(
+      <DashboardFixture
+        phases={SIX_PHASES}
+        collisionPrompt={{ repoRoot: 'C:/repo', message: 'collision' }}
+        onRequestWorktree={onRequestWorktree}
+        onDismissCollision={onDismissCollision}
+      />
+    )
+    fireEvent.click(screen.getByTestId('sdd-collision-confirm'))
+    expect(onRequestWorktree).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByTestId('sdd-collision-dismiss'))
+    expect(onDismissCollision).toHaveBeenCalledTimes(1)
   })
 })

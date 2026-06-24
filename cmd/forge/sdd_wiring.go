@@ -196,12 +196,23 @@ func handleSddBind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Concurrency detection + worktree provisioning (specs/011): a second pipeline in the same repo
-	// is bound to an isolated worktree; the first/only pipeline keeps the main checkout (FR-005).
+	// Recovery-first (specs/013): a bind re-attaches to a recorded/existing worktree or stays on
+	// the main checkout — it NEVER provisions one. Isolation is opt-in via POST /api/sdd/worktree.
 	effectiveRepoRoot, binding := resolveSddWorkspace(request.SessionID, request.RepoRoot)
 	startSddPipeline(request.SessionID, effectiveRepoRoot, binding)
 	pipeline, _ := sddPipelineFor(request.SessionID)
-	writeSddJSON(w, http.StatusOK, sddBindResponse(pipeline))
+
+	// Offer (never force) isolation when another ACTIVE pipeline already runs in this repo and
+	// this session is on the shared main checkout — the real collision case (specs/013 FR-003).
+	if !binding.isIsolated && binding.notice == "" && sddHasActiveConcurrentPipeline(request.SessionID, binding.gitCommonDir) {
+		pushWorktreeCollisionPrompt(request.SessionID, effectiveRepoRoot)
+	}
+
+	response := sddBindResponse(pipeline)
+	if binding.notice != "" {
+		response["notice"] = binding.notice // one-time fallback message (FR-005).
+	}
+	writeSddJSON(w, http.StatusOK, response)
 }
 
 // sddBindResponse builds the bind reply, carrying the worktree binding additively so existing

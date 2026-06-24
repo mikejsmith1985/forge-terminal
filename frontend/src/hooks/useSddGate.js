@@ -8,7 +8,12 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 const SDD_PHASE_GATE_TYPE = 'SDD_PHASE_GATE'
 // Live status broadcast type — carries phase array and feature name.
 const SDD_PHASE_STATUS_TYPE = 'SDD_PHASE_STATUS'
+// Collision offer type (specs/013 FR-003): pushed when another ACTIVE pipeline already runs in
+// this repo, offering — never forcing — an isolated worktree for this tab.
+const SDD_WORKTREE_COLLISION_TYPE = 'SDD_WORKTREE_COLLISION'
 const DECISION_ENDPOINT = '/api/sdd/decision'
+// Explicit "isolate this tab" endpoint — the ONLY path that creates a worktree (specs/013 US3).
+const WORKTREE_ENDPOINT = '/api/sdd/worktree'
 // Page-reload recovery endpoint (FR-012: one-time fetch, never polled).
 const STATUS_ENDPOINT = '/api/sdd/status'
 // Hook installation check — fetched once on mount so the dashboard can prompt the developer
@@ -50,6 +55,9 @@ export function useSddGate({ activeSessionId }) {
   // Current phase's verification verdict (specs/012 US4): { decision, blockReason, exemptReason, bypassed }
   // or null. Carries WHY a phase is blocked so the dashboard can show it (honest failure).
   const [verification, setVerification] = useState(null)
+  // Pending collision offer for this session (specs/013 FR-003): { repoRoot, message } or null.
+  // Opt-in only — the worktree is created solely when the developer confirms.
+  const [collisionPrompt, setCollisionPrompt] = useState(null)
   // Accumulated gate summaries keyed by phase name. Ref to avoid extra re-renders.
   const phaseSummaries = useRef({})
   // Default true: avoids a flash-of-banner while the fetch is in flight. The banner only
@@ -82,6 +90,7 @@ export function useSddGate({ activeSessionId }) {
     setFeatureName('')
     setBinding(null)
     setVerification(null)
+    setCollisionPrompt(null)
     phaseSummaries.current = {}
     fetch(`${STATUS_ENDPOINT}?sessionId=${encodeURIComponent(activeSessionId)}`, {
       credentials: 'same-origin',
@@ -129,6 +138,13 @@ export function useSddGate({ activeSessionId }) {
         return
       }
 
+      // Worktree collision offer (specs/013 FR-003): show the opt-in prompt for this session.
+      if (parsed?.type === SDD_WORKTREE_COLLISION_TYPE) {
+        if (parsed.sessionId !== activeSessionId) return
+        setCollisionPrompt({ repoRoot: parsed.repoRoot, message: parsed.message })
+        return
+      }
+
       if (parsed?.type !== SDD_PHASE_GATE_TYPE) return
       if (parsed.sessionId !== activeSessionId) return
 
@@ -166,6 +182,30 @@ export function useSddGate({ activeSessionId }) {
       // change. The next WS reconnect will deliver the card again.
     }
   }, [activeSessionId])
+
+  // requestWorktree is the explicit "isolate this tab" action (specs/013 US3, FR-007) — the only
+  // client path that creates a worktree. Used by both the proactive per-tab control and the
+  // confirm button on the collision prompt. Clears the prompt on success; never auto-fires.
+  const requestWorktree = useCallback(async () => {
+    if (!activeSessionId) return { isolated: false }
+    try {
+      const response = await fetch(WORKTREE_ENDPOINT, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: activeSessionId }),
+      })
+      const data = response.ok ? await response.json() : { isolated: false }
+      if (data.isolated) setCollisionPrompt(null)
+      return data
+    } catch {
+      return { isolated: false } // best-effort: the tab simply stays on the main checkout.
+    }
+  }, [activeSessionId])
+
+  // dismissCollision declines the offer locally — the tab stays on the shared main checkout and
+  // nothing is created (specs/013 C11: dismiss is the safe default).
+  const dismissCollision = useCallback(() => setCollisionPrompt(null), [])
 
   // dismiss is the failsafe exit: it clears the card locally with no backend
   // call, so the user can always escape even when the backend is unreachable.
@@ -224,9 +264,12 @@ export function useSddGate({ activeSessionId }) {
     verification,
     phaseSummaries,
     isHookInstalled,
+    collisionPrompt,
     handleWsMessage,
     fetchPendingGate,
     submitDecision,
+    requestWorktree,
+    dismissCollision,
     dismiss,
   }
 }

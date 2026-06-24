@@ -230,8 +230,57 @@ func handleSddWorktreeClose(w http.ResponseWriter, r *http.Request) {
 	removed, warning := safeCleanupWorktree(pipeline)
 	if removed {
 		sddPipelines.Delete(request.SessionID)
+		// Drop the durable recovery record so a future bind never re-attaches to the
+		// reclaimed worktree (specs/013 US2 lifecycle, FR-012).
+		evictWorktreeBinding(request.SessionID)
 	}
 	writeSddJSON(w, http.StatusOK, map[string]any{"removed": removed, "warning": warning})
+}
+
+// sddWorktreeRequest is the POST /api/sdd/worktree body — the explicit "isolate this tab"
+// request a developer makes via the per-tab action (specs/013 US3, FR-007).
+type sddWorktreeRequest struct {
+	SessionID string `json:"sessionId"`
+}
+
+// handleSddWorktree provisions an isolated worktree for a session ON EXPLICIT REQUEST — the only
+// path that ever creates a worktree (specs/013 US3, FR-007). Already-isolated sessions are an
+// idempotent success (no new worktree, C9). On any provisioning failure the tab stays on the main
+// checkout with a message (FR-011), never left in a half-made or nested directory.
+func handleSddWorktree(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeSddError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var request sddWorktreeRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeSddError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if request.SessionID == "" {
+		writeSddError(w, http.StatusBadRequest, "sessionId is required")
+		return
+	}
+	pipeline, found := sddPipelineFor(request.SessionID)
+	if !found {
+		writeSddError(w, http.StatusConflict, "no active SDD pipeline for this session")
+		return
+	}
+	if pipeline.isIsolated {
+		// Already isolated → idempotent; never nest a worktree in a worktree (C9).
+		writeSddJSON(w, http.StatusOK, map[string]any{"isolated": true, "worktreePath": pipeline.worktreePath, "branch": pipeline.branch})
+		return
+	}
+
+	binding, ok := provisionWorktreeOnRequest(request.SessionID, pipeline.repoRoot)
+	if !ok {
+		writeSddJSON(w, http.StatusOK, map[string]any{"isolated": false, "message": "could not create an isolated worktree; staying on the main checkout"})
+		return
+	}
+	// Rebind the pipeline to the new worktree so the rest of the SDD machinery isolates for free.
+	startSddPipeline(request.SessionID, binding.worktreePath, binding)
+	broadcastPhaseStatus(request.SessionID)
+	writeSddJSON(w, http.StatusOK, map[string]any{"isolated": true, "worktreePath": binding.worktreePath, "branch": binding.branch})
 }
 
 // handleSddStatus returns the current phase status for a session (used by the
