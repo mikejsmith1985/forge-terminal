@@ -103,17 +103,17 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 ### Tests for User Story 3 (write first, must FAIL)
 
-- [ ] T022 [P] [US3] Write FAILING unit tests in `cmd/forge/sdd_verification_test.go`: userFacing with only curl/200 evidence ⇒ block; `uxResult.ran == false` ⇒ block (fail closed); `ran && passed` ⇒ pass.
-- [ ] T023 [P] [US3] Write FAILING Playwright test in `tests/e2e/sdd-tdd-enforcement.spec.js`: a user-facing phase blocks without UX evidence and passes with a UX test that drives the UI and asserts on `window.term.buffer.active`.
+- [X] T022 [US3] FAILING-then-passing `TestEvaluateGate_UXRule` (no-UX ⇒ block; `ran==false` ⇒ block fail-closed; failed ⇒ block; `ran&&passed` ⇒ pass; non-user-facing ⇒ skip) in `cmd/forge/sdd_verification_test.go`.
+- [~] T023 [US3] Playwright UX-gate scenario added to `tests/e2e/sdd-tdd-enforcement.spec.js` as `test.fixme` — the gate *logic* is proven by T022; the end-to-end rendered-verdict assertion requires the frontend verdict chip (US4/T032) + live harness, so it is marked pending to avoid a false pass.
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] Implement the UX-evidence reader in `cmd/forge/sdd_verification.go`: consume a Playwright result, reject non-UX evidence (text-search/HTTP/status/log/compile) per FR-013 (passes T022 partial).
-- [ ] T025 [US3] Add the UX rule to `evaluateGate`: `userFacing` requires `ran && passed`; fail closed when `ran == false` (passes T022; contract C3, FR-016).
-- [ ] T026 [US3] Extend `scripts/sdd-gate-check.ps1` to report a verification-blocked phase (fail-closed PreToolUse signal; never auto-pass).
-- [ ] T027 [US3] Surface the UX result in `cmd/forge/sdd_report_card.go`, carry it through `frontend/src/hooks/useSddGate.js`, and render it in `frontend/src/components/SddDashboard.jsx` (FR-015).
+- [X] T024 [US3] Implemented `readUXEvidence` in `cmd/forge/sdd_verification.go` reusing the workflow ledger (`workflow.GateUXValidated = "ux-validated"`): a recorded entry = a passing real-UI run; absence ⇒ nil. Non-UX evidence (curl/200/log) never produces the entry, so it is structurally rejected (FR-013).
+- [X] T025 [US3] Added the UX rule to `evaluateGate`: `userFacing` requires `UXResult.Ran && Passed`; `nil`/`ran==false`/failed ⇒ block (fail closed, FR-016, contract C3). Wired `readUXEvidence` into `assembleVerificationRecord`.
+- [~] T026 [US3] Deferred to the surfacing pass (US4): the blocked verdict is already broadcast to the dashboard via the report-card `verification` field; extending the PreToolUse `sdd-gate-check.ps1` is a secondary channel, folded into US4.
+- [~] T027 [US3] Backend DONE — the UX block reason is surfaced on the report card `verification` field (decision + reason). Frontend rendering (`useSddGate.js` / `SddDashboard.jsx`) is US4/T032.
 
-**Checkpoint**: US1 + US2 + US3 work independently; user-facing changes require real UI proof.
+**Checkpoint**: ✅ US1 + US2 + US3 gate logic work; user-facing changes require a recorded passing Playwright result. Full suite + integration GREEN; ledger shows US3 Red→Green. (Frontend verdict chip + E2E rendered-verdict assertion land in US4.)
 
 ---
 

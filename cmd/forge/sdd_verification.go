@@ -66,7 +66,14 @@ func evaluateGate(record phaseVerificationRecord) gateDecision {
 			return gateBlock
 		}
 	}
-	// US3 UX gate is layered in here once wired: userFacing requires UXResult ran && passed.
+	// Playwright UX gate (US3, FR-012/FR-013/FR-016): a user-facing change needs a real-UI
+	// validation that ran and passed. No recorded result (e.g. only curl/200 evidence exists)
+	// or a result that could not run is fail-closed → block.
+	if record.Classification.UserFacing {
+		if record.UXResult == nil || !record.UXResult.Ran || !record.UXResult.Passed {
+			return gateBlock
+		}
+	}
 	return gatePass
 }
 
@@ -83,6 +90,18 @@ func reasonForBlock(record phaseVerificationRecord) string {
 	}
 	if !record.RedObserved.Before(record.GreenObserved) {
 		return "the test passed without first being observed to fail (Red must precede Green)"
+	}
+	// TDD is satisfied; a remaining block can only be the UX gate (user-facing changes).
+	if record.Classification.UserFacing {
+		if record.UXResult == nil {
+			return "user-facing change needs a passing Playwright UX result (grep/curl/HTTP-status do not count)"
+		}
+		if !record.UXResult.Ran {
+			return "the Playwright UX validation could not run (fail closed — never treated as passed)"
+		}
+		if !record.UXResult.Passed {
+			return "the Playwright UX validation failed"
+		}
 	}
 	return ""
 }
@@ -108,6 +127,24 @@ func readTddEvidence(projectRoot string) (red, green time.Time) {
 		}
 	}
 	return red, green
+}
+
+// readUXEvidence reads the workflow ledger for a recorded Playwright UX validation
+// (workflow GateUXValidated). A recorded entry means a real-UI test ran and passed — the
+// ledger only records gates that passed, so the presence of the entry IS the pass. Its
+// absence yields nil, which the gate treats as fail-closed (no UX proof). Evidence that is
+// only grep/curl/HTTP-status never produces a ux-validated entry, so it never counts (FR-013).
+func readUXEvidence(projectRoot string) *uxEvidence {
+	ticket, err := workflow.LoadTicket(projectRoot)
+	if err != nil || ticket == nil {
+		return nil
+	}
+	for _, entry := range ticket.Gates {
+		if entry.Gate == workflow.GateUXValidated {
+			return &uxEvidence{Ran: true, Passed: true, Output: entry.Evidence}
+		}
+	}
+	return nil
 }
 
 // readAuditedBypass reads the explicit, logged escape hatch (FR-020). It mirrors the
@@ -136,6 +173,7 @@ func assembleVerificationRecord(pipeline *sddPipeline, phase sdd.PhaseName) phas
 		Classification: sdd.ClassifyBehavior(paths),
 		RedObserved:    red,
 		GreenObserved:  green,
+		UXResult:       readUXEvidence(pipeline.repoRoot),
 		Bypassed:       bypassed,
 		BypassReason:   reason,
 	}

@@ -52,3 +52,19 @@ test.describe('specs/012 deterministic resume — no recursive worktree nesting'
     await terminalShouldContain(page, ':', { timeout: 10000 })
   })
 })
+
+test.describe('specs/012 US3 — Playwright UX gate (end-to-end)', () => {
+  // The UX-gate decision logic is fully proven by the Go unit suite
+  // (TestEvaluateGate_UXRule: no-UX ⇒ block, ran=false ⇒ block, failed ⇒ block,
+  // passing ⇒ pass). This end-to-end scenario asserts the *rendered* verdict on the
+  // SDD dashboard report card and requires (a) the live dev harness and (b) the
+  // frontend verdict chip (US4 / T032). Marked pending until that lands so it can
+  // never report a false pass — consistent with the honest-failure principle this
+  // feature enforces.
+  test.fixme('a user-facing phase shows a "blocked — needs UX validation" verdict until a passing Playwright result is recorded', async ({ page }) => {
+    // 1. Drive a user-facing phase to completion with no ux-validated ledger entry.
+    // 2. Assert the dashboard report card renders decision=block with the UX reason,
+    //    read from the verification field — not the DOM canvas (Article X).
+    // 3. Record a passing UX result; assert the verdict flips to pass.
+  })
+})

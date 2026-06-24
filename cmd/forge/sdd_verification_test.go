@@ -59,6 +59,63 @@ func TestEvaluateGate_TDDRule(t *testing.T) {
 	})
 }
 
+// userFacingRecord is a behaviour-changing, user-facing phase whose TDD evidence is
+// already satisfied, so only the UX rule is the variable under test.
+func userFacingRecord() phaseVerificationRecord {
+	red := time.Date(2026, 6, 24, 10, 0, 0, 0, time.UTC)
+	return phaseVerificationRecord{
+		Phase:          "implement",
+		Classification: sdd.BehaviorClassification{BehaviorChanging: true, UserFacing: true},
+		RedObserved:    red,
+		GreenObserved:  red.Add(5 * time.Minute),
+	}
+}
+
+// TestEvaluateGate_UXRule covers the US3 Playwright UX gate (FR-012/FR-013/FR-016, contract C3).
+func TestEvaluateGate_UXRule(t *testing.T) {
+	t.Run("user-facing with no UX evidence is blocked (curl/200 does not count)", func(t *testing.T) {
+		record := userFacingRecord()
+		record.UXResult = nil // only non-UX evidence (e.g. curl/200) exists → no ux-validated entry.
+		if got := evaluateGate(record); got != gateBlock {
+			t.Errorf("decision = %q, want block (non-UX evidence is rejected)", got)
+		}
+	})
+
+	t.Run("UX tooling could not run is blocked (fail closed)", func(t *testing.T) {
+		record := userFacingRecord()
+		record.UXResult = &uxEvidence{Ran: false}
+		if got := evaluateGate(record); got != gateBlock {
+			t.Errorf("decision = %q, want block (fail closed when Playwright cannot run)", got)
+		}
+	})
+
+	t.Run("failing UX test is blocked", func(t *testing.T) {
+		record := userFacingRecord()
+		record.UXResult = &uxEvidence{Ran: true, Passed: false}
+		if got := evaluateGate(record); got != gateBlock {
+			t.Errorf("decision = %q, want block (UX test failed)", got)
+		}
+	})
+
+	t.Run("passing real-UI result passes", func(t *testing.T) {
+		record := userFacingRecord()
+		record.UXResult = &uxEvidence{Ran: true, Passed: true}
+		if got := evaluateGate(record); got != gatePass {
+			t.Errorf("decision = %q, want pass (passing Playwright UX result)", got)
+		}
+	})
+
+	t.Run("non-user-facing phase needs no UX evidence", func(t *testing.T) {
+		record := behaviorRecord() // BehaviorChanging, not UserFacing
+		record.RedObserved = time.Date(2026, 6, 24, 10, 0, 0, 0, time.UTC)
+		record.GreenObserved = record.RedObserved.Add(time.Minute)
+		record.UXResult = nil
+		if got := evaluateGate(record); got != gatePass {
+			t.Errorf("decision = %q, want pass (UX gate must not apply to backend-only changes)", got)
+		}
+	})
+}
+
 // TestEvaluateGate_Determinism proves identical records yield identical decisions (FR-019/SC-007).
 func TestEvaluateGate_Determinism(t *testing.T) {
 	record := behaviorRecord() // missing Red→Green → block

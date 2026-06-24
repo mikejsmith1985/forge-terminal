@@ -43,6 +43,7 @@ const (
 	GateTestFailedFirst = "test-failed-first"
 	GateTestsWritten   = "tests-written"
 	GateTestsPassed    = "tests-passed"
+	GateUXValidated    = "ux-validated"
 	GateBuildPassed    = "build-passed"
 	GateChangelogBumped = "changelog-bumped"
 )
