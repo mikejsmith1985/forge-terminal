@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.20.3] - 2026-06-24
+
+### Fixed
+- **SDD dashboard crash now contained, not fatal** — Wrapped `SddDashboard` in its own `ErrorBoundary` so any render failure inside the dashboard panel no longer tears down the entire Forge Terminal UI. The terminal remains usable while the dashboard shows its error state.
+- **`ctx` ReferenceError in ForgeAssist terminal send** — `onSendToTerminal` referenced an undefined variable `ctx` instead of the callback parameter `cmd` in the `termRef.write` fallback path, causing a crash when the fallback branch was reached.
+
 ## [7.20.2] - 2026-06-24
 
 ---
