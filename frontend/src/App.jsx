@@ -2200,22 +2200,27 @@ function App() {
           </div>
         </div>
         {/* spec-006: unified SDD dashboard — always visible, replaces SddPipelinePanel
-             and PhaseDecisionCard with a single inline surface (phase rail + decision bar). */}
-        <SddDashboard
-          phases={sddGate.phaseStatuses}
-          featureName={sddGate.featureName}
-          binding={sddGate.binding}
-          phaseSummaries={sddGate.phaseSummaries}
-          isCardOpen={sddGate.isCardOpen}
-          card={sddGate.card}
-          decisionError={sddGate.decisionError}
-          isSubmitting={sddGate.isSubmitting}
-          isHookInstalled={sddGate.isHookInstalled}
-          onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
-          onDismiss={sddGate.dismiss}
-          onFileOpen={handleFileOpen}
-          onAwaitingPhaseClick={sddGate.fetchPendingGate}
-        />
+             and PhaseDecisionCard with a single inline surface (phase rail + decision bar).
+             Wrapped in its own ErrorBoundary so a dashboard render crash never takes
+             down the terminal (the whole-app boundary at AppWithErrorBoundary would
+             otherwise blank the entire UI on any SDD panel error). */}
+        <ErrorBoundary>
+          <SddDashboard
+            phases={sddGate.phaseStatuses}
+            featureName={sddGate.featureName}
+            binding={sddGate.binding}
+            phaseSummaries={sddGate.phaseSummaries}
+            isCardOpen={sddGate.isCardOpen}
+            card={sddGate.card}
+            decisionError={sddGate.decisionError}
+            isSubmitting={sddGate.isSubmitting}
+            isHookInstalled={sddGate.isHookInstalled}
+            onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
+            onDismiss={sddGate.dismiss}
+            onFileOpen={handleFileOpen}
+            onAwaitingPhaseClick={sddGate.fetchPendingGate}
+          />
+        </ErrorBoundary>
       </div>
       {showEditor && editorFile && (
         <div className="editor-panel">
@@ -2383,7 +2388,7 @@ function App() {
           if (termRef?.sendCommand) {
             termRef.sendCommand(cmd);
           } else if (termRef?.write) {
-            termRef.write(ctx);
+            termRef.write(cmd);
           }
         }}
         terminalBuffer={(() => {
@@ -2396,6 +2401,8 @@ function App() {
         activeTabId={activeTabId}
         contextFiles={contextFiles}
       />}
+
+
 
       {/* Code Tutor Panel — HIDDEN for subscription release (feature not yet vetted) */}
 
