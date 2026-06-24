@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.20.4] - 2026-06-24
+
+---
+
+## [v7.20.4] - 2026-06-24
+
 ### Fixed
 - **Numbers can't be typed in recovered tabs** — During multi-tab session recovery, all xterm textareas mount simultaneously with `visibility:hidden` (not `display:none`), making hidden tabs' textareas focusable. They can win the focus race and silently consume keystrokes — numbers especially, since Claude Code CLI shows a numbered prompt immediately on restore. The App-level `keydown` capture handler now verifies the focused textarea belongs to the **active** terminal before early-returning; a hidden tab's textarea falls through to the redirect, which restores correct focus and forwards the key to the right PTY.
 - **SDD dashboard crash on tab switch (null files/decisions)** — A Go `nil` slice serialises as JSON `null`, not `[]`. When no phase decisions were stored yet and no files changed, `buildPhaseReportCard` sent `"files":null` and `"decisions":null`. JavaScript destructuring defaults (`= []`) only guard `undefined`, so `null.length` crashed `ReportCard` on every report-card render after a phase gate opened. Fixed in two layers: Go normalises nil slices to empty before building the card; `ReportCard` additionally uses `?? []` for defence in depth.
