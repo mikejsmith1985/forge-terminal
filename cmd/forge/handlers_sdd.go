@@ -171,7 +171,9 @@ func applySddPhaseEvent(pipeline *sddPipeline, request sddPhaseEventRequest, pha
 	if def, ok := sdd.PhaseByName(phase); ok {
 		artifactRel = def.ExpectedArtifact
 	}
-	pipeline.orchestrator.HandlePhaseComplete(phase, artifactRel)
+	// Route through the verification gate (specs/012): a behaviour-changing phase without
+	// Red→Green test evidence is blocked rather than presented as complete (FR-007/FR-017).
+	gatedHandlePhaseComplete(pipeline, phase, artifactRel, request.SessionID)
 }
 
 // activeSddFeatureDir reads <repoRoot>/.specify/feature.json and returns the absolute feature

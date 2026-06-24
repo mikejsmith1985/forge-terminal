@@ -328,6 +328,52 @@ func TestHandleSddStatus_IncludesBinding(t *testing.T) {
 	}
 }
 
+// TestAssertNoNesting guards the core invariant of specs/012 US1: a worktree must
+// never be anchored under a path that is itself already inside .forge/worktrees/.
+func TestAssertNoNesting(t *testing.T) {
+	if !assertNoNesting("C:/repo") {
+		t.Error("a plain main checkout must be a safe anchor")
+	}
+	if assertNoNesting("C:/repo/.forge/worktrees/wt1") {
+		t.Error("a path already inside .forge/worktrees/ must be rejected as an anchor (FR-003)")
+	}
+}
+
+// TestResolveWorkspace_ReattachesExistingWorktree proves deterministic resume
+// (specs/012 US1, FR-001/004/005): when a bind directory is ALREADY an isolated
+// worktree, the session re-attaches to it rather than provisioning a NEW (nested)
+// one. This is the direct fix for the captured .../worktrees/X/.forge/worktrees/Y bug.
+func TestResolveWorkspace_ReattachesExistingWorktree(t *testing.T) {
+	fake := gitRepoFake()
+	// Bind directory is itself a linked worktree; git reports the main checkout first.
+	fake.outputs["worktree list --porcelain"] = strings.Join([]string{
+		"worktree C:/repo",
+		"branch refs/heads/main",
+		"",
+		"worktree C:/repo/.forge/worktrees/wt-second",
+		"branch refs/heads/feature/x",
+		"",
+	}, "\n")
+	fake.outputs["rev-parse --abbrev-ref HEAD"] = "feature/x"
+	withFakeGit(t, fake)
+
+	worktreePath := "C:/repo/.forge/worktrees/wt-second"
+	repoRoot, binding := resolveSddWorkspace("wt-second", worktreePath)
+
+	if !binding.isIsolated {
+		t.Fatal("re-attaching to an existing worktree must keep the pipeline isolated")
+	}
+	if repoRoot != worktreePath || binding.worktreePath != worktreePath {
+		t.Errorf("re-attach repoRoot=%q worktreePath=%q; want both %q", repoRoot, binding.worktreePath, worktreePath)
+	}
+	if binding.mainRepoRoot != "C:/repo" {
+		t.Errorf("mainRepoRoot = %q; want the main checkout C:/repo (from worktree list, not show-toplevel)", binding.mainRepoRoot)
+	}
+	if fake.called("worktree add") {
+		t.Error("re-attach must NOT provision a new worktree (no nesting) — `git worktree add` was issued")
+	}
+}
+
 func TestSanitizeSessionToken(t *testing.T) {
 	cases := map[string]string{
 		"tab-3-abc123": "tab-3-abc123",

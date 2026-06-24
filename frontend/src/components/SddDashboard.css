@@ -578,3 +578,32 @@
   text-overflow: ellipsis;
   max-width: 240px;
 }
+
+/* Verification verdict chip (specs/012 US4): the honest-failure surface. A blocked phase
+   shows WHY (TDD / Playwright UX evidence missing); a bypass and an exemption are shown so
+   neither is silent. A plain pass renders nothing. */
+.sdd-dashboard__verification {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.sdd-dashboard__verification-icon { flex: 0 0 auto; }
+.sdd-dashboard__verification-text { overflow-wrap: anywhere; }
+.sdd-dashboard__verification--block {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+.sdd-dashboard__verification--bypass {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fcd34d;
+}
+.sdd-dashboard__verification--exempt {
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+}

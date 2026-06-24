@@ -93,6 +93,43 @@ function WorktreeIndicator({ binding }) {
   )
 }
 
+// VerificationChip surfaces the current phase's gate verdict (specs/012 US4). It is the
+// honest-failure surface: when a phase is blocked it shows WHY (TDD or UX evidence missing),
+// so a behaviour change can never silently appear stuck. It renders nothing for a plain pass
+// (no news is good news); a bypass and an exemption are shown so neither is silent.
+function VerificationChip({ verification }) {
+  if (!verification) return null
+  const { decision, blockReason, exemptReason, bypassed } = verification
+
+  if (decision === 'block') {
+    return (
+      <div className="sdd-dashboard__verification sdd-dashboard__verification--block" data-testid="sdd-verification" role="status">
+        <span className="sdd-dashboard__verification-icon" aria-hidden="true">⛔</span>
+        <span className="sdd-dashboard__verification-text">
+          Phase blocked — {blockReason || 'verification evidence required'}
+        </span>
+      </div>
+    )
+  }
+  if (bypassed) {
+    return (
+      <div className="sdd-dashboard__verification sdd-dashboard__verification--bypass" data-testid="sdd-verification" role="status">
+        <span className="sdd-dashboard__verification-icon" aria-hidden="true">⚠</span>
+        <span className="sdd-dashboard__verification-text">Verification bypassed (audited)</span>
+      </div>
+    )
+  }
+  if (decision === 'exempt' && exemptReason) {
+    return (
+      <div className="sdd-dashboard__verification sdd-dashboard__verification--exempt" data-testid="sdd-verification" role="status">
+        <span className="sdd-dashboard__verification-icon" aria-hidden="true">○</span>
+        <span className="sdd-dashboard__verification-text">Exempt — {exemptReason}</span>
+      </div>
+    )
+  }
+  return null // a plain pass needs no chip.
+}
+
 function PhaseCell({ entry, isSelected, onClick }) {
   const { phase, displayStatus, runCount } = entry
   const knownStatuses = Object.keys(STATUS_ICON)
@@ -467,6 +504,7 @@ export default function SddDashboard({
   phases = [],
   featureName = '',
   binding = null,
+  verification = null,
   phaseSummaries,
   isCardOpen = false,
   card = null,
@@ -514,6 +552,7 @@ export default function SddDashboard({
         <HookInstallBanner onDismiss={() => setIsHookBannerDismissed(true)} />
       )}
       <DashboardHeader featureName={featureName} phases={phases} binding={binding} />
+      <VerificationChip verification={verification} />
 
       <div className="sdd-dashboard__rail-wrapper">
         <PhaseRail

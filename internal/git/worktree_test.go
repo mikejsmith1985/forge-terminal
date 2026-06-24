@@ -201,3 +201,36 @@ func TestBranchRenameAndDelete(t *testing.T) {
 		t.Fatalf("BranchDelete issued %q", fake.lastCall())
 	}
 }
+
+// TestMainCheckout proves the fix for the recursive-nesting bug (specs/012, US1):
+// the main checkout MUST be resolved from `git worktree list --porcelain` (whose
+// first entry is always the main worktree), NOT from `rev-parse --show-toplevel`
+// (which returns a linked worktree's OWN root when run from inside one, anchoring
+// new worktrees under it and producing .forge/worktrees/X/.forge/worktrees/Y).
+func TestMainCheckout(t *testing.T) {
+	porcelain := strings.Join([]string{
+		"worktree C:/repo",
+		"HEAD 1111111111111111111111111111111111111111",
+		"branch refs/heads/main",
+		"",
+		"worktree C:/repo/.forge/worktrees/wt1",
+		"HEAD 2222222222222222222222222222222222222222",
+		"branch refs/heads/feature/x",
+		"",
+	}, "\n")
+
+	// Queried from INSIDE the linked worktree, MainCheckout must still return the
+	// main checkout (the first porcelain entry), never the worktree's own path.
+	fromWorktree := newFakeRunner()
+	fromWorktree.outputs["worktree list --porcelain"] = porcelain
+	if got, err := NewWithRunner(fromWorktree).MainCheckout("C:/repo/.forge/worktrees/wt1"); err != nil || got != "C:/repo" {
+		t.Fatalf("MainCheckout(from worktree) = %q, %v; want C:/repo, nil", got, err)
+	}
+
+	// An empty/unknown list yields an empty result (caller falls back), not a crash.
+	empty := newFakeRunner()
+	empty.outputs["worktree list --porcelain"] = ""
+	if got, err := NewWithRunner(empty).MainCheckout("C:/repo"); err != nil || got != "" {
+		t.Fatalf("MainCheckout(empty) = %q, %v; want \"\", nil", got, err)
+	}
+}

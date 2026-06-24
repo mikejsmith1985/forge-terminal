@@ -141,6 +141,52 @@ func TestRestartDiscovery_RealGit(t *testing.T) {
 	t.Cleanup(func() { _ = sddGitClient.WorktreeRemove(repoDir, wtPath) })
 }
 
+// TestNoNesting_RealGit proves the specs/012 US1 fix against the real git binary:
+// (1) MainCheckout is stable regardless of which worktree it is queried from and
+// never points inside .forge/worktrees/; (2) re-binding a session that is already
+// inside a worktree re-attaches to it and provisions NOTHING, so the recursive
+// .forge/worktrees/X/.forge/worktrees/Y nesting from the captured bug cannot occur.
+func TestNoNesting_RealGit(t *testing.T) {
+	repoDir := newWorktreeTestRepo(t)
+	base, _ := sddGitClient.CurrentBranch(repoDir)
+
+	wtPath := filepath.Join(repoDir, ".forge", "worktrees", "wt1")
+	if err := sddGitClient.WorktreeAdd(repoDir, wtPath, "feature/wt1", base); err != nil {
+		t.Fatalf("WorktreeAdd: %v", err)
+	}
+	t.Cleanup(func() { _ = sddGitClient.WorktreeRemove(repoDir, wtPath) })
+
+	// (1) MainCheckout is identical whether queried from the main repo or from inside
+	// the linked worktree, and never resolves to a path under .forge/worktrees/ — unlike
+	// --show-toplevel, which would return wtPath itself when queried from wtPath.
+	mainFromRepo, err := sddGitClient.MainCheckout(repoDir)
+	if err != nil || mainFromRepo == "" {
+		t.Fatalf("MainCheckout(repo) = %q, %v; want the main checkout", mainFromRepo, err)
+	}
+	mainFromWorktree, err := sddGitClient.MainCheckout(wtPath)
+	if err != nil || mainFromWorktree != mainFromRepo {
+		t.Fatalf("MainCheckout(worktree) = %q, %v; want it stable at %q regardless of query dir", mainFromWorktree, err, mainFromRepo)
+	}
+	if isForgeWorktreePath(mainFromWorktree) {
+		t.Fatalf("MainCheckout returned a path inside .forge/worktrees/: %q (would re-nest)", mainFromWorktree)
+	}
+
+	// (2) Re-binding a session whose directory IS the worktree re-attaches; no new
+	// worktree is provisioned and no nested .forge/worktrees/ appears inside it.
+	before, _ := sddGitClient.WorktreeList(repoDir)
+	effRoot, binding := resolveSddWorkspace("wt-reattach", wtPath)
+	if !binding.isIsolated || effRoot != wtPath {
+		t.Fatalf("re-attach: isolated=%v effRoot=%q; want isolated=true, effRoot=%q", binding.isIsolated, effRoot, wtPath)
+	}
+	after, _ := sddGitClient.WorktreeList(repoDir)
+	if len(after) != len(before) {
+		t.Fatalf("re-attach provisioned a new worktree (before=%d after=%d) — nesting bug not prevented", len(before), len(after))
+	}
+	if _, statErr := os.Stat(filepath.Join(wtPath, ".forge", "worktrees")); !os.IsNotExist(statErr) {
+		t.Fatalf("a nested .forge/worktrees/ was created inside the worktree at %q", wtPath)
+	}
+}
+
 func statusPorcelain(dir string) (string, error) {
 	cmd := exec.Command("git", "status", "--porcelain")
 	cmd.Dir = dir

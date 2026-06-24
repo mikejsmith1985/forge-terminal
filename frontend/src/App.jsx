@@ -2220,6 +2220,7 @@ function App() {
             phases={sddGate.phaseStatuses}
             featureName={sddGate.featureName}
             binding={sddGate.binding}
+            verification={sddGate.verification}
             phaseSummaries={sddGate.phaseSummaries}
             isCardOpen={sddGate.isCardOpen}
             card={sddGate.card}

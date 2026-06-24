@@ -37,6 +37,25 @@ func (c *Client) Toplevel(dir string) (string, error) {
 	return c.runner.Run(dir, "rev-parse", "--show-toplevel")
 }
 
+// MainCheckout returns the repository's MAIN working tree — the first entry of
+// `git worktree list --porcelain`, which git always lists first regardless of
+// which linked worktree the command runs from. This is the correct anchor for
+// locating .forge/worktrees/: unlike Toplevel (`--show-toplevel`), which returns
+// a linked worktree's OWN root when run from inside one, MainCheckout always
+// points at the true main checkout, so a worktree can never be created inside
+// another worktree (specs/012 US1; the .forge/worktrees/X/.forge/worktrees/Y bug).
+// An empty result means git reported no worktrees; the caller falls back safely.
+func (c *Client) MainCheckout(dir string) (string, error) {
+	worktrees, err := c.WorktreeList(dir)
+	if err != nil {
+		return "", err
+	}
+	if len(worktrees) == 0 {
+		return "", nil
+	}
+	return worktrees[0].Path, nil
+}
+
 // CurrentBranch returns the short name of the branch checked out in dir.
 func (c *Client) CurrentBranch(dir string) (string, error) {
 	return c.runner.Run(dir, "rev-parse", "--abbrev-ref", "HEAD")
