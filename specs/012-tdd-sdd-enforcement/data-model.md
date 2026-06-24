@@ -41,10 +41,10 @@ The decision of which gates apply to a completing phase, derived from its change
 | Field | Type | Rule |
 |---|---|---|
 | `behaviorChanging` | bool | True if any non-test source file changed (`cmd/forge/**`, `internal/**`, `frontend/src/**`). Ambiguous ⇒ true (fail safe). |
-| `userFacing` | bool | True if any non-test `frontend/src/**` file changed (UI surface). |
-| `exemptReason` | string | Non-empty only for docs-only or pure-refactor/test-only phases; recorded and shown. |
+| `userFacing` | bool | True if any change touches a user-visible output surface: a non-test `frontend/src/**` file **OR** a backend code path known to alter user-visible output (terminal/prompt rendering, SDD gate/report message producers — e.g. `cmd/forge/sdd_*`, terminal output writers). Ambiguous ⇒ true (fail safe), so a backend change that may alter what the developer sees never silently skips the UX gate. |
+| `exemptReason` | string | Set **only by classification** when the touched surfaces are exclusively docs (`*.md`, `specs/**`, `docs/**`) or test-only — never by agent self-assertion. Empty for any behavior-changing phase. Shown in the report. |
 
-**Derivation**: pure function of the report card's `[]sddFileChange` (already computed at the completion seam). No external input.
+**Derivation**: pure function of the report card's `[]sddFileChange` (already computed at the completion seam). No external input, and no self-declared exemption — the classifier is the sole author of `exemptReason`.
 
 ---
 

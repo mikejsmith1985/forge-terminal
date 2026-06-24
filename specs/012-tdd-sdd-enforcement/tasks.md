@@ -25,8 +25,9 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Establish a green baseline and create empty skeletons so later tasks only add behavior.
+**Purpose**: Establish a green baseline, reconcile the cross-feature collision with 011, and create empty skeletons so later tasks only add behavior.
 
+- [ ] T038 Reconcile the 011 ↔ 012 collision on `cmd/forge/sdd_worktree.go` (both rewrite `resolveSddWorkspace`/`provisionWorktreeForSession`): decide and record the merge order — 012's main-checkout anchoring + no-nesting fix lands first as the bug fix; feature 011's opt-in/default-to-main redesign rebases onto it. **Execute before T014/T015.** (Resolves analysis finding X1.)
 - [ ] T001 Confirm a green baseline on `feature/012-tdd-sdd-enforcement`: run `go test ./...`, `cd frontend && npx vitest run`, and `npx playwright --version`; record that all pass before any change.
 - [ ] T002 [P] Create skeleton `cmd/forge/sdd_resume.go` with a one-line file-purpose comment and package declaration only (no logic).
 - [ ] T003 [P] Create skeleton `cmd/forge/sdd_verification.go` with a one-line file-purpose comment and package declaration only (no logic).
@@ -41,8 +42,8 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 **⚠️ CRITICAL**: US2/US3/US4 cannot begin until this phase is complete.
 
 - [ ] T005 Define `BehaviorClassification`, `PhaseVerificationRecord`, and `GateDecision` types per data-model.md in `cmd/forge/sdd_verification.go`.
-- [ ] T006 [P] Write FAILING unit test for `ClassifyBehavior` covering code-only, docs-only, test-only, UI, and ambiguous file sets (ambiguous ⇒ behaviorChanging) in `internal/sdd/detector_test.go`.
-- [ ] T007 Implement `ClassifyBehavior(touchedFiles)` in `internal/sdd/detector.go` so T006 passes (file-path heuristic per research R4; fail-safe default).
+- [ ] T006 [P] Write FAILING unit test for `ClassifyBehavior` in `internal/sdd/detector_test.go` covering: code-only, docs-only, test-only, frontend-UI, **backend-change-that-alters-terminal/gate-output ⇒ userFacing=true**, ambiguous ⇒ behaviorChanging=true **and** userFacing=true (both axes fail safe), and docs/refactor ⇒ classifier-set `exemptReason` (never self-asserted).
+- [ ] T007 Implement `ClassifyBehavior(touchedFiles)` in `internal/sdd/detector.go` so T006 passes: `userFacing` covers frontend surfaces AND backend user-visible-output paths (`cmd/forge/sdd_*`, terminal/prompt writers); both axes fail safe on ambiguity; the classifier is the sole author of `exemptReason` (research R4, FR-009/FR-011).
 - [ ] T008 Implement a pure `evaluateGate(record) GateDecision` in `cmd/forge/sdd_verification.go` handling only `exempt` and default-`pass` for now (deterministic; rules added in US2/US3).
 - [ ] T009 Intercept the completion seam in `cmd/forge/handlers_sdd.go` (`applySddPhaseEvent` "complete"): assemble a `PhaseVerificationRecord` from the report-card diff + `ClassifyBehavior`, call `evaluateGate`, and only call `HandlePhaseComplete()` on `pass`/`exempt`; keep behavior green (no rules block yet).
 
@@ -61,7 +62,7 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 - [ ] T010 [P] [US1] Write FAILING unit test for `git.MainCheckout` (fake runner returns ordered `worktree list --porcelain`; called from a linked worktree it still returns the main root) in `internal/git/worktree_test.go`.
 - [ ] T011 [P] [US1] Write FAILING unit test for `assertNoNesting` (rejects any path already under `.forge/worktrees/`) in `cmd/forge/sdd_worktree_test.go`.
 - [ ] T012 [P] [US1] Write FAILING integration test (build tag `integration`) provisioning a worktree twice against a real temp repo and asserting exactly one `.forge/worktrees/` level (siblings, never nested) in `cmd/forge/sdd_worktree_integration_test.go`.
-- [ ] T013 [P] [US1] Write FAILING Playwright test: after restart the tab re-attaches to the same worktree dir; with the worktree deleted it lands on the main checkout with one fallback message — reading `window.term.buffer.active`, not the DOM — in `tests/e2e/sdd-tdd-enforcement.spec.js`.
+- [ ] T013 [P] [US1] Write FAILING Playwright test: after restart the tab re-attaches to the same worktree dir; with the worktree deleted it lands on the main checkout with one fallback message — reading `window.term.buffer.active`, not the DOM — **and assert the re-attach completes within the 10 s budget (SC-008)** — in `tests/e2e/sdd-tdd-enforcement.spec.js`.
 
 ### Implementation for User Story 1
 
@@ -82,7 +83,7 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 ### Tests for User Story 2 (write first, must FAIL)
 
-- [ ] T018 [P] [US2] Write FAILING unit tests in `cmd/forge/sdd_verification_test.go` for the TDD rule: (a) behaviorChanging + no Red ⇒ block, (b) Green-without-prior-Red ⇒ block, (c) Red-then-Green ⇒ pass, (d) docs-only + exemptReason ⇒ exempt.
+- [ ] T018 [P] [US2] Write FAILING unit tests in `cmd/forge/sdd_verification_test.go` for the TDD rule: (a) behaviorChanging + no Red ⇒ block, (b) Green-without-prior-Red ⇒ block, (c) Red-then-Green ⇒ pass, (d) classifier-derived docs/refactor exemption ⇒ exempt (and a behavior-changing phase can never be marked exempt).
 
 ### Implementation for User Story 2
 
@@ -144,6 +145,7 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 - [ ] T035 Run all six `quickstart.md` scenarios end-to-end via `./run-dev-clean.ps1` and record outcomes.
 - [ ] T036 [P] Dogfood verification: confirm this feature's own commits carry `test-failed-first` → `tests-passed` ledger evidence (the gates pass on their own implementation).
 - [ ] T037 Full suite green: `go test ./...`, `go test -tags=integration ./...`, `cd frontend && npx vitest run`, `npx playwright test tests/e2e/sdd-tdd-enforcement.spec.js`.
+- [ ] T039 [P] Add a lint/check that terminal-output e2e tests use the shared buffer-reading fixture (`window.term.buffer.active`) rather than DOM assertions, surfacing any bypass as a reviewable violation in `tests/e2e/` (resolves analysis finding U1, enforces FR-014's buffer-read trust boundary).
 
 ---
 
@@ -153,7 +155,7 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 - **Setup (Phase 1)**: no dependencies.
 - **Foundational (Phase 2)**: depends on Setup; **blocks US2, US3, US4**. Does **not** block US1.
-- **US1 (Phase 3, P1)**: depends only on Setup — independent of Phase 2; can run in parallel with Foundational.
+- **US1 (Phase 3, P1)**: depends only on Setup — independent of Phase 2; can run in parallel with Foundational. **T038 (011↔012 merge-order reconciliation) MUST precede T014/T015**, since both features edit `resolveSddWorkspace`.
 - **US2 (Phase 4, P1)** and **US3 (Phase 5, P1)**: depend on Foundational; independent of each other (both add rules to `evaluateGate` but in separate, ordered tasks — sequence T020 before T025 if worked by one developer to avoid edit overlap).
 - **US4 (Phase 6, P2)**: depends on US2 + US3 (it asserts over the full rule set).
 - **Polish (Phase 7)**: depends on all desired stories.
@@ -208,3 +210,4 @@ Each increment adds enforcement without breaking the prior.
 - Gates fail **closed**: a check that cannot run blocks; it never auto-passes.
 - Never wildcard-kill processes during restart/cleanup tests — target specific PIDs (Article II).
 - Commit after each task or logical group; record `test-failed-first`/`tests-passed` in the ledger as you go.
+- **Task count**: 39 (T001–T039). T038 (coordination, executes first in Setup) and T039 (buffer-fixture lint, Polish) were added during `/speckit-analyze` remediation to resolve findings X1 and U1.

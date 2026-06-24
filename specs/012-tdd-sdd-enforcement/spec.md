@@ -25,7 +25,14 @@ A worktree had been provisioned **inside another worktree**, recursively, becaus
 - Q: Should the TDD and Playwright validation gates be advisory warnings or hard blocks that stop a phase from completing? → A: **Hard blocks.** A behavior-changing phase cannot be marked complete until the testing evidence exists. This matches the existing PreToolUse enforcement model (specs/008) and Constitution Articles V and X, which already mandate Red→Green→Refactor and behavioral proof; this feature makes that mandate mechanically enforced rather than documentary.
 - Q: What counts as acceptable proof for a user-facing change? → A: A Playwright test that drives the **real UI** through real input (keyboard/click) and asserts on the **actually rendered result** (for terminal output, the xterm.js buffer model, per Article X). `grep`, `curl`, log scraping, "it compiles," and "the endpoint returned 200" are explicitly rejected as proof of user-facing behavior.
 - Q: Where does a resumed session re-attach when its original worktree no longer exists (merged/cleaned up)? → A: It falls back to the repository's **main checkout** with a clear, single message explaining the worktree is gone — never into a nested or newly-invented directory, and never silently into the wrong feature.
-- Q: Does the TDD gate apply to every phase? → A: Only to phases that change executable behavior. Documentation-only or pure-refactor phases (no behavioral change) may pass with a recorded, human-readable exemption reason, so the gate cannot be dodged silently but also does not block legitimate non-code work.
+- Q: Does the TDD gate apply to every phase? → A: Only to phases that change executable behavior. Documentation-only or pure-refactor phases (no behavioral change) may pass with an exemption whose reason is **derived from the change classification** (the file surfaces touched), so the gate cannot be dodged by self-assertion but also does not block legitimate non-code work.
+
+### Session 2026-06-24 — Analysis Remediation
+
+- Q: How is "user-facing" decided, and what happens when a backend change alters what the user sees (e.g., terminal/gate message text produced by Go code)? → A: User-facing means **any output a developer sees, regardless of which layer produced it** — not "frontend files changed." A change is user-facing if it touches a frontend surface OR a backend code path that alters user-visible output. When user-facing status is **uncertain, the phase is treated as user-facing (fail safe)**, mirroring the behavior-changing default, so an ambiguous change can never skip the UX gate.
+- Q: Who authors the exemption reason for a docs/refactor phase — a human, or the system? → A: The **system**, from the change classification. Exemption is granted by classification (only docs/refactor/test-only surfaces touched), never by the agent claiming it. This closes the "self-declared exempt" loophole.
+- Q: How does the UX gate trust that a passing Playwright test actually asserted on the rendered terminal buffer and not the DOM (Article X)? → A: Terminal-output UX tests MUST use the shared e2e buffer-reading fixture (`window.term.buffer.active`); the gate treats use of that fixture as the buffer-read evidence. Tests that bypass the fixture to assert on the DOM are a reviewable violation, not a silent pass.
+- Q: Does "deterministic" mean the gate ignores disk/time? → A: Determinism is scoped to the **assembled verification record**: identical records yield identical decisions. Record *assembly* legitimately reads mutable disk (the evidence ledger, the Playwright result); the guarantee is that nothing else (wall-clock, ordering, randomness) influences the verdict.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -121,18 +128,18 @@ When any required test or validation fails, the pipeline reports the failure tog
 
 **TDD enforcement (US2)**
 
-- **FR-006**: The system MUST classify whether a phase changed executable behavior, so the TDD gate applies only to behavior-changing phases.
+- **FR-006**: The system MUST classify whether a phase changed executable behavior, so the TDD gate applies only to behavior-changing phases. (This and FR-011 are two axes — executable vs user-facing — of a single classification step over the phase's touched files.)
 - **FR-007**: For a behavior-changing phase, the system MUST require evidence that a test was observed to **fail** before the implementation and **pass** after it (Red→Green), and MUST block phase completion when that evidence is absent.
 - **FR-008**: The system MUST reject, as insufficient for TDD, a test that passed without any recorded prior failing observation.
-- **FR-009**: The system MUST allow a documentation-only or pure-refactor phase to complete without a test ONLY when a human-readable exemption reason is recorded and shown in the phase report.
+- **FR-009**: The system MUST allow a documentation-only or pure-refactor phase to complete without a test, attaching an exemption reason **derived automatically from the change classification** (the file surfaces touched) and shown in the phase report. The exemption MUST be granted by classification, never by the agent self-asserting it, so it can never be claimed for a phase that actually changed executable behavior.
 - **FR-010**: The system MUST record the Red and Green observations (or the exemption reason) in the phase's developer-facing report.
 
 **Playwright UX validation (US3)**
 
-- **FR-011**: The system MUST classify whether a phase changed **user-facing** behavior, so the UX validation gate applies to those phases.
+- **FR-011**: The system MUST classify whether a phase changed **user-facing** behavior — any output a developer sees, regardless of which layer produced it. A change is user-facing if it touches a frontend surface OR a backend code path that alters user-visible output (terminal/prompt text, gate messages, report content). When user-facing status cannot be determined, the system MUST treat the phase as user-facing (fail safe), so an ambiguous change is never allowed to skip the UX validation gate.
 - **FR-012**: For a user-facing phase, the system MUST require validation evidence produced by a test that drives the real UI through real user input and asserts on the actually rendered result.
 - **FR-013**: The system MUST reject evidence consisting solely of text search, HTTP requests, HTTP status codes, log inspection, or compilation success as proof of user-facing behavior.
-- **FR-014**: For terminal-output behavior, the system MUST require assertions against the rendered terminal buffer state rather than the DOM or log files.
+- **FR-014**: For terminal-output behavior, the system MUST require assertions against the rendered terminal buffer state rather than the DOM or log files. Terminal-output UX tests MUST use the shared end-to-end buffer-reading fixture; the gate treats use of that fixture as the buffer-read evidence, and a test that bypasses it to assert on the DOM is a reviewable violation rather than a silent pass.
 - **FR-015**: The system MUST surface the UX validation outcome — pass or fail, with the failing output on failure — in the phase report, and MUST block completion on failure.
 - **FR-016**: When the UX validation tooling cannot run, the gate MUST fail closed with an actionable message and MUST NOT report the phase as passed.
 
@@ -140,7 +147,7 @@ When any required test or validation fails, the pipeline reports the failure tog
 
 - **FR-017**: The system MUST NOT report a phase as complete or passed when any required test or validation did not run or did not pass.
 - **FR-018**: When a required check fails, the system MUST present the actual failing output and keep the phase open for fix-and-retry.
-- **FR-019**: Re-running the same phase against the same inputs MUST produce the same gate decision (pass/block) so the pipeline behaves predictably and repeatably.
+- **FR-019**: The gate decision MUST be a deterministic function of the **assembled verification record**: identical records yield identical decisions (pass/block/exempt). Assembling that record legitimately reads mutable state (the evidence ledger, the validation result); the guarantee is that nothing else — wall-clock, ordering, or randomness — influences the verdict, so the pipeline behaves predictably and repeatably.
 - **FR-020**: Any gate bypass MUST be explicit, require a recorded reason, and be auditable; the system MUST NOT provide a silent path around the TDD or UX gates.
 
 ### Key Entities *(include if data involves data)*
@@ -165,6 +172,8 @@ When any required test or validation fails, the pipeline reports the failure tog
 ## Assumptions
 
 - **Worktree mechanics come from feature 011**: The opt-in worktree provisioning, picker, and cleanup are delivered by `011-worktree-concurrency`. This feature (012) adds the **determinism guarantee** (stable re-attach, no nesting) on top of that mechanism and the **testing-enforcement** gates; it does not re-implement worktree provisioning.
+- **011 ↔ 012 coordination is explicit**: Both features modify the same provisioning code (`resolveSddWorkspace`/`provisionWorktreeForSession`). 012's main-checkout anchoring + no-nesting fix and 011's opt-in/default-to-main redesign MUST be reconciled in a single merge order — the anchoring fix (012) is the bug fix and lands first; 011's opt-in model rebases onto it. This sequencing is tracked as an explicit task, not left to merge-time discovery.
+- **Terminology**: "main checkout" and "main project directory" denote the same thing — the repository's primary working tree (the first entry of the worktree list). "main checkout" is the canonical term used in the plan and design artifacts.
 - **Constitution Articles V and X are the standard, now enforced**: The requirement for Red→Green→Refactor TDD and for real Playwright UX proof (reading the xterm.js buffer model, never the DOM, and rejecting "compiles"/"200 OK") already exists in the constitution. This feature makes those Articles mechanically enforced in the pipeline rather than relying on agent discipline.
 - **Hard enforcement, with audited bypass**: Gates block by default. A single, explicit, reason-recorded bypass exists for genuine emergencies (mirroring the existing workflow-ledger bypass) so the developer is never permanently trapped, but the bypass is always visible.
 - **Behavior classification is decidable from the phase's changes**: Whether a phase changed executable and/or user-facing behavior can be determined from the files and surfaces it touched; ambiguous cases default to "behavior-changing" so the gate fails safe rather than waving work through.
