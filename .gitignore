@@ -117,6 +117,12 @@ v*.md
 *_FIX_*.md
 *_VALIDATION*.md
 *_DASHBOARD*.html
+
+# Re-include the entire Spec Kit artifact tree. The customer-facing-doc ignore
+# rules above (V*.md, RELEASE_*.md, *_FIX_*.md, …) are meant for root-level
+# changelogs, but they silently swallowed specs/.../contracts/verification-gates.md.
+# specs/ holds tracked pipeline artifacts and must never be caught by those rules.
+!specs/**
 *-dashboard*.html
 *-validation*.html
 
