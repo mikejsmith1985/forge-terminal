@@ -7,7 +7,7 @@
  * 2. Whether backspace/keyboard input has latency issues
  * 3. Whether AM logging is blocking the UI
  */
-const { test, expect, visitWithoutTour } = require('../fixtures/forge')
+const { test, expect, visitWithoutTour, terminalShouldContain, getTerminalOutput } = require('../fixtures/forge')
 
 test.describe('WebSocket Recovery', () => {
   const baseUrl = 'http://localhost:3005';
@@ -37,8 +37,8 @@ test.describe('WebSocket Recovery', () => {
       console.log('Terminal container:', terminalContainerFound ? 'found' : 'not found');
       console.log('Connection indicator:', connectionIndicatorFound ? 'found' : 'not found');
 
-      // The terminal should show "Connected" message
-      await expect(page.locator('.xterm-screen')).toContainText('Connected');
+      // The terminal should show "Connected" message — read the xterm buffer, not the DOM (Article X).
+      await terminalShouldContain(page, 'Connected');
     });
 
     test('should have WebSocket in OPEN state after connection', async ({ page }) => {
@@ -189,7 +189,7 @@ test.describe('WebSocket Recovery', () => {
 
       // The character should echo in terminal
       await page.waitForTimeout(200);
-      const textLength = await page.locator('.xterm-screen').evaluate((el) => el.textContent.length);
+      const textLength = (await getTerminalOutput(page, 50)).length; // buffer model, not DOM (Article X).
       // Just verify we didn't get an error
       console.log('Screen contains text of length:', textLength);
     });
@@ -212,7 +212,7 @@ test.describe('WebSocket Recovery', () => {
 
       // Both should work without blocking
       await page.waitForTimeout(1000);
-      await expect(page.locator('.xterm-screen')).toContainText('test');
+      await terminalShouldContain(page, 'test'); // buffer model, not DOM (Article X).
     });
   });
 
