@@ -72,13 +72,24 @@ func resolveSddWorkspace(sessionID, repoRoot string) (string, sddWorktreeBinding
 	if err != nil || commonDir == "" {
 		return repoRoot, sddWorktreeBinding{}
 	}
+	// Deterministic resume (specs/012 US1, FR-001/004/005): when the bind directory is
+	// ALREADY an isolated worktree, re-attach to it instead of provisioning a new one.
+	// This lands a resumed session back in the exact directory it left across restarts
+	// and makes the recursive .forge/worktrees/X/.forge/worktrees/Y nesting impossible.
+	if isForgeWorktreePath(repoRoot) {
+		return reattachExistingWorktree(repoRoot, commonDir)
+	}
 	if !sddHasConcurrentPipeline(sessionID, commonDir) {
 		return repoRoot, sddWorktreeBinding{gitCommonDir: commonDir} // first pipeline (FR-005).
 	}
 
-	mainRepoRoot, err := sddGitClient.Toplevel(repoRoot)
-	if err != nil || mainRepoRoot == "" {
-		mainRepoRoot = repoRoot
+	// Anchor provisioning to the MAIN checkout (worktree-list first entry), never to
+	// `--show-toplevel`, which returns a linked worktree's own root from inside one
+	// and is the original cause of recursive nesting (specs/012 US1, FR-002).
+	mainRepoRoot := mainCheckoutOrFallback(repoRoot)
+	if !assertNoNesting(mainRepoRoot) {
+		// The resolved anchor is itself inside a worktree — refuse to nest; degrade safe.
+		return repoRoot, sddWorktreeBinding{gitCommonDir: commonDir}
 	}
 	worktreePath, branch, base, ok := provisionWorktreeForSession(sessionID, mainRepoRoot)
 	if !ok {
@@ -92,6 +103,40 @@ func resolveSddWorkspace(sessionID, repoRoot string) (string, sddWorktreeBinding
 		worktreePath: worktreePath,
 		branch:       branch,
 		baseBranch:   base,
+		isIsolated:   true,
+	}
+}
+
+// mainCheckoutOrFallback resolves the repository's main checkout via MainCheckout
+// (the durable, worktree-list-anchored answer), falling back to dir when git cannot
+// report it so a bind is never blocked (FR-014).
+func mainCheckoutOrFallback(dir string) string {
+	main, err := sddGitClient.MainCheckout(dir)
+	if err != nil || main == "" {
+		return dir
+	}
+	return main
+}
+
+// assertNoNesting reports whether root is a safe anchor for a new worktree — i.e. it
+// is not itself inside a .forge/worktrees/ directory. Anchoring under such a path is
+// exactly what produced the recursive nesting bug (specs/012 US1, FR-003).
+func assertNoNesting(root string) bool {
+	return !isForgeWorktreePath(root)
+}
+
+// reattachExistingWorktree binds a session to the worktree it is already sitting in,
+// resolving the main checkout from the worktree list (never --show-toplevel) and
+// provisioning nothing. A resumed session therefore keeps its exact directory and
+// can never spawn a nested worktree (specs/012 US1, FR-001/004/005). The shell is
+// NOT retargeted — the session is already in this directory.
+func reattachExistingWorktree(worktreePath, commonDir string) (string, sddWorktreeBinding) {
+	branch, _ := sddGitClient.CurrentBranch(worktreePath)
+	return worktreePath, sddWorktreeBinding{
+		gitCommonDir: commonDir,
+		mainRepoRoot: mainCheckoutOrFallback(worktreePath),
+		worktreePath: worktreePath,
+		branch:       branch,
 		isIsolated:   true,
 	}
 }

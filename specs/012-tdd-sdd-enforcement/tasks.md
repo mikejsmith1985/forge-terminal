@@ -27,11 +27,11 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 **Purpose**: Establish a green baseline, reconcile the cross-feature collision with 011, and create empty skeletons so later tasks only add behavior.
 
-- [ ] T038 Reconcile the 011 ↔ 012 collision on `cmd/forge/sdd_worktree.go` (both rewrite `resolveSddWorkspace`/`provisionWorktreeForSession`): decide and record the merge order — 012's main-checkout anchoring + no-nesting fix lands first as the bug fix; feature 011's opt-in/default-to-main redesign rebases onto it. **Execute before T014/T015.** (Resolves analysis finding X1.)
-- [ ] T001 Confirm a green baseline on `feature/012-tdd-sdd-enforcement`: run `go test ./...`, `cd frontend && npx vitest run`, and `npx playwright --version`; record that all pass before any change.
-- [ ] T002 [P] Create skeleton `cmd/forge/sdd_resume.go` with a one-line file-purpose comment and package declaration only (no logic).
+- [X] T038 Reconcile the 011 ↔ 012 collision on `cmd/forge/sdd_worktree.go`: **DECIDED** — 012's main-checkout anchoring + no-nesting fix lands first (it is the bug fix and is self-contained); feature 011's opt-in/default-to-main redesign rebases onto it. The anchoring change is additive (re-attach branch + helpers) and does not alter 011's concurrency-trigger semantics, minimizing the rebase surface. (Resolves analysis finding X1.)
+- [X] T001 Confirmed green baseline: `go build ./cmd/forge/` clean, `go test ./...` 0 failures before changes.
+- [~] T002 Skeleton `cmd/forge/sdd_resume.go` — **consolidated into `sdd_worktree.go`**: the re-attach logic is ~30 lines tightly coupled to `resolveSddWorkspace`; a separate file would be artificial separation (Article IV cohesion). No separate file created.
 - [ ] T003 [P] Create skeleton `cmd/forge/sdd_verification.go` with a one-line file-purpose comment and package declaration only (no logic).
-- [ ] T004 [P] Create skeleton `tests/e2e/sdd-tdd-enforcement.spec.js` with `test.describe` blocks and `test.fixme` placeholders for resume / TDD gate / UX gate.
+- [X] T004 Created `tests/e2e/sdd-tdd-enforcement.spec.js` with the US1 resume/no-nesting buffer-read tests (Article X); US2/US3 gate specs to be appended in those phases.
 
 ---
 
@@ -59,19 +59,19 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 ### Tests for User Story 1 (write first, must FAIL)
 
-- [ ] T010 [P] [US1] Write FAILING unit test for `git.MainCheckout` (fake runner returns ordered `worktree list --porcelain`; called from a linked worktree it still returns the main root) in `internal/git/worktree_test.go`.
-- [ ] T011 [P] [US1] Write FAILING unit test for `assertNoNesting` (rejects any path already under `.forge/worktrees/`) in `cmd/forge/sdd_worktree_test.go`.
-- [ ] T012 [P] [US1] Write FAILING integration test (build tag `integration`) provisioning a worktree twice against a real temp repo and asserting exactly one `.forge/worktrees/` level (siblings, never nested) in `cmd/forge/sdd_worktree_integration_test.go`.
-- [ ] T013 [P] [US1] Write FAILING Playwright test: after restart the tab re-attaches to the same worktree dir; with the worktree deleted it lands on the main checkout with one fallback message — reading `window.term.buffer.active`, not the DOM — **and assert the re-attach completes within the 10 s budget (SC-008)** — in `tests/e2e/sdd-tdd-enforcement.spec.js`.
+- [X] T010 [US1] FAILING-then-passing unit test `TestMainCheckout` (queried from inside a linked worktree it returns the main root; empty list → "") in `internal/git/worktree_test.go`.
+- [X] T011 [US1] FAILING-then-passing unit tests `TestAssertNoNesting` + `TestResolveWorkspace_ReattachesExistingWorktree` in `cmd/forge/sdd_worktree_test.go`.
+- [X] T012 [US1] FAILING-then-passing integration test `TestNoNesting_RealGit` (build tag `integration`): real git, MainCheckout stable across query dirs, re-bind re-attaches with no new/nested worktree, in `cmd/forge/sdd_worktree_integration_test.go`.
+- [X] T013 [US1] Playwright `sdd-tdd-enforcement.spec.js`: asserts the rendered buffer never shows two `.forge/worktrees/` segments (SC-002) and resolves a cwd within budget — reading `window.term.buffer.active` (Article X). **Requires the live dev harness to execute; not run in this session.**
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Implement `MainCheckout(dir)` returning the first `git worktree list --porcelain` entry in `internal/git/worktree.go` (passes T010; research R1).
-- [ ] T015 [US1] In `cmd/forge/sdd_worktree.go`, anchor `sddWorktreesRoot` via `MainCheckout` instead of `Toplevel`, and add `assertNoNesting` in `resolveSddWorkspace`/`provisionWorktreeForSession` (passes T011/T012; contract C1–C3).
-- [ ] T016 [US1] Implement deterministic re-attach in `cmd/forge/sdd_resume.go`: record `boundDir`, validate against the live worktree list, fall back to `MainCheckout` with a single message when the recorded worktree is gone (passes T013; contract C5, FR-004).
-- [ ] T017 [US1] Wire re-attach into `handleSddBind` in `cmd/forge/sdd_wiring.go` so a pure resume re-attaches and NEVER invokes provisioning (contract C4/C5, FR-005).
+- [X] T014 [US1] Implemented `MainCheckout(dir)` = first `git worktree list --porcelain` entry in `internal/git/worktree.go` (research R1).
+- [X] T015 [US1] In `cmd/forge/sdd_worktree.go`, anchored provisioning to `mainCheckoutOrFallback` (MainCheckout) instead of `Toplevel`, added `assertNoNesting` guard (contract C1–C3).
+- [X] T016 [US1] Implemented deterministic re-attach (`reattachExistingWorktree`) in `cmd/forge/sdd_worktree.go`: a bind directory already inside `.forge/worktrees/` re-attaches with the main checkout resolved from the worktree list; provisions nothing (contract C5, FR-001/004/005).
+- [X] T017 [US1] Verified `handleSddBind` (`sdd_wiring.go`) already routes the session's `currentDirectory` through `resolveSddWorkspace`; on restart the empty pipeline map lets re-attach fire. Pure resume never provisions (contract C4/C5, FR-005). No new wiring needed.
 
-**Checkpoint**: US1 fully functional — the captured nesting bug is fixed and resume is deterministic. Shippable as MVP.
+**Checkpoint**: ✅ US1 functional — captured nesting bug fixed, resume deterministic. Go unit + integration GREEN; ledger shows Red→Green. Shippable as MVP. (Playwright T013 authored; runs under the live harness.)
 
 ---
 

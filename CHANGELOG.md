@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Recursive worktree nesting / broken session resume (specs/012 US1)** — Concurrent SDD sessions could end up in a working directory nested inside another worktree (`.forge/worktrees/X/.forge/worktrees/Y`), deepening on every app restart and making directory-bound Resume/Continue impossible. Root cause: the main checkout was resolved with `git rev-parse --show-toplevel`, which returns a *linked worktree's own root* when run from inside one, so new worktrees were anchored under the current worktree. Fixed by resolving the main checkout from `git worktree list --porcelain` (its first entry is always the main worktree) via a new `MainCheckout` helper, adding a hard no-nesting guard, and re-attaching a session that is already inside a worktree to that worktree instead of provisioning a new one — so a resumed session lands back in the exact directory it left. Proven by Go unit + real-git integration tests (`TestMainCheckout`, `TestNoNesting_RealGit`).
+
 ## [7.20.4] - 2026-06-24
 
 ---
