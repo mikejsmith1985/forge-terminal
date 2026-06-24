@@ -98,7 +98,9 @@ func TestResolveWorkspace_FirstPipelineKeepsMainCheckout(t *testing.T) {
 	if repoRoot != "C:/repo" {
 		t.Errorf("repoRoot = %q, want the main checkout C:/repo", repoRoot)
 	}
-	if binding.gitCommonDir != "C:/repo/.git" {
+	// GitCommonDir normalizes to an absolute path via filepath.Clean, so the expected
+	// value must also be Clean'd — on Windows that converts "/" to "\" separators.
+	if binding.gitCommonDir != filepath.Clean("C:/repo/.git") {
 		t.Errorf("gitCommonDir = %q, want it recorded for later concurrency checks", binding.gitCommonDir)
 	}
 }
@@ -107,7 +109,8 @@ func TestResolveWorkspace_ConcurrentSessionGetsWorktree(t *testing.T) {
 	fake := gitRepoFake()
 	withFakeGit(t, fake)
 	// An existing pipeline already owns this repo's common dir → the next bind is concurrent.
-	sddPipelines.Store("wt-owner", &sddPipeline{gitCommonDir: "C:/repo/.git"})
+	// Use filepath.Clean to match the normalized value GitCommonDir now returns.
+	sddPipelines.Store("wt-owner", &sddPipeline{gitCommonDir: filepath.Clean("C:/repo/.git")})
 	t.Cleanup(func() { sddPipelines.Delete("wt-owner") })
 
 	repoRoot, binding := resolveSddWorkspace("wt-second", "C:/repo")
@@ -136,7 +139,7 @@ func TestResolveWorkspace_DegradesSafelyWhenProvisioningFails(t *testing.T) {
 	fake := gitRepoFake()
 	fake.failPrefixes = []string{"worktree add"} // platform-independent: any worktree add fails.
 	withFakeGit(t, fake)
-	sddPipelines.Store("wt-owner2", &sddPipeline{gitCommonDir: "C:/repo/.git"})
+	sddPipelines.Store("wt-owner2", &sddPipeline{gitCommonDir: filepath.Clean("C:/repo/.git")})
 	t.Cleanup(func() { sddPipelines.Delete("wt-owner2") })
 
 	repoRoot, binding := resolveSddWorkspace("wt-second", "C:/repo")

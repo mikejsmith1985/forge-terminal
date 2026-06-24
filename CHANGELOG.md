@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Every tab was getting a worktree even in different repos** — `git rev-parse --git-common-dir` returns a relative path (`.git`) from the main checkout, so every repo shared the same grouping key. `GitCommonDir` now joins relative results with the caller's directory (`filepath.Join(dir, out)`) and normalizes with `filepath.Clean`, giving each repo a unique absolute key. Previously, the second tab opened for *any* repo would receive a worktree; now only the second (and beyond) tab for the *same* repo is isolated.
+
 ## [7.20.3] - 2026-06-24
 
 ---
