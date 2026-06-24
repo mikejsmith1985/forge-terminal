@@ -123,6 +123,15 @@ func parseNumstat(numstat string) []sddFileChange {
 // command-emitted decisions, truncating the file list to the top-N for scannability
 // (FR-008). An empty file list yields a "No files changed" scope (US3 #4).
 func buildPhaseReportCard(phase sdd.PhaseName, files []sddFileChange, scope string, decisions []string, runCount int) sddPhaseReportCard {
+	// Normalize nil slices to empty slices so JSON serializes them as [] not null.
+	// A JS destructuring default (files = []) only handles undefined, not null, so
+	// a Go nil slice reaching the frontend would crash ReportCard with ".length on null".
+	if files == nil {
+		files = []sddFileChange{}
+	}
+	if decisions == nil {
+		decisions = []string{}
+	}
 	card := sddPhaseReportCard{
 		Phase:      string(phase),
 		TotalFiles: len(files),

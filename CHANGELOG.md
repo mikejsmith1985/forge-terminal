@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **SDD dashboard crash on tab switch (null files/decisions)** — A Go `nil` slice serialises as JSON `null`, not `[]`. When no phase decisions were stored yet and no files changed, `buildPhaseReportCard` sent `"files":null` and `"decisions":null`. JavaScript destructuring defaults (`= []`) only guard `undefined`, so `null.length` crashed `ReportCard` on every report-card render after a phase gate opened. Fixed in two layers: Go normalises nil slices to empty before building the card; `ReportCard` additionally uses `?? []` for defence in depth.
 - **Every tab was getting a worktree even in different repos** — `git rev-parse --git-common-dir` returns a relative path (`.git`) from the main checkout, so every repo shared the same grouping key. `GitCommonDir` now joins relative results with the caller's directory (`filepath.Join(dir, out)`) and normalizes with `filepath.Clean`, giving each repo a unique absolute key. Previously, the second tab opened for *any* repo would receive a worktree; now only the second (and beyond) tab for the *same* repo is isolated.
 
 ## [7.20.3] - 2026-06-24
