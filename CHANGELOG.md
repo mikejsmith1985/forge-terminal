@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.20.2] - 2026-06-24
+
+---
+
+## [v7.20.2] - 2026-06-24
+
 ### Fixed
 - **SDD dashboard no longer crashes on null `phases` prop** — `TypeError: Cannot read properties of null (reading 'length')` could tear down the entire Forge Terminal UI when switching tabs while the SDD pipeline was initialising. Root cause: `phases` is briefly `null` during the React re-render cycle after a session switch; all three render paths (`deriveActionPrompt`, `derivePipelineBadge`, `PhaseRail`) called `.length` without guarding. Fixed with `!phases ||` null-guards in each path and a `phases = []` default on `DashboardHeader`. Also fixed `useSddGate` to reset `phaseStatuses` to `[]` immediately on session change (before the recovery fetch resolves) and to use `Array.isArray` instead of truthy-length guard so an empty-array response from a new session correctly clears stale phases from the previous session.
 
