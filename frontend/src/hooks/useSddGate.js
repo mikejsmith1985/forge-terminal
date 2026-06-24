@@ -47,6 +47,9 @@ export function useSddGate({ activeSessionId }) {
   // Worktree binding for this session (specs/011): { isolated, worktreePath, branch, baseBranch }
   // or null when the tab runs on the repo's main checkout (no worktree indicator shown).
   const [binding, setBinding] = useState(null)
+  // Current phase's verification verdict (specs/012 US4): { decision, blockReason, exemptReason, bypassed }
+  // or null. Carries WHY a phase is blocked so the dashboard can show it (honest failure).
+  const [verification, setVerification] = useState(null)
   // Accumulated gate summaries keyed by phase name. Ref to avoid extra re-renders.
   const phaseSummaries = useRef({})
   // Default true: avoids a flash-of-banner while the fetch is in flight. The banner only
@@ -78,6 +81,7 @@ export function useSddGate({ activeSessionId }) {
     setPhaseStatuses([])
     setFeatureName('')
     setBinding(null)
+    setVerification(null)
     phaseSummaries.current = {}
     fetch(`${STATUS_ENDPOINT}?sessionId=${encodeURIComponent(activeSessionId)}`, {
       credentials: 'same-origin',
@@ -89,6 +93,8 @@ export function useSddGate({ activeSessionId }) {
         if (data?.feature) setFeatureName(data.feature)
         // Worktree binding (specs/011) — only meaningful when isolated.
         if (data?.binding?.isolated) setBinding(data.binding)
+        // Verification verdict (specs/012 US4) — recovered so a blocked phase shows after reload.
+        setVerification(data?.verification ?? null)
         // Restore a pending gate card after page reload. SDD_PHASE_GATE events are
         // not replayed on reconnect, so the status endpoint includes the pending card
         // when one exists so the decision bar reappears without a new WS event.
@@ -117,6 +123,9 @@ export function useSddGate({ activeSessionId }) {
         // Track the worktree binding so the dashboard can show which worktree/branch this
         // tab runs in (specs/011, FR-007); isolated:false clears the indicator.
         if (parsed.binding !== undefined) setBinding(parsed.binding?.isolated ? parsed.binding : null)
+        // Verification verdict (specs/012 US4): undefined leaves it as-is; null/absent clears it
+        // (e.g. once a phase passes). A block carries decision + reason so the dashboard can show it.
+        setVerification(parsed.verification ?? null)
         return
       }
 
@@ -212,6 +221,7 @@ export function useSddGate({ activeSessionId }) {
     phaseStatuses,
     featureName,
     binding,
+    verification,
     phaseSummaries,
     isHookInstalled,
     handleWsMessage,

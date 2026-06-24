@@ -181,6 +181,20 @@ func assembleVerificationRecord(pipeline *sddPipeline, phase sdd.PhaseName) phas
 	return record
 }
 
+// phaseVerificationView projects a phase's stored verdict into the additive view the
+// frontend renders, or nil when no verdict has been evaluated for that phase. This is how
+// a blocked phase's reason rides the SDD_PHASE_STATUS broadcast so the developer sees WHY
+// the phase is stuck (US4 honest failure, FR-015/017/018).
+func phaseVerificationView(pipeline *sddPipeline, phase sdd.PhaseName) *sddVerificationView {
+	if pipeline == nil || phase == "" {
+		return nil
+	}
+	if verification, ok := pipeline.verificationFor(phase); ok {
+		return newVerificationView(verification)
+	}
+	return nil
+}
+
 // gatedHandlePhaseComplete is the single verification chokepoint both completion paths use
 // (the authoritative phase-event and the pty-quiet watcher fallback). On a blocking verdict
 // it records the verdict and surfaces the blocked state WITHOUT presenting the phase as

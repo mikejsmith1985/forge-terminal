@@ -31,6 +31,7 @@ function DashboardFixture(props) {
       phases={props.phases ?? []}
       featureName={props.featureName ?? ''}
       binding={props.binding ?? null}
+      verification={props.verification ?? null}
       phaseSummaries={phaseSummaries}
       isCardOpen={props.isCardOpen ?? false}
       card={props.card ?? null}
@@ -44,6 +45,43 @@ function DashboardFixture(props) {
     />
   )
 }
+
+// ── Verification verdict chip (specs/012 US4) ────────────────────────────────
+
+describe('SddDashboard verification verdict (specs/012 US4)', () => {
+  it('shows a blocked verdict with its reason so the developer sees WHY a phase is stuck', () => {
+    render(<DashboardFixture
+      phases={SIX_PHASES}
+      verification={{ decision: 'block', blockReason: 'no failing test was recorded before implementation (TDD Red→Green required)' }}
+    />)
+    const chip = screen.getByTestId('sdd-verification')
+    expect(chip.textContent).toContain('Phase blocked')
+    expect(chip.textContent).toContain('failing test')
+  })
+
+  it('shows a UX block reason verbatim', () => {
+    render(<DashboardFixture
+      phases={SIX_PHASES}
+      verification={{ decision: 'block', blockReason: 'user-facing change needs a passing Playwright UX result (grep/curl/HTTP-status do not count)' }}
+    />)
+    expect(screen.getByTestId('sdd-verification').textContent).toContain('Playwright UX result')
+  })
+
+  it('renders no chip for a plain pass (no news is good news)', () => {
+    render(<DashboardFixture phases={SIX_PHASES} verification={{ decision: 'pass' }} />)
+    expect(screen.queryByTestId('sdd-verification')).toBeNull()
+  })
+
+  it('renders no chip when there is no verdict', () => {
+    render(<DashboardFixture phases={SIX_PHASES} verification={null} />)
+    expect(screen.queryByTestId('sdd-verification')).toBeNull()
+  })
+
+  it('surfaces an audited bypass so it is never silent', () => {
+    render(<DashboardFixture phases={SIX_PHASES} verification={{ decision: 'pass', bypassed: true }} />)
+    expect(screen.getByTestId('sdd-verification').textContent).toContain('bypassed')
+  })
+})
 
 // ── Smoke test ───────────────────────────────────────────────────────────────
 

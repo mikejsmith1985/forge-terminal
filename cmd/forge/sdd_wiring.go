@@ -463,6 +463,9 @@ type sddPhaseStatusEnvelope struct {
 	Feature   string                 `json:"feature"`
 	Phases    []sdd.PhaseStatusEntry `json:"phases"`
 	Binding   sddBindingInfo         `json:"binding"`
+	// Verification carries the current phase's gate verdict (specs/012 US4) so the dashboard
+	// can show why a phase is blocked. Omitted when the current phase has no recorded verdict.
+	Verification *sddVerificationView `json:"verification,omitempty"`
 }
 
 // buildPhaseStatuses derives the display status for every pipeline phase. Orchestrator
@@ -574,11 +577,12 @@ func broadcastPhaseStatus(sessionID string) {
 		state = pipeline.orchestrator.State() // re-read after potential advance
 	}
 	termHandler.BroadcastJSONToSession(sessionID, sddPhaseStatusEnvelope{
-		Type:      "SDD_PHASE_STATUS",
-		SessionID: sessionID,
-		Feature:   filepath.Base(state.FeatureDir),
-		Phases:    buildPhaseStatuses(pipeline),
-		Binding:   sddBindingInfoFor(pipeline),
+		Type:         "SDD_PHASE_STATUS",
+		SessionID:    sessionID,
+		Feature:      filepath.Base(state.FeatureDir),
+		Phases:       buildPhaseStatuses(pipeline),
+		Binding:      sddBindingInfoFor(pipeline),
+		Verification: phaseVerificationView(pipeline, state.CurrentPhase),
 	})
 }
 

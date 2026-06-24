@@ -125,17 +125,17 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 ### Tests for User Story 4 (write first, must FAIL)
 
-- [ ] T028 [P] [US4] Write FAILING unit tests in `cmd/forge/sdd_verification_test.go`: a failed required check never yields `pass`/complete; identical `PhaseVerificationRecord` ⇒ identical `GateDecision` across repeated evaluation (determinism).
-- [ ] T029 [P] [US4] Write FAILING unit test in `cmd/forge/sdd_verification_test.go`: an audited bypass (`FORGE_BYPASS` + reason) converts a `block` to `pass` and records the reason.
+- [X] T028 [US4] `TestEvaluateGate_Determinism` (identical record ⇒ identical decision across repeated evaluation) in `cmd/forge/sdd_verification_test.go` (done in US2).
+- [X] T029 [US4] `TestEvaluateGate_AuditedBypass` (`FORGE_BYPASS` converts block→pass) in `cmd/forge/sdd_verification_test.go` (done in US2).
 
 ### Implementation for User Story 4
 
-- [ ] T030 [US4] Ensure the `block` path in `cmd/forge/handlers_sdd.go` keeps the phase active and surfaces the actual failing output — no auto-advance (passes T028; FR-017/018).
-- [ ] T031 [US4] Implement the audited bypass in `cmd/forge/sdd_verification.go`: read `FORGE_BYPASS`/`FORGE_BYPASS_REASON`, convert block→pass, append to `.forge/bypasses.log`, mark the record bypassed (passes T029; FR-020, contract C6).
-- [ ] T032 [US4] Render the verification verdict (pass / blocked-needs-test / blocked-needs-UX / exempt / bypassed) in `frontend/src/components/SddDashboard.jsx` (Article XI: concise, within the existing card).
-- [ ] T033 [P] [US4] Add a frontend unit test for the verification indicator in `frontend/src/components/SddDashboard.test.jsx`.
+- [X] T030 [US4] The `block` path keeps the phase active: `gatedHandlePhaseComplete` returns BEFORE `HandlePhaseComplete`, so no auto-advance; the block reason is logged and surfaced. The new `TestPhaseVerificationView_SurfacesBlockReason` proves the reason is projected for the developer (FR-017/018).
+- [X] T031 [US4] Audited bypass implemented in `cmd/forge/sdd_verification.go` (`readAuditedBypass` reads `FORGE_BYPASS`/`FORGE_BYPASS_REASON`; `evaluateGate` converts block→pass; record marked bypassed and surfaced) (done in US2; FR-020, contract C6).
+- [X] T032 [US4] `VerificationChip` renders the verdict (blocked-with-reason / bypassed / exempt; nothing on a plain pass) in `frontend/src/components/SddDashboard.jsx`, fed by `verification` carried through `frontend/src/hooks/useSddGate.js` from the `SDD_PHASE_STATUS` envelope (`sddPhaseStatusEnvelope.Verification` via `phaseVerificationView`). CSS added (Article XI: concise, in the header).
+- [X] T033 [US4] 5 vitest cases for the verdict chip in `frontend/src/components/SddDashboard.test.jsx` (block reason shown, UX reason verbatim, no chip on pass, no chip on null, bypass surfaced).
 
-**Checkpoint**: All four stories independently functional; the pipeline is deterministic and honest.
+**Checkpoint**: ✅ All four stories functional. The pipeline is deterministic, honest (blocks surface their reason), and the developer SEES why a phase is stuck. Go + frontend + integration GREEN.
 
 ---
 

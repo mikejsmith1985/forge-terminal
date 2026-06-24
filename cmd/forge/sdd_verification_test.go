@@ -127,6 +127,31 @@ func TestEvaluateGate_Determinism(t *testing.T) {
 	}
 }
 
+// TestPhaseVerificationView_SurfacesBlockReason proves a blocked verdict is projected for
+// the frontend so the developer sees WHY a phase is stuck (US4 honest failure, FR-015/017/018).
+func TestPhaseVerificationView_SurfacesBlockReason(t *testing.T) {
+	pipeline := &sddPipeline{}
+	blocked := phaseVerificationRecord{
+		Phase:          "implement",
+		Classification: sdd.BehaviorClassification{BehaviorChanging: true},
+		BlockReason:    "no failing test was recorded before implementation (TDD Red→Green required)",
+	}
+	pipeline.storeVerification(sdd.PhaseImplement, blocked, gateBlock)
+
+	view := phaseVerificationView(pipeline, sdd.PhaseImplement)
+	if view == nil || view.Decision != "block" {
+		t.Fatalf("phaseVerificationView = %+v; want decision=block", view)
+	}
+	if view.BlockReason == "" {
+		t.Error("a blocked verdict must carry a human-readable reason for the developer")
+	}
+
+	// A phase with no recorded verdict yields nil (nothing to surface).
+	if got := phaseVerificationView(pipeline, sdd.PhaseSpecify); got != nil {
+		t.Errorf("phaseVerificationView(no verdict) = %+v; want nil", got)
+	}
+}
+
 // TestEvaluateGate_AuditedBypass proves an explicit bypass converts a block to a pass (FR-020, contract C6).
 func TestEvaluateGate_AuditedBypass(t *testing.T) {
 	record := behaviorRecord() // would block (no Red→Green)
