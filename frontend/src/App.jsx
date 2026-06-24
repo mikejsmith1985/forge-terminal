@@ -1072,12 +1072,23 @@ function App() {
 
     // For all remaining keys: when the terminal helper textarea is focused
     // (terminal has keyboard focus), let xterm handle the event natively.
+    // Guard: only early-return when the ACTIVE tab's terminal is focused.
+    // During multi-tab session recovery all xterm textareas mount simultaneously
+    // with visibility:hidden (not display:none), so hidden tabs' textareas are
+    // focusable and can win focus races. If a hidden tab wins, this handler would
+    // early-return and the keystroke would go to the wrong PTY — silently dropped.
+    // Numbers are especially affected because Claude Code CLI shows a numbered
+    // prompt immediately on restore, before focus races settle.
     if (isXtermTextarea) {
-      return;
-    }
-
-    // Skip App-level shortcuts when the user is typing in a real input field.
-    if (isInputField) {
+      const activeTermElement = getActiveTerminalRef()?.getTerminal()?.element;
+      const isActiveTermFocused = !activeTermElement || activeTermElement.contains(e.target);
+      if (isActiveTermFocused) {
+        return; // Active terminal has focus — let xterm handle the key normally.
+      }
+      // A hidden tab's textarea has focus — fall through to the redirect so the
+      // active terminal receives the keystroke instead (isInputField guard skipped
+      // intentionally: the hidden textarea is also a TEXTAREA element).
+    } else if (isInputField) {
       return;
     }
 
