@@ -33,13 +33,24 @@ type sddFileChange struct {
 
 // sddPhaseReportCard is the concise gate surface (FR-007): grouped, scannable bullets.
 type sddPhaseReportCard struct {
-	Phase          string          `json:"phase"`
-	Files          []sddFileChange `json:"files"`
-	TotalFiles     int             `json:"totalFiles"`
-	FilesTruncated bool            `json:"filesTruncated"`
-	Scope          string          `json:"scope"`
-	Decisions      []string        `json:"decisions"`
-	RunCount       int             `json:"runCount"`
+	Phase          string               `json:"phase"`
+	Files          []sddFileChange      `json:"files"`
+	TotalFiles     int                  `json:"totalFiles"`
+	FilesTruncated bool                 `json:"filesTruncated"`
+	Scope          string               `json:"scope"`
+	Decisions      []string             `json:"decisions"`
+	RunCount       int                  `json:"runCount"`
+	Verification   *sddVerificationView `json:"verification,omitempty"`
+}
+
+// sddVerificationView is the gate verdict surfaced on the report card (specs/012 US2/US3/US4):
+// the decision plus, on a block, the human-readable reason. Additive and omitempty, so older
+// clients simply ignore it while the dashboard can show why a phase passed or is blocked.
+type sddVerificationView struct {
+	Decision     string `json:"decision"`               // pass | block | exempt
+	BlockReason  string `json:"blockReason,omitempty"`  // why a behaviour change was blocked (TDD/UX unmet).
+	ExemptReason string `json:"exemptReason,omitempty"` // why a docs/refactor phase needed no test.
+	Bypassed     bool   `json:"bypassed,omitempty"`     // true when an audited override was used.
 }
 
 // captureWorkTree snapshots the full working tree (tracked + untracked, minus
@@ -179,5 +190,19 @@ func buildSddPhaseReportCardForPipeline(pipeline *sddPipeline, phase sdd.PhaseNa
 	baseline := pipeline.baselineFor(phase)
 	endTree := captureWorkTree(pipeline.repoRoot)
 	files := diffWorkTrees(pipeline.repoRoot, baseline, endTree)
-	return buildPhaseReportCard(phase, files, "", pipeline.decisionsFor(phase), pipeline.orchestrator.PhaseRunCount(phase))
+	card := buildPhaseReportCard(phase, files, "", pipeline.decisionsFor(phase), pipeline.orchestrator.PhaseRunCount(phase))
+	if verification, ok := pipeline.verificationFor(phase); ok {
+		card.Verification = newVerificationView(verification)
+	}
+	return card
+}
+
+// newVerificationView projects a stored verdict into the additive report-card view (specs/012).
+func newVerificationView(verification sddPhaseVerification) *sddVerificationView {
+	return &sddVerificationView{
+		Decision:     string(verification.decision),
+		BlockReason:  verification.record.BlockReason,
+		ExemptReason: verification.record.Classification.ExemptReason,
+		Bypassed:     verification.record.Bypassed,
+	}
 }

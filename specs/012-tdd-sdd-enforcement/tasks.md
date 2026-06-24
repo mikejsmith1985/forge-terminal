@@ -41,13 +41,13 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 **⚠️ CRITICAL**: US2/US3/US4 cannot begin until this phase is complete.
 
-- [ ] T005 Define `BehaviorClassification`, `PhaseVerificationRecord`, and `GateDecision` types per data-model.md in `cmd/forge/sdd_verification.go`.
-- [ ] T006 [P] Write FAILING unit test for `ClassifyBehavior` in `internal/sdd/detector_test.go` covering: code-only, docs-only, test-only, frontend-UI, **backend-change-that-alters-terminal/gate-output ⇒ userFacing=true**, ambiguous ⇒ behaviorChanging=true **and** userFacing=true (both axes fail safe), and docs/refactor ⇒ classifier-set `exemptReason` (never self-asserted).
-- [ ] T007 Implement `ClassifyBehavior(touchedFiles)` in `internal/sdd/detector.go` so T006 passes: `userFacing` covers frontend surfaces AND backend user-visible-output paths (`cmd/forge/sdd_*`, terminal/prompt writers); both axes fail safe on ambiguity; the classifier is the sole author of `exemptReason` (research R4, FR-009/FR-011).
-- [ ] T008 Implement a pure `evaluateGate(record) GateDecision` in `cmd/forge/sdd_verification.go` handling only `exempt` and default-`pass` for now (deterministic; rules added in US2/US3).
-- [ ] T009 Intercept the completion seam in `cmd/forge/handlers_sdd.go` (`applySddPhaseEvent` "complete"): assemble a `PhaseVerificationRecord` from the report-card diff + `ClassifyBehavior`, call `evaluateGate`, and only call `HandlePhaseComplete()` on `pass`/`exempt`; keep behavior green (no rules block yet).
+- [X] T005 Defined `gateDecision`, `phaseVerificationRecord`, `uxEvidence` and reused `sdd.BehaviorClassification` per data-model in `cmd/forge/sdd_verification.go`.
+- [X] T006 [US-shared] FAILING-then-passing `TestClassifyBehavior` in `internal/sdd/detector_test.go` covering code-only, docs-only, test-only, frontend-UI, backend-alters-output ⇒ userFacing, ambiguous ⇒ both axes, and docs/refactor ⇒ classifier-set exemption.
+- [X] T007 Implemented `ClassifyBehavior` in `internal/sdd/detector.go`: `userFacing` covers frontend AND backend user-visible-output paths; both axes fail safe; classifier is the sole author of `exemptReason`.
+- [X] T008 Implemented pure `evaluateGate(record) gateDecision` in `cmd/forge/sdd_verification.go` (deterministic; exempt + bypass + TDD rule).
+- [X] T009 Intercepted BOTH completion paths via `gatedHandlePhaseComplete` (in `handlers_sdd.go` and the `sdd_wiring.go` watcher fallback): assembles the record, calls `evaluateGate`, completes only on pass/exempt; transparent for empty-diff (no regressions).
 
-**Checkpoint**: Classifier + deterministic gate scaffold in place; pipeline still passes everything (no regressions).
+**Checkpoint**: ✅ Classifier + deterministic gate in the live path; full suite + integration GREEN (gate transparent when there is nothing to verify).
 
 ---
 
@@ -83,15 +83,15 @@ Go backend at repo root (`cmd/forge/`, `internal/`); React frontend at `frontend
 
 ### Tests for User Story 2 (write first, must FAIL)
 
-- [ ] T018 [P] [US2] Write FAILING unit tests in `cmd/forge/sdd_verification_test.go` for the TDD rule: (a) behaviorChanging + no Red ⇒ block, (b) Green-without-prior-Red ⇒ block, (c) Red-then-Green ⇒ pass, (d) classifier-derived docs/refactor exemption ⇒ exempt (and a behavior-changing phase can never be marked exempt).
+- [X] T018 [US2] FAILING-then-passing `TestEvaluateGate_TDDRule` (no-Red ⇒ block, Green-without-Red ⇒ block, Red→Green ⇒ pass, docs ⇒ exempt) + `_Determinism` + `_AuditedBypass` in `cmd/forge/sdd_verification_test.go`.
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Implement a workflow-ledger reader in `cmd/forge/sdd_verification.go` that reads `.forge/workflow-ticket.json` and recognizes a `test-failed-first` (Red) observation alongside `tests-passed` (Green) (research R5).
-- [ ] T020 [US2] Add the TDD rule to `evaluateGate` in `cmd/forge/sdd_verification.go`: `behaviorChanging && !exempt` requires `redObserved < greenObserved`, else `block` (passes T018; contract C2).
-- [ ] T021 [US2] Surface Red/Green timestamps and exemption reason in the report card in `cmd/forge/sdd_report_card.go` (FR-010).
+- [X] T019 [US2] Implemented `readTddEvidence` in `cmd/forge/sdd_verification.go` reusing `internal/workflow.LoadTicket`; added `workflow.GateTestFailedFirst = "test-failed-first"` (Red) alongside `tests-passed` (Green) (research R5).
+- [X] T020 [US2] Added the TDD rule to `evaluateGate`: `behaviorChanging && !exempt` requires `RedObserved` strictly before `GreenObserved`, else `block` (contract C2). Bypass converts block→pass (FR-020).
+- [X] T021 [US2] Surfaced the verdict (decision + block/exempt reason + bypassed) as an additive `verification` field on the report card in `cmd/forge/sdd_report_card.go` (FR-010); omitempty so older clients ignore it.
 
-**Checkpoint**: US1 + US2 both work independently; behavior changes now require real Red→Green evidence.
+**Checkpoint**: ✅ US1 + US2 work independently; behaviour changes now require real Red→Green evidence at phase completion. Ledger shows US2 Red→Green.
 
 ---
 

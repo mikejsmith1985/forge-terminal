@@ -31,3 +31,43 @@ func TestClassifyArtifact(t *testing.T) {
 		})
 	}
 }
+
+// TestClassifyBehavior covers the specs/012 US2/US3 classifier: which gate applies to a
+// completing phase, derived purely from the files it touched. Both axes fail safe.
+func TestClassifyBehavior(t *testing.T) {
+	cases := []struct {
+		name                 string
+		files                []string
+		wantBehaviorChanging bool
+		wantUserFacing       bool
+		wantExempt           bool // expects a non-empty ExemptReason
+	}{
+		{"backend code only (not user-visible)", []string{"internal/git/worktree.go"}, true, false, false},
+		{"docs only", []string{"specs/012/spec.md", "README.md"}, false, false, true},
+		{"test files only", []string{"cmd/forge/foo_test.go", "frontend/src/App.test.jsx"}, false, false, true},
+		{"frontend UI source", []string{"frontend/src/components/SddDashboard.jsx"}, true, true, false},
+		{"backend that alters terminal/gate output", []string{"cmd/forge/sdd_report_card.go"}, true, true, false},
+		{"ambiguous unknown type fails safe to both", []string{"scripts/mystery.xyz"}, true, true, false},
+		{"docs plus code is behavior-changing", []string{"specs/012/spec.md", "internal/sdd/orchestrator.go"}, true, false, false},
+		{"empty diff is exempt (no work to verify)", []string{}, false, false, true},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := ClassifyBehavior(testCase.files)
+			if got.BehaviorChanging != testCase.wantBehaviorChanging {
+				t.Errorf("BehaviorChanging = %v, want %v", got.BehaviorChanging, testCase.wantBehaviorChanging)
+			}
+			if got.UserFacing != testCase.wantUserFacing {
+				t.Errorf("UserFacing = %v, want %v", got.UserFacing, testCase.wantUserFacing)
+			}
+			if (got.ExemptReason != "") != testCase.wantExempt {
+				t.Errorf("ExemptReason = %q, want exempt=%v", got.ExemptReason, testCase.wantExempt)
+			}
+			// A behavior-changing phase must NEVER carry an exemption (FR-009 cannot be claimed for code).
+			if got.BehaviorChanging && got.ExemptReason != "" {
+				t.Error("behavior-changing classification must not be exempt")
+			}
+		})
+	}
+}

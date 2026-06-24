@@ -40,6 +40,7 @@ var RequiredGates = []string{
 const (
 	GateBranchCreated  = "branch-created"
 	GatePlanRecorded   = "plan-recorded"
+	GateTestFailedFirst = "test-failed-first"
 	GateTestsWritten   = "tests-written"
 	GateTestsPassed    = "tests-passed"
 	GateBuildPassed    = "build-passed"

@@ -79,6 +79,9 @@ type sddPipeline struct {
 	// baselines holds the git work-tree snapshot (SHA) captured at each phase's start
 	// (sdd.PhaseName -> string), so the report card can diff the phase window (FR-014).
 	baselines sync.Map
+	// verifications holds the latest verification verdict per phase (sdd.PhaseName ->
+	// sddPhaseVerification), so the report card can show why a phase passed or is blocked (specs/012).
+	verifications sync.Map
 	// Worktree binding (specs/011). gitCommonDir is the per-repo grouping key used to detect
 	// concurrency; when isIsolated, the pipeline runs in worktreePath on its own branch instead
 	// of the repository's main checkout, so repoRoot above already points at the worktree.
@@ -114,6 +117,26 @@ func (p *sddPipeline) baselineFor(phase sdd.PhaseName) string {
 		return value.(string)
 	}
 	return ""
+}
+
+// sddPhaseVerification bundles a phase's assembled verification record with its gate
+// decision, so the report card can render the verdict and (on block) the reason (specs/012).
+type sddPhaseVerification struct {
+	record   phaseVerificationRecord
+	decision gateDecision
+}
+
+// storeVerification records the gate verdict for a phase (specs/012 US2/US3/US4).
+func (p *sddPipeline) storeVerification(phase sdd.PhaseName, record phaseVerificationRecord, decision gateDecision) {
+	p.verifications.Store(phase, sddPhaseVerification{record: record, decision: decision})
+}
+
+// verificationFor returns the stored gate verdict for a phase, or (zero, false) if none.
+func (p *sddPipeline) verificationFor(phase sdd.PhaseName) (sddPhaseVerification, bool) {
+	if value, ok := p.verifications.Load(phase); ok {
+		return value.(sddPhaseVerification), true
+	}
+	return sddPhaseVerification{}, false
 }
 
 // sddPipelines maps sessionId -> *sddPipeline. A sync.Map because binds (HTTP), decisions (HTTP),
@@ -311,7 +334,9 @@ func gateSddArtifact(pipeline *sddPipeline, sessionID, changedPath string) {
 		if state.Status == sdd.StatusAwaitingDecision && state.PendingCard != nil && state.PendingCard.Phase == phase {
 			return
 		}
-		pipeline.orchestrator.HandlePhaseComplete(phase, featureRel)
+		// Route through the verification gate (specs/012): a behaviour change without
+		// Red→Green evidence is blocked rather than presented as complete.
+		gatedHandlePhaseComplete(pipeline, phase, featureRel, sessionID)
 	}()
 }
 
