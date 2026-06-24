@@ -33,7 +33,7 @@ function capitalise(str) {
  * @returns {string}
  */
 export function deriveActionPrompt(phases, isCardOpen) {
-  if (phases.length === 0) {
+  if (!phases || phases.length === 0) {
     return 'Run /speckit-specify to start a new feature.'
   }
 

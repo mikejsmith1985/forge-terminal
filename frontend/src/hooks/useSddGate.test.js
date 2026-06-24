@@ -250,6 +250,70 @@ const buildStatusMessage = (overrides = {}) =>
     ...overrides,
   })
 
+// ── Phase status null-safety (fix/sdd-dashboard-null-phases-crash) ──────────
+
+describe('useSddGate — phaseStatuses null-safety', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('resets phaseStatuses to [] on session switch so stale phases never bleed into a new tab', async () => {
+    const OTHER_SESSION_ID = 'tab-9-other'
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ phases: [{ phase: 'specify', displayStatus: 'complete', order: 1, runCount: 1 }], feature: 'feat-a' }),
+      })
+      .mockResolvedValue({ ok: false })
+
+    const { result, rerender } = renderHook(
+      ({ sid }) => useSddGate({ activeSessionId: sid }),
+      { initialProps: { sid: ACTIVE_SESSION_ID } }
+    )
+
+    await waitFor(() => expect(result.current.phaseStatuses).toHaveLength(1))
+
+    // Switch tabs — phases must reset immediately, not linger from session A.
+    rerender({ sid: OTHER_SESSION_ID })
+    expect(result.current.phaseStatuses).toEqual([])
+  })
+
+  it('updates phaseStatuses from the recovery fetch even when the response is an empty array', async () => {
+    // Old guard `if (data?.phases?.length)` skipped the setter when the array was empty,
+    // leaving stale phases from a previous session visible in the new session.
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ phases: [], feature: '' }),
+      })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    await waitFor(() => expect(Array.isArray(result.current.phaseStatuses)).toBe(true))
+    expect(result.current.phaseStatuses).toEqual([])
+  })
+
+  it('handles a SDD_PHASE_STATUS message with phases:null without crashing', () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(JSON.stringify({
+        type: 'SDD_PHASE_STATUS',
+        sessionId: ACTIVE_SESSION_ID,
+        phases: null,
+        feature: '',
+      }))
+    })
+
+    // The ?? [] fallback converts null to [] so consumers never receive null.
+    expect(result.current.phaseStatuses).toEqual([])
+  })
+})
+
 // ── Tab-switch isolation (Bug 4 root-cause fix) ───────────────────────────────
 
 describe('useSddGate — card isolation on session change', () => {
