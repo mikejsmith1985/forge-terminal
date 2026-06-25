@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.22.0] - 2026-06-25
+
+---
+
+## [v7.22.0] - 2026-06-25
+
 ### Fixed
 - **The worktree collision offer now actually reaches the UI (specs/013 FR-003)** — `ForgeTerminal`'s WebSocket handler forwarded only `SDD_PHASE_GATE` and `SDD_PHASE_STATUS` to the dashboard hook, so the `SDD_WORKTREE_COLLISION` offer added by this feature was silently dropped before rendering — the opt-in prompt would never have appeared in production. Added the type to the forward allow-list. Caught by the recovery-first Playwright spec (a real-UI gate per Article X) that the unit layer could not detect: every layer was green in isolation and the gap was the socket→hook forwarding seam. The E2E WS-injection harness was also made deterministic — it now reads the active tab's session id from its own socket URL instead of racing on the first bind — fixing pre-existing flakiness in the worktree specs when the app boots with restored tabs.
 - **Opening a tab no longer silently creates a worktree — recovery is now the default (specs/013)** — Despite v7.21.0 (specs/012), opening a second tab on a repository that already had an active SDD pipeline still spawned a fresh `.forge/worktrees/…` directory and moved the shell into it. Root cause: `handleSddBind` eager-binds every tab and `resolveSddWorkspace` auto-provisioned a worktree whenever another pipeline shared the repo — specs/012 only fixed the *already-inside-a-worktree* re-attach case, never this concurrency trigger. Fixed by **inverting the design**: a bind now NEVER provisions. It re-attaches from a durable recovery record, or to the worktree it is already in, or stays on the main checkout. Worktrees are created only on **explicit consent** — a per-tab "Isolate this tab" action or a confirmed collision prompt (`POST /api/sdd/worktree`). Proven by Go unit + real-git integration tests that count worktrees before/after a bind and assert the count is unchanged (`TestResolveWorkspace_ConcurrentSessionStaysOnMainCheckout`, `TestResolveWorkspace_ConcurrentBindDoesNotProvision_RealGit`).
