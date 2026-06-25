@@ -35,11 +35,10 @@ workflow. The full required sequence is:
 | 3 | `code-quality` | **ALL** code tasks |
 | 4 | `framework-first` | **ALL** code tasks — confirm the framework doesn't already provide it before building infrastructure |
 | 5 | `branching-strategy` | **ALL** code tasks (branch must exist before code) |
-| 6 | `code-tutor-workflow` | **ALL** code tasks — user expects walkthrough of changes |
 | — | **speckit pipeline** (`speckit-specify → speckit-plan → speckit-tasks → speckit-implement`) | The workflow itself, in any `.specify/` project |
-| 7 | `multi-agent` | Tasks spanning 3+ files |
-| 8 | `testing-standards` | Any test creation or modification |
-| 9 | `pr-workflow` | Creating or reviewing pull requests |
+| 6 | `multi-agent` | Tasks spanning 3+ files |
+| 7 | `testing-standards` | Any test creation or modification |
+| 8 | `pr-workflow` | Creating or reviewing pull requests |
 
 > The legacy bespoke `forge-workflow` 5-phase skill has been **removed** — its standards now live in
 > the constitution (`.specify/memory/constitution.md`) and its orchestration is the speckit pipeline.

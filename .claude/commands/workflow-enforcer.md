@@ -70,7 +70,6 @@ a skill is not found, mark it ⚠️ and continue — do NOT block the task.
 If the project is in **Enterprise mode** and a skill is not found, mark it ❌ and stop.
 ```
 invoke skill: branching-strategy
-invoke skill: code-tutor-workflow
 ```
 
 ### Conditionally Required (invoke when the task warrants it)
@@ -97,7 +96,6 @@ reflects the Check 1 result from Phase 0A.
 │ code-quality            │ ✅ Loaded                                  │
 │ forge-vault             │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
 │ branching-strategy      │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
-│ code-tutor-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ AGENTS.md               │ ✅ Found   /  ⚠️ Not present (standard mode) │
 ├─────────────────────────┼────────────────────────────────────────────┤
 │ Active mode             │ Forge Enterprise  /  Enterprise  /  Standard │

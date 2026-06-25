@@ -42,7 +42,6 @@ $skillOrder = @(
     'code-quality',
     'framework-first',
     'branching-strategy',
-    'code-tutor-workflow',
     'add-command-card'
 )
 
