@@ -156,6 +156,26 @@ func TestWorkflowMacrosOmitForgeWorkflow(t *testing.T) {
 	}
 }
 
+// TestWorkflowMacrosOmitCodeTutor guards the Code Tutor retirement: the code-tutor
+// and code-tutor-workflow skills have been removed entirely, so no session-start macro
+// may still name them — otherwise agents would be told to invoke a skill that no longer
+// exists, breaking the mandatory skill chain. The "code-tutor" substring also catches
+// the "code-tutor-workflow" variant.
+func TestWorkflowMacrosOmitCodeTutor(t *testing.T) {
+	macrosUnderTest := map[string]string{
+		"CopilotWorkflowMacro": CopilotWorkflowMacro,
+		"GoogleWorkflowMacro":  GoogleWorkflowMacro,
+		"ClaudeAwarenessMacro": ClaudeAwarenessMacro,
+		"ClaudeEnforcedMacro":  ClaudeEnforcedMacro,
+	}
+
+	for macroName, macroText := range macrosUnderTest {
+		if contains(macroText, "code-tutor") {
+			t.Errorf("%s still names the retired code-tutor skill", macroName)
+		}
+	}
+}
+
 // TestClaudeMacrosOmitCopilotInstructions guards the cross-tool boundary created by
 // the SDD migration: a macro injected into a Claude session must NOT tell Claude to
 // read Copilot's instruction file (.github/copilot-instructions.md). The binding

@@ -43,7 +43,6 @@ $curatedSkills = @(
     'code-quality',
     'framework-first',
     'branching-strategy',
-    'code-tutor-workflow',
     'add-command-card',
     'forge-vault'
 )
@@ -59,8 +58,7 @@ $globalSkills = @(
     'workflow-enforcer',
     'code-quality',
     'framework-first',
-    'branching-strategy',
-    'code-tutor-workflow'
+    'branching-strategy'
 )
 
 # Write-GlobalUserSkills copies the project-agnostic skills into the user-level ~/.claude/skills
