@@ -1213,4 +1213,13 @@ maps to the ` + "`/speckit.analyze`" + ` consistency gate.
 
 Maintain at most one dashboard file (` + "`refactor_plan.html`" + `), purged fresh each session. Do not
 narrate internal phase names to the user. Do not emit Markdown summaries unless explicitly requested.
+
+## Article XII — Interaction & Response Format
+
+Responses to the user are tight and scannable — never verbose tutorial walkthroughs or "Insight"
+preambles. Use emoji-prefixed section headers (🔧 Fix, 🐛 Bug, 🧪 Tests, 📋 Plan, ✅ Done, ⚠️ Warning,
+🚀 Deploy), horizontal-rule dividers between sections, and tables when content is comparative or
+multi-field. Keep each section to roughly 75 words; deep analysis belongs in tool calls and code, not
+prose. This Response Format applies on every turn, including casual ones. Ask clarifying questions in
+plain prose, never via a multiple-choice prompt tool.
 `

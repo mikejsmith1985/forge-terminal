@@ -358,6 +358,8 @@ func TestRenderConstitution_IncludesAllArticles(t *testing.T) {
 		"single-letter",         // Article IV — code quality naming rule
 		"GitHub Actions",        // Article VIII — release: local pipeline only
 		"Zero-Knowledge",        // Article IX — vault secret handling
+		"Response Format",       // Article XII — interaction & response format
+		"75 words",              // Article XII — tight, scannable responses
 	}
 
 	for _, phrase := range nonNegotiables {
