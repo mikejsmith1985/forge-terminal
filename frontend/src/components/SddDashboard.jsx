@@ -63,9 +63,10 @@ function baseName(filePath) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function DashboardHeader({ featureName, phases = [], binding }) {
+function DashboardHeader({ featureName, phases = [], binding, onRequestWorktree }) {
   const badgeKey = derivePipelineBadge(phases)
   const { label, mod } = PIPELINE_BADGE[badgeKey]
+  const isIsolated = Boolean(binding?.isolated)
   return (
     <div className="sdd-dashboard__header">
       <span className="sdd-dashboard__feature-name">
@@ -73,6 +74,48 @@ function DashboardHeader({ featureName, phases = [], binding }) {
       </span>
       <span className={`sdd-dashboard__badge sdd-dashboard__badge--${mod}`}>{label}</span>
       <WorktreeIndicator binding={binding} />
+      {!isIsolated && onRequestWorktree && (
+        <button
+          type="button"
+          className="sdd-dashboard__isolate-btn"
+          data-testid="sdd-isolate-tab"
+          onClick={onRequestWorktree}
+          title="Run this tab in its own isolated git worktree"
+        >
+          ⑂ Isolate this tab
+        </button>
+      )}
+    </div>
+  )
+}
+
+// CollisionPrompt offers — never forces — isolation when another active pipeline already runs in
+// this repo (specs/013 FR-003). Confirm creates a worktree; Dismiss keeps the tab on the shared
+// main checkout and creates nothing (C11: dismiss is the safe default).
+function CollisionPrompt({ prompt, onConfirm, onDismiss }) {
+  if (!prompt) return null
+  return (
+    <div className="sdd-dashboard__collision" role="status" data-testid="sdd-collision-prompt">
+      <span className="sdd-dashboard__collision-icon" aria-hidden="true">⑂</span>
+      <span className="sdd-dashboard__collision-text">
+        {prompt.message || 'This repository already has an active SDD pipeline.'}
+      </span>
+      <button
+        type="button"
+        className="sdd-dashboard__collision-btn sdd-dashboard__collision-btn--confirm"
+        data-testid="sdd-collision-confirm"
+        onClick={onConfirm}
+      >
+        Isolate this tab
+      </button>
+      <button
+        type="button"
+        className="sdd-dashboard__collision-btn sdd-dashboard__collision-btn--dismiss"
+        data-testid="sdd-collision-dismiss"
+        onClick={onDismiss}
+      >
+        Stay shared
+      </button>
     </div>
   )
 }
@@ -512,6 +555,11 @@ export default function SddDashboard({
   isSubmitting = false,
   // Default true: no banner on initial render before the status fetch resolves.
   isHookInstalled = true,
+  // Collision offer + explicit isolate action (specs/013 US3). collisionPrompt is the pending
+  // offer (or null); onRequestWorktree provisions on explicit consent; onDismissCollision declines.
+  collisionPrompt = null,
+  onRequestWorktree,
+  onDismissCollision,
   onAction,
   onDismiss,
   onFileOpen,
@@ -551,8 +599,9 @@ export default function SddDashboard({
       {!isHookInstalled && !isHookBannerDismissed && (
         <HookInstallBanner onDismiss={() => setIsHookBannerDismissed(true)} />
       )}
-      <DashboardHeader featureName={featureName} phases={phases} binding={binding} />
+      <DashboardHeader featureName={featureName} phases={phases} binding={binding} onRequestWorktree={onRequestWorktree} />
       <VerificationChip verification={verification} />
+      <CollisionPrompt prompt={collisionPrompt} onConfirm={onRequestWorktree} onDismiss={onDismissCollision} />
 
       <div className="sdd-dashboard__rail-wrapper">
         <PhaseRail

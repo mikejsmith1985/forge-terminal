@@ -9,5 +9,5 @@
 @.specify/memory/constitution.md
 
 <!-- SPECKIT START -->
-Active feature: @specs/012-tdd-sdd-enforcement/plan.md
+Active feature: @specs/013-worktree-recovery-first/plan.md
 <!-- SPECKIT END -->

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -52,12 +53,20 @@ func (f *fakeWorktreeGitRunner) called(prefix string) bool {
 	return false
 }
 
-// withFakeGit swaps in a fake git client for the duration of a test.
+// withFakeGit swaps in a fake git client for the duration of a test and redirects the durable
+// worktree-binding store to a throwaway temp dir, so unit tests never read or write the real
+// ~/.forge/sdd recovery file (specs/013).
 func withFakeGit(t *testing.T, fake *fakeWorktreeGitRunner) {
 	t.Helper()
 	prev := sddGitClient
 	sddGitClient = gitwt.NewWithRunner(fake)
-	t.Cleanup(func() { sddGitClient = prev })
+	prevDir := worktreeBindingStoreDir
+	tempDir := t.TempDir()
+	worktreeBindingStoreDir = func() string { return tempDir }
+	t.Cleanup(func() {
+		sddGitClient = prev
+		worktreeBindingStoreDir = prevDir
+	})
 }
 
 func gitRepoFake() *fakeWorktreeGitRunner {
@@ -72,17 +81,31 @@ func gitRepoFake() *fakeWorktreeGitRunner {
 	}
 }
 
-func TestSddHasConcurrentPipeline(t *testing.T) {
-	sddPipelines.Store("wt-other", &sddPipeline{gitCommonDir: "C:/repo/.git"})
-	t.Cleanup(func() { sddPipelines.Delete("wt-other") })
+// TestSddHasActiveConcurrentPipeline proves the F1 fix: only a sibling running an ACTIVE
+// pipeline (a started, not-yet-complete phase) counts — a merely-bound idle tab does not, so
+// ordinary tabs are never offered the collision prompt (specs/013 FR-003).
+func TestSddHasActiveConcurrentPipeline(t *testing.T) {
+	idle := &sddPipeline{gitCommonDir: "C:/repo/.git", orchestrator: sdd.NewOrchestrator(sdd.Options{SessionID: "wt-idle"})}
+	sddPipelines.Store("wt-idle", idle)
+	t.Cleanup(func() { sddPipelines.Delete("wt-idle") })
 
-	if !sddHasConcurrentPipeline("wt-self", "C:/repo/.git") {
-		t.Error("expected concurrency with a sibling sharing the common dir")
+	if sddHasActiveConcurrentPipeline("wt-self", "C:/repo/.git") {
+		t.Error("a merely-bound IDLE sibling must NOT count as an active collision (F1)")
 	}
-	if sddHasConcurrentPipeline("wt-self", "C:/other/.git") {
+
+	active := &sddPipeline{gitCommonDir: "C:/repo/.git", orchestrator: sdd.NewOrchestrator(sdd.Options{SessionID: "wt-active"})}
+	active.orchestrator.BindSession("wt-active")
+	active.orchestrator.MarkPhaseRunning(sdd.PhaseTable()[0].Name) // a phase is now running.
+	sddPipelines.Store("wt-active", active)
+	t.Cleanup(func() { sddPipelines.Delete("wt-active") })
+
+	if !sddHasActiveConcurrentPipeline("wt-self", "C:/repo/.git") {
+		t.Error("an ACTIVE sibling sharing the common dir must count as a collision")
+	}
+	if sddHasActiveConcurrentPipeline("wt-self", "C:/other/.git") {
 		t.Error("a different common dir must not count as concurrent")
 	}
-	if sddHasConcurrentPipeline("wt-other", "C:/repo/.git") {
+	if sddHasActiveConcurrentPipeline("wt-active", "C:/repo/.git") {
 		t.Error("a session must not detect concurrency with itself")
 	}
 }
@@ -105,50 +128,151 @@ func TestResolveWorkspace_FirstPipelineKeepsMainCheckout(t *testing.T) {
 	}
 }
 
-func TestResolveWorkspace_ConcurrentSessionGetsWorktree(t *testing.T) {
+// TestResolveWorkspace_ConcurrentSessionStaysOnMainCheckout is the headline specs/013 inversion:
+// a bind NEVER provisions a worktree, even when a sibling pipeline already owns the repo. This is
+// the direct fix for "a second tab silently spawns a directory" (FR-001/FR-003, C1).
+func TestResolveWorkspace_ConcurrentSessionStaysOnMainCheckout(t *testing.T) {
 	fake := gitRepoFake()
 	withFakeGit(t, fake)
-	// An existing pipeline already owns this repo's common dir → the next bind is concurrent.
-	// Use filepath.Clean to match the normalized value GitCommonDir now returns.
+	// A sibling pipeline already owns this repo's common dir — the OLD code would isolate here.
 	sddPipelines.Store("wt-owner", &sddPipeline{gitCommonDir: filepath.Clean("C:/repo/.git")})
 	t.Cleanup(func() { sddPipelines.Delete("wt-owner") })
 
 	repoRoot, binding := resolveSddWorkspace("wt-second", "C:/repo")
 
-	if !binding.isIsolated {
-		t.Fatal("a concurrent same-repo session must be isolated (FR-001/FR-002)")
+	if binding.isIsolated {
+		t.Fatal("a concurrent same-repo bind must STAY on the main checkout — never auto-provision (FR-001/FR-003)")
 	}
-	if !strings.Contains(filepath.ToSlash(binding.worktreePath), ".forge/worktrees/") {
-		t.Errorf("worktreePath = %q, want it under .forge/worktrees/ (FR-016)", binding.worktreePath)
+	if repoRoot != "C:/repo" {
+		t.Errorf("repoRoot = %q, want the main checkout C:/repo (no worktree)", repoRoot)
 	}
-	if binding.branch != "forge/wt-wt-second" {
-		t.Errorf("branch = %q, want provisional forge/wt-<token>", binding.branch)
-	}
-	if binding.baseBranch != "main" {
-		t.Errorf("baseBranch = %q, want the captured base 'main'", binding.baseBranch)
-	}
-	if repoRoot != binding.worktreePath {
-		t.Errorf("effective repoRoot = %q, want the worktree path %q", repoRoot, binding.worktreePath)
-	}
-	if !fake.called("worktree add") {
-		t.Error("provisioning must issue `git worktree add`")
+	if fake.called("worktree add") {
+		t.Error("a bind must NEVER issue `git worktree add` — provisioning is explicit-only (C1)")
 	}
 }
 
-func TestResolveWorkspace_DegradesSafelyWhenProvisioningFails(t *testing.T) {
+// TestProvisionWorktreeOnRequest_CreatesWorktree proves the explicit-consent path (US3, C7):
+// the ONLY way a worktree is created. It anchors under .forge/worktrees/, persists a recovery
+// record, and issues `git worktree add`.
+func TestProvisionWorktreeOnRequest_CreatesWorktree(t *testing.T) {
 	fake := gitRepoFake()
-	fake.failPrefixes = []string{"worktree add"} // platform-independent: any worktree add fails.
 	withFakeGit(t, fake)
-	sddPipelines.Store("wt-owner2", &sddPipeline{gitCommonDir: filepath.Clean("C:/repo/.git")})
-	t.Cleanup(func() { sddPipelines.Delete("wt-owner2") })
 
-	repoRoot, binding := resolveSddWorkspace("wt-second", "C:/repo")
+	binding, ok := provisionWorktreeOnRequest("wt-explicit", "C:/repo")
+
+	if !ok || !binding.isIsolated {
+		t.Fatalf("explicit request must isolate: ok=%v isolated=%v (FR-007)", ok, binding.isIsolated)
+	}
+	if !strings.Contains(filepath.ToSlash(binding.worktreePath), ".forge/worktrees/") {
+		t.Errorf("worktreePath = %q, want under .forge/worktrees/ (FR-008)", binding.worktreePath)
+	}
+	if binding.branch != "forge/wt-wt-explicit" || binding.baseBranch != "main" {
+		t.Errorf("branch=%q base=%q, want provisional forge/wt-<token> off main", binding.branch, binding.baseBranch)
+	}
+	if !fake.called("worktree add") {
+		t.Error("explicit provisioning must issue `git worktree add`")
+	}
+	if _, recorded := lookupWorktreeBinding("wt-explicit"); !recorded {
+		t.Error("explicit provisioning must persist a durable recovery record (US2/FR-012)")
+	}
+}
+
+// TestProvisionWorktreeOnRequest_DegradesSafelyOnFailure proves FR-011/C8: a git failure leaves
+// the tab on the main checkout with NO binding record — never a half-made or nested directory.
+func TestProvisionWorktreeOnRequest_DegradesSafelyOnFailure(t *testing.T) {
+	fake := gitRepoFake()
+	fake.failPrefixes = []string{"worktree add"}
+	withFakeGit(t, fake)
+
+	binding, ok := provisionWorktreeOnRequest("wt-fail", "C:/repo")
+
+	if ok || binding.isIsolated {
+		t.Errorf("a failed `worktree add` must NOT isolate: ok=%v isolated=%v (FR-011)", ok, binding.isIsolated)
+	}
+	if _, recorded := lookupWorktreeBinding("wt-fail"); recorded {
+		t.Error("a failed provision must NOT persist a recovery record")
+	}
+}
+
+// TestResolveWorkspace_RecoversFromBindingRecord proves recovery-first (US2, C6): after a
+// restart (in-memory map empty) the frontend may report the MAIN checkout, yet the durable
+// record re-attaches the session to its worktree — provisioning nothing.
+func TestResolveWorkspace_RecoversFromBindingRecord(t *testing.T) {
+	fake := gitRepoFake()
+	withFakeGit(t, fake)
+	wtPath := filepath.Join(t.TempDir(), ".forge", "worktrees", "wt1")
+	if err := os.MkdirAll(wtPath, 0o755); err != nil {
+		t.Fatalf("mk worktree dir: %v", err)
+	}
+	saveWorktreeBinding("wt-resume", worktreeBindingRecord{
+		WorktreePath: wtPath, Branch: "feature/x", BaseBranch: "main", MainRepoRoot: "C:/repo",
+	})
+
+	repoRoot, binding := resolveSddWorkspace("wt-resume", "C:/repo")
+
+	if !binding.isIsolated || repoRoot != wtPath {
+		t.Fatalf("recovery: isolated=%v repoRoot=%q; want isolated, repoRoot=%q", binding.isIsolated, repoRoot, wtPath)
+	}
+	if fake.called("worktree add") {
+		t.Error("recovery must re-attach, never provision a new worktree")
+	}
+}
+
+// TestResolveWorkspace_MissingWorktreeFallsBackWithNotice proves FR-005/C3: when the recorded
+// worktree is gone, the session falls back to the main checkout with exactly one notice and the
+// stale record is evicted — never recreating or nesting a directory.
+func TestResolveWorkspace_MissingWorktreeFallsBackWithNotice(t *testing.T) {
+	fake := gitRepoFake()
+	fake.outputs["worktree list --porcelain"] = "worktree C:/repo\nbranch refs/heads/main\n\n"
+	withFakeGit(t, fake)
+	saveWorktreeBinding("wt-gone", worktreeBindingRecord{
+		WorktreePath: "C:/repo/.forge/worktrees/gone", Branch: "feature/gone", BaseBranch: "main", MainRepoRoot: "C:/repo",
+	})
+
+	repoRoot, binding := resolveSddWorkspace("wt-gone", "C:/repo")
 
 	if binding.isIsolated {
-		t.Error("a failed `worktree add` must degrade to a non-isolated pipeline (FR-014)")
+		t.Error("a gone worktree must fall back to the main checkout, not stay isolated (FR-005)")
+	}
+	if binding.notice == "" {
+		t.Error("fallback must carry exactly one notice explaining the worktree is gone (FR-005)")
 	}
 	if repoRoot != "C:/repo" {
-		t.Errorf("on degrade, repoRoot = %q, want the original main checkout", repoRoot)
+		t.Errorf("fallback repoRoot = %q, want the main checkout", repoRoot)
+	}
+	if _, stillThere := lookupWorktreeBinding("wt-gone"); stillThere {
+		t.Error("a stale record must be evicted on fallback")
+	}
+}
+
+// TestResolveWorkspace_RecordlessWorktree documents the exact boundary of FR-012 recovery for
+// worktrees created BEFORE this feature (which therefore have no durable binding record):
+//   (a) entered directly (frontend reports the worktree path) → re-attach via the specs/012 branch;
+//   (b) frontend reports the MAIN checkout → stay on the main checkout (NOT recovered, by design),
+//       because there is no record to consult and the main checkout is not a worktree path.
+// This makes the documented limitation a tested invariant rather than an accident.
+func TestResolveWorkspace_RecordlessWorktree(t *testing.T) {
+	// (a) recordless worktree, entered directly → re-attaches, provisions nothing.
+	fakeA := gitRepoFake()
+	fakeA.outputs["worktree list --porcelain"] = strings.Join([]string{
+		"worktree C:/repo", "branch refs/heads/main", "",
+		"worktree C:/repo/.forge/worktrees/pre", "branch refs/heads/feature/pre", "",
+	}, "\n")
+	withFakeGit(t, fakeA)
+	worktreePath := "C:/repo/.forge/worktrees/pre"
+	repoRoot, binding := resolveSddWorkspace("wt-recordless-direct", worktreePath)
+	if !binding.isIsolated || repoRoot != worktreePath {
+		t.Fatalf("(a) recordless worktree entered directly: isolated=%v root=%q; want re-attach to %q", binding.isIsolated, repoRoot, worktreePath)
+	}
+	if fakeA.called("worktree add") {
+		t.Error("(a) re-attach must not provision")
+	}
+
+	// (b) recordless worktree, frontend reports the MAIN checkout → stays on main (documented limit).
+	withFakeGit(t, gitRepoFake())
+	rootB, bindingB := resolveSddWorkspace("wt-recordless-main", "C:/repo")
+	if bindingB.isIsolated || rootB != "C:/repo" {
+		t.Fatalf("(b) recordless + reports-main: isolated=%v root=%q; want stay-on-main (FR-012 boundary)", bindingB.isIsolated, rootB)
 	}
 }
 
@@ -325,6 +449,51 @@ func TestHandleSddStatus_IncludesBinding(t *testing.T) {
 	mainBinding := bindingFor("wt-main")
 	if mainBinding["isolated"] != false {
 		t.Errorf("main-checkout binding = %v, want isolated:false (no worktree indicator, SC-007)", mainBinding)
+	}
+}
+
+// TestHandleSddWorktree_Validation covers the explicit-provision endpoint's guard rails
+// (specs/013 US3): bad method, missing sessionId, and an unbound session — none of which may
+// create anything.
+func TestHandleSddWorktree_Validation(t *testing.T) {
+	get := httptest.NewRecorder()
+	handleSddWorktree(get, httptest.NewRequest(http.MethodGet, "/api/sdd/worktree", nil))
+	if get.Code != http.StatusMethodNotAllowed {
+		t.Errorf("GET = %d, want 405", get.Code)
+	}
+
+	noSession := httptest.NewRecorder()
+	handleSddWorktree(noSession, httptest.NewRequest(http.MethodPost, "/api/sdd/worktree", strings.NewReader(`{}`)))
+	if noSession.Code != http.StatusBadRequest {
+		t.Errorf("missing sessionId = %d, want 400", noSession.Code)
+	}
+
+	unbound := httptest.NewRecorder()
+	handleSddWorktree(unbound, httptest.NewRequest(http.MethodPost, "/api/sdd/worktree", strings.NewReader(`{"sessionId":"nope"}`)))
+	if unbound.Code != http.StatusConflict {
+		t.Errorf("unbound session = %d, want 409", unbound.Code)
+	}
+}
+
+// TestHandleSddWorktree_AlreadyIsolatedIsIdempotent proves C9: requesting isolation for a tab
+// that is already in a worktree returns success WITHOUT creating (nesting) another worktree.
+func TestHandleSddWorktree_AlreadyIsolatedIsIdempotent(t *testing.T) {
+	withFakeGit(t, gitRepoFake())
+	sddPipelines.Store("wt-already", &sddPipeline{
+		isIsolated: true, worktreePath: "C:/repo/.forge/worktrees/already", branch: "feature/already",
+	})
+	t.Cleanup(func() { sddPipelines.Delete("wt-already") })
+
+	rec := httptest.NewRecorder()
+	handleSddWorktree(rec, httptest.NewRequest(http.MethodPost, "/api/sdd/worktree", strings.NewReader(`{"sessionId":"wt-already"}`)))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var resp map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp["isolated"] != true || resp["worktreePath"] != "C:/repo/.forge/worktrees/already" {
+		t.Errorf("already-isolated response = %v, want the existing worktree echoed back (C9)", resp)
 	}
 }
 
