@@ -47,21 +47,24 @@ async function enableWsInjection(page) {
   })
 }
 
-// visitAndBind opens a fresh tab (always on the main checkout) and returns ITS session id —
-// captured from the new tab's own /api/sdd/bind POST. This is deterministic even when the app
-// restored other tabs on boot (whose WS traffic would otherwise win a first-message race).
+// activeSessionIdFromSocket reads the session id of the socket the harness injects into. Each tab
+// opens its own `/ws?tabId=<id>` connection, and the active tab's socket is the last one constructed
+// (window.__testWS). Reading tabId from THAT socket's URL targets the active tab deterministically —
+// immune to the restored-tab race that capturing "the next /api/sdd/bind POST" suffered from (a
+// late-binding restored tab could win the race and mislabel the injected message's session).
+async function activeSessionIdFromSocket(page, timeout = 8000) {
+  await page.waitForFunction(() => !!(window.__testWS && window.__testWS.url), { timeout })
+  return page.evaluate(() => new URL(window.__testWS.url).searchParams.get('tabId'))
+}
+
+// visitAndBind opens a fresh tab (always on the main checkout) and returns ITS session id.
 async function visitAndBind(page) {
   await visitWithoutTour(page, APP_URL)
   await page.locator('.xterm').first().waitFor({ state: 'visible', timeout: 20000 })
   await page.locator('[data-testid="sdd-dashboard"]').waitFor({ state: 'visible', timeout: 15000 })
-  const bindReq = page.waitForRequest(
-    (r) => r.url().includes('/api/sdd/bind') && r.method() === 'POST',
-    { timeout: 20000 }
-  )
   await page.locator('.new-tab-btn').click()
-  const sessionId = (await bindReq).postDataJSON().sessionId
-  await page.waitForTimeout(500) // let useSddGate settle on the new active session.
-  return sessionId
+  await page.waitForTimeout(1500) // let the new tab open its socket and useSddGate settle on it.
+  return activeSessionIdFromSocket(page)
 }
 
 // collisionMsg builds the SDD_WORKTREE_COLLISION offer the backend pushes when another active

@@ -1881,9 +1881,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             try {
               const msg = JSON.parse(str);
 
-              // SDD orchestrator (specs/003, 006): surface gate and live-status messages to
-              // the dashboard hook and stop — these are not terminal output.
-              if (msg.type === 'SDD_PHASE_GATE' || msg.type === 'SDD_PHASE_STATUS') {
+              // SDD orchestrator (specs/003, 006, 013): surface gate, live-status, and
+              // worktree-collision offers to the dashboard hook and stop — these are control
+              // messages, not terminal output. SDD_WORKTREE_COLLISION must be forwarded here
+              // or the recovery-first opt-in prompt (specs/013 FR-003) never reaches the UI.
+              if (msg.type === 'SDD_PHASE_GATE' || msg.type === 'SDD_PHASE_STATUS' || msg.type === 'SDD_WORKTREE_COLLISION') {
                 if (onSddGateRef.current) onSddGateRef.current(str);
                 return;
               }

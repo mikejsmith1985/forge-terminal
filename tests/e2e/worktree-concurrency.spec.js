@@ -45,9 +45,13 @@ async function enableWsInjection(page) {
   })
 }
 
+// getSessionId returns the active tab's session id by reading tabId from the socket the harness
+// injects into (window.__testWS — the last-constructed = active tab's connection). This is
+// deterministic even when the app restored other tabs on boot, unlike latching onto the first
+// sessionId-bearing message (which a restored tab can win, mislabelling the injected message).
 async function getSessionId(page, timeout = 8000) {
-  await page.waitForFunction(() => !!window.__testSessionId, { timeout })
-  return page.evaluate(() => window.__testSessionId)
+  await page.waitForFunction(() => !!(window.__testWS && window.__testWS.url), { timeout })
+  return page.evaluate(() => new URL(window.__testWS.url).searchParams.get('tabId'))
 }
 
 async function visitAndBind(page) {
