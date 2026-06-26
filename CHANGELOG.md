@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.23.0] - 2026-06-26
+
+---
+
+## [v7.23.0] - 2026-06-26
+
 ### Removed
 - **Code Tutor fully retired from the workflow (skills + scaffold + chain)** — The `code-tutor` and `code-tutor-workflow` skills and their "Post-Change Walkthrough" mode have been removed entirely. The mandatory skill chain is now `workflow-enforcer → code-quality → framework-first → branching-strategy` everywhere it is declared: the Claude awareness/enforced session macros and the Copilot/Google workflow macros (`internal/commands/storage.go`), the `workflow-enforcer` SKILL and its `.claude/commands` mirror, the Copilot and Aider system prompts, `AGENTS.md`, the three `command-cards/copilot-*.json` seeds, and the `deploy-skills.ps1` / `sync-skills.ps1` manifests. The two `.github/skills/code-tutor*` directories and the deployed `~/.claude/skills/code-tutor*` copies were deleted. Existing installs self-heal on next boot: `healClaudeMacroVariant` rewrites any stored session macro that still names the retired skill to the new canonical text — so a missing-skill reference can never break the chain. Also removed dead scaffold code: the `codeTutorWorkflowSkill` template var, a malformed half-removed `code-tutor-workflow` entry in `scaffold.go`, and the `EnabledModules "code-tutor"` PR-checklist conditional. Guarded by the new `TestWorkflowMacrosOmitCodeTutor` (Red→Green).
 
