@@ -621,10 +621,19 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		// scrollback into the ring buffer so reconnecting clients don't see
 		// a blank screen even if the server was restarted.
 		hub.journal = NewSessionJournal(sessionID)
+		// Restore the terminal keyboard/private-mode state for this session. The
+		// persisted sidecar carries the modes a TUI set at startup even after they
+		// were trimmed from the scrollback journal — this is what lets a recovered
+		// tab's xterm re-sync with the still-running TUI so digits/arrows work.
+		hub.modeTracker.SetPersistPath(sessionModesPath(sessionID))
+		hub.modeTracker.LoadPersisted(sessionModesPath(sessionID))
 		if prior := hub.journal.ReadAll(); len(prior) > 0 {
 			hub.mu.Lock()
 			hub.appendToRingLocked(prior)
 			hub.mu.Unlock()
+			// Observe the replayed scrollback too, so any mode changes still present
+			// in the (un-trimmed) journal update the state on top of the sidecar.
+			hub.modeTracker.Observe(prior)
 			log.Printf("[Terminal] Session %s: ring buffer seeded from journal (%d bytes)", sessionID, len(prior))
 		}
 	}
