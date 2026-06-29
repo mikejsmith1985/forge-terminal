@@ -637,7 +637,6 @@ var preCommitPS1Template = "#!/usr/bin/env pwsh\n" +
 	"if (-not $stagedFiles) { exit 0 }\n" +
 	"\n" +
 	"$sourceExtensions = @(\".go\", \".js\", \".jsx\", \".ts\", \".tsx\", \".py\", \".rs\", \".java\", \".cs\")\n" +
-	"$testPatterns = @(\"_test.go\", \".test.js\", \".test.jsx\", \".test.ts\", \".test.tsx\", \".spec.js\", \".spec.jsx\", \".spec.ts\", \".spec.tsx\", \"_test.py\", \"_test.rs\")\n" +
 	"$sourceFiles = $stagedFiles | Where-Object {\n" +
 	"    $extension = [System.IO.Path]::GetExtension($_)\n" +
 	"    $sourceExtensions -contains $extension\n" +
@@ -660,9 +659,11 @@ var preCommitPS1Template = "#!/usr/bin/env pwsh\n" +
 	"}\n" +
 	"\n" +
 	"# ── TEST FILE GATE (Gate 4) ─────────────────────────────────────────────\n" +
-	"# Every new source file must have a corresponding test file staged or on disk.\n" +
-	"# Build output directories are excluded — they contain compiled artifacts, not\n" +
-	"# authored source code, and must never be flagged for missing test coverage.\n" +
+	"# Every new source file must have a corresponding test file — staged or found\n" +
+	"# anywhere in the repo (test projects/dirs are common). Conventions are\n" +
+	"# language-specific: Go (_test.go), JS/TS (.test/.spec), Python (test_ prefix\n" +
+	"# or _test suffix), Rust (_test.rs or inline #[cfg(test)]), C# (Tests/Test\n" +
+	"# suffix), Java (Test/Tests/IT). Build output directories are excluded.\n" +
 	"$buildOutputDirs = @(\"cmd/forge/web/\", \"frontend/dist/\", \"bin/\")\n" +
 	"$newSourceFiles = git diff --cached --name-only --diff-filter=A 2>$null | Where-Object {\n" +
 	"    $extension = [System.IO.Path]::GetExtension($_)\n" +
@@ -672,25 +673,43 @@ var preCommitPS1Template = "#!/usr/bin/env pwsh\n" +
 	"    }\n" +
 	"    return $true\n" +
 	"}\n" +
-	"# Exclude files that are themselves test files\n" +
+	"# Recognise a path that is itself a test file (so a new test file isn't flagged).\n" +
 	"$isTestFile = { param($f)\n" +
-	"    foreach ($pattern in $testPatterns) { if ($f -like \"*$pattern\") { return $true } }\n" +
+	"    $name = [System.IO.Path]::GetFileName($f)\n" +
+	"    if ($name -match '(_test\\.go|\\.test\\.(js|jsx|ts|tsx)|\\.spec\\.(js|jsx|ts|tsx)|_test\\.py|_test\\.rs)$') { return $true }\n" +
+	"    if ($name -like 'test_*.py') { return $true }\n" +
+	"    if ($name -match '(Tests|Test)\\.cs$') { return $true }\n" +
+	"    if ($name -match '(Test|Tests|IT)\\.java$') { return $true }\n" +
 	"    return $false\n" +
+	"}\n" +
+	"# Candidate test FILE NAMES for a source leaf, by language.\n" +
+	"$testCandidates = { param($leaf, $ext)\n" +
+	"    switch ($ext) {\n" +
+	"        '.go'   { return @(\"${leaf}_test.go\") }\n" +
+	"        '.js'   { return @(\"${leaf}.test.js\", \"${leaf}.spec.js\") }\n" +
+	"        '.jsx'  { return @(\"${leaf}.test.jsx\", \"${leaf}.spec.jsx\") }\n" +
+	"        '.ts'   { return @(\"${leaf}.test.ts\", \"${leaf}.spec.ts\") }\n" +
+	"        '.tsx'  { return @(\"${leaf}.test.tsx\", \"${leaf}.spec.tsx\") }\n" +
+	"        '.py'   { return @(\"test_${leaf}.py\", \"${leaf}_test.py\") }\n" +
+	"        '.rs'   { return @(\"${leaf}_test.rs\") }\n" +
+	"        '.cs'   { return @(\"${leaf}Tests.cs\", \"${leaf}Test.cs\", \"${leaf}.Tests.cs\", \"${leaf}.Test.cs\") }\n" +
+	"        '.java' { return @(\"${leaf}Test.java\", \"${leaf}Tests.java\", \"${leaf}IT.java\") }\n" +
+	"        default { return @() }\n" +
+	"    }\n" +
 	"}\n" +
 	"foreach ($newFile in $newSourceFiles) {\n" +
 	"    if (& $isTestFile $newFile) { continue }\n" +
-	"    # Determine expected test file path based on language\n" +
 	"    $extension = [System.IO.Path]::GetExtension($newFile)\n" +
-	"    $baseName = $newFile.Substring(0, $newFile.Length - $extension.Length)\n" +
+	"    $leaf = [System.IO.Path]::GetFileNameWithoutExtension($newFile)\n" +
 	"    $hasTest = $false\n" +
-	"    if ($extension -eq \".go\") {\n" +
-	"        $expectedTest = \"${baseName}_test.go\"\n" +
-	"        if (($stagedFiles -contains $expectedTest) -or (Test-Path $expectedTest)) { $hasTest = $true }\n" +
-	"    } else {\n" +
-	"        # JS/TS: check for .test and .spec variants\n" +
-	"        foreach ($testSuffix in @(\".test$extension\", \".spec$extension\")) {\n" +
-	"            $expectedTest = \"${baseName}${testSuffix}\"\n" +
-	"            if (($stagedFiles -contains $expectedTest) -or (Test-Path $expectedTest)) { $hasTest = $true; break }\n" +
+	"    # Rust commonly keeps unit tests inline in the same file via #[cfg(test)].\n" +
+	"    if ($extension -eq '.rs' -and (Test-Path $newFile) -and (Select-String -Path $newFile -Pattern '#\\[cfg\\(test\\)\\]' -Quiet -ErrorAction SilentlyContinue)) {\n" +
+	"        $hasTest = $true\n" +
+	"    }\n" +
+	"    if (-not $hasTest) {\n" +
+	"        foreach ($cand in (& $testCandidates $leaf $extension)) {\n" +
+	"            if ($stagedFiles | Where-Object { [System.IO.Path]::GetFileName($_) -eq $cand }) { $hasTest = $true; break }\n" +
+	"            if (Get-ChildItem -Path . -Recurse -File -Filter $cand -ErrorAction SilentlyContinue | Select-Object -First 1) { $hasTest = $true; break }\n" +
 	"        }\n" +
 	"    }\n" +
 	"    if (-not $hasTest) {\n" +
@@ -776,26 +795,33 @@ var preCommitSHTemplate = "#!/usr/bin/env bash\n" +
 	"new_source_files=$(git diff --cached --name-only --diff-filter=A 2>/dev/null | grep -E '\\.(go|js|jsx|ts|tsx|py|rs|java|cs)$' | grep -vE '^(cmd/forge/web/|frontend/dist/|bin/)')\n" +
 	"if [[ -n \"$new_source_files\" ]]; then\n" +
 	"    while IFS= read -r new_file; do\n" +
-	"        # Skip files that are themselves test files\n" +
-	"        if echo \"$new_file\" | grep -qE '(_test\\.go|\\.test\\.(js|jsx|ts|tsx)|\\.spec\\.(js|jsx|ts|tsx)|_test\\.py|_test\\.rs)$'; then\n" +
-	"            continue\n" +
-	"        fi\n" +
+	"        [[ -z \"$new_file\" ]] && continue\n" +
+	"        base=$(basename \"$new_file\")\n" +
+	"        # Skip files that are themselves test files (every supported convention).\n" +
+	"        if echo \"$base\" | grep -qE '(_test\\.go|\\.test\\.(js|jsx|ts|tsx)|\\.spec\\.(js|jsx|ts|tsx)|_test\\.py|_test\\.rs|Tests?\\.cs|(Test|Tests|IT)\\.java)$'; then continue; fi\n" +
+	"        if echo \"$base\" | grep -qE '^test_.*\\.py$'; then continue; fi\n" +
 	"        extension=\"${new_file##*.}\"\n" +
-	"        base_name=\"${new_file%.*}\"\n" +
+	"        leaf=\"${base%.*}\"\n" +
 	"        has_test=false\n" +
-	"        if [[ \"$extension\" == \"go\" ]]; then\n" +
-	"            expected_test=\"${base_name}_test.go\"\n" +
-	"            if echo \"$staged_files\" | grep -qF \"$expected_test\" || [[ -f \"$expected_test\" ]]; then\n" +
-	"                has_test=true\n" +
-	"            fi\n" +
-	"        else\n" +
-	"            # JS/TS: check for .test and .spec variants\n" +
-	"            for test_suffix in \".test.${extension}\" \".spec.${extension}\"; do\n" +
-	"                expected_test=\"${base_name}${test_suffix}\"\n" +
-	"                if echo \"$staged_files\" | grep -qF \"$expected_test\" || [[ -f \"$expected_test\" ]]; then\n" +
-	"                    has_test=true\n" +
-	"                    break\n" +
-	"                fi\n" +
+	"        # Candidate test FILE NAMES for this source leaf, by language.\n" +
+	"        candidates=\"\"\n" +
+	"        case \"$extension\" in\n" +
+	"            go)   candidates=\"${leaf}_test.go\" ;;\n" +
+	"            js)   candidates=\"${leaf}.test.js ${leaf}.spec.js\" ;;\n" +
+	"            jsx)  candidates=\"${leaf}.test.jsx ${leaf}.spec.jsx\" ;;\n" +
+	"            ts)   candidates=\"${leaf}.test.ts ${leaf}.spec.ts\" ;;\n" +
+	"            tsx)  candidates=\"${leaf}.test.tsx ${leaf}.spec.tsx\" ;;\n" +
+	"            py)   candidates=\"test_${leaf}.py ${leaf}_test.py\" ;;\n" +
+	"            rs)   candidates=\"${leaf}_test.rs\" ;;\n" +
+	"            cs)   candidates=\"${leaf}Tests.cs ${leaf}Test.cs ${leaf}.Tests.cs ${leaf}.Test.cs\" ;;\n" +
+	"            java) candidates=\"${leaf}Test.java ${leaf}Tests.java ${leaf}IT.java\" ;;\n" +
+	"        esac\n" +
+	"        # Rust frequently keeps unit tests inline via #[cfg(test)].\n" +
+	"        if [[ \"$extension\" == \"rs\" && -f \"$new_file\" ]] && grep -q '#\\[cfg(test)\\]' \"$new_file\"; then has_test=true; fi\n" +
+	"        if [[ \"$has_test\" == \"false\" ]]; then\n" +
+	"            for cand in $candidates; do\n" +
+	"                # A test file staged or already present anywhere in the repo satisfies the gate.\n" +
+	"                if [[ -n \"$(find . -type f -name \"$cand\" 2>/dev/null | head -n1)\" ]]; then has_test=true; break; fi\n" +
 	"            done\n" +
 	"        fi\n" +
 	"        if [[ \"$has_test\" == \"false\" ]]; then\n" +

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Scaffolded pre-commit "test file gate" no longer false-flags C#/Java/Python/Rust repos into `--no-verify`** — The generated pre-commit hook (`internal/workflow/templates.go`, both PowerShell and Bash variants) listed `.cs`, `.java`, `.py`, `.rs` as source extensions but only knew how to find a **Go** (`_test.go`) or **JS/TS** (`.test`/`.spec`) test file. For every other language it computed a JS-style expected name (e.g. `Foo.test.cs`), which never matches real conventions — so a C# repo using `FooTests.cs` had *every* new source file flagged "no corresponding test file," forcing developers and agents to commit with `git commit --no-verify`. Worse, the `FooTests.cs` test file itself was then flagged as untested source. Replaced the Go/JS-only logic with per-language candidates searched repo-wide (test projects/dirs are common): Go `_test.go`; JS/TS `.test`/`.spec`; Python `test_` prefix or `_test` suffix; Rust `_test.rs` **or** an inline `#[cfg(test)]` module; C# `Tests`/`Test` suffix; Java `Test`/`Tests`/`IT`. The "is this file itself a test?" exclusion was widened to match. Guarded by content tests over both hook variants and a behavioural test that **executes** the rendered Bash hook in a throwaway git repo, proving a lone `Calculator.cs` is flagged and adding `CalculatorTests.cs` satisfies the gate (Red→Green). NOTE: applies to newly scaffolded repos and any repo that re-runs `scripts/install-workflow-hooks.{ps1,sh}`; an already-installed buggy hook must be regenerated to pick up the fix.
+
 ## [7.23.2] - 2026-06-29
 
 ---
