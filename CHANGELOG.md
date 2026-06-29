@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.23.2] - 2026-06-29
+
+---
+
+## [v7.23.2] - 2026-06-29
+
 ### Fixed
 - **Recovered TUI tabs accept numbers again — terminal keyboard mode is now restored on reattach (the real root cause)** — A tab auto-recovered after an app update would accept letters but silently drop **all** number keys (top-row and numpad). Hard evidence pinned it down: the broken tab's scrollback journal contained **zero** terminal mode-setup sequences. A TUI (e.g. an AI CLI) emits its keyboard/private-mode setup — application cursor keys, application keypad, bracketed paste, `modifyOtherKeys`, the Kitty keyboard protocol — **once at startup**, and those bytes are trimmed from the 2 MiB scrollback journal over a long session. On app restart the fresh xterm reattaches to the still-running TUI by replaying only the scrollback, so it comes up in **default keyboard mode while the TUI is still in application mode**. Letters are mode-independent ASCII (they work); digits, the numpad and arrows are mode-dependent (they break). This is reattach-only and TUI-only — a plain PowerShell tab sets no such modes, which is why new tabs always worked. Fixed with a new `terminalModeTracker` (`internal/terminal/terminal_mode_tracker.go`) that observes PTY output for mode set/reset sequences, persists the current state to a per-session sidecar (`logs/sessions/<id>.modes`) so it survives an app restart even after journal trimming, and re-asserts it ahead of the scrollback when a client reattaches (`sessionHub.replayPayload`). Guarded by Go unit tests (DEC private set/reset, application keypad, `modifyOtherKeys`, Kitty protocol, split-across-chunks, persist round-trip) and a hub-level integration test proving the restore prefix precedes the replayed scrollback. NOTE: this restores modes for sessions created **under this build onward**; a tab already broken from a pre-fix session won't self-heal on the upgrade — relaunch its CLI (e.g. `claude --continue`) once to recover it. Supersedes the earlier focus/`inert` and tab-id fixes (v7.23.1), which addressed different recovery defects but not this one.
 
