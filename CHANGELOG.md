@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Recovered tabs can no longer swallow keystrokes ("can't type numbers" after an app update)** — Two distinct session-restore defects fixed at root cause. (1) **Focus race:** on restore, every tab's xterm mounts in parallel and a *non-visible* tab's hidden `.xterm-helper-textarea` could win the focus race and silently consume the user's input — most visibly a CLI's numeric prompt in a recovered tab, which is why it presented as "numbers won't type." Two earlier band-aid fixes (`fbb72121`, `bf8f75fd`) only patched the symptom. The non-visible `terminal-wrapper` is now marked `inert`, removing it from focus and keyboard handling entirely, so a hidden tab can never receive focus or keystrokes regardless of mount timing (`inert` does not affect layout, so xterm's viewport is not corrupted the way `display:none` would). (2) **Duplicate tab indices:** `useTabManager` seeded its id counter from the restored tab *count* (`restoredTabs.length + 1`), so after any earlier tab had been closed a freshly created tab reused a restored index — observed live as two concurrent `tab-5-*` PTY sessions. The counter is now seeded past the highest *index actually present* in the restored ids via the new pure `computeNextTabIdCounter` helper. Guarded by Go-fast Vitest unit tests (`computeNextTabIdCounter.test.js`, a gapped-restore regression in `useTabManager.test.js`) and a deterministic Playwright proof (`tab-focus-inert.spec.js`) that reads `window.term.buffer.active` (Article X): a hidden tab is `inert`, focusing its textarea is a no-op, and a digit typed with the real keyboard lands in the active tab's buffer.
+
 ## [7.23.0] - 2026-06-26
 
 ---
