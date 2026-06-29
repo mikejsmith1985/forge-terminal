@@ -33,6 +33,31 @@ function generateId() {
 }
 
 /**
+ * Compute the value to seed the tab-id counter with after a session restore.
+ *
+ * The counter must sit strictly above the highest index already present in the
+ * restored tab ids (formatted "tab-<index>-<random>"). Seeding from the restored
+ * tab COUNT — the previous behaviour — minted a duplicate index whenever an
+ * earlier tab had been closed, so a freshly created tab could collide with a
+ * restored one. That collision is what produced two live "tab-5" sessions after
+ * an app update. Parsing the actual indices and taking max+1 makes new ids
+ * unique no matter how many tabs were closed before the restore.
+ *
+ * @param {string[]} restoredTabIds - the ids of the tabs restored from session
+ * @returns {number} the next counter value (one past the highest restored index)
+ */
+export function computeNextTabIdCounter(restoredTabIds) {
+  let highestIndex = 0;
+  for (const tabId of restoredTabIds) {
+    const indexMatch = /^tab-(\d+)(?:-|$)/.exec(tabId || '');
+    if (!indexMatch) continue; // ignore malformed/legacy ids that lack an index
+    const parsedIndex = parseInt(indexMatch[1], 10);
+    if (parsedIndex > highestIndex) highestIndex = parsedIndex;
+  }
+  return highestIndex + 1;
+}
+
+/**
  * Create a new tab object
  * @param {Object} shellConfig - Shell configuration
  * @param {number} tabNumber - Tab number for title
@@ -275,8 +300,10 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
           };
         });
 
-        // Update idCounter to avoid collisions
-        idCounter = restoredTabs.length + 1;
+        // Seed idCounter past the highest restored index (NOT the tab count) so
+        // a newly created tab can never reuse a restored tab's index. See
+        // computeNextTabIdCounter for the duplicate-"tab-5" regression this fixes.
+        idCounter = computeNextTabIdCounter(restoredTabs.map(tab => tab.id));
         themeIndex = restoredTabs.length;
 
         // Find active tab, default to first if not found

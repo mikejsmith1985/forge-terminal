@@ -155,4 +155,45 @@ describe('useTabManager — session restore', () => {
     const tab = result.current.tabs.find((t) => t.id === 'tab-1')
     expect(tab?.title).toBe('my-custom-name')
   })
+
+  it('never mints a tab id that collides with a restored index (gapped session)', async () => {
+    // A session whose indices have a gap (2 and 4) — the shape left behind when
+    // an earlier tab was closed. The next created tab must take index 5, never
+    // re-use the restored index 4. This is the root cause of the duplicate
+    // "tab-5" sessions seen after an app update.
+    const session = makeSession([
+      {
+        id: 'tab-2-aaa',
+        title: 'forge-terminal',
+        currentDirectory: 'C:/ProjectsWin/forge-terminal',
+        shellConfig: { shellType: 'powershell', wslDistro: '', wslHomePath: '' },
+      },
+      {
+        id: 'tab-4-bbb',
+        title: 'AzureWorkflowPOC',
+        currentDirectory: 'C:/ProjectsWin/AzureWorkflowPOC',
+        shellConfig: { shellType: 'powershell', wslDistro: '', wslHomePath: '' },
+      },
+    ])
+
+    global.fetch = vi.fn((url) =>
+      url === '/api/sessions'
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(session) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve(null) })
+    )
+
+    const { result } = renderHook(() => useTabManager({ shellType: 'powershell' }, 'auto-cycle'))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    act(() => {
+      result.current.createTab({ shellType: 'powershell' }, 'C:/ProjectsWin/forge-terminal')
+    })
+
+    const allIds = result.current.tabs.map((tab) => tab.id)
+    const allIndices = allIds.map((id) => parseInt(/^tab-(\d+)/.exec(id)[1], 10))
+    // Every tab index is unique — no collision with a restored index.
+    expect(new Set(allIndices).size).toBe(allIndices.length)
+  })
 })

@@ -2141,10 +2141,22 @@ function App() {
               }}>
                 Loading...
               </div>
-            ) : tabs.map((tab) => (
+            ) : tabs.map((tab) => {
+              // A non-visible tab is made `inert` so its hidden xterm textarea
+              // can NEVER win the focus race that recurs on session restore (all
+              // tabs mount in parallel). inert removes the whole subtree from
+              // focus and keyboard handling without affecting layout — unlike
+              // display:none, which corrupts xterm's viewport. This is the
+              // root-cause fix for the "can't type / numbers dropped" bug in a
+              // recovered tab; the App-level focus redirect remains as a backup.
+              // React 18 has no native `inert` prop, so pass '' to render the
+              // attribute and undefined to omit it.
+              const isHidden = tab.id !== activeTabId;
+              return (
               <div
                 key={tab.id}
-                className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
+                className={`terminal-wrapper ${isHidden ? 'hidden' : ''}`}
+                inert={isHidden ? '' : undefined}
               >
                 {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}
                 {/* v3.8.2: Terminal is the only view - ChatView and NotebookLayout removed */}
@@ -2214,7 +2226,7 @@ function App() {
                 </div>
                 {/* v3.8.2: NotebookLayout REMOVED - Terminal is the only view */}
               </div>
-            ))}
+            )})}
           </div>
         </div>
         {/* spec-006: unified SDD dashboard — always visible, replaces SddPipelinePanel
