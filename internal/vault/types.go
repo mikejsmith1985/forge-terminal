@@ -55,16 +55,22 @@ type AddEntryRequest struct {
 }
 
 // UpdateEntryRequest is the body of PUT /api/vault/entries.
-// All fields are optional — only non-empty fields are applied to the existing entry.
-// This lets callers update just the secret value without touching the name or env var,
-// or rename an entry without re-entering the secret.
+// All fields are optional. The required identifier fields (SecretName, EnvVarName,
+// SecretValue) use empty-means-no-change: an empty string leaves them untouched,
+// which lets callers update just the secret value without re-entering the name.
+//
+// The optional free-text fields (URL, Description) are pointers so they can express
+// three distinct intents — the only way to let a user actually blank one out:
+//   - nil        → field omitted, leave unchanged
+//   - non-nil "" → explicitly clear the field
+//   - non-nil    → set the field to the given value
 type UpdateEntryRequest struct {
-	ID          string `json:"id"`
-	SecretName  string `json:"secretName,omitempty"`
-	EnvVarName  string `json:"envVarName,omitempty"`
-	SecretValue string `json:"secretValue,omitempty"`
-	URL         string `json:"url,omitempty"`
-	Description string `json:"description,omitempty"`
+	ID          string  `json:"id"`
+	SecretName  string  `json:"secretName,omitempty"`
+	EnvVarName  string  `json:"envVarName,omitempty"`
+	SecretValue string  `json:"secretValue,omitempty"`
+	URL         *string `json:"url,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // AutoInjectToggleRequest is the body of POST /api/vault/auto-inject.

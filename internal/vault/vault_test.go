@@ -500,7 +500,7 @@ func TestUpdateEntryURLOnly(t *testing.T) {
 
 	_, updateErr := testVault.UpdateEntry(UpdateEntryRequest{
 		ID:  createdEntry.ID,
-		URL: "https://new.example.com",
+		URL: stringPointer("https://new.example.com"),
 	})
 	if updateErr != nil {
 		t.Fatalf("UpdateEntry returned unexpected error: %v", updateErr)
@@ -515,6 +515,96 @@ func TestUpdateEntryURLOnly(t *testing.T) {
 	}
 	if allEntries[0].EnvVarName != "URL_SECRET" {
 		t.Errorf("expected env var to remain unchanged, got %q", allEntries[0].EnvVarName)
+	}
+}
+
+// stringPointer returns a pointer to the given string. Update requests use pointer
+// fields for URL and Description so tests can express "clear this field" (a non-nil
+// empty string) distinctly from "leave unchanged" (a nil pointer).
+func stringPointer(value string) *string {
+	return &value
+}
+
+// TestUpdateEntryClearsDescription verifies that a user can blank out a previously
+// set description and that the cleared value survives a vault reopen. This directly
+// reproduces the reported bug: the save appeared to succeed but reopening still
+// showed the old description, because the update path treated an empty string as
+// "leave unchanged" rather than "clear this field".
+func TestUpdateEntryClearsDescription(t *testing.T) {
+	tempDir, mkdirErr := os.MkdirTemp("", "forge-vault-clear-desc-*")
+	if mkdirErr != nil {
+		t.Fatalf("creating temp dir: %v", mkdirErr)
+	}
+	defer os.RemoveAll(tempDir)
+
+	firstVault, openErr := Open(tempDir)
+	if openErr != nil {
+		t.Fatalf("opening first vault: %v", openErr)
+	}
+
+	createdEntry, addErr := firstVault.AddEntry(AddEntryRequest{
+		SecretName:  "Described Secret",
+		EnvVarName:  "DESCRIBED_SECRET",
+		SecretValue: "described-secret",
+		Description: "old description",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	// Explicitly clear the description while leaving every other field alone.
+	_, updateErr := firstVault.UpdateEntry(UpdateEntryRequest{
+		ID:          createdEntry.ID,
+		Description: stringPointer(""),
+	})
+	if updateErr != nil {
+		t.Fatalf("UpdateEntry returned unexpected error: %v", updateErr)
+	}
+
+	// Reopen from the same directory to simulate closing and reopening the panel.
+	secondVault, reopenErr := Open(tempDir)
+	if reopenErr != nil {
+		t.Fatalf("reopening vault: %v", reopenErr)
+	}
+
+	reopenedEntries := secondVault.ListEntries()
+	if len(reopenedEntries) != 1 {
+		t.Fatalf("expected 1 entry after reopen, got %d", len(reopenedEntries))
+	}
+	if reopenedEntries[0].Description != "" {
+		t.Errorf("expected description to be cleared after reopen, got %q", reopenedEntries[0].Description)
+	}
+}
+
+// TestUpdateEntryOmittedDescriptionUnchanged verifies the other side of the
+// tri-state contract: when the description pointer is nil (field omitted), an
+// update to a different field leaves the existing description intact.
+func TestUpdateEntryOmittedDescriptionUnchanged(t *testing.T) {
+	testVault, cleanup := openTestVault(t)
+	defer cleanup()
+
+	createdEntry, addErr := testVault.AddEntry(AddEntryRequest{
+		SecretName:  "Keeps Description",
+		EnvVarName:  "KEEPS_DESCRIPTION",
+		SecretValue: "keeps-description",
+		Description: "keep me",
+	})
+	if addErr != nil {
+		t.Fatalf("AddEntry returned unexpected error: %v", addErr)
+	}
+
+	// Update only the secret value; Description is nil, so it must be left alone.
+	_, updateErr := testVault.UpdateEntry(UpdateEntryRequest{
+		ID:          createdEntry.ID,
+		SecretValue: "rotated",
+	})
+	if updateErr != nil {
+		t.Fatalf("UpdateEntry returned unexpected error: %v", updateErr)
+	}
+
+	allEntries := testVault.ListEntries()
+	if allEntries[0].Description != "keep me" {
+		t.Errorf("expected description to be preserved, got %q", allEntries[0].Description)
 	}
 }
 
