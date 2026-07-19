@@ -198,11 +198,13 @@ func (v *Vault) UpdateEntry(request UpdateEntryRequest) (*VaultEntry, error) {
 	if request.SecretValue != "" {
 		targetEntry.SecretValue = request.SecretValue
 	}
-	if request.URL != "" {
-		targetEntry.URL = request.URL
+	// URL and Description are pointers: a non-nil value is applied verbatim,
+	// including an empty string, which is how the caller clears the field.
+	if request.URL != nil {
+		targetEntry.URL = *request.URL
 	}
-	if request.Description != "" {
-		targetEntry.Description = request.Description
+	if request.Description != nil {
+		targetEntry.Description = *request.Description
 	}
 
 	if saveErr := v.saveToFileLocked(); saveErr != nil {
