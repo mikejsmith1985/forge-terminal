@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.23.4] - 2026-07-19
+
+---
+
+## [v7.23.4] - 2026-07-19
+
 ### Fixed
 - **Vault: clearing a secret's description (or URL) now actually saves** — Editing a vault entry to *blank out* its Description showed the success flash but silently kept the old text; reopening the entry still displayed the original value. Root cause was entirely server-side: `UpdateEntryRequest.URL` and `.Description` were plain `string`s, so the update path (`internal/vault/vault.go`) could not distinguish *"field omitted → leave unchanged"* from *"field sent as empty → clear it"*, and its `if request.Description != ""` guard treated every blank as "no change." The frontend already sends `{description: ""}` on clear, so no UI change was needed. Made the two optional free-text fields tri-state `*string` (nil = omit, non-nil `""` = clear, non-nil = set); the required identifier fields (name/env var/value) keep empty-means-no-change since a required field can't be blanked. The HTTP handler's trim/validation moved into a small `normalizeUpdateRequest` helper (`cmd/forge/handlers_vault.go`). Guarded Red→Green by a Go unit test that clears a description, reopens the vault from disk, and asserts the blank persisted — plus a companion test proving an omitted (nil) description is still left untouched.
 
