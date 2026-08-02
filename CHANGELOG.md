@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Background subprocesses can no longer steal keyboard focus (Windows)** — A deep audit found five `exec.Command` sites still missing `CREATE_NO_WINDOW` suppression, each briefly opening a real console window that yanks foreground focus from whatever the user is typing in — even while Forge appears idle, because three of them fire from *background* work: the vault script runner (`internal/mcp/tools_vault.go`, a full `pwsh` spawn on every agent `vault_run_script`/inject — the slowest and most visible offender), the SDD phase report card (`cmd/forge/sdd_report_card.go`, three `git` spawns whenever a pipeline phase completes in an unattended tab), and the tutor change analyzer (`internal/tutor/changes.go`, several `git diff` spawns each time watched files change). The remaining two are user-triggered: WSL home-directory resolution and ffmpeg video-frame extraction in the file handler (`internal/files/handler.go`, a package that had no suppression helper at all). Fixed by routing each site through a hidden-window command builder (`newVaultSubprocess`, `newRepoGitCommand`, `newGitCommand`) or the new `internal/files` `hideExecWindow` helper (`proc_windows.go`/`proc_unix.go` pair, matching the convention in the other ten packages). Guarded Red→Green by five new unit tests asserting `SysProcAttr.HideWindow` + `CREATE_NO_WINDOW` on every builder (Windows) and no-op behavior on Unix. Audit also verified the negatives: no `SetForegroundWindow`-family calls exist anywhere, and every idle-loop (update checker, tutor file scan, config watcher, freeze detector, tunnel probes, license heartbeat) is HTTP/filesystem-only and spawns nothing.
+
 ## [7.23.4] - 2026-07-19
 
 ---

@@ -168,6 +168,7 @@ func resolveWSLHome(distro, remainder string) (string, error) {
 	// Try to get the WSL home directory using wsl.exe (only once per distro)
 	// This runs: wsl -d <distro> -e echo $HOME
 	cmd := exec.Command("wsl", "-d", distro, "-e", "sh", "-c", "echo $HOME")
+	hideExecWindow(cmd) // Prevent focus-stealing console flash on Windows
 	output, err := cmd.Output()
 	if err != nil {
 		// Fallback: just use ~ as-is, won't work but provides error feedback
@@ -412,7 +413,8 @@ func extractVideoFrames(videoPath, tempDir string) ([]string, bool) {
 		framePattern,
 		"-y", // Overwrite existing
 	)
-	
+	hideExecWindow(cmd) // Prevent focus-stealing console flash on Windows
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("[Files] ffmpeg frame extraction failed: %v, output: %s", err, string(output))

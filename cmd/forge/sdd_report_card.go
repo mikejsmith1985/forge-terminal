@@ -75,14 +75,12 @@ func captureWorkTree(repoRoot string) string {
 	indexEnv := append(os.Environ(), "GIT_INDEX_FILE="+tmpPath)
 
 	// Stage the whole working tree into the empty temp index, then write it as a tree.
-	addCmd := exec.Command("git", "add", "-A")
-	addCmd.Dir = repoRoot
+	addCmd := newRepoGitCommand(repoRoot, "add", "-A")
 	addCmd.Env = indexEnv
 	if runErr := addCmd.Run(); runErr != nil {
 		return ""
 	}
-	writeCmd := exec.Command("git", "write-tree")
-	writeCmd.Dir = repoRoot
+	writeCmd := newRepoGitCommand(repoRoot, "write-tree")
 	writeCmd.Env = indexEnv
 	out, writeErr := writeCmd.Output()
 	if writeErr != nil {
@@ -91,14 +89,23 @@ func captureWorkTree(repoRoot string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// newRepoGitCommand builds a git invocation rooted at repoRoot with the console
+// window suppressed. Report cards are generated when an SDD phase completes in the
+// background; without suppression each git spawn steals keyboard focus on Windows.
+func newRepoGitCommand(repoRoot string, args ...string) *exec.Cmd {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = repoRoot
+	hideWindow(cmd)
+	return cmd
+}
+
 // diffWorkTrees returns the per-file changes between two tree SHAs (the phase window).
 // Returns nil when either snapshot is missing or git fails.
 func diffWorkTrees(repoRoot, startTree, endTree string) []sddFileChange {
 	if repoRoot == "" || startTree == "" || endTree == "" || startTree == endTree {
 		return nil
 	}
-	cmd := exec.Command("git", "diff", "--numstat", startTree, endTree)
-	cmd.Dir = repoRoot
+	cmd := newRepoGitCommand(repoRoot, "diff", "--numstat", startTree, endTree)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil
