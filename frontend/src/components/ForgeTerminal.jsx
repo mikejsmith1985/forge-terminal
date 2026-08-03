@@ -12,6 +12,7 @@ import { diagnosticCore } from '../utils/diagnosticCore';
 import { isLLMCommand } from '../utils/llmDetection';
 import { extractProjectFolder, isFileLikeName, isTempOrSystemPath } from '../utils/projectFolder';
 import { shouldDetectDirectoryFromText } from '../utils/terminalTuiState';
+import { neutralizeSocket } from '../utils/websocketManager';
 
 // Paste error logger
 const logPasteError = (error, context = {}) => {
@@ -114,6 +115,11 @@ function stripAnsi(text) {
 
 // Menu-style prompts where an option is already selected (just press Enter)
 // These search the ENTIRE buffer, not just the last line
+// How long Take Control waits for the server's CONTROL_GRANTED before treating
+// the socket as dead and reconnecting. Generous enough for a slow loopback
+// round-trip; short enough that a click never feels ignored.
+const TAKE_CONTROL_GRANT_TIMEOUT_MS = 2000;
+
 const MENU_SELECTION_PATTERNS = [
   // Copilot CLI: "❯ 1. Yes" or "> 1. Yes" (numbered menu with selection indicator)
   /[›❯>]\s*1\.\s*Yes\b/i,
@@ -595,6 +601,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // defer has run. If CONTROL_GRANTED arrives within 600ms we cancel the timer so the
   // banner never appears.
   const bannerTimerRef = useRef(null);
+  // Timer armed when the user clicks Take Control: if CONTROL_GRANTED doesn't
+  // arrive in time the socket is presumed dead and we force a reconnect —
+  // a fresh join auto-promotes this tab when no live controller exists.
+  const takeControlRetryRef = useRef(null);
 
   // Tracks how far the virtual keyboard has pushed up the visible viewport on mobile.
   // When the keyboard opens, window.visualViewport.height shrinks but window.innerHeight
@@ -1754,13 +1764,25 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
       }
 
+      // Disown any previous socket BEFORE opening a new one. Every connect path
+      // (initial mount, backoff retry, visibility wake, manual reconnect) funnels
+      // through here, so this guarantees at most one socket owns this tab's state.
+      // Without it, a still-open superseded socket registers at the server as a
+      // second "device": the new socket joins as a passive viewer and the two
+      // connections fight over isActiveDevice — the stuck "Take Control" bug.
+      neutralizeSocket(wsRef.current);
+
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
-        logger.terminal('WebSocket connected', { 
+        // Superseded-socket guard: only the socket this tab currently owns may
+        // mutate connection state (neutralizeSocket detaches handlers, this is
+        // belt-and-suspenders for events already queued on the event loop).
+        if (wsRef.current !== ws) return;
+        logger.terminal('WebSocket connected', {
           tabId, 
           shellType: cfg?.shellType,
           wsUrl: wsUrl.replace(window.location.host, '[host]'),
@@ -1866,6 +1888,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // =========================================================================
 
       ws.onmessage = (event) => {
+        // Superseded-socket guard: a replaced socket's late messages must not
+        // reach the terminal or flip isActiveDevice against the live socket.
+        if (wsRef.current !== ws) return;
         // CRITICAL: Keep hot path minimal - just write to terminal
         let textData = '';
 
@@ -1920,6 +1945,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   // Treat this the same as CONTROL_GRANTED — no passive-device banner.
                   logger.terminal('Joined session as active device (auto-promoted)', { tabId });
                   clearTimeout(bannerTimerRef.current);
+                  clearTimeout(takeControlRetryRef.current);
                   setIsActiveDevice(true);
                   // Fit to this device's screen before sending resize (same reasoning
                   // as CONTROL_GRANTED — ensures mobile gets correct col/row count).
@@ -1957,8 +1983,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               if (msg.type === 'CONTROL_GRANTED') {
                 logger.terminal('Control granted to this device', { tabId });
                 // Cancel any pending SESSION_JOINED banner timer — we're the active
-                // device, so no passive-device overlay should appear.
+                // device, so no passive-device overlay should appear. Also cancel
+                // the Take Control retry: the grant arrived, no reconnect needed.
                 clearTimeout(bannerTimerRef.current);
+                clearTimeout(takeControlRetryRef.current);
                 setIsActiveDevice(true);
                 // Fit the terminal to THIS device's screen BEFORE reading cols/rows.
                 // Without this, mobile devices inherit the desktop's column count
@@ -2054,13 +2082,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       };
 
       ws.onerror = (error) => {
+        if (wsRef.current !== ws) return; // superseded socket — not our error
         logger.terminal('WebSocket error', { tabId, error: error.message || 'unknown' });
         term.write('\r\n\x1b[1;31m[Error]\x1b[0m Connection error.\r\n');
       };
 
       ws.onclose = (event) => {
+        // Superseded-socket guard: a replaced socket closing must not print
+        // "[Disconnected]" or schedule a reconnect against the live socket.
+        if (wsRef.current !== ws) return;
         logger.terminal('WebSocket closed', { tabId, code: event.code, reason: event.reason });
-        
+
         setIsConnected(false);
         if (onConnectionChange) onConnectionChange(false);
         
@@ -2334,6 +2366,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       onDataDisposable.dispose();
       onResizeDisposable.dispose();
       clearTimeout(bannerTimerRef.current);
+      clearTimeout(takeControlRetryRef.current);
 
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Signal that this is an intentional unmount, not a connectivity issue.
@@ -2374,6 +2407,34 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     if (xtermRef.current) {
       xtermRef.current.focus();
     }
+  };
+
+  // requestTakeControl asks the server to make this device the PTY controller.
+  // Self-healing by design: a dead socket (half-open after sleep/network loss)
+  // would swallow the request silently, so if CONTROL_GRANTED doesn't arrive
+  // within the timeout we drop the socket and reconnect — the fresh join
+  // auto-promotes this tab whenever no live controller exists on the server.
+  const requestTakeControl = () => {
+    const socket = wsRef.current;
+    const isSocketOpen = socket && socket.readyState === WebSocket.OPEN;
+    if (!isSocketOpen) {
+      // The socket the banner believes in is already gone — clicking should
+      // recover the tab, not silently do nothing.
+      logger.terminal('Take Control clicked on dead socket — reconnecting', { tabId });
+      if (connectFnRef.current) connectFnRef.current();
+      return;
+    }
+    if (xtermRef.current) {
+      const { cols, rows } = xtermRef.current;
+      socket.send(JSON.stringify({ type: 'take_control', cols, rows }));
+    }
+    clearTimeout(takeControlRetryRef.current);
+    takeControlRetryRef.current = setTimeout(() => {
+      if (!isActiveDeviceRef.current && connectFnRef.current) {
+        logger.terminal('take_control unanswered — forcing reconnect', { tabId });
+        connectFnRef.current();
+      }
+    }, TAKE_CONTROL_GRANT_TIMEOUT_MS);
   };
 
   return (
@@ -2467,12 +2528,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             Another device controls this terminal
           </span>
           <button
-            onClick={() => {
-              if (wsRef.current?.readyState === WebSocket.OPEN && xtermRef.current) {
-                const { cols, rows } = xtermRef.current;
-                wsRef.current.send(JSON.stringify({ type: 'take_control', cols, rows }));
-              }
-            }}
+            onClick={requestTakeControl}
             style={{
               padding: '4px 14px',
               fontSize: '13px',

@@ -673,10 +673,12 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// Scrollback was already replayed before hub.add() above.
 
-			// If no device currently controls this PTY (previous owner disconnected),
-			// auto-promote this client to active so it can resize and interact fully.
-			// This handles the common case of the same user reconnecting after a hiccup.
-			if hub.getActive() == nil {
+			// If no LIVE device currently controls this PTY (previous owner
+			// disconnected, or the recorded controller's socket already failed a
+			// write), auto-promote this client to active so it can resize and
+			// interact fully. Checking liveness — not just presence — prevents a
+			// dead socket from demoting every rejoining tab to a passive viewer.
+			if !hub.hasLiveActive() {
 				hub.setActive(conn)
 				log.Printf("[Terminal] Session %s: auto-promoted joining client to active (no previous active)", sessionID)
 				_ = conn.WriteJSON(map[string]interface{}{
@@ -710,12 +712,15 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				isWatcher = true
 				sessionLock.Unlock()
 				log.Printf("[Terminal] Session %s: became watcher after lock (another goroutine created it)", sessionID)
+				// Liveness check (not just presence): a dead controller socket
+				// must not force this client into passive-viewer mode.
+				shouldPromoteJoiner := !hub.hasLiveActive()
 				_ = conn.WriteJSON(map[string]interface{}{
 					"type":           "SESSION_JOINED",
 					"sessionId":      sessionID,
-					"isActiveDevice": hub.getActive() == nil,
+					"isActiveDevice": shouldPromoteJoiner,
 				})
-				if hub.getActive() == nil {
+				if shouldPromoteJoiner {
 					hub.setActive(conn)
 				}
 			}
