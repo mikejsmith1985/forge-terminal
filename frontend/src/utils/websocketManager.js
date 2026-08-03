@@ -217,6 +217,41 @@ export class ConnectionStateTracker {
   }
 }
 
+// Numeric readyState values from the WebSocket spec, named so the liveness
+// check below reads without a WebSocket global (also keeps this testable in node).
+const SOCKET_STATE_CONNECTING = 0;
+const SOCKET_STATE_OPEN = 1;
+
+/**
+ * neutralizeSocket fully disowns a WebSocket this code no longer controls:
+ * it detaches every event handler, then closes the socket if still alive.
+ *
+ * Why this exists: when a tab reconnects (backoff retry, visibility wake, or a
+ * manual "Reconnect" click) while its previous socket is still open, BOTH
+ * sockets keep firing handlers into the same component state. The server sees
+ * the old socket as a second "device", demotes the new one to passive viewer,
+ * and the two connections fight over the active-device flag — producing a
+ * phantom "Another device controls this terminal" banner whose Take Control
+ * button can never win. Disowning the superseded socket before opening a new
+ * one guarantees at most one socket owns a tab's state.
+ */
+export function neutralizeSocket(socket) {
+  if (!socket) return;
+  socket.onopen = null;
+  socket.onmessage = null;
+  socket.onerror = null;
+  socket.onclose = null;
+  const isSocketStillAlive =
+    socket.readyState === SOCKET_STATE_CONNECTING || socket.readyState === SOCKET_STATE_OPEN;
+  if (isSocketStillAlive) {
+    try {
+      socket.close();
+    } catch {
+      // The browser already tore the socket down — nothing left to release.
+    }
+  }
+}
+
 export function isValidWebSocketURL(url) {
   try {
     const parsed = new URL(url);
@@ -236,6 +271,7 @@ export default {
   WebSocketReconnectionManager,
   ConnectionStateTracker,
   createWebSocketManager,
+  neutralizeSocket,
   isValidWebSocketURL,
   getWebSocketURL
 };

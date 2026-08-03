@@ -184,6 +184,16 @@ func (h *sessionHub) isActive(cw *connWriter) bool {
 	return h.activeConn == cw
 }
 
+// hasLiveActive reports whether an OPEN connection currently controls the PTY.
+// A connection that failed a write (marked closed) no longer counts: treating a
+// dead socket as the controller is what left reconnecting tabs stuck as passive
+// viewers — "Another device controls this terminal" with no such device alive.
+func (h *sessionHub) hasLiveActive() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.activeConn != nil && !h.activeConn.closed.Load()
+}
+
 // getActive returns the current active connection, or nil.
 func (h *sessionHub) getActive() *connWriter {
 	h.mu.Lock()
@@ -263,12 +273,16 @@ func (h *sessionHub) clearActiveAndPromote(cw *connWriter, sessionID string) {
 	}
 	h.activeConn = nil
 
-	// Pick any remaining client as the new active device.
+	// Pick any remaining LIVE client as the new active device — promoting a
+	// closed (write-failed) connection would strand the session with a phantom
+	// controller that can never resize, type, or hand control back.
 	// cw has already been removed from h.clients via hub.remove() before this call.
 	var candidate *connWriter
 	for c := range h.clients {
-		candidate = c
-		break
+		if !c.closed.Load() {
+			candidate = c
+			break
+		}
 	}
 	if candidate != nil {
 		h.activeConn = candidate

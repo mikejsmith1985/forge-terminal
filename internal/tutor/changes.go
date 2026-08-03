@@ -150,8 +150,7 @@ func runGitCommand(projectPath string, args ...string) (string, error) {
 		return "", fmt.Errorf("resolving project path %q: %w", projectPath, err)
 	}
 
-	cmd := exec.Command("git", args...)
-	cmd.Dir = absPath
+	cmd := newGitCommand(absPath, args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -162,4 +161,14 @@ func runGitCommand(projectPath string, args ...string) (string, error) {
 	}
 
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+// newGitCommand builds a git invocation rooted at projectPath with the console
+// window suppressed. The tutor analyzes file changes in the background; without
+// suppression each git spawn steals keyboard focus on Windows.
+func newGitCommand(projectPath string, args ...string) *exec.Cmd {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = projectPath
+	hideExecWindow(cmd)
+	return cmd
 }

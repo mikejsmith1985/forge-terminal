@@ -404,9 +404,7 @@ func (r *realVaultScriptRunner) ExecuteVaultScript(scriptPath string, followUpCo
 	)
 	defer cancelCtx()
 
-	shellBinary, shellArgs := buildVaultSubprocessArgs(scriptPath, followUpCommand)
-
-	subproc := exec.CommandContext(ctx, shellBinary, shellArgs...)
+	subproc := newVaultSubprocess(ctx, scriptPath, followUpCommand)
 
 	var combinedOutputBuf bytes.Buffer
 	subproc.Stdout = &combinedOutputBuf
@@ -431,6 +429,16 @@ func (r *realVaultScriptRunner) ExecuteVaultScript(scriptPath string, followUpCo
 // The & { } invocation block on Windows ensures the dot-source sets $env: vars
 // in the same scope as the follow-up command, and $PSCommandPath inside the
 // script resolves correctly so the self-delete fires.
+// newVaultSubprocess builds the shell invocation that sources a vault script, with
+// the console window suppressed. Vault operations run from background agent sessions;
+// without suppression the pwsh spawn opens a visible console that steals keyboard focus.
+func newVaultSubprocess(ctx context.Context, scriptPath string, followUpCommand string) *exec.Cmd {
+	shellBinary, shellArgs := buildVaultSubprocessArgs(scriptPath, followUpCommand)
+	subproc := exec.CommandContext(ctx, shellBinary, shellArgs...)
+	suppressConsoleWindow(subproc) // platform-specific; no-op on non-Windows
+	return subproc
+}
+
 func buildVaultSubprocessArgs(scriptPath string, followUpCommand string) (shellBinary string, shellArgs []string) {
 	if runtime.GOOS == "windows" {
 		return buildWindowsSubprocessArgs(scriptPath, followUpCommand)
