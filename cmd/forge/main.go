@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -115,14 +116,16 @@ func main() {
 		logFilename = "forge-dev.log"
 	}
 	logPath := filepath.Join(forgeDir, logFilename)
+	// Move an oversized log aside first so the active file never grows unbounded
+	// (forge.log reached 888 MB in the field before rotation existed).
+	_ = rotateOversizedLog(logPath, maxLogFileSizeBytes)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
-		// Log to both file and stdout
-		log.SetOutput(os.Stdout) // Keep stdout for console
 		log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-		// Also write to file by wrapping
-		multiWriter := io.MultiWriter(os.Stdout, logFile)
-		log.SetOutput(multiWriter)
+		// File first, stdout best-effort: a windowsgui binary launched from
+		// Explorer has a dead stdout handle, and a plain io.MultiWriter would
+		// abort at that error and silently stop writing the log file.
+		log.SetOutput(newResilientLogWriter(logFile, os.Stdout))
 		defer logFile.Close()
 	}
 
@@ -445,6 +448,7 @@ func main() {
 
 	// Shutdown API - allows graceful shutdown from browser
 	http.HandleFunc("/api/shutdown", WrapWithMiddleware(handleShutdown))
+	http.HandleFunc("/api/instance/exit", WrapWithMiddleware(handleInstanceExit))
 
 	// IDE Integration API - open current workspace in external IDE
 	http.HandleFunc("/api/ide/open", WrapWithMiddleware(handleOpenIDE))
@@ -693,6 +697,11 @@ func main() {
 	// Find an available port (use override if specified)
 	addr, listener, err := findAvailablePort(overrideHost, overridePort)
 	if err != nil {
+		var alreadyRunning *forgeAlreadyRunningError
+		if errors.As(err, &alreadyRunning) {
+			deferToRunningInstance(alreadyRunning.Instance)
+			return
+		}
 		log.Fatalf("Failed to find available port: %v", err)
 	}
 
@@ -1158,13 +1167,24 @@ func findAvailablePort(host string, overridePort int) (string, net.Listener, err
 		// Fall through to try preferred ports
 	}
 
+	probeClient := newInstanceProbeClient()
 	for _, port := range preferredPorts {
 		addr := fmt.Sprintf("%s:%d", host, port)
 		listener, err := net.Listen("tcp", addr)
 		if err == nil {
 			return addr, listener, nil
 		}
-		log.Printf("Port %d unavailable, trying next...", port)
+		// Single-instance guard: if the busy port belongs to another Forge
+		// instance, never fall through silently — that used to leave a stale
+		// old binary running side by side with this one for weeks.
+		takeoverListener, guardErr := resolvePreferredPortConflict(probeClient, host, port, updater.GetVersion())
+		if guardErr != nil {
+			return "", nil, guardErr
+		}
+		if takeoverListener != nil {
+			return addr, takeoverListener, nil
+		}
+		log.Printf("Port %d busy with a non-Forge service, trying next...", port)
 	}
 
 	// Fallback: let OS assign a random available port
