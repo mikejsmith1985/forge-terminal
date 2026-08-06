@@ -197,3 +197,80 @@ describe('useTabManager — session restore', () => {
     expect(new Set(allIndices).size).toBe(allIndices.length)
   })
 })
+
+// An unattended shell now survives a full day of disconnection so an overnight
+// gap can never destroy running work. That safety net is only affordable because
+// deliberately closing a tab reclaims its shell straight away — these tests pin
+// that signal, and pin that it is NOT sent for a tab that stays open.
+describe('useTabManager — explicit tab close reclaims the shell', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const twoTabSession = () =>
+    makeSession([
+      {
+        id: 'tab-1-aaa',
+        title: 'forge-terminal',
+        currentDirectory: 'C:/ProjectsWin/forge-terminal',
+        shellConfig: { shellType: 'powershell', wslDistro: '', wslHomePath: '' },
+      },
+      {
+        id: 'tab-2-bbb',
+        title: 'AzureWorkflowPOC',
+        currentDirectory: 'C:/ProjectsWin/AzureWorkflowPOC',
+        shellConfig: { shellType: 'powershell', wslDistro: '', wslHomePath: '' },
+      },
+    ])
+
+  const renderWithSession = async (session) => {
+    global.fetch = vi.fn((url) =>
+      url === '/api/sessions'
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(session) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve(null) })
+    )
+    const { result } = renderHook(() => useTabManager({ shellType: 'powershell' }, 'auto-cycle'))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    return result
+  }
+
+  const terminalCloseCallsFor = (tabId) =>
+    global.fetch.mock.calls.filter(
+      ([url, options]) =>
+        url === '/api/terminal/close' && JSON.parse(options.body).sessionId === tabId
+    )
+
+  it('tells the backend to reclaim the shell of a closed tab', async () => {
+    const result = await renderWithSession(twoTabSession())
+
+    act(() => {
+      result.current.closeTab('tab-2-bbb')
+    })
+
+    expect(terminalCloseCallsFor('tab-2-bbb')).toHaveLength(1)
+  })
+
+  it('never reclaims the shell of the last tab, which stays open', async () => {
+    const result = await renderWithSession(
+      makeSession([
+        {
+          id: 'tab-1-only',
+          title: 'forge-terminal',
+          currentDirectory: 'C:/ProjectsWin/forge-terminal',
+          shellConfig: { shellType: 'powershell', wslDistro: '', wslHomePath: '' },
+        },
+      ])
+    )
+
+    act(() => {
+      result.current.closeTab('tab-1-only')
+    })
+
+    // The tab is still there — destroying its shell would strand the user with a
+    // terminal that can never respond again.
+    expect(result.current.tabs).toHaveLength(1)
+    expect(terminalCloseCallsFor('tab-1-only')).toHaveLength(0)
+  })
+})

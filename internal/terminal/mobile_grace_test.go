@@ -50,14 +50,6 @@ func TestGracePeriodForClient(t *testing.T) {
 	}
 }
 
-func TestDefaultGracePeriod(t *testing.T) {
-	if sessionGracePeriod != 5*time.Minute {
-		t.Errorf("default grace period should be 5 min, got %v", sessionGracePeriod)
-	}
-}
-
-func TestMobileGracePeriod(t *testing.T) {
-	if mobileGracePeriod != 30*time.Minute {
-		t.Errorf("mobile grace period should be 30 min, got %v", mobileGracePeriod)
-	}
-}
+// The exact retention values are no longer pinned here. What matters is the
+// user-facing rule — a session outlives any disconnect until the user closes
+// its tab — which is asserted in session_retention_test.go.
