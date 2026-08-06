@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.23.8] - 2026-08-06
+
+---
+
+## [v7.23.8] - 2026-08-06
+
 ### Fixed
 - **"Create GitHub repo" on a new project failed every time — `--push` on an empty repository** — The Projects card's create flow (`POST /api/project/create`) ran `git init` → scaffold → `gh repo create --source … --push`, but never committed anything, and `gh` refuses to push a repository with zero commits (`` `--push` enabled but no commits found ``). Traced live against a real forge.log tail plus a direct endpoint probe: the folder, `git init`, and 65-file scaffold all succeed, then the GitHub step dies before the remote is even created. The handler (`cmd/forge/handlers_project_create.go`) now records a bootstrap commit (`chore: initial project scaffold`) before invoking `gh`. The commit uses `--no-verify` because the scaffold's own pre-commit hook intentionally blocks commits on main/master — it governs day-to-day work, not Forge's own bootstrap — and falls back to a neutral `Forge Terminal` author identity when the machine has no `user.email` configured, so first-run setups don't fail either. New projects also now `git init -b main` (with a plain-init fallback for git < 2.28) so the pushed GitHub default branch is `main` instead of the local legacy `master`. Guarded Red→Green by three Go tests: bootstrap commit on a fresh scaffold, commit surviving a deliberately blocking pre-commit hook, and main-branch initialization.
 
