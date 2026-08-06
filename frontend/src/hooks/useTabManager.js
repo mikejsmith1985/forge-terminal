@@ -432,6 +432,25 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       body: JSON.stringify({ sessionId: tabId }),
     }).catch(() => {});
 
+    // Closing a tab is also the ONLY signal that its shell should be destroyed.
+    // An unattended PTY now survives a full day of disconnection so an overnight
+    // gap never kills running work, which means the deliberate close has to do
+    // the reclaiming — otherwise every closed tab leaks a live shell process.
+    //
+    // Gated on the tab actually going away: the request to close the very last
+    // tab is refused below, and destroying that tab's shell while the tab stays
+    // on screen would leave the user looking at a terminal that can never
+    // respond again. Best-effort otherwise — never block tab close on it.
+    const isTabActuallyClosing = (stateRef.current?.tabs?.length ?? 0) > 1;
+    if (isTabActuallyClosing) {
+      fetch('/api/terminal/close', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: tabId }),
+      }).catch(() => {});
+    }
+
     setState(prev => {
       // Don't close the last tab
       if (prev.tabs.length <= 1) {

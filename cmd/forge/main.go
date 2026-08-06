@@ -374,6 +374,11 @@ func main() {
 	termHandler = terminal.NewHandlerDirect(nil, visionParser, llmDetector)
 	http.HandleFunc("/ws", AuthMiddleware(LicenseMiddleware(termHandler.HandleWebSocket)))
 
+	// Closing a tab is the ONLY thing that should destroy a running shell — an
+	// unattended PTY otherwise survives a full day of disconnection (see
+	// terminal.sessionGracePeriod), so the deliberate close does the reclaiming.
+	http.HandleFunc("/api/terminal/close", WrapWithMiddleware(handleTerminalClose))
+
 	// Server-side macro injection.  Must register AFTER termHandler is set
 	// because the handler closure dereferences it.  See handlers_macro.go
 	// for why this lives on the backend rather than in the browser.
