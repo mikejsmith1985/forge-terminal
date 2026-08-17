@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Background tabs filled up with `cd` commands nobody typed** — Switching to a tab that had been sitting in the background revealed a `cd "C:\..."` line the developer never entered, and any CLI agent running in that tab received the same text as a submitted prompt. The cause was the hidden-tab directory-restore fallback in `ForgeTerminal`'s socket-open handler: its only escape hatch was `wasReconnection`, which is true **only** for a socket that dropped and *retried*. An app restart or a page reload opens a *first-attempt* socket that the server answers with `SESSION_REATTACHED` — not a reconnection — so the guard passed and a `cd` was typed into a shell that was already sitting in that exact directory. Worse, the decision was made at socket-open while `SESSION_REATTACHED` arrives milliseconds *later*, so the reattach signal could never have been seen even if it had been consulted. Measured on the pre-fix build, a single page reload injected a `cd` into **five** separate hidden tabs at once. The rule now lives in `frontend/src/utils/directoryRestore.js`, is re-evaluated at the moment the command would actually be sent, and refuses to send for any reattached session — the backend already starts every shell in the right directory (`ConPtyWorkDir`), so this fallback is only ever needed for a genuinely fresh hidden shell. Guarded Red→Green by 13 unit tests over the extracted decision plus each shell's command form, and by a Playwright spec (`tests/e2e/hidden-tab-no-cd-injection.spec.js`) that spies on every WebSocket frame the page sends across a reload and asserts zero `cd`-shaped frames, corroborated by reading the recovered tab's own `window.term.buffer.active` (Article X). The spec was demonstrated Red against the pre-fix build and Green against the fix on the same harness.
+
 ## [7.23.8] - 2026-08-06
 
 ---
