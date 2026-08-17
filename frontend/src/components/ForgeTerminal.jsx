@@ -13,6 +13,11 @@ import { isLLMCommand } from '../utils/llmDetection';
 import { extractProjectFolder, isFileLikeName, isTempOrSystemPath } from '../utils/projectFolder';
 import { shouldDetectDirectoryFromText } from '../utils/terminalTuiState';
 import { neutralizeSocket } from '../utils/websocketManager';
+import {
+  shouldRestoreDirectory,
+  buildDirectoryRestoreCommand,
+  DIRECTORY_RESTORE_DELAY_MS,
+} from '../utils/directoryRestore';
 
 // Paste error logger
 const logPasteError = (error, context = {}) => {
@@ -1844,34 +1849,34 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }
         }, 100);
 
-        // Restore directory if available — but ONLY for hidden (non-active) tabs
-        // and NEVER for reattached sessions (the shell already has its directory).
-        // For the visible/active tab the psHome query param already told the backend to
-        // run Set-Location at 100ms, so we don't need to send a visible cd command here
-        // (which would clutter the terminal screen).  Hidden tabs can run the cd silently
-        // as a belt-and-suspenders fallback without the user ever seeing it.
-        if (currentDirectoryRef.current && !isVisibleRef.current && !wasReconnection) {
-          const dir = currentDirectoryRef.current;
-          logger.terminal('Restoring directory (hidden tab fallback)', { tabId, directory: dir });
-          
-          setTimeout(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              const shellType = cfg?.shellType || 'powershell';
-              let cdCommand = '';
-              
-              if (shellType === 'wsl') {
-                cdCommand = dir.startsWith('~') ? `cd ${dir.replace(/ /g, '\\ ')}\r` : `cd "${dir}"\r`;
-              } else if (shellType === 'cmd') {
-                cdCommand = `cd /d "${dir}"\r`;
-              } else {
-                cdCommand = `cd "${dir}"\r`;
-              }
-              
-              ws.send(cdCommand);
-              logger.terminal('Directory restore command sent (hidden)', { tabId, command: cdCommand.trim() });
-            }
-          }, 800);
-        }
+        // Restore the saved directory for hidden tabs whose shell was started fresh.
+        // The backend already starts every shell in the right directory (the psHome
+        // query param), so this is only a fallback — and it must never fire for a shell
+        // the server handed back alive, because the `cd` would be echoed into scrollback
+        // (surfacing as commands the developer never typed) or swallowed as input by a
+        // CLI agent running in that tab.
+        //
+        // The decision is re-checked inside the delay rather than here: SESSION_REATTACHED
+        // arrives shortly AFTER the socket opens, so deciding now would always read the
+        // reattach flag as false.
+        setTimeout(() => {
+          const restoreOptions = {
+            savedDirectory: currentDirectoryRef.current,
+            isVisible: isVisibleRef.current,
+            wasReconnection,
+            wasSessionReattached: sessionReattachedRef.current,
+          };
+          if (ws.readyState !== WebSocket.OPEN || !shouldRestoreDirectory(restoreOptions)) {
+            logger.terminal('Directory restore skipped', { tabId, ...restoreOptions });
+            return;
+          }
+          const cdCommand = buildDirectoryRestoreCommand(
+            cfg?.shellType || 'powershell',
+            currentDirectoryRef.current
+          );
+          ws.send(cdCommand);
+          logger.terminal('Directory restore command sent (hidden)', { tabId, command: cdCommand.trim() });
+        }, DIRECTORY_RESTORE_DELAY_MS);
 
         if (onConnectionChange) onConnectionChange(true);
       };
