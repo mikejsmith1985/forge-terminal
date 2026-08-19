@@ -33,8 +33,38 @@ import {
 } from 'lucide-react'
 import { useVault } from '../hooks/useVault'
 import { buildVaultDisplayItems } from './vaultEntryGrouping'
+import { deriveEnvVarName, describeEnvVarNameAdvisory } from './envVarName'
 import { detectSecretInDescription } from '../utils/secretDetector'
 import './VaultPanel.css'
+
+// EnvVarNameAdvisory renders an inline, non-blocking note when a variable name
+// is not a plain POSIX identifier. Such a name is perfectly usable on Windows
+// and through auto-inject, but POSIX shells cannot export it, so vault scripts
+// substitute the underscore form there — this says so before the surprise, and
+// offers the substitute as a one-click alternative.
+function EnvVarNameAdvisory({ envVarName, onUseSuggestedName }) {
+  const advisory = describeEnvVarNameAdvisory(envVarName)
+  if (!advisory) {
+    return null
+  }
+  return (
+    <div className="vp-description-warning" role="status">
+      <AlertCircle size={13} className="vp-description-warning-icon" />
+      <span>
+        {advisory.message}
+        {advisory.suggestedName && (
+          <button
+            type="button"
+            className="vp-inline-link-btn"
+            onClick={() => onUseSuggestedName(advisory.suggestedName)}
+          >
+            Use {advisory.suggestedName}
+          </button>
+        )}
+      </span>
+    </div>
+  )
+}
 
 // DescriptionSecretWarning renders an inline, non-blocking warning when the given
 // description text appears to contain a secret. It nudges the user to store the
@@ -71,19 +101,6 @@ const SECRET_TYPE_CREDENTIAL = 'credential'
 const SORT_MODE_COMMON = 'common'
 const SORT_MODE_ALPHABETICAL = 'alphabetical'
 const SORT_MODE_RECENT = 'recent'
-
-/**
- * Derives an environment variable name from a human-readable secret name.
- * "OpenAI API Key" → "OPENAI_API_KEY"
- *
- * @param {string} secretName - The human-readable name to convert
- * @returns {string} The derived env var name
- */
-const deriveEnvVarName = (secretName) =>
-  secretName
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -657,6 +674,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
                 placeholder="OPENAI_API_KEY"
                 autoComplete="off"
               />
+              <EnvVarNameAdvisory envVarName={envVarName} onUseSuggestedName={setEnvVarName} />
             </div>
 
             <div className="vp-form-field">
@@ -957,6 +975,7 @@ function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
             onChange={(changeEvent) => setEnvVarName(changeEvent.target.value.toUpperCase())}
             autoComplete="off"
           />
+          <EnvVarNameAdvisory envVarName={envVarName} onUseSuggestedName={setEnvVarName} />
         </div>
 
         <div className="vp-form-field">
