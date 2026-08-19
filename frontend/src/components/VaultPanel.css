@@ -1507,6 +1507,24 @@
   color: #f0c674;
 }
 
+/* Inline "apply this suggestion" action inside an advisory line — reads as a
+   link so it never competes with the form's real submit button. */
+.vp-inline-link-btn {
+  margin-left: 6px;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #f0c674;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.vp-inline-link-btn:hover {
+  color: #ffd98a;
+}
+
 .vp-entry-warning {
   display: flex;
   align-items: center;
