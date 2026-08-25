@@ -1,6 +1,6 @@
 // Client-side renderer for the recruiter-facing product portfolio microsite.
 
-import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260523-quikeys-blended-snippets';
+import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260825-forge-terminal-real-ui';
 
 function createFeatureImage(feature, app) {
   if (!feature.imagePath) {
@@ -67,6 +67,25 @@ function createAppSection(app) {
   `;
 }
 
+// The hero used to hard-code its totals, which silently went stale whenever a
+// product gained a feature. Deriving them from the data keeps the claim honest.
+function renderHeroCounts() {
+  const totalFeatureCount = PORTFOLIO_APPS.reduce(
+    (runningTotal, app) => runningTotal + app.features.length,
+    0,
+  );
+
+  const productCountElement = document.getElementById('portfolio-product-count');
+  const featureCountElement = document.getElementById('portfolio-feature-count');
+
+  if (productCountElement) {
+    productCountElement.textContent = `${PORTFOLIO_APPS.length} products`;
+  }
+  if (featureCountElement) {
+    featureCountElement.textContent = `${totalFeatureCount} wow moments`;
+  }
+}
+
 function renderPortfolio() {
   const portfolioContainer = document.getElementById('portfolio-apps');
   if (!portfolioContainer) {
@@ -76,4 +95,5 @@ function renderPortfolio() {
   portfolioContainer.innerHTML = PORTFOLIO_APPS.map((app) => createAppSection(app)).join('');
 }
 
+renderHeroCounts();
 renderPortfolio();

@@ -12,12 +12,29 @@ test('portfolio contains the expected five products', () => {
   assert.equal(PORTFOLIO_APPS.length, 5);
 });
 
-test('each product defines exactly three wow moments', () => {
+// Three features is the floor that keeps a card substantial. The flagship
+// product carries more because it ships more distinct surfaces; the cap stops
+// any card from turning into an unreviewable feature dump.
+const MINIMUM_SHOWCASE_FEATURES = 3;
+const MAXIMUM_SHOWCASE_FEATURES = 6;
+
+test('each product defines between three and six wow moments', () => {
   for (const portfolioApp of PORTFOLIO_APPS) {
+    assert.ok(
+      portfolioApp.features.length >= MINIMUM_SHOWCASE_FEATURES
+        && portfolioApp.features.length <= MAXIMUM_SHOWCASE_FEATURES,
+      `${portfolioApp.name} has ${portfolioApp.features.length} showcase features.`,
+    );
+  }
+});
+
+test('every showcase feature id is unique within its product', () => {
+  for (const portfolioApp of PORTFOLIO_APPS) {
+    const featureIdSet = new Set(portfolioApp.features.map((feature) => feature.id));
     assert.equal(
+      featureIdSet.size,
       portfolioApp.features.length,
-      3,
-      `${portfolioApp.name} should define exactly three showcase features.`,
+      `${portfolioApp.name} repeats a showcase feature id.`,
     );
   }
 });

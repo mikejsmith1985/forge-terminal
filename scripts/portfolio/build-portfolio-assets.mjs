@@ -9,6 +9,7 @@ import {
   PORTFOLIO_APP_DEFINITIONS,
   PORTFOLIO_CAPTURE_CONFIGS,
 } from './apps/index.mjs';
+import { FORGE_TERMINAL_SCREEN_BUILDERS } from './screens/forge-terminal-screens.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -30,9 +31,14 @@ const MBL2PC_ASSET_SOURCES = new Map([
 ]);
 
 const SOURCE_DERIVED_SCREEN_BUILDERS = {
-  'forge-terminal:multi-tab-terminal': createForgeTerminalWorkspaceScreen,
-  'forge-terminal:instruction-workflow': createForgeInstructionWorkflowScreen,
-  'forge-terminal:tunnel-mobile': createForgeTunnelScreen,
+  // Forge Terminal screens live in their own module because they replicate the
+  // shipped product chrome pixel-for-pixel rather than using the generic
+  // portfolio shell the other four products share.
+  ...Object.fromEntries(
+    Object.entries(FORGE_TERMINAL_SCREEN_BUILDERS).map(
+      ([featureId, screenBuilder]) => [`forge-terminal:${featureId}`, screenBuilder],
+    ),
+  ),
   'nodetoolbox:home-launcher': createNodeToolboxHomeScreen,
   'nodetoolbox:sprint-dashboard': createNodeToolboxSprintScreen,
   'nodetoolbox:snow-hub-art': createNodeToolboxOperationsScreen,
@@ -216,152 +222,6 @@ function createSourceScreenDocument(title, accentColor, bodyMarkup) {
     </head>
     <body>${bodyMarkup}</body>
   </html>`;
-}
-
-function createForgeTerminalWorkspaceScreen() {
-  const bodyMarkup = createWindowChrome(
-    'Forge Terminal - C:\\ProjectsWin\\benefits-enrollment-demo',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>Developer cockpit with real terminal state</h1>
-          <p>Multiple PTY tabs, saved command cards, and workflow gates share one workspace so engineering rituals are visible while work happens.</p>
-        </div>
-        <div class="pill-row"><span class="pill">feature/portfolio-showcase</span><span class="pill">4 PTYs</span><span class="pill">Workflow green</span></div>
-      </header>
-      ${createMetricCards([
-        ['Open tabs', '4', 'PowerShell, API, UI, Tests'],
-        ['Command cards', '12', 'Saved repeatable workflows'],
-        ['Workflow gates', '3/3', 'Branch, tests, proof recorded'],
-        ['Repo health', 'Green', 'No failing checks in demo state'],
-      ])}
-      <div class="two-column">
-        <section class="panel">
-          <div class="toolbar"><span>PowerShell - API</span><span>Node UI</span><span>Test Runner</span><span>Release Notes</span></div>
-          ${createTerminalBlock([
-            'PS C:\\ProjectsWin\\benefits-enrollment-demo> forge workflow status',
-            '[PASS] branch-created    feature/portfolio-showcase',
-            '[PASS] tests-written     portfolio-data.test.mjs',
-            '[PASS] tests-passed      go test ./... && npx vitest run',
-            '[INFO] evidence bundle   validation.html with highlighted screenshots',
-            'PS C:\\ProjectsWin\\benefits-enrollment-demo> npm run portfolio:publish',
-            'Published static preview to GitHub Pages.',
-          ])}
-        </section>
-        <section class="panel">
-          <h2>Pinned command cards</h2>
-          <div class="three-column" style="grid-template-columns: 1fr;">
-            <div class="feature-tile"><strong>Run regression pack</strong><p>go test ./... + frontend vitest with compact status output.</p></div>
-            <div class="feature-tile"><strong>Open PR checklist</strong><p>Branch, tests, changelog, proof dashboard, and release notes in one card.</p></div>
-            <div class="feature-tile"><strong>Publish static preview</strong><p>Build portfolio assets and push GitHub Pages without leaving the terminal.</p></div>
-          </div>
-        </section>
-      </div>
-    `,
-    {
-      appSlug: 'forge-terminal',
-      sidebarTitle: 'Forge Terminal',
-      activeNav: 'Terminal',
-      navigationItems: ['Terminal', 'Command Cards', 'Agents', 'Git', 'Workflow'],
-    },
-  );
-  return createSourceScreenDocument('Forge Terminal multi-tab workspace', '#5d8cff', bodyMarkup);
-}
-
-function createForgeInstructionWorkflowScreen() {
-  const bodyMarkup = createWindowChrome(
-    'Forge Terminal - AI workflow controls',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>AI workflow with enforceable guardrails</h1>
-          <p>The assistant thread, task plan, terminal output, and verification gates stay connected instead of becoming an unstructured chat transcript.</p>
-        </div>
-        <div class="pill-row"><span class="pill">Tutor mode</span><span class="pill">TDD enforced</span><span class="pill">PR-ready proof</span></div>
-      </header>
-      <div class="two-column">
-        <section class="panel">
-          <h2>Assistant conversation</h2>
-          <div class="feature-tile"><strong>User</strong><p>Build employer-facing portfolio cards using real UI screenshots or source-derived replicas with safe mock data.</p></div>
-          <div class="feature-tile"><strong>Copilot</strong><p>Replacing generic SVG mockups with PNG captures, asset validation, and direct portfolio wiring.</p></div>
-          <div class="feature-tile"><strong>Code Tutor</strong><p>The changes teach through readable structures: per-app capture metadata, explicit image paths, and no hidden fallback.</p></div>
-        </section>
-        <section class="panel">
-          <h2>Workflow ledger</h2>
-          ${createDataTable(
-            ['Gate', 'Evidence', 'Owner', 'State'],
-            [
-              ['Branch', 'feature/build-portfolio-showcase', 'GitHub Flow', 'Recorded'],
-              ['Tests', 'portfolio-data + renderer', 'Node test', 'Queued'],
-              ['Visual proof', 'PNG screenshots only', 'Portfolio runner', 'In progress'],
-              ['Publish', 'GitHub Pages preview', 'gh-pages', 'Pending'],
-            ],
-          )}
-        </section>
-      </div>
-      <section class="panel" style="margin-top:18px;">
-        ${createTerminalBlock([
-          '> workflow_preflight_check',
-          'branch-created: pass',
-          'tests-written: pass',
-          'tests-passed: waiting on recovered portfolio validation',
-          'next: capture highlighted visual proof and publish employer preview',
-        ])}
-      </section>
-    `,
-    {
-      appSlug: 'forge-terminal',
-      sidebarTitle: 'Forge Terminal',
-      activeNav: 'Assistant',
-      navigationItems: ['Terminal', 'Assistant', 'Plan', 'Review', 'Tutor'],
-    },
-  );
-  return createSourceScreenDocument('Forge Terminal workflow assistant', '#5d8cff', bodyMarkup);
-}
-
-function createForgeTunnelScreen() {
-  const bodyMarkup = createWindowChrome(
-    'Forge Terminal - remote access setup',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>Remote and mobile handoff without leaking local context</h1>
-          <p>Named tunnel setup, one-time access, mobile companion state, and safety controls are presented as one operator-ready flow.</p>
-        </div>
-        <div class="pill-row"><span class="pill">Named tunnel</span><span class="pill">10 min token</span><span class="pill">Vault disabled</span></div>
-      </header>
-      <div class="two-column">
-        <section class="panel">
-          <h2>Tunnel setup</h2>
-          ${createDataTable(
-            ['Setting', 'Configured value', 'Safety note', 'Status'],
-            [
-              ['Hostname', 'portfolio-demo.trycloudflare.com', 'Fictional demo host', 'Ready'],
-              ['Access code', 'FT-2048', 'Rotates after preview', 'Active'],
-              ['PTY mode', 'Read/write', 'Explicit user approval', 'Enabled'],
-              ['Vault injection', 'Disabled', 'No secrets in browser session', 'Locked'],
-            ],
-          )}
-          <div class="toolbar" style="margin-top:16px;"><span>Generate QR</span><span>Copy invite</span><span>Revoke session</span></div>
-        </section>
-        <section class="panel">
-          <h2>Mobile companion preview</h2>
-          <div class="phone-frame"><div class="phone-screen">
-            <div class="badge">Forge Companion</div>
-            <div class="qr-box"></div>
-            <div class="feature-tile"><strong>Portfolio Demo</strong><p>Terminal session ready. Clipboard handoff is enabled for this one-time code only.</p></div>
-          </div></div>
-        </section>
-      </div>
-    `,
-    {
-      appSlug: 'forge-terminal',
-      sidebarTitle: 'Forge Terminal',
-      activeNav: 'Remote Access',
-      navigationItems: ['Terminal', 'Remote Access', 'Vault', 'Mobile', 'Settings'],
-    },
-  );
-  return createSourceScreenDocument('Forge Terminal tunnel workflow', '#5d8cff', bodyMarkup);
 }
 
 function createNodeToolboxHomeScreen() {

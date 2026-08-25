@@ -21,13 +21,13 @@ test('portfolio registry exports five capture configs', () => {
   assert.equal(PORTFOLIO_CAPTURE_CONFIGS.length, 5);
 });
 
-test('every display app definition uses a unique slug and three showcase features', () => {
+test('every display app definition uses a unique slug and enough showcase features', () => {
   const slugSet = new Set(PORTFOLIO_APP_DEFINITIONS.map((appDefinition) => appDefinition.slug));
   assert.equal(slugSet.size, PORTFOLIO_APP_DEFINITIONS.length);
 
   for (const appDefinition of PORTFOLIO_APP_DEFINITIONS) {
     assertHasNonEmptyString(appDefinition.slug, `${appDefinition.name}.slug`);
-    assert.equal(appDefinition.features.length, 3, `${appDefinition.name} must define three showcase features`);
+    assert.ok(appDefinition.features.length >= 3, `${appDefinition.name} must define at least three showcase features`);
   }
 });
 
@@ -61,7 +61,17 @@ test('every capture config defines the shared runner fields', () => {
     assert.ok(captureConfig.demoSetupHooks.length >= 1, `${captureConfig.slug} must define at least one demo hook`);
 
     assert.ok(Array.isArray(captureConfig.captureTargets), `${captureConfig.slug}.captureTargets must be an array`);
-    assert.equal(captureConfig.captureTargets.length, 3, `${captureConfig.slug} must define three capture targets`);
+    // A capture target per showcase feature — anything else means a card would
+    // point at an image the runner never produces, or the runner would render
+    // an image no card displays.
+    const displayApp = PORTFOLIO_APP_DEFINITIONS.find(
+      (appDefinition) => appDefinition.slug === captureConfig.slug,
+    );
+    assert.equal(
+      captureConfig.captureTargets.length,
+      displayApp.features.length,
+      `${captureConfig.slug} must define one capture target per showcase feature`,
+    );
   }
 });
 

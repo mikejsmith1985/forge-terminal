@@ -4,48 +4,81 @@ export const PORTFOLIO_APPS = [
   {
     "slug": "forge-terminal",
     "name": "Forge Terminal",
-    "tagline": "Agentic terminal UX with real PTYs, workflow enforcement, and remote access in one product.",
-    "summary": "Forge Terminal combines a full terminal, AI-assisted workflows, command cards, and secure remote access. The strongest product story is the way product design, local tooling, and developer ergonomics converge into one desktop experience.",
-    "accent": "#5d8cff",
+    "tagline": "An agentic development environment: real PTYs, a token-budgeted context engine, an MCP tool bridge, release automation, and a zero-knowledge secret vault in one desktop app.",
+    "summary": "Forge Terminal is where an engineer and a coding agent share one workspace. Real terminal tabs sit beside a rail that turns the hard parts of agent-assisted work into product surfaces: choosing what context to spend tokens on, exposing build tooling to the agent over MCP, cutting a release, recording a browser bug, and handing over credentials without ever revealing them. The process is enforced by a six-phase workflow bar pinned under every tab.",
+    "accent": "#22d3ee",
     "category": "Desktop + web hybrid",
     "launchSurface": ".\\run-dev-clean.ps1 -Port 9999",
     "techStack": [
       "Go",
       "React",
       "xterm.js",
-      "Cypress"
+      "ConPTY",
+      "WebSocket",
+      "MCP",
+      "Playwright"
     ],
-    "proofNote": "All three visuals in this section are PNG source-derived replicas built from the implemented product structure, component names, and seeded demo content.",
+    "proofNote": "Every visual in this section is a PNG rebuilt from the shipped Forge Terminal interface, populated with a fictional workspace. No real repository, machine, or credential appears — and no secret value is rendered in any screen, including the vault.",
     "features": [
       {
         "id": "multi-tab-terminal",
-        "title": "Multi-tab terminal with command-card acceleration",
-        "wowFactor": "Shows product depth beyond a normal shell wrapper: tabs, saved commands, and quick actions work together as one developer cockpit.",
-        "whatItShows": "A mocked Forge Terminal workspace with four terminal tabs, a workflow-status command running, pinned command cards, and repo health signals visible in one screen.",
-        "mockDataApproach": "The screen uses a fictional benefits-enrollment demo repository, safe workflow-gate output, and generic command cards instead of a real customer workspace.",
-        "capturePlan": "Portfolio runner renders the source-derived terminal workspace replica as a PNG using the implemented component structure and safe seeded command output.",
+        "title": "Real terminal tabs with a workflow the agent cannot skip",
+        "wowFactor": "This is not a chat window bolted onto a shell. Genuine PTY sessions run beside a command rail, and a six-phase workflow bar tracks the work — with a runtime hook that blocks a commit whose gates were never recorded.",
+        "whatItShows": "A workspace with two live terminal tabs, an agent mid-plan, a project switcher, saved command cards that launch a chosen assistant, and the Specify → Implement phase bar showing gate state under the session.",
+        "mockDataApproach": "The repository, branch, project list, and terminal output all come from a fictional quote-engine service. No real workspace path or project name is shown.",
+        "capturePlan": "Portfolio runner renders the Forge Terminal command rail and terminal surface from the shipped component structure with seeded demo output.",
         "imageKind": "source-derived-replica",
         "imagePath": "./assets/forge-terminal/forge-terminal-multi-tab-terminal.png"
       },
       {
-        "id": "instruction-workflow",
-        "title": "Persistent instruction workflow for AI-driven development",
-        "wowFactor": "Shows opinionated UX for repeatable, high-signal AI collaboration — the assistant workflow feels controllable rather than magical.",
-        "whatItShows": "A mocked assistant workflow screen with the user request, Copilot response, workflow gates, and task state presented together so the AI process feels controlled.",
-        "mockDataApproach": "The conversation text, task name, and workflow checklist are portfolio-safe examples that describe this visual rebuild rather than a private development session.",
-        "capturePlan": "Portfolio runner renders the source-derived assistant workflow replica as a PNG using workflow-gate and task-state concepts from the app.",
+        "id": "context-engineering",
+        "title": "Context engineering with a visible token budget",
+        "wowFactor": "It treats the context window as a budget you spend deliberately. Every file carries its token cost, and a cart shows exactly what the agent will receive before you send it — the difference between directing an agent and hoping it guessed right.",
+        "whatItShows": "The file rail grouped by directory with per-file token counts and modified dates, a heatmap/graph/search switcher, and a Context Cart metering the selection against a 128,000-token budget.",
+        "mockDataApproach": "The file tree belongs to the same fictional quote-engine service; filenames, token counts, and dates are invented.",
+        "capturePlan": "Portfolio runner renders the file rail and Context Cart from the shipped layout with a seeded fictional repository tree.",
         "imageKind": "source-derived-replica",
-        "imagePath": "./assets/forge-terminal/forge-terminal-instruction-workflow.png"
+        "imagePath": "./assets/forge-terminal/forge-terminal-context-engineering.png"
       },
       {
-        "id": "tunnel-mobile",
-        "title": "Remote and mobile access setup",
-        "wowFactor": "Demonstrates platform thinking, networking knowledge, and user-centric onboarding — shows the app is designed for real work, not just localhost demos.",
-        "whatItShows": "A mocked remote-access setup screen with a named tunnel, companion PWA handoff, one-time access code, and safety controls displayed in the same flow.",
-        "mockDataApproach": "The hostname, access code, and connection settings are fictional portfolio values that show the intended UX without exposing real network topology.",
-        "capturePlan": "Portfolio runner renders the source-derived remote-access replica as a PNG with fictional tunnel, mobile, and vault-safety values.",
+        "id": "mcp-integration",
+        "title": "MCP bridge that gives the agent real build environments",
+        "wowFactor": "Forge is an MCP server, not just an MCP client. It hands any connected assistant a set of tools that detect and drive the right build sandbox — native, WSL2, or Docker — so the agent can run a real build instead of guessing at one.",
+        "whatItShows": "Server discovery, the adaptive build-environment bridge reporting its registered tools, the per-repository MCP token, one-click connection for several assistant CLIs, and the live tool list with what each tool does.",
+        "mockDataApproach": "The token path points at a fictional home directory and the connected assistants are shown generically. No real token, host, or repository is displayed.",
+        "capturePlan": "Portfolio runner renders the MCP rail from the shipped panel structure with fictional token and server values.",
         "imageKind": "source-derived-replica",
-        "imagePath": "./assets/forge-terminal/forge-terminal-tunnel-mobile.png"
+        "imagePath": "./assets/forge-terminal/forge-terminal-mcp-integration.png"
+      },
+      {
+        "id": "release-manager",
+        "title": "Release manager that ships from inside the terminal",
+        "wowFactor": "Cutting a release is a product surface rather than a runbook: pick the semantic bump, see the resulting version before committing to it, and run the whole build-and-publish pipeline as a background job that survives the session.",
+        "whatItShows": "The release card with current → next version, major/minor/patch choices priced in real version numbers, an optional commit message, and the background release job that reports back by notification.",
+        "mockDataApproach": "A fictional internal service and its invented version history stand in for any real product release cadence.",
+        "capturePlan": "Portfolio runner renders the release manager rail from the shipped card structure with fictional version values.",
+        "imageKind": "source-derived-replica",
+        "imagePath": "./assets/forge-terminal/forge-terminal-release-manager.png"
+      },
+      {
+        "id": "web-app-debugger",
+        "title": "Follow-me debugger that turns a bug into evidence",
+        "wowFactor": "It closes the worst loop in agent-assisted work — describing a UI bug in prose. The recorder captures the interaction, console, and network traffic, and is explicit about what it cannot see, so the agent gets evidence instead of a description.",
+        "whatItShows": "The debugger panel listing exactly what it captures and what it does not, the optional target app path, external log hook-up, and the record control that starts a session.",
+        "mockDataApproach": "The panel shows only its own capability copy — no captured session, URL, or log content is displayed.",
+        "capturePlan": "Portfolio runner renders the web app debugger rail from the shipped panel structure.",
+        "imageKind": "source-derived-replica",
+        "imagePath": "./assets/forge-terminal/forge-terminal-web-app-debugger.png"
+      },
+      {
+        "id": "secret-vault",
+        "title": "Zero-knowledge vault the agent can use but never read",
+        "wowFactor": "The security model is the feature. Secrets live in the OS credential store; the agent names where a value should go and the vault injects it into the shell directly. The value never enters the conversation, a file, or a log — and the vault flags a secret that leaked into its own metadata.",
+        "whatItShows": "The vault with stored credentials shown by reference name and environment variable, per-secret auto-inject toggles, reveal and copy controls held behind an unlock, and a rotation warning on an entry whose description looks like it contains a secret.",
+        "mockDataApproach": "Every credential name and environment variable is invented, and no secret value is rendered anywhere on the screen — only the reference that points at one.",
+        "capturePlan": "Portfolio runner renders the vault modal from the shipped layout with fictional credential names and no values.",
+        "imageKind": "source-derived-replica",
+        "imagePath": "./assets/forge-terminal/forge-terminal-secret-vault.png"
       }
     ]
   },
