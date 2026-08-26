@@ -157,3 +157,19 @@ test('the workflow phase bar advances across the screens', () => {
     `every screen sits on the same phase (${activePhases[0]}) — the bar looks static.`,
   );
 });
+
+test('every terminal session fills its pane', () => {
+  // A short session leaves a band of empty scrollback above the prompt, which
+  // reads as an app sitting idle rather than one being worked in.
+  const MINIMUM_SCROLLBACK_LINES = 22;
+
+  for (const { featureId, markup } of renderEveryScreen()) {
+    if (featureId === 'secret-vault') continue;
+
+    const lineCount = (markup.match(/<div class="line /g) ?? []).length;
+    assert.ok(
+      lineCount >= MINIMUM_SCROLLBACK_LINES,
+      `${featureId} shows only ${lineCount} scrollback lines; the pane will look empty.`,
+    );
+  }
+});

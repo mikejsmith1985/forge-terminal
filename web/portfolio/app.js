@@ -23,6 +23,11 @@ const FLAGSHIP_APP_SLUG = 'forge-terminal';
 // proceed without a human, NodeToolbox refuses to guess at a number.
 const DEPTH_APP_SLUGS = ['lgbuilder', 'nodetoolbox'];
 
+// Screenshot filenames are stable across rebuilds, so a returning visitor's
+// browser serves the old image until its cache expires. Bump this whenever the
+// assets are regenerated so a redeploy is never invisible.
+const ASSET_VERSION = '20260826-fuller-terminals';
+
 const GITHUB_COMMIT_BASE_URL = 'https://github.com/mikejsmith1985/forge-terminal/commit/';
 
 function escapeHtml(value) {
@@ -80,7 +85,7 @@ function createFeatureFigure(feature, app, figureClassName) {
   return `
     <figure class="${escapeHtml(figureClassName)}">
       <img
-        src="${escapeHtml(feature.imagePath)}"
+        src="${escapeHtml(feature.imagePath)}?v=${escapeHtml(ASSET_VERSION)}"
         alt="${escapeHtml(`${app.name} — ${feature.title}`)}"
         loading="lazy"
       />
