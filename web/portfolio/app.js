@@ -6,12 +6,18 @@
 // obvious answer was wrong. All content comes from generated data modules so
 // the page can never drift from what the repository actually contains.
 
-import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260826-thesis-rebuild';
+import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260826-architecture';
 import {
+  ARCHITECTURE_CONTROL_PLANE,
+  ARCHITECTURE_FLOW,
+  ARCHITECTURE_NODE_KINDS,
+  ARCHITECTURE_OBSERVABILITY,
+  ARCHITECTURE_ROUTES,
+  ARCHITECTURE_STATE_OBJECT,
   ENGINEERING_CASE_STUDIES,
   PORTFOLIO_PROOF_STATS,
   PORTFOLIO_THESIS,
-} from './data/narrative.mjs?v=20260826-thesis-rebuild';
+} from './data/narrative.mjs?v=20260826-architecture';
 
 // Forge Terminal is the flagship because it is the tooling that enforces the
 // standard the rest of the page claims. Everything else is supporting breadth.
@@ -22,6 +28,9 @@ const FLAGSHIP_APP_SLUG = 'forge-terminal';
 // carries the same argument in a different domain: LG-Builder refuses to
 // proceed without a human, NodeToolbox refuses to guess at a number.
 const DEPTH_APP_SLUGS = ['lgbuilder', 'nodetoolbox'];
+
+// Only one product carries an architecture diagram; the rest are product tours.
+const ARCHITECTURE_APP_SLUG = 'lgbuilder';
 
 // Screenshot filenames are stable across rebuilds, so a returning visitor's
 // browser serves the old image until its cache expires. Bump this whenever the
@@ -103,6 +112,11 @@ function createTechStack(app) {
     .join('')}</div>`;
 }
 
+/** Emits the mount point for the architecture diagram, for the one app that has one. */
+function createArchitectureSlot(appSlug) {
+  return appSlug === ARCHITECTURE_APP_SLUG ? '<div class="architecture-slot"></div>' : '';
+}
+
 function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
   const portfolioApp = PORTFOLIO_APPS.find((app) => app.slug === appSlug);
   if (!portfolioApp) {
@@ -123,6 +137,7 @@ function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
       ${createTechStack(portfolioApp)}
       <p class="evidence-note">${escapeHtml(portfolioApp.proofNote)}</p>
     </div>
+    ${createArchitectureSlot(appSlug)}
     <div class="flagship__figures">${figuresMarkup}</div>`;
 }
 
@@ -159,6 +174,100 @@ function renderSupportingProducts() {
         </div>
       </article>`)
     .join('');
+}
+
+
+// ── Architecture ────────────────────────────────────────────────────────────
+// Rendered as markup rather than an image so it reflows on a narrow screen and
+// keeps the page's type scale. A scaled-down SVG would put 8px text on a phone,
+// and recruiters open these links from phones.
+
+function createArchitectureNode(architectureStep) {
+  const nodeNameMarkup = architectureStep.nodeName
+    ? `<code class="arch-node__name">${escapeHtml(architectureStep.nodeName)}</code>`
+    : '';
+
+  return `
+    <li class="arch-node arch-node--${escapeHtml(architectureStep.kind)}">
+      <span class="arch-node__kind">${escapeHtml(architectureStep.kind)}</span>
+      <h4>${escapeHtml(architectureStep.title)}</h4>
+      ${nodeNameMarkup}
+      <p>${escapeHtml(architectureStep.detail)}</p>
+    </li>`;
+}
+
+function createArchitectureRoute(architectureRoute) {
+  const stepsMarkup = architectureRoute.steps.map(createArchitectureNode).join('');
+  const loopMarkup = architectureRoute.loopsBackTo
+    ? `<p class="arch-route__loop">↺ back to
+        <code>${escapeHtml(architectureRoute.loopsBackTo)}</code> —
+        ${escapeHtml(architectureRoute.loopNote)}</p>`
+    : `<p class="arch-route__end">${escapeHtml(architectureRoute.endsAt)}</p>`;
+
+  return `
+    <section class="arch-route arch-route--${escapeHtml(architectureRoute.tone)}">
+      <header>
+        <code class="arch-route__label">${escapeHtml(architectureRoute.label)}</code>
+        <span class="arch-route__summary">${escapeHtml(architectureRoute.summary)}</span>
+      </header>
+      <ol class="arch-node-list">${stepsMarkup}</ol>
+      ${loopMarkup}
+    </section>`;
+}
+
+function createArchitectureLegend() {
+  return `<ul class="arch-legend">${ARCHITECTURE_NODE_KINDS.map((nodeKind) => `
+    <li class="arch-legend__item arch-node--${escapeHtml(nodeKind.id)}">
+      <b>${escapeHtml(nodeKind.label)}</b> ${escapeHtml(nodeKind.detail)}
+    </li>`).join('')}</ul>`;
+}
+
+function createObservabilityCallout() {
+  return `
+    <div class="arch-observability">
+      <h4>Three layers, three different questions</h4>
+      <dl>${ARCHITECTURE_OBSERVABILITY.map((observabilityLayer) => `
+        <div>
+          <dt>${escapeHtml(observabilityLayer.layer)}
+            <span>${escapeHtml(observabilityLayer.scope)}</span></dt>
+          <dd>${escapeHtml(observabilityLayer.answers)}</dd>
+        </div>`).join('')}</dl>
+    </div>`;
+}
+
+function createControlPlaneCallout() {
+  const stagesMarkup = ARCHITECTURE_CONTROL_PLANE.stages.map((controlStage) => `
+    <li><b>${escapeHtml(controlStage.label)}</b> ${escapeHtml(controlStage.detail)}</li>`).join('');
+
+  return `
+    <aside class="arch-control-plane">
+      <h4>${escapeHtml(ARCHITECTURE_CONTROL_PLANE.title)}</h4>
+      <p>${escapeHtml(ARCHITECTURE_CONTROL_PLANE.detail)}</p>
+      <ol>${stagesMarkup}</ol>
+    </aside>`;
+}
+
+function renderArchitecture() {
+  const architectureHost = document.querySelector(
+    `#depth [data-app="${ARCHITECTURE_APP_SLUG}"] .architecture-slot`,
+  );
+  if (!architectureHost) {
+    throw new Error('The architecture slot is missing from the LG-Builder entry.');
+  }
+
+  architectureHost.innerHTML = `
+    <h3 class="arch-heading">How a ticket moves through the graph</h3>
+    <p class="arch-intro">Every box below is a node the compiled graph registers, named exactly as
+      the orchestrator names it. State travels between them as
+      <code>${escapeHtml(ARCHITECTURE_STATE_OBJECT)}</code>.</p>
+    ${createArchitectureLegend()}
+    <ol class="arch-node-list arch-node-list--trunk">
+      ${ARCHITECTURE_FLOW.map(createArchitectureNode).join('')}
+    </ol>
+    <p class="arch-branch-label">One decision, four routes</p>
+    <div class="arch-routes">${ARCHITECTURE_ROUTES.map(createArchitectureRoute).join('')}</div>
+    ${createControlPlaneCallout()}
+    ${createObservabilityCallout()}`;
 }
 
 // ── Debugging case studies ──────────────────────────────────────────────────
@@ -215,6 +324,7 @@ renderThesis();
 renderProofStats();
 renderFlagship();
 renderDepth();
+renderArchitecture();
 renderCaseStudies();
 renderSupportingProducts();
 renderColophon();
