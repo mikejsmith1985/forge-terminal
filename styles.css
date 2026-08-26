@@ -417,6 +417,113 @@ main > section {
 .product-figure .figure-why { font-size: 13.5px; }
 .product-figure .figure-shows { display: none; }
 
+
+/* ── Architecture diagram ─────────────────────────────────────────────────── */
+/* Built from markup rather than an image so it reflows on a phone and keeps the
+   page's type scale. A scaled SVG would render 8px text on a narrow screen. */
+
+.architecture-slot { margin: 64px 0 8px; }
+
+.arch-heading { margin: 0 0 10px; font-size: 24px; letter-spacing: -0.02em; }
+.arch-intro { margin: 0 0 22px; max-width: var(--measure); color: var(--text-muted);
+  font-size: 15px; }
+.arch-intro code, .arch-route__loop code { font-family: var(--mono); font-size: 13.5px;
+  color: var(--cyan); }
+
+.arch-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 26px; padding: 0;
+  list-style: none; }
+.arch-legend__item { border: 1px solid var(--line); border-left-width: 3px; border-radius: 7px;
+  padding: 6px 12px; font-size: 12.5px; color: var(--text-faint); }
+.arch-legend__item b { color: var(--text); margin-right: 5px; }
+
+.arch-node-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.arch-node-list--trunk { max-width: 560px; margin-bottom: 8px; }
+/* The connector between stacked nodes. Drawn with a pseudo-element so there is
+   no image to load and no JS to run. */
+.arch-node-list > .arch-node + .arch-node::before { content: '↓'; display: block;
+  margin: -20px 0 8px; color: var(--text-faint); font-size: 15px; }
+
+.arch-node { border: 1px solid var(--line); border-left-width: 3px; border-radius: 9px;
+  padding: 13px 16px; background: var(--ink-card); }
+.arch-node h4 { margin: 4px 0 6px; font-size: 15.5px; letter-spacing: -0.01em; }
+.arch-node p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--text-muted); }
+.arch-node__kind { font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; }
+.arch-node__name { display: inline-block; font-family: var(--mono); font-size: 12.5px;
+  background: #0b0b0f; border: 1px solid var(--line-soft); border-radius: 5px;
+  padding: 2px 8px; color: var(--text); }
+
+/* One colour per node kind, used identically in the legend and the diagram. */
+.arch-node--agent { border-left-color: var(--violet); }
+.arch-node--agent .arch-node__kind, .arch-legend__item.arch-node--agent b { color: var(--violet); }
+.arch-node--function { border-left-color: var(--text-faint); }
+.arch-node--function .arch-node__kind { color: var(--text-faint); }
+.arch-node--pause { border-left-color: var(--amber); }
+.arch-node--pause .arch-node__kind, .arch-legend__item.arch-node--pause b { color: var(--amber); }
+.arch-node--terminal { border-left-color: var(--text-muted); }
+.arch-node--terminal .arch-node__kind { color: var(--text-muted); }
+
+.arch-branch-label { margin: 26px 0 14px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); }
+
+/* Four routes across at desktop so none orphans onto a row of its own, and
+   start-aligned because the clarification route is legitimately taller. */
+.arch-routes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start; gap: 14px; }
+.arch-route { border: 1px solid var(--line); border-top-width: 3px; border-radius: 10px;
+  padding: 15px 16px; background: var(--ink-raised); }
+.arch-route header { margin-bottom: 12px; }
+.arch-route__label { display: block; font-family: var(--mono); font-size: 13px;
+  margin-bottom: 3px; }
+.arch-route__summary { font-size: 13px; color: var(--text-muted); }
+.arch-route__loop, .arch-route__end { margin: 12px 0 0; font-size: 12.5px;
+  color: var(--text-faint); line-height: 1.55; }
+
+.arch-route--ready { border-top-color: var(--green); }
+.arch-route--ready .arch-route__label { color: var(--green); }
+.arch-route--loop { border-top-color: var(--amber); }
+.arch-route--loop .arch-route__label { color: var(--amber); }
+.arch-route--blocked { border-top-color: var(--violet); }
+.arch-route--blocked .arch-route__label { color: var(--violet); }
+.arch-route--error { border-top-color: #f87171; }
+.arch-route--error .arch-route__label { color: #f87171; }
+
+.arch-control-plane { margin-top: 26px; border: 1px solid var(--line);
+  border-left: 3px solid var(--cyan); border-radius: 10px; padding: 16px 18px;
+  background: var(--ink-card); }
+.arch-control-plane h4 { margin: 0 0 8px; font-size: 15.5px; }
+.arch-control-plane p { margin: 0 0 12px; max-width: var(--measure); font-size: 13.5px;
+  line-height: 1.6; color: var(--text-muted); }
+.arch-control-plane ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.arch-control-plane li { font-size: 13px; color: var(--text-faint); }
+.arch-control-plane li b { color: var(--text); margin-right: 5px; }
+
+.arch-observability { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px 18px; background: var(--ink-card); }
+.arch-observability h4 { margin: 0 0 12px; font-size: 15.5px; }
+.arch-observability dl { margin: 0; display: grid; gap: 11px; }
+.arch-observability dt { font-size: 14px; font-weight: 650; }
+.arch-observability dt span { margin-left: 8px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan); }
+.arch-observability dd { margin: 3px 0 0; font-size: 13px; color: var(--text-muted); }
+
+@media (max-width: 1080px) {
+  .arch-routes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .architecture-slot { margin-top: 44px; }
+  .arch-routes { grid-template-columns: 1fr; }
+  /* Micro-labels that read fine on a desktop are too small on a phone, which is
+     where this page is most often opened. */
+  .arch-node__kind, .arch-observability dt span { font-size: 11px; }
+  .arch-branch-label { font-size: 12px; }
+  .arch-node__name, .arch-route__label { font-size: 13px; }
+  .arch-node p, .arch-control-plane li, .arch-route__loop, .arch-route__end { font-size: 14px; }
+  .arch-legend__item { font-size: 13.5px; }
+  .arch-legend__item { width: 100%; }
+}
+
 /* ── Colophon ─────────────────────────────────────────────────────────────── */
 
 .colophon {
