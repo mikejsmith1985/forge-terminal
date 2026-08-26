@@ -11,6 +11,7 @@ import {
 } from './apps/index.mjs';
 import { FORGE_TERMINAL_SCREEN_BUILDERS } from './screens/forge-terminal-screens.mjs';
 import { NODETOOLBOX_SCREEN_BUILDERS } from './screens/nodetoolbox-screens.mjs';
+import { LGBUILDER_SCREEN_BUILDERS } from './screens/lgbuilder-screens.mjs';
 import {
   ENGINEERING_CASE_STUDIES,
   PORTFOLIO_PROOF_STATS,
@@ -60,6 +61,9 @@ const SOURCE_DERIVED_SCREEN_BUILDERS = {
   // NodeToolbox screens likewise replicate their own product chrome, and carry
   // the heaviest anonymisation burden on the site.
   ...createScreenRegistry('nodetoolbox', NODETOOLBOX_SCREEN_BUILDERS),
+  // LG-Builder runs in two places, so its screens replicate both the chat
+  // integration and the admin console.
+  ...createScreenRegistry('lgbuilder', LGBUILDER_SCREEN_BUILDERS),
   'eztest:onboarding': createEztestOnboardingScreen,
   'eztest:dashboard-actions': createEztestDashboardScreen,
   'eztest:run-modal': createEztestRunModalScreen,

@@ -13,12 +13,12 @@ function assertHasNonEmptyString(value, fieldLabel) {
   assert.ok(value.length > 0, `${fieldLabel} must not be empty`);
 }
 
-test('portfolio registry exports five display app definitions', () => {
-  assert.equal(PORTFOLIO_APP_DEFINITIONS.length, 5);
+test('every display app definition is paired with a capture config', () => {
+  assert.equal(PORTFOLIO_APP_DEFINITIONS.length, PORTFOLIO_CAPTURE_CONFIGS.length);
 });
 
-test('portfolio registry exports five capture configs', () => {
-  assert.equal(PORTFOLIO_CAPTURE_CONFIGS.length, 5);
+test('the portfolio carries a reviewable number of products', () => {
+  assert.ok(PORTFOLIO_CAPTURE_CONFIGS.length >= 4 && PORTFOLIO_CAPTURE_CONFIGS.length <= 8);
 });
 
 test('every display app definition uses a unique slug and enough showcase features', () => {

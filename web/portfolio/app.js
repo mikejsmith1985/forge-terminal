@@ -17,10 +17,11 @@ import {
 // standard the rest of the page claims. Everything else is supporting breadth.
 const FLAGSHIP_APP_SLUG = 'forge-terminal';
 
-// The deepest product gets its own full-width tier rather than a grid cell.
-// It is not the flagship — Forge Terminal is the machinery the thesis is about
-// — but it is the strongest product-thinking argument on the page.
-const DEPTH_APP_SLUG = 'nodetoolbox';
+// These get their own full-width tier rather than a grid cell. Neither is the
+// flagship — Forge Terminal is the machinery the thesis is about — but each
+// carries the same argument in a different domain: LG-Builder refuses to
+// proceed without a human, NodeToolbox refuses to guess at a number.
+const DEPTH_APP_SLUGS = ['lgbuilder', 'nodetoolbox'];
 
 const GITHUB_COMMIT_BASE_URL = 'https://github.com/mikejsmith1985/forge-terminal/commit/';
 
@@ -103,7 +104,7 @@ function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
     throw new Error(`The product "${appSlug}" is missing from the portfolio data.`);
   }
 
-  const headingId = `${sectionSelector.replace('#', '')}-heading`;
+  const headingId = `${appSlug}-heading`;
   const figuresMarkup = portfolioApp.features
     .map((feature) => createFeatureFigure(feature, portfolioApp, figureClassName))
     .join('');
@@ -125,11 +126,18 @@ function renderFlagship() {
 }
 
 function renderDepth() {
-  renderFullWidthApp(DEPTH_APP_SLUG, '#depth', 'Depth', 'flagship-figure');
+  const depthSection = selectElement('#depth');
+  depthSection.innerHTML = DEPTH_APP_SLUGS
+    .map((appSlug) => `<div class="depth-entry" data-app="${escapeHtml(appSlug)}"></div>`)
+    .join('');
+
+  DEPTH_APP_SLUGS.forEach((appSlug) => {
+    renderFullWidthApp(appSlug, `#depth [data-app="${appSlug}"]`, 'Depth', 'flagship-figure');
+  });
 }
 
 function renderSupportingProducts() {
-  const promotedSlugs = [FLAGSHIP_APP_SLUG, DEPTH_APP_SLUG];
+  const promotedSlugs = [FLAGSHIP_APP_SLUG, ...DEPTH_APP_SLUGS];
   const supportingApps = PORTFOLIO_APPS.filter((app) => !promotedSlugs.includes(app.slug));
 
   selectElement('.products__list').innerHTML = supportingApps
