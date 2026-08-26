@@ -37,7 +37,9 @@ const FORGE_TERMINAL_LAUNCH_STRATEGY = {
 // Every Forge Terminal screen is captured at the same desktop size so the
 // showcase cards line up and the side rail keeps its shipped proportions.
 const FORGE_SCREEN_WIDTH = 1760;
-const FORGE_SCREEN_HEIGHT = 990;
+// Sized so a working session fills the terminal pane. A taller frame leaves a
+// band of empty scrollback above the prompt, which reads as an idle app.
+const FORGE_SCREEN_HEIGHT = 820;
 
 // The vault is a centred modal, so it is captured in a narrower frame.
 const FORGE_VAULT_SCREEN_WIDTH = 980;
@@ -133,8 +135,11 @@ export const FORGE_TERMINAL_APP = {
         'blocks a commit whose gates were never recorded.',
       whatItShows:
         'A workspace with two live terminal tabs, an agent mid-plan, a project switcher, saved ' +
-        'command cards that launch a chosen assistant, and the Specify → Implement phase bar ' +
-        'showing gate state under the session.',
+        'command cards that launch a chosen assistant, and the workflow bar pinned under the ' +
+        'session. That bar is the six-stage pipeline every change moves through — specify, ' +
+        'clarify, plan, tasks, validate, implement — and a stage cannot be marked done until its ' +
+        'evidence is recorded. The screens that follow show the same piece of work at later ' +
+        'stages of it.',
       mockDataApproach:
         'The repository, branch, project list, and terminal output all come from a fictional ' +
         'quote-engine service. No real workspace path or project name is shown.',

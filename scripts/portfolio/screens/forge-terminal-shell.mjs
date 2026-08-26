@@ -10,7 +10,6 @@ import {
   DEMO_ACTIVE_REPOSITORY,
   DEMO_BACKGROUND_REPOSITORY,
   DEMO_UPDATE_BANNER,
-  DEMO_WORKFLOW_PHASES,
 } from './forge-terminal-demo-data.mjs';
 
 // The four rail destinations in the shipped product, in on-screen order.
@@ -188,8 +187,8 @@ export function createRailControls() {
     </div>`;
 }
 
-function createPhaseBar() {
-  const phasesMarkup = DEMO_WORKFLOW_PHASES.map((workflowPhase) => {
+function createPhaseBar(workflowPhases, hintText) {
+  const phasesMarkup = workflowPhases.map((workflowPhase) => {
     const stateClassName = workflowPhase.state.toLowerCase();
     return `<div class="${stateClassName}">
       <div class="name">${escapeHtml(workflowPhase.label)}</div>
@@ -204,7 +203,7 @@ function createPhaseBar() {
         <span class="isolate">⌄ Isolate this tab</span>
       </div>
       <div class="phases">${phasesMarkup}</div>
-      <div class="hint">Run /speckit-plan to continue.</div>
+      <div class="hint">${escapeHtml(hintText)}</div>
     </div>`;
 }
 
@@ -220,7 +219,7 @@ export function createUpdateBanner() {
  * Assembles a complete Forge Terminal screen from the terminal content on the
  * left and whichever rail panel the screen is meant to showcase on the right.
  */
-export function createForgeShell(terminalMarkup, railMarkup) {
+export function createForgeShell(terminalMarkup, railMarkup, workflowPhases, hintText) {
   return `
     <div class="app">
       ${createTabStrip()}
@@ -228,6 +227,6 @@ export function createForgeShell(terminalMarkup, railMarkup) {
         <div class="terminal">${terminalMarkup}</div>
         <div class="rail">${railMarkup}</div>
       </div>
-      ${createPhaseBar()}
+      ${createPhaseBar(workflowPhases, hintText)}
     </div>`;
 }

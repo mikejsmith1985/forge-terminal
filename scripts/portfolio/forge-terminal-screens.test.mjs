@@ -119,3 +119,42 @@ test('each screen reproduces the shipped Forge Terminal surface it claims to sho
     }
   }
 });
+
+test('no two shell screens show the same terminal session', () => {
+  // Identical scrollback under every rail reads as one static mock-up rather
+  // than an application in use, and hides what the phase bar exists to show.
+  const shellScreens = renderEveryScreen().filter(({ featureId }) => featureId !== 'secret-vault');
+  const scrollbackByFeature = shellScreens.map(({ featureId, markup }) => {
+    const scrollbackMatch = markup.match(/<div class="scrollback">([\s\S]*?)<\/div>\s*<div class="update-banner"/);
+    assert.ok(scrollbackMatch, `${featureId} has no scrollback to compare.`);
+    return { featureId, scrollback: scrollbackMatch[1] };
+  });
+
+  const seenScrollbacks = new Map();
+  for (const { featureId, scrollback } of scrollbackByFeature) {
+    const duplicateOf = seenScrollbacks.get(scrollback);
+    assert.equal(
+      duplicateOf,
+      undefined,
+      `${featureId} shows the same terminal session as ${duplicateOf}.`,
+    );
+    seenScrollbacks.set(scrollback, featureId);
+  }
+});
+
+test('the workflow phase bar advances across the screens', () => {
+  // The six screens should read as one piece of work moving through the
+  // pipeline, so the active phase must not be identical on all of them.
+  const activePhases = renderEveryScreen()
+    .filter(({ featureId }) => featureId !== 'secret-vault')
+    .map(({ markup }) => {
+      const activeMatch = markup.match(/<div class="active">\s*<div class="name">([^<]+)</);
+      return activeMatch ? activeMatch[1] : null;
+    });
+
+  assert.ok(activePhases.every(Boolean), 'every shell screen must mark one phase active.');
+  assert.ok(
+    new Set(activePhases).size > 1,
+    `every screen sits on the same phase (${activePhases[0]}) — the bar looks static.`,
+  );
+});

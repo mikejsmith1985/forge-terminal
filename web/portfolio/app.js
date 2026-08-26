@@ -17,6 +17,11 @@ import {
 // standard the rest of the page claims. Everything else is supporting breadth.
 const FLAGSHIP_APP_SLUG = 'forge-terminal';
 
+// The deepest product gets its own full-width tier rather than a grid cell.
+// It is not the flagship — Forge Terminal is the machinery the thesis is about
+// — but it is the strongest product-thinking argument on the page.
+const DEPTH_APP_SLUG = 'nodetoolbox';
+
 const GITHUB_COMMIT_BASE_URL = 'https://github.com/mikejsmith1985/forge-terminal/commit/';
 
 function escapeHtml(value) {
@@ -92,30 +97,40 @@ function createTechStack(app) {
     .join('')}</div>`;
 }
 
-function renderFlagship() {
-  const flagshipApp = PORTFOLIO_APPS.find((app) => app.slug === FLAGSHIP_APP_SLUG);
-  if (!flagshipApp) {
-    throw new Error(`The flagship product "${FLAGSHIP_APP_SLUG}" is missing from the portfolio data.`);
+function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
+  const portfolioApp = PORTFOLIO_APPS.find((app) => app.slug === appSlug);
+  if (!portfolioApp) {
+    throw new Error(`The product "${appSlug}" is missing from the portfolio data.`);
   }
 
-  const figuresMarkup = flagshipApp.features
-    .map((feature) => createFeatureFigure(feature, flagshipApp, 'flagship-figure'))
+  const headingId = `${sectionSelector.replace('#', '')}-heading`;
+  const figuresMarkup = portfolioApp.features
+    .map((feature) => createFeatureFigure(feature, portfolioApp, figureClassName))
     .join('');
 
-  selectElement('#flagship').innerHTML = `
+  selectElement(sectionSelector).innerHTML = `
     <div class="section-intro">
-      <p class="kicker">Flagship</p>
-      <h2 id="flagship-heading">${escapeHtml(flagshipApp.name)}</h2>
-      <p class="flagship__tagline">${escapeHtml(flagshipApp.tagline)}</p>
-      <p>${escapeHtml(flagshipApp.summary)}</p>
-      ${createTechStack(flagshipApp)}
-      <p class="evidence-note">${escapeHtml(flagshipApp.proofNote)}</p>
+      <p class="kicker">${escapeHtml(kicker)}</p>
+      <h2 id="${escapeHtml(headingId)}">${escapeHtml(portfolioApp.name)}</h2>
+      <p class="flagship__tagline">${escapeHtml(portfolioApp.tagline)}</p>
+      <p>${escapeHtml(portfolioApp.summary)}</p>
+      ${createTechStack(portfolioApp)}
+      <p class="evidence-note">${escapeHtml(portfolioApp.proofNote)}</p>
     </div>
     <div class="flagship__figures">${figuresMarkup}</div>`;
 }
 
+function renderFlagship() {
+  renderFullWidthApp(FLAGSHIP_APP_SLUG, '#flagship', 'Flagship', 'flagship-figure');
+}
+
+function renderDepth() {
+  renderFullWidthApp(DEPTH_APP_SLUG, '#depth', 'Depth', 'flagship-figure');
+}
+
 function renderSupportingProducts() {
-  const supportingApps = PORTFOLIO_APPS.filter((app) => app.slug !== FLAGSHIP_APP_SLUG);
+  const promotedSlugs = [FLAGSHIP_APP_SLUG, DEPTH_APP_SLUG];
+  const supportingApps = PORTFOLIO_APPS.filter((app) => !promotedSlugs.includes(app.slug));
 
   selectElement('.products__list').innerHTML = supportingApps
     .map((app) => `
@@ -186,6 +201,7 @@ function renderColophon() {
 renderThesis();
 renderProofStats();
 renderFlagship();
+renderDepth();
 renderCaseStudies();
 renderSupportingProducts();
 renderColophon();

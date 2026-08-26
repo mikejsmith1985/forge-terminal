@@ -15,9 +15,9 @@ import {
   DEMO_PROJECT_NAMES,
   DEMO_PROJECTS_ROOT,
   DEMO_RELEASE_MANAGER,
-  DEMO_TERMINAL_LINES,
-  DEMO_TERMINAL_PROMPT,
+  DEMO_TERMINAL_SESSIONS,
   DEMO_ACTIVE_REPOSITORY,
+  getWorkflowPhases,
   DEMO_VAULT_SECRETS,
   DEMO_VAULT_SECRET_COUNT,
 } from './forge-terminal-demo-data.mjs';
@@ -39,18 +39,31 @@ const VISIBLE_PROJECT_COUNT = 22;
 
 // ── Shared terminal surface ─────────────────────────────────────────────────
 
-/** Renders the scrollback, updater banner, and prompt shown left of the rail. */
-function createTerminalSurface() {
-  const scrollbackMarkup = DEMO_TERMINAL_LINES
+/** Renders the scrollback, updater banner, and prompt for one screen's session. */
+function createTerminalSurface(screenFeatureId) {
+  const terminalSession = DEMO_TERMINAL_SESSIONS[screenFeatureId];
+  const scrollbackMarkup = terminalSession.lines
     .map((terminalLine) => `<div class="line ${terminalLine.tone}">${escapeHtml(terminalLine.text) || '&nbsp;'}</div>`)
     .join('');
 
   return `
-    <div class="replayed-line">&gt; plan the cache layer for the quote engine</div>
+    <div class="replayed-line">${escapeHtml(terminalSession.replayedLine)}</div>
     <div class="scrollback">${scrollbackMarkup}</div>
     ${createUpdateBanner()}
-    <div class="prompt-area">${escapeHtml(DEMO_TERMINAL_PROMPT)}<span style="color:#22d3ee">▌</span></div>
+    <div class="prompt-area">${escapeHtml(terminalSession.prompt)}<span style="color:#22d3ee">▌</span></div>
     <div class="mode-line">▸▸ auto mode on <span>(shift+tab to cycle) · ← for agents</span></div>`;
+}
+
+/** Assembles one screen: its own session on the left, its rail on the right. */
+function createForgeScreen(screenFeatureId, railMarkup) {
+  const terminalSession = DEMO_TERMINAL_SESSIONS[screenFeatureId];
+
+  return createForgeShell(
+    createTerminalSurface(screenFeatureId),
+    railMarkup,
+    getWorkflowPhases(screenFeatureId),
+    terminalSession.hint,
+  );
 }
 
 /** Wraps a rail panel in the tab bar and control row every rail destination shows. */
@@ -141,7 +154,7 @@ function createMultiTabTerminalScreen() {
 
   return createForgeDocument(
     'Forge Terminal — multi-tab workspace',
-    createForgeShell(createTerminalSurface(), railMarkup),
+    createForgeScreen('multi-tab-terminal', railMarkup),
   );
 }
 
@@ -228,7 +241,7 @@ function createContextEngineeringScreen() {
 
   return createForgeDocument(
     'Forge Terminal — context engineering',
-    createForgeShell(createTerminalSurface(), railMarkup),
+    createForgeScreen('context-engineering', railMarkup),
   );
 }
 
@@ -296,7 +309,7 @@ function createMcpIntegrationScreen() {
 
   return createForgeDocument(
     'Forge Terminal — MCP bridge',
-    createForgeShell(createTerminalSurface(), railMarkup),
+    createForgeScreen('mcp-integration', railMarkup),
   );
 }
 
@@ -362,7 +375,7 @@ function createReleaseManagerScreen() {
 
   return createForgeDocument(
     'Forge Terminal — release manager',
-    createForgeShell(createTerminalSurface(), railMarkup),
+    createForgeScreen('release-manager', railMarkup),
   );
 }
 
@@ -412,7 +425,7 @@ function createWebAppDebuggerScreen() {
 
   return createForgeDocument(
     'Forge Terminal — web app debugger',
-    createForgeShell(createTerminalSurface(), railMarkup),
+    createForgeScreen('web-app-debugger', railMarkup),
   );
 }
 

@@ -47,44 +47,162 @@ export const DEMO_COMMAND_CARDS = [
   { icon: '🩺', title: 'Diagnose failing job', tag: 'Ops', note: 'Tail logs and retry' },
 ];
 
-// The six-phase Spec-Driven Development bar pinned under every terminal.
-export const DEMO_WORKFLOW_PHASES = [
-  { label: 'Specify', state: 'Done' },
-  { label: 'Clarify', state: 'Done' },
-  { label: 'Plan', state: 'Active' },
-  { label: 'Tasks', state: 'Pending' },
-  { label: 'Validate', state: 'Pending' },
-  { label: 'Implement', state: 'Pending' },
-];
+// Each screen gets its own terminal session and its own point in the workflow.
+// Showing identical scrollback under every rail would read as one static
+// mock-up rather than an application being used, and it would hide the thing
+// the phase bar exists to show: that work advances through recorded stages.
+//
+// The six phases are the Spec-Driven Development pipeline the product enforces.
+// Work moves Specify → Clarify → Plan → Tasks → Validate → Implement, and a
+// phase cannot be marked done until its evidence has been recorded.
+const WORKFLOW_PHASE_LABELS = ['Specify', 'Clarify', 'Plan', 'Tasks', 'Validate', 'Implement'];
 
-// Terminal scrollback for the workspace screen. Written as portfolio-safe
-// output that still demonstrates the real workflow-gate ledger.
-export const DEMO_TERMINAL_LINES = [
-  { text: `> plan the cache layer for the quote engine`, tone: 'echo' },
-  { text: '', tone: 'plain' },
-  { text: '● 🔍 Reading the quote engine', tone: 'heading' },
-  { text: '', tone: 'plain' },
-  { text: `  src/quotes/engine.ts        420 lines   pricing rules + rounding`, tone: 'dim' },
-  { text: `  src/quotes/repository.ts    198 lines   reads every quote per request`, tone: 'dim' },
-  { text: `  src/quotes/engine.test.ts    96 lines   covers rounding, not caching`, tone: 'dim' },
-  { text: '', tone: 'plain' },
-  { text: '● 📋 Plan', tone: 'heading' },
-  { text: '', tone: 'plain' },
-  { text: '  ┌──────────────────────┬────────────────────────────────────────┐', tone: 'box' },
-  { text: '  │ Step                 │ Detail                                 │', tone: 'box' },
-  { text: '  ├──────────────────────┼────────────────────────────────────────┤', tone: 'box' },
-  { text: '  │ 1  Cache seam        │ Wrap repository reads, not the engine  │', tone: 'box' },
-  { text: '  │ 2  Invalidation      │ Evict on rate-table publish event      │', tone: 'box' },
-  { text: '  │ 3  Failing test      │ Assert one read per quote batch        │', tone: 'box' },
-  { text: '  │ 4  Measure           │ p95 latency before and after           │', tone: 'box' },
-  { text: '  └──────────────────────┴────────────────────────────────────────┘', tone: 'box' },
-  { text: '', tone: 'plain' },
-  { text: '  [PASS] branch-created   feature/quote-engine-cache', tone: 'pass' },
-  { text: '  [PASS] tests-written    engine.cache.test.ts', tone: 'pass' },
-  { text: '  [WAIT] tests-passed     awaiting first green run', tone: 'wait' },
-];
+/** Builds phase-bar state with everything before the active phase marked done. */
+function createPhaseProgress(activePhaseLabel) {
+  const activeIndex = WORKFLOW_PHASE_LABELS.indexOf(activePhaseLabel);
 
-export const DEMO_TERMINAL_PROMPT = '> write the failing cache test first';
+  return WORKFLOW_PHASE_LABELS.map((phaseLabel, phaseIndex) => {
+    if (phaseIndex < activeIndex) {
+      return { label: phaseLabel, state: 'Done' };
+    }
+    if (phaseIndex === activeIndex) {
+      return { label: phaseLabel, state: 'Active' };
+    }
+    return { label: phaseLabel, state: 'Pending' };
+  });
+}
+
+export const DEMO_TERMINAL_SESSIONS = {
+  'multi-tab-terminal': {
+    replayedLine: '> plan the cache layer for the quote engine',
+    activePhase: 'Plan',
+    hint: 'Run /speckit-plan to continue.',
+    prompt: '> write the failing cache test first',
+    lines: [
+      { text: '● 🔍 Reading the quote engine', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  src/quotes/engine.ts        420 lines   pricing rules + rounding', tone: 'dim' },
+      { text: '  src/quotes/repository.ts    198 lines   reads every quote per request', tone: 'dim' },
+      { text: '  src/quotes/engine.test.ts    96 lines   covers rounding, not caching', tone: 'dim' },
+      { text: '', tone: 'plain' },
+      { text: '● 📋 Plan', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  ┌──────────────────────┬────────────────────────────────────────┐', tone: 'box' },
+      { text: '  │ Step                 │ Detail                                 │', tone: 'box' },
+      { text: '  ├──────────────────────┼────────────────────────────────────────┤', tone: 'box' },
+      { text: '  │ 1  Cache seam        │ Wrap repository reads, not the engine  │', tone: 'box' },
+      { text: '  │ 2  Invalidation      │ Evict on rate-table publish event      │', tone: 'box' },
+      { text: '  │ 3  Failing test      │ Assert one read per quote batch        │', tone: 'box' },
+      { text: '  │ 4  Measure           │ p95 latency before and after           │', tone: 'box' },
+      { text: '  └──────────────────────┴────────────────────────────────────────┘', tone: 'box' },
+      { text: '', tone: 'plain' },
+      { text: '  [PASS] branch-created   feature/quote-engine-cache', tone: 'pass' },
+      { text: '  [WAIT] tests-written    no failing test recorded yet', tone: 'wait' },
+    ],
+  },
+
+  'context-engineering': {
+    replayedLine: '> which files do you actually need for the cache work?',
+    activePhase: 'Tasks',
+    hint: 'Run /speckit-tasks to continue.',
+    prompt: '> send those three and nothing else',
+    lines: [
+      { text: '● 🛒 Context selected from the file rail', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  engine.ts                 6,240 tokens   the read path being wrapped', tone: 'dim' },
+      { text: '  repository.ts             2,905 tokens   where the caching seam goes', tone: 'dim' },
+      { text: '  0007-cache-strategy.md    2,166 tokens   the decision this must follow', tone: 'dim' },
+      { text: '', tone: 'plain' },
+      { text: '  11,311 of 128,000 tokens · 9% of the window', tone: 'plain' },
+      { text: '', tone: 'plain' },
+      { text: '● 📝 Deliberately not sent', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  rate-table.ts   3,712 tokens   read by the seam, never modified by it', tone: 'dim' },
+      { text: '  rounding.ts       844 tokens   unrelated to the read path', tone: 'dim' },
+      { text: '', tone: 'plain' },
+      { text: '  [PASS] branch-created   feature/quote-engine-cache', tone: 'pass' },
+      { text: '  [PASS] tests-written    engine.cache.test.ts', tone: 'pass' },
+      { text: '  [WAIT] tests-passed     awaiting first green run', tone: 'wait' },
+    ],
+  },
+
+  'mcp-integration': {
+    replayedLine: '> run the test suite in whatever sandbox this repo needs',
+    activePhase: 'Validate',
+    hint: 'Run /speckit-analyze to continue.',
+    prompt: '> good — record that as the passing run',
+    lines: [
+      { text: '● ⚙ environment_detect', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  native      node 22 present, lockfile targets a different toolchain', tone: 'dim' },
+      { text: '  wsl2        available, Ubuntu 24.04', tone: 'dim' },
+      { text: '  docker      daemon not running', tone: 'dim' },
+      { text: '  strategy    wsl2   chosen automatically, no configuration', tone: 'plain' },
+      { text: '', tone: 'plain' },
+      { text: '● ⚡ environment_run — npm test', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  engine.cache.test.ts   one read per quote batch        PASS', tone: 'pass' },
+      { text: '  engine.cache.test.ts   evicts on rate-table publish    PASS', tone: 'pass' },
+      { text: '  engine.test.ts         rounding unchanged              PASS', tone: 'pass' },
+      { text: '', tone: 'plain' },
+      { text: '  204 passed · 0 failed · 11.4s in wsl2', tone: 'plain' },
+      { text: '', tone: 'plain' },
+      { text: '  [PASS] tests-passed     204 passed in wsl2', tone: 'pass' },
+    ],
+  },
+
+  'release-manager': {
+    replayedLine: '> cut the patch release now the gates are green',
+    activePhase: 'Implement',
+    hint: 'All gates recorded — the commit is allowed.',
+    prompt: '> ship it',
+    lines: [
+      { text: '● ✅ Workflow ledger', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  [PASS] branch-created   feature/quote-engine-cache', tone: 'pass' },
+      { text: '  [PASS] tests-written    engine.cache.test.ts', tone: 'pass' },
+      { text: '  [PASS] tests-passed     204 passed in wsl2', tone: 'pass' },
+      { text: '', tone: 'plain' },
+      { text: '● 🏷 Background release job', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  build      windows/amd64, linux/amd64         done', tone: 'dim' },
+      { text: '  sign       artefacts signed                   done', tone: 'dim' },
+      { text: '  publish    uploading 4 objects                 84%', tone: 'plain' },
+      { text: '', tone: 'plain' },
+      { text: '  p95 quote latency  412ms → 96ms  after the cache seam', tone: 'plain' },
+      { text: '', tone: 'plain' },
+      { text: '  pre-commit hook: every required gate present, commit allowed', tone: 'pass' },
+    ],
+  },
+
+  'web-app-debugger': {
+    replayedLine: '> the quote total flickers when the cache warms — watch me do it',
+    activePhase: 'Validate',
+    hint: 'Recording — stop when the bug has happened once.',
+    prompt: '> that flicker, right there',
+    lines: [
+      { text: '● 📹 Recording browser session', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  00:02  click     Quotes › Recalculate', tone: 'dim' },
+      { text: '  00:03  xhr       GET /api/quotes/batch     200   412ms', tone: 'dim' },
+      { text: '  00:04  xhr       GET /api/quotes/batch     200     8ms   cached', tone: 'dim' },
+      { text: '  00:04  console   Warning: total rendered twice for batch 4471', tone: 'wait' },
+      { text: '  00:05  render    QuoteTotal re-mounted, previous value flashed', tone: 'wait' },
+      { text: '', tone: 'plain' },
+      { text: '● 🔎 What the recording settles', tone: 'heading' },
+      { text: '', tone: 'plain' },
+      { text: '  The second request is the cache hit, not a duplicate fetch.', tone: 'dim' },
+      { text: '  The flicker is a re-mount on the cached path, not a network race.', tone: 'dim' },
+      { text: '', tone: 'plain' },
+      { text: '  evidence bundle written · events, console, network, screen capture', tone: 'pass' },
+    ],
+  },
+};
+
+/** Returns the phase-bar state to show beneath one screen's terminal. */
+export function getWorkflowPhases(screenFeatureId) {
+  return createPhaseProgress(DEMO_TERMINAL_SESSIONS[screenFeatureId].activePhase);
+}
 
 // The in-app updater banner that sits above the prompt in the shipped UI.
 export const DEMO_UPDATE_BANNER = {

@@ -10,6 +10,7 @@ import {
   PORTFOLIO_CAPTURE_CONFIGS,
 } from './apps/index.mjs';
 import { FORGE_TERMINAL_SCREEN_BUILDERS } from './screens/forge-terminal-screens.mjs';
+import { NODETOOLBOX_SCREEN_BUILDERS } from './screens/nodetoolbox-screens.mjs';
 import {
   ENGINEERING_CASE_STUDIES,
   PORTFOLIO_PROOF_STATS,
@@ -26,6 +27,12 @@ const PORTFOLIO_DATA_FILE_PATH = path.join(PORTFOLIO_DATA_DIRECTORY, 'apps.mjs')
 const PORTFOLIO_NARRATIVE_FILE_PATH = path.join(PORTFOLIO_DATA_DIRECTORY, 'narrative.mjs');
 const NODE_TOOLBOX_PLAYWRIGHT_PATH = 'C:\\ProjectsWin\\NodeToolbox\\node_modules\\playwright';
 const MBL2PC_CAPTURE_DIRECTORY = 'C:\\ProjectsWin\\mbl2pc\\portfolio_screenshots';
+// A capture is trimmed to the height its content actually occupies, so a short
+// screen does not ship with a band of dead space beneath it. The floor keeps
+// every asset large enough to read; the ceiling stops one long screen from
+// dominating its card.
+const MINIMUM_CAPTURE_HEIGHT = 780;
+const MAXIMUM_CAPTURE_HEIGHT = 1600;
 const DESKTOP_SCREEN_WIDTH = 1600;
 const DESKTOP_SCREEN_HEIGHT = 1000;
 const QUIKEYS_SCREEN_WIDTH = 1280;
@@ -36,18 +43,23 @@ const MBL2PC_ASSET_SOURCES = new Map([
   ['search-and-theme', '03_ocean_theme_search.png'],
 ]);
 
+/** Namespaces an app's screen builders by slug for the shared registry. */
+function createScreenRegistry(appSlug, screenBuilders) {
+  return Object.fromEntries(
+    Object.entries(screenBuilders).map(
+      ([featureId, screenBuilder]) => [`${appSlug}:${featureId}`, screenBuilder],
+    ),
+  );
+}
+
 const SOURCE_DERIVED_SCREEN_BUILDERS = {
   // Forge Terminal screens live in their own module because they replicate the
   // shipped product chrome pixel-for-pixel rather than using the generic
   // portfolio shell the other four products share.
-  ...Object.fromEntries(
-    Object.entries(FORGE_TERMINAL_SCREEN_BUILDERS).map(
-      ([featureId, screenBuilder]) => [`forge-terminal:${featureId}`, screenBuilder],
-    ),
-  ),
-  'nodetoolbox:home-launcher': createNodeToolboxHomeScreen,
-  'nodetoolbox:sprint-dashboard': createNodeToolboxSprintScreen,
-  'nodetoolbox:snow-hub-art': createNodeToolboxOperationsScreen,
+  ...createScreenRegistry('forge-terminal', FORGE_TERMINAL_SCREEN_BUILDERS),
+  // NodeToolbox screens likewise replicate their own product chrome, and carry
+  // the heaviest anonymisation burden on the site.
+  ...createScreenRegistry('nodetoolbox', NODETOOLBOX_SCREEN_BUILDERS),
   'eztest:onboarding': createEztestOnboardingScreen,
   'eztest:dashboard-actions': createEztestDashboardScreen,
   'eztest:run-modal': createEztestRunModalScreen,
@@ -228,138 +240,6 @@ function createSourceScreenDocument(title, accentColor, bodyMarkup) {
     </head>
     <body>${bodyMarkup}</body>
   </html>`;
-}
-
-function createNodeToolboxHomeScreen() {
-  const bodyMarkup = createWindowChrome(
-    'NodeToolbox - Your personal utility belt',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>Your personal utility belt</h1>
-          <p>A single local-first launcher organizes Agile delivery, ServiceNow, reporting, development utilities, and documentation surfaces into one internal operating system.</p>
-        </div>
-        <div class="pill-row"><span class="pill">Jira ready</span><span class="pill">ServiceNow ready</span><span class="pill">Confluence ready</span></div>
-      </header>
-      <section class="panel">
-        <div class="three-column">
-          ${[
-            ['🏃 Team Dashboard', 'Live sprint/Kanban view with burndown, blockers, DSU, metrics, planning, and pointing.'],
-            ['🚂 ART View', 'Release Train Engineer view with team health, predictability, goals, and release radar.'],
-            ['📊 My Issues', 'Jira issues, custom JQL, saved filters, boards, health badges, and export.'],
-            ['❄️ SNow Hub', 'Create change requests from Jira versions and pair Problem Records with Jira work.'],
-            ['📈 Reports Hub', 'Director and RTE snapshots for delivery health, flow, quality, and status summaries.'],
-            ['📖 Code Walkthrough', 'Architecture, security model, data flow, and API transparency report.'],
-          ].map(([title, text]) => `<div class="feature-tile"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`).join('')}
-        </div>
-      </section>
-      <div style="margin-top:18px;">${createMetricCards([
-        ['Programs', '3', 'HSCS enrollment workstreams'],
-        ['Modules', '11', 'One workspace, many jobs'],
-        ['Release trains', '2', 'ART and team-level views'],
-        ['Open risks', '5', 'Surfaced before status meetings'],
-      ])}</div>
-    `,
-    {
-      appSlug: 'nodetoolbox',
-      sidebarTitle: 'NodeToolbox',
-      activeNav: 'Home',
-      navigationItems: ['Home', 'Team Dashboard', 'My Issues', 'SNow Hub', 'Reports'],
-    },
-  );
-  return createSourceScreenDocument('NodeToolbox home launcher', '#1cc88a', bodyMarkup);
-}
-
-function createNodeToolboxSprintScreen() {
-  const bodyMarkup = createWindowChrome(
-    'NodeToolbox - Team Dashboard',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>Team Dashboard</h1>
-          <p>Monitor sprint health, board progress, blocker age, defects, standup flow, and story-point readiness from one Jira-backed workspace.</p>
-        </div>
-        <div class="toolbar"><span>Overview</span><span>By Assignee</span><span>Blockers</span><span>Pipeline</span><span>Releases</span></div>
-      </header>
-      ${createMetricCards([
-        ['Goal confidence', '86%', 'Sprint 24.6 is trending green'],
-        ['Blocked stories', '4', 'Two are older than 48 hours'],
-        ['Open defects', '7', 'One production severity item'],
-        ['Carryover risk', 'Medium', 'Capacity model says watch QA'],
-      ])}
-      <div class="two-column">
-        <section class="panel">
-          <h2>Priority Jira work</h2>
-          ${createDataTable(
-            ['Key', 'Summary', 'Owner', 'Status'],
-            [
-              ['BEN-1421', 'Eligibility rule sync', 'A. Rivera', 'In Review'],
-              ['BEN-1440', 'Enrollment retry audit', 'M. Chen', 'Blocked'],
-              ['BEN-1452', 'API latency dashboard', 'J. Patel', 'Ready QA'],
-              ['BEN-1468', 'Evidence export polish', 'S. Moore', 'In Dev'],
-            ],
-          )}
-        </section>
-        <section class="panel">
-          <h2>Team load</h2>
-          ${[
-            ['Backend', 72],
-            ['Frontend', 64],
-            ['QA', 58],
-            ['DevOps', 41],
-          ].map(([label, value]) => `<p><strong>${escapeHtml(label)}</strong><span style="float:right">${value}%</span></p><div class="progress-track"><span style="width:${value}%"></span></div>`).join('')}
-        </section>
-      </div>
-    `,
-    {
-      appSlug: 'nodetoolbox',
-      sidebarTitle: 'NodeToolbox',
-      activeNav: 'Team Dashboard',
-      navigationItems: ['Home', 'Team Dashboard', 'My Issues', 'SNow Hub', 'Reports'],
-    },
-  );
-  return createSourceScreenDocument('NodeToolbox sprint dashboard', '#1cc88a', bodyMarkup);
-}
-
-function createNodeToolboxOperationsScreen() {
-  const bodyMarkup = createWindowChrome(
-    'NodeToolbox - SNow Hub and ART View',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>SNow Hub + ART operating view</h1>
-          <p>ServiceNow change work and release-train signals are pulled into a workflow surface that makes cross-program hygiene visible.</p>
-        </div>
-        <div class="pill-row"><span class="pill">PI confidence 4.6/5</span><span class="pill">7 change windows</span><span class="pill">2 Sev-2 incidents</span></div>
-      </header>
-      <div class="two-column">
-        <section class="panel">
-          <h2>Operational queue</h2>
-          ${createBoardColumns([
-            ['Triage', ['INC-4021 Enrollment timeout', 'INC-4035 Batch warning', 'PRB-118 Missing validation note']],
-            ['In progress', ['CHG-1182 Policy sync', 'TASK-552 Data cleanup', 'STORY-772 CAB evidence']],
-            ['Ready for CAB', ['CHG-1201 Release approval', 'CHG-1205 Weekend deployment']],
-          ])}
-        </section>
-        <section class="panel">
-          <h2>Release train radar</h2>
-          ${createMetricCards([
-            ['Teams green', '8/10', 'Two teams need dependency help'],
-            ['Objectives met', '91%', 'Based on committed PI goals'],
-            ['Aging risks', '5', 'Escalation list is visible'],
-            ['Release risk', 'Low', 'CAB evidence is complete'],
-          ])}
-        </section>
-      </div>
-    `,
-    {
-      appSlug: 'nodetoolbox',
-      sidebarTitle: 'NodeToolbox',
-      activeNav: 'SNow Hub',
-      navigationItems: ['Home', 'Team Dashboard', 'My Issues', 'SNow Hub', 'Reports'],
-    },
-  );
-  return createSourceScreenDocument('NodeToolbox ServiceNow ART workflow', '#1cc88a', bodyMarkup);
 }
 
 function createEztestOnboardingScreen() {
@@ -593,6 +473,25 @@ async function renderSourceDerivedReplica(browser, portfolioApp, portfolioFeatur
   });
 
   await page.setContent(screenBuilder(), { waitUntil: 'networkidle' });
+
+  // Screens built to fill the viewport report exactly the viewport height, so
+  // they are unaffected; screens that size to their content get trimmed.
+  // scrollHeight never reports less than the viewport, so it cannot detect a
+  // short screen. The bottom edge of the last top-level element can.
+  const contentHeight = await page.evaluate(() => {
+    const childBottoms = [...document.body.children]
+      .map((element) => element.getBoundingClientRect().bottom);
+    return Math.ceil(Math.max(0, ...childBottoms));
+  });
+  const captureHeight = Math.min(
+    MAXIMUM_CAPTURE_HEIGHT,
+    Math.max(MINIMUM_CAPTURE_HEIGHT, contentHeight),
+  );
+  await page.setViewportSize({
+    width: captureTarget.viewportWidth ?? DESKTOP_SCREEN_WIDTH,
+    height: captureHeight,
+  });
+
   await page.screenshot({ path: outputPath, type: 'png' });
   await page.close();
 }
