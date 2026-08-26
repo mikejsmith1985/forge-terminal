@@ -280,6 +280,8 @@ main > section {
 /* Depth tier: same treatment as the flagship, on a raised ground so the page
    still reads as flagship-then-everything-else rather than two flagships. */
 .depth { background: var(--ink-raised); }
+.depth-entry + .depth-entry { margin-top: 96px; padding-top: 88px;
+  border-top: 1px solid var(--line); }
 
 /* ── Case studies ─────────────────────────────────────────────────────────── */
 
