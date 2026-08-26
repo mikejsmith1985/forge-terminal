@@ -31,7 +31,6 @@ const FORBIDDEN_PRIVATE_STRINGS = [
   'ProjectsWin',
   'NodeToolbox',
   'mbl2pc',
-  'QuiKeys',
   'TranscriptBoss',
   'discord-snow-bot',
   'AzureWorkflowPOC',

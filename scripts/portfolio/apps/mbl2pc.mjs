@@ -10,51 +10,55 @@ export const MBL2PC_APP = {
   tagline:
     'Phone-to-PC file handoff, link sharing, snippets, and messaging in one lightweight app.',
   summary:
-    'MBL2PC tells a strong story about end-user empathy: move a link from phone to PC, send a resume file back to mobile, and save reusable snippets without context switching. The local test server makes it ideal for a demo-safe portfolio because the real UI works with seeded messages, files, and snippets.',
+    'MBL2PC is the small one, and it earns its place by solving a problem everybody has and nobody writes down: the thing you need is on the wrong device. A link that reads badly on a phone goes to the desktop, the file the desktop produces comes straight back, and the sentence you keep retyping is saved once. Pinning, search, and clipboard sync are there because the handoff you need again is always the one from yesterday.',
   accent: '#ff8a4c',
   category: 'Cross-device utility',
   launchSurface: 'python test_local.py',
   techStack: ['FastAPI', 'Python', 'HTML', 'Cypress'],
   proofNote:
-    'All three visuals in this section are real screenshots captured from the shipped messaging UI with safe seeded demo data.',
+    'These screens are source-derived replicas of the shipped interface, populated with an '
+    + 'invented handoff session. The originals were genuine screenshots of personal devices and '
+    + 'are no longer published — one of them carried a file named after a real person.'
+    + '',
   features: [
     {
       id: 'chat-dashboard',
-      title: 'Phone-to-PC link and resume handoff',
+      title: 'The handoff, in both directions',
       wowFactor: 'Shows practical cross-device utility instead of a basic chat demo.',
       whatItShows:
-        'A real MBL2PC message thread where a phone sends a portfolio link that renders better on desktop, then the PC returns a downloadable resume PDF for mobile use.',
+        'A thread where the phone sends a link that reads better on a desktop, the desktop sends the resulting file straight back, and both ends of the exchange are pinned so they stay reachable.',
       mockDataApproach:
-        'The thread uses safe portfolio values: a public GitHub Pages link, a fictional PC sender, and a renamed resume PDF file card rather than any private document.',
+        'Every message, filename, link, and device label belongs to an invented session. The originals were genuine screenshots of personal devices and are no longer published.',
       capturePlan:
         'Open /send.html on the local test server and capture after the first .bubble element is rendered.',
-      imageKind: 'real-ui',
+      imageKind: 'source-derived-replica',
       imagePath: './assets/mbl2pc/mbl2pc-chat-dashboard.png',
     },
     {
       id: 'dark-mode-theme',
-      title: 'Dark-mode file handoff with saved outreach snippets',
-      wowFactor: 'Shows the app is useful for real recruiting and field workflows, not just sending text bubbles.',
+      title: 'The same thread, in the theme you actually use',
+      wowFactor: 'Theming is the tell that this was built to be lived in rather than demonstrated: the whole chrome, the pinned bar, the bubbles, and the composer all move together, on a phone-sized layout that stays legible in either theme.',
       whatItShows:
-        'The same link-and-resume handoff in the shipped dark mobile UI, with saved snippets visible for resume notes, PC-friendly links, and follow-up language.',
+        'The identical exchange rendered in the shipped dark theme, with the pinned bar, snippet drawer, and composer carrying the theme through rather than being left light.',
       mockDataApproach:
-        'The screenshot uses fictional snippet text and safe file names such as Michael_Smith_Resume_2026.pdf and Resume_Portfolio_Packet.zip.',
+        'Snippet text, filenames, and links are all invented; the attachments read as work '
+        + 'artefacts rather than anything named after a person.',
       capturePlan:
         'Switch the live page into dark theme, wait for the surface colors to settle, and capture the full messaging viewport.',
-      imageKind: 'real-ui',
+      imageKind: 'source-derived-replica',
       imagePath: './assets/mbl2pc/mbl2pc-dark-mode-theme.png',
     },
     {
       id: 'search-and-theme',
       title: 'Searchable file history and reusable snippets',
-      wowFactor: 'Highlights a productivity loop: find the file handoff later and reuse the exact outreach text.',
+      wowFactor: 'This is the part that makes it a tool rather than a chat window: the handoff you need again is always the one from yesterday, so it is searchable, and the sentence you keep retyping is saved once and reused.',
       whatItShows:
-        'A real search result filtered to resume-related handoffs, showing the downloadable PDF, a zipped portfolio packet, and saved snippets ready to copy.',
+        'A search narrowing the thread to the file handoffs it matched, in a third theme, with the snippet drawer open and each saved snippet one tap from the clipboard.',
       mockDataApproach:
         'The search term, file names, and snippet contents are seeded portfolio examples that demonstrate the workflow without exposing private messages.',
       capturePlan:
         'Apply the ocean palette, enter a safe search term, and capture the filtered live view.',
-      imageKind: 'real-ui',
+      imageKind: 'source-derived-replica',
       imagePath: './assets/mbl2pc/mbl2pc-search-and-theme.png',
     },
   ],
@@ -98,24 +102,24 @@ export const MBL2PC_PORTFOLIO_CONFIG = {
       outputFileName: 'mbl2pc-chat-dashboard.png',
       captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
       waitForSelector: '.bubble',
-      viewportWidth: 1440,
-      viewportHeight: 900,
+      viewportWidth: 620,
+      viewportHeight: 1150,
     },
     {
       featureId: 'dark-mode-theme',
       outputFileName: 'mbl2pc-dark-mode-theme.png',
       captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
       waitForSelector: '#themePopover.open',
-      viewportWidth: 1440,
-      viewportHeight: 900,
+      viewportWidth: 620,
+      viewportHeight: 1150,
     },
     {
       featureId: 'search-and-theme',
       outputFileName: 'mbl2pc-search-and-theme.png',
       captureUrl: `${LOCAL_SERVER_BASE_URL}/send.html`,
       waitForSelector: '#snippetsList',
-      viewportWidth: 1440,
-      viewportHeight: 900,
+      viewportWidth: 620,
+      viewportHeight: 1150,
     },
   ],
 };

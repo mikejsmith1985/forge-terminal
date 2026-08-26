@@ -222,58 +222,10 @@ export const PORTFOLIO_APPS = [
     ]
   },
   {
-    "slug": "eztest",
-    "name": "EZTest",
-    "tagline": "AI-assisted behavioral testing companion with a polished browser wizard and Playwright-native workflows.",
-    "summary": "EZTest stands out because it turns test generation, defect capture, and fix validation into a guided product experience. The UI reads more like a polished SaaS wizard than a developer utility.",
-    "accent": "#a66bff",
-    "category": "Developer productivity",
-    "launchSurface": "npm run dev -- ui -p 7433",
-    "techStack": [
-      "TypeScript",
-      "Express",
-      "Socket.io",
-      "Playwright"
-    ],
-    "proofNote": "This section uses PNG source-derived replicas composed from the implemented wizard, dashboard, and run-feedback flows.",
-    "features": [
-      {
-        "id": "onboarding",
-        "title": "Two-step onboarding that explains value without jargon",
-        "wowFactor": "Proves the product is approachable to non-experts, not just power users.",
-        "whatItShows": "A mocked onboarding wizard with project folder, framework detection, provider setup, and ready-to-generate steps shown in plain language.",
-        "mockDataApproach": "The wizard uses a fictional Sample React Checkout project, local demo provider, and safe localhost target URL.",
-        "capturePlan": "Portfolio runner renders a source-derived onboarding PNG from the implemented wizard steps and safe project-detection data.",
-        "imageKind": "source-derived-replica",
-        "imagePath": "./assets/eztest/eztest-onboarding.png"
-      },
-      {
-        "id": "dashboard-actions",
-        "title": "Action dashboard that frames testing work as outcomes",
-        "wowFactor": "Shows product strategy, not just command execution.",
-        "whatItShows": "A mocked action dashboard where Generate, Record, Fix, Run, MCP Setup, and API Settings are presented as clear testing jobs to be done.",
-        "mockDataApproach": "The summary metrics are seeded with safe fixture values: 12 behaviors, 8 specs, 1 flaky test, and 74% coverage.",
-        "capturePlan": "Portfolio runner renders a source-derived dashboard PNG from the implemented action grid and safe project summary data.",
-        "imageKind": "source-derived-replica",
-        "imagePath": "./assets/eztest/eztest-dashboard-actions.png"
-      },
-      {
-        "id": "run-modal",
-        "title": "Live run modal with progress, logs, and follow-up actions",
-        "wowFactor": "Communicates end-to-end workflow maturity and actionable feedback loops.",
-        "whatItShows": "A mocked run modal with generation logs, created spec files, completion state, and follow-up actions such as opening the report.",
-        "mockDataApproach": "The run transcript references fictional fixture specs only, so the workflow reads realistically without using private project output.",
-        "capturePlan": "Portfolio runner renders a source-derived run-modal PNG from the implemented terminal feedback flow and safe generated-spec transcript.",
-        "imageKind": "source-derived-replica",
-        "imagePath": "./assets/eztest/eztest-run-modal.png"
-      }
-    ]
-  },
-  {
     "slug": "mbl2pc",
     "name": "MBL2PC",
     "tagline": "Phone-to-PC file handoff, link sharing, snippets, and messaging in one lightweight app.",
-    "summary": "MBL2PC tells a strong story about end-user empathy: move a link from phone to PC, send a resume file back to mobile, and save reusable snippets without context switching. The local test server makes it ideal for a demo-safe portfolio because the real UI works with seeded messages, files, and snippets.",
+    "summary": "MBL2PC is the small one, and it earns its place by solving a problem everybody has and nobody writes down: the thing you need is on the wrong device. A link that reads badly on a phone goes to the desktop, the file the desktop produces comes straight back, and the sentence you keep retyping is saved once. Pinning, search, and clipboard sync are there because the handoff you need again is always the one from yesterday.",
     "accent": "#ff8a4c",
     "category": "Cross-device utility",
     "launchSurface": "python test_local.py",
@@ -283,85 +235,37 @@ export const PORTFOLIO_APPS = [
       "HTML",
       "Cypress"
     ],
-    "proofNote": "All three visuals in this section are real screenshots captured from the shipped messaging UI with safe seeded demo data.",
+    "proofNote": "These screens are source-derived replicas of the shipped interface, populated with an invented handoff session. The originals were genuine screenshots of personal devices and are no longer published — one of them carried a file named after a real person.",
     "features": [
       {
         "id": "chat-dashboard",
-        "title": "Phone-to-PC link and resume handoff",
+        "title": "The handoff, in both directions",
         "wowFactor": "Shows practical cross-device utility instead of a basic chat demo.",
-        "whatItShows": "A real MBL2PC message thread where a phone sends a portfolio link that renders better on desktop, then the PC returns a downloadable resume PDF for mobile use.",
-        "mockDataApproach": "The thread uses safe portfolio values: a public GitHub Pages link, a fictional PC sender, and a renamed resume PDF file card rather than any private document.",
+        "whatItShows": "A thread where the phone sends a link that reads better on a desktop, the desktop sends the resulting file straight back, and both ends of the exchange are pinned so they stay reachable.",
+        "mockDataApproach": "Every message, filename, link, and device label belongs to an invented session. The originals were genuine screenshots of personal devices and are no longer published.",
         "capturePlan": "Open /send.html on the local test server and capture after the first .bubble element is rendered.",
-        "imageKind": "real-ui",
+        "imageKind": "source-derived-replica",
         "imagePath": "./assets/mbl2pc/mbl2pc-chat-dashboard.png"
       },
       {
         "id": "dark-mode-theme",
-        "title": "Dark-mode file handoff with saved outreach snippets",
-        "wowFactor": "Shows the app is useful for real recruiting and field workflows, not just sending text bubbles.",
-        "whatItShows": "The same link-and-resume handoff in the shipped dark mobile UI, with saved snippets visible for resume notes, PC-friendly links, and follow-up language.",
-        "mockDataApproach": "The screenshot uses fictional snippet text and safe file names such as Michael_Smith_Resume_2026.pdf and Resume_Portfolio_Packet.zip.",
+        "title": "The same thread, in the theme you actually use",
+        "wowFactor": "Theming is the tell that this was built to be lived in rather than demonstrated: the whole chrome, the pinned bar, the bubbles, and the composer all move together, on a phone-sized layout that stays legible in either theme.",
+        "whatItShows": "The identical exchange rendered in the shipped dark theme, with the pinned bar, snippet drawer, and composer carrying the theme through rather than being left light.",
+        "mockDataApproach": "Snippet text, filenames, and links are all invented; the attachments read as work artefacts rather than anything named after a person.",
         "capturePlan": "Switch the live page into dark theme, wait for the surface colors to settle, and capture the full messaging viewport.",
-        "imageKind": "real-ui",
+        "imageKind": "source-derived-replica",
         "imagePath": "./assets/mbl2pc/mbl2pc-dark-mode-theme.png"
       },
       {
         "id": "search-and-theme",
         "title": "Searchable file history and reusable snippets",
-        "wowFactor": "Highlights a productivity loop: find the file handoff later and reuse the exact outreach text.",
-        "whatItShows": "A real search result filtered to resume-related handoffs, showing the downloadable PDF, a zipped portfolio packet, and saved snippets ready to copy.",
+        "wowFactor": "This is the part that makes it a tool rather than a chat window: the handoff you need again is always the one from yesterday, so it is searchable, and the sentence you keep retyping is saved once and reused.",
+        "whatItShows": "A search narrowing the thread to the file handoffs it matched, in a third theme, with the snippet drawer open and each saved snippet one tap from the clipboard.",
         "mockDataApproach": "The search term, file names, and snippet contents are seeded portfolio examples that demonstrate the workflow without exposing private messages.",
         "capturePlan": "Apply the ocean palette, enter a safe search term, and capture the filtered live view.",
-        "imageKind": "real-ui",
+        "imageKind": "source-derived-replica",
         "imagePath": "./assets/mbl2pc/mbl2pc-search-and-theme.png"
-      }
-    ]
-  },
-  {
-    "slug": "quikeys",
-    "name": "QuiKeys",
-    "tagline": "Secure keyboard automation for commands, guarded values, reusable greetings, and support responses.",
-    "summary": "QuiKeys is the strongest native-app story in the set. It demonstrates platform APIs, encrypted local storage, and operator-focused UX through a practical mix of secure automation and reusable text: save commands, masked demo credentials, a standard greeting, a customer service paragraph, and a signature once, then reuse them with a hotkey or text trigger.",
-    "accent": "#ff5fa2",
-    "category": "Native desktop utility",
-    "launchSurface": "python src\\main.py",
-    "techStack": [
-      "Python",
-      "Tkinter",
-      "Pillow",
-      "cryptography"
-    ],
-    "proofNote": "All three visuals in this section are PNG source-derived replicas based on the shipped desktop flows and safe seeded automation plus customer-service macro data.",
-    "features": [
-      {
-        "id": "unlock-flow",
-        "title": "First-run unlock and secure vault setup",
-        "wowFactor": "Demonstrates security thinking without sacrificing clarity.",
-        "whatItShows": "A mocked native unlock dialog with masked password input, vault location, encryption context, and the trust cues a user needs before opening sensitive macros.",
-        "mockDataApproach": "The vault path, masked password, and encryption state are fictional portfolio values; no real master password or credential value is shown.",
-        "capturePlan": "Start QuiKeys via python src\\main.py with PORTFOLIO_VAULT pointing at the seeded demo vault and isVaultUnlocked=false. Wait for the unlock window to appear (poll window title for \"QuiKeys\" or \"Unlock\"). Capture the full window bounds. Do not enter the password — the locked state is the story.",
-        "imageKind": "source-derived-replica",
-        "imagePath": "./assets/quikeys/quikeys-unlock-flow.png"
-      },
-      {
-        "id": "macro-manager",
-        "title": "Macro manager for secure automation and reusable text",
-        "wowFactor": "Shows a flexible power-user workflow across commands, guarded values, and repeated text.",
-        "whatItShows": "A mocked macro table with deploy commands, a masked demo token, Docker automation, a standard greeting, customer service paragraph, and support signature.",
-        "mockDataApproach": "The table uses fictional developer commands, a deliberately masked demo token, and safe customer-service language with no real customer, credential, or ticket data.",
-        "capturePlan": "Start QuiKeys with isVaultUnlocked=true and the full seeded macro list. Wait for the main manager window to appear. Ensure the macro table is scrolled to the top so the blended automation and text rows are visible. Capture the full window bounds.",
-        "imageKind": "source-derived-replica",
-        "imagePath": "./assets/quikeys/quikeys-macro-manager.png"
-      },
-      {
-        "id": "macro-dialog",
-        "title": "Add and edit dialog for service paragraph templates",
-        "wowFactor": "Shows that long, repeated response text can be standardized without memorizing it.",
-        "whatItShows": "A mocked add/edit dialog for a reusable customer service paragraph, including label, category, hotkey, text trigger, and the exact paragraph that QuiKeys would type.",
-        "mockDataApproach": "The dialog is prefilled with fictional support language, not a real customer message, password, token, or private shortcut.",
-        "capturePlan": "Start QuiKeys with the vault unlocked and open the add/edit dialog programmatically (via PORTFOLIO_OPEN_DIALOG=add environment variable if the build supports it, otherwise trigger the \"Add\" button via the OS accessibility API). Wait for the dialog window to appear. Let the PORTFOLIO_PREFILL_MACRO values populate. Capture the dialog window bounds.",
-        "imageKind": "source-derived-replica",
-        "imagePath": "./assets/quikeys/quikeys-macro-dialog.png"
       }
     ]
   }

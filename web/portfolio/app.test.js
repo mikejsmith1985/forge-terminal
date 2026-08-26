@@ -109,7 +109,7 @@ test('portfolio data resolves every feature to a PNG asset', async () => {
       );
 
       assert.match(portfolioFeature.imagePath, /\.png$/);
-      assert.ok(['real-ui', 'source-derived-replica'].includes(portfolioFeature.imageKind));
+      assert.ok(portfolioFeature.imageKind === 'source-derived-replica');
       assert.ok(fs.existsSync(featureAssetPath), `${featureAssetPath} should exist.`);
     }
   }

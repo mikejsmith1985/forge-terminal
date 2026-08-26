@@ -12,6 +12,7 @@ import {
 import { FORGE_TERMINAL_SCREEN_BUILDERS } from './screens/forge-terminal-screens.mjs';
 import { NODETOOLBOX_SCREEN_BUILDERS } from './screens/nodetoolbox-screens.mjs';
 import { LGBUILDER_SCREEN_BUILDERS } from './screens/lgbuilder-screens.mjs';
+import { MBL2PC_SCREEN_BUILDERS } from './screens/mbl2pc-screens.mjs';
 import {
   ENGINEERING_CASE_STUDIES,
   PORTFOLIO_PROOF_STATS,
@@ -27,7 +28,6 @@ const PORTFOLIO_DATA_DIRECTORY = path.join(PROJECT_ROOT, 'web', 'portfolio', 'da
 const PORTFOLIO_DATA_FILE_PATH = path.join(PORTFOLIO_DATA_DIRECTORY, 'apps.mjs');
 const PORTFOLIO_NARRATIVE_FILE_PATH = path.join(PORTFOLIO_DATA_DIRECTORY, 'narrative.mjs');
 const NODE_TOOLBOX_PLAYWRIGHT_PATH = 'C:\\ProjectsWin\\NodeToolbox\\node_modules\\playwright';
-const MBL2PC_CAPTURE_DIRECTORY = 'C:\\ProjectsWin\\mbl2pc\\portfolio_screenshots';
 // A capture is trimmed to the height its content actually occupies, so a short
 // screen does not ship with a band of dead space beneath it. The floor keeps
 // every asset large enough to read; the ceiling stops one long screen from
@@ -36,13 +36,6 @@ const MINIMUM_CAPTURE_HEIGHT = 780;
 const MAXIMUM_CAPTURE_HEIGHT = 1600;
 const DESKTOP_SCREEN_WIDTH = 1600;
 const DESKTOP_SCREEN_HEIGHT = 1000;
-const QUIKEYS_SCREEN_WIDTH = 1280;
-const QUIKEYS_SCREEN_HEIGHT = 820;
-const MBL2PC_ASSET_SOURCES = new Map([
-  ['chat-dashboard', '01_chat_messages_light.png'],
-  ['dark-mode-theme', '02_chat_dark_mode.png'],
-  ['search-and-theme', '03_ocean_theme_search.png'],
-]);
 
 /** Namespaces an app's screen builders by slug for the shared registry. */
 function createScreenRegistry(appSlug, screenBuilders) {
@@ -64,12 +57,7 @@ const SOURCE_DERIVED_SCREEN_BUILDERS = {
   // LG-Builder runs in two places, so its screens replicate both the chat
   // integration and the admin console.
   ...createScreenRegistry('lgbuilder', LGBUILDER_SCREEN_BUILDERS),
-  'eztest:onboarding': createEztestOnboardingScreen,
-  'eztest:dashboard-actions': createEztestDashboardScreen,
-  'eztest:run-modal': createEztestRunModalScreen,
-  'quikeys:unlock-flow': createQuiKeysUnlockScreen,
-  'quikeys:macro-manager': createQuiKeysManagerScreen,
-  'quikeys:macro-dialog': createQuiKeysDialogScreen,
+  ...createScreenRegistry('mbl2pc', MBL2PC_SCREEN_BUILDERS),
 };
 
 function escapeHtml(value) {
@@ -246,219 +234,6 @@ function createSourceScreenDocument(title, accentColor, bodyMarkup) {
   </html>`;
 }
 
-function createEztestOnboardingScreen() {
-  const bodyMarkup = createWindowChrome(
-    'EZTest - Guided onboarding',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>Connect a project and generate useful tests</h1>
-          <p>The first-run wizard explains each decision in plain language: project folder, detected framework, provider, and local app URL.</p>
-        </div>
-        <div class="pill-row"><span class="pill">React + Vite</span><span class="pill">Playwright detected</span><span class="pill">Local provider</span></div>
-      </header>
-      <section class="panel">
-        <div class="wizard-steps">
-          <div class="wizard-step active"><strong>1. Project folder</strong><br />C:\\Repos\\sample-checkout</div>
-          <div class="wizard-step active"><strong>2. Framework</strong><br />React + Vite detected</div>
-          <div class="wizard-step"><strong>3. Provider</strong><br />Local demo model</div>
-          <div class="wizard-step"><strong>4. Ready</strong><br />Generate a test plan</div>
-        </div>
-      </section>
-      <div class="two-column" style="margin-top:18px;">
-        <section class="panel">
-          <h2>Detected project details</h2>
-          ${['Project folder|C:\\Repos\\sample-checkout', 'Framework|React + Vite', 'Test runner|Playwright', 'Target URL|http://localhost:5173'].map((row) => {
-            const [label, value] = row.split('|');
-            return `<div class="form-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
-          }).join('')}
-        </section>
-        <section class="panel">
-          <h2>Plain-language guidance</h2>
-          <div class="feature-tile"><strong>What EZTest will do</strong><p>Scan visible behavior, map interaction paths, and generate focused specs for the selected app.</p></div>
-          <div class="feature-tile"><strong>What stays local</strong><p>Project paths and provider settings are demo values; no customer repository or API key appears.</p></div>
-        </section>
-      </div>
-    `,
-    {
-      appSlug: 'eztest',
-      sidebarTitle: 'EZTest',
-      activeNav: 'Setup',
-      navigationItems: ['Setup', 'Dashboard', 'Generate', 'Record', 'Reports'],
-    },
-  );
-  return createSourceScreenDocument('EZTest onboarding', '#a66bff', bodyMarkup);
-}
-
-function createEztestDashboardScreen() {
-  const bodyMarkup = createWindowChrome(
-    'EZTest - Project dashboard',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>Sample React Checkout</h1>
-          <p>Testing work is framed as product outcomes: generate, record, fix, run, configure MCP, and manage provider settings from one action grid.</p>
-        </div>
-        <div class="pill-row"><span class="pill">12 behaviors mapped</span><span class="pill">8 existing specs</span><span class="pill">Last run 2 min ago</span></div>
-      </header>
-      ${createMetricCards([
-        ['Behaviors', '12', 'Mapped from app routes'],
-        ['Specs', '8', 'Existing Playwright coverage'],
-        ['Flaky tests', '1', 'One selector repair suggested'],
-        ['Coverage', '74%', 'Behavior-level confidence'],
-      ])}
-      <section class="panel">
-        <div class="three-column">
-          ${[
-            ['Generate Tests', 'Create specs from discovered behavior and selected target flows.'],
-            ['Record Flow', 'Capture a browser journey and convert it into maintainable test code.'],
-            ['Fix Failures', 'Turn failing traces into repair tasks with exact file context.'],
-            ['Run Suite', 'Execute tests and open the report without leaving the wizard.'],
-            ['MCP Setup', 'Connect automation tools and browser control safely.'],
-            ['API Settings', 'Manage local provider configuration and model choices.'],
-          ].map(([title, text]) => `<div class="feature-tile"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`).join('')}
-        </div>
-      </section>
-    `,
-    {
-      appSlug: 'eztest',
-      sidebarTitle: 'EZTest',
-      activeNav: 'Dashboard',
-      navigationItems: ['Setup', 'Dashboard', 'Generate', 'Record', 'Reports'],
-    },
-  );
-  return createSourceScreenDocument('EZTest dashboard actions', '#a66bff', bodyMarkup);
-}
-
-function createEztestRunModalScreen() {
-  const bodyMarkup = createWindowChrome(
-    'EZTest - Run feedback',
-    `
-      <header class="screen-heading">
-        <div>
-          <h1>Live generation run with next actions</h1>
-          <p>The modal gives non-experts understandable progress, generated files, completion state, and the next button to open evidence.</p>
-        </div>
-        <div class="pill-row"><span class="pill">3 specs generated</span><span class="pill">0 secrets</span><span class="pill">Report ready</span></div>
-      </header>
-      <div class="panel" style="max-width:1080px;margin:0 auto;">
-        <div class="dialog-card" style="padding:22px;background:#050912;">
-          <h2>Generate Playwright tests</h2>
-          ${createTerminalBlock([
-            '[10:42:01] Analyzing interaction graph for Sample React Checkout...',
-            '[10:42:06] Mapped 8 components with event coverage.',
-            '[10:42:11] Created tests/sign-in.spec.ts',
-            '[10:42:15] Created tests/cart-checkout.spec.ts',
-            '[10:42:20] Created tests/profile-update.spec.ts',
-            '[10:42:24] Generation complete - 3 tests ready for review.',
-          ])}
-          <div class="toolbar" style="margin-top:18px;"><span>Open HTML report</span><span>Review generated specs</span><span>Run changed tests only</span><span>Create fix task</span></div>
-        </div>
-      </div>
-    `,
-    {
-      appSlug: 'eztest',
-      sidebarTitle: 'EZTest',
-      activeNav: 'Reports',
-      navigationItems: ['Setup', 'Dashboard', 'Generate', 'Record', 'Reports'],
-    },
-  );
-  return createSourceScreenDocument('EZTest run modal', '#a66bff', bodyMarkup);
-}
-
-function createQuiKeysUnlockScreen() {
-  const bodyMarkup = `
-    <div class="desktop-frame quikeys">
-      <div class="native-window" style="width:620px;margin-top:120px;">
-        <div class="native-title">QuiKeys - Unlock encrypted vault</div>
-        <div class="native-body">
-          <h1 style="margin:0 0 8px;">Unlock QuiKeys</h1>
-          <p style="margin:0 0 18px;color:#4b5563;">Local encrypted vault for commands, guarded values, greetings, signatures, and support responses.</p>
-          <label>Master password</label>
-          <input class="native-input" value="••••••••••••" />
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
-            <div><label>Vault location</label><div class="native-input">%TEMP%\\portfolio-demo.vault</div></div>
-            <div><label>Encryption</label><div class="native-input">AES-256 local vault</div></div>
-          </div>
-          <div class="native-buttons"><button class="native-button">Cancel</button><button class="native-button primary">Unlock</button></div>
-        </div>
-      </div>
-    </div>
-  `;
-  return createSourceScreenDocument('QuiKeys unlock', '#ff5fa2', bodyMarkup);
-}
-
-function createQuiKeysManagerScreen() {
-  const bodyMarkup = `
-    <div class="desktop-frame quikeys">
-      <div class="native-window" style="width:1160px;margin-top:46px;">
-        <div class="native-title">QuiKeys - Macro Manager</div>
-        <div class="native-body">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div><h1 style="margin:0;">Macro Manager</h1><p style="margin:4px 0 0;color:#4b5563;">Secure automation, guarded values, reusable text, hotkeys, and triggers.</p></div>
-            <div class="native-buttons" style="margin:0;"><button class="native-button primary">Add Macro</button><button class="native-button">Edit</button><button class="native-button">Lock Vault</button></div>
-          </div>
-          ${createDataTable(
-            ['Name', 'Hotkey', 'Trigger', 'Category', 'Value', 'Enabled'],
-            [
-              ['Git Push Origin', 'Ctrl+Shift+G', ':push:', 'Development', 'git push origin main --follow-tags', 'Yes'],
-              ['Deploy to Staging', 'Ctrl+Shift+D', ':deploy:', 'DevOps', 'npm run deploy:staging', 'Yes'],
-              ['API Token (demo)', 'Ctrl+Shift+T', ':token:', 'Credentials', '••••••••••••••••••••••', 'Yes'],
-              ['Docker Compose Up', 'Ctrl+Shift+U', ':docker:', 'DevOps', 'docker compose up --build -d', 'Yes'],
-              ['Standard greeting', 'Ctrl+Alt+G', ':hello:', 'Customer Service', 'Hello, thank you for reaching out. I am happy to help...', 'Yes'],
-              ['Customer service paragraph', 'Ctrl+Shift+P', ':resolve:', 'Customer Service', 'I reviewed the details and documented the next steps...', 'Yes'],
-              ['Support signature', 'Ctrl+Alt+S', ':sig:', 'Signature', 'Best regards / Michael Smith / Customer Support', 'Yes'],
-            ],
-            'native-table',
-          )}
-        </div>
-      </div>
-    </div>
-  `;
-  return createSourceScreenDocument('QuiKeys manager', '#ff5fa2', bodyMarkup);
-}
-
-function createQuiKeysDialogScreen() {
-  const bodyMarkup = `
-    <div class="desktop-frame quikeys">
-      <div class="native-window" style="width:720px;margin-top:70px;">
-        <div class="native-title">QuiKeys - Add Macro</div>
-        <div class="native-body">
-          <h1 style="margin:0 0 14px;">Add reusable service response</h1>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-            <div><label>Name</label><input class="native-input" value="Customer service paragraph" /></div>
-            <div><label>Category</label><select class="native-select"><option>Customer Service</option></select></div>
-            <div><label>Hotkey</label><input class="native-input" value="Ctrl+Shift+P" /></div>
-            <div><label>Text trigger</label><input class="native-input" value=":resolve:" /></div>
-          </div>
-          <div style="margin-top:14px;"><label>Text typed by the macro</label><textarea class="native-textarea">I reviewed the details you provided and documented the next steps. I will follow up as soon as the update is ready.
-
-Best regards,
-Michael Smith</textarea></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
-            <div><label>Mask value in manager table</label><div class="native-input">No - service text is safe to display</div></div>
-            <div><label>Enabled</label><div class="native-input">Yes - available after save</div></div>
-          </div>
-          <div class="native-buttons"><button class="native-button">Cancel</button><button class="native-button primary">Save Macro</button></div>
-        </div>
-      </div>
-    </div>
-  `;
-  return createSourceScreenDocument('QuiKeys add macro', '#ff5fa2', bodyMarkup);
-}
-
-async function copyMbl2pcCapture(portfolioApp, portfolioFeature, outputPath) {
-  const sourceFileName = MBL2PC_ASSET_SOURCES.get(portfolioFeature.id);
-
-  if (!sourceFileName) {
-    throw new Error(`No MBL2PC source screenshot mapping exists for ${portfolioFeature.id}.`);
-  }
-
-  const sourcePath = path.join(MBL2PC_CAPTURE_DIRECTORY, sourceFileName);
-  await fs.access(sourcePath);
-  await fs.copyFile(sourcePath, outputPath);
-}
-
 async function renderSourceDerivedReplica(browser, portfolioApp, portfolioFeature, outputPath) {
   const screenKey = `${portfolioApp.slug}:${portfolioFeature.id}`;
   const screenBuilder = SOURCE_DERIVED_SCREEN_BUILDERS[screenKey];
@@ -516,11 +291,7 @@ async function buildPngAssets() {
           `${portfolioApp.slug}-${portfolioFeature.id}.png`,
         );
 
-        if (portfolioFeature.imageKind === 'real-ui') {
-          await copyMbl2pcCapture(portfolioApp, portfolioFeature, outputPath);
-        } else {
-          await renderSourceDerivedReplica(browser, portfolioApp, portfolioFeature, outputPath);
-        }
+        await renderSourceDerivedReplica(browser, portfolioApp, portfolioFeature, outputPath);
       }
     }
   } finally {

@@ -50,7 +50,7 @@ test('each showcase feature has the required narrative fields', () => {
       assert.ok(portfolioFeature.whatItShows);
       assert.ok(portfolioFeature.mockDataApproach);
       assert.ok(portfolioFeature.capturePlan);
-      assert.ok(['real-ui', 'source-derived-replica'].includes(portfolioFeature.imageKind));
+      assert.ok(portfolioFeature.imageKind === 'source-derived-replica');
       assert.ok(portfolioFeature.imagePath);
       assert.match(portfolioFeature.imagePath, /\.png$/);
     }
@@ -67,27 +67,6 @@ test('MBL2PC portfolio copy uses the concise PC device label', () => {
   assert.ok(mbl2pcPortfolioApp, 'MBL2PC should be present in the public portfolio data.');
   assert.doesNotMatch(JSON.stringify(mbl2pcPortfolioApp), /Work PC/);
   assert.match(JSON.stringify(mbl2pcPortfolioApp), /\bPC\b/);
-});
-
-test('QuiKeys portfolio blends secure automation with reusable service text snippets', () => {
-  const quikeysPortfolioApp = PORTFOLIO_APPS.find((portfolioApp) => portfolioApp.slug === 'quikeys');
-  const quikeysPortfolioJson = JSON.stringify(quikeysPortfolioApp);
-  const assetBuilderSource = fs.readFileSync(
-    path.join(process.cwd(), 'scripts', 'portfolio', 'build-portfolio-assets.mjs'),
-    'utf8',
-  );
-
-  assert.ok(quikeysPortfolioApp, 'QuiKeys should be present in the public portfolio data.');
-  assert.match(quikeysPortfolioJson, /standard greeting/i);
-  assert.match(quikeysPortfolioJson, /customer service paragraph/i);
-  assert.match(quikeysPortfolioJson, /signature/i);
-  assert.match(assetBuilderSource, /Customer service paragraph/);
-  assert.match(assetBuilderSource, /Standard greeting/);
-  assert.match(assetBuilderSource, /Support signature/);
-  assert.match(quikeysPortfolioJson, /secure automation/i);
-  assert.match(assetBuilderSource, /API Token/);
-  assert.match(assetBuilderSource, /Docker Compose/);
-  assert.match(assetBuilderSource, /Deploy to Staging/);
 });
 
 function readPngDimensions(assetPath) {
@@ -124,4 +103,31 @@ test('portfolio no longer ships generated SVG fallback assets', () => {
   const generatedSvgDirectory = path.join(process.cwd(), 'web', 'portfolio', 'assets', 'generated');
 
   assert.equal(fs.existsSync(generatedSvgDirectory), false);
+});
+
+// The per-app screen suites scan rendered markup, which cannot see a private
+// string sitting in a narrative or safety-note field. This closes that gap: it
+// scans everything the site actually publishes. A real filename survived here
+// once, in a field describing how the data had been anonymised.
+const FORBIDDEN_PUBLISHED_STRINGS = [
+  'Michael_Smith', 'Michael Smith', 'mikejsmith1985', 'mikej',
+  'ProjectsWin', 'SmithWorksApps', 'smithbros',
+  'ENCUC', 'ENFCT', 'DENP-', 'MAPD', 'Transformers', 'Somagutta', 'Kasuganti',
+  'hcsc', 'EGWP', 'Facets', 'FiServ',
+  'SBRO-', 'INC0010', 'sim-hitl', 'poc-chat', 'poc-escalation',
+  'CLOUDFLARE_API_TOKEN', 'SUPABASE_ACCESS_TOKEN', 'CODEMAGIC', 'SLACK_CLIENT_SECRET',
+];
+
+test('nothing the site publishes contains a private string', () => {
+  const publishedText = [
+    fs.readFileSync(path.join(process.cwd(), 'web', 'portfolio', 'data', 'apps.mjs'), 'utf8'),
+    fs.readFileSync(path.join(process.cwd(), 'web', 'portfolio', 'data', 'narrative.mjs'), 'utf8'),
+    fs.readFileSync(path.join(process.cwd(), 'web', 'portfolio', 'index.html'), 'utf8'),
+  ].join(' ').toLowerCase();
+
+  const leaks = FORBIDDEN_PUBLISHED_STRINGS.filter(
+    (forbiddenString) => publishedText.includes(forbiddenString.toLowerCase()),
+  );
+
+  assert.deepEqual(leaks, [], `published data leaks: ${leaks.join(', ')}`);
 });
