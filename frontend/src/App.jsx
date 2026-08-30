@@ -1048,7 +1048,13 @@ function App() {
       //   return;
       // }
 
-    // Ctrl+End: Scroll to bottom (safe — not a shell binding)
+    // Ctrl+End: return to the newest output. Safe to intercept because no shell binds
+    // it. The terminal decides what it means: in an ordinary shell it scrolls the
+    // viewport, and while a full-screen program owns the screen (Claude Code, vim,
+    // less) it is forwarded to that program, which binds it to "jump to the end".
+    // Previously this path always scrolled the viewport, which is a guaranteed no-op
+    // in a full-screen program — so the shortcut did nothing exactly when it was most
+    // needed, and swallowed the keypress so the program never saw it either.
     if (e.ctrlKey && e.key === 'End') {
       e.preventDefault();
       e.stopPropagation();

@@ -4,14 +4,18 @@ import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
-import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
+import ScrollToBottomButton from './ScrollToBottomButton';
+import {
+  WHEEL_SCROLL_LINES_PER_NOTCH,
+  performScrollToBottom,
+} from '../utils/terminalScrollTarget';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import { diagnosticCore } from '../utils/diagnosticCore';
 import { isLLMCommand } from '../utils/llmDetection';
 import { extractProjectFolder, isFileLikeName, isTempOrSystemPath } from '../utils/projectFolder';
-import { shouldDetectDirectoryFromText } from '../utils/terminalTuiState';
+import { shouldDetectDirectoryFromText, ALTERNATE_SCREEN_BUFFER } from '../utils/terminalTuiState';
 import { neutralizeSocket } from '../utils/websocketManager';
 import {
   shouldRestoreDirectory,
@@ -586,6 +590,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
   const isVisibleRef = useRef(isVisible); // Track visibility to avoid stale closures in paste handlers
+  // Lets the imperative handle (declared above handleScrollToBottom) reach the
+  // current handler without duplicating its logic.
+  const handleScrollToBottomRef = useRef(() => {});
   // Keystrokes that arrive while the WebSocket is still CONNECTING are buffered here
   // and flushed in bulk the moment the socket opens.  Without this, rapid typing
   // immediately after a session recovery (or the initial mount) silently drops keys
@@ -595,6 +602,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
+  // True while a full-screen program (Claude Code's fullscreen renderer, vim, less)
+  // owns the screen. That mode has no terminal scrollback, so the scroll-to-bottom
+  // button has to ask the program instead of moving a viewport that cannot move.
+  const [isAlternateScreen, setIsAlternateScreen] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
@@ -957,11 +968,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         searchAddonRef.current.clearDecorations();
       }
     },
+    // Ctrl+End (App-level shortcut) lands here. Delegating to the shared handler is
+    // what makes the shortcut work inside a full-screen program, where the previous
+    // direct scrollToBottom() call was a guaranteed no-op.
     scrollToBottom: () => {
-      if (xtermRef.current) {
-        xtermRef.current.scrollToBottom();
-        setShowScrollButton(false);
-      }
+      handleScrollToBottomRef.current();
     },
     sendRaw: (bytes) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -1037,6 +1048,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
+      // One wheel notch moves this many lines; see WHEEL_SCROLL_LINES_PER_NOTCH.
+      scrollSensitivity: WHEEL_SCROLL_LINES_PER_NOTCH,
       clipboardMode: 'off', // We handle paste exclusively in handlePaste for full control (image/video support)
       lineHeight: 1.0,
       letterSpacing: 0,
@@ -1299,6 +1312,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
 
     const scrollDisposable = term.onScroll(checkScrollPosition);
+
+    // Switching between the normal and alternate screen buffers changes what the
+    // scroll-to-bottom button can do, and it fires no scroll event — so track it
+    // separately. Seeded from the current buffer because a restored tab can already
+    // have a full-screen program running before this listener is attached.
+    setIsAlternateScreen(term.buffer.active.type === ALTERNATE_SCREEN_BUFFER);
+    const bufferChangeDisposable = term.buffer.onBufferChange((activeBuffer) => {
+      setIsAlternateScreen(activeBuffer.type === ALTERNATE_SCREEN_BUFFER);
+    });
 
     // Mouse wheel scrolling bypasses term.onScroll — listen directly on the DOM viewport.
     if (viewport) {
@@ -2346,6 +2368,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       resizeObserver.disconnect();
 
       scrollDisposable.dispose();
+      bufferChangeDisposable.dispose();
       if (viewport) {
         viewport.removeEventListener('scroll', checkScrollPosition);
       }
@@ -2389,30 +2412,23 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
   }, []); // Only run once on mount, theme updates handled by other effect
 
+  // Both the on-screen button and the Ctrl+End shortcut route through here so the
+  // two can never diverge again — the shortcut used to carry its own copy of the
+  // logic that could not reach a full-screen program at all.
   const handleScrollToBottom = () => {
-    if (xtermRef.current) {
-      xtermRef.current.scrollToBottom();
-    }
-    // Belt-and-suspenders: scroll the xterm DOM viewport directly.
-    // xterm's scrollToBottom() can silently no-op when its internal buffer
-    // cursor is already at the last line (common during streaming output),
-    // leaving the DOM viewport scrollTop stale. Forcing scrollTop here is
-    // always reliable regardless of xterm's internal state.
-    const viewport = terminalRef.current?.querySelector('.xterm-viewport');
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight;
-    }
-    // Do NOT call setShowScrollButton(false) here — let checkScrollPosition
-    // confirm the scroll actually reached the bottom before hiding the button.
-    // This prevents the button from disappearing when the scroll silently failed.
-
-    // Restore focus: clicking the scroll button moves browser focus away from
-    // xterm's hidden textarea. Refocus immediately so the next keypress goes
-    // directly to the terminal without needing the App-level capture redirect.
-    if (xtermRef.current) {
-      xtermRef.current.focus();
-    }
+    performScrollToBottom({
+      terminal: xtermRef.current,
+      viewportElement: terminalRef.current?.querySelector('.xterm-viewport'),
+    });
+    // Deliberately not clearing showScrollButton here — checkScrollPosition confirms
+    // the scroll actually landed before hiding the button, so a silently failed
+    // scroll leaves the button on screen instead of pretending it worked.
   };
+
+  // Keep the ref the imperative handle calls pointing at the current handler.
+  useEffect(() => {
+    handleScrollToBottomRef.current = handleScrollToBottom;
+  });
 
   // requestTakeControl asks the server to make this device the PTY controller.
   // Self-healing by design: a dead socket (half-open after sleep/network loss)
@@ -2552,14 +2568,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       )}
       
       {isVisible && (
-        <button
-          className={`scroll-to-bottom-btn${showScrollButton ? ' is-scrolled-up' : ''}`}
-          onClick={handleScrollToBottom}
-          title="Scroll to bottom (Ctrl+End)"
-          aria-label="Scroll to bottom"
-        >
-          <ArrowDownToLine size={16} />
-        </button>
+        <ScrollToBottomButton
+          isScrolledUp={showScrollButton}
+          isAlternateScreen={isAlternateScreen}
+          onScrollToBottom={handleScrollToBottom}
+        />
       )}
     </div>
   );
