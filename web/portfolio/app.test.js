@@ -122,3 +122,61 @@ test('the published narrative data carries the full argument', async () => {
   assert.ok(narrativeModule.PORTFOLIO_PROOF_STATS.length >= 4);
   assert.ok(narrativeModule.ENGINEERING_CASE_STUDIES.length >= 4);
 });
+
+// ── U2 Counter: the headline, the key points, and the two links ──────────────
+//
+// This entry is the only one on the page that leads with a claim about elapsed
+// time and the only one carrying outbound links, so both need holding in place.
+// The link rule is the fiddly one: the repository handle is a rendering
+// constant, never a value in the published data, because the data file is
+// scanned for exactly that string as a sign that a local path has leaked into
+// it. The tests below check the arrangement from both ends.
+
+test('U2 Counter publishes the headline, key points, and links it leads with', async () => {
+  const { PORTFOLIO_APPS } = await import(pathToFileURL(PORTFOLIO_DATA_PATH).href);
+  const counterApp = PORTFOLIO_APPS.find((portfolioApp) => portfolioApp.slug === 'u2-counter');
+
+  assert.ok(counterApp, 'U2 Counter should be present in the published portfolio data.');
+
+  assert.match(counterApp.headline, /Friday afternoon/);
+  assert.match(counterApp.headline, /Monday morning/);
+
+  assert.ok(counterApp.keyPoints.length >= 4, 'the four claims the entry rests on must all ship.');
+  assert.match(JSON.stringify(counterApp.keyPoints), /regression test/i);
+  assert.match(JSON.stringify(counterApp.keyPoints), /never been validated against a live/i);
+
+  assert.equal(counterApp.links.length, 2);
+  for (const publishedLink of counterApp.links) {
+    assert.ok(publishedLink.label, 'every link needs a label.');
+    assert.match(publishedLink.repoPath, /^u2-counter/, 'links resolve under the repo base URL.');
+    assert.ok(
+      !('href' in publishedLink),
+      'a link must carry a repo path, not a full URL, so no handle reaches the data file.',
+    );
+  }
+});
+
+test('U2 Counter publishes no live or interactive demo link', async () => {
+  const { PORTFOLIO_APPS } = await import(pathToFileURL(PORTFOLIO_DATA_PATH).href);
+  const counterApp = PORTFOLIO_APPS.find((portfolioApp) => portfolioApp.slug === 'u2-counter');
+  const publishedCopy = JSON.stringify(counterApp);
+
+  for (const deploymentHost of ['core.windows.net', 'azurewebsites.net', 'azurecontainerapps.io']) {
+    assert.ok(!publishedCopy.includes(deploymentHost), `the card links to ${deploymentHost}.`);
+  }
+  assert.doesNotMatch(publishedCopy, /https?:\/\//, 'the card should carry no absolute URL at all.');
+});
+
+test('the renderer turns a repo path into a link and escapes it', () => {
+  const rendererSource = fs.readFileSync(PORTFOLIO_RENDERER_PATH, 'utf8');
+
+  assert.match(rendererSource, /const GITHUB_REPO_BASE_URL = /);
+  assert.match(rendererSource, /function createAppLinks\(/);
+  assert.match(rendererSource, /function createHeadline\(/);
+  assert.match(rendererSource, /function createKeyPoints\(/);
+
+  // The depth tier is where an entry gets room for a summary and its evidence
+  // note; the supporting grid renders neither, so a card with four claims and
+  // two links cannot live there.
+  assert.match(rendererSource, /DEPTH_APP_SLUGS = \[[^\]]*'u2-counter'/);
+});

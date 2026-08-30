@@ -13,6 +13,7 @@ import { FORGE_TERMINAL_SCREEN_BUILDERS } from './screens/forge-terminal-screens
 import { NODETOOLBOX_SCREEN_BUILDERS } from './screens/nodetoolbox-screens.mjs';
 import { LGBUILDER_SCREEN_BUILDERS } from './screens/lgbuilder-screens.mjs';
 import { MBL2PC_SCREEN_BUILDERS } from './screens/mbl2pc-screens.mjs';
+import { U2_COUNTER_SCREEN_BUILDERS } from './screens/u2-counter-screens.mjs';
 import {
   ARCHITECTURE_CONTROL_PLANE,
   ARCHITECTURE_FLOW,
@@ -66,6 +67,10 @@ const SOURCE_DERIVED_SCREEN_BUILDERS = {
   // integration and the admin console.
   ...createScreenRegistry('lgbuilder', LGBUILDER_SCREEN_BUILDERS),
   ...createScreenRegistry('mbl2pc', MBL2PC_SCREEN_BUILDERS),
+  // U2 Counter replicates a workstation application over a MultiValue store,
+  // so its screens carry the real attribute and value marks rather than a
+  // table standing in for them.
+  ...createScreenRegistry('u2-counter', U2_COUNTER_SCREEN_BUILDERS),
 };
 
 function escapeHtml(value) {

@@ -83,6 +83,71 @@ export const PORTFOLIO_APPS = [
     ]
   },
   {
+    "slug": "u2-counter",
+    "name": "U2 Counter",
+    "tagline": "An AI answering trade-counter questions against an ERP on a 1960s Pick database, through a hardened MCP server.",
+    "headline": "I had never heard of Eclipse or a Pick database on Friday afternoon. By Monday morning this was running.",
+    "summary": "A working prototype that lets an AI answer counter questions against an ERP system running on a Pick database, via the U2 MCP server. Pick — MultiValue — is a database paradigm from the 1960s that still runs enterprise ERP systems today, and it does not behave like a relational store: a record is not a row, and fields run in parallel, so position three of one field belongs with position three of the next. Built in .NET, deployed to an Azure container that scales to zero when idle, and running entirely on synthetic data.",
+    "accent": "#b45309",
+    "category": "AI over legacy ERP",
+    "launchSurface": "./scripts/run-dev-clean.ps1",
+    "techStack": [
+      "C# / .NET",
+      "MCP",
+      "Azure",
+      "Pick / UniVerse (MultiValue)"
+    ],
+    "keyPoints": [
+      "The U2 MCP server is open source but was not adoptable as it stood — it had open vulnerabilities. I forked it, worked through the known issues, found several more, and fixed them.",
+      "Each fix is backed by a regression test that fails on the original branch and passes on mine. A script checks out the upstream commit, runs the same tests against both, and keeps the raw output of each run.",
+      "It has never been validated against a live UniVerse instance. I wrote up what this prototype does not prove, and what would be required before anyone called it production-ready.",
+      "Built in one weekend, from a vague requirement."
+    ],
+    "links": [
+      {
+        "label": "Source — u2-counter",
+        "repoPath": "u2-counter"
+      },
+      {
+        "label": "What it does not show — the limits, written down",
+        "repoPath": "u2-counter/blob/main/docs/what-it-does-not-show.md"
+      }
+    ],
+    "proofNote": "These screens are source-derived replicas of the shipped interface. The product already runs on a synthetic store, and every part, branch, customer and figure below was invented again for publication — no screen here was captured from a running system, and none of it belongs to a real business.",
+    "features": [
+      {
+        "id": "guided-tour",
+        "title": "A tour that drives the product rather than describing it",
+        "wowFactor": "The reader arriving here knows neither MultiValue nor MCP, and the interface does not announce itself. The tour spotlights the real control and puts the application into the state each step needs, so the thing is watched happening rather than claimed.",
+        "whatItShows": "The overlay dimming the page and cutting a hole around the branch table, on the step that explains free-to-sell — on hand minus what orders already hold, which is the distinction the whole product exists to protect.",
+        "mockDataApproach": "The tour copy is the shipped wording; the part, branches and customer beneath it are invented for publication.",
+        "capturePlan": "Render the tour replica at the free-to-sell step with the spotlight over the branch grid, and trim the capture to the content height.",
+        "imageKind": "source-derived-replica",
+        "imagePath": "./assets/u2-counter/u2-counter-guided-tour.png"
+      },
+      {
+        "id": "availability-answer",
+        "title": "The one figure a representative is allowed to quote",
+        "wowFactor": "A branch with forty on the shelf and thirty-nine promised has one to sell. Showing the forty is how a customer gets let down, so on hand, committed and free to sell are three separate columns and the third is the only one the eye lands on.",
+        "whatItShows": "The branch table answering a counter question for one part and one customer, with the stored MultiValue record open beneath it — the bytes on the left, the parallel fields parsed out on the right.",
+        "mockDataApproach": "Every part number, branch, customer and quantity is invented. The parsed table is derived from the same invented record the bytes panel prints, so the two cannot disagree in the published image.",
+        "capturePlan": "Render the branch grid and record panel together at desktop width and trim to content.",
+        "imageKind": "source-derived-replica",
+        "imagePath": "./assets/u2-counter/u2-counter-availability-answer.png"
+      },
+      {
+        "id": "mcp-transcript",
+        "title": "The answer, and every call underneath it",
+        "wowFactor": "A sentence saying \"299 free to sell\" is worth no more than the reader's willingness to believe it. Under each answer is every call the model made — tool, file, key and timing — and the raw record with its separators marked, which is the part a relational database could not have produced.",
+        "whatItShows": "A question asked in plain words, the answer with its qualifier, the four MCP calls that produced it, and the note that of the eight tools the server offers, none of them writes.",
+        "mockDataApproach": "The question, answer and call transcript are invented alongside the record they read, and the attribute and value marks are the real separator characters rather than punctuation standing in for them.",
+        "capturePlan": "Render the assistant panel above the record panel at desktop width and trim to content.",
+        "imageKind": "source-derived-replica",
+        "imagePath": "./assets/u2-counter/u2-counter-mcp-transcript.png"
+      }
+    ]
+  },
+  {
     "slug": "nodetoolbox",
     "name": "NodeToolbox",
     "tagline": "Local-first delivery workspace that reconstructs the truth about a program's work — and says so when it cannot.",
