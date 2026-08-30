@@ -1823,18 +1823,20 @@ body {
   transform: scale(0.85);
 }
 
-/* Reveal on hover anywhere over the terminal */
-.terminal-outer-container:hover .scroll-to-bottom-btn {
-  opacity: 0.55;
-  pointer-events: auto;
-  transform: scale(1);
-}
-
-/* Full visibility when the user has actually scrolled up */
+/* Visible and clickable only once the user has actually scrolled up.
+   Previously any hover over the terminal revealed the button AND gave it
+   pointer-events, so at the bottom of the scrollback it offered a control whose
+   click could not do anything — the "this button doesn't work" report. It also
+   swallowed clicks aimed at the terminal text underneath it. */
 .scroll-to-bottom-btn.is-scrolled-up {
   opacity: 0.9;
   pointer-events: auto;
   transform: scale(1);
+}
+
+/* Full strength when the pointer is over the terminal it belongs to */
+.terminal-outer-container:hover .scroll-to-bottom-btn.is-scrolled-up {
+  opacity: 1;
 }
 
 .scroll-to-bottom-btn:hover {
