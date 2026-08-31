@@ -36,15 +36,15 @@ that must first fail.
 ### Tests (write first, must fail)
 
 - [X] T008 [P] [US1] Write the failing unit test for the new gate constant in `internal/workflow/ticket_test.go`: `RequiredGates` contains `brief-published`
-- [ ] T009 [P] [US1] Write the failing unit test for the MCP tool contract in `internal/mcp/tools_change_brief_test.go`: a valid brief records the gate and returns a `briefId`; an invalid brief records nothing and names the offending field
+- [X] T009 [P] [US1] Write the failing unit test for the MCP tool contract in `internal/mcp/tools_change_brief_test.go`: a valid brief records the gate and returns a `briefId`; an invalid brief records nothing and names the offending field
 - [ ] T010 [US1] Write the failing integration test in `internal/workflow/brief_gate_integration_test.go` against a **real temp git repository with the real generated hook**: a commit with no brief is refused, a commit with a brief is allowed, `FORGE_BYPASS=1` overrides and writes to `.forge/bypasses.log`, and a documentation-only commit is allowed with no brief
 
 ### Implementation
 
 - [X] T011 [US1] Add `GateBriefPublished = "brief-published"` beside the existing gate constants in `internal/workflow/ticket.go`
 - [X] T012 [US1] Add `GateBriefPublished` to the `RequiredGates` slice in `internal/workflow/ticket.go` to turn T008 green
-- [ ] T013 [US1] Implement `change_brief_publish` in `internal/mcp/tools_change_brief.go` against the existing `ToolHandler` interface, per `specs/014-comprehension-first-workflow/contracts/change-brief-tool.md`, to turn T009 green
-- [ ] T014 [US1] Register the new tool in the handler list in `internal/mcp/server.go:351-357`, beside `newWorkflowGateRecordTool` and `newTerminalReadTool`
+- [X] T013 [US1] Implement `change_brief_publish` in `internal/mcp/tools_change_brief.go` against the existing `ToolHandler` interface, per `specs/014-comprehension-first-workflow/contracts/change-brief-tool.md`, to turn T009 green
+- [X] T014 [US1] Register the new tool in the handler list in `internal/mcp/server.go:351-357`, beside `newWorkflowGateRecordTool` and `newTerminalReadTool`
 - [ ] T015 [US1] Scope the gate to code changes only in `internal/workflow/ticket.go`, exempting `specs/`, documentation-only, generated and vendored paths per `contracts/brief-gate.md`, to turn T010 green
 - [ ] T016 [US1] Update the pre-commit hook message body in `internal/workflow/hooks.go` to name `brief-published` among the required gates and point at the publishing tool
 
