@@ -34,6 +34,7 @@ var RequiredGates = []string{
 	GateBranchCreated,
 	GateTestsWritten,
 	GateTestsPassed,
+	GateBriefPublished,
 }
 
 // Gate identifiers.  Use string constants so callers cannot typo them.
@@ -46,6 +47,12 @@ const (
 	GateUXValidated    = "ux-validated"
 	GateBuildPassed    = "build-passed"
 	GateChangelogBumped = "changelog-bumped"
+	// GateBriefPublished proves a change brief was published for the task, so a
+	// change cannot be committed without the developer having something to look
+	// at.  Prose cannot be gated — a full-screen CLI leaves screen redraws in the
+	// terminal buffer, not a transcript — but the presence of a published
+	// document is a fact, and a fact can be required.
+	GateBriefPublished = "brief-published"
 )
 
 // GateRecord is a single entry in the ticket's gate ledger.
