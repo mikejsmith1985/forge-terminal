@@ -1,0 +1,212 @@
+/* The change brief, styled to be looked at rather than read.
+ *
+ * Type is deliberately large and panels deliberately few. The constraint that
+ * shapes everything here: a reader whose eye lands on a block of small text
+ * decides it is too much and agrees instead of engaging. So each panel carries
+ * one idea, at a size that is legible from normal seating distance.
+ *
+ * Colour means one thing consistently. Cyan marks what was done and is checkable;
+ * amber marks a risk or an assumption; violet marks the question the developer is
+ * being asked. Nothing is coloured for decoration.
+ */
+
+.change-brief {
+  --brief-evidence: #22d3ee;
+  --brief-risk: #f59e0b;
+  --brief-question: #8b8bf5;
+  --brief-ink: #0f0f14;
+  --brief-raised: #17171f;
+  --brief-line: #2a2a35;
+  --brief-text: #f2f2f7;
+  --brief-muted: #a8a8b8;
+
+  background: var(--brief-ink);
+  color: var(--brief-text);
+  border: 1px solid var(--brief-line);
+  border-radius: 14px;
+  padding: 28px;
+  font-family: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  max-width: 1100px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.brief-kicker {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brief-evidence);
+}
+
+/* The one line the developer is most likely to actually read, so it is the
+   largest thing on the panel by a clear margin. */
+.brief-headline {
+  margin: 0 0 12px;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  font-weight: 650;
+}
+
+.brief-scale {
+  margin: 0;
+  font-size: 14px;
+  color: var(--brief-muted);
+}
+
+/* ── The three panels ───────────────────────────────────────────────────── */
+
+.brief-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.brief-panel {
+  background: var(--brief-raised);
+  border: 1px solid var(--brief-line);
+  border-left-width: 4px;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+
+.brief-panel h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--brief-muted);
+}
+
+.brief-panel p {
+  margin: 0;
+  font-size: 16.5px;
+  line-height: 1.5;
+}
+
+.brief-panel--changed { border-left-color: var(--brief-evidence); }
+.brief-panel--why { border-left-color: var(--brief-line); }
+
+/* Risk carries its own colour and a tinted ground, because a risk that looks
+   like every other panel is a risk the eye skips over. */
+.brief-panel--risk {
+  border-left-color: var(--brief-risk);
+  background: rgba(245, 158, 11, 0.07);
+}
+.brief-panel--risk h3 { color: var(--brief-risk); }
+
+/* ── The decision ───────────────────────────────────────────────────────── */
+
+.brief-decision {
+  margin-top: 22px;
+  background: var(--brief-raised);
+  border: 1px solid var(--brief-line);
+  border-radius: 10px;
+  padding: 20px 22px;
+}
+
+.brief-decision__title {
+  margin: 0 0 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--brief-muted);
+}
+
+/* Both sides of the fork side by side, so the reader sees a choice was made
+   rather than reading a claim that one was. */
+.brief-fork {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.brief-fork__chosen,
+.brief-fork__rejected {
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.brief-fork__chosen {
+  background: rgba(34, 211, 238, 0.09);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+.brief-fork__rejected {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--brief-line);
+  color: var(--brief-muted);
+}
+
+.brief-fork__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brief-muted);
+}
+
+.brief-fork p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.brief-because {
+  margin: 16px 0 0;
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--brief-muted);
+}
+
+/* The question is the point of the whole panel, so it is set apart and given
+   the only colour reserved for asking something of the reader. */
+.brief-question {
+  margin: 16px 0 0;
+  padding-left: 16px;
+  border-left: 3px solid var(--brief-question);
+  font-size: 17px;
+  line-height: 1.45;
+  font-weight: 550;
+  color: var(--brief-text);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+.brief-footer {
+  margin-top: 22px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.brief-dismiss {
+  background: transparent;
+  border: 1px solid var(--brief-line);
+  border-radius: 999px;
+  padding: 9px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brief-text);
+  cursor: pointer;
+}
+
+.brief-dismiss:hover {
+  border-color: var(--brief-evidence);
+  color: var(--brief-evidence);
+}
+
+/* ── Narrow screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .change-brief { padding: 20px; }
+  /* The fork stacks rather than shrinking: two columns at this width would put
+     the choice and its alternative in columns too narrow to read either. */
+  .brief-fork { grid-template-columns: 1fr; }
+}

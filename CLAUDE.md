@@ -9,5 +9,5 @@
 @.specify/memory/constitution.md
 
 <!-- SPECKIT START -->
-Active feature: @specs/013-worktree-recovery-first/plan.md
+Active feature: @specs/014-comprehension-first-workflow/plan.md
 <!-- SPECKIT END -->

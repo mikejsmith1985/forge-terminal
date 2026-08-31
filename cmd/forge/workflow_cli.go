@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
 )
@@ -17,7 +20,7 @@ import (
 // exit code the caller should use.
 func runWorkflowCommand(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: forge workflow <preflight|record> [...]")
+		fmt.Fprintln(os.Stderr, "usage: forge workflow <preflight|record|naming> [...]")
 		return 1
 	}
 	switch args[0] {
@@ -25,6 +28,8 @@ func runWorkflowCommand(args []string) int {
 		return runWorkflowPreflight()
 	case "record":
 		return runWorkflowRecord(args[1:])
+	case "naming":
+		return runWorkflowNaming()
 	default:
 		fmt.Fprintf(os.Stderr, "unknown workflow subcommand %q\n", args[0])
 		return 1
@@ -39,7 +44,11 @@ func runWorkflowPreflight() int {
 		fmt.Fprintf(os.Stderr, "preflight: %v\n", err)
 		return 1
 	}
-	result, err := workflow.Preflight(root)
+	// Scoped to what is actually staged, so a documentation-only commit is not
+	// asked for a change brief.  A gate that fires on everything gets bypassed
+	// on everything, and a bypass used by reflex is a gate that has stopped
+	// working.
+	result, err := workflow.PreflightForChange(root, stagedPaths(root))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "preflight: %v\n", err)
 		return 1
@@ -77,5 +86,76 @@ func runWorkflowRecord(args []string) int {
 	}
 	body, _ := json.MarshalIndent(ticket, "", "  ")
 	fmt.Println(string(body))
+	return 0
+}
+
+// stagedPaths returns the repository-relative paths git has staged.
+//
+// Returns nil when git cannot be asked — outside a repository, or with no git
+// on the path.  A nil result means no source is known to have changed, so the
+// brief gate does not fire.  That is the right way to fail: the alternative is
+// blocking a commit over a question we were unable to ask.
+func stagedPaths(projectRoot string) []string {
+	command := exec.Command("git", "diff", "--cached", "--name-only")
+	command.Dir = projectRoot
+
+	output, err := command.Output()
+	if err != nil {
+		return nil
+	}
+
+	var paths []string
+	for _, line := range strings.Split(string(output), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			paths = append(paths, trimmed)
+		}
+	}
+	return paths
+}
+
+// runWorkflowNaming checks staged Go files for unreadable names.
+//
+// Exit 2 when a blocking violation is found, so the pre-commit hook can refuse
+// the commit the same way it refuses a missing gate. Advisory findings —
+// verb-first, which is recognised from a word list that can never be complete —
+// are printed and do not affect the exit code.
+func runWorkflowNaming() int {
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "naming: %v\n", err)
+		return 1
+	}
+
+	var blocking, advisory []workflow.NamingFinding
+
+	for _, stagedPath := range stagedPaths(projectRoot) {
+		source, readErr := os.ReadFile(filepath.Join(projectRoot, stagedPath))
+		if readErr != nil {
+			// A staged deletion has no content to check. Not a violation.
+			continue
+		}
+
+		for _, finding := range workflow.CheckChangedFile(stagedPath, string(source)) {
+			if finding.Rule.IsBlocking() {
+				blocking = append(blocking, finding)
+			} else {
+				advisory = append(advisory, finding)
+			}
+		}
+	}
+
+	for _, finding := range advisory {
+		fmt.Printf("[forge] naming (advisory) %s:%d  %s — %s\n",
+			finding.Path, finding.Line, finding.Identifier, finding.Suggestion)
+	}
+	for _, finding := range blocking {
+		fmt.Fprintf(os.Stderr, "[forge] naming %s:%d  %s — %s\n",
+			finding.Path, finding.Line, finding.Identifier, finding.Suggestion)
+	}
+
+	if len(blocking) > 0 {
+		return 2
+	}
 	return 0
 }

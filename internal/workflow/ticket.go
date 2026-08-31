@@ -34,6 +34,7 @@ var RequiredGates = []string{
 	GateBranchCreated,
 	GateTestsWritten,
 	GateTestsPassed,
+	GateBriefPublished,
 }
 
 // Gate identifiers.  Use string constants so callers cannot typo them.
@@ -46,6 +47,12 @@ const (
 	GateUXValidated    = "ux-validated"
 	GateBuildPassed    = "build-passed"
 	GateChangelogBumped = "changelog-bumped"
+	// GateBriefPublished proves a change brief was published for the task, so a
+	// change cannot be committed without the developer having something to look
+	// at.  Prose cannot be gated — a full-screen CLI leaves screen redraws in the
+	// terminal buffer, not a transcript — but the presence of a published
+	// document is a fact, and a fact can be required.
+	GateBriefPublished = "brief-published"
 )
 
 // GateRecord is a single entry in the ticket's gate ledger.
@@ -178,6 +185,15 @@ type PreflightResult struct {
 // The pre-commit hook calls this same function via the MCP tool
 // workflow_preflight_check, so the CLI and the hook stay in lockstep.
 func Preflight(projectRoot string) (*PreflightResult, error) {
+	return preflightAgainst(projectRoot, RequiredGates)
+}
+
+// preflightAgainst evaluates the ticket against a specific set of gates.
+//
+// Split out so the pre-commit path can ask a narrower question — a change with
+// no source in it owes no brief — without duplicating the ledger reading, which
+// is the part that must never differ between the CLI and the hook.
+func preflightAgainst(projectRoot string, requiredGates []string) (*PreflightResult, error) {
 	ticket, err := LoadTicket(projectRoot)
 	if err != nil {
 		return nil, err
@@ -185,7 +201,7 @@ func Preflight(projectRoot string) (*PreflightResult, error) {
 	if ticket == nil {
 		return &PreflightResult{
 			OK:           false,
-			MissingGates: append([]string{}, RequiredGates...),
+			MissingGates: append([]string{}, requiredGates...),
 			Reason:       "no workflow ticket exists — call workflow_gate_record before committing",
 		}, nil
 	}
@@ -194,7 +210,7 @@ func Preflight(projectRoot string) (*PreflightResult, error) {
 		recorded[gateRecord.Gate] = true
 	}
 	var missing []string
-	for _, requiredGate := range RequiredGates {
+	for _, requiredGate := range requiredGates {
 		if !recorded[requiredGate] {
 			missing = append(missing, requiredGate)
 		}
