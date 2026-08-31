@@ -37,6 +37,14 @@ const maximumPanelLength = 400
 // shorter than this is not an answer, it is an evasion.
 const minimumPanelLength = 10
 
+// MaximumBriefPanels caps how much a brief may grow.
+//
+// A brief that expanded with the size of the change would become the wall of
+// text it replaces. Past this point it has to summarise — which is the harder
+// and more useful discipline anyway: naming the two decisions that mattered is
+// worth more to a reader than listing twenty.
+const MaximumBriefPanels = 6
+
 // Errors a caller can distinguish, so the tool layer can name what was wrong
 // rather than reporting a generic failure.
 var (
@@ -196,4 +204,38 @@ func (decision *Decision) validate(index int) error {
 // equalIgnoringCaseAndSpace compares two strings as a reader would hear them.
 func equalIgnoringCaseAndSpace(first, second string) bool {
 	return strings.EqualFold(strings.TrimSpace(first), strings.TrimSpace(second))
+}
+
+// PanelCount reports how many panels this brief renders as.
+//
+// A routine change is one panel. Anything else is the three standing panels
+// plus one per decision, capped so a large change summarises rather than
+// sprawling.
+func (brief *ChangeBrief) PanelCount() int {
+	if brief.IsRoutine && len(brief.Decisions) == 0 {
+		return 1
+	}
+
+	// What changed, why, and what could break — the three that always appear.
+	const standingPanels = 3
+
+	total := standingPanels + len(brief.Decisions)
+	if total > MaximumBriefPanels {
+		return MaximumBriefPanels
+	}
+	return total
+}
+
+// DecisionsToShow returns the decisions a brief should render.
+//
+// Capped for the same reason as PanelCount: past a handful, a reader stops
+// reading them individually and starts skimming, which defeats the point.
+func (brief *ChangeBrief) DecisionsToShow() []Decision {
+	const standingPanels = 3
+	room := MaximumBriefPanels - standingPanels
+
+	if len(brief.Decisions) <= room {
+		return brief.Decisions
+	}
+	return brief.Decisions[:room]
 }

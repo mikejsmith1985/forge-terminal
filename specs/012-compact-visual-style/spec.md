@@ -4,7 +4,19 @@
 
 **Created**: 2026-06-23
 
-**Status**: Draft
+**Status**: SUPERSEDED by [specs/014-comprehension-first-workflow](../014-comprehension-first-workflow/spec.md)
+
+> **Why this was never built.** This specification described the response-format
+> half of the problem and was never planned or implemented. What shipped instead
+> was an advisory reminder outside the repository, which was ignored for months
+> because nothing detected a violation and nothing could refuse one.
+>
+> Specification 014 supersedes it and treats that failure as the central design
+> constraint rather than a delivery slip: what an agent *says* cannot be reliably
+> enforced, because an agent CLI is a full-screen program and the terminal buffer
+> holds screen redraws rather than a transcript. What an agent *does* can be. So
+> the enforced artefact is a published change brief, and the response format
+> remains advisory — but honestly labelled as such this time.
 
 **Input**: User description: "I want to implement a skill or something that will persist as part of the forge workflow process so that you will always interact with me like this. Visually, tables and emojis, dividers, context clarity, bullets. No section ever exceeds 75 words unless I ask for more context."
 

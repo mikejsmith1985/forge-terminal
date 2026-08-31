@@ -115,3 +115,29 @@ block, and this scenario exists to prove it never does.
 | 5 | Naming vs prose | Naming blocks; prose only warns |
 
 Scenario 1 is the acceptance test for the feature as a whole. The rest are how it is worth using.
+
+---
+
+## Acceptance run — 2026-08-31
+
+Verified against a real temporary git repository and the running dev instance,
+not against fixtures.
+
+| # | Scenario | Observed |
+|---|---|---|
+| 1 | Code change, no brief | `ok: false` · `missing gates: brief-published` |
+| 2 | Brief published, retried | `ok: true` · all gates recorded |
+| — | Documentation-only change | `ok: true` — no brief demanded |
+| 3 | Hollow brief rejected, routine accepted | 8 validation subtests passing |
+| 4 | Panel renders and survives reload | 6/6 Playwright against :9999 |
+| 5 | Naming blocks, prose only warns | `n` caught, exit 2 · format check has no blocking path |
+
+**Scenario 1 is the acceptance test for the feature as a whole**, and it passes:
+a code change with no published brief cannot get through preflight, which is what
+the pre-commit hook refuses on.
+
+One limitation is worth stating plainly rather than leaving to be discovered. The
+gate lives in the compiled binary, so it does not bite for anyone still running an
+older build. Verified directly: the installed v7.23.10 passed preflight with no
+brief, and a binary built from this tree refused it. This feature is not live until
+it is released and installed.

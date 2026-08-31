@@ -108,18 +108,18 @@ that must first fail.
 
 - [X] T034 [US4] Implement the changed-files naming checker in `internal/workflow/naming.go` to turn T031 and T032 green, with a file purpose comment carrying the Framework-First justification from research R5
 - [X] T035 [US4] Add the naming check step to the generated pre-commit hook body in `internal/workflow/hooks.go`, preserving the existing `FORGE_BYPASS` path and the graceful skip when the forge binary is absent, to turn T033 green
-- [ ] T036 [US4] Add the meaningless-but-legal name case to the brief rather than the checker, per FR-019, in `internal/mcp/tools_change_brief.go`
+- [X] T036 [US4] Add the meaningless-but-legal name case to the brief rather than the checker, per FR-019, in `internal/mcp/tools_change_brief.go`
 
 ---
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T037 [P] Mark `specs/012-compact-visual-style/spec.md` superseded by this feature, with a pointer to `specs/014-comprehension-first-workflow/`
-- [ ] T038 [P] Update `CHANGELOG.md` under Unreleased, describing the enforceability split in the terms the developer will recognise
-- [ ] T039 Implement brief scaling in `internal/workflow/brief.go`: a trivial change yields one panel, a large change summarises rather than growing without bound, per FR-006
-- [ ] T040 Verify all five quickstart scenarios in `specs/014-comprehension-first-workflow/quickstart.md` against the running dev instance, and record the evidence
-- [ ] T041 Record this feature's own gates via `forge workflow record tests-written|tests-passed|brief-published "<evidence>" comprehension-first-workflow` — the feature must pass its own gate before it can be committed
-- [ ] T042 Run the full suites: `go build ./...`, `go test ./...`, `cd frontend; npx vitest run`, and the Playwright spec via `run-dev-clean.ps1`
+- [X] T037 [P] Mark `specs/012-compact-visual-style/spec.md` superseded by this feature, with a pointer to `specs/014-comprehension-first-workflow/`
+- [X] T038 [P] Update `CHANGELOG.md` under Unreleased, describing the enforceability split in the terms the developer will recognise
+- [X] T039 Implement brief scaling in `internal/workflow/brief.go`: a trivial change yields one panel, a large change summarises rather than growing without bound, per FR-006
+- [X] T040 Verify all five quickstart scenarios in `specs/014-comprehension-first-workflow/quickstart.md` against the running dev instance, and record the evidence
+- [X] T041 Record this feature's own gates via `forge workflow record tests-written|tests-passed|brief-published "<evidence>" comprehension-first-workflow` — the feature must pass its own gate before it can be committed
+- [X] T042 Run the full suites: `go build ./...`, `go test ./...`, `cd frontend; npx vitest run`, and the Playwright spec via `run-dev-clean.ps1`
 
 ---
 

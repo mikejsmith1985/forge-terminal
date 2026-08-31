@@ -169,3 +169,47 @@ func TestOpenQuestionIsRequiredSoADecisionEndsAnswerably(t *testing.T) {
 		t.Fatalf("a decision with no open question should be rejected, got: %v", err)
 	}
 }
+
+func TestARoutineBriefIsAllowedToBeShort(t *testing.T) {
+	// A trivial change should cost a trivial brief. Demanding the same weight
+	// for a typo fix as for a design decision is how the requirement becomes
+	// something to resent and then to bypass.
+	brief := validBrief()
+	brief.IsRoutine = true
+	brief.Decisions = nil
+	brief.WhatCouldBreak = "Nothing: the change is a spelling correction in a comment."
+
+	if err := brief.Validate(); err != nil {
+		t.Fatalf("a short routine brief should be accepted, got: %v", err)
+	}
+	if brief.PanelCount() != 1 {
+		t.Errorf("a routine brief should render as one panel, got %d", brief.PanelCount())
+	}
+}
+
+func TestABriefWithDecisionsRendersMorePanels(t *testing.T) {
+	brief := validBrief()
+
+	if brief.PanelCount() <= 1 {
+		t.Errorf("a brief carrying a decision should render more than one panel, got %d", brief.PanelCount())
+	}
+}
+
+func TestPanelCountIsBoundedSoALargeChangeSummarises(t *testing.T) {
+	// A brief that grew with the change would become the wall of text it
+	// replaces. Past the cap it has to summarise instead.
+	brief := validBrief()
+	for len(brief.Decisions) < 20 {
+		brief.Decisions = append(brief.Decisions, Decision{
+			Chose:        "One approach among many",
+			InsteadOf:    "A different approach entirely",
+			Because:      "It fitted the existing seam.",
+			OpenQuestion: "Was the seam the right one?",
+		})
+	}
+
+	if brief.PanelCount() > MaximumBriefPanels {
+		t.Errorf("a brief must not grow without bound: got %d panels, cap is %d",
+			brief.PanelCount(), MaximumBriefPanels)
+	}
+}
