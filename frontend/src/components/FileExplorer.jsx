@@ -10,6 +10,8 @@ import {
   ChevronDown,
   RefreshCw
 } from 'lucide-react';
+import ContextMenu from './ContextMenu';
+import { copyText } from '../utils/copyText';
 import './FileExplorer.css';
 
 const getFileIcon = (fileName) => {
@@ -99,56 +101,35 @@ function FileTreeNode({ node, level, onFileOpen, onContextMenu, expandedDirs, to
   );
 }
 
-function ContextMenu({ x, y, node, onClose, onAction }) {
-  useEffect(() => {
-    const handleClick = () => onClose();
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, [onClose]);
-  
-  const actions = node.isDir
-    ? [
-        { label: 'Open in Terminal', action: 'openInTerminal' },
-        { label: 'Send Path to Terminal', action: 'sendPath' },
-        { label: '─────────────', disabled: true },
-        { label: 'New File', action: 'newFile' },
-        { label: 'New Folder', action: 'newFolder' },
-        { label: '─────────────', disabled: true },
-        { label: 'Rename', action: 'rename' },
-        { label: 'Delete', action: 'delete' },
-      ]
-    : [
-        { label: 'Open in Editor', action: 'openInEditor' },
-        { label: 'Open in New Tab', action: 'openInNewTab' },
-        { label: '─────────────', disabled: true },
-        { label: 'Send to Terminal', action: 'sendToTerminal' },
-        { label: 'Copy Path', action: 'copyPath' },
-        { label: 'Copy Relative Path', action: 'copyRelativePath' },
-        { label: '─────────────', disabled: true },
-        { label: 'Rename', action: 'rename' },
-        { label: 'Delete', action: 'delete' },
-      ];
-  
-  return (
-    <div className="context-menu" style={{ top: y, left: x }}>
-      {actions.map((action, idx) => (
-        action.disabled ? (
-          <div key={idx} className="context-menu-separator" />
-        ) : (
-          <div
-            key={idx}
-            className="context-menu-item"
-            onClick={() => {
-              onAction(action.action, node);
-              onClose();
-            }}
-          >
-            {action.label}
-          </div>
-        )
-      ))}
-    </div>
-  );
+/** What a right-click offers, which differs for a folder and a file. */
+function buildMenuItems(node) {
+  if (node.isDir) {
+    return [
+      { label: 'Open in Terminal', action: 'openInTerminal' },
+      { label: 'Send Path to Terminal', action: 'sendPath' },
+      { separator: true },
+      { label: 'Copy Path', action: 'copyPath' },
+      { label: 'Copy Relative Path', action: 'copyRelativePath' },
+      { separator: true },
+      { label: 'New File', action: 'newFile' },
+      { label: 'New Folder', action: 'newFolder' },
+      { separator: true },
+      { label: 'Rename', action: 'rename' },
+      { label: 'Delete', action: 'delete' },
+    ];
+  }
+
+  return [
+    { label: 'Open in Editor', action: 'openInEditor' },
+    { label: 'Open in New Tab', action: 'openInNewTab' },
+    { separator: true },
+    { label: 'Send to Terminal', action: 'sendToTerminal' },
+    { label: 'Copy Path', action: 'copyPath' },
+    { label: 'Copy Relative Path', action: 'copyRelativePath' },
+    { separator: true },
+    { label: 'Rename', action: 'rename' },
+    { label: 'Delete', action: 'delete' },
+  ];
 }
 
 export default function FileExplorer({ currentPath, rootPath, onFileOpen, terminalRef, onRefresh, shellConfig }) {
@@ -338,11 +319,11 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
         break;
         
       case 'copyPath':
-        navigator.clipboard.writeText(node.path);
+        copyText(node.path);
         break;
         
       case 'copyRelativePath':
-        navigator.clipboard.writeText(`./${node.name}`);
+        copyText(`./${node.name}`);
         break;
         
       case 'delete':
@@ -413,11 +394,11 @@ export default function FileExplorer({ currentPath, rootPath, onFileOpen, termin
       
       {contextMenu && (
         <ContextMenu
-          clientX={contextMenu.clientX}
-          clientY={contextMenu.clientY}
-          node={contextMenu.node}
+          x={contextMenu.clientX}
+          y={contextMenu.clientY}
+          items={buildMenuItems(contextMenu.node)}
           onClose={() => setContextMenu(null)}
-          onAction={handleContextAction}
+          onAction={(action) => handleContextAction(action, contextMenu.node)}
         />
       )}
     </div>

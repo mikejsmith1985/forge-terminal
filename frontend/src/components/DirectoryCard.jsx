@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, FolderOpen, FolderPlus, RefreshCw, Settings, X, ChevronUp, ChevronDown, Github } from 'lucide-react';
+import ContextMenu from './ContextMenu';
+import { copyText } from '../utils/copyText';
 import './DirectoryCard.css';
+
+// What a right-click on a project folder offers. Copy Path leads because it is
+// the reason the menu exists: the path is the thing a project row is most often
+// wanted for, and there was previously no way to get it out of the UI.
+const FOLDER_MENU_ITEMS = [
+  { label: 'Copy Path', action: 'copyPath' },
+  { label: 'Copy Folder Name', action: 'copyName' },
+  { separator: true },
+  { label: 'Open in Terminal', action: 'openInTerminal' },
+];
 
 const DirectoryCard = ({ onExecute, onHide }) => {
   const [rootPath, setRootPath] = useState(() => localStorage.getItem('forge_directory_card_root') || '');
@@ -11,6 +23,8 @@ const DirectoryCard = ({ onExecute, onHide }) => {
   const [error, setError] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredDir, setHoveredDir] = useState(null);
+  // Which folder was right-clicked, and where to open its menu.
+  const [folderMenu, setFolderMenu] = useState(null);
   const inputRef = useRef(null);
 
   // New Project wizard state
@@ -87,6 +101,44 @@ const DirectoryCard = ({ onExecute, onHide }) => {
   const handleDirectoryClick = (dir) => {
     if (!onExecute) return;
     onExecute({ command: `cd "${dir.path}"`, delay: 0 });
+  };
+
+  /** Opens the folder menu where the pointer is, without opening the folder. */
+  const handleDirectoryRightClick = (dir, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setFolderMenu({ dir, x: event.clientX, y: event.clientY });
+  };
+
+  const closeFolderMenu = useCallback(() => setFolderMenu(null), []);
+
+  /**
+   * Runs a folder-menu action.
+   *
+   * @returns A message for the menu to show, or nothing to close it silently.
+   */
+  const handleFolderMenuAction = async (actionName) => {
+    const dir = folderMenu?.dir;
+    if (!dir) return undefined;
+
+    switch (actionName) {
+      case 'copyPath':
+        return (await copyText(dir.path))
+          ? 'Copied path'
+          : 'Could not copy — clipboard unavailable';
+
+      case 'copyName':
+        return (await copyText(dir.name))
+          ? 'Copied name'
+          : 'Could not copy — clipboard unavailable';
+
+      case 'openInTerminal':
+        handleDirectoryClick(dir);
+        return undefined;
+
+      default:
+        return undefined;
+    }
   };
 
   const handleCreateProject = async () => {
@@ -314,6 +366,7 @@ const DirectoryCard = ({ onExecute, onHide }) => {
                   key={dir.path}
                   className={`directory-card-folder-btn ${hoveredDir === dir.path ? 'hovered' : ''}`}
                   onClick={() => handleDirectoryClick(dir)}
+                  onContextMenu={(event) => handleDirectoryRightClick(dir, event)}
                   onMouseEnter={() => setHoveredDir(dir.path)}
                   onMouseLeave={() => setHoveredDir(null)}
                   title={dir.path}
@@ -325,6 +378,16 @@ const DirectoryCard = ({ onExecute, onHide }) => {
             </div>
           )}
         </div>
+      )}
+
+      {folderMenu && (
+        <ContextMenu
+          x={folderMenu.x}
+          y={folderMenu.y}
+          items={FOLDER_MENU_ITEMS}
+          onClose={closeFolderMenu}
+          onAction={handleFolderMenuAction}
+        />
       )}
     </div>
   );
