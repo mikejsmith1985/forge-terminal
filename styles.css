@@ -241,6 +241,82 @@ main > section {
   color: var(--green);
 }
 
+/* ── Entry headline, claims, and links ────────────────────────────────────── */
+/* Three optional blocks a full-width entry may carry. Only U2 Counter uses all
+   three today: it is the one entry whose opening line is the argument, and the
+   only one that hands the reader somewhere to go and check. */
+
+/* Set above the product name and in the page's largest non-heading type,
+   because it is the sentence the entry is asking to be remembered by. */
+.app-headline {
+  max-width: 46ch;
+  margin: 0 0 20px;
+  font-size: clamp(21px, 2.5vw, 27px);
+  line-height: 1.32;
+  font-weight: 550;
+  letter-spacing: -0.018em;
+  color: var(--text);
+  border-left: 3px solid var(--cyan);
+  padding-left: 20px;
+}
+
+.app-key-points {
+  max-width: var(--measure);
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+/* Cyan marks verified evidence everywhere else on the page, and these claims
+   are each either checkable in the repository or an admission — so they get the
+   same mark rather than a bullet. */
+.app-key-points li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--text-muted);
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+.app-key-points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 9px;
+  height: 2px;
+  background: var(--cyan);
+}
+
+.app-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+.app-link {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.app-link::before {
+  content: '↗';
+  margin-right: 8px;
+  color: var(--cyan);
+}
+.app-link:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+/* The evidence note sits closer to a link row than to a paragraph, because the
+   links are pill-shaped and carry their own padding. */
+.app-links + .evidence-note { margin-top: 30px; }
+
 /* ── Flagship ─────────────────────────────────────────────────────────────── */
 
 .flagship__tagline {
@@ -547,6 +623,10 @@ main > section {
   .masthead__nav { gap: 16px; font-size: 13px; }
   .flagship-figure figcaption { grid-template-columns: 1fr; }
   .beat { border-right: 0; }
+  /* The headline keeps its rule but loses the inset, which costs a phone most
+     of a short line. Links stack rather than wrapping mid-label. */
+  .app-headline { padding-left: 14px; }
+  .app-links { flex-direction: column; align-items: flex-start; }
 }
 
 @media (max-width: 520px) {

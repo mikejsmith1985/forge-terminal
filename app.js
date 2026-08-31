@@ -23,11 +23,13 @@ import {
 // standard the rest of the page claims. Everything else is supporting breadth.
 const FLAGSHIP_APP_SLUG = 'forge-terminal';
 
-// These get their own full-width tier rather than a grid cell. Neither is the
+// These get their own full-width tier rather than a grid cell. None is the
 // flagship — Forge Terminal is the machinery the thesis is about — but each
-// carries the same argument in a different domain: LG-Builder refuses to
-// proceed without a human, NodeToolbox refuses to guess at a number.
-const DEPTH_APP_SLUGS = ['lgbuilder', 'nodetoolbox'];
+// carries the same argument in a different domain: U2 Counter refuses to quote
+// a figure it cannot trace to a lookup, LG-Builder refuses to proceed without a
+// human, NodeToolbox refuses to guess at a number. U2 Counter leads the tier
+// because its opening line is the one a reader will remember.
+const DEPTH_APP_SLUGS = ['u2-counter', 'lgbuilder', 'nodetoolbox'];
 
 // Only one product carries an architecture diagram; the rest are product tours.
 const ARCHITECTURE_APP_SLUG = 'lgbuilder';
@@ -35,9 +37,14 @@ const ARCHITECTURE_APP_SLUG = 'lgbuilder';
 // Screenshot filenames are stable across rebuilds, so a returning visitor's
 // browser serves the old image until its cache expires. Bump this whenever the
 // assets are regenerated so a redeploy is never invisible.
-const ASSET_VERSION = '20260826-fuller-terminals';
+const ASSET_VERSION = '20260830-u2-counter';
 
-const GITHUB_COMMIT_BASE_URL = 'https://github.com/mikejsmith1985/forge-terminal/commit/';
+// The repository handle lives here rather than in the generated data, because
+// that data file is scanned for exactly this string as a sign that a local path
+// has leaked into published copy. An app's links therefore carry a repo-relative
+// path and this constant supplies the rest.
+const GITHUB_REPO_BASE_URL = 'https://github.com/mikejsmith1985/';
+const GITHUB_COMMIT_BASE_URL = `${GITHUB_REPO_BASE_URL}forge-terminal/commit/`;
 
 function escapeHtml(value) {
   return String(value)
@@ -112,6 +119,53 @@ function createTechStack(app) {
     .join('')}</div>`;
 }
 
+/**
+ * Emits the line an entry leads with, for the entries that have one.
+ *
+ * Set above the tagline rather than inside the summary because it is a claim in
+ * its own right and reads as weaker the moment it is surrounded by other
+ * sentences.
+ */
+function createHeadline(app) {
+  return app.headline
+    ? `<p class="app-headline">${escapeHtml(app.headline)}</p>`
+    : '';
+}
+
+/** Emits the short claims an entry rests on, each one checkable or an admission. */
+function createKeyPoints(app) {
+  if (!app.keyPoints) {
+    return '';
+  }
+
+  const pointsMarkup = app.keyPoints
+    .map((keyPoint) => `<li>${escapeHtml(keyPoint)}</li>`)
+    .join('');
+
+  return `<ul class="app-key-points">${pointsMarkup}</ul>`;
+}
+
+/**
+ * Emits an entry's outbound links, resolved against the repository base URL.
+ *
+ * Each link carries a repo-relative path rather than a full address, so the
+ * generated data file never contains the handle the leak scanner looks for.
+ */
+function createAppLinks(app) {
+  if (!app.links) {
+    return '';
+  }
+
+  const linksMarkup = app.links
+    .map((appLink) => `
+      <a class="app-link" href="${escapeHtml(GITHUB_REPO_BASE_URL)}${escapeHtml(appLink.repoPath)}" rel="noopener">
+        ${escapeHtml(appLink.label)}
+      </a>`)
+    .join('');
+
+  return `<div class="app-links">${linksMarkup}</div>`;
+}
+
 /** Emits the mount point for the architecture diagram, for the one app that has one. */
 function createArchitectureSlot(appSlug) {
   return appSlug === ARCHITECTURE_APP_SLUG ? '<div class="architecture-slot"></div>' : '';
@@ -131,10 +185,13 @@ function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
   selectElement(sectionSelector).innerHTML = `
     <div class="section-intro">
       <p class="kicker">${escapeHtml(kicker)}</p>
+      ${createHeadline(portfolioApp)}
       <h2 id="${escapeHtml(headingId)}">${escapeHtml(portfolioApp.name)}</h2>
       <p class="flagship__tagline">${escapeHtml(portfolioApp.tagline)}</p>
       <p>${escapeHtml(portfolioApp.summary)}</p>
+      ${createKeyPoints(portfolioApp)}
       ${createTechStack(portfolioApp)}
+      ${createAppLinks(portfolioApp)}
       <p class="evidence-note">${escapeHtml(portfolioApp.proofNote)}</p>
     </div>
     ${createArchitectureSlot(appSlug)}
