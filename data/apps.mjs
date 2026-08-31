@@ -109,7 +109,7 @@ export const PORTFOLIO_APPS = [
         "repoPath": "u2-counter"
       },
       {
-        "label": "What it does not show — the limits, written down",
+        "label": "What it does not show",
         "repoPath": "u2-counter/blob/main/docs/what-it-does-not-show.md"
       }
     ],
