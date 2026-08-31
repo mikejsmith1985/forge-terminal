@@ -26,7 +26,7 @@ func projectRootForTest(t *testing.T) string {
 
 func TestWorkflowGateRecord_StoresEvidence(t *testing.T) {
 	projectRoot := projectRootForTest(t)
-	tool := newWorkflowGateRecordTool(projectRoot)
+	tool := newWorkflowGateRecordTool(staticProjectPath(projectRoot))
 
 	result, err := tool.Execute(map[string]any{
 		"gate":     workflow.RequiredGates[0],
@@ -43,7 +43,7 @@ func TestWorkflowGateRecord_StoresEvidence(t *testing.T) {
 
 func TestWorkflowGateRecord_RejectsEmptyEvidence(t *testing.T) {
 	projectRoot := projectRootForTest(t)
-	tool := newWorkflowGateRecordTool(projectRoot)
+	tool := newWorkflowGateRecordTool(staticProjectPath(projectRoot))
 
 	result, _ := tool.Execute(map[string]any{
 		"gate":     workflow.RequiredGates[0],
@@ -58,7 +58,7 @@ func TestWorkflowGateRecord_RejectsEmptyEvidence(t *testing.T) {
 
 func TestWorkflowPreflightCheck_ReportsBlockedWhenLedgerEmpty(t *testing.T) {
 	projectRoot := projectRootForTest(t)
-	tool := newWorkflowPreflightTool(projectRoot)
+	tool := newWorkflowPreflightTool(staticProjectPath(projectRoot))
 
 	result, err := tool.Execute(nil)
 	if err != nil {

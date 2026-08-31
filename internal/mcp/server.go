@@ -74,7 +74,21 @@ type Dependencies struct {
 	WorkflowConfig workflow.WorkflowConfig
 
 	// ProjectPath is the root path used by file tools and workflow compliance scans.
+	//
+	// Prefer ProjectPathFunc. This stays for tests and for callers that genuinely
+	// know the project up front.
 	ProjectPath string
+
+	// ProjectPathFunc resolves the project at call time rather than at startup.
+	//
+	// Needed because the right answer changes: the developer switches tabs, and
+	// the project a tool should write to is the one that tab is bound to. A path
+	// captured when Forge started describes where Forge was launched, which is
+	// the project only by coincidence — and on Windows that coincidence produced
+	// writes into C:\WINDOWS\system32.
+	//
+	// Nil falls back to ProjectPath.
+	ProjectPathFunc func() string
 
 	// AllowedTools restricts which built-in tools are registered.
 	// An empty/nil slice means all tools are exposed (the default).
@@ -109,6 +123,19 @@ type Dependencies struct {
 
 // NewServer creates a fully initialised MCP server.
 // authToken is loaded by auth.LoadOrCreateToken() before this call.
+// resolveProjectPath returns the project a tool should act on, asked fresh.
+//
+// Resolved per call rather than held, because the developer changes tabs and the
+// answer changes with them.
+func (deps Dependencies) resolveProjectPath() string {
+	if deps.ProjectPathFunc != nil {
+		if resolved := deps.ProjectPathFunc(); resolved != "" {
+			return resolved
+		}
+	}
+	return deps.ProjectPath
+}
+
 func NewServer(authToken string, deps Dependencies) *Server {
 	broker := NewTaskBroker()
 
@@ -354,9 +381,12 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newFileListTool(srv.deps.ProjectPath),
 		newTaskSubmitTool(srv.broker),
 		newWorkflowStatusTool(srv.deps.ProjectPath, srv.deps.WorkflowConfig),
-		newWorkflowGateRecordTool(srv.deps.ProjectPath),
-		newWorkflowPreflightTool(srv.deps.ProjectPath),
-		newChangeBriefPublishTool(srv.deps.ProjectPath, srv.deps.TermHandler),
+		// These three write project state, so they resolve the project when they
+		// run rather than when Forge started — the developer changes tabs, and
+		// the right project changes with them.
+		newWorkflowGateRecordTool(srv.deps.resolveProjectPath),
+		newWorkflowPreflightTool(srv.deps.resolveProjectPath),
+		newChangeBriefPublishTool(srv.deps.resolveProjectPath, srv.deps.TermHandler),
 		newEnvironmentDetectTool(environmentRunner),
 		newEnvironmentRunTool(environmentRunner, environmentJobManager),
 		newEnvironmentJobsTool(environmentJobManager),

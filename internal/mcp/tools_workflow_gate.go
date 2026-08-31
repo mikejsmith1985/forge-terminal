@@ -19,11 +19,14 @@ import (
 
 // workflowGateRecordTool persists a gate pass to the project ticket.
 type workflowGateRecordTool struct {
-	projectPath string
+	// resolveProjectPath is asked on every call rather than once at startup,
+	// because the project a gate belongs to is the one the developer's tab is
+	// in, and that changes as they switch tabs.
+	resolveProjectPath func() string
 }
 
-func newWorkflowGateRecordTool(projectPath string) ToolHandler {
-	return &workflowGateRecordTool{projectPath: projectPath}
+func newWorkflowGateRecordTool(resolveProjectPath func() string) ToolHandler {
+	return &workflowGateRecordTool{resolveProjectPath: resolveProjectPath}
 }
 
 func (t *workflowGateRecordTool) Definition() ToolDefinition {
@@ -46,7 +49,8 @@ func (t *workflowGateRecordTool) Definition() ToolDefinition {
 }
 
 func (t *workflowGateRecordTool) Execute(args map[string]any) (*CallToolResult, error) {
-	if t.projectPath == "" {
+	projectPath := t.resolveProjectPath()
+	if projectPath == "" {
 		return errorContent("no project path configured — cannot record gate"), nil
 	}
 	gate, _ := args["gate"].(string)
@@ -54,13 +58,13 @@ func (t *workflowGateRecordTool) Execute(args map[string]any) (*CallToolResult, 
 	taskID, _ := args["taskId"].(string)
 	branch, _ := args["branch"].(string)
 
-	ticket, err := workflow.RecordGate(t.projectPath, taskID, gate, evidence)
+	ticket, err := workflow.RecordGate(projectPath, taskID, gate, evidence)
 	if err != nil {
 		return errorContent(fmt.Sprintf("workflow_gate_record: %v", err)), nil
 	}
 	if branch != "" && ticket.Branch == "" {
 		ticket.Branch = branch
-		if err := workflow.SaveTicket(t.projectPath, ticket); err != nil {
+		if err := workflow.SaveTicket(projectPath, ticket); err != nil {
 			return errorContent(fmt.Sprintf("saving branch on ticket: %v", err)), nil
 		}
 	}
@@ -73,11 +77,11 @@ func (t *workflowGateRecordTool) Execute(args map[string]any) (*CallToolResult, 
 
 // workflowPreflightTool returns whether the ticket has all required gates.
 type workflowPreflightTool struct {
-	projectPath string
+	resolveProjectPath func() string
 }
 
-func newWorkflowPreflightTool(projectPath string) ToolHandler {
-	return &workflowPreflightTool{projectPath: projectPath}
+func newWorkflowPreflightTool(resolveProjectPath func() string) ToolHandler {
+	return &workflowPreflightTool{resolveProjectPath: resolveProjectPath}
 }
 
 func (t *workflowPreflightTool) Definition() ToolDefinition {
@@ -94,10 +98,11 @@ func (t *workflowPreflightTool) Definition() ToolDefinition {
 }
 
 func (t *workflowPreflightTool) Execute(_ map[string]any) (*CallToolResult, error) {
-	if t.projectPath == "" {
+	projectPath := t.resolveProjectPath()
+	if projectPath == "" {
 		return errorContent("no project path configured — cannot run preflight"), nil
 	}
-	result, err := workflow.Preflight(t.projectPath)
+	result, err := workflow.Preflight(projectPath)
 	if err != nil {
 		return errorContent(fmt.Sprintf("preflight: %v", err)), nil
 	}

@@ -35,12 +35,16 @@ type briefBroadcaster interface {
 
 // changeBriefPublishTool stores a brief, records its gate, and shows it.
 type changeBriefPublishTool struct {
-	projectPath string
-	broadcaster briefBroadcaster
+	// resolveProjectPath is asked on every call rather than once at startup.
+	// A brief belongs to the project the developer's tab is in, and a path
+	// captured when Forge started describes where Forge was launched instead —
+	// which on Windows meant attempting to write into C:\WINDOWS\system32.
+	resolveProjectPath func() string
+	broadcaster        briefBroadcaster
 }
 
-func newChangeBriefPublishTool(projectPath string, broadcaster briefBroadcaster) ToolHandler {
-	return &changeBriefPublishTool{projectPath: projectPath, broadcaster: broadcaster}
+func newChangeBriefPublishTool(resolveProjectPath func() string, broadcaster briefBroadcaster) ToolHandler {
+	return &changeBriefPublishTool{resolveProjectPath: resolveProjectPath, broadcaster: broadcaster}
 }
 
 func (t *changeBriefPublishTool) Definition() ToolDefinition {
@@ -82,8 +86,12 @@ func (t *changeBriefPublishTool) Definition() ToolDefinition {
 }
 
 func (t *changeBriefPublishTool) Execute(args map[string]any) (*CallToolResult, error) {
-	if t.projectPath == "" {
-		return errorContent("no project path configured — cannot publish a brief"), nil
+	projectPath := t.resolveProjectPath()
+	if projectPath == "" {
+		// Said plainly, because the alternative — writing into whatever
+		// directory Forge happened to start in — produced an operating-system
+		// permission error that explained nothing.
+		return errorContent("cannot tell which project this is — open a terminal tab in the repository and try again"), nil
 	}
 
 	brief, err := briefFromArgs(args)
@@ -93,12 +101,12 @@ func (t *changeBriefPublishTool) Execute(args map[string]any) (*CallToolResult, 
 
 	// Stored first.  A brief that failed validation must leave nothing behind,
 	// or a rejected document would still unblock the commit.
-	if err := workflow.SaveBrief(t.projectPath, brief); err != nil {
+	if err := workflow.SaveBrief(projectPath, brief); err != nil {
 		return errorContent(fmt.Sprintf("change_brief_publish: %v", err)), nil
 	}
 
 	evidence := fmt.Sprintf("brief %s published for task %s", brief.BriefID, brief.TaskID)
-	if _, err := workflow.RecordGate(t.projectPath, brief.TaskID, workflow.GateBriefPublished, evidence); err != nil {
+	if _, err := workflow.RecordGate(projectPath, brief.TaskID, workflow.GateBriefPublished, evidence); err != nil {
 		return errorContent(fmt.Sprintf("recording the brief-published gate: %v", err)), nil
 	}
 
