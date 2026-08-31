@@ -14,7 +14,7 @@ that must first fail.
 
 - [X] T001 Record the `branch-created` gate for this work via `forge workflow record branch-created "<evidence>" comprehension-first-workflow`
 - [X] T002 [P] Add the brief document shape as Go types in `internal/workflow/brief.go`, matching the Change Brief and Decision entities in `specs/014-comprehension-first-workflow/data-model.md`
-- [ ] T003 [P] Add the `CHANGE_BRIEF` WebSocket message-type constant in `frontend/src/hooks/useChangeBrief.js` alongside the existing `SDD_PHASE_GATE` pattern in `frontend/src/hooks/useSddGate.js`
+- [X] T003 [P] Add the `CHANGE_BRIEF` WebSocket message-type constant in `frontend/src/hooks/useChangeBrief.js` alongside the existing `SDD_PHASE_GATE` pattern in `frontend/src/hooks/useSddGate.js`
 
 ---
 
@@ -58,18 +58,18 @@ that must first fail.
 
 ### Tests (write first, must fail)
 
-- [ ] T017 [P] [US2] Write the failing frontend unit test in `frontend/src/hooks/useChangeBrief.test.js`: a `CHANGE_BRIEF` message populates state, an unrelated message type is ignored, and a pending brief is restored after reload
-- [ ] T018 [P] [US2] Write the failing frontend unit test in `frontend/src/components/ChangeBriefPanel.test.jsx`: what-changed, why, and what-could-break render as visually distinct panels; the risk panel carries its own styling; each decision renders its `openQuestion`; a routine brief renders a single panel
-- [ ] T019 [US2] Write the failing Playwright spec in `tests/e2e/change-brief.spec.js` run against `run-dev-clean.ps1` on `:9999`: a brief published by a tool call reaches the panel, no panel requires scrolling at the default viewport, and the brief survives a page reload
+- [X] T017 [P] [US2] Write the failing frontend unit test in `frontend/src/hooks/useChangeBrief.test.js`: a `CHANGE_BRIEF` message populates state, an unrelated message type is ignored, and a pending brief is restored after reload
+- [X] T018 [P] [US2] Write the failing frontend unit test in `frontend/src/components/ChangeBriefPanel.test.jsx`: what-changed, why, and what-could-break render as visually distinct panels; the risk panel carries its own styling; each decision renders its `openQuestion`; a routine brief renders a single panel
+- [X] T019 [US2] Write the failing Playwright spec in `tests/e2e/change-brief.spec.js` run against `run-dev-clean.ps1` on `:9999`: a brief published by a tool call reaches the panel, no panel requires scrolling at the default viewport, and the brief survives a page reload
 
 ### Implementation
 
-- [ ] T020 [US2] Implement `frontend/src/hooks/useChangeBrief.js` receiving `CHANGE_BRIEF` over the hub and restoring a pending brief, mirroring `frontend/src/hooks/useSddGate.js`, to turn T017 green
-- [ ] T021 [US2] Implement `frontend/src/components/ChangeBriefPanel.jsx` to turn T018 green
-- [ ] T022 [P] [US2] Implement `frontend/src/components/ChangeBriefPanel.css` with large type, high contrast, and colour that carries meaning consistently — one token for verified evidence, one for risk — per FR-003
-- [ ] T023 [US2] Push the published brief to the frontend from `internal/mcp/tools_change_brief.go` using the existing `BroadcastJSONToSession` in `internal/terminal/mcp_bridge.go`
-- [ ] T024 [US2] Mount the panel and route the message type in `frontend/src/App.jsx` to turn T019 green
-- [ ] T025 [US2] Implement the no-session case in `internal/mcp/tools_change_brief.go`: the brief is stored and the gate recorded even when no terminal session can render it, per `contracts/change-brief-tool.md`
+- [X] T020 [US2] Implement `frontend/src/hooks/useChangeBrief.js` receiving `CHANGE_BRIEF` over the hub and restoring a pending brief, mirroring `frontend/src/hooks/useSddGate.js`, to turn T017 green
+- [X] T021 [US2] Implement `frontend/src/components/ChangeBriefPanel.jsx` to turn T018 green
+- [X] T022 [P] [US2] Implement `frontend/src/components/ChangeBriefPanel.css` with large type, high contrast, and colour that carries meaning consistently — one token for verified evidence, one for risk — per FR-003
+- [X] T023 [US2] Push the published brief to the frontend from `internal/mcp/tools_change_brief.go` using the existing `BroadcastJSONToSession` in `internal/terminal/mcp_bridge.go`
+- [X] T024 [US2] Mount the panel and route the message type in `frontend/src/App.jsx` to turn T019 green
+- [X] T025 [US2] Implement the no-session case in `internal/mcp/tools_change_brief.go`: the brief is stored and the gate recorded even when no terminal session can render it, per `contracts/change-brief-tool.md`
 
 ---
 

@@ -36,6 +36,8 @@ import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
 import { useSddGate } from './hooks/useSddGate'
+import { useChangeBrief } from './hooks/useChangeBrief'
+import ChangeBriefPanel from './components/ChangeBriefPanel'
 import { useDevMode } from './hooks/useDevMode'
 // useWorkflowManager REMOVED - v3.9.0: Workflows deleted
 import { logger } from './utils/logger'
@@ -444,6 +446,9 @@ function App() {
 
   // SDD phase orchestrator (specs/003): the decision-card gate for the active session.
   const sddGate = useSddGate({ activeSessionId: activeTabId });
+  // The change brief for this tab. Separate from the gate card because a
+  // brief explains work already done, while a gate asks permission to proceed.
+  const changeBrief = useChangeBrief({ activeSessionId: activeTabId });
 
   // Bind the active session + its repo to the SDD pipeline once the working directory is
   // known. The backend resolves the active feature from .specify/feature.json and returns
@@ -2197,7 +2202,10 @@ function App() {
                     onSpawnFailed={handleSpawnFailed}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
-                    onSddGate={tab.id === activeTabId ? sddGate.handleWsMessage : undefined}
+                    onSddGate={tab.id === activeTabId ? (raw) => {
+                      sddGate.handleWsMessage(raw)
+                      changeBrief.handleWsMessage(raw)
+                    } : undefined}
                     onCopy={() => addToast('✓ Copied to clipboard', 'success', 1500)}
                     onFileOpen={handleFileOpen}
                     onPaste={(type, metadata) => {
@@ -2240,6 +2248,12 @@ function App() {
              Wrapped in its own ErrorBoundary so a dashboard render crash never takes
              down the terminal (the whole-app boundary at AppWithErrorBoundary would
              otherwise blank the entire UI on any SDD panel error). */}
+        {changeBrief.isBriefOpen && (
+          <ErrorBoundary>
+            <ChangeBriefPanel brief={changeBrief.brief} onDismiss={changeBrief.dismiss} />
+          </ErrorBoundary>
+        )}
+
         <ErrorBoundary>
           <SddDashboard
             phases={sddGate.phaseStatuses}

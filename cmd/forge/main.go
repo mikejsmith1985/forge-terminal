@@ -628,6 +628,10 @@ func main() {
 	http.HandleFunc("/api/sdd/bind", WrapWithMiddleware(handleSddBind))
 	http.HandleFunc("/api/sdd/decision", WrapWithMiddleware(handleSddDecision))
 	http.HandleFunc("/api/sdd/status", WrapWithMiddleware(handleSddStatus))
+	// Restores a brief published before a page reload. The live path is the
+	// WebSocket; this covers only the refresh case, where a lost brief would
+	// leave the developer believing they reviewed something they never saw.
+	http.HandleFunc("/api/brief/latest", WrapWithMiddleware(handleBriefLatest))
 	// phase-event is the authoritative phase signal emitted by the speckit skill workflow:
 	// "started" marks a phase running, "complete" opens its gate — replacing file-watcher
 	// inference as the primary state driver (specs/010-sdd-authoritative-state, FR-001).
