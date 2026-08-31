@@ -12,18 +12,18 @@ that must first fail.
 
 ## Phase 1: Setup
 
-- [ ] T001 Record the `branch-created` gate for this work via `forge workflow record branch-created "<evidence>" comprehension-first-workflow`
-- [ ] T002 [P] Add the brief document shape as Go types in `internal/workflow/brief.go`, matching the Change Brief and Decision entities in `specs/014-comprehension-first-workflow/data-model.md`
+- [X] T001 Record the `branch-created` gate for this work via `forge workflow record branch-created "<evidence>" comprehension-first-workflow`
+- [X] T002 [P] Add the brief document shape as Go types in `internal/workflow/brief.go`, matching the Change Brief and Decision entities in `specs/014-comprehension-first-workflow/data-model.md`
 - [ ] T003 [P] Add the `CHANGE_BRIEF` WebSocket message-type constant in `frontend/src/hooks/useChangeBrief.js` alongside the existing `SDD_PHASE_GATE` pattern in `frontend/src/hooks/useSddGate.js`
 
 ---
 
 ## Phase 2: Foundational (blocking — no user story can complete without these)
 
-- [ ] T004 Write the failing unit test for brief validation in `internal/workflow/brief_test.go`: an empty required panel is rejected, `decisions: []` with `isRoutine: false` is rejected, `insteadOf` restating `chose` is rejected, and `isRoutine: true` with no decisions is accepted
-- [ ] T005 Implement brief validation in `internal/workflow/brief.go` to turn T004 green
-- [ ] T006 Write the failing unit test for brief persistence in `internal/workflow/brief_store_test.go`: a brief round-trips under `.forge/`, and republishing the same `briefId` updates rather than duplicating
-- [ ] T007 Implement brief load/save/update in `internal/workflow/brief_store.go` to turn T006 green
+- [X] T004 Write the failing unit test for brief validation in `internal/workflow/brief_test.go`: an empty required panel is rejected, `decisions: []` with `isRoutine: false` is rejected, `insteadOf` restating `chose` is rejected, and `isRoutine: true` with no decisions is accepted
+- [X] T005 Implement brief validation in `internal/workflow/brief.go` to turn T004 green
+- [X] T006 Write the failing unit test for brief persistence in `internal/workflow/brief_store_test.go`: a brief round-trips under `.forge/`, and republishing the same `briefId` updates rather than duplicating
+- [X] T007 Implement brief load/save/update in `internal/workflow/brief_store.go` to turn T006 green
 
 ---
 
