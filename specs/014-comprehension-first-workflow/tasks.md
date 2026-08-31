@@ -100,14 +100,14 @@ that must first fail.
 
 ### Tests (write first, must fail)
 
-- [ ] T031 [P] [US4] Write the failing unit test in `internal/workflow/naming_test.go` for the rule set in `data-model.md`: single-letter identifiers rejected, `i`/`j`/`k` loop iterators and `w`/`r` handler parameters permitted, unprefixed booleans rejected, non-verb-first functions rejected
-- [ ] T032 [P] [US4] Write the failing unit test in `internal/workflow/naming_test.go` for scope: generated, vendored and third-party paths are skipped entirely
-- [ ] T033 [US4] Write the failing integration test in `internal/workflow/naming_integration_test.go` against a real temp repository: a violating commit is refused naming the identifier and its location, and `FORGE_BYPASS` overrides with the reason recorded
+- [X] T031 [P] [US4] Write the failing unit test in `internal/workflow/naming_test.go` for the rule set in `data-model.md`: single-letter identifiers rejected, `i`/`j`/`k` loop iterators and `w`/`r` handler parameters permitted, unprefixed booleans rejected, non-verb-first functions rejected
+- [X] T032 [P] [US4] Write the failing unit test in `internal/workflow/naming_test.go` for scope: generated, vendored and third-party paths are skipped entirely
+- [X] T033 [US4] Write the failing integration test in `internal/workflow/naming_integration_test.go` against a real temp repository: a violating commit is refused naming the identifier and its location, and `FORGE_BYPASS` overrides with the reason recorded
 
 ### Implementation
 
-- [ ] T034 [US4] Implement the changed-files naming checker in `internal/workflow/naming.go` to turn T031 and T032 green, with a file purpose comment carrying the Framework-First justification from research R5
-- [ ] T035 [US4] Add the naming check step to the generated pre-commit hook body in `internal/workflow/hooks.go`, preserving the existing `FORGE_BYPASS` path and the graceful skip when the forge binary is absent, to turn T033 green
+- [X] T034 [US4] Implement the changed-files naming checker in `internal/workflow/naming.go` to turn T031 and T032 green, with a file purpose comment carrying the Framework-First justification from research R5
+- [X] T035 [US4] Add the naming check step to the generated pre-commit hook body in `internal/workflow/hooks.go`, preserving the existing `FORGE_BYPASS` path and the graceful skip when the forge binary is absent, to turn T033 green
 - [ ] T036 [US4] Add the meaningless-but-legal name case to the brief rather than the checker, per FR-019, in `internal/mcp/tools_change_brief.go`
 
 ---
