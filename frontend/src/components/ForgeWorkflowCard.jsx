@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle, Copy, Eye, EyeOff, Info } from 'lucide-react'
+import { Shield, ChevronDown, ChevronUp, Settings, RefreshCw, CheckCircle, AlertTriangle, XCircle, Copy, Eye, EyeOff, Info, Globe } from 'lucide-react'
 import { useWorkflowSetup } from '../hooks/useWorkflowSetup'
 import WorkflowWizard from './WorkflowWizard'
 import './ForgeWorkflowCard.css'
@@ -20,6 +20,9 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [showFindings, setShowFindings] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  // Drives the styled in-app confirmation for the global install, replacing the
+  // jarring native window.confirm browser dialog.
+  const [isConfirmingGlobalInstall, setIsConfirmingGlobalInstall] = useState(false)
   const workflow = useWorkflowSetup()
 
   const {
@@ -27,6 +30,8 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
     compliance,
     checkStatus,
     scanCompliance,
+    installGlobalConstitution,
+    isInstallingGlobal,
   } = workflow
 
   // Auto-check status when cwd changes
@@ -71,6 +76,29 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
     }
   }, [cwd, checkStatus])
 
+  // Installing the constitution writes outside the current project (~/.claude,
+  // ~/.copilot, ~/.gemini), so we confirm first — but with a styled in-app panel,
+  // not a native window.confirm popup. requestGlobalInstall opens that panel.
+  const requestGlobalInstall = useCallback(() => {
+    setIsConfirmingGlobalInstall(true)
+  }, [])
+
+  const cancelGlobalInstall = useCallback(() => {
+    setIsConfirmingGlobalInstall(false)
+  }, [])
+
+  // Run the global install after the user confirms in the styled panel, then
+  // report the outcome via a toast (success or failure).
+  const confirmGlobalInstall = useCallback(async () => {
+    setIsConfirmingGlobalInstall(false)
+    const result = await installGlobalConstitution()
+    if (result) {
+      onToast?.(`Constitution installed to ${result.targetsWritten?.length || 0} CLI tool(s)`, 'success')
+    } else {
+      onToast?.('Global constitution install failed', 'error')
+    }
+  }, [installGlobalConstitution, onToast])
+
   // Determine compliance badge
   const complianceBadge = getComplianceBadge(compliance)
 
@@ -100,6 +128,37 @@ const ForgeWorkflowCard = ({ onExecuteCommand, onToast, cwd }) => {
         {/* Expanded View */}
         {isExpanded && (
           <div className="fwc-body">
+            {/* Global action — independent of the current project. Installs the
+                constitution into every CLI tool's machine-wide instructions. */}
+            <button
+              className="fwc-btn fwc-btn-global"
+              onClick={requestGlobalInstall}
+              disabled={isInstallingGlobal || isConfirmingGlobalInstall}
+              title="Write the Forge constitution into ~/.claude, ~/.copilot and ~/.gemini"
+            >
+              <Globe size={14} className={isInstallingGlobal ? 'fwc-spin' : ''} />
+              {isInstallingGlobal ? 'Installing…' : 'Install Constitution Globally'}
+            </button>
+
+            {/* Styled in-app confirmation — replaces the native window.confirm dialog. */}
+            {isConfirmingGlobalInstall && (
+              <div className="fwc-confirm" role="alertdialog" aria-label="Confirm global constitution install">
+                <p className="fwc-confirm-message">
+                  Install the Forge constitution globally? This writes it into your global CLI
+                  instruction files (<code>~/.claude</code>, <code>~/.copilot</code>, <code>~/.gemini</code>)
+                  inside a managed marker block — your own instructions outside that block are preserved.
+                </p>
+                <div className="fwc-confirm-actions">
+                  <button className="fwc-btn fwc-btn-primary" onClick={confirmGlobalInstall}>
+                    Install
+                  </button>
+                  <button className="fwc-btn fwc-btn-secondary" onClick={cancelGlobalInstall}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             {status?.configured ? (
               <>
                 {/* Compliance Summary */}

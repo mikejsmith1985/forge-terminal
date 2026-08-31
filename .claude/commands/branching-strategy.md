@@ -40,7 +40,7 @@ git branch --show-current   # confirm — must NOT output "main"
 
 ## Step 3 — Confirm before proceeding
 
-After creating the branch, output the branch name to the user so they can see it was created. Then proceed to Phase 1 of the forge-workflow.
+After creating the branch, output the branch name to the user so they can see it was created. Then proceed with planning (the SDD specify/plan stage).
 
 ---
 
@@ -59,4 +59,4 @@ After creating the branch, output the branch name to the user so they can see it
 2. Stash the changes: `git stash`
 3. Create the correct branch: `git checkout -b fix/<name>`
 4. Apply the stash: `git stash pop`
-5. Continue from Phase 2 of forge-workflow.
+5. Continue with the task.

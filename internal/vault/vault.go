@@ -25,11 +25,11 @@ import (
 // Obtain an instance by calling Open; use GetGlobal to retrieve the
 // application-wide singleton after initialization.
 type Vault struct {
-	mu          sync.RWMutex
-	isOpen      bool
-	vaultPath   string  // absolute path to vault.enc
-	masterKey   []byte  // 32-byte AES-256 key held in memory while running
-	entries     []*diskEntry
+	mu        sync.RWMutex
+	isOpen    bool
+	vaultPath string // absolute path to vault.enc
+	masterKey []byte // 32-byte AES-256 key held in memory while running
+	entries   []*diskEntry
 }
 
 // globalVaultInstance is the application-wide singleton set by Open.
@@ -100,7 +100,10 @@ func (v *Vault) AddEntry(request AddEntryRequest) (*VaultEntry, error) {
 		SecretName:       request.SecretName,
 		EnvVarName:       request.EnvVarName,
 		SecretValue:      request.SecretValue,
+		URL:              request.URL,
 		Description:      request.Description,
+		BundleID:         request.BundleID,
+		BundleType:       request.BundleType,
 		ShouldAutoInject: request.ShouldAutoInject,
 		CreatedAt:        time.Now().UTC(),
 	}
@@ -172,6 +175,7 @@ func (v *Vault) UpdateEntry(request UpdateEntryRequest) (*VaultEntry, error) {
 	originalSecretName := targetEntry.SecretName
 	originalEnvVarName := targetEntry.EnvVarName
 	originalSecretValue := targetEntry.SecretValue
+	originalURL := targetEntry.URL
 	originalDescription := targetEntry.Description
 
 	// If the caller is changing the env var name, reject duplicates against other entries.
@@ -194,8 +198,13 @@ func (v *Vault) UpdateEntry(request UpdateEntryRequest) (*VaultEntry, error) {
 	if request.SecretValue != "" {
 		targetEntry.SecretValue = request.SecretValue
 	}
-	if request.Description != "" {
-		targetEntry.Description = request.Description
+	// URL and Description are pointers: a non-nil value is applied verbatim,
+	// including an empty string, which is how the caller clears the field.
+	if request.URL != nil {
+		targetEntry.URL = *request.URL
+	}
+	if request.Description != nil {
+		targetEntry.Description = *request.Description
 	}
 
 	if saveErr := v.saveToFileLocked(); saveErr != nil {
@@ -203,6 +212,7 @@ func (v *Vault) UpdateEntry(request UpdateEntryRequest) (*VaultEntry, error) {
 		targetEntry.SecretName = originalSecretName
 		targetEntry.EnvVarName = originalEnvVarName
 		targetEntry.SecretValue = originalSecretValue
+		targetEntry.URL = originalURL
 		targetEntry.Description = originalDescription
 		return nil, fmt.Errorf("saving vault after update: %w", saveErr)
 	}
@@ -230,6 +240,21 @@ func (v *Vault) SetAutoInject(entryID string, shouldAutoInject bool) error {
 }
 
 // ── Read operations ──────────────────────────────────────────────────────────
+
+// ListEntryNames returns the SecretName of every vault entry in insertion order.
+// This is the discovery method exposed to MCP agents via the vault_list tool.
+// Only names are returned — secret values and UUIDs are intentionally excluded
+// so agents can learn what is available without receiving sensitive material.
+func (v *Vault) ListEntryNames() []string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+
+	entryNames := make([]string, 0, len(v.entries))
+	for _, entry := range v.entries {
+		entryNames = append(entryNames, entry.SecretName)
+	}
+	return entryNames
+}
 
 // ListEntries returns public metadata for all vault entries.
 // Secret values are intentionally excluded from the returned structs.
@@ -292,6 +317,82 @@ func (v *Vault) GetEnvVarsForIDs(entryIDs []string) map[string]string {
 	}
 
 	return result
+}
+
+// BuildInjectionScriptForNames is the zero-knowledge injection path for MCP agents.
+//
+// It looks up the vault entries matching secretNames, writes a self-deleting
+// platform script (PowerShell on Windows, POSIX sh elsewhere) with their env var
+// assignments, and returns only the absolute path to that script. Secret values
+// flow from vault memory → temp file and never appear in the return value, making
+// this safe for agents to call without exposing secrets to conversation context.
+//
+// Returns an error if any requested name is not found in the vault or if the vault
+// is not open. The caller should pass the returned path to terminal_execute
+// using `. '<path>'` (dot-source) to activate the variables in the running session.
+func (v *Vault) BuildInjectionScriptForNames(secretNames []string) (string, error) {
+	if len(secretNames) == 0 {
+		return "", fmt.Errorf("at least one secret name is required")
+	}
+
+	resolvedEnvVars, resolveErr := v.resolveEnvVarsForNames(secretNames)
+	if resolveErr != nil {
+		return "", resolveErr
+	}
+
+	return BuildInjectionScript(resolvedEnvVars)
+}
+
+// resolveEnvVarsForNames maps the requested secret names to their envVarName→secretValue
+// pairs, updating LastUsedAt timestamps as a side effect. Holds the write lock
+// for the duration so callers must NOT hold the lock when calling this method.
+// Returns an error if any requested name has no matching entry.
+func (v *Vault) resolveEnvVarsForNames(secretNames []string) (map[string]string, error) {
+	// Track which names have not yet been found so we can report missing entries.
+	pendingNames := make(map[string]bool, len(secretNames))
+	for _, secretName := range secretNames {
+		pendingNames[secretName] = true
+	}
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	if !v.isOpen {
+		return nil, fmt.Errorf("vault is not open")
+	}
+
+	now := time.Now().UTC()
+	resolvedEnvVars := make(map[string]string, len(secretNames))
+
+	for _, entry := range v.entries {
+		if pendingNames[entry.SecretName] {
+			resolvedEnvVars[entry.EnvVarName] = entry.SecretValue
+			entry.LastUsedAt = &now
+			delete(pendingNames, entry.SecretName) // mark as found
+		}
+	}
+
+	// Any name remaining in pendingNames was not present in the vault.
+	// Include the full list of available names in the error so agents can
+	// self-correct on the next call without requiring user intervention.
+	if len(pendingNames) > 0 {
+		missingNames := make([]string, 0, len(pendingNames))
+		for missingName := range pendingNames {
+			missingNames = append(missingNames, missingName)
+		}
+		availableNames := make([]string, 0, len(v.entries))
+		for _, entry := range v.entries {
+			availableNames = append(availableNames, entry.SecretName)
+		}
+		return nil, fmt.Errorf("vault entries not found: %v. Available entry names: %v", missingNames, availableNames)
+	}
+
+	// Persist updated LastUsedAt timestamps before releasing the lock.
+	if len(resolvedEnvVars) > 0 {
+		_ = v.saveToFileLocked()
+	}
+
+	return resolvedEnvVars, nil
 }
 
 // GetEntryValue returns the decrypted plaintext value for the entry with entryID.
@@ -403,14 +504,24 @@ func (v *Vault) findEntryIndexLocked(entryID string) int {
 
 // diskEntryToPublic converts the internal disk representation to the API-safe
 // VaultEntry type. The SecretValue field is intentionally not copied.
+//
+// It also recomputes DescriptionWarning on every read (rather than persisting it),
+// so descriptions that contain secret material — including those stored before this
+// check existed — are flagged to the user without any data migration.
 func diskEntryToPublic(entry *diskEntry) *VaultEntry {
+	_, descriptionWarning := ScanForSecretInText(entry.Description)
+
 	return &VaultEntry{
-		ID:               entry.ID,
-		SecretName:       entry.SecretName,
-		EnvVarName:       entry.EnvVarName,
-		Description:      entry.Description,
-		ShouldAutoInject: entry.ShouldAutoInject,
-		CreatedAt:        entry.CreatedAt,
-		LastUsedAt:       entry.LastUsedAt,
+		ID:                 entry.ID,
+		SecretName:         entry.SecretName,
+		EnvVarName:         entry.EnvVarName,
+		URL:                entry.URL,
+		Description:        entry.Description,
+		BundleID:           entry.BundleID,
+		BundleType:         entry.BundleType,
+		ShouldAutoInject:   entry.ShouldAutoInject,
+		CreatedAt:          entry.CreatedAt,
+		LastUsedAt:         entry.LastUsedAt,
+		DescriptionWarning: descriptionWarning,
 	}
 }

@@ -335,6 +335,71 @@ func TestRenderChangelog(t *testing.T) {
 	}
 }
 
+// ─── Constitution (Spec-Driven Development base) ─────────────────────────────
+
+// TestRenderConstitution_IncludesAllArticles proves the generated constitution
+// carries Forge's non-negotiable, hard-won rules. If any of these phrases ever
+// goes missing, a scaffolded project would silently lose a safety or process
+// guarantee — so each is asserted explicitly rather than by article count.
+func TestRenderConstitution_IncludesAllArticles(t *testing.T) {
+	config := DefaultConfig()
+	config.ProjectName = "constitution-test"
+
+	result, err := RenderConstitution(config)
+	if err != nil {
+		t.Fatalf("RenderConstitution() error: %v", err)
+	}
+
+	// Each phrase maps to a constitution Article that must survive rendering.
+	nonNegotiables := []string{
+		"constitution-test",     // project name interpolated
+		"fterm.exe",             // Article II — process protection
+		"GitHub Flow",           // Article III — branching
+		"single-letter",         // Article IV — code quality naming rule
+		"GitHub Actions",        // Article VIII — release: local pipeline only
+		"Zero-Knowledge",        // Article IX — vault secret handling
+		"Response Format",       // Article XII — interaction & response format
+		"75 words",              // Article XII — tight, scannable responses
+	}
+
+	for _, phrase := range nonNegotiables {
+		if !containsString(result, phrase) {
+			t.Errorf("RenderConstitution() output missing non-negotiable phrase %q", phrase)
+		}
+	}
+}
+
+// TestDefaultConfig_IncludesConstitution proves the constitution module is part
+// of the enterprise-standard baseline, so every default scaffold emits it.
+func TestDefaultConfig_IncludesConstitution(t *testing.T) {
+	config := DefaultConfig()
+	if !config.HasModule(ModuleConstitution) {
+		t.Error("DefaultConfig() does not enable ModuleConstitution — new projects would not receive a constitution")
+	}
+}
+
+// TestScaffoldProject_GeneratesConstitution proves a real scaffold writes the
+// constitution to the Spec Kit-standard path that the speckit pipeline expects.
+func TestScaffoldProject_GeneratesConstitution(t *testing.T) {
+	tempDir := t.TempDir()
+
+	config := DefaultConfig()
+	config.ProjectName = "scaffold-constitution-test"
+
+	if _, err := ScaffoldProject(tempDir, config); err != nil {
+		t.Fatalf("ScaffoldProject() error: %v", err)
+	}
+
+	constitutionPath := filepath.Join(tempDir, ".specify", "memory", "constitution.md")
+	info, err := os.Stat(constitutionPath)
+	if os.IsNotExist(err) {
+		t.Fatal(".specify/memory/constitution.md was not created on disk")
+	}
+	if info.Size() == 0 {
+		t.Error("constitution.md was created but is empty")
+	}
+}
+
 func TestRenderSkill_AllSkillIDs(t *testing.T) {
 	skillModules := []ModuleID{
 		ModuleBranchingStrategy,

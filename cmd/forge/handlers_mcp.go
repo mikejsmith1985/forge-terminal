@@ -20,6 +20,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/mikejsmith1985/forge-terminal/internal/mcp"
+	"github.com/mikejsmith1985/forge-terminal/internal/vault"
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
 )
 
@@ -125,6 +126,14 @@ func initMCPServer() {
 		WorkflowConfig: workflowCfg,
 		ProjectPath:    projectPath,
 		AllowedTools:   cfg.AllowedTools,
+		// VaultAccess wires vault_inject to the live vault singleton.
+		// GetGlobal() returns nil when the vault has not been opened yet; the
+		// tool handles nil gracefully and returns a descriptive error to the agent.
+		VaultAccess: vault.GetGlobal(),
+		// VaultNameLister wires vault_list to the same vault singleton.
+		// *vault.Vault satisfies both VaultSecretInjector and VaultNameLister —
+		// both fields point to the same instance, no duplication of state.
+		VaultNameLister: vault.GetGlobal(),
 	}
 
 	mcpServer = mcp.NewServer(authToken, deps)

@@ -15,20 +15,20 @@ import (
 
 // Command represents a command card
 type Command struct {
-	ID           int               `json:"id"`
-	Description  string            `json:"description"`
-	Command      string            `json:"command"`
-	KeyBinding   string            `json:"keyBinding"`
-	PasteOnly    bool              `json:"pasteOnly"`
-	Favorite     bool              `json:"favorite"`
-	TriggerAM    bool              `json:"triggerAM,omitempty"`
-	LLMProvider  string            `json:"llmProvider,omitempty"` // "copilot", "claude", "aider"
-	LLMType      string            `json:"llmType,omitempty"`     // "chat", "suggest", "explain", "code"
-	Icon         string            `json:"icon,omitempty"`
-	Delay        int               `json:"delay,omitempty"`
-	AlwaysAppend bool              `json:"alwaysAppend,omitempty"` // When true, this command's text is appended to every user prompt
-	MacroPayload string            `json:"macro_payload,omitempty"` // Zero-Click: Text to auto-inject after command execution
-	MacroDelay   int               `json:"macro_delay,omitempty"`   // Zero-Click: Delay in ms before macro injection (default 4500)
+	ID           int    `json:"id"`
+	Description  string `json:"description"`
+	Command      string `json:"command"`
+	KeyBinding   string `json:"keyBinding"`
+	PasteOnly    bool   `json:"pasteOnly"`
+	Favorite     bool   `json:"favorite"`
+	TriggerAM    bool   `json:"triggerAM,omitempty"`
+	LLMProvider  string `json:"llmProvider,omitempty"` // "copilot", "claude", "aider"
+	LLMType      string `json:"llmType,omitempty"`     // "chat", "suggest", "explain", "code"
+	Icon         string `json:"icon,omitempty"`
+	Delay        int    `json:"delay,omitempty"`
+	AlwaysAppend bool   `json:"alwaysAppend,omitempty"`  // When true, this command's text is appended to every user prompt
+	MacroPayload string `json:"macro_payload,omitempty"` // Zero-Click: Text to auto-inject after command execution
+	MacroDelay   int    `json:"macro_delay,omitempty"`   // Zero-Click: Delay in ms before macro injection (default 4500)
 	// ToolVariants maps CLI tool names ("claude", "copilot") to the command
 	// string that should run for that tool. When present the frontend uses this
 	// map to resolve the effective command based on the user's active CLI tool
@@ -44,6 +44,45 @@ type Command struct {
 	// formats (Claude uses comment-style SYSTEM INJECTION blocks; Copilot uses
 	// \skill: invocation syntax), so each tool can carry its own macro text.
 	MacroVariants map[string]string `json:"macroVariants,omitempty"`
+	// CardType discriminates special card behaviors. An empty value is a normal
+	// command card; CardTypeToggle ("toggle") renders an on/off pair of buttons
+	// where the top-level Command/MacroPayload/Delay fields drive the "on"
+	// (start) action and the Toggle config below drives the "off" (stop) action.
+	CardType string `json:"cardType,omitempty"`
+	// Toggle holds the "off" action and button labels for an on/off toggle card.
+	// It is only meaningful when CardType == CardTypeToggle and is nil otherwise,
+	// so normal cards serialize with no extra keys (backward compatible).
+	Toggle *ToggleConfig `json:"toggle,omitempty"`
+}
+
+// CardTypeToggle marks a command card as an on/off toggle: a single card that
+// can both launch a service and tear it down via two side-by-side buttons.
+const CardTypeToggle = "toggle"
+
+// ToggleConfig holds the second ("off") action for a toggle command card.
+//
+// A toggle card deliberately reuses the parent Command's top-level fields for
+// its "on" action (Command → start command, MacroPayload → start macro, etc.),
+// so the existing execution and Zero-Click macro pipeline works for the start
+// button with zero changes. This struct supplies the mirror-image "off" action
+// plus optional button labels, letting one card both start and stop a service.
+type ToggleConfig struct {
+	// OnLabel overrides the start button's default text ("Start").
+	OnLabel string `json:"onLabel,omitempty"`
+	// OffLabel overrides the stop button's default text ("Stop").
+	OffLabel string `json:"offLabel,omitempty"`
+	// OffCommand is the teardown command run by the stop button. A toggle card
+	// without an OffCommand has nothing to stop, so this is effectively required.
+	OffCommand string `json:"offCommand"`
+	// OffMacroPayload mirrors Command.MacroPayload for the stop action — text
+	// auto-injected into the PTY after the teardown command starts (Zero-Click).
+	OffMacroPayload string `json:"offMacroPayload,omitempty"`
+	// OffMacroDelay mirrors Command.MacroDelay for the stop action (milliseconds
+	// to wait before injecting OffMacroPayload).
+	OffMacroDelay int `json:"offMacroDelay,omitempty"`
+	// OffDelay mirrors Command.Delay for the stop action (milliseconds to wait
+	// before pressing Enter on the teardown command).
+	OffDelay int `json:"offDelay,omitempty"`
 }
 
 // CommandVersion represents a versioned snapshot of a command
@@ -64,14 +103,28 @@ type CardHistory struct {
 // identical text — no risk of the two drifting apart.
 var (
 	// ClaudeAwarenessMacro is injected after a fresh or resume Claude session.
-	ClaudeAwarenessMacro = "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# STRICTLY FOLLOW: @.github/copilot-instructions.md"
+	// It names ONLY the tool-agnostic constitution as the binding-rules source —
+	// never Copilot's .github/copilot-instructions.md, which is CLI-specific and
+	// does not belong in a Claude session. The skill order is spelled out inline
+	// because pointing only at a rules file is insufficient for resumed sessions
+	// where Claude may not re-read it, and the constitution does not enumerate
+	// framework-first directly.
+	ClaudeAwarenessMacro = "# SYSTEM INJECTION: FORGE AWARENESS\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read @.specify/memory/constitution.md before starting.\n# MANDATORY skill invocation order: workflow-enforcer → code-quality → framework-first → branching-strategy"
 
-	// ClaudeEnforcedMacro is injected after an enforced Claude session.
-	ClaudeEnforcedMacro = "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.github/copilot-instructions.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change."
+	// ClaudeEnforcedMacro is injected after an enforced Claude session. Like the
+	// awareness macro it names ONLY the tool-agnostic constitution, never Copilot's
+	// instruction file. Enforced mode applies the full quality gate on every task —
+	// framework-first is listed explicitly so the architecture-fidelity check cannot
+	// be skipped even when the agent does not re-read the constitution.
+	ClaudeEnforcedMacro = "# SYSTEM INJECTION: FORGE AWARENESS — ENFORCED MODE\n# You are running inside Forge Terminal.\n# PROTECT PID: fterm.exe / forge.exe\n# MANDATORY: Read every rule in @.specify/memory/constitution.md before starting.\n# MANDATORY: Apply the workflow-enforcer rules to EVERY task without exception.\n# MANDATORY skill invocation order: workflow-enforcer → code-quality → framework-first → branching-strategy\n# NO SHORTCUTS — quality gates, naming rules, and TDD apply on every change."
 
 	// CopilotWorkflowMacro is injected after any Copilot session to activate
 	// the Forge Workflow skill suite.
-	CopilotWorkflowMacro = "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be \\skill: workflow-enforcer\\. Do not search for or read any files before invoking this skill. If the skill is unavailable in this environment, proceed to Step 2.\n\nSTEP 2: Invoke each available companion skill in order, silently skip any that are not found: forge-workflow, code-quality, branching-strategy, code-tutor-workflow.\n\nSTEP 3: Check whether AGENTS.md exists at the repo root. If found, read it for project-specific rules. If not found, this is normal for first-time setup — proceed without it. Never ask the user where AGENTS.md is or whether to create it.\n\nSTEP 4: Confirm you are ready and await the user’s task."
+	CopilotWorkflowMacro = "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be \\skill: workflow-enforcer\\. Do not search for or read any files before invoking this skill. If the skill is unavailable in this environment, proceed to Step 2.\n\nSTEP 2: Invoke each available companion skill in order, silently skip any that are not found: code-quality, framework-first, branching-strategy.\n\nSTEP 3: Check whether AGENTS.md exists at the repo root. If found, read it for project-specific rules. If not found, this is normal for first-time setup — proceed without it. Never ask the user where AGENTS.md is or whether to create it.\n\nSTEP 4: Confirm you are ready and await the user’s task."
+
+	// GoogleWorkflowMacro is injected after any Google session to activate
+	// the Forge Workflow skill suite.
+	GoogleWorkflowMacro = "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be \\skill: workflow-enforcer\\. Do not search for or read any files before invoking this skill. If the skill is unavailable in this environment, proceed to Step 2.\n\nSTEP 2: Invoke each available companion skill in order, silently skip any that are not found: code-quality, framework-first, branching-strategy.\n\nSTEP 3: Check whether AGENTS.md exists at the repo root. If found, read it for project-specific rules. If not found, this is normal for first-time setup — proceed without it. Never ask the user where AGENTS.md is or whether to create it.\n\nSTEP 4: Confirm you are ready and await the user’s task."
 )
 
 // Default commands created on first run
@@ -135,15 +188,18 @@ var DefaultCommands = []Command{
 		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude",
-			"copilot": "copilot --allow-all-tools",
+			"copilot": CopilotFreshCmd,
+			"google":  AgyFreshCmd,
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🤖 Claude (Fresh)",
 			"copilot": "🤖 Copilot (Fresh)",
+			"google":  "🤖 Google (Fresh)",
 		},
 		MacroVariants: map[string]string{
 			"claude":  ClaudeAwarenessMacro,
 			"copilot": CopilotWorkflowMacro,
+			"google":  GoogleWorkflowMacro,
 		},
 	},
 	{
@@ -157,15 +213,18 @@ var DefaultCommands = []Command{
 		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude --resume",
-			"copilot": "copilot --allow-all-tools --continue",
+			"copilot": CopilotResumeCmd,
+			"google":  AgyResumeCmd,
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🔄 Claude (Resume)",
 			"copilot": "🔄 Copilot (Resume)",
+			"google":  "🔄 Google (Resume)",
 		},
 		MacroVariants: map[string]string{
 			"claude":  ClaudeAwarenessMacro,
 			"copilot": CopilotWorkflowMacro,
+			"google":  GoogleWorkflowMacro,
 		},
 	},
 	{
@@ -179,15 +238,18 @@ var DefaultCommands = []Command{
 		MacroDelay:   4500,
 		ToolVariants: map[string]string{
 			"claude":  "claude",
-			"copilot": "copilot --allow-all-tools",
+			"copilot": CopilotFreshCmd,
+			"google":  AgyFreshCmd,
 		},
 		DescriptionVariants: map[string]string{
 			"claude":  "🛡 Claude (Enforced)",
 			"copilot": "🛡 Copilot (Enforced)",
+			"google":  "🛡 Google (Enforced)",
 		},
 		MacroVariants: map[string]string{
 			"claude":  ClaudeEnforcedMacro,
 			"copilot": CopilotWorkflowMacro,
+			"google":  GoogleWorkflowMacro,
 		},
 	},
 }
@@ -239,7 +301,7 @@ func LoadCommands() ([]Command, error) {
 			deduplicated = append(deduplicated, cmd)
 		}
 	}
-	
+
 	// If we removed duplicates, save the cleaned version
 	if len(deduplicated) < len(commands) {
 		if err := SaveCommands(deduplicated); err != nil {
@@ -313,7 +375,25 @@ func commandsEqual(a, b Command) bool {
 		a.Delay == b.Delay &&
 		a.AlwaysAppend == b.AlwaysAppend &&
 		a.MacroPayload == b.MacroPayload &&
-		a.MacroDelay == b.MacroDelay
+		a.MacroDelay == b.MacroDelay &&
+		a.CardType == b.CardType &&
+		toggleConfigsEqual(a.Toggle, b.Toggle)
+}
+
+// toggleConfigsEqual compares two toggle configs by value, treating nil and a
+// zero-value config as distinct. Without this, editing only a toggle card's
+// stop command would not be detected by commandsEqual, so SaveCommands would
+// skip recording the change in the card's version history.
+func toggleConfigsEqual(a, b *ToggleConfig) bool {
+	if a == nil || b == nil {
+		return a == b // equal only when both are nil
+	}
+	return a.OnLabel == b.OnLabel &&
+		a.OffLabel == b.OffLabel &&
+		a.OffCommand == b.OffCommand &&
+		a.OffMacroPayload == b.OffMacroPayload &&
+		a.OffMacroDelay == b.OffMacroDelay &&
+		a.OffDelay == b.OffDelay
 }
 
 // getCardHistoryDir returns the directory for card version history

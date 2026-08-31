@@ -176,15 +176,42 @@ type Handler struct {
 // The PTY process continues running; output accumulates in the OS pipe buffer.
 // A reconnecting client can reattach within the grace period to resume I/O.
 type DetachedSession struct {
-	session     *TerminalSession
-	graceTimer  *time.Timer
-	detachedAt  time.Time
-	gracePeriod time.Duration
-	readerDone  chan struct{} // Close to stop the orphaned PTY reader goroutine
+	session      *TerminalSession
+	graceTimer   *time.Timer
+	detachedAt   time.Time
+	gracePeriod  time.Duration
+	readerDone   chan struct{} // Close to stop the orphaned PTY reader goroutine
+	readerStopId sync.Once     // Guards readerDone against a double close
 }
 
-const sessionGracePeriod = 5 * time.Minute  // How long a detached PTY stays alive
-const agentGracePeriod   = 8 * time.Hour   // Extended grace when an AI agent is running
+// stopOrphanReader tells the previous owner's PTY reader goroutine to exit.
+//
+// Safe to call repeatedly: the reaper, a reconnecting client and an explicit tab
+// close can all race for the same session, and closing the channel twice would
+// panic the whole server rather than just that session.
+func (ds *DetachedSession) stopOrphanReader() {
+	ds.readerStopId.Do(func() {
+		if ds.readerDone != nil {
+			close(ds.readerDone)
+		}
+	})
+}
+
+// How long a PTY with no connected client is kept alive.
+//
+// This is deliberately measured in hours, not minutes. A disconnect is almost
+// always transient — the machine slept, Wi-Fi dropped, the browser throttled a
+// background tab, the app updated — and none of those mean the developer is
+// finished with their shell. The previous five-minute window destroyed running
+// work simply because someone stepped away overnight. A tab the user actually
+// closes is reaped at once via CloseSessionNow, so this long window is only the
+// backstop for when that signal never arrives (crash, force quit, power loss).
+const sessionGracePeriod = 24 * time.Hour
+
+// agentGracePeriod is kept as a distinct name for the AI-agent case. It no
+// longer needs to extend anything now that the default retention is a full day,
+// but callers still reference it and a shorter value here would be a regression.
+const agentGracePeriod = sessionGracePeriod
 
 // detachSession keeps a PTY alive after its WebSocket disconnects.
 // If the PTY process has already exited, the session is closed immediately.
@@ -222,11 +249,9 @@ func (h *Handler) detachSession(sessionID string, session *TerminalSession, grac
 			hubRaw.(*sessionHub).close()
 		}
 		h.sessions.Delete(sessionID)
-		// Close readerDone so the orphaned PTY reader goroutine exits cleanly
-		// instead of blocking on Read() until the PTY error propagates.
-		if readerDone != nil {
-			close(readerDone)
-		}
+		// Stop the orphaned PTY reader goroutine so it exits cleanly instead of
+		// blocking on Read() until the PTY error propagates.
+		ds.stopOrphanReader()
 		session.Close()
 	})
 
@@ -248,9 +273,7 @@ func (h *Handler) reattachSession(sessionID string) (*DetachedSession, bool) {
 	// Stop the orphaned PTY reader goroutine from the previous handler.
 	// Without this, two goroutines race to Read() from the same PTY fd,
 	// splitting output and corrupting the terminal stream.
-	if ds.readerDone != nil {
-		close(ds.readerDone)
-	}
+	ds.stopOrphanReader()
 
 	// Verify PTY is still alive
 	if ds.session.IsDone() || ds.session.IsClosed() {
@@ -262,6 +285,63 @@ func (h *Handler) reattachSession(sessionID string) (*DetachedSession, bool) {
 	log.Printf("[Terminal] Session %s: reattaching (was detached for %v)",
 		sessionID, time.Since(ds.detachedAt))
 	return ds, true
+}
+
+// reclaimDetachedSession hands a still-running PTY to a client that has just
+// reconnected to it, and reports how long the terminal was unattended.
+//
+// A detach record exists only while NO connection is reading the PTY, so finding
+// one proves the previous owner is gone and this client must become the new
+// owner. Reclaiming cancels the reaper and stops the previous owner's orphaned
+// reader goroutine (two goroutines reading one PTY would split the output).
+//
+// Returning true therefore obliges the caller to start a replacement reader:
+// once the orphan is stopped, nothing else is reading the terminal, and a client
+// that merely watches would leave the session permanently mute — the shell keeps
+// running and executing typed commands while its output reaches no one.
+func (h *Handler) reclaimDetachedSession(sessionID string) (detachedFor time.Duration, wasReclaimed bool) {
+	detachedValue, wasDetached := h.detachedSessions.LoadAndDelete(sessionID)
+	if !wasDetached {
+		return 0, false
+	}
+
+	detached := detachedValue.(*DetachedSession)
+	detached.graceTimer.Stop()
+	detached.stopOrphanReader()
+	return time.Since(detached.detachedAt), true
+}
+
+// CloseSessionNow destroys a terminal session because the user explicitly closed
+// its tab, and reports whether anything was actually closed.
+//
+// This is the counterpart to the day-long unattended retention: since an
+// abandoned shell is no longer reclaimed within minutes, the deliberate close
+// has to do the reclaiming, or every closed tab would leave a shell running.
+// Calling it for an unknown or already-closed session is harmless, so the
+// frontend can fire it best-effort and retry.
+func (h *Handler) CloseSessionNow(sessionID string) bool {
+	wasClosed := false
+
+	if detachedValue, wasDetached := h.detachedSessions.LoadAndDelete(sessionID); wasDetached {
+		detached := detachedValue.(*DetachedSession)
+		detached.graceTimer.Stop()
+		detached.stopOrphanReader()
+		wasClosed = true
+	}
+
+	if sessionValue, wasLive := h.sessions.LoadAndDelete(sessionID); wasLive {
+		sessionValue.(*TerminalSession).Close()
+		wasClosed = true
+	}
+
+	if hubValue, hadHub := h.hubs.LoadAndDelete(sessionID); hadHub {
+		hubValue.(*sessionHub).close()
+	}
+
+	if wasClosed {
+		log.Printf("[Terminal] Session %s: closed at the user's request (tab closed)", sessionID)
+	}
+	return wasClosed
 }
 
 // connWriter wraps a websocket.Conn with a mutex for thread-safe writes.
@@ -448,9 +528,7 @@ func (h *Handler) CloseAllSessions() int {
 	h.detachedSessions.Range(func(key, value interface{}) bool {
 		if ds, ok := value.(*DetachedSession); ok {
 			ds.graceTimer.Stop()
-			if ds.readerDone != nil {
-				close(ds.readerDone)
-			}
+			ds.stopOrphanReader()
 			ds.session.Close()
 			log.Printf("[Terminal] Closing detached session %s for restart", key)
 			count++
@@ -487,9 +565,7 @@ func (h *Handler) SuspendSessions() int {
 	h.detachedSessions.Range(func(key, value interface{}) bool {
 		if ds, ok := value.(*DetachedSession); ok {
 			ds.graceTimer.Stop()
-			if ds.readerDone != nil {
-				close(ds.readerDone)
-			}
+			ds.stopOrphanReader()
 			ds.session.Close()
 			log.Printf("[Terminal] Closing detached session %s for system sleep", key)
 			count++
@@ -621,10 +697,19 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		// scrollback into the ring buffer so reconnecting clients don't see
 		// a blank screen even if the server was restarted.
 		hub.journal = NewSessionJournal(sessionID)
+		// Restore the terminal keyboard/private-mode state for this session. The
+		// persisted sidecar carries the modes a TUI set at startup even after they
+		// were trimmed from the scrollback journal — this is what lets a recovered
+		// tab's xterm re-sync with the still-running TUI so digits/arrows work.
+		hub.modeTracker.SetPersistPath(sessionModesPath(sessionID))
+		hub.modeTracker.LoadPersisted(sessionModesPath(sessionID))
 		if prior := hub.journal.ReadAll(); len(prior) > 0 {
 			hub.mu.Lock()
 			hub.appendToRingLocked(prior)
 			hub.mu.Unlock()
+			// Observe the replayed scrollback too, so any mode changes still present
+			// in the (un-trimmed) journal update the state on top of the sidecar.
+			hub.modeTracker.Observe(prior)
 			log.Printf("[Terminal] Session %s: ring buffer seeded from journal (%d bytes)", sessionID, len(prior))
 		}
 	}
@@ -639,53 +724,69 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	var isReattach bool
 	var isWatcher bool // true when joining a PTY that is already owned by another connection
 
-	// Priority 1: Live session (another connection already owns the PTY).
-	// Join as a watcher: share PTY output via hub, send input normally.
+	// Priority 1: the PTY for this tab is still alive. Two very different
+	// situations land here, and telling them apart is what keeps a reconnecting
+	// tab from going silent:
+	//
+	//   * The PTY was detached — its previous connection is gone and nothing is
+	//     reading it. This client must RECLAIM it and become the new owner, so
+	//     the owner-only setup below starts a replacement reader goroutine.
+	//   * The PTY is genuinely shared — another live connection is reading it.
+	//     This client joins as a watcher: it sees output via the hub and sends
+	//     input normally, and the existing reader is left strictly alone.
+	//
+	// Treating the first case as a watcher is what froze recovered tabs: the
+	// orphaned reader was stopped and never replaced, so the shell kept running
+	// and executing keystrokes while its output reached nobody.
 	if liveVal, ok := h.sessions.Load(sessionID); ok {
 		live := liveVal.(*TerminalSession)
 		if !live.IsClosed() && !live.IsDone() {
 			session = live
-			isWatcher = true
-			log.Printf("[Terminal] Session %s: client joining live session (hub size now %d)", sessionID, hub.size())
-
-			// If this session is also in detachedSessions (the previous handler
-			// disconnected and detached it, but the session is still alive), clean
-			// up the detach state: stop the grace timer and close readerDone so
-			// the orphaned PTY reader goroutine exits. Without this, the old
-			// goroutine keeps reading from the PTY fd, racing with the new one.
-			if dsVal, dsOk := h.detachedSessions.LoadAndDelete(sessionID); dsOk {
-				ds := dsVal.(*DetachedSession)
-				ds.graceTimer.Stop()
-				if ds.readerDone != nil {
-					close(ds.readerDone)
-				}
-				log.Printf("[Terminal] Session %s: cleaned up detached state (client rejoined live session)", sessionID)
-			}
 
 			// Scrollback was already replayed before hub.add() above.
-
-			// If no device currently controls this PTY (previous owner disconnected),
-			// auto-promote this client to active so it can resize and interact fully.
-			// This handles the common case of the same user reconnecting after a hiccup.
-			if hub.getActive() == nil {
-				hub.setActive(conn)
-				log.Printf("[Terminal] Session %s: auto-promoted joining client to active (no previous active)", sessionID)
+			if detachedFor, wasReclaimed := h.reclaimDetachedSession(sessionID); wasReclaimed {
+				isReattach = true // owner: starts its own PTY reader below
+				log.Printf("[Terminal] Session %s: reclaimed unattended PTY after %v — taking ownership",
+					sessionID, detachedFor)
 				_ = conn.WriteJSON(map[string]interface{}{
-					"type":           "SESSION_JOINED",
-					"sessionId":      sessionID,
-					"isActiveDevice": true,
+					"type":             "SESSION_REATTACHED",
+					"sessionId":        sessionID,
+					"detachedDuration": detachedFor.Seconds(),
 				})
 			} else {
-				_ = conn.WriteJSON(map[string]interface{}{
-					"type":           "SESSION_JOINED",
-					"sessionId":      sessionID,
-					"isActiveDevice": false,
-				})
+				isWatcher = true
+				log.Printf("[Terminal] Session %s: client joining live session (hub size now %d)", sessionID, hub.size())
+
+				// If no LIVE device currently controls this PTY (previous owner
+				// disconnected, or the recorded controller's socket already failed a
+				// write), auto-promote this client to active so it can resize and
+				// interact fully. Checking liveness — not just presence — prevents a
+				// dead socket from demoting every rejoining tab to a passive viewer.
+				if !hub.hasLiveActive() {
+					hub.setActive(conn)
+					log.Printf("[Terminal] Session %s: auto-promoted joining client to active (no previous active)", sessionID)
+					_ = conn.WriteJSON(map[string]interface{}{
+						"type":           "SESSION_JOINED",
+						"sessionId":      sessionID,
+						"isActiveDevice": true,
+					})
+				} else {
+					_ = conn.WriteJSON(map[string]interface{}{
+						"type":           "SESSION_JOINED",
+						"sessionId":      sessionID,
+						"isActiveDevice": false,
+					})
+				}
 			}
 		}
 	}
 
-	if !isWatcher {
+	// Only look for a session to reattach or create when Priority 1 found none.
+	// Testing session (not isWatcher) matters now that Priority 1 can also hand
+	// back a reclaimed PTY: a reclaiming owner already has its session and must
+	// not fall through here, where the live-session re-check would demote it to a
+	// watcher and leave the terminal with no reader at all.
+	if session == nil {
 		// Acquire a per-sessionID lock to prevent two simultaneous WebSocket
 		// upgrades from creating duplicate PTY processes for the same tab.
 		lockRaw, _ := h.sessionCreateLocks.LoadOrStore(sessionID, &sync.Mutex{})
@@ -701,12 +802,15 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				isWatcher = true
 				sessionLock.Unlock()
 				log.Printf("[Terminal] Session %s: became watcher after lock (another goroutine created it)", sessionID)
+				// Liveness check (not just presence): a dead controller socket
+				// must not force this client into passive-viewer mode.
+				shouldPromoteJoiner := !hub.hasLiveActive()
 				_ = conn.WriteJSON(map[string]interface{}{
 					"type":           "SESSION_JOINED",
 					"sessionId":      sessionID,
-					"isActiveDevice": hub.getActive() == nil,
+					"isActiveDevice": shouldPromoteJoiner,
 				})
-				if hub.getActive() == nil {
+				if shouldPromoteJoiner {
 					hub.setActive(conn)
 				}
 			}

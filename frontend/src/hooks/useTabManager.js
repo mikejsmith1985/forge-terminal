@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { themeOrder } from '../themes';
 import { logger } from '../utils/logger';
-import { extractProjectFolder, getTabTitle, getShellLabel, isStaticNamingStrategy, isFileLikeName } from '../utils/projectFolder';
+import { isFileLikeName } from '../utils/projectFolder';
+import { computeTabLabel, dedupeLabel, shouldRelabelForDirectory } from '../utils/tabLabel';
 
 const MAX_TABS = 20;
 
@@ -29,6 +30,31 @@ let themeIndex = 0;
 function generateId() {
   idCounter += 1;
   return `tab-${idCounter}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Compute the value to seed the tab-id counter with after a session restore.
+ *
+ * The counter must sit strictly above the highest index already present in the
+ * restored tab ids (formatted "tab-<index>-<random>"). Seeding from the restored
+ * tab COUNT — the previous behaviour — minted a duplicate index whenever an
+ * earlier tab had been closed, so a freshly created tab could collide with a
+ * restored one. That collision is what produced two live "tab-5" sessions after
+ * an app update. Parsing the actual indices and taking max+1 makes new ids
+ * unique no matter how many tabs were closed before the restore.
+ *
+ * @param {string[]} restoredTabIds - the ids of the tabs restored from session
+ * @returns {number} the next counter value (one past the highest restored index)
+ */
+export function computeNextTabIdCounter(restoredTabIds) {
+  let highestIndex = 0;
+  for (const tabId of restoredTabIds) {
+    const indexMatch = /^tab-(\d+)(?:-|$)/.exec(tabId || '');
+    if (!indexMatch) continue; // ignore malformed/legacy ids that lack an index
+    const parsedIndex = parseInt(indexMatch[1], 10);
+    if (parsedIndex > highestIndex) highestIndex = parsedIndex;
+  }
+  return highestIndex + 1;
 }
 
 /**
@@ -72,27 +98,11 @@ function createTab(shellConfig, tabNumber, colorTheme = null, mode = null, curre
 
   const newTab = {
     id: generateId(),
-    title: (() => {
-      if (options.title) return options.title;
-      const strategy    = options.namingStrategy    || 'project-root';
-      const prefix      = options.namingPrefix      || 'Dev';
-      const rootFolder  = options.namingRootFolder  || '';
-      if (strategy === 'shell-type') {
-        return `${getShellLabel(shellConfig?.shellType)} ${tabNumber}`;
-      }
-      if (strategy === 'custom-prefix') {
-        return `${prefix} ${tabNumber}`;
-      }
-      if (strategy === 'numbered') {
-        return `Terminal ${tabNumber}`;
-      }
-      // Dynamic strategies (project-root, current-dir, parent-child):
-      // seed from currentDirectory if available, otherwise generic placeholder
-      if (currentDirectory) {
-        return getTabTitle(currentDirectory, strategy, { tabNumber, prefix, rootFolder, fallback: `Terminal ${tabNumber}` });
-      }
-      return `Terminal ${tabNumber}`;
-    })(),
+    // Tab naming rebuild: one fixed rule — the project-root name from the initial
+    // directory, computed ONCE here. An explicit options.title (e.g. a manual
+    // rename or a restored label) always wins. De-duplication (` #N`) is applied
+    // by the caller against the open tabs' labels.
+    title: options.title || computeTabLabel(currentDirectory),
     shellConfig: { ...shellConfig },
     colorTheme: assignedTheme,
     mode: assignedMode, // Per-tab light/dark mode
@@ -138,6 +148,9 @@ function tabsToSession(tabs, activeTabId) {
       // v3.12.3: amEnabled removed
       visionEnabled: tab.visionEnabled || false,
       currentDirectory: tab.currentDirectory || null,
+      // Persisted so a manual rename stays immune to relabel-on-project-switch
+      // across restarts (see updateTabTitle / updateTabDirectory).
+      isManuallyRenamed: tab.isManuallyRenamed || false,
 
     })),
     activeTabId: activeTabId,
@@ -199,12 +212,9 @@ async function loadSession() {
  * Hook for managing terminal tabs
  * @param {Object} initialShellConfig       - Default shell configuration
  * @param {string} defaultThemePreference   - Default theme preference: 'auto-cycle' or specific theme name
- * @param {string} [defaultNamingStrategy]    - Tab naming strategy (see getTabTitle)
- * @param {string} [defaultNamingPrefix]      - Custom prefix for the 'custom-prefix' strategy
- * @param {string} [defaultNamingRootFolder]  - Root folder name for the 'project-root' strategy
  * @returns {Object} Tab state and actions
  */
-export function useTabManager(initialShellConfig, defaultThemePreference = 'auto-cycle', defaultNamingStrategy = 'project-root', defaultNamingPrefix = 'Dev', defaultNamingRootFolder = '') {
+export function useTabManager(initialShellConfig, defaultThemePreference = 'auto-cycle') {
   // Track if session has been loaded
   const sessionLoadedRef = useRef(false);
 
@@ -215,21 +225,9 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   const themePreferenceRef = useRef(defaultThemePreference);
   themePreferenceRef.current = defaultThemePreference;
 
-  // Store naming preferences in refs so createTabAction callback always reads the latest value
-  const namingStrategyRef = useRef(defaultNamingStrategy);
-  namingStrategyRef.current = defaultNamingStrategy;
-  const namingPrefixRef = useRef(defaultNamingPrefix);
-  namingPrefixRef.current = defaultNamingPrefix;
-  const namingRootFolderRef = useRef(defaultNamingRootFolder);
-  namingRootFolderRef.current = defaultNamingRootFolder;
-
   // Initialize with one default tab
   const [state, setState] = useState(() => {
-    const initialTab = createTab(initialShellConfig, 1, null, null, null, defaultThemePreference, {
-      namingStrategy: defaultNamingStrategy,
-      namingPrefix: defaultNamingPrefix,
-      namingRootFolder: defaultNamingRootFolder,
-    });
+    const initialTab = createTab(initialShellConfig, 1, null, null, null, defaultThemePreference);
     return {
       tabs: [initialTab],
       activeTabId: initialTab.id,
@@ -268,31 +266,19 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       if (session && session.tabs && session.tabs.length > 0) {
         // Restore tabs from session
         const restoredTabs = session.tabs.map((tabState, index) => {
-          const strategy    = namingStrategyRef.current    || 'project-root';
-          const rootFolder  = namingRootFolderRef.current  || '';
-          let title = tabState.title || `Terminal ${index + 1}`;
-
-          // Re-derive title from saved directory when using a dynamic strategy.
-          // Also re-derive if the saved title is a filename that leaked in from a prior session.
-          if (!isStaticNamingStrategy(strategy) && tabState.currentDirectory &&
-              (title.startsWith('Terminal ') || title === 'forge-terminal' || title === '~' || !title || isFileLikeName(title))) {
-            const derived = getTabTitle(tabState.currentDirectory, strategy, {
-              tabNumber: index + 1,
-              prefix: namingPrefixRef.current || 'Dev',
-              rootFolder,
-              fallback: `Terminal ${index + 1}`,
+          // Tab naming rebuild: labels are write-once, so restore the saved title
+          // as-is. Self-heal only a legacy/corrupted title (empty, file-like, or
+          // carrying control characters from the old rename bug) by recomputing it
+          // once from the saved directory.
+          let title = tabState.title;
+          const isCorruptTitle = !title || title === '~' || title.startsWith('Terminal ') || isFileLikeName(title) || Array.from(title).some(function (ch) { return ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127; });
+          if (isCorruptTitle) {
+            title = computeTabLabel(tabState.currentDirectory);
+            logger.session('Self-healed a corrupted tab title', {
+              tabId: tabState.id,
+              directory: tabState.currentDirectory,
+              healedTitle: title,
             });
-            // Guard against saved paths ending in a document or binary filename.
-            // Uses the centralized isFileLikeName check from projectFolder.js.
-            if (derived && !isFileLikeName(derived) && derived !== '~') {
-              title = derived;
-              logger.session('Derived tab title from directory', {
-                tabId: tabState.id,
-                directory: tabState.currentDirectory,
-                strategy,
-                derivedTitle: title,
-              });
-            }
           }
           
           return {
@@ -305,13 +291,19 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
             // v3.12.3: amEnabled removed
             visionEnabled: tabState.visionEnabled || false,
             currentDirectory: tabState.currentDirectory || null,
+            // Preserve a manual rename across restarts. A self-healed (formerly
+            // corrupt) title is NOT treated as manual, so it can still relabel on a
+            // later project switch.
+            isManuallyRenamed: isCorruptTitle ? false : (tabState.isManuallyRenamed || false),
 
             createdAt: Date.now(),
           };
         });
 
-        // Update idCounter to avoid collisions
-        idCounter = restoredTabs.length + 1;
+        // Seed idCounter past the highest restored index (NOT the tab count) so
+        // a newly created tab can never reuse a restored tab's index. See
+        // computeNextTabIdCounter for the duplicate-"tab-5" regression this fixes.
+        idCounter = computeNextTabIdCounter(restoredTabs.map(tab => tab.id));
         themeIndex = restoredTabs.length;
 
         // Find active tab, default to first if not found
@@ -388,19 +380,12 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       }
 
       const config = shellConfig || configRef.current;
-      // For static strategies (numbered / shell-type / custom-prefix), compute the next
-      // number from the highest existing tab number rather than the current tab count.
-      // Using count+1 causes duplicates whenever a tab has been closed — e.g. if tabs are
-      // ["Terminal 1", "Terminal 3"] (count=2), count+1 gives 3, producing "Terminal 3"
-      // again.  Max+1 always gives a fresh, collision-free number.
-      const currentStrategy = namingStrategyRef.current;
-      const newTabNumber = isStaticNamingStrategy(currentStrategy)
-        ? Math.max(0, ...prev.tabs.map(tab => parseInt(tab.title?.match(/\d+$/)?.[0] || '0', 10))) + 1
-        : prev.tabs.length + 1;
-      const newTab = createTab(config, newTabNumber, null, null, currentDirectory, themePreferenceRef.current, {
-        namingStrategy: namingStrategyRef.current,
-        namingPrefix: namingPrefixRef.current,
-        namingRootFolder: namingRootFolderRef.current,
+      // Tab naming rebuild: the label is the project root, de-duplicated against
+      // the labels already open so a second tab in the same project becomes
+      // "name #2" (lowest free suffix).
+      const dedupedTitle = dedupeLabel(computeTabLabel(currentDirectory), prev.tabs.map(tab => tab.title));
+      const newTab = createTab(config, prev.tabs.length + 1, null, null, currentDirectory, themePreferenceRef.current, {
+        title: dedupedTitle,
       });
       createdTab = newTab;
 
@@ -436,7 +421,36 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
    */
   const closeTab = useCallback((tabId) => {
     logger.tabs('Close tab requested', { tabId });
-    
+
+    // Closing a tab is the explicit signal that its SDD pipeline is done with (specs/011).
+    // Tell the backend so it can safe-clean an isolated worktree (merged + clean only; an
+    // un-merged or dirty worktree is retained). Best-effort: never block tab close on it.
+    fetch('/api/sdd/worktree-close', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: tabId }),
+    }).catch(() => {});
+
+    // Closing a tab is also the ONLY signal that its shell should be destroyed.
+    // An unattended PTY now survives a full day of disconnection so an overnight
+    // gap never kills running work, which means the deliberate close has to do
+    // the reclaiming — otherwise every closed tab leaks a live shell process.
+    //
+    // Gated on the tab actually going away: the request to close the very last
+    // tab is refused below, and destroying that tab's shell while the tab stays
+    // on screen would leave the user looking at a terminal that can never
+    // respond again. Best-effort otherwise — never block tab close on it.
+    const isTabActuallyClosing = (stateRef.current?.tabs?.length ?? 0) > 1;
+    if (isTabActuallyClosing) {
+      fetch('/api/terminal/close', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: tabId }),
+      }).catch(() => {});
+    }
+
     setState(prev => {
       // Don't close the last tab
       if (prev.tabs.length <= 1) {
@@ -503,7 +517,9 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
   }, []);
 
   /**
-   * Update a tab's title
+   * Update a tab's title. This is the explicit user-rename path, so the tab is
+   * marked as manually renamed — which makes its label permanent and immune to the
+   * automatic relabel-on-project-switch in updateTabDirectory.
    * @param {string} tabId - ID of tab to update
    * @param {string} title - New title
    */
@@ -515,7 +531,7 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
       }
 
       const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], title };
+      newTabs[tabIndex] = { ...newTabs[tabIndex], title, isManuallyRenamed: true };
       return {
         ...prev,
         tabs: newTabs,
@@ -523,61 +539,6 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     });
   }, []);
 
-  /**
-   * Recompute every open tab's title from its stored currentDirectory using
-   * the supplied naming strategy. Called when the user changes naming
-   * settings in the Tab Controls panel and clicks Save — without this the
-   * change wouldn't take effect until the user happens to `cd` and the
-   * shell's OSC 9;9 integration fires (which may never happen on tabs
-   * restored from a prior session, leaving stale titles like project names
-   * pulled from the previous working directory).
-   *
-   * Static strategies (numbered / shell-type / custom-prefix) ignore cwd —
-   * they are recomputed from the tab's index + saved shellConfig instead.
-   *
-   * Skips tabs whose derived title would be a generic "Terminal N" or a
-   * file-like name, so we never replace a real project name with garbage.
-   *
-   * @param {string} strategy   New naming strategy id
-   * @param {string} prefix     Custom prefix (used only for 'custom-prefix')
-   * @param {string} rootFolder Configured projects root folder name
-   */
-  const retitleAllTabsFromCwd = useCallback((strategy, prefix, rootFolder) => {
-    setState(prev => {
-      const newTabs = prev.tabs.map((tab, index) => {
-        const tabNumber = index + 1;
-        let derived = null;
-
-        if (isStaticNamingStrategy(strategy)) {
-          // Static strategies derive purely from index + shell type
-          derived = getTabTitle(null, strategy, {
-            tabNumber,
-            shellType: tab.shellConfig?.shellType,
-            prefix: prefix || 'Dev',
-            fallback: `Terminal ${tabNumber}`,
-          });
-        } else if (tab.currentDirectory) {
-          derived = getTabTitle(tab.currentDirectory, strategy, {
-            tabNumber,
-            prefix: prefix || 'Dev',
-            rootFolder: rootFolder || '',
-            fallback: `Terminal ${tabNumber}`,
-          });
-        }
-
-        // Refuse to overwrite a real title with junk: skip blanks,
-        // generic "Terminal N" placeholders, and file-like names.
-        if (!derived || isFileLikeName(derived)) return tab;
-        if (!isStaticNamingStrategy(strategy) && derived.startsWith('Terminal ')) {
-          return tab;
-        }
-        if (derived === tab.title) return tab;
-
-        return { ...tab, title: derived };
-      });
-      return { ...prev, tabs: newTabs };
-    });
-  }, []);
 
   /**
    * Reorder tabs
@@ -794,9 +755,27 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
         return prev;
       }
 
+      const targetTab = prev.tabs[tabIndex];
+      const updatedTab = { ...targetTab, currentDirectory };
+
+      // Tab-naming rebuild kept labels write-once to stop title drift. The single
+      // sanctioned exception lives here: when the shell moves to a *different
+      // project root* (not just a deeper folder), relabel the tab to match — but
+      // never over a user's manual rename. shouldRelabelForDirectory returns null
+      // for deep navigation and temp detours, so this cannot reintroduce drift.
+      if (!targetTab.isManuallyRenamed) {
+        const switchedRootLabel = shouldRelabelForDirectory(targetTab.currentDirectory, currentDirectory);
+        if (switchedRootLabel) {
+          const otherTabLabels = prev.tabs
+            .filter((_, index) => index !== tabIndex)
+            .map(tab => tab.title);
+          updatedTab.title = dedupeLabel(switchedRootLabel, otherTabLabels);
+        }
+      }
+
       const newTabs = [...prev.tabs];
-      newTabs[tabIndex] = { ...newTabs[tabIndex], currentDirectory };
-      
+      newTabs[tabIndex] = updatedTab;
+
       return {
         ...prev,
         tabs: newTabs,
@@ -863,6 +842,5 @@ export function useTabManager(initialShellConfig, defaultThemePreference = 'auto
     toggleTabViewMode, // v3.3.0: Toggle between chat and terminal view
     updateTabDirectory,
     reorderTabs,
-    retitleAllTabsFromCwd,
   };
 }

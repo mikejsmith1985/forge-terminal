@@ -2,56 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Palette, Sun, Moon, Info, Tag, Folder, Layers, Terminal, Hash, Pencil } from 'lucide-react';
 import { themes, themeOrder } from '../themes';
 
-// ─── Tab Naming Strategy Definitions ───────────────────────────────────────
-const NAMING_STRATEGIES = [
-  {
-    value: 'project-root',
-    label: 'Project Root',
-    icon: Layers,
-    example: 'my-project',
-    desc: 'Pins to the workspace root — the first child of your configured projects folder. Stays stable no matter how deep you navigate. Recommended for multi-project setups.',
-  },
-  {
-    value: 'current-dir',
-    label: 'Current Directory',
-    icon: Folder,
-    example: 'src',
-    desc: 'Always shows the directory you are currently in. Updates automatically on every cd.',
-  },
-  {
-    value: 'parent-child',
-    label: 'Parent / Child',
-    icon: Folder,
-    example: 'forge-terminal/src',
-    desc: 'Shows two levels of context: the parent and current directory. Useful when you work in sibling directories.',
-  },
-  {
-    value: 'shell-type',
-    label: 'Shell Type',
-    icon: Terminal,
-    example: 'PowerShell 1',
-    desc: 'Names each tab after its shell (PowerShell, CMD, WSL). Never changes on cd — great for identifying shell environments at a glance.',
-  },
-  {
-    value: 'numbered',
-    label: 'Numbered',
-    icon: Hash,
-    example: 'Terminal 1',
-    desc: 'Classic numeric labelling. Simple, stable, and distraction-free.',
-  },
-  {
-    value: 'custom-prefix',
-    label: 'Custom Prefix',
-    icon: Pencil,
-    example: 'Dev 1',
-    desc: 'Set your own prefix. Each new tab appends a number. Ideal for colour-coded team workflows or personal naming conventions.',
-  },
-];
-
 /**
- * TabControlsPanel - Configure tab naming strategy, per-tab theme defaults, and global presets.
+ * TabControlsPanel - Configure per-tab theme defaults and global presets.
+ * (Tab naming is no longer configurable — labels are the project root, fixed at
+ * tab creation; see frontend/src/utils/tabLabel.js.)
  */
-function TabControlsPanel({ onToast, onNamingChange }) {
+function TabControlsPanel({ onToast }) {
   const [tabDefaults, setTabDefaults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,17 +22,6 @@ function TabControlsPanel({ onToast, onNamingChange }) {
       if (res.ok) {
         const data = await res.json();
         setTabDefaults(data);
-        // Mirror naming settings to localStorage so App.jsx can read synchronously
-        if (data.namingStrategy) {
-          localStorage.setItem('forge:tabNamingStrategy', data.namingStrategy);
-        }
-        if (data.namingPrefix) {
-          localStorage.setItem('forge:tabNamingPrefix', data.namingPrefix);
-        }
-        localStorage.setItem('forge:tabNamingRootFolder', data.namingRootFolder || '');
-        if (onNamingChange && data.namingStrategy) {
-          onNamingChange(data.namingStrategy, data.namingPrefix || 'Dev', data.namingRootFolder || '');
-        }
       } else {
         console.error('Failed to load tab defaults');
       }
@@ -99,13 +44,6 @@ function TabControlsPanel({ onToast, onNamingChange }) {
       });
       
       if (res.ok) {
-        // Mirror naming settings to localStorage for instant synchronous reads
-        localStorage.setItem('forge:tabNamingStrategy', tabDefaults.namingStrategy || 'project-root');
-        localStorage.setItem('forge:tabNamingPrefix', tabDefaults.namingPrefix || 'Dev');
-        localStorage.setItem('forge:tabNamingRootFolder', tabDefaults.namingRootFolder || '');
-        if (onNamingChange) {
-          onNamingChange(tabDefaults.namingStrategy || 'project-root', tabDefaults.namingPrefix || 'Dev', tabDefaults.namingRootFolder || '');
-        }
         if (onToast) onToast('Tab defaults saved!', 'success', 3000);
       } else {
         if (onToast) onToast('Failed to save tab defaults', 'error', 3000);
@@ -163,224 +101,6 @@ function TabControlsPanel({ onToast, onNamingChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-      {/* ── Tab Naming Section ─────────────────────────────────────── */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-          <Tag size={16} color="#8b5cf6" />
-          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#fff' }}>
-            Tab Naming
-          </h4>
-        </div>
-        <p style={{ margin: '0 0 14px', fontSize: '12px', color: '#888' }}>
-          Choose how new tabs are named and how titles update as you navigate directories.
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {NAMING_STRATEGIES.map(strategy => {
-            const Icon = strategy.icon;
-            const isActive = (tabDefaults.namingStrategy || 'project-root') === strategy.value;
-            return (
-              <label
-                key={strategy.value}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  padding: '12px 14px',
-                  background: isActive ? '#8b5cf622' : '#111',
-                  border: `1px solid ${isActive ? '#8b5cf6' : '#2a2a2a'}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.15s, background 0.15s',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="namingStrategy"
-                  value={strategy.value}
-                  checked={isActive}
-                  onChange={() => setTabDefaults({ ...tabDefaults, namingStrategy: strategy.value })}
-                  style={{ marginTop: '3px', cursor: 'pointer', accentColor: '#8b5cf6' }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                    <Icon size={13} color={isActive ? '#a78bfa' : '#666'} />
-                    <span style={{ fontWeight: 600, color: isActive ? '#e9d5ff' : '#ccc', fontSize: '13px' }}>
-                      {strategy.label}
-                    </span>
-                    <span style={{
-                      marginLeft: '6px',
-                      padding: '1px 8px',
-                      background: isActive ? '#8b5cf633' : '#1e1e1e',
-                      border: `1px solid ${isActive ? '#8b5cf666' : '#333'}`,
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      color: isActive ? '#c4b5fd' : '#666',
-                      fontFamily: 'monospace',
-                    }}>
-                      {strategy.value === 'custom-prefix'
-                        ? `${tabDefaults.namingPrefix || 'Dev'} 1`
-                        : strategy.example}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.5' }}>
-                    {strategy.desc}
-                  </div>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-
-        {/* Root folder input – only visible when project-root is selected */}
-        {(tabDefaults.namingStrategy || 'project-root') === 'project-root' && (
-          <div style={{
-            marginTop: '12px',
-            padding: '14px',
-            background: '#0d0d0d',
-            border: '1px solid #8b5cf644',
-            borderRadius: '8px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <Folder size={14} color="#8b5cf6" style={{ flexShrink: 0 }} />
-              <label style={{ fontSize: '12px', color: '#aaa', fontWeight: 500 }}>
-                Projects root folder name
-              </label>
-            </div>
-            <p style={{ margin: '0 0 10px', fontSize: '11px', color: '#666', lineHeight: '1.5' }}>
-              The name of the top-level folder that contains your projects (e.g.{' '}
-              <span style={{ fontFamily: 'monospace', color: '#888' }}>repos</span>,{' '}
-              <span style={{ fontFamily: 'monospace', color: '#888' }}>Projects</span>,{' '}
-              <span style={{ fontFamily: 'monospace', color: '#888' }}>workspace</span>).
-              Forge looks for this folder in your path and pins the tab name to its first child.
-            </p>
-            {(tabDefaults.namingStrategy || 'project-root') === 'project-root' && !tabDefaults.namingRootFolder && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px',
-                padding: '8px 12px',
-                marginBottom: '10px',
-                background: '#2a1f00',
-                border: '1px solid #f59e0b55',
-                borderRadius: '6px',
-                fontSize: '11px',
-                color: '#fbbf24',
-                lineHeight: '1.5',
-              }}>
-                <span style={{ flexShrink: 0, marginTop: '1px' }}>⚠</span>
-                <span>
-                  No root folder configured — tabs will update on every <code style={{ fontFamily: 'monospace', background: '#ffffff11', padding: '0 3px', borderRadius: '3px' }}>cd</code>, same as <strong>Current Directory</strong> mode.
-                  Enter the folder name that contains your projects to pin tab names.
-                </span>
-              </div>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input
-                type="text"
-                value={tabDefaults.namingRootFolder || ''}
-                onChange={(e) => setTabDefaults({ ...tabDefaults, namingRootFolder: e.target.value })}
-                placeholder="e.g. repos, Projects, workspace"
-                maxLength={64}
-                style={{
-                  flex: 1,
-                  padding: '8px 10px',
-                  background: '#1a1a1a',
-                  border: '1px solid #444',
-                  borderRadius: '6px',
-                  color: '#fff',
-                  fontSize: '13px',
-                  outline: 'none',
-                }}
-              />
-              {tabDefaults.namingRootFolder && (
-                <div style={{
-                  padding: '8px 14px',
-                  background: '#1e1a2e',
-                  border: '1px solid #8b5cf633',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontFamily: 'monospace',
-                  color: '#c4b5fd',
-                  whiteSpace: 'nowrap',
-                }}>
-                  …/{tabDefaults.namingRootFolder}/<span style={{ color: '#a78bfa', fontWeight: 700 }}>my-project</span>/…
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Custom prefix input – only visible when custom-prefix is selected */}
-        {(tabDefaults.namingStrategy || 'project-root') === 'custom-prefix' && (
-          <div style={{
-            marginTop: '12px',
-            padding: '14px',
-            background: '#0d0d0d',
-            border: '1px solid #8b5cf644',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-          }}>
-            <Pencil size={14} color="#8b5cf6" style={{ flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#aaa', marginBottom: '6px', fontWeight: 500 }}>
-                Custom prefix text
-              </label>
-              <input
-                type="text"
-                value={tabDefaults.namingPrefix || ''}
-                onChange={(e) => setTabDefaults({ ...tabDefaults, namingPrefix: e.target.value })}
-                placeholder="Dev"
-                maxLength={20}
-                style={{
-                  padding: '8px 10px',
-                  background: '#1a1a1a',
-                  border: '1px solid #444',
-                  borderRadius: '6px',
-                  color: '#fff',
-                  fontSize: '13px',
-                  width: '180px',
-                  outline: 'none',
-                }}
-              />
-            </div>
-            <div style={{
-              padding: '8px 14px',
-              background: '#1e1a2e',
-              border: '1px solid #8b5cf633',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontFamily: 'monospace',
-              color: '#c4b5fd',
-            }}>
-              {tabDefaults.namingPrefix || 'Dev'} 1
-            </div>
-          </div>
-        )}
-
-        {/* Connectivity note */}
-        <div style={{
-          marginTop: '12px',
-          padding: '10px 14px',
-          background: '#0f1a0f',
-          border: '1px solid #22c55e33',
-          borderRadius: '6px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '8px',
-        }}>
-          <Info size={13} color="#4ade80" style={{ marginTop: '1px', flexShrink: 0 }} />
-          <span style={{ fontSize: '11px', color: '#86efac', lineHeight: '1.5' }}>
-            <strong>Connectivity tip:</strong> If you experience tabs disconnecting unexpectedly,
-            switch to <em>Numbered</em> or <em>Shell Type</em> mode. Static names eliminate
-            any re-render triggered by auto-rename events during active sessions.
-          </span>
-        </div>
-      </div>
-
-      <div style={{ borderTop: '1px solid #222' }} />
 
       {/* ── Global Presets Section ─────────────────────────────────── */}
       <div>

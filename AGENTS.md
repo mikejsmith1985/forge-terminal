@@ -24,18 +24,24 @@ The rule forces skills to fire BEFORE analysis begins, not after.
 ## Mandatory Skill Invocation Sequence
 
 When `workflow-enforcer` loads, it will instruct you to invoke the following co-skills.
-For reference, the full required sequence is:
+This project uses **Spec-Driven Development (GitHub Spec Kit)**: when `.specify/` is present,
+`.specify/memory/constitution.md` holds the binding rules and the `speckit-*` pipeline is the
+workflow. The full required sequence is:
 
-| Order | Skill | When Required |
-|-------|-------|---------------|
+| Order | Skill / Step | When Required |
+|-------|--------------|---------------|
 | 1 | `workflow-enforcer` | **ALL** code tasks — invoke this first, always |
-| 2 | `forge-workflow` | **ALL** code tasks |
+| 2 | read `.specify/memory/constitution.md` | **ALL** code tasks in an SDD project — the authoritative binding rules |
 | 3 | `code-quality` | **ALL** code tasks |
-| 4 | `branching-strategy` | **ALL** code tasks (branch must exist before code) |
-| 5 | `code-tutor-workflow` | **ALL** code tasks — user expects walkthrough of changes |
+| 4 | `framework-first` | **ALL** code tasks — confirm the framework doesn't already provide it before building infrastructure |
+| 5 | `branching-strategy` | **ALL** code tasks (branch must exist before code) |
+| — | **speckit pipeline** (`speckit-specify → speckit-plan → speckit-tasks → speckit-implement`) | The workflow itself, in any `.specify/` project |
 | 6 | `multi-agent` | Tasks spanning 3+ files |
 | 7 | `testing-standards` | Any test creation or modification |
 | 8 | `pr-workflow` | Creating or reviewing pull requests |
+
+> The legacy bespoke `forge-workflow` 5-phase skill has been **removed** — its standards now live in
+> the constitution (`.specify/memory/constitution.md`) and its orchestration is the speckit pipeline.
 
 ---
 

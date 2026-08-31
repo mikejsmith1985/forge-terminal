@@ -12,8 +12,12 @@ jobs:
       
       - name: Check for unapproved root .md files
         run: |
-          # Get list of .md files in root from PR
-          PR_FILES=$(git diff --name-only origin/main...HEAD | grep '\.md$' | grep -v '^docs/' | grep -v '^\.github/' | grep -v '^frontend/' | grep -v '^cmd/' | grep -v '^scripts/' || true)
+          # Get the list of ROOT-level .md files changed in the PR. The check governs the
+          # repository ROOT only, so match files with no directory component (no '/'). This
+          # correctly ignores every subdirectory — docs/, frontend/, cmd/, scripts/, and the
+          # Spec Kit pipeline artifacts under specs/ and .specify/, which Constitution Article VI
+          # exempts as generated artifacts rather than ad-hoc root docs.
+          PR_FILES=$(git diff --name-only origin/main...HEAD | grep -E '^[^/]+\.md$' || true)
           
           if [ -z "$PR_FILES" ]; then
             echo "✅ No root .md files added"

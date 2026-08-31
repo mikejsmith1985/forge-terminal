@@ -31,7 +31,9 @@ func startPTY(cmd *exec.Cmd) (io.ReadWriteCloser, error) {
 }
 
 // startPTYWithShell starts a PTY session with a specific shell and arguments.
-func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadWriteCloser, error) {
+// sessionID is the per-tab identity written into the shell as FORGE_SESSION_ID
+// so SDD signals can be scoped to this session (specs/010, FR-003).
+func startPTYWithShell(shell string, args []string, workingDir string, sessionID string) (io.ReadWriteCloser, error) {
 	// Build command line
 	commandLine := shell
 	if len(args) > 0 {
@@ -63,7 +65,11 @@ func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadW
 			// PowerShell: use $env:VAR syntax
 			cpty.Write([]byte(fmt.Sprintf("$env:FORGE_INSTANCE_PID=%d\r", forgePID)))
 			cpty.Write([]byte(fmt.Sprintf("$env:FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
-			
+			// Per-tab SDD identity (FR-003). Single-quoted; sessionID is app-generated, not user input.
+			if sessionID != "" {
+				cpty.Write([]byte(fmt.Sprintf("$env:FORGE_SESSION_ID='%s'\r", sessionID)))
+			}
+
 			if workingDir != "" {
 				cpty.Write([]byte("Set-Location \"" + workingDir + "\"\r"))
 			}
@@ -71,7 +77,11 @@ func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadW
 			// Unix shells: use export
 			cpty.Write([]byte(fmt.Sprintf("export FORGE_INSTANCE_PID=%d\r", forgePID)))
 			cpty.Write([]byte(fmt.Sprintf("export FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
-			
+			// Per-tab SDD identity (FR-003).
+			if sessionID != "" {
+				cpty.Write([]byte(fmt.Sprintf("export FORGE_SESSION_ID=%s\r", sessionID)))
+			}
+
 			if workingDir != "" {
 				cpty.Write([]byte("cd \"" + workingDir + "\"\r"))
 			}
@@ -79,7 +89,11 @@ func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadW
 			// CMD.exe: use SET
 			cpty.Write([]byte(fmt.Sprintf("SET FORGE_INSTANCE_PID=%d\r", forgePID)))
 			cpty.Write([]byte(fmt.Sprintf("SET FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
-			
+			// Per-tab SDD identity (FR-003).
+			if sessionID != "" {
+				cpty.Write([]byte(fmt.Sprintf("SET FORGE_SESSION_ID=%s\r", sessionID)))
+			}
+
 			if workingDir != "" {
 				cpty.Write([]byte("cd /d \"" + workingDir + "\"\r"))
 			}

@@ -4,13 +4,24 @@ import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
-import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
+import ScrollToBottomButton from './ScrollToBottomButton';
+import {
+  WHEEL_SCROLL_LINES_PER_NOTCH,
+  performScrollToBottom,
+} from '../utils/terminalScrollTarget';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
 import { diagnosticCore } from '../utils/diagnosticCore';
 import { isLLMCommand } from '../utils/llmDetection';
 import { extractProjectFolder, isFileLikeName, isTempOrSystemPath } from '../utils/projectFolder';
+import { shouldDetectDirectoryFromText, ALTERNATE_SCREEN_BUFFER } from '../utils/terminalTuiState';
+import { neutralizeSocket } from '../utils/websocketManager';
+import {
+  shouldRestoreDirectory,
+  buildDirectoryRestoreCommand,
+  DIRECTORY_RESTORE_DELAY_MS,
+} from '../utils/directoryRestore';
 
 // Paste error logger
 const logPasteError = (error, context = {}) => {
@@ -113,6 +124,11 @@ function stripAnsi(text) {
 
 // Menu-style prompts where an option is already selected (just press Enter)
 // These search the ENTIRE buffer, not just the last line
+// How long Take Control waits for the server's CONTROL_GRANTED before treating
+// the socket as dead and reconnecting. Generous enough for a slow loopback
+// round-trip; short enough that a click never feels ignored.
+const TAKE_CONTROL_GRANT_TIMEOUT_MS = 2000;
+
 const MENU_SELECTION_PATTERNS = [
   // Copilot CLI: "❯ 1. Yes" or "> 1. Yes" (numbered menu with selection indicator)
   /[›❯>]\s*1\.\s*Yes\b/i,
@@ -525,6 +541,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   onConnectionChange = null,
   onWaitingChange = null, // Callback when prompt waiting state changes
   onDirectoryChange = null, // Callback when directory changes (for tab rename)
+  onSddGate = null, // Callback with the raw SDD_PHASE_GATE message JSON (specs/003 decision card)
   onCopy = null, // Callback when text is copied (for toast notification)
   onPaste = null, // Callback when text is pasted (for toast notification)
   onFileOpen = null, // Callback when file path is double-clicked to open in editor
@@ -558,6 +575,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const tabNameRef = useRef(tabName);
   const lastDirectoryRef = useRef(null);
   const onDirectoryChangeRef = useRef(onDirectoryChange);
+  const onSddGateRef = useRef(onSddGate);
   const onCopyRef = useRef(onCopy);
   const onPasteRef = useRef(onPaste);
   const onFileOpenRef = useRef(onFileOpen);
@@ -572,6 +590,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   const isCopyingRef = useRef(false); // Prevent clipboard spam
   const isPastingRef = useRef(false); // Prevent double paste handling
   const isVisibleRef = useRef(isVisible); // Track visibility to avoid stale closures in paste handlers
+  // Lets the imperative handle (declared above handleScrollToBottom) reach the
+  // current handler without duplicating its logic.
+  const handleScrollToBottomRef = useRef(() => {});
   // Keystrokes that arrive while the WebSocket is still CONNECTING are buffered here
   // and flushed in bulk the moment the socket opens.  Without this, rapid typing
   // immediately after a session recovery (or the initial mount) silently drops keys
@@ -581,6 +602,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   
   // State for scroll button visibility
   const [showScrollButton, setShowScrollButton] = useState(false);
+  // True while a full-screen program (Claude Code's fullscreen renderer, vim, less)
+  // owns the screen. That mode has no terminal scrollback, so the scroll-to-bottom
+  // button has to ask the program instead of moving a viewport that cannot move.
+  const [isAlternateScreen, setIsAlternateScreen] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
@@ -592,6 +617,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   // defer has run. If CONTROL_GRANTED arrives within 600ms we cancel the timer so the
   // banner never appears.
   const bannerTimerRef = useRef(null);
+  // Timer armed when the user clicks Take Control: if CONTROL_GRANTED doesn't
+  // arrive in time the socket is presumed dead and we force a reconnect —
+  // a fresh join auto-promotes this tab when no live controller exists.
+  const takeControlRetryRef = useRef(null);
 
   // Tracks how far the virtual keyboard has pushed up the visible viewport on mobile.
   // When the keyboard opens, window.visualViewport.height shrinks but window.innerHeight
@@ -695,6 +724,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
   useEffect(() => {
     onDirectoryChangeRef.current = onDirectoryChange;
   }, [onDirectoryChange]);
+
+  // Keep onSddGate ref updated so the WebSocket handler always calls the latest callback.
+  useEffect(() => {
+    onSddGateRef.current = onSddGate;
+  }, [onSddGate]);
 
   // Keep onCopy ref updated
   useEffect(() => {
@@ -934,11 +968,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         searchAddonRef.current.clearDecorations();
       }
     },
+    // Ctrl+End (App-level shortcut) lands here. Delegating to the shared handler is
+    // what makes the shortcut work inside a full-screen program, where the previous
+    // direct scrollToBottom() call was a guaranteed no-op.
     scrollToBottom: () => {
-      if (xtermRef.current) {
-        xtermRef.current.scrollToBottom();
-        setShowScrollButton(false);
-      }
+      handleScrollToBottomRef.current();
     },
     sendRaw: (bytes) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -1014,6 +1048,8 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       theme: initialTheme,
       allowProposedApi: true,
       scrollback: 5000,
+      // One wheel notch moves this many lines; see WHEEL_SCROLL_LINES_PER_NOTCH.
+      scrollSensitivity: WHEEL_SCROLL_LINES_PER_NOTCH,
       clipboardMode: 'off', // We handle paste exclusively in handlePaste for full control (image/video support)
       lineHeight: 1.0,
       letterSpacing: 0,
@@ -1276,6 +1312,15 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
 
     const scrollDisposable = term.onScroll(checkScrollPosition);
+
+    // Switching between the normal and alternate screen buffers changes what the
+    // scroll-to-bottom button can do, and it fires no scroll event — so track it
+    // separately. Seeded from the current buffer because a restored tab can already
+    // have a full-screen program running before this listener is attached.
+    setIsAlternateScreen(term.buffer.active.type === ALTERNATE_SCREEN_BUFFER);
+    const bufferChangeDisposable = term.buffer.onBufferChange((activeBuffer) => {
+      setIsAlternateScreen(activeBuffer.type === ALTERNATE_SCREEN_BUFFER);
+    });
 
     // Mouse wheel scrolling bypasses term.onScroll — listen directly on the DOM viewport.
     if (viewport) {
@@ -1746,13 +1791,25 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
         }
       }
 
+      // Disown any previous socket BEFORE opening a new one. Every connect path
+      // (initial mount, backoff retry, visibility wake, manual reconnect) funnels
+      // through here, so this guarantees at most one socket owns this tab's state.
+      // Without it, a still-open superseded socket registers at the server as a
+      // second "device": the new socket joins as a passive viewer and the two
+      // connections fight over isActiveDevice — the stuck "Take Control" bug.
+      neutralizeSocket(wsRef.current);
+
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
-        logger.terminal('WebSocket connected', { 
+        // Superseded-socket guard: only the socket this tab currently owns may
+        // mutate connection state (neutralizeSocket detaches handlers, this is
+        // belt-and-suspenders for events already queued on the event loop).
+        if (wsRef.current !== ws) return;
+        logger.terminal('WebSocket connected', {
           tabId, 
           shellType: cfg?.shellType,
           wsUrl: wsUrl.replace(window.location.host, '[host]'),
@@ -1814,34 +1871,34 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           }
         }, 100);
 
-        // Restore directory if available — but ONLY for hidden (non-active) tabs
-        // and NEVER for reattached sessions (the shell already has its directory).
-        // For the visible/active tab the psHome query param already told the backend to
-        // run Set-Location at 100ms, so we don't need to send a visible cd command here
-        // (which would clutter the terminal screen).  Hidden tabs can run the cd silently
-        // as a belt-and-suspenders fallback without the user ever seeing it.
-        if (currentDirectoryRef.current && !isVisibleRef.current && !wasReconnection) {
-          const dir = currentDirectoryRef.current;
-          logger.terminal('Restoring directory (hidden tab fallback)', { tabId, directory: dir });
-          
-          setTimeout(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              const shellType = cfg?.shellType || 'powershell';
-              let cdCommand = '';
-              
-              if (shellType === 'wsl') {
-                cdCommand = dir.startsWith('~') ? `cd ${dir.replace(/ /g, '\\ ')}\r` : `cd "${dir}"\r`;
-              } else if (shellType === 'cmd') {
-                cdCommand = `cd /d "${dir}"\r`;
-              } else {
-                cdCommand = `cd "${dir}"\r`;
-              }
-              
-              ws.send(cdCommand);
-              logger.terminal('Directory restore command sent (hidden)', { tabId, command: cdCommand.trim() });
-            }
-          }, 800);
-        }
+        // Restore the saved directory for hidden tabs whose shell was started fresh.
+        // The backend already starts every shell in the right directory (the psHome
+        // query param), so this is only a fallback — and it must never fire for a shell
+        // the server handed back alive, because the `cd` would be echoed into scrollback
+        // (surfacing as commands the developer never typed) or swallowed as input by a
+        // CLI agent running in that tab.
+        //
+        // The decision is re-checked inside the delay rather than here: SESSION_REATTACHED
+        // arrives shortly AFTER the socket opens, so deciding now would always read the
+        // reattach flag as false.
+        setTimeout(() => {
+          const restoreOptions = {
+            savedDirectory: currentDirectoryRef.current,
+            isVisible: isVisibleRef.current,
+            wasReconnection,
+            wasSessionReattached: sessionReattachedRef.current,
+          };
+          if (ws.readyState !== WebSocket.OPEN || !shouldRestoreDirectory(restoreOptions)) {
+            logger.terminal('Directory restore skipped', { tabId, ...restoreOptions });
+            return;
+          }
+          const cdCommand = buildDirectoryRestoreCommand(
+            cfg?.shellType || 'powershell',
+            currentDirectoryRef.current
+          );
+          ws.send(cdCommand);
+          logger.terminal('Directory restore command sent (hidden)', { tabId, command: cdCommand.trim() });
+        }, DIRECTORY_RESTORE_DELAY_MS);
 
         if (onConnectionChange) onConnectionChange(true);
       };
@@ -1858,6 +1915,9 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       // =========================================================================
 
       ws.onmessage = (event) => {
+        // Superseded-socket guard: a replaced socket's late messages must not
+        // reach the terminal or flip isActiveDevice against the live socket.
+        if (wsRef.current !== ws) return;
         // CRITICAL: Keep hot path minimal - just write to terminal
         let textData = '';
 
@@ -1872,7 +1932,16 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
           if (str.length > 0 && str[0] === '{') {
             try {
               const msg = JSON.parse(str);
-              
+
+              // SDD orchestrator (specs/003, 006, 013): surface gate, live-status, and
+              // worktree-collision offers to the dashboard hook and stop — these are control
+              // messages, not terminal output. SDD_WORKTREE_COLLISION must be forwarded here
+              // or the recovery-first opt-in prompt (specs/013 FR-003) never reaches the UI.
+              if (msg.type === 'SDD_PHASE_GATE' || msg.type === 'SDD_PHASE_STATUS' || msg.type === 'SDD_WORKTREE_COLLISION') {
+                if (onSddGateRef.current) onSddGateRef.current(str);
+                return;
+              }
+
               // Handle server errors (e.g. failed to start PTY)
               if (msg.error) {
                 console.error('[Terminal] Server error:', msg.error);
@@ -1903,6 +1972,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
                   // Treat this the same as CONTROL_GRANTED — no passive-device banner.
                   logger.terminal('Joined session as active device (auto-promoted)', { tabId });
                   clearTimeout(bannerTimerRef.current);
+                  clearTimeout(takeControlRetryRef.current);
                   setIsActiveDevice(true);
                   // Fit to this device's screen before sending resize (same reasoning
                   // as CONTROL_GRANTED — ensures mobile gets correct col/row count).
@@ -1940,8 +2010,10 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
               if (msg.type === 'CONTROL_GRANTED') {
                 logger.terminal('Control granted to this device', { tabId });
                 // Cancel any pending SESSION_JOINED banner timer — we're the active
-                // device, so no passive-device overlay should appear.
+                // device, so no passive-device overlay should appear. Also cancel
+                // the Take Control retry: the grant arrived, no reconnect needed.
                 clearTimeout(bannerTimerRef.current);
+                clearTimeout(takeControlRetryRef.current);
                 setIsActiveDevice(true);
                 // Fit the terminal to THIS device's screen BEFORE reading cols/rows.
                 // Without this, mobile devices inherit the desktop's column count
@@ -2006,19 +2078,29 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             }
           }
 
-          // Directory detection (also uses regex)
-          const detectedDir = extractDirectory(buf.data);
-          if (detectedDir && detectedDir !== lastDirectoryRef.current) {
-            lastDirectoryRef.current = detectedDir;
-            // Defense-in-depth: skip temp/system paths detected via text patterns.
-            // handleDirectoryChange (App.jsx) also guards these, but blocking here
-            // avoids a spurious callback and keeps lastDirectoryRef free of
-            // non-project values (e.g. %TEMP% after an AI agent processes a
-            // pasted clipboard image and changes to that directory).
-            if (!isTempOrSystemPath(detectedDir)) {
-              const folderName = getFolderName(detectedDir);
-              if (folderName && onDirectoryChangeRef.current) {
-                onDirectoryChangeRef.current(folderName, detectedDir);
+          // Directory detection (also uses regex).
+          //
+          // Skip it entirely while a full-screen TUI owns the terminal — either
+          // via the alternate screen buffer (vim, htop) or a box-drawn frame in
+          // the normal buffer (Claude Code, lazygit). Those apps render Windows
+          // paths and ">" chevrons inside their UI that the prompt parser would
+          // mistake for the shell's CWD. That corruption is what made the Release
+          // Manager card lose track of the repo and type the release command into
+          // a running Claude Code session instead of starting a background job.
+          if (shouldDetectDirectoryFromText(buf.data, term.buffer.active.type)) {
+            const detectedDir = extractDirectory(buf.data);
+            if (detectedDir && detectedDir !== lastDirectoryRef.current) {
+              lastDirectoryRef.current = detectedDir;
+              // Defense-in-depth: skip temp/system paths detected via text patterns.
+              // handleDirectoryChange (App.jsx) also guards these, but blocking here
+              // avoids a spurious callback and keeps lastDirectoryRef free of
+              // non-project values (e.g. %TEMP% after an AI agent processes a
+              // pasted clipboard image and changes to that directory).
+              if (!isTempOrSystemPath(detectedDir)) {
+                const folderName = getFolderName(detectedDir);
+                if (folderName && onDirectoryChangeRef.current) {
+                  onDirectoryChangeRef.current(folderName, detectedDir);
+                }
               }
             }
           }
@@ -2027,13 +2109,17 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       };
 
       ws.onerror = (error) => {
+        if (wsRef.current !== ws) return; // superseded socket — not our error
         logger.terminal('WebSocket error', { tabId, error: error.message || 'unknown' });
         term.write('\r\n\x1b[1;31m[Error]\x1b[0m Connection error.\r\n');
       };
 
       ws.onclose = (event) => {
+        // Superseded-socket guard: a replaced socket closing must not print
+        // "[Disconnected]" or schedule a reconnect against the live socket.
+        if (wsRef.current !== ws) return;
         logger.terminal('WebSocket closed', { tabId, code: event.code, reason: event.reason });
-        
+
         setIsConnected(false);
         if (onConnectionChange) onConnectionChange(false);
         
@@ -2282,6 +2368,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       resizeObserver.disconnect();
 
       scrollDisposable.dispose();
+      bufferChangeDisposable.dispose();
       if (viewport) {
         viewport.removeEventListener('scroll', checkScrollPosition);
       }
@@ -2307,6 +2394,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       onDataDisposable.dispose();
       onResizeDisposable.dispose();
       clearTimeout(bannerTimerRef.current);
+      clearTimeout(takeControlRetryRef.current);
 
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         // Signal that this is an intentional unmount, not a connectivity issue.
@@ -2324,29 +2412,50 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
     };
   }, []); // Only run once on mount, theme updates handled by other effect
 
+  // Both the on-screen button and the Ctrl+End shortcut route through here so the
+  // two can never diverge again — the shortcut used to carry its own copy of the
+  // logic that could not reach a full-screen program at all.
   const handleScrollToBottom = () => {
-    if (xtermRef.current) {
-      xtermRef.current.scrollToBottom();
-    }
-    // Belt-and-suspenders: scroll the xterm DOM viewport directly.
-    // xterm's scrollToBottom() can silently no-op when its internal buffer
-    // cursor is already at the last line (common during streaming output),
-    // leaving the DOM viewport scrollTop stale. Forcing scrollTop here is
-    // always reliable regardless of xterm's internal state.
-    const viewport = terminalRef.current?.querySelector('.xterm-viewport');
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight;
-    }
-    // Do NOT call setShowScrollButton(false) here — let checkScrollPosition
-    // confirm the scroll actually reached the bottom before hiding the button.
-    // This prevents the button from disappearing when the scroll silently failed.
+    performScrollToBottom({
+      terminal: xtermRef.current,
+      viewportElement: terminalRef.current?.querySelector('.xterm-viewport'),
+    });
+    // Deliberately not clearing showScrollButton here — checkScrollPosition confirms
+    // the scroll actually landed before hiding the button, so a silently failed
+    // scroll leaves the button on screen instead of pretending it worked.
+  };
 
-    // Restore focus: clicking the scroll button moves browser focus away from
-    // xterm's hidden textarea. Refocus immediately so the next keypress goes
-    // directly to the terminal without needing the App-level capture redirect.
-    if (xtermRef.current) {
-      xtermRef.current.focus();
+  // Keep the ref the imperative handle calls pointing at the current handler.
+  useEffect(() => {
+    handleScrollToBottomRef.current = handleScrollToBottom;
+  });
+
+  // requestTakeControl asks the server to make this device the PTY controller.
+  // Self-healing by design: a dead socket (half-open after sleep/network loss)
+  // would swallow the request silently, so if CONTROL_GRANTED doesn't arrive
+  // within the timeout we drop the socket and reconnect — the fresh join
+  // auto-promotes this tab whenever no live controller exists on the server.
+  const requestTakeControl = () => {
+    const socket = wsRef.current;
+    const isSocketOpen = socket && socket.readyState === WebSocket.OPEN;
+    if (!isSocketOpen) {
+      // The socket the banner believes in is already gone — clicking should
+      // recover the tab, not silently do nothing.
+      logger.terminal('Take Control clicked on dead socket — reconnecting', { tabId });
+      if (connectFnRef.current) connectFnRef.current();
+      return;
     }
+    if (xtermRef.current) {
+      const { cols, rows } = xtermRef.current;
+      socket.send(JSON.stringify({ type: 'take_control', cols, rows }));
+    }
+    clearTimeout(takeControlRetryRef.current);
+    takeControlRetryRef.current = setTimeout(() => {
+      if (!isActiveDeviceRef.current && connectFnRef.current) {
+        logger.terminal('take_control unanswered — forcing reconnect', { tabId });
+        connectFnRef.current();
+      }
+    }, TAKE_CONTROL_GRANT_TIMEOUT_MS);
   };
 
   return (
@@ -2440,12 +2549,7 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             Another device controls this terminal
           </span>
           <button
-            onClick={() => {
-              if (wsRef.current?.readyState === WebSocket.OPEN && xtermRef.current) {
-                const { cols, rows } = xtermRef.current;
-                wsRef.current.send(JSON.stringify({ type: 'take_control', cols, rows }));
-              }
-            }}
+            onClick={requestTakeControl}
             style={{
               padding: '4px 14px',
               fontSize: '13px',
@@ -2464,14 +2568,11 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
       )}
       
       {isVisible && (
-        <button
-          className={`scroll-to-bottom-btn${showScrollButton ? ' is-scrolled-up' : ''}`}
-          onClick={handleScrollToBottom}
-          title="Scroll to bottom (Ctrl+End)"
-          aria-label="Scroll to bottom"
-        >
-          <ArrowDownToLine size={16} />
-        </button>
+        <ScrollToBottomButton
+          isScrolledUp={showScrollButton}
+          isAlternateScreen={isAlternateScreen}
+          onScrollToBottom={handleScrollToBottom}
+        />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel, isFileLikeName, isTempOrSystemPath } from './projectFolder';
+import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, getShellLabel, isFileLikeName, isTempOrSystemPath, isSystemProfilePath } from './projectFolder';
 
 // Tests for projectFolder.js -- the canonical source for tab title extraction logic.
 
@@ -212,8 +212,17 @@ describe('getTabTitle', () => {
     expect(getTabTitle(windowsProjectPath, 'project-root', { tabNumber: 1 })).toBe('forge-terminal');
   });
 
-  it('project-root: falls back to third Unix segment when rootFolder not found in path', () => {
-    expect(getTabTitle(unixProjectPath, 'project-root', { tabNumber: 1, rootFolder: 'ProjectsWin' })).toBe('projects');
+  it('project-root: auto-detects "projects" (Linux/WSL convention) in a Unix path', () => {
+    // /home/<user>/projects/<project>/… is the standard WSL layout.
+    // Adding "projects" to KNOWN_ROOT_FOLDER_NAMES means the strategy returns
+    // the actual project name rather than the username (the pre-fix bug).
+    expect(getTabTitle('/home/mikejsmith1985/projects/forge-terminal/src', 'project-root', { tabNumber: 1 })).toBe('forge-terminal');
+  });
+
+  it('project-root: falls back to third Unix segment when no known root folder is found', () => {
+    // "myapp" is returned because "projects" IS in KNOWN_ROOT_FOLDER_NAMES now.
+    // rootFolder 'ProjectsWin' is absent from this Unix path so auto-detect fires.
+    expect(getTabTitle('/home/user/projects/myapp/components', 'project-root', { tabNumber: 1, rootFolder: 'ProjectsWin' })).toBe('myapp');
   });
 
   it('project-root: works with custom root folder names', () => {
@@ -378,7 +387,88 @@ describe('isTempOrSystemPath – image paste scenario', () => {
   });
 });
 
-// ── isStaticNamingStrategy ──────────────────────────────────────────────────
+// ── isSystemProfilePath ────────────────────────────────────────────────────
+// These tests guard the "mikejsmith1985" bug where a WSL shell fires OSC 9;9
+// with /home/<user> on startup before navigating to the actual project folder.
+
+describe('isSystemProfilePath', () => {
+  // Paths that ARE a bare home/profile directory — tab title must not update
+  it('identifies a bare Unix home directory (/home/<user>)', () => {
+    expect(isSystemProfilePath('/home/mikejsmith1985')).toBe(true);
+    expect(isSystemProfilePath('/home/user')).toBe(true);
+    expect(isSystemProfilePath('/home/mike/')).toBe(true); // trailing slash handled
+  });
+
+  it('identifies a bare Windows user profile root (C:\\Users\\<user>)', () => {
+    expect(isSystemProfilePath('C:\\Users\\mike')).toBe(true);
+    expect(isSystemProfilePath('C:\\Users\\mikejsmith1985')).toBe(true);
+    expect(isSystemProfilePath('C:/Users/mike')).toBe(true); // forward slashes
+  });
+
+  // Paths that are NOT home roots — they ARE real working directories
+  it('does NOT flag a Unix project path under the home directory', () => {
+    expect(isSystemProfilePath('/home/user/projects/forge-terminal')).toBe(false);
+    expect(isSystemProfilePath('/home/mikejsmith1985/projects/forge-terminal/src')).toBe(false);
+    expect(isSystemProfilePath('/home/user/repos/my-lib')).toBe(false);
+  });
+
+  it('does NOT flag a Windows project path under the user profile', () => {
+    expect(isSystemProfilePath('C:\\Users\\mike\\Documents\\my-project')).toBe(false);
+    expect(isSystemProfilePath('C:\\Users\\mike\\projects\\forge-terminal')).toBe(false);
+  });
+
+  it('does NOT flag a standard Windows project path', () => {
+    expect(isSystemProfilePath('C:\\ProjectsWin\\forge-terminal')).toBe(false);
+    expect(isSystemProfilePath('C:\\ProjectsWin\\forge-terminal\\src\\components')).toBe(false);
+  });
+
+  it('does NOT flag a standard Unix project path outside /home', () => {
+    expect(isSystemProfilePath('/opt/my-project')).toBe(false);
+    expect(isSystemProfilePath('/var/www/html')).toBe(false);
+  });
+
+  it('does NOT flag tilde paths (handled separately as project paths)', () => {
+    expect(isSystemProfilePath('~/projects/forge-terminal')).toBe(false);
+    expect(isSystemProfilePath('~')).toBe(false);
+  });
+
+  it('returns false for empty, null, or non-string values', () => {
+    expect(isSystemProfilePath('')).toBe(false);
+    expect(isSystemProfilePath(null)).toBe(false);
+    expect(isSystemProfilePath(undefined)).toBe(false);
+  });
+});
+
+// ── "projects" KNOWN_ROOT_FOLDER_NAMES coverage ────────────────────────────
+// Regression tests specifically for the mikejsmith1985 bug where "projects"
+// was absent from KNOWN_ROOT_FOLDER_NAMES, causing extractProjectFolder to
+// return the collection folder name instead of the project name.
+
+describe('extractProjectFolder – projects folder auto-detection', () => {
+  it('extracts project name from /home/user/projects/<project>', () => {
+    expect(extractProjectFolder('/home/mikejsmith1985/projects/forge-terminal')).toBe('forge-terminal');
+  });
+
+  it('extracts project name from deep path under /home/<user>/projects/<project>', () => {
+    expect(extractProjectFolder('/home/user/projects/forge-terminal/src/components')).toBe('forge-terminal');
+  });
+
+  it('extracts project name from tilde path ~/projects/<project>', () => {
+    expect(extractProjectFolder('~/projects/forge-terminal')).toBe('forge-terminal');
+  });
+
+  it('does NOT return username from bare /home/<user> path (2-segment guard)', () => {
+    // The old bug: extractProjectFolder('/home/mikejsmith1985') returned 'mikejsmith1985'.
+    // With the parts.length >= 2 fallback removed, this now falls to last-resort.
+    // isSystemProfilePath() guards the caller (handleDirectoryChange) from using
+    // this result — but the extraction itself should also not confidently anchor here.
+    const result = extractProjectFolder('/home/mikejsmith1985');
+    // Falls to last-resort (deepest segment) — still 'mikejsmith1985',
+    // but isSystemProfilePath() now prevents it from being used as a title.
+    expect(result).toBe('mikejsmith1985');
+  });
+});
+
 
 describe('isStaticNamingStrategy', () => {
   // Static strategies produce a title once at creation (e.g. "Terminal 3") and

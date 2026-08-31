@@ -256,6 +256,92 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
+.orc-release-job-panel {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.orc-release-job-panel.completed {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.orc-release-job-panel.failed {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.orc-release-job-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.orc-release-job-meta {
+  margin-top: 6px;
+  color: var(--subtext);
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 0.7rem;
+}
+
+.orc-release-job-log {
+  margin-top: 10px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text);
+  font-size: 0.72rem;
+}
+
+.orc-release-modal {
+  width: 620px;
+}
+
+.orc-release-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.orc-release-summary code {
+  color: var(--text);
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.orc-release-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--text);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.orc-release-checkbox input {
+  margin-top: 3px;
+}
+
+.orc-release-help {
+  margin: 14px 0 0;
+  color: var(--subtext);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
 /* Commit Section */
 .orc-commit-section {
   display: flex;

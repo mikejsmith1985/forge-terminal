@@ -52,7 +52,7 @@ if (Test-Path package.json) {
 if ($ver_success) {
     $b = git branch --show-current
     git add -A
-    if ($?) { git commit -m "Release $ver" --allow-empty
+    if ($?) { git commit -m "chore: release $ver" --allow-empty
     if ($?) { git push origin $b
     if ($?) { git checkout main
     if ($?) { git pull origin main
@@ -76,7 +76,7 @@ unset GH_TOKEN
 ver="vX.Y.Z"
 [ -f package.json ] && npm version $ver --no-git-tag-version --allow-same-version
 b=$(git branch --show-current)
-git add -A && git commit -m "Release $ver" --allow-empty \
+git add -A && git commit -m "chore: release $ver" --allow-empty \
   && git push origin $b \
   && git checkout main && git pull origin main \
   && git merge $b --no-edit && git push origin main \
@@ -101,7 +101,7 @@ If a `release.yml` or similar workflow was previously created, remove it:
 ```powershell
 Remove-Item ".github\workflows\release.yml" -ErrorAction SilentlyContinue
 git add -A
-git commit -m "Remove GH Actions release workflow — using local gh CLI pipeline"
+git commit -m "chore: remove GH Actions release workflow"
 git push origin main
 ```
 
@@ -142,5 +142,4 @@ The 🚀 Release Manager command card in Forge Terminal automatically generates 
 4. Pastes it into the terminal ready to run
 
 If the card isn't visible, restore it via Settings → Restore Release Manager.
-
 

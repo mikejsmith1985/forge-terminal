@@ -93,8 +93,46 @@ func inferProviderFromCommand(command, description string) string {
 	if strings.Contains(combined, "aider") {
 		return "aider"
 	}
+	if strings.Contains(combined, "google") || strings.Contains(combined, "gemini") || strings.Contains(combined, "agy") {
+		return "google"
+	}
 
 	return ""
+}
+
+// forgeAwarenessHeader marks a Claude session macro as Forge-managed (an awareness or
+// enforced macro), as opposed to one a user wrote by hand. Older generations of the
+// Forge macro carry this same header, which is what lets the heal below recognise — and
+// safely replace — a drifted Forge macro without clobbering a deliberate customisation.
+const forgeAwarenessHeader = "SYSTEM INJECTION: FORGE AWARENESS"
+
+// healClaudeMacroVariant rewrites a default card's Claude macro variant to the canonical
+// text whenever the stored value has drifted from it. Per FR-011 a Claude session must
+// be driven only by the tool-agnostic constitution and the current skill order — never
+// by an older generation that points at .github/copilot-instructions.md, names the
+// retired forge-workflow skill, or omits framework-first. Healing against the canonical
+// CONSTANT (rather than a per-symptom Contains check) means every future drift
+// self-heals; the previous code only caught the single "missing framework-first" case
+// and silently let the copilot-instructions reference survive. To avoid reverting an
+// intentional customisation, it heals only a missing/empty variant or one still carrying
+// the Forge awareness header. Returns true if it changed the card.
+func healClaudeMacroVariant(cmd *Command, canonicalClaudeMacro string) bool {
+	if cmd.MacroVariants == nil {
+		return false
+	}
+
+	current, exists := cmd.MacroVariants["claude"]
+	if current == canonicalClaudeMacro {
+		return false
+	}
+
+	isForgeManaged := !exists || current == "" || strings.Contains(current, forgeAwarenessHeader)
+	if !isForgeManaged {
+		return false
+	}
+
+	cmd.MacroVariants["claude"] = canonicalClaudeMacro
+	return true
 }
 
 // migrateToolVariants upgrades the legacy Copilot-specific cards (IDs 6, 7, 8)
@@ -115,18 +153,28 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].Command = "claude"
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude",
-					"copilot": "copilot --allow-all-tools",
+					"copilot": CopilotFreshCmd,
+					"google":  AgyFreshCmd,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded ID 6 to tool-agnostic Fresh Session card")
+			} else if cmd.ToolVariants["google"] == "" || cmd.ToolVariants["google"] == "gemini" {
+				commands[i].ToolVariants["google"] = AgyFreshCmd
+				changed = true
+				log.Printf("[Commands] Migration: Upgraded Google ToolVariant in ID 6 to agy")
 			}
 			if len(commands[i].DescriptionVariants) == 0 {
 				commands[i].DescriptionVariants = map[string]string{
 					"claude":  "🤖 Claude (Fresh)",
 					"copilot": "🤖 Copilot (Fresh)",
+					"google":  "🤖 Google (Fresh)",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 6")
+			} else if _, ok := commands[i].DescriptionVariants["google"]; !ok {
+				commands[i].DescriptionVariants["google"] = "🤖 Google (Fresh)"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google DescriptionVariant to ID 6")
 			}
 			if len(commands[i].MacroVariants) == 0 {
 				copilotMacro := cmd.MacroPayload
@@ -136,9 +184,23 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants = map[string]string{
 					"claude":  ClaudeAwarenessMacro,
 					"copilot": copilotMacro,
+					"google":  GoogleWorkflowMacro,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 6")
+			} else {
+				if _, ok := commands[i].MacroVariants["google"]; !ok {
+					commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+					changed = true
+					log.Printf("[Commands] Migration: Added Google MacroVariant to ID 6")
+				}
+				// Heal a drifted Claude macro (e.g. one that still references Copilot's
+				// instruction file) back to the canonical awareness macro — independently
+				// of the Google check above, so a card can be missing neither yet still stale.
+				if healClaudeMacroVariant(&commands[i], ClaudeAwarenessMacro) {
+					changed = true
+					log.Printf("[Commands] Migration: Reset stale Claude MacroVariant in ID 6 to canonical awareness macro (FR-011)")
+				}
 			}
 
 		case 7:
@@ -147,18 +209,28 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].Command = "claude --resume"
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude --resume",
-					"copilot": "copilot --allow-all-tools --continue",
+					"copilot": CopilotResumeCmd,
+					"google":  AgyResumeCmd,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded ID 7 to tool-agnostic Resume card")
+			} else if cmd.ToolVariants["google"] == "" || cmd.ToolVariants["google"] == "gemini --resume" || cmd.ToolVariants["google"] == "gemini" {
+				commands[i].ToolVariants["google"] = AgyResumeCmd
+				changed = true
+				log.Printf("[Commands] Migration: Upgraded Google ToolVariant in ID 7 to agy")
 			}
 			if len(commands[i].DescriptionVariants) == 0 {
 				commands[i].DescriptionVariants = map[string]string{
 					"claude":  "🔄 Claude (Resume)",
 					"copilot": "🔄 Copilot (Resume)",
+					"google":  "🔄 Google (Resume)",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 7")
+			} else if _, ok := commands[i].DescriptionVariants["google"]; !ok {
+				commands[i].DescriptionVariants["google"] = "🔄 Google (Resume)"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google DescriptionVariant to ID 7")
 			}
 			if len(commands[i].MacroVariants) == 0 {
 				copilotMacro := cmd.MacroPayload
@@ -168,9 +240,22 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants = map[string]string{
 					"claude":  ClaudeAwarenessMacro,
 					"copilot": copilotMacro,
+					"google":  GoogleWorkflowMacro,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 7")
+			} else {
+				if _, ok := commands[i].MacroVariants["google"]; !ok {
+					commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+					changed = true
+					log.Printf("[Commands] Migration: Added Google MacroVariant to ID 7")
+				}
+				// Same heal as ID 6 — a resume card's Claude macro must point at the
+				// constitution, never Copilot's instruction file.
+				if healClaudeMacroVariant(&commands[i], ClaudeAwarenessMacro) {
+					changed = true
+					log.Printf("[Commands] Migration: Reset stale Claude MacroVariant in ID 7 to canonical awareness macro (FR-011)")
+				}
 			}
 
 		case 8:
@@ -183,18 +268,28 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].Command = "claude"
 				commands[i].ToolVariants = map[string]string{
 					"claude":  "claude",
-					"copilot": "copilot --allow-all-tools",
+					"copilot": CopilotFreshCmd,
+					"google":  AgyFreshCmd,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Upgraded existing ID 8 to tool-agnostic Enforced card")
+			} else if cmd.ToolVariants["google"] == "" || cmd.ToolVariants["google"] == "gemini" {
+				commands[i].ToolVariants["google"] = AgyFreshCmd
+				changed = true
+				log.Printf("[Commands] Migration: Upgraded Google ToolVariant in ID 8 to agy")
 			}
 			if len(commands[i].DescriptionVariants) == 0 {
 				commands[i].DescriptionVariants = map[string]string{
 					"claude":  "🛡 Claude (Enforced)",
 					"copilot": "🛡 Copilot (Enforced)",
+					"google":  "🛡 Google (Enforced)",
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added DescriptionVariants to ID 8")
+			} else if _, ok := commands[i].DescriptionVariants["google"]; !ok {
+				commands[i].DescriptionVariants["google"] = "🛡 Google (Enforced)"
+				changed = true
+				log.Printf("[Commands] Migration: Added Google DescriptionVariant to ID 8")
 			}
 			if len(commands[i].MacroVariants) == 0 {
 				copilotMacro := cmd.MacroPayload
@@ -204,9 +299,23 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 				commands[i].MacroVariants = map[string]string{
 					"claude":  ClaudeEnforcedMacro,
 					"copilot": copilotMacro,
+					"google":  GoogleWorkflowMacro,
 				}
 				changed = true
 				log.Printf("[Commands] Migration: Added MacroVariants to ID 8")
+			} else {
+				if _, ok := commands[i].MacroVariants["google"]; !ok {
+					commands[i].MacroVariants["google"] = GoogleWorkflowMacro
+					changed = true
+					log.Printf("[Commands] Migration: Added Google MacroVariant to ID 8")
+				}
+				// Enforced mode is the strictest gate, so its Claude macro must be exactly
+				// canonical. Heal any drifted generation — including the reported one that
+				// already named framework-first but still pointed at copilot-instructions.md.
+				if healClaudeMacroVariant(&commands[i], ClaudeEnforcedMacro) {
+					changed = true
+					log.Printf("[Commands] Migration: Reset stale Claude MacroVariant in ID 8 to canonical enforced macro (FR-011)")
+				}
 			}
 		}
 	}
@@ -221,15 +330,18 @@ func migrateToolVariants(commands []Command) ([]Command, bool) {
 			Icon:         "emoji-shield",
 			ToolVariants: map[string]string{
 				"claude":  "claude",
-				"copilot": "copilot --allow-all-tools",
+				"copilot": CopilotFreshCmd,
+				"google":  AgyFreshCmd,
 			},
 			DescriptionVariants: map[string]string{
 				"claude":  "🛡 Claude (Enforced)",
 				"copilot": "🛡 Copilot (Enforced)",
+				"google":  "🛡 Google (Enforced)",
 			},
 			MacroVariants: map[string]string{
 				"claude":  ClaudeEnforcedMacro,
 				"copilot": CopilotWorkflowMacro,
+				"google":  GoogleWorkflowMacro,
 			},
 		}
 		commands = append(commands, enforced)

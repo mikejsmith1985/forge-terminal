@@ -1,9 +1,11 @@
 package mcp_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/mcp"
+	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
 )
 
@@ -66,5 +68,55 @@ func TestTerminalReadTool_MissingSessionID(t *testing.T) {
 	result := callTool(t, srv, "terminal_read", map[string]any{})
 	if !result.IsError {
 		t.Error("expected error when session_id is missing")
+	}
+}
+
+// TestTerminalExecuteTool_ActiveSessionGuard_SessionNotFound verifies that the
+// guard runs against a real (but empty) handler and returns a "no active session"
+// error rather than panicking or hitting WriteCommandToSession for unknown IDs.
+func TestTerminalExecuteTool_ActiveSessionGuard_SessionNotFound(t *testing.T) {
+	// NewHandlerDirect creates a zero-session handler — no PTY is started.
+	emptyHandler := terminal.NewHandlerDirect(nil, nil, nil)
+	srv := mcp.NewServer("tok", mcp.Dependencies{
+		TermHandler:    emptyHandler,
+		WorkflowConfig: workflow.WorkflowConfig{},
+	})
+
+	result := callTool(t, srv, "terminal_execute", map[string]any{
+		"session_id": "not-a-real-session",
+		"command":    "echo guard-test",
+	})
+
+	if !result.IsError {
+		t.Error("expected IsError=true for an unknown session ID")
+	}
+	responseText := result.Content[0].Text
+	if !strings.Contains(responseText, "no active session") {
+		t.Errorf("guard error must mention 'no active session'; got: %s", responseText)
+	}
+}
+
+// TestTerminalExecuteTool_ActiveSessionGuard_ErrorMentionsSessionID ensures the
+// error message names the session so agents can adjust their next call.
+func TestTerminalExecuteTool_ActiveSessionGuard_ErrorMentionsSessionID(t *testing.T) {
+	const targetSessionID = "specific-tab-99"
+
+	emptyHandler := terminal.NewHandlerDirect(nil, nil, nil)
+	srv := mcp.NewServer("tok", mcp.Dependencies{
+		TermHandler:    emptyHandler,
+		WorkflowConfig: workflow.WorkflowConfig{},
+	})
+
+	result := callTool(t, srv, "terminal_execute", map[string]any{
+		"session_id": targetSessionID,
+		"command":    "echo hi",
+	})
+
+	if !result.IsError {
+		t.Error("expected IsError=true for unknown session")
+	}
+	if !strings.Contains(result.Content[0].Text, targetSessionID) {
+		t.Errorf("error message must include the session ID %q; got: %s",
+			targetSessionID, result.Content[0].Text)
 	}
 }

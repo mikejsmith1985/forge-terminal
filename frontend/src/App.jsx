@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Wrench, Plug, Tag, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock } from 'lucide-react';
+import { Moon, Sun, Plus, Minus, Power, Settings, Palette, PanelLeft, PanelRight, Download, Folder, Command, Wrench, Plug, Tag, MessageCircle, Clock, BookOpen, QrCode, Menu, X, Lock, RefreshCw } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary'
 import ForgeTerminal from './components/ForgeTerminal'
+import SddDashboard from './components/SddDashboard'
 import ForgeAssist from './components/ForgeAssist'
 import CommandCards from './components/CommandCards'
 import CommandModal from './components/CommandModal'
@@ -34,13 +35,13 @@ import VaultPanel from './components/VaultPanel'
 import { ToastContainer, useToast } from './components/Toast'
 import { themes, themeOrder, applyTheme } from './themes'
 import { useTabManager } from './hooks/useTabManager'
+import { useSddGate } from './hooks/useSddGate'
 import { useDevMode } from './hooks/useDevMode'
 // useWorkflowManager REMOVED - v3.9.0: Workflows deleted
 import { logger } from './utils/logger'
 import { getNextAvailableKeybinding, validateKeybinding, getKeybindingAvailability } from './utils/keybindingManager'
 import { performanceInstrumentation } from './utils/performanceInstrumentation'
-import { extractProjectFolder, getTabTitle, isStaticNamingStrategy, isFileLikeName, isTempOrSystemPath } from './utils/projectFolder'
-import { useTabNaming } from './hooks/useTabNaming'
+import { isTempOrSystemPath } from './utils/projectFolder'
 import useGuidedTour from './hooks/useGuidedTour'
 import TourOverlay from './components/TourOverlay'
 import { TOUR_STEPS } from './config/tourSteps'
@@ -97,7 +98,6 @@ function App() {
   const [defaultTabTheme, setDefaultTabTheme] = useState(() => {
     return localStorage.getItem('defaultTabTheme') || 'auto-cycle-dark';
   })
-  const { namingStrategy, namingPrefix, namingRootFolder, setNamingStrategy, setNamingPrefix, setNamingRootFolder } = useTabNaming();
   const [sidebarPosition, setSidebarPosition] = useState(() => {
     return localStorage.getItem('sidebarPosition') || 'right';
   })
@@ -231,9 +231,8 @@ function App() {
     toggleTabViewMode,
     updateTabDirectory,
     reorderTabs,
-    retitleAllTabsFromCwd,
-  } = useTabManager(shellConfig, defaultTabTheme, namingStrategy, namingPrefix, namingRootFolder);
-  
+  } = useTabManager(shellConfig, defaultTabTheme);
+
   // DevMode state
   const { devMode, setDevMode, isInitialized: devModeInitialized } = useDevMode();
   
@@ -347,6 +346,93 @@ function App() {
   const terminalRefs = useRef({});
   const { toasts, addToast, removeToast } = useToast()
 
+  // Active background release jobs mapping: repoPath -> { jobId, version, status }
+  const [activeReleaseJobs, setActiveReleaseJobs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('forge_active_release_jobs');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error('Failed to parse active release jobs', e);
+      return {};
+    }
+  });
+
+  const handleJobStatusChange = useCallback((repoPath, job) => {
+    if (!repoPath) return;
+    setActiveReleaseJobs(prev => {
+      const updated = { ...prev };
+      if (!job) {
+        delete updated[repoPath];
+      } else {
+        updated[repoPath] = {
+          jobId: job.job_id,
+          version: job.version,
+          status: job.status
+        };
+      }
+      localStorage.setItem('forge_active_release_jobs', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const activeReleaseJobsRef = useRef(activeReleaseJobs);
+  useEffect(() => {
+    activeReleaseJobsRef.current = activeReleaseJobs;
+  }, [activeReleaseJobs]);
+
+  useEffect(() => {
+    let shouldContinue = true;
+
+    const pollAllJobs = async () => {
+      const currentJobs = activeReleaseJobsRef.current;
+      const activePaths = Object.keys(currentJobs);
+      if (activePaths.length === 0) return;
+
+      for (const repoPath of activePaths) {
+        const jobInfo = currentJobs[repoPath];
+        if (!jobInfo || !jobInfo.jobId) continue;
+
+        try {
+          const query = new URLSearchParams({
+            repoPath,
+            jobId: jobInfo.jobId,
+            maxLogBytes: '100', // Cheap status check
+          });
+          const response = await fetch(`/api/project/release-jobs?${query.toString()}`);
+          if (!shouldContinue) return;
+
+          if (response.ok) {
+            const body = await response.json();
+            const updatedJob = body.job;
+            if (updatedJob) {
+              if (updatedJob.status === 'completed') {
+                addToast(`Release v${updatedJob.version} completed successfully!`, 'success', 5000);
+                handleJobStatusChange(repoPath, null);
+              } else if (updatedJob.status === 'failed') {
+                addToast(`Release v${updatedJob.version} failed.`, 'error', 6000);
+                handleJobStatusChange(repoPath, null);
+              } else if (updatedJob.status !== jobInfo.status) {
+                // Status changed (e.g. queued -> running)
+                handleJobStatusChange(repoPath, updatedJob);
+              }
+            }
+          } else if (response.status === 404) {
+            // Job not found, clear it
+            handleJobStatusChange(repoPath, null);
+          }
+        } catch (err) {
+          console.error('[GlobalReleasePoll] Failed to poll status for', repoPath, err);
+        }
+      }
+    };
+
+    const timer = setInterval(pollAllJobs, 2000);
+    return () => {
+      shouldContinue = false;
+      clearInterval(timer);
+    };
+  }, [handleJobStatusChange, addToast]);
+
   const DEFAULT_FONT_SIZE = 14;
   const MIN_FONT_SIZE = 8;
   const MAX_FONT_SIZE = 30;
@@ -355,6 +441,33 @@ function App() {
   const getActiveTerminalRef = useCallback(() => {
     return activeTabId ? terminalRefs.current[activeTabId] : null;
   }, [activeTabId]);
+
+  // SDD phase orchestrator (specs/003): the decision-card gate for the active session.
+  const sddGate = useSddGate({ activeSessionId: activeTabId });
+
+  // Bind the active session + its repo to the SDD pipeline once the working directory is
+  // known. The backend resolves the active feature from .specify/feature.json and returns
+  // 409 for repos not running a Spec Kit pipeline, so this is safe to call broadly.
+  const lastSddBindRef = useRef(null);
+  useEffect(() => {
+    const repoRoot = activeTab?.currentDirectory;
+    const bindKey = `${activeTabId}:${repoRoot}`;
+    if (!activeTabId || !repoRoot || lastSddBindRef.current === bindKey) return;
+    lastSddBindRef.current = bindKey;
+    fetch('/api/sdd/bind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ sessionId: activeTabId, repoRoot }),
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        // Recovery fallback notice (specs/013 FR-005): the recorded worktree was gone, so the
+        // tab re-attached to the main checkout — tell the developer once, never silently.
+        if (data?.notice) addToast(data.notice, 'info', 6000);
+      })
+      .catch(() => { /* best-effort: a failed bind never blocks the terminal */ });
+  }, [activeTabId, activeTab?.currentDirectory, addToast]);
 
   const handleFontSizeChange = (delta) => {
     if (fontTarget === 'terminal') {
@@ -935,7 +1048,13 @@ function App() {
       //   return;
       // }
 
-    // Ctrl+End: Scroll to bottom (safe — not a shell binding)
+    // Ctrl+End: return to the newest output. Safe to intercept because no shell binds
+    // it. The terminal decides what it means: in an ordinary shell it scrolls the
+    // viewport, and while a full-screen program owns the screen (Claude Code, vim,
+    // less) it is forwarded to that program, which binds it to "jump to the end".
+    // Previously this path always scrolled the viewport, which is a guaranteed no-op
+    // in a full-screen program — so the shortcut did nothing exactly when it was most
+    // needed, and swallowed the keypress so the program never saw it either.
     if (e.ctrlKey && e.key === 'End') {
       e.preventDefault();
       e.stopPropagation();
@@ -966,12 +1085,23 @@ function App() {
 
     // For all remaining keys: when the terminal helper textarea is focused
     // (terminal has keyboard focus), let xterm handle the event natively.
+    // Guard: only early-return when the ACTIVE tab's terminal is focused.
+    // During multi-tab session recovery all xterm textareas mount simultaneously
+    // with visibility:hidden (not display:none), so hidden tabs' textareas are
+    // focusable and can win focus races. If a hidden tab wins, this handler would
+    // early-return and the keystroke would go to the wrong PTY — silently dropped.
+    // Numbers are especially affected because Claude Code CLI shows a numbered
+    // prompt immediately on restore, before focus races settle.
     if (isXtermTextarea) {
-      return;
-    }
-
-    // Skip App-level shortcuts when the user is typing in a real input field.
-    if (isInputField) {
+      const activeTermElement = getActiveTerminalRef()?.getTerminal()?.element;
+      const isActiveTermFocused = !activeTermElement || activeTermElement.contains(e.target);
+      if (isActiveTermFocused) {
+        return; // Active terminal has focus — let xterm handle the key normally.
+      }
+      // A hidden tab's textarea has focus — fall through to the redirect so the
+      // active terminal receives the keystroke instead (isInputField guard skipped
+      // intentionally: the hidden textarea is also a TEXTAREA element).
+    } else if (isInputField) {
       return;
     }
 
@@ -1180,36 +1310,22 @@ function App() {
     }));
   }, []);
 
-  // Handle directory change from terminal - auto-rename tab and save directory.
-  // Respects the user's chosen tab naming strategy: static strategies (numbered,
-  // shell-type, custom-prefix) never auto-rename; dynamic strategies update on cd.
+  // Handle directory change from the terminal: track the shell's current directory
+  // for features that depend on it (git panel, release/workflow cards), but NEVER
+  // rename the tab. The tab label is set once at tab creation (see tabLabel.js) and
+  // is deliberately immune to navigation — this is the tab-naming rebuild's core
+  // rule, and the reason the label no longer drifts (or corrupts) as an agent
+  // navigates deep into a project.
   const handleDirectoryChange = useCallback((tabId, folderName, fullPath) => {
-    // Guard: skip all updates when the shell navigates into a temp or system
-    // directory. AI tools that open pasted images from %TEMP% (or /tmp) would
-    // otherwise overwrite the tab's project name AND currentDirectory, breaking
-    // the release manager card, workflow card, git panel, and other features
-    // that depend on currentDirectory pointing at the actual project root.
+    // Skip temp/system directories so currentDirectory keeps pointing at the real
+    // project root rather than a transient %TEMP% path (used by other features).
     if (fullPath && isTempOrSystemPath(fullPath)) {
       return;
-    }
-    // Static strategies: never auto-rename on directory change
-    if (isStaticNamingStrategy(namingStrategy)) {
-      if (fullPath) updateTabDirectory(tabId, fullPath);
-      return;
-    }
-    if (folderName || fullPath) {
-      const title = getTabTitle(fullPath, namingStrategy, { fallback: folderName, prefix: namingPrefix, rootFolder: namingRootFolder }) || '';
-      logger.tabs('Auto-renaming tab to folder', { tabId, folderName, fullPath, title, namingStrategy });
-      // Guard: skip rename if title looks like a file or fell back to a generic "Terminal N".
-      // Overwriting a real project name with "Terminal 1" is worse than leaving it unchanged.
-      if (title && !title.startsWith('Terminal ') && !isFileLikeName(title)) {
-        updateTabTitle(tabId, title);
-      }
     }
     if (fullPath) {
       updateTabDirectory(tabId, fullPath);
     }
-  }, [namingStrategy, namingPrefix, namingRootFolder, updateTabTitle, updateTabDirectory]);
+  }, [updateTabDirectory]);
 
   // Helper to get folder name from a path
   const getFolderNameFromPath = (path) => {
@@ -1365,54 +1481,55 @@ function App() {
   
   // Workflow handlers - REMOVED v3.9.0: Workflows deleted
 
-  const loadCommands = () => {
+  const loadCommands = useCallback(() => {
     setCommandsLoading(true);
     setCommandsError(null);
-    
-    // Set a timeout to detect hanging requests
-    let timeoutId = setTimeout(() => {
+
+    // Use a mutable flag instead of reading stale `commandsLoading` from a closure.
+    // Without this, a second call to loadCommands (e.g. the refresh button) would
+    // capture commandsLoading=false from the previous render and the guard below
+    // would be false, silently discarding the fetched cards and leaving the sidebar
+    // frozen on "Loading command cards..." forever.
+    let isRequestActive = true;
+
+    const timeoutId = setTimeout(() => {
+      if (!isRequestActive) return;
+      isRequestActive = false;
       setCommandsError('Request timeout - server may be unresponsive');
       setCommandsLoading(false);
       addToast('Failed to load command cards - timeout', 'error', 5000);
-      timeoutId = null; // Mark as fired
-    }, 10000); // 10 second timeout
-    
+    }, 10000);
+
     fetch('/api/commands')
       .then(r => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
+        // Abort if the timeout already fired
+        if (!isRequestActive) return null;
+        clearTimeout(timeoutId);
         if (!r.ok) {
           throw new Error(`HTTP ${r.status}: ${r.statusText}`);
         }
         return r.json();
       })
       .then(data => {
-        // Only update if timeout hasn't fired
-        if (timeoutId !== null || commandsLoading) {
-          // Ensure data is an array; filter out legacy Release Manager card (id: -1)
-          // which now lives permanently in the Tools tab
-          const cards = (Array.isArray(data) ? data : []).filter(c => c.id !== -1);
+        if (data === null) return; // Request was already handled by the timeout
+        if (!isRequestActive) return;
+        isRequestActive = false;
 
-          setCommands(cards);
-          setCommandsLoading(false);
-        }
+        // Filter out the legacy Release Manager card (id: -1) which lives in the Tools tab
+        const cards = (Array.isArray(data) ? data : []).filter(c => c.id !== -1);
+        setCommands(cards);
+        setCommandsLoading(false);
       })
       .catch(err => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-        // Only show error if not already timed out
-        if (commandsLoading) {
-          console.error('Failed to load commands:', err);
-          setCommandsError(err.message);
-          setCommandsLoading(false);
-          addToast(`Failed to load command cards: ${err.message}`, 'error', 5000);
-        }
-      })
-  }
+        clearTimeout(timeoutId);
+        if (!isRequestActive) return;
+        isRequestActive = false;
+        console.error('Failed to load commands:', err);
+        setCommandsError(err.message);
+        setCommandsLoading(false);
+        addToast(`Failed to load command cards: ${err.message}`, 'error', 5000);
+      });
+  }, [addToast])
 
   const handleShutdown = async () => {
     addToast('Shutting down Forge Terminal...', 'warning', 3000);
@@ -1616,8 +1733,38 @@ function App() {
     let newCommands;
     if (editingCommand) {
       // Update existing
+      const isToolAware = !!editingCommand.toolVariants && Object.keys(editingCommand.toolVariants).length > 0;
+      let finalCommandData = { ...commandData, id: editingCommand.id };
+
+      if (isToolAware) {
+        // Save the edited values back to the active tool's variant maps
+        const updatedToolVariants = {
+          ...editingCommand.toolVariants,
+          [preferredCliTool]: commandData.command
+        };
+        const updatedDescriptionVariants = {
+          ...editingCommand.descriptionVariants,
+          [preferredCliTool]: commandData.description
+        };
+        const updatedMacroVariants = {
+          ...editingCommand.macroVariants,
+          [preferredCliTool]: commandData.macro_payload
+        };
+
+        finalCommandData = {
+          ...finalCommandData,
+          toolVariants: updatedToolVariants,
+          descriptionVariants: updatedDescriptionVariants,
+          macroVariants: updatedMacroVariants,
+          // Preserve base values for non-active tools/fallbacks
+          command: editingCommand.command,
+          description: editingCommand.description,
+          macro_payload: editingCommand.macro_payload
+        };
+      }
+
       newCommands = commands.map(c =>
-        c.id === editingCommand.id ? { ...commandData, id: c.id } : c
+        c.id === editingCommand.id ? finalCommandData : c
       )
     } else {
       // Add new with smart keybinding
@@ -1715,6 +1862,21 @@ function App() {
                   <Folder size={14} />
                 </button>
               )}
+              {/* Reload cards from the server without a full page refresh.
+                  Useful when an agent has added new command cards via the API
+                  and you want to see them immediately. */}
+              <button
+                className="btn btn-secondary"
+                onClick={loadCommands}
+                disabled={commandsLoading}
+                title="Reload command cards"
+                style={{ padding: '5px 8px' }}
+              >
+                <RefreshCw
+                  size={14}
+                  style={commandsLoading ? { animation: 'spin 1s linear infinite' } : undefined}
+                />
+              </button>
               <button className="btn btn-primary" onClick={handleAdd}>
                 <Plus size={16} /> Add
               </button>
@@ -1887,6 +2049,8 @@ function App() {
                 onToast={addToast}
                 shellType={shellConfig.shellType}
                 cwd={activeTab?.currentDirectory}
+                activeReleaseJobs={activeReleaseJobs}
+                onJobStatusChange={handleJobStatusChange}
               />
               <ForgeWorkflowCard onExecuteCommand={handleExecute} onToast={addToast} cwd={activeTab?.currentDirectory} />
               <WebAppDebuggerCard />
@@ -1949,6 +2113,7 @@ function App() {
             isVaultOpen={isVaultOpen}
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
+            activeReleaseJobs={activeReleaseJobs}
             mode={theme}
             devMode={devMode}
           />
@@ -1982,10 +2147,22 @@ function App() {
               }}>
                 Loading...
               </div>
-            ) : tabs.map((tab) => (
+            ) : tabs.map((tab) => {
+              // A non-visible tab is made `inert` so its hidden xterm textarea
+              // can NEVER win the focus race that recurs on session restore (all
+              // tabs mount in parallel). inert removes the whole subtree from
+              // focus and keyboard handling without affecting layout — unlike
+              // display:none, which corrupts xterm's viewport. This is the
+              // root-cause fix for the "can't type / numbers dropped" bug in a
+              // recovered tab; the App-level focus redirect remains as a backup.
+              // React 18 has no native `inert` prop, so pass '' to render the
+              // attribute and undefined to omit it.
+              const isHidden = tab.id !== activeTabId;
+              return (
               <div
                 key={tab.id}
-                className={`terminal-wrapper ${tab.id !== activeTabId ? 'hidden' : ''}`}
+                className={`terminal-wrapper ${isHidden ? 'hidden' : ''}`}
+                inert={isHidden ? '' : undefined}
               >
                 {/* Task Dashboard removed in v3.12.3 - was unimplemented scaffolding */}
                 {/* v3.8.2: Terminal is the only view - ChatView and NotebookLayout removed */}
@@ -2020,6 +2197,7 @@ function App() {
                     onSpawnFailed={handleSpawnFailed}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
+                    onSddGate={tab.id === activeTabId ? sddGate.handleWsMessage : undefined}
                     onCopy={() => addToast('✓ Copied to clipboard', 'success', 1500)}
                     onFileOpen={handleFileOpen}
                     onPaste={(type, metadata) => {
@@ -2054,9 +2232,35 @@ function App() {
                 </div>
                 {/* v3.8.2: NotebookLayout REMOVED - Terminal is the only view */}
               </div>
-            ))}
+            )})}
           </div>
         </div>
+        {/* spec-006: unified SDD dashboard — always visible, replaces SddPipelinePanel
+             and PhaseDecisionCard with a single inline surface (phase rail + decision bar).
+             Wrapped in its own ErrorBoundary so a dashboard render crash never takes
+             down the terminal (the whole-app boundary at AppWithErrorBoundary would
+             otherwise blank the entire UI on any SDD panel error). */}
+        <ErrorBoundary>
+          <SddDashboard
+            phases={sddGate.phaseStatuses}
+            featureName={sddGate.featureName}
+            binding={sddGate.binding}
+            verification={sddGate.verification}
+            phaseSummaries={sddGate.phaseSummaries}
+            isCardOpen={sddGate.isCardOpen}
+            card={sddGate.card}
+            decisionError={sddGate.decisionError}
+            isSubmitting={sddGate.isSubmitting}
+            isHookInstalled={sddGate.isHookInstalled}
+            collisionPrompt={sddGate.collisionPrompt}
+            onRequestWorktree={sddGate.requestWorktree}
+            onDismissCollision={sddGate.dismissCollision}
+            onAction={(action, clarifyText) => sddGate.submitDecision(action, clarifyText)}
+            onDismiss={sddGate.dismiss}
+            onFileOpen={handleFileOpen}
+            onAwaitingPhaseClick={sddGate.fetchPendingGate}
+          />
+        </ErrorBoundary>
       </div>
       {showEditor && editorFile && (
         <div className="editor-panel">
@@ -2124,6 +2328,7 @@ function App() {
         onSave={handleSaveCommand}
         initialData={editingCommand}
         commands={commands}
+        preferredCliTool={preferredCliTool}
       />
 
       <FeedbackModal
@@ -2157,18 +2362,6 @@ function App() {
         onDefaultTabThemeChange={(newTheme) => {
           setDefaultTabTheme(newTheme);
           localStorage.setItem('defaultTabTheme', newTheme);
-        }}
-        onNamingChange={(strategy, prefix, rootFolder) => {
-          setNamingStrategy(strategy);
-          setNamingPrefix(prefix);
-          setNamingRootFolder(rootFolder ?? '');
-          // Apply the new strategy to all currently-open tabs immediately,
-          // re-deriving each title from the tab's stored currentDirectory.
-          // Without this, the change wouldn't take effect until the user
-          // happens to `cd` and the shell's OSC 9;9 integration fires —
-          // restored tabs from a prior session would keep stale titles
-          // forever even after the user explicitly saves new settings.
-          retitleAllTabsFromCwd(strategy, prefix, rootFolder ?? '');
         }}
         onRestartTour={() => {
           setIsSettingsModalOpen(false);
@@ -2235,7 +2428,7 @@ function App() {
           if (termRef?.sendCommand) {
             termRef.sendCommand(cmd);
           } else if (termRef?.write) {
-            termRef.write(ctx);
+            termRef.write(cmd);
           }
         }}
         terminalBuffer={(() => {
@@ -2248,6 +2441,8 @@ function App() {
         activeTabId={activeTabId}
         contextFiles={contextFiles}
       />}
+
+
 
       {/* Code Tutor Panel — HIDDEN for subscription release (feature not yet vetted) */}
 

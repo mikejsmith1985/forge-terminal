@@ -58,7 +58,7 @@ type ToolHandler interface {
 // new forge.toml allowed_tools list without restarting the process.
 type Server struct {
 	authToken string
-	deps      Dependencies  // retained so ReloadAllowedTools can rebuild handlers
+	deps      Dependencies // retained so ReloadAllowedTools can rebuild handlers
 	toolsMu   sync.RWMutex // guards the tools map for concurrent reload safety
 	tools     map[string]ToolHandler
 	broker    *TaskBroker
@@ -84,6 +84,27 @@ type Dependencies struct {
 	// environment_detect and environment_run tools. Set this in tests to inject a
 	// mock without spawning real WSL or Docker processes. Nil means use the real runner.
 	EnvironmentCommandRunner CommandRunner
+
+	// EnvironmentJobStore overrides where detached adaptive build jobs are persisted.
+	// Tests inject a temp-backed store; production defaults to ProjectPath/.forge.
+	EnvironmentJobStore *EnvironmentJobStore
+
+	// VaultAccess provides the vault_inject tool with zero-knowledge secret injection.
+	// Nil means vault_inject is registered but returns an error when called (vault not ready).
+	// In production this is vault.GetGlobal(); in tests it is a mock VaultSecretInjector.
+	VaultAccess VaultSecretInjector
+
+	// VaultScriptRunner provides vault_run_script with a PTY-free subprocess executor.
+	// Nil means vault_run_script is registered but returns an error when called.
+	// In production this is &realVaultScriptRunner{}; in tests it is a mock VaultScriptRunner.
+	VaultScriptRunner VaultScriptRunner
+
+	// VaultNameLister provides vault_list with the names of all vault entries.
+	// Nil means vault_list is registered but returns an error when called (vault not ready).
+	// In production this is vault.GetGlobal(); in tests it is a mock VaultNameLister.
+	// *vault.Vault satisfies this interface in addition to VaultSecretInjector —
+	// both VaultAccess and VaultNameLister can point to the same vault singleton.
+	VaultNameLister VaultNameLister
 }
 
 // NewServer creates a fully initialised MCP server.
@@ -311,6 +332,18 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 	if environmentRunner == nil {
 		environmentRunner = &realCommandRunner{}
 	}
+	environmentJobStore := srv.deps.EnvironmentJobStore
+	if environmentJobStore == nil {
+		environmentJobStore = NewEnvironmentJobStore(srv.deps.ProjectPath)
+	}
+	environmentJobManager := NewEnvironmentJobManager(environmentRunner, environmentJobStore)
+
+	// Use the injected VaultScriptRunner if provided (for tests), otherwise use
+	// the real subprocess runner that shells out to pwsh / sh.
+	vaultScriptRunner := srv.deps.VaultScriptRunner
+	if vaultScriptRunner == nil {
+		vaultScriptRunner = &realVaultScriptRunner{}
+	}
 
 	candidates := []ToolHandler{
 		newTerminalSessionsTool(srv.deps.TermHandler),
@@ -324,7 +357,12 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newWorkflowGateRecordTool(srv.deps.ProjectPath),
 		newWorkflowPreflightTool(srv.deps.ProjectPath),
 		newEnvironmentDetectTool(environmentRunner),
-		newEnvironmentRunTool(environmentRunner),
+		newEnvironmentRunTool(environmentRunner, environmentJobManager),
+		newEnvironmentJobsTool(environmentJobManager),
+		newEnvironmentReadJobTool(environmentJobManager),
+		newVaultInjectTool(srv.deps.VaultAccess),
+		newVaultRunScriptTool(vaultScriptRunner),
+		newVaultListTool(srv.deps.VaultNameLister),
 	}
 
 	registry := make(map[string]ToolHandler, len(candidates))

@@ -70,3 +70,32 @@ func TestActiveSessionInfo_Fields(t *testing.T) {
 		t.Errorf("unexpected ConnectedClients: %d", info.ConnectedClients)
 	}
 }
+
+func TestGetSessionConnectedClientCount_UnknownSession_ReturnsFalse(t *testing.T) {
+	handler := terminal.NewHandlerDirect(nil, nil, nil)
+
+	connectedClientCount, isFound := handler.GetSessionConnectedClientCount("does-not-exist-xyz")
+
+	if isFound {
+		t.Error("expected isFound=false for an unregistered session ID")
+	}
+	if connectedClientCount != 0 {
+		t.Errorf("expected connectedClientCount=0 for unknown session, got %d", connectedClientCount)
+	}
+}
+
+func TestGetSessionConnectedClientCount_AnotherUnknownSession_ZeroClients(t *testing.T) {
+	// Distinct session IDs must all return (0, false) on an empty handler —
+	// no session map should bleed state from one lookup to the next.
+	handler := terminal.NewHandlerDirect(nil, nil, nil)
+
+	for _, sessionID := range []string{"tab-1", "tab-2", "background-3"} {
+		count, found := handler.GetSessionConnectedClientCount(sessionID)
+		if found {
+			t.Errorf("session %q: expected isFound=false, got true", sessionID)
+		}
+		if count != 0 {
+			t.Errorf("session %q: expected count=0, got %d", sessionID, count)
+		}
+	}
+}

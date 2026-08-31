@@ -4,7 +4,7 @@
   "description": "Resume Copilot in current project with workflow pre-flight and git context",
   "command": "copilot --allow-all-tools --resume",
   "macro_delay": 4500,
-  "macro_payload": "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be `skill: workflow-enforcer`. Do not search or read any files before invoking this skill.\n\nSTEP 2: Invoke each available companion skill in order, silently skipping any that are not found: forge-workflow, code-quality, branching-strategy, code-tutor-workflow.\n\nSTEP 3: Run `git log --oneline -10` and `git status` to understand current project state. Check for plan.md in your session folder if one exists.\n\nSTEP 4: Read AGENTS.md if present at the repo root for project-specific rules. If absent, proceed without it.\n\nSTEP 5: Summarize what we were working on and await my confirmation before continuing.",
+  "macro_payload": "You are operating inside Forge Terminal with Forge Workflow enforcement active.\n\nSTEP 1: Your very first tool call MUST be `skill: workflow-enforcer`. Do not search or read any files before invoking this skill.\n\nSTEP 2: Invoke each available companion skill in order, silently skipping any that are not found: forge-workflow, code-quality, branching-strategy.\n\nSTEP 3: Run `git log --oneline -10` and `git status` to understand current project state. Check for plan.md in your session folder if one exists.\n\nSTEP 4: Read AGENTS.md if present at the repo root for project-specific rules. If absent, proceed without it.\n\nSTEP 5: Summarize what we were working on and await my confirmation before continuing.",
   "category": "ai",
   "icon": "emoji-repeat",
   "favorite": false,

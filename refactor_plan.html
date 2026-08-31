@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Forge — vault_list + Discovery</title>
+<style>
+  body { background:#0d1117; color:#e6edf3; font-family:monospace; padding:2rem; }
+  h1 { color:#58a6ff; }
+  h2 { color:#79c0ff; border-bottom:1px solid #30363d; padding-bottom:.4rem; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:.75rem; font-weight:bold; margin-right:.5rem; }
+  .pending  { background:#161b22; color:#8b949e; border:1px solid #30363d; }
+  .progress { background:#1f3a5f; color:#79c0ff; border:1px solid #388bfd; }
+  .done     { background:#0d2b1e; color:#3fb950; border:1px solid #238636; }
+  table { border-collapse:collapse; width:100%; margin-bottom:1.5rem; }
+  td, th { border:1px solid #30363d; padding:.5rem .75rem; text-align:left; }
+  th { background:#161b22; color:#8b949e; }
+  code { background:#161b22; padding:2px 6px; border-radius:3px; color:#ff7b72; }
+</style>
+</head>
+<body>
+<h1>Feature: vault_list MCP Tool + Discovery Improvements</h1>
+<p><strong>Branch:</strong> <code>feature/vault-list-tool-and-discovery</code> &nbsp;|&nbsp; <strong>Date:</strong> 2026-06-01</p>
+
+<h2>Problem Statement</h2>
+<p>Agents calling <code>vault_inject</code> must know the exact entry name in advance. When they guess wrong (e.g. <code>DBAI_TESTBOT</code> vs the real name <code>DBAI-TestBot</code>), they get a silent dead-end error with no hint of available names. This forces users to screenshot the Vault UI every session.</p>
+
+<h2>Solution</h2>
+<table>
+  <tr><th>Change</th><th>Impact</th></tr>
+  <tr><td>Add <code>vault_list</code> MCP tool</td><td>Agent proactively discovers all entry names before calling vault_inject</td></tr>
+  <tr><td>Improve vault_inject error message</td><td>Failed injection now lists available names so agent self-corrects immediately</td></tr>
+  <tr><td>Add <code>ListEntryNames()</code> to vault.go</td><td>Names-only read — no values, no UUIDs, zero-knowledge-safe</td></tr>
+</table>
+
+<h2>Task Tracker</h2>
+<table>
+  <tr><th>Task</th><th>File</th><th>Status</th></tr>
+  <tr><td>Failing tests — vaultListTool</td><td>internal/mcp/tools_vault_test.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Failing test — improved error message</td><td>internal/vault/vault_test.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Add <code>ListEntryNames()</code></td><td>internal/vault/vault.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Improve resolveEnvVarsForNames error</td><td>internal/vault/vault.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Add VaultNameLister + vaultListTool</td><td>internal/mcp/tools_vault.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Add VaultNameLister to Dependencies</td><td>internal/mcp/server.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Wire VaultNameLister in handlers_mcp.go</td><td>cmd/forge/handlers_mcp.go</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>go build passes</td><td>—</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>All tests pass</td><td>—</td><td><span class="badge pending">PENDING</span></td></tr>
+  <tr><td>Phase 5 delivery</td><td>CHANGELOG + PR + Release</td><td><span class="badge pending">PENDING</span></td></tr>
+</table>
+</body>
+</html>

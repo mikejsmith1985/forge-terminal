@@ -22,15 +22,12 @@ func startPTY(cmd *exec.Cmd) (io.ReadWriteCloser, error) {
 	return pty.Start(cmd)
 }
 
-// startPTYWithShell is not used on Unix (shell config handled in session.go).
-func startPTYWithShell(shell string, args []string, workingDir string) (io.ReadWriteCloser, error) {
+// startPTYWithShell is not used on Unix (shell config handled in session.go),
+// but is kept signature-compatible with the Windows build. It injects the same
+// per-tab FORGE_SESSION_ID identity via cmd.Env (specs/010, FR-003).
+func startPTYWithShell(shell string, args []string, workingDir string, sessionID string) (io.ReadWriteCloser, error) {
 	cmd := exec.Command(shell, args...)
-	cmd.Env = append(os.Environ(),
-		"TERM=xterm-256color",
-		"COLORTERM=truecolor",
-		fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
-		fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
-	)
+	cmd.Env = forgeSessionEnv(os.Environ(), sessionID)
 	if workingDir != "" {
 		cmd.Dir = workingDir
 	}

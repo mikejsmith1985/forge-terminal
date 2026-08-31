@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -12,6 +13,16 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/mikejsmith1985/forge-terminal/internal/commands"
+	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
+	"github.com/mikejsmith1985/forge-terminal/internal/files"
+	"github.com/mikejsmith1985/forge-terminal/internal/license"
+	"github.com/mikejsmith1985/forge-terminal/internal/llm"
+	"github.com/mikejsmith1985/forge-terminal/internal/storage"
+	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
+	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
+	"github.com/mikejsmith1985/forge-terminal/internal/tunnel"
+	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -23,16 +34,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"github.com/mikejsmith1985/forge-terminal/internal/commands"
-	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
-	"github.com/mikejsmith1985/forge-terminal/internal/files"
-	"github.com/mikejsmith1985/forge-terminal/internal/license"
-	"github.com/mikejsmith1985/forge-terminal/internal/llm"
-	"github.com/mikejsmith1985/forge-terminal/internal/storage"
-	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
-	"github.com/mikejsmith1985/forge-terminal/internal/terminal/vision"
-	"github.com/mikejsmith1985/forge-terminal/internal/tunnel"
-	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
 
 //go:embed all:web
@@ -100,12 +101,12 @@ func main() {
 	}
 
 	forgeDir := filepath.Join(homeDir, ".forge")
-	
+
 	// Check for devMode from environment if not set via ldflags
 	if devMode == "" {
 		devMode = os.Getenv("FORGE_DEV_MODE")
 	}
-	
+
 	// Ensure directory exists for logging (created by lockfile usually, but we want to log earlier)
 	_ = os.MkdirAll(forgeDir, 0755)
 
@@ -115,14 +116,16 @@ func main() {
 		logFilename = "forge-dev.log"
 	}
 	logPath := filepath.Join(forgeDir, logFilename)
+	// Move an oversized log aside first so the active file never grows unbounded
+	// (forge.log reached 888 MB in the field before rotation existed).
+	_ = rotateOversizedLog(logPath, maxLogFileSizeBytes)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
-		// Log to both file and stdout
-		log.SetOutput(os.Stdout) // Keep stdout for console
 		log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-		// Also write to file by wrapping
-		multiWriter := io.MultiWriter(os.Stdout, logFile)
-		log.SetOutput(multiWriter)
+		// File first, stdout best-effort: a windowsgui binary launched from
+		// Explorer has a dead stdout handle, and a plain io.MultiWriter would
+		// abort at that error and silently stop writing the log file.
+		log.SetOutput(newResilientLogWriter(logFile, os.Stdout))
 		defer logFile.Close()
 	}
 
@@ -138,7 +141,7 @@ func main() {
 		log.Println("[Forge] Starting background cleanup of old debug sessions...")
 		CleanupOldDebugSessions(7 * 24 * time.Hour)
 	}()
-	
+
 	// Parse port and host from command line or environment
 	var overridePort int
 	var overrideHost string
@@ -194,7 +197,7 @@ func main() {
 		SetAuthToken(token)
 		log.Printf("[Forge] Auth token set for remote access")
 	}
-	
+
 	// v3.7.1: Handle subcommands before starting web server
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -235,7 +238,7 @@ func main() {
 	}
 
 	// Logging is already set up at the top of main()
-	
+
 	// Migrate storage structure if needed
 	log.Printf("[Forge] Checking storage structure...")
 	if err := storage.MigrateToV2(); err != nil {
@@ -266,6 +269,12 @@ func main() {
 
 	// Initialize Forge Vault (AES-256-GCM encrypted secret store)
 	initVault(storage.GetVaultDir())
+
+	// Load the vault session token BEFORE routes register, so it is available to
+	// inject into the served page (serveIndexWithVersion). Every /api/vault/*
+	// route requires this token even on a tokenless localhost install — without
+	// it the vault would be readable by any local process (see vault_auth.go).
+	initVaultSessionToken()
 
 	// Check license at startup — gates all /api/* routes via LicenseMiddleware.
 	activeLicenseStatus, activeLicenseInfo = license.CheckLicense()
@@ -301,7 +310,7 @@ func main() {
 	// Actual API calls (/api/mobile/*) remain behind their own auth layer.
 	companionSubFS, companionSubErr := fs.Sub(webFS, "companion")
 	if companionSubErr != nil {
-		log.Printf("[companion] WARNING: companion PWA files missing from embedded FS — " +
+		log.Printf("[companion] WARNING: companion PWA files missing from embedded FS — "+
 			"run 'cd frontend && npm run build' to regenerate them: %v", companionSubErr)
 	} else {
 		companionFileServer := http.FileServer(http.FS(companionSubFS))
@@ -365,6 +374,11 @@ func main() {
 	termHandler = terminal.NewHandlerDirect(nil, visionParser, llmDetector)
 	http.HandleFunc("/ws", AuthMiddleware(LicenseMiddleware(termHandler.HandleWebSocket)))
 
+	// Closing a tab is the ONLY thing that should destroy a running shell — an
+	// unattended PTY otherwise survives a full day of disconnection (see
+	// terminal.sessionGracePeriod), so the deliberate close does the reclaiming.
+	http.HandleFunc("/api/terminal/close", WrapWithMiddleware(handleTerminalClose))
+
 	// Server-side macro injection.  Must register AFTER termHandler is set
 	// because the handler closure dereferences it.  See handlers_macro.go
 	// for why this lives on the backend rather than in the browser.
@@ -373,9 +387,9 @@ func main() {
 	// Commands API
 	http.HandleFunc("/api/commands", WrapWithMiddleware(handleCommands))
 	http.HandleFunc("/api/commands/restore-defaults", WrapWithMiddleware(handleRestoreDefaultCommands))
-	http.HandleFunc("/api/commands/backups", WrapWithMiddleware(handleCommandBackups)) // Deprecated
+	http.HandleFunc("/api/commands/backups", WrapWithMiddleware(handleCommandBackups))       // Deprecated
 	http.HandleFunc("/api/commands/restore-backup", WrapWithMiddleware(handleRestoreBackup)) // Deprecated
-	
+
 	// Card History API (new per-card versioning system)
 	http.HandleFunc("/api/commands/card-history", WrapWithMiddleware(handleCardHistory))
 	http.HandleFunc("/api/commands/card-history/restore", WrapWithMiddleware(handleRestoreCardVersion))
@@ -413,6 +427,7 @@ func main() {
 	http.HandleFunc("/api/hosted/stop", WrapWithMiddleware(handleHostedStop))
 
 	http.HandleFunc("/api/project/release-script", WrapWithMiddleware(handleProjectReleaseScript))
+	http.HandleFunc("/api/project/release-jobs", WrapWithMiddleware(handleProjectReleaseJobs))
 	http.HandleFunc("/api/project/create", WrapWithMiddleware(handleProjectCreate))
 
 	// Setup wizard
@@ -438,7 +453,8 @@ func main() {
 
 	// Shutdown API - allows graceful shutdown from browser
 	http.HandleFunc("/api/shutdown", WrapWithMiddleware(handleShutdown))
-	
+	http.HandleFunc("/api/instance/exit", WrapWithMiddleware(handleInstanceExit))
+
 	// IDE Integration API - open current workspace in external IDE
 	http.HandleFunc("/api/ide/open", WrapWithMiddleware(handleOpenIDE))
 	http.HandleFunc("/api/build/detect", WrapWithMiddleware(handleDetectBuildSystem))
@@ -446,7 +462,7 @@ func main() {
 	// Version and system info API
 	http.HandleFunc("/api/version", WrapWithMiddleware(handleVersion))
 	http.HandleFunc("/api/git/version", WrapWithMiddleware(handleGitVersion))
-	http.HandleFunc("/api/system-info", WrapWithMiddleware(handleSystemInfo))  // NEW: Process safeguard info
+	http.HandleFunc("/api/system-info", WrapWithMiddleware(handleSystemInfo)) // NEW: Process safeguard info
 	http.HandleFunc("/api/update/check", WrapWithMiddleware(handleUpdateCheck))
 	http.HandleFunc("/api/update/apply", WrapWithMiddleware(handleUpdateApply))
 	http.HandleFunc("/api/update/versions", WrapWithMiddleware(handleListVersions))
@@ -548,7 +564,7 @@ func main() {
 	}))
 	http.HandleFunc("/api/debug-sessions/active", WrapWithMiddleware(handleSetActiveDebugSession)) // v3.12.16
 	http.HandleFunc("/api/debug-sessions/", WrapWithMiddleware(handleGetDebugSession))
-	
+
 	// PTY Logs API - Get PTY logs for Follow Me integration
 	http.HandleFunc("/api/debug/pty-logs", WrapWithMiddleware(handleGetPTYLogs))
 
@@ -565,7 +581,7 @@ func main() {
 	http.HandleFunc("/api/directory/list", WrapWithMiddleware(handleDirectoryList))
 
 	// File management API
-	http.HandleFunc("/api/files/list", WrapWithMiddleware(handleListFiles)) // v3.3.7 Active Engineer
+	http.HandleFunc("/api/files/list", WrapWithMiddleware(handleListFiles))      // v3.3.7 Active Engineer
 	http.HandleFunc("/api/files/flat", WrapWithMiddleware(files.HandleFlatList)) // v3.3.6 @ mentions
 	http.HandleFunc("/api/files/stats", WrapWithMiddleware(files.HandleStats))
 	http.HandleFunc("/api/files/read", WrapWithMiddleware(files.HandleRead))
@@ -602,10 +618,32 @@ func main() {
 	http.HandleFunc("/api/workflow/status", WrapWithMiddleware(handleWorkflowStatus))
 	http.HandleFunc("/api/workflow/compliance", WrapWithMiddleware(handleWorkflowCompliance))
 	http.HandleFunc("/api/workflow/modules", WrapWithMiddleware(handleWorkflowModules))
+	http.HandleFunc("/api/workflow/global-install", WrapWithMiddleware(handleWorkflowGlobalInstall))
 	http.HandleFunc("/api/workflow/release-preflight", WrapWithMiddleware(handleReleasePreflight))
 	http.HandleFunc("/api/workflow/watch", WrapWithMiddleware(handleWorkflowWatchStart))
 	http.HandleFunc("/api/workflow/watch/poll", WrapWithMiddleware(handleWorkflowWatchPoll))
 	http.HandleFunc("/api/workflow/watch/stop", WrapWithMiddleware(handleWorkflowWatchStop))
+
+	// ── SDD phase orchestrator (specs/003 + 004 + 008) — HITL decision, dashboard, enforcement ──
+	http.HandleFunc("/api/sdd/bind", WrapWithMiddleware(handleSddBind))
+	http.HandleFunc("/api/sdd/decision", WrapWithMiddleware(handleSddDecision))
+	http.HandleFunc("/api/sdd/status", WrapWithMiddleware(handleSddStatus))
+	// phase-event is the authoritative phase signal emitted by the speckit skill workflow:
+	// "started" marks a phase running, "complete" opens its gate — replacing file-watcher
+	// inference as the primary state driver (specs/010-sdd-authoritative-state, FR-001).
+	http.HandleFunc("/api/sdd/phase-event", WrapWithMiddleware(handleSddPhaseEvent))
+	// worktree-close is the explicit tab-close signal: it safe-cleans the closed tab's isolated
+	// worktree (merged+clean only), never on a transient socket drop (specs/011, FR-011/FR-012).
+	http.HandleFunc("/api/sdd/worktree-close", WrapWithMiddleware(handleSddWorktreeClose))
+	// worktree (POST) is the EXPLICIT "isolate this tab" request — the only path that creates a
+	// worktree now that binds never auto-provision (specs/013 US3, recovery-first inversion).
+	http.HandleFunc("/api/sdd/worktree", WrapWithMiddleware(handleSddWorktree))
+	// gate-check is polled by the PreToolUse hook before each speckit Skill run to enforce that
+	// the developer approves each phase before the agent advances (specs/008-sdd-real-enforcement).
+	http.HandleFunc("/api/sdd/gate-check", WrapWithMiddleware(handleSddGateCheck))
+	// hook-status is called by the dashboard on mount so it can show an install prompt when
+	// the gate enforcement hook is absent from .claude/settings.json (specs/008 FR-003).
+	http.HandleFunc("/api/sdd/hook-status", WrapWithMiddleware(handleSddHookStatus))
 
 	// ── MCP Server routes (own auth, no standard middleware) ──────────────
 	// Must be initialised AFTER termHandler is set (line ~282 above).
@@ -664,6 +702,11 @@ func main() {
 	// Find an available port (use override if specified)
 	addr, listener, err := findAvailablePort(overrideHost, overridePort)
 	if err != nil {
+		var alreadyRunning *forgeAlreadyRunningError
+		if errors.As(err, &alreadyRunning) {
+			deferToRunningInstance(alreadyRunning.Instance)
+			return
+		}
 		log.Fatalf("Failed to find available port: %v", err)
 	}
 
@@ -1128,14 +1171,25 @@ func findAvailablePort(host string, overridePort int) (string, net.Listener, err
 		log.Printf("[Dev] Override port %d unavailable: %v", overridePort, err)
 		// Fall through to try preferred ports
 	}
-	
+
+	probeClient := newInstanceProbeClient()
 	for _, port := range preferredPorts {
 		addr := fmt.Sprintf("%s:%d", host, port)
 		listener, err := net.Listen("tcp", addr)
 		if err == nil {
 			return addr, listener, nil
 		}
-		log.Printf("Port %d unavailable, trying next...", port)
+		// Single-instance guard: if the busy port belongs to another Forge
+		// instance, never fall through silently — that used to leave a stale
+		// old binary running side by side with this one for weeks.
+		takeoverListener, guardErr := resolvePreferredPortConflict(probeClient, host, port, updater.GetVersion())
+		if guardErr != nil {
+			return "", nil, guardErr
+		}
+		if takeoverListener != nil {
+			return addr, takeoverListener, nil
+		}
+		log.Printf("Port %d busy with a non-Forge service, trying next...", port)
 	}
 
 	// Fallback: let OS assign a random available port
@@ -1154,9 +1208,9 @@ func handleOpenIDE(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	var req struct {
 		IDE  string `json:"ide"`  // "vscode", "cursor", "idea", "sublime"
 		Path string `json:"path"` // Workspace path to open
@@ -1165,7 +1219,7 @@ func handleOpenIDE(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	
+
 	if req.Path == "" {
 		// Use current working directory
 		var err error
@@ -1175,7 +1229,7 @@ func handleOpenIDE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// Map IDE names to commands
 	ideCommands := map[string][]string{
 		"vscode":  {"code", req.Path},
@@ -1184,33 +1238,33 @@ func handleOpenIDE(w http.ResponseWriter, r *http.Request) {
 		"sublime": {"subl", req.Path},
 		"vim":     {"vim", req.Path},
 	}
-	
+
 	ide := req.IDE
 	if ide == "" {
 		ide = "vscode" // Default
 	}
-	
+
 	cmdArgs, ok := ideCommands[ide]
 	if !ok {
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false, 
-			"error": fmt.Sprintf("Unknown IDE: %s. Supported: vscode, cursor, idea, sublime", ide),
+			"success": false,
+			"error":   fmt.Sprintf("Unknown IDE: %s. Supported: vscode, cursor, idea, sublime", ide),
 		})
 		return
 	}
-	
+
 	// Run the command
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	hideWindow(cmd) // Prevent console window flash on Windows
 	if err := cmd.Start(); err != nil {
 		log.Printf("[IDE] Failed to open %s: %v", ide, err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false, 
-			"error": fmt.Sprintf("Failed to open %s: %v (is it installed?)", ide, err),
+			"success": false,
+			"error":   fmt.Sprintf("Failed to open %s: %v (is it installed?)", ide, err),
 		})
 		return
 	}
-	
+
 	log.Printf("[IDE] Opened %s for: %s", ide, req.Path)
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "ide": ide, "path": req.Path})
 }
@@ -1218,7 +1272,7 @@ func handleOpenIDE(w http.ResponseWriter, r *http.Request) {
 // handleDetectBuildSystem detects the build system for the current project
 func handleDetectBuildSystem(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		var err error
@@ -1228,54 +1282,54 @@ func handleDetectBuildSystem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// Detect build systems by checking for config files
 	type BuildSystem struct {
-		Name        string `json:"name"`
-		File        string `json:"file"`
-		BuildCmd    string `json:"buildCmd"`
-		DevCmd      string `json:"devCmd"`
-		DeployCmd   string `json:"deployCmd,omitempty"`
-		TestCmd     string `json:"testCmd,omitempty"`
-		Detected    bool   `json:"detected"`
+		Name      string `json:"name"`
+		File      string `json:"file"`
+		BuildCmd  string `json:"buildCmd"`
+		DevCmd    string `json:"devCmd"`
+		DeployCmd string `json:"deployCmd,omitempty"`
+		TestCmd   string `json:"testCmd,omitempty"`
+		Detected  bool   `json:"detected"`
 	}
-	
+
 	systems := []BuildSystem{
 		// JavaScript/Node
 		{Name: "npm", File: "package.json", BuildCmd: "npm run build", DevCmd: "npm run dev", TestCmd: "npm test"},
 		{Name: "yarn", File: "yarn.lock", BuildCmd: "yarn build", DevCmd: "yarn dev", TestCmd: "yarn test"},
 		{Name: "pnpm", File: "pnpm-lock.yaml", BuildCmd: "pnpm build", DevCmd: "pnpm dev", TestCmd: "pnpm test"},
-		
+
 		// Go
 		{Name: "go", File: "go.mod", BuildCmd: "go build ./...", DevCmd: "go run .", TestCmd: "go test ./..."},
-		
+
 		// Python
 		{Name: "pip", File: "requirements.txt", BuildCmd: "pip install -r requirements.txt", DevCmd: "python main.py", TestCmd: "pytest"},
 		{Name: "poetry", File: "pyproject.toml", BuildCmd: "poetry install", DevCmd: "poetry run python main.py", TestCmd: "poetry run pytest"},
-		
+
 		// Rust
 		{Name: "cargo", File: "Cargo.toml", BuildCmd: "cargo build --release", DevCmd: "cargo run", TestCmd: "cargo test"},
-		
+
 		// Java/JVM
 		{Name: "maven", File: "pom.xml", BuildCmd: "mvn package", DevCmd: "mvn spring-boot:run", TestCmd: "mvn test"},
 		{Name: "gradle", File: "build.gradle", BuildCmd: "gradle build", DevCmd: "gradle bootRun", TestCmd: "gradle test"},
-		
+
 		// .NET
 		{Name: "dotnet", File: "*.csproj", BuildCmd: "dotnet build", DevCmd: "dotnet run", TestCmd: "dotnet test"},
-		
+
 		// Docker
 		{Name: "docker", File: "Dockerfile", BuildCmd: "docker build -t app .", DevCmd: "docker-compose up", DeployCmd: "docker push app"},
 		{Name: "docker-compose", File: "docker-compose.yml", BuildCmd: "docker-compose build", DevCmd: "docker-compose up -d"},
-		
+
 		// Make
 		{Name: "make", File: "Makefile", BuildCmd: "make build", DevCmd: "make run", TestCmd: "make test"},
 	}
-	
+
 	var detected []BuildSystem
 	for _, sys := range systems {
 		// Check if the config file exists
 		checkPath := filepath.Join(path, sys.File)
-		
+
 		// Handle wildcard patterns like *.csproj
 		if strings.Contains(sys.File, "*") {
 			matches, _ := filepath.Glob(checkPath)
@@ -1288,12 +1342,97 @@ func handleDetectBuildSystem(w http.ResponseWriter, r *http.Request) {
 			detected = append(detected, sys)
 		}
 	}
-	
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"path":     path,
-		"systems":  detected,
+		"path":      path,
+		"systems":   detected,
 		"hasBuilds": len(detected) > 0,
 	})
+}
+
+var semverGitTagPattern = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)$`)
+
+type semanticVersionTag struct {
+	major int
+	minor int
+	patch int
+}
+
+// normalizeSemverGitTag converts supported tags to the canonical vX.Y.Z format.
+func normalizeSemverGitTag(rawTag string) (string, bool) {
+	parsedVersionTag, isValidSemverTag := parseSemverGitTag(rawTag)
+	if !isValidSemverTag {
+		return "", false
+	}
+	return parsedVersionTag.String(), true
+}
+
+func parseSemverGitTag(rawTag string) (semanticVersionTag, bool) {
+	trimmedTag := strings.TrimSpace(rawTag)
+	matchGroups := semverGitTagPattern.FindStringSubmatch(trimmedTag)
+	if len(matchGroups) != 4 {
+		return semanticVersionTag{}, false
+	}
+
+	majorVersion, majorVersionError := strconv.Atoi(matchGroups[1])
+	minorVersion, minorVersionError := strconv.Atoi(matchGroups[2])
+	patchVersion, patchVersionError := strconv.Atoi(matchGroups[3])
+	if majorVersionError != nil || minorVersionError != nil || patchVersionError != nil {
+		return semanticVersionTag{}, false
+	}
+
+	return semanticVersionTag{
+		major: majorVersion,
+		minor: minorVersion,
+		patch: patchVersion,
+	}, true
+}
+
+func (versionTag semanticVersionTag) String() string {
+	return fmt.Sprintf("v%d.%d.%d", versionTag.major, versionTag.minor, versionTag.patch)
+}
+
+func (versionTag semanticVersionTag) isGreaterThan(otherVersionTag semanticVersionTag) bool {
+	if versionTag.major != otherVersionTag.major {
+		return versionTag.major > otherVersionTag.major
+	}
+	if versionTag.minor != otherVersionTag.minor {
+		return versionTag.minor > otherVersionTag.minor
+	}
+	return versionTag.patch > otherVersionTag.patch
+}
+
+// getHighestSemverGitTagForPath returns the highest semver tag for a git worktree.
+func getHighestSemverGitTagForPath(repoPath string) (string, error) {
+	command := exec.Command("git", "tag", "--sort=-version:refname")
+	if repoPath != "" {
+		command.Dir = repoPath
+	}
+	hideWindow(command)
+
+	rawOutput, commandError := command.Output()
+	if commandError != nil {
+		return "", commandError
+	}
+
+	var highestVersionTag semanticVersionTag
+	hasFoundSemverTag := false
+	for _, rawLine := range strings.Split(string(rawOutput), "\n") {
+		candidateVersionTag, isValidSemverTag := parseSemverGitTag(rawLine)
+		if !isValidSemverTag {
+			continue
+		}
+		if !hasFoundSemverTag || candidateVersionTag.isGreaterThan(highestVersionTag) {
+			highestVersionTag = candidateVersionTag
+			hasFoundSemverTag = true
+		}
+	}
+
+	if hasFoundSemverTag {
+		return highestVersionTag.String(), nil
+	}
+
+	return "", fmt.Errorf("no semver tags found")
 }
 
 // getLatestGitTag returns the highest semver tag found across all refs.
@@ -1301,18 +1440,11 @@ func handleDetectBuildSystem(w http.ResponseWriter, r *http.Request) {
 // query covers tags created on feature branches before they merge to main.
 // Returns an empty string when git is unavailable or no semver tags exist.
 func getLatestGitTag() string {
-	rawOutput, err := exec.Command("git", "tag", "--sort=-version:refname").Output()
-	if err != nil {
+	latestTag, tagError := getHighestSemverGitTagForPath("")
+	if tagError != nil {
 		return ""
 	}
-	semverPattern := regexp.MustCompile(`^v\d+\.\d+\.\d+$`)
-	for _, rawLine := range strings.Split(string(rawOutput), "\n") {
-		trimmedTag := strings.TrimSpace(rawLine)
-		if semverPattern.MatchString(trimmedTag) {
-			return trimmedTag
-		}
-	}
-	return ""
+	return latestTag
 }
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -1349,11 +1481,6 @@ func handleGitVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Run git describe --tags --abbrev=0
-	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
-	cmd.Dir = req.Path
-	hideWindow(cmd) // v3.17.1.1: Prevent console window flash on tab switch
-	
 	// Check if git directory exists first to avoid fatal errors
 	if _, err := os.Stat(filepath.Join(req.Path, ".git")); os.IsNotExist(err) {
 		// Not a git repo? Or maybe a subdir.
@@ -1364,24 +1491,16 @@ func handleGitVersion(w http.ResponseWriter, r *http.Request) {
 		if err := checkCmd.Run(); err != nil {
 			json.NewEncoder(w).Encode(map[string]string{
 				"version": "v0.0.0", // Default if not a git repo
-				"error": "Not a git repository",
+				"error":   "Not a git repository",
 			})
 			return
 		}
 	}
 
-	out, err := cmd.Output()
-	version := strings.TrimSpace(string(out))
-	
-	if err != nil {
-		// If no tags exist, git describe fails. Fallback to v0.0.0
-		log.Printf("[GitVersion] No tags found or git error in %s: %v", req.Path, err)
+	version, versionError := getHighestSemverGitTagForPath(req.Path)
+	if versionError != nil {
+		log.Printf("[GitVersion] No usable semver tags found or git error in %s: %v", req.Path, versionError)
 		version = "v0.0.0"
-	}
-	
-	// Ensure v prefix
-	if !strings.HasPrefix(version, "v") && version != "" {
-		version = "v" + version
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1392,19 +1511,19 @@ func handleGitVersion(w http.ResponseWriter, r *http.Request) {
 
 func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	// Get active port from listener
 	addr, _ := net.ResolveTCPAddr("tcp", "localhost:"+strconv.Itoa(activePort))
-	
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"pid":     os.Getpid(),
-		"port":    activePort,
-		"version": updater.GetVersion(),
-		"address": addr.String(),
+		"pid":         os.Getpid(),
+		"port":        activePort,
+		"version":     updater.GetVersion(),
+		"address":     addr.String(),
 		"processName": "forge-terminal",
 		"safeguard": map[string]interface{}{
-			"enabled": true,
-			"version": "v3.11.6",
+			"enabled":          true,
+			"version":          "v3.11.6",
 			"protectionLayers": 5,
 		},
 	})
@@ -1446,10 +1565,10 @@ func handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 // Shared between handleUpdateCheck and handleUpdateApply to avoid redundant GitHub API calls
 // that quickly exhaust the 60 req/hour unauthenticated rate limit (returning 403).
 var (
-	cachedUpdateInfo      *updater.UpdateInfo
-	cachedUpdateInfoTime  time.Time
-	cachedUpdateInfoMu    sync.Mutex
-	updateCacheTTL        = 5 * time.Minute
+	cachedUpdateInfo     *updater.UpdateInfo
+	cachedUpdateInfoTime time.Time
+	cachedUpdateInfoMu   sync.Mutex
+	updateCacheTTL       = 5 * time.Minute
 )
 
 func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
@@ -1660,15 +1779,15 @@ func handleSetCustomVersion(w http.ResponseWriter, r *http.Request) {
 	// Update the version in the updater package
 	oldVersion := updater.Version
 	updater.Version = version
-	
+
 	log.Printf("[Version] Custom version set: %s -> %s", oldVersion, version)
 
 	// Send success response
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":     true,
-		"oldVersion":  oldVersion,
-		"newVersion":  version,
-		"message":     fmt.Sprintf("Version updated from %s to %s", oldVersion, version),
+		"success":    true,
+		"oldVersion": oldVersion,
+		"newVersion": version,
+		"message":    fmt.Sprintf("Version updated from %s to %s", oldVersion, version),
 	})
 }
 
@@ -1903,8 +2022,6 @@ func inferLLMType(explicit string) llm.CommandType {
 	return llm.CommandChat // Default to chat
 }
 
-
-
 // handleLogError handles client-side error logging
 func handleLogError(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1933,7 +2050,7 @@ func handleLogError(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log the error with a clear prefix for frontend errors
-	log.Printf("[Frontend Error] %s (at %s) - %s\nStack: %s", 
+	log.Printf("[Frontend Error] %s (at %s) - %s\nStack: %s",
 		errorLog.Error, errorLog.Component, errorLog.Timestamp, errorLog.Stack)
 
 	// Always return success to prevent cascading errors on the frontend
@@ -2113,7 +2230,7 @@ func handleRestoreCardVersion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[CardHistory] Restoring %d card(s) to specific versions", len(req.Restorations))
-	
+
 	if err := commands.RestoreMultipleCardVersions(req.Restorations); err != nil {
 		log.Printf("[CardHistory] Restore failed: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -2139,7 +2256,7 @@ func handleInitCardHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println("[CardHistory] Initializing card histories...")
-	
+
 	if err := commands.InitializeCardHistories(); err != nil {
 		log.Printf("[CardHistory] Initialization failed: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -2423,7 +2540,7 @@ func handleDiagnosticsStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	svc := diagnostic.GetService()
 	platform := svc.GetPlatformInfo()
 	events := svc.GetEvents(50)
@@ -2443,7 +2560,7 @@ func handleDiagnosticsPlatform(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	svc := diagnostic.GetService()
 	platform := svc.GetPlatformInfo()
 
@@ -2468,6 +2585,12 @@ func serveIndexWithVersion(w http.ResponseWriter, r *http.Request, webFS fs.FS) 
 		return
 	}
 
+	// Embed the vault session token so the same-origin frontend can authenticate
+	// its /api/vault/* calls. Safe to inject here: this page is served only over
+	// the same-origin, AuthMiddleware-wrapped root handler, and the no-store
+	// headers below keep the token out of any cache.
+	content = injectVaultTokenIntoHTML(content)
+
 	// Set headers - rely on Vite's content hashing for cache busting
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -2477,3 +2600,29 @@ func serveIndexWithVersion(w http.ResponseWriter, r *http.Request, webFS fs.FS) 
 	w.Write(content)
 }
 
+// injectVaultTokenIntoHTML embeds the active vault session token into the served
+// page as the window.__forgeVaultToken global so the same-origin frontend can
+// attach it as a bearer token on /api/vault/* requests. The token is URL-safe
+// hex, but it is JSON-encoded to produce a safely-quoted JS string literal as a
+// defensive measure against any future change to the token alphabet. Returns the
+// content unchanged when no token is loaded (the vault then fails closed).
+func injectVaultTokenIntoHTML(content []byte) []byte {
+	if activeVaultSessionToken == "" {
+		return content
+	}
+
+	encodedToken, marshalErr := json.Marshal(activeVaultSessionToken)
+	if marshalErr != nil {
+		return content
+	}
+	scriptTag := []byte("<script>window.__forgeVaultToken=" + string(encodedToken) + ";</script>")
+
+	headCloseTag := []byte("</head>")
+	if bytes.Contains(content, headCloseTag) {
+		return bytes.Replace(content, headCloseTag, append(scriptTag, headCloseTag...), 1)
+	}
+
+	// Fallback for an unexpected page without a </head>: prepend the script so the
+	// global still exists before the app bundle runs.
+	return append(scriptTag, content...)
+}

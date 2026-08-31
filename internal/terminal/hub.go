@@ -33,15 +33,22 @@ type sessionHub struct {
 	// journal persists PTY output to disk so scrollback survives server
 	// restarts and extended disconnections. May be nil (disabled).
 	journal *SessionJournal
+
+	// modeTracker remembers the terminal keyboard/private-mode state a TUI set so
+	// it can be re-asserted to a freshly reattached client. Without this, a
+	// recovered tab's xterm comes up in default mode while the TUI is still in
+	// application mode — breaking digits, the numpad and arrows. Never nil.
+	modeTracker *terminalModeTracker
 }
 
 const defaultScrollbackSize = 64 * 1024 // 64 KiB — enough for ~2000 lines of 80-col text
 
 func newSessionHub() *sessionHub {
 	return &sessionHub{
-		clients:  make(map[*connWriter]struct{}),
-		ringBuf:  make([]byte, 0, defaultScrollbackSize),
-		ringSize: defaultScrollbackSize,
+		clients:     make(map[*connWriter]struct{}),
+		ringBuf:     make([]byte, 0, defaultScrollbackSize),
+		ringSize:    defaultScrollbackSize,
+		modeTracker: newTerminalModeTracker(),
 	}
 }
 
@@ -85,6 +92,11 @@ func (h *sessionHub) broadcast(msgType int, data []byte) {
 
 	// Persist to disk after clients receive data so I/O doesn't block sends.
 	j.Write(data)
+
+	// Track any terminal mode changes so a future reattach can restore them.
+	// Done outside h.mu (the tracker has its own lock) to keep the broadcast
+	// critical section short.
+	h.modeTracker.Observe(data)
 }
 
 // appendToRingLocked appends data to the ring buffer, evicting oldest bytes
@@ -103,16 +115,31 @@ func (h *sessionHub) appendToRingLocked(data []byte) {
 	}
 }
 
-// replayTo sends the accumulated ring buffer to a single client.
-// Used when a watcher joins to provide terminal scrollback history.
-func (h *sessionHub) replayTo(cw *connWriter, msgType int) {
+// replayPayload returns the bytes a newly-joined client should receive: the
+// tracked terminal mode-restore sequence FIRST (so the fresh xterm is put back
+// in sync with the still-running TUI's keyboard mode), followed by the scrollback
+// ring buffer. Returns nil when there is nothing to replay.
+func (h *sessionHub) replayPayload() []byte {
 	h.mu.Lock()
 	buf := make([]byte, len(h.ringBuf))
 	copy(buf, h.ringBuf)
 	h.mu.Unlock()
 
-	if len(buf) > 0 {
-		_ = cw.WriteMessage(msgType, buf)
+	restore := h.modeTracker.RestoreSequence()
+	if len(restore) == 0 && len(buf) == 0 {
+		return nil
+	}
+	out := make([]byte, 0, len(restore)+len(buf))
+	out = append(out, restore...)
+	out = append(out, buf...)
+	return out
+}
+
+// replayTo sends the mode-restore prefix and accumulated scrollback to a single
+// client. Used when a watcher joins to re-sync keyboard mode and provide history.
+func (h *sessionHub) replayTo(cw *connWriter, msgType int) {
+	if payload := h.replayPayload(); len(payload) > 0 {
+		_ = cw.WriteMessage(msgType, payload)
 	}
 }
 
@@ -155,6 +182,16 @@ func (h *sessionHub) isActive(cw *connWriter) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.activeConn == cw
+}
+
+// hasLiveActive reports whether an OPEN connection currently controls the PTY.
+// A connection that failed a write (marked closed) no longer counts: treating a
+// dead socket as the controller is what left reconnecting tabs stuck as passive
+// viewers — "Another device controls this terminal" with no such device alive.
+func (h *sessionHub) hasLiveActive() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.activeConn != nil && !h.activeConn.closed.Load()
 }
 
 // getActive returns the current active connection, or nil.
@@ -236,12 +273,16 @@ func (h *sessionHub) clearActiveAndPromote(cw *connWriter, sessionID string) {
 	}
 	h.activeConn = nil
 
-	// Pick any remaining client as the new active device.
+	// Pick any remaining LIVE client as the new active device — promoting a
+	// closed (write-failed) connection would strand the session with a phantom
+	// controller that can never resize, type, or hand control back.
 	// cw has already been removed from h.clients via hub.remove() before this call.
 	var candidate *connWriter
 	for c := range h.clients {
-		candidate = c
-		break
+		if !c.closed.Load() {
+			candidate = c
+			break
+		}
 	}
 	if candidate != nil {
 		h.activeConn = candidate

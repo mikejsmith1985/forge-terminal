@@ -23,12 +23,21 @@ const CurrentVaultFileVersion = 1
 // controlled access when building PTY environment overlays.
 type VaultEntry struct {
 	ID               string     `json:"id"`
-	SecretName       string     `json:"secretName"`       // Human label, e.g. "OpenAI API Key"
-	EnvVarName       string     `json:"envVarName"`       // Shell variable, e.g. "OPENAI_API_KEY"
+	SecretName       string     `json:"secretName"`    // Human label, e.g. "OpenAI API Key"
+	EnvVarName       string     `json:"envVarName"`    // Shell variable, e.g. "OPENAI_API_KEY"
+	URL              string     `json:"url,omitempty"` // Optional associated URL, e.g. login endpoint
 	Description      string     `json:"description"`
-	ShouldAutoInject bool       `json:"shouldAutoInject"` // Inject into every new PTY session
+	BundleID         string     `json:"bundleId,omitempty"`   // Optional grouping id for related entries (e.g. username/password pair)
+	BundleType       string     `json:"bundleType,omitempty"` // Optional role within a bundle (e.g. "username" or "password")
+	ShouldAutoInject bool       `json:"shouldAutoInject"`     // Inject into every new PTY session
 	CreatedAt        time.Time  `json:"createdAt"`
 	LastUsedAt       *time.Time `json:"lastUsedAt,omitempty"`
+
+	// DescriptionWarning is a heuristic, non-persisted advisory: when non-empty,
+	// the description looks like it contains a secret (e.g. a password embedded in
+	// a URL) that should be rotated and moved into the encrypted value field. It is
+	// recomputed on every read so existing entries are flagged without migration.
+	DescriptionWarning string `json:"descriptionWarning,omitempty"`
 }
 
 // AddEntryRequest is the body of POST /api/vault/entries.
@@ -38,20 +47,30 @@ type AddEntryRequest struct {
 	SecretName       string `json:"secretName"`
 	EnvVarName       string `json:"envVarName"`
 	SecretValue      string `json:"secretValue"`
+	URL              string `json:"url,omitempty"`
 	Description      string `json:"description"`
+	BundleID         string `json:"bundleId,omitempty"`
+	BundleType       string `json:"bundleType,omitempty"`
 	ShouldAutoInject bool   `json:"shouldAutoInject"`
 }
 
 // UpdateEntryRequest is the body of PUT /api/vault/entries.
-// All fields are optional — only non-empty fields are applied to the existing entry.
-// This lets callers update just the secret value without touching the name or env var,
-// or rename an entry without re-entering the secret.
+// All fields are optional. The required identifier fields (SecretName, EnvVarName,
+// SecretValue) use empty-means-no-change: an empty string leaves them untouched,
+// which lets callers update just the secret value without re-entering the name.
+//
+// The optional free-text fields (URL, Description) are pointers so they can express
+// three distinct intents — the only way to let a user actually blank one out:
+//   - nil        → field omitted, leave unchanged
+//   - non-nil "" → explicitly clear the field
+//   - non-nil    → set the field to the given value
 type UpdateEntryRequest struct {
-	ID          string `json:"id"`
-	SecretName  string `json:"secretName,omitempty"`
-	EnvVarName  string `json:"envVarName,omitempty"`
-	SecretValue string `json:"secretValue,omitempty"`
-	Description string `json:"description,omitempty"`
+	ID          string  `json:"id"`
+	SecretName  string  `json:"secretName,omitempty"`
+	EnvVarName  string  `json:"envVarName,omitempty"`
+	SecretValue string  `json:"secretValue,omitempty"`
+	URL         *string `json:"url,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // AutoInjectToggleRequest is the body of POST /api/vault/auto-inject.
@@ -72,8 +91,8 @@ type InjectRequest struct {
 // The script self-deletes after running so values are never persisted to shell
 // history or left on disk beyond the sourcing window.
 type InjectResult struct {
-	ScriptPath   string `json:"scriptPath"`
-	InjectedCount int   `json:"injectedCount"`
+	ScriptPath    string `json:"scriptPath"`
+	InjectedCount int    `json:"injectedCount"`
 }
 
 // VaultStatus is returned by GET /api/vault/status.
@@ -108,7 +127,10 @@ type diskEntry struct {
 	SecretName       string     `json:"secretName"`
 	EnvVarName       string     `json:"envVarName"`
 	SecretValue      string     `json:"secretValue"` // plaintext inside the encrypted blob
+	URL              string     `json:"url,omitempty"`
 	Description      string     `json:"description"`
+	BundleID         string     `json:"bundleId,omitempty"`
+	BundleType       string     `json:"bundleType,omitempty"`
 	ShouldAutoInject bool       `json:"shouldAutoInject"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	LastUsedAt       *time.Time `json:"lastUsedAt,omitempty"`

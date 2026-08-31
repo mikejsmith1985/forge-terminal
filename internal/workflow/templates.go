@@ -103,10 +103,23 @@ func RenderCopilotAgentSetup(config WorkflowConfig) (string, error) {
 }
 
 // RenderClaudeMD generates CLAUDE.md, which Claude Code reads automatically
-// at every session start. It imports the canonical agent instructions file so
-// both Claude Code and GitHub Copilot share a single source of truth.
+// at every session start. It imports ONLY the tool-agnostic constitution
+// (.specify/memory/constitution.md) — never Copilot's copilot-instructions.md,
+// which is CLI-specific and must not route a Claude session through another
+// tool's file (FR-011, consistent with the session-macro fix in PR #162).
 func RenderClaudeMD(config WorkflowConfig) (string, error) {
 	return renderTemplate("claude-md", claudeMDTemplate, config)
+}
+
+// RenderConstitution generates .specify/memory/constitution.md — the GitHub
+// Spec Kit (Spec-Driven Development) source of truth for a project's binding
+// rules. Every Spec Kit stage (specify → plan → tasks → implement) reads this
+// file first, so it merges Forge's hard-won, non-negotiable standards into the
+// Articles below. This is the native-Go base of the SDD integration: it is
+// emitted with zero external dependencies so "create project" works offline,
+// independent of whether the `specify` CLI is installed on the machine.
+func RenderConstitution(config WorkflowConfig) (string, error) {
+	return renderTemplate("constitution", constitutionTemplate, config)
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -487,34 +500,6 @@ description: "Enforces multi-agent orchestration for quality. Activates on keywo
 {{end}}
 `
 
-var codeTutorWorkflowSkill = `---
-name: code-tutor-workflow
-description: "Integrates Code Tutor with Forge Workflow. Activates on keywords: tutor, teach, explain, walkthrough, learn, understand."
----
-
-# Code Tutor Integration
-
-## Behavior
-
-When Code Tutor is active in the workflow:
-
-1. **File change notifications** — When files are created or modified, the system sends a notification: "N files changed — want a walkthrough?"
-2. **Explanation depth levels:**
-   - **Overview** — General, mildly technical summary suitable for project managers
-   - **Technical** — Standard developer-level explanation of logic and patterns
-   - **Line-by-Line** — Detailed walk-through of every significant line
-3. **Quality auditing** — Tutor explanations flag naming violations, missing comments, and readability concerns
-
-## Agent Integration
-
-When creating or modifying files with Code Tutor active:
-
-1. Write code that is optimized for learning — clear structure, logical flow
-2. Add brief inline comments on non-obvious logic (the "why" moments)
-3. Use architecture decision blocks for significant structural decisions
-4. Ensure every public/exported symbol has a documentation comment
-`
-
 var workflowEnforcerSkill = `---
 name: workflow-enforcer
 description: "MANDATORY for all code changes. Enforces Forge Workflow standards. Activates on ANY implementation, refactor, bugfix, feature, build, create, modify, update, fix, add, change, or code modification task."
@@ -652,7 +637,6 @@ var preCommitPS1Template = "#!/usr/bin/env pwsh\n" +
 	"if (-not $stagedFiles) { exit 0 }\n" +
 	"\n" +
 	"$sourceExtensions = @(\".go\", \".js\", \".jsx\", \".ts\", \".tsx\", \".py\", \".rs\", \".java\", \".cs\")\n" +
-	"$testPatterns = @(\"_test.go\", \".test.js\", \".test.jsx\", \".test.ts\", \".test.tsx\", \".spec.js\", \".spec.jsx\", \".spec.ts\", \".spec.tsx\", \"_test.py\", \"_test.rs\")\n" +
 	"$sourceFiles = $stagedFiles | Where-Object {\n" +
 	"    $extension = [System.IO.Path]::GetExtension($_)\n" +
 	"    $sourceExtensions -contains $extension\n" +
@@ -675,9 +659,11 @@ var preCommitPS1Template = "#!/usr/bin/env pwsh\n" +
 	"}\n" +
 	"\n" +
 	"# ── TEST FILE GATE (Gate 4) ─────────────────────────────────────────────\n" +
-	"# Every new source file must have a corresponding test file staged or on disk.\n" +
-	"# Build output directories are excluded — they contain compiled artifacts, not\n" +
-	"# authored source code, and must never be flagged for missing test coverage.\n" +
+	"# Every new source file must have a corresponding test file — staged or found\n" +
+	"# anywhere in the repo (test projects/dirs are common). Conventions are\n" +
+	"# language-specific: Go (_test.go), JS/TS (.test/.spec), Python (test_ prefix\n" +
+	"# or _test suffix), Rust (_test.rs or inline #[cfg(test)]), C# (Tests/Test\n" +
+	"# suffix), Java (Test/Tests/IT). Build output directories are excluded.\n" +
 	"$buildOutputDirs = @(\"cmd/forge/web/\", \"frontend/dist/\", \"bin/\")\n" +
 	"$newSourceFiles = git diff --cached --name-only --diff-filter=A 2>$null | Where-Object {\n" +
 	"    $extension = [System.IO.Path]::GetExtension($_)\n" +
@@ -687,25 +673,43 @@ var preCommitPS1Template = "#!/usr/bin/env pwsh\n" +
 	"    }\n" +
 	"    return $true\n" +
 	"}\n" +
-	"# Exclude files that are themselves test files\n" +
+	"# Recognise a path that is itself a test file (so a new test file isn't flagged).\n" +
 	"$isTestFile = { param($f)\n" +
-	"    foreach ($pattern in $testPatterns) { if ($f -like \"*$pattern\") { return $true } }\n" +
+	"    $name = [System.IO.Path]::GetFileName($f)\n" +
+	"    if ($name -match '(_test\\.go|\\.test\\.(js|jsx|ts|tsx)|\\.spec\\.(js|jsx|ts|tsx)|_test\\.py|_test\\.rs)$') { return $true }\n" +
+	"    if ($name -like 'test_*.py') { return $true }\n" +
+	"    if ($name -match '(Tests|Test)\\.cs$') { return $true }\n" +
+	"    if ($name -match '(Test|Tests|IT)\\.java$') { return $true }\n" +
 	"    return $false\n" +
+	"}\n" +
+	"# Candidate test FILE NAMES for a source leaf, by language.\n" +
+	"$testCandidates = { param($leaf, $ext)\n" +
+	"    switch ($ext) {\n" +
+	"        '.go'   { return @(\"${leaf}_test.go\") }\n" +
+	"        '.js'   { return @(\"${leaf}.test.js\", \"${leaf}.spec.js\") }\n" +
+	"        '.jsx'  { return @(\"${leaf}.test.jsx\", \"${leaf}.spec.jsx\") }\n" +
+	"        '.ts'   { return @(\"${leaf}.test.ts\", \"${leaf}.spec.ts\") }\n" +
+	"        '.tsx'  { return @(\"${leaf}.test.tsx\", \"${leaf}.spec.tsx\") }\n" +
+	"        '.py'   { return @(\"test_${leaf}.py\", \"${leaf}_test.py\") }\n" +
+	"        '.rs'   { return @(\"${leaf}_test.rs\") }\n" +
+	"        '.cs'   { return @(\"${leaf}Tests.cs\", \"${leaf}Test.cs\", \"${leaf}.Tests.cs\", \"${leaf}.Test.cs\") }\n" +
+	"        '.java' { return @(\"${leaf}Test.java\", \"${leaf}Tests.java\", \"${leaf}IT.java\") }\n" +
+	"        default { return @() }\n" +
+	"    }\n" +
 	"}\n" +
 	"foreach ($newFile in $newSourceFiles) {\n" +
 	"    if (& $isTestFile $newFile) { continue }\n" +
-	"    # Determine expected test file path based on language\n" +
 	"    $extension = [System.IO.Path]::GetExtension($newFile)\n" +
-	"    $baseName = $newFile.Substring(0, $newFile.Length - $extension.Length)\n" +
+	"    $leaf = [System.IO.Path]::GetFileNameWithoutExtension($newFile)\n" +
 	"    $hasTest = $false\n" +
-	"    if ($extension -eq \".go\") {\n" +
-	"        $expectedTest = \"${baseName}_test.go\"\n" +
-	"        if (($stagedFiles -contains $expectedTest) -or (Test-Path $expectedTest)) { $hasTest = $true }\n" +
-	"    } else {\n" +
-	"        # JS/TS: check for .test and .spec variants\n" +
-	"        foreach ($testSuffix in @(\".test$extension\", \".spec$extension\")) {\n" +
-	"            $expectedTest = \"${baseName}${testSuffix}\"\n" +
-	"            if (($stagedFiles -contains $expectedTest) -or (Test-Path $expectedTest)) { $hasTest = $true; break }\n" +
+	"    # Rust commonly keeps unit tests inline in the same file via #[cfg(test)].\n" +
+	"    if ($extension -eq '.rs' -and (Test-Path $newFile) -and (Select-String -Path $newFile -Pattern '#\\[cfg\\(test\\)\\]' -Quiet -ErrorAction SilentlyContinue)) {\n" +
+	"        $hasTest = $true\n" +
+	"    }\n" +
+	"    if (-not $hasTest) {\n" +
+	"        foreach ($cand in (& $testCandidates $leaf $extension)) {\n" +
+	"            if ($stagedFiles | Where-Object { [System.IO.Path]::GetFileName($_) -eq $cand }) { $hasTest = $true; break }\n" +
+	"            if (Get-ChildItem -Path . -Recurse -File -Filter $cand -ErrorAction SilentlyContinue | Select-Object -First 1) { $hasTest = $true; break }\n" +
 	"        }\n" +
 	"    }\n" +
 	"    if (-not $hasTest) {\n" +
@@ -791,26 +795,33 @@ var preCommitSHTemplate = "#!/usr/bin/env bash\n" +
 	"new_source_files=$(git diff --cached --name-only --diff-filter=A 2>/dev/null | grep -E '\\.(go|js|jsx|ts|tsx|py|rs|java|cs)$' | grep -vE '^(cmd/forge/web/|frontend/dist/|bin/)')\n" +
 	"if [[ -n \"$new_source_files\" ]]; then\n" +
 	"    while IFS= read -r new_file; do\n" +
-	"        # Skip files that are themselves test files\n" +
-	"        if echo \"$new_file\" | grep -qE '(_test\\.go|\\.test\\.(js|jsx|ts|tsx)|\\.spec\\.(js|jsx|ts|tsx)|_test\\.py|_test\\.rs)$'; then\n" +
-	"            continue\n" +
-	"        fi\n" +
+	"        [[ -z \"$new_file\" ]] && continue\n" +
+	"        base=$(basename \"$new_file\")\n" +
+	"        # Skip files that are themselves test files (every supported convention).\n" +
+	"        if echo \"$base\" | grep -qE '(_test\\.go|\\.test\\.(js|jsx|ts|tsx)|\\.spec\\.(js|jsx|ts|tsx)|_test\\.py|_test\\.rs|Tests?\\.cs|(Test|Tests|IT)\\.java)$'; then continue; fi\n" +
+	"        if echo \"$base\" | grep -qE '^test_.*\\.py$'; then continue; fi\n" +
 	"        extension=\"${new_file##*.}\"\n" +
-	"        base_name=\"${new_file%.*}\"\n" +
+	"        leaf=\"${base%.*}\"\n" +
 	"        has_test=false\n" +
-	"        if [[ \"$extension\" == \"go\" ]]; then\n" +
-	"            expected_test=\"${base_name}_test.go\"\n" +
-	"            if echo \"$staged_files\" | grep -qF \"$expected_test\" || [[ -f \"$expected_test\" ]]; then\n" +
-	"                has_test=true\n" +
-	"            fi\n" +
-	"        else\n" +
-	"            # JS/TS: check for .test and .spec variants\n" +
-	"            for test_suffix in \".test.${extension}\" \".spec.${extension}\"; do\n" +
-	"                expected_test=\"${base_name}${test_suffix}\"\n" +
-	"                if echo \"$staged_files\" | grep -qF \"$expected_test\" || [[ -f \"$expected_test\" ]]; then\n" +
-	"                    has_test=true\n" +
-	"                    break\n" +
-	"                fi\n" +
+	"        # Candidate test FILE NAMES for this source leaf, by language.\n" +
+	"        candidates=\"\"\n" +
+	"        case \"$extension\" in\n" +
+	"            go)   candidates=\"${leaf}_test.go\" ;;\n" +
+	"            js)   candidates=\"${leaf}.test.js ${leaf}.spec.js\" ;;\n" +
+	"            jsx)  candidates=\"${leaf}.test.jsx ${leaf}.spec.jsx\" ;;\n" +
+	"            ts)   candidates=\"${leaf}.test.ts ${leaf}.spec.ts\" ;;\n" +
+	"            tsx)  candidates=\"${leaf}.test.tsx ${leaf}.spec.tsx\" ;;\n" +
+	"            py)   candidates=\"test_${leaf}.py ${leaf}_test.py\" ;;\n" +
+	"            rs)   candidates=\"${leaf}_test.rs\" ;;\n" +
+	"            cs)   candidates=\"${leaf}Tests.cs ${leaf}Test.cs ${leaf}.Tests.cs ${leaf}.Test.cs\" ;;\n" +
+	"            java) candidates=\"${leaf}Test.java ${leaf}Tests.java ${leaf}IT.java\" ;;\n" +
+	"        esac\n" +
+	"        # Rust frequently keeps unit tests inline via #[cfg(test)].\n" +
+	"        if [[ \"$extension\" == \"rs\" && -f \"$new_file\" ]] && grep -q '#\\[cfg(test)\\]' \"$new_file\"; then has_test=true; fi\n" +
+	"        if [[ \"$has_test\" == \"false\" ]]; then\n" +
+	"            for cand in $candidates; do\n" +
+	"                # A test file staged or already present anywhere in the repo satisfies the gate.\n" +
+	"                if [[ -n \"$(find . -type f -name \"$cand\" 2>/dev/null | head -n1)\" ]]; then has_test=true; break; fi\n" +
 	"            done\n" +
 	"        fi\n" +
 	"        if [[ \"$has_test\" == \"false\" ]]; then\n" +
@@ -964,10 +975,19 @@ var prePushPS1Template = "#!/usr/bin/env pwsh\n" +
 	"\n" +
 	"# ── Go Build + Test ─────────────────────────────────────────────────────\n" +
 	"if (Test-Path \"go.mod\") {\n" +
+	"    # Projects using a-h/templ generate Go source from .templ files that are\n" +
+	"    # gitignored (*_templ.go); regenerate them first so a clean build does not fail.\n" +
+	"    # Guarded on the templ tool directive so this is a no-op in non-templ projects.\n" +
+	"    if (Select-String -Path go.mod -Pattern \"tool github.com/a-h/templ\" -Quiet) {\n" +
+	"        Write-Host \"  [Go] Generating templ files...\" -ForegroundColor Cyan\n" +
+	"        go tool templ generate *> $null\n" +
+	"    }\n" +
 	"    Write-Host \"  [Go] Building...\" -ForegroundColor Cyan\n" +
-	"    $buildOutput = go build ./cmd/forge/ 2>&1\n" +
+	"    # Build every package, not a single hardcoded entrypoint, so this hook stays\n" +
+	"    # correct regardless of the project's cmd/ layout.\n" +
+	"    $buildOutput = go build ./... 2>&1\n" +
 	"    if ($LASTEXITCODE -ne 0) {\n" +
-	"        $failures += \"GO BUILD: go build ./cmd/forge/ failed\"\n" +
+	"        $failures += \"GO BUILD: go build ./... failed\"\n" +
 	"        Write-Host \"  [Go] Build FAILED\" -ForegroundColor Red\n" +
 	"        Write-Host $buildOutput -ForegroundColor Red\n" +
 	"    } else {\n" +
@@ -1030,10 +1050,19 @@ var prePushSHTemplate = "#!/usr/bin/env bash\n" +
 	"\n" +
 	"# ── Go Build + Test ─────────────────────────────────────────────────────\n" +
 	"if [[ -f \"go.mod\" ]]; then\n" +
+	"    # Projects using a-h/templ generate Go source from .templ files that are\n" +
+	"    # gitignored (*_templ.go); regenerate them first so a clean build does not fail.\n" +
+	"    # Guarded on the templ tool directive so this is a no-op in non-templ projects.\n" +
+	"    if grep -q \"tool github.com/a-h/templ\" go.mod 2>/dev/null; then\n" +
+	"        echo -e \"  \\033[36m[Go] Generating templ files...\\033[0m\"\n" +
+	"        go tool templ generate > /dev/null 2>&1\n" +
+	"    fi\n" +
 	"    echo -e \"  \\033[36m[Go] Building...\\033[0m\"\n" +
-	"    build_output=$(go build ./cmd/forge/ 2>&1)\n" +
+	"    # Build every package, not a single hardcoded entrypoint, so this hook stays\n" +
+	"    # correct regardless of the project's cmd/ layout.\n" +
+	"    build_output=$(go build ./... 2>&1)\n" +
 	"    if [[ $? -ne 0 ]]; then\n" +
-	"        failures+=(\"GO BUILD: go build ./cmd/forge/ failed\")\n" +
+	"        failures+=(\"GO BUILD: go build ./... failed\")\n" +
 	"        echo -e \"  \\033[31m[Go] Build FAILED\\033[0m\"\n" +
 	"        echo \"$build_output\"\n" +
 	"    else\n" +
@@ -1098,8 +1127,6 @@ var prTemplateContent = `## Description
 - [ ] Code comments are readable by non-developers
 - [ ] Tests written or updated for changed code
 - [ ] Branch follows naming convention (feature/*, fix/*, chore/*, docs/*)
-{{if contains .EnabledModules "code-tutor"}}- [ ] Code Tutor walkthrough completed for new/changed files
-{{end}}
 ## Testing
 
 <!-- How was this tested? Include test output or screenshots. -->
@@ -1115,8 +1142,8 @@ var prTemplateContent = `## Description
 // ──────────────────────────────────────────────────────────────────────────────
 // Template: CLAUDE.md
 // Claude Code reads this file automatically at every session start.
-// It imports the canonical agent instructions so Claude Code and GitHub Copilot
-// share a single source of truth without duplicating content.
+// It imports ONLY the tool-agnostic constitution — never copilot-instructions.md —
+// so a Claude session is never routed through another tool's instruction file.
 // ──────────────────────────────────────────────────────────────────────────────
 
 var claudeMDTemplate = `# {{.ProjectName}} — Forge Agent Instructions
@@ -1125,5 +1152,100 @@ var claudeMDTemplate = `# {{.ProjectName}} — Forge Agent Instructions
 > at every session start. All workflow rules below are binding — read them
 > before beginning any task.
 
-@.github/copilot-instructions.md
+@.specify/memory/constitution.md
+
+<!-- SPECKIT START -->
+<!-- SPECKIT END -->
+`
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Template: Project Constitution (generates .specify/memory/constitution.md)
+// The GitHub Spec Kit source of truth. Read first by every Spec-Driven
+// Development stage. Merges Forge's non-negotiable standards into numbered
+// Articles so they propagate to every project without per-repo reconstruction.
+// ──────────────────────────────────────────────────────────────────────────────
+
+var constitutionTemplate = `# {{.ProjectName}} — Project Constitution
+
+> Auto-generated by Forge Terminal for Spec-Driven Development (GitHub Spec Kit).
+> This file is the single source of truth for this project's binding rules.
+> Every Spec Kit stage — ` + "`/speckit.specify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.implement`" + ` —
+> MUST read and obey these Articles. Quality Mode: **{{upper (print .QualityMode)}}** | Project Type: **{{.ProjectType}}**
+
+## Article I — Prime Directive
+
+{{if eq .QualityMode "best"}}Take the BEST route, never the fastest. Production-readiness outranks speed; a "quick but dirty" solution is strictly forbidden. Parallelize independent work across sub-agents and reserve premium models for architecture and complex tasks.{{else}}Balance speed with quality. Single-agent mode is acceptable for most tasks; favor working code while holding the minimum quality bar in the Articles below.{{end}}
+
+## Article II — Process Protection (HIGHEST SEVERITY)
+
+The production binary is ` + "`fterm.exe`" + `. The agent may itself run inside a process matching ` + "`forge-*`" + `.
+NEVER use wildcard process kills (e.g. ` + "`Get-Process -Name \"forge*\"`" + ` or ` + "`pkill forge`" + `).
+ALWAYS target a specific PID: ` + "`Stop-Process -Id <PID>`" + ` or ` + "`kill <PID>`" + `.
+Violating this rule kills the agent's own session and destroys all context.
+
+## Article III — Branching (GitHub Flow)
+
+All work happens on feature branches: ` + "`feature/*`, `fix/*`, `chore/*`, `docs/*`" + `.
+Never commit directly to ` + "`main`" + `. Every merge to ` + "`main`" + ` requires a Pull Request.
+Branch names are lowercase, hyphenated, and descriptive — scoped to one concern.
+
+## Article IV — Code Quality
+
+Names must be self-documenting: no single-letter variables (except ` + "`i`/`j`/`k`" + ` loop iterators
+and ` + "`w`/`r`" + ` HTTP handler parameters). Booleans are prefixed ` + "`is`/`has`/`can`/`should`/`was`" + `.
+Functions are verb-first. No magic numbers. Comments explain the "why," readable by a non-developer:
+every file opens with a one-line purpose comment, and every exported/public function carries a doc
+comment. Functions stay under 40 lines; prefer guard clauses over deep nesting.
+
+## Article V — Testing (Three-Layer Separation)
+
+Unit tests are 100% mocked and run in under 10ms. Integration tests use real infrastructure
+(testcontainers), never mocked drivers. UX tests use Cypress with ` + "`cypress-real-events`" + ` —
+never synthetic events — launched via ` + "`run-dev-clean.ps1`" + `, never by building the binary.
+Follow Red → Green → Refactor: the failing test is written before the implementation.
+
+## Article VI — Documentation Discipline
+
+` + "`CHANGELOG.md`" + ` is the single source of truth for what changed; update it in every PR that
+changes behavior. Do not create auxiliary summary or status documents. The per-feature
+` + "`specs/<feature>/`" + ` tree produced by the Spec Kit pipeline is exempt — those are pipeline
+artifacts, not ad-hoc status docs.
+
+## Article VII — Framework-First Gate
+
+Before building any infrastructure, confirm the governing framework does not already provide it.
+Build custom only against a documented gap, and record the one-line justification at the custom
+component. This gate must pass before ` + "`/speckit.plan`" + ` finalizes a technical approach.
+
+## Article VIII — Release: Local Pipeline ONLY
+
+Releases NEVER use GitHub Actions. Detection order: if ` + "`scripts/local-release.ps1`" + ` exists, run it;
+otherwise ` + "`git tag`" + ` then ` + "`gh release create`" + ` directly. Never push a tag and wait for an Actions
+runner to build the release.
+
+## Article IX — Vault Zero-Knowledge
+
+Secrets are injected by the Forge Vault, never handled in plaintext by the agent. The agent is a
+director, not a courier: it names WHERE a secret goes; the vault resolves and delivers it. A secret
+value must never enter the conversation, a file, or a log.
+
+## Article X — Verification & Proof
+
+"It compiles" and "the API returned 200" are not proof. Verify behavior with evidence. For terminal
+output, read the xterm.js buffer model (` + "`window.term.buffer.active`" + `), never the DOM. This Article
+maps to the ` + "`/speckit.analyze`" + ` consistency gate.
+
+## Article XI — Output & Dashboard Restraint
+
+Maintain at most one dashboard file (` + "`refactor_plan.html`" + `), purged fresh each session. Do not
+narrate internal phase names to the user. Do not emit Markdown summaries unless explicitly requested.
+
+## Article XII — Interaction & Response Format
+
+Responses to the user are tight and scannable — never verbose tutorial walkthroughs or "Insight"
+preambles. Use emoji-prefixed section headers (🔧 Fix, 🐛 Bug, 🧪 Tests, 📋 Plan, ✅ Done, ⚠️ Warning,
+🚀 Deploy), horizontal-rule dividers between sections, and tables when content is comparative or
+multi-field. Keep each section to roughly 75 words; deep analysis belongs in tool calls and code, not
+prose. This Response Format applies on every turn, including casual ones. Ask clarifying questions in
+plain prose, never via a multiple-choice prompt tool.
 `

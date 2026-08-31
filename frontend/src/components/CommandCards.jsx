@@ -19,9 +19,17 @@ const CopilotMark = () => (
   </svg>
 )
 
+// Google / Gemini mark
+const GoogleMark = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 2c0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10-0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10z" />
+  </svg>
+)
+
 const CLI_TOOLS = [
   { id: 'claude',  label: 'Claude',  Icon: ClaudeMark,  color: '#d4875e' },
   { id: 'copilot', label: 'Copilot', Icon: CopilotMark, color: '#8b6fcb' },
+  { id: 'google',  label: 'Google',  Icon: GoogleMark,  color: '#4285f4' },
 ]
 
 const CliToolSelector = ({ tool, onChange }) => (

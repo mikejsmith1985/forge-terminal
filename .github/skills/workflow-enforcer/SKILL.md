@@ -20,18 +20,23 @@ Before loading any co-skills, determine the **project mode** by checking two thi
 Test-Path "AGENTS.md"
 ```
 
-**Check 2 — Does `.github/skills/forge-workflow/` exist?**
+**Check 2 — Does `.specify/memory/constitution.md` exist?**
 ```powershell
-Test-Path ".github/skills/forge-workflow"
+Test-Path ".specify/memory/constitution.md"
 ```
+If present, the project is in **Spec-Driven Development (SDD) mode**. The constitution at
+`.specify/memory/constitution.md` is the AUTHORITATIVE source of binding rules — read it FIRST,
+before any co-skill. Its Articles supersede any duplicated standards elsewhere, and the `speckit-*`
+pipeline (Phase 0B) is the workflow.
 
 ### Mode Decision Table
 
-| AGENTS.md | forge-workflow skill | Detected Mode |
-|-----------|----------------------|---------------|
-| ✅ Found  | ✅ Found             | **Forge Enterprise** |
-| ❌ Missing | ✅ Found             | **Enterprise** |
-| ❌ Missing | ❌ Missing           | **Standard** |
+| AGENTS.md | constitution | Detected Mode |
+|-----------|--------------|---------------|
+| ✅ Found  | ✅ Found      | **Forge Enterprise (SDD)** |
+| ❌ Missing | ✅ Found      | **Enterprise (SDD)** |
+| ✅ Found  | ❌ Missing    | **Enterprise** |
+| ❌ Missing | ❌ Missing    | **Standard** |
 
 Store the detected mode. It controls which co-skills are **required** vs **optional**.
 
@@ -45,7 +50,17 @@ Invoke co-skills in the order listed. Behavior on failure differs by mode:
 These must load successfully in every project. If missing, report ❌ and stop.
 ```
 invoke skill: code-quality
+invoke skill: framework-first
 ```
+
+### Spec-Driven Development pipeline (load when `.specify/` exists)
+When the project has a `.specify/` directory, the GitHub Spec Kit pipeline IS the workflow. Use the
+`speckit-*` skills to drive execution, reading `.specify/memory/constitution.md` as the binding rules:
+```
+speckit-specify  →  speckit-plan  →  speckit-tasks  →  speckit-implement
+```
+Quality gates (load as the task warrants): `speckit-clarify` (de-risk before plan),
+`speckit-analyze` (cross-artifact consistency before implement), `speckit-checklist`.
 
 ### Forge Terminal Project Only (load when AGENTS.md is present)
 These skills are specific to the Forge Terminal codebase. Load them automatically
@@ -53,17 +68,15 @@ when `AGENTS.md` exists — they teach the agent about project-specific systems.
 If a skill is missing, report ⚠️ and continue.
 ```
 invoke skill: forge-vault
-invoke skill: sequential-tasks
 ```
+(The former `sequential-tasks` skill is superseded by `speckit-tasks` in the SDD pipeline.)
 
 ### Enterprise-Only (required in Forge Enterprise / Enterprise mode; optional in Standard)
 Attempt to load these in every project. If the project is in **Standard mode** and
 a skill is not found, mark it ⚠️ and continue — do NOT block the task.
 If the project is in **Enterprise mode** and a skill is not found, mark it ❌ and stop.
 ```
-invoke skill: forge-workflow
 invoke skill: branching-strategy
-invoke skill: code-tutor-workflow
 ```
 
 ### Conditionally Required (invoke when the task warrants it)
@@ -72,6 +85,7 @@ invoke skill: multi-agent             # tasks spanning 3+ files
 invoke skill: testing-standards       # test creation or modification
 invoke skill: pr-workflow             # PR creation or review
 invoke skill: forge-release-process   # release, publish, bump version, create a release
+invoke skill: add-command-card        # create command card, launch POC, add sidebar shortcut
 ```
 
 ---
@@ -89,10 +103,7 @@ reflects the Check 1 result from Phase 0A.
 ├─────────────────────────┼────────────────────────────────────────────┤
 │ code-quality            │ ✅ Loaded                                  │
 │ forge-vault             │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
-│ sequential-tasks        │ ✅ Loaded  /  ⚠️ Not configured (optional)  │
-│ forge-workflow          │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ branching-strategy      │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
-│ code-tutor-workflow     │ ✅ Loaded  /  ⚠️ Not configured (optional) /  ❌ Required but missing │
 │ AGENTS.md               │ ✅ Found   /  ⚠️ Not present (standard mode) │
 ├─────────────────────────┼────────────────────────────────────────────┤
 │ Active mode             │ Forge Enterprise  /  Enterprise  /  Standard │

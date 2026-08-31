@@ -26,6 +26,14 @@ cat ~/.forge/mcp-token
 
 ---
 
+## Forge Vault and Jira metadata
+
+The repo-root `.mcp.json` registers the Forge Vault proxy with a relative path (`mcp-forge-vault/index.js`), which keeps the setup portable across projects opened from this repository.
+
+Forge Vault entries can also carry an associated URL. Use that field for Jira base URLs such as `https://your-org.atlassian.net`, then store the matching credentials as `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_PASSWORD` so agents can discover the project context consistently.
+
+---
+
 ## Available Tools
 
 | Tool | Description |

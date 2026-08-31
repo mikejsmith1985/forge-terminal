@@ -1,0 +1,638 @@
+// Tests for the SDD gate hook: it must accept raw WebSocket strings, store only
+// the gate destined for the active session, and submit the user's decision to
+// the backend, clearing the card on success.
+import { act, renderHook, waitFor } from '@testing-library/react'
+
+import { useSddGate } from './useSddGate'
+
+const ACTIVE_SESSION_ID = 'tab-3-abc123'
+
+const buildGateMessage = (overrides = {}) =>
+  JSON.stringify({
+    type: 'SDD_PHASE_GATE',
+    sessionId: ACTIVE_SESSION_ID,
+    cardId: 'gate-plan-1718402000',
+    phase: 'plan',
+    summary: {
+      headline: 'Plan ready · 3 contracts · 0 open clarifications',
+      producedItems: ['plan.md', 'research.md'],
+      flags: [],
+    },
+    actions: ['approve', 'reject', 'clarify'],
+    ...overrides,
+  })
+
+describe('useSddGate', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('stores the card when a matching SDD_PHASE_GATE message arrives', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    expect(result.current.isCardOpen).toBe(true)
+    expect(result.current.card).toMatchObject({
+      sessionId: ACTIVE_SESSION_ID,
+      cardId: 'gate-plan-1718402000',
+      phase: 'plan',
+    })
+  })
+
+  it('ignores a gate message for a different session', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ sessionId: 'tab-9-other' }))
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+    expect(result.current.card).toBeNull()
+  })
+
+  // ── Worktree collision offer (specs/013 FR-003) ──────────────────────────────
+
+  const buildCollisionMessage = (overrides = {}) =>
+    JSON.stringify({
+      type: 'SDD_WORKTREE_COLLISION',
+      sessionId: ACTIVE_SESSION_ID,
+      repoRoot: 'C:/repo',
+      message: 'This repository already has an active SDD pipeline.',
+      ...overrides,
+    })
+
+  it('shows a collision offer for a matching SDD_WORKTREE_COLLISION message', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildCollisionMessage())
+    })
+
+    expect(result.current.collisionPrompt).toMatchObject({ repoRoot: 'C:/repo' })
+  })
+
+  it('ignores a collision offer for a different session', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildCollisionMessage({ sessionId: 'tab-9-other' }))
+    })
+
+    expect(result.current.collisionPrompt).toBeNull()
+  })
+
+  it('dismissCollision clears the offer with no side effect', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildCollisionMessage())
+    })
+    expect(result.current.collisionPrompt).not.toBeNull()
+
+    act(() => {
+      result.current.dismissCollision()
+    })
+    expect(result.current.collisionPrompt).toBeNull()
+  })
+
+  it('requestWorktree POSTs to /api/sdd/worktree and clears the offer on success', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ isolated: true, worktreePath: 'C:/repo/.forge/worktrees/wt1' }),
+    })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildCollisionMessage())
+    })
+
+    let response
+    await act(async () => {
+      response = await result.current.requestWorktree()
+    })
+
+    const call = fetchSpy.mock.calls.find(([url]) => url === '/api/sdd/worktree')
+    expect(call).toBeTruthy()
+    const [, options] = call
+    expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body)).toEqual({ sessionId: ACTIVE_SESSION_ID })
+    expect(response).toMatchObject({ isolated: true })
+    await waitFor(() => expect(result.current.collisionPrompt).toBeNull())
+  })
+
+  it('ignores non-gate message types', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(JSON.stringify({ type: 'SOMETHING_ELSE' }))
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+    expect(result.current.card).toBeNull()
+  })
+
+  it('ignores malformed JSON without throwing', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage('{not valid json')
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+  })
+
+  it('submits an approve decision with the correct body and clears the card', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+    expect(result.current.isCardOpen).toBe(true)
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+
+    // mount fires two fetches: hook-status check (specs/008) + /api/sdd/status recovery (FR-012); total is 3
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    const decisionCall = fetchSpy.mock.calls.find(([url]) => url === '/api/sdd/decision')
+    const [calledUrl, calledOptions] = decisionCall
+    expect(calledUrl).toBe('/api/sdd/decision')
+    expect(calledOptions.method).toBe('POST')
+    expect(calledOptions.credentials).toBe('same-origin')
+
+    const body = JSON.parse(calledOptions.body)
+    expect(body).toEqual({
+      sessionId: ACTIVE_SESSION_ID,
+      cardId: 'gate-plan-1718402000',
+      phase: 'plan',
+      action: 'approve',
+      clarifyText: null,
+    })
+
+    await waitFor(() => expect(result.current.isCardOpen).toBe(false))
+    expect(result.current.card).toBeNull()
+  })
+
+  it('passes clarifyText through when provided', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    await act(async () => {
+      await result.current.submitDecision('clarify', 'Please clarify the data model')
+    })
+
+    // calls[0] is the mount-time recovery fetch; decision POST is the /api/sdd/decision call
+    const decisionCall = fetchSpy.mock.calls.find(([url]) => url === '/api/sdd/decision')
+    const body = JSON.parse(decisionCall[1].body)
+    expect(body.action).toBe('clarify')
+    expect(body.clarifyText).toBe('Please clarify the data model')
+  })
+
+  it('keeps the card open when the decision request fails', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+
+    expect(result.current.isCardOpen).toBe(true)
+  })
+
+  it('dismiss() clears the card locally with no fetch call', () => {
+    // Provide a stub so the mount-time recovery fetch (FR-012) doesn't hit the network.
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+    expect(result.current.isCardOpen).toBe(true)
+
+    act(() => {
+      result.current.dismiss()
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+    expect(result.current.card).toBeNull()
+    // The decision endpoint must never be called; only the recovery fetch is permitted.
+    const decisionCalls = fetchSpy.mock.calls.filter(([url]) => url === '/api/sdd/decision')
+    expect(decisionCalls).toHaveLength(0)
+  })
+
+  it('on a 500 sets decisionError, keeps the card open, and clears isSubmitting', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+
+    expect(result.current.isCardOpen).toBe(true)
+    expect(result.current.decisionError).toEqual(expect.stringContaining('500'))
+    expect(result.current.isSubmitting).toBe(false)
+  })
+
+  it('clears decisionError and the card on a successful decision', async () => {
+    // First fail to populate decisionError, then succeed.
+    // mockResolvedValueOnce order: (1) hook-status check, (2) mount recovery fetch, (3) first decision → 503, (4) second decision → ok
+    const fetchSpy = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: true })               // hook-status check (specs/008) — best-effort on mount
+      .mockResolvedValueOnce({ ok: false })              // mount-time /api/sdd/status recovery
+      .mockResolvedValueOnce({ ok: false, status: 503 }) // first submitDecision → error
+      .mockResolvedValueOnce({ ok: true })               // second submitDecision → success
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+    expect(result.current.decisionError).not.toBeNull()
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+
+    expect(fetchSpy).toHaveBeenCalledTimes(4) // hook-status + recovery + two decisions
+    await waitFor(() => expect(result.current.isCardOpen).toBe(false))
+    expect(result.current.card).toBeNull()
+    expect(result.current.decisionError).toBeNull()
+  })
+
+  it('clears a prior decisionError when a new SDD_PHASE_GATE arrives', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+
+    await act(async () => {
+      await result.current.submitDecision('approve')
+    })
+    expect(result.current.decisionError).not.toBeNull()
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ cardId: 'gate-plan-next' }))
+    })
+
+    expect(result.current.decisionError).toBeNull()
+    expect(result.current.isCardOpen).toBe(true)
+  })
+})
+
+// ── T002: featureName and phaseSummaries (spec-006) ─────────────────────────
+
+const buildStatusMessage = (overrides = {}) =>
+  JSON.stringify({
+    type: 'SDD_PHASE_STATUS',
+    sessionId: ACTIVE_SESSION_ID,
+    feature: 'demo-feature',
+    phases: [],
+    ...overrides,
+  })
+
+// ── Phase status null-safety (fix/sdd-dashboard-null-phases-crash) ──────────
+
+describe('useSddGate — phaseStatuses null-safety', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('resets phaseStatuses to [] on session switch so stale phases never bleed into a new tab', async () => {
+    const OTHER_SESSION_ID = 'tab-9-other'
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ phases: [{ phase: 'specify', displayStatus: 'complete', order: 1, runCount: 1 }], feature: 'feat-a' }),
+      })
+      .mockResolvedValue({ ok: false })
+
+    const { result, rerender } = renderHook(
+      ({ sid }) => useSddGate({ activeSessionId: sid }),
+      { initialProps: { sid: ACTIVE_SESSION_ID } }
+    )
+
+    await waitFor(() => expect(result.current.phaseStatuses).toHaveLength(1))
+
+    // Switch tabs — phases must reset immediately, not linger from session A.
+    rerender({ sid: OTHER_SESSION_ID })
+    expect(result.current.phaseStatuses).toEqual([])
+  })
+
+  it('updates phaseStatuses from the recovery fetch even when the response is an empty array', async () => {
+    // Old guard `if (data?.phases?.length)` skipped the setter when the array was empty,
+    // leaving stale phases from a previous session visible in the new session.
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ phases: [], feature: '' }),
+      })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    await waitFor(() => expect(Array.isArray(result.current.phaseStatuses)).toBe(true))
+    expect(result.current.phaseStatuses).toEqual([])
+  })
+
+  it('handles a SDD_PHASE_STATUS message with phases:null without crashing', () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(JSON.stringify({
+        type: 'SDD_PHASE_STATUS',
+        sessionId: ACTIVE_SESSION_ID,
+        phases: null,
+        feature: '',
+      }))
+    })
+
+    // The ?? [] fallback converts null to [] so consumers never receive null.
+    expect(result.current.phaseStatuses).toEqual([])
+  })
+})
+
+// ── Tab-switch isolation (Bug 4 root-cause fix) ───────────────────────────────
+
+describe('useSddGate — card isolation on session change', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('clears the card when activeSessionId changes (prevents cross-tab gate bleed)', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+
+    const OTHER_SESSION_ID = 'tab-9-other'
+    const { result, rerender } = renderHook(
+      ({ sid }) => useSddGate({ activeSessionId: sid }),
+      { initialProps: { sid: ACTIVE_SESSION_ID } }
+    )
+
+    // Open a gate on the first session.
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage())
+    })
+    expect(result.current.isCardOpen).toBe(true)
+
+    // Simulate switching to a different tab (session change).
+    rerender({ sid: OTHER_SESSION_ID })
+
+    // Card must be cleared immediately so the new tab starts gate-free.
+    expect(result.current.isCardOpen).toBe(false)
+    expect(result.current.card).toBeNull()
+  })
+})
+
+// ── Card recovery from status endpoint (post-spec-006 bug fix) ───────────────
+
+describe('useSddGate — pendingCard recovery', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('restores an open card when the recovery fetch returns pendingCard', async () => {
+    const pendingCard = {
+      cardId:  'gate-specify-999',
+      sessionId: ACTIVE_SESSION_ID,
+      phase:   'specify',
+      summary: { headline: 'Spec done', producedItems: ['spec.md'], flags: [] },
+      actions: ['approve', 'reject', 'clarify'],
+    }
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false }) // hook-status check (specs/008) — best-effort, result ignored
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ phases: [], feature: '', pendingCard }),
+      })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    await waitFor(() => expect(result.current.isCardOpen).toBe(true))
+    expect(result.current.card).toMatchObject({ phase: 'specify', cardId: 'gate-specify-999' })
+  })
+
+  it('does not restore a card when pendingCard is absent from the recovery fetch', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ phases: [], feature: '' }),
+    })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    // Give the fetch time to resolve.
+    await act(async () => {})
+    expect(result.current.isCardOpen).toBe(false)
+  })
+})
+
+// ── T002: featureName and phaseSummaries (spec-006) ─────────────────────────
+
+describe('useSddGate — featureName (spec-006)', () => {
+  beforeEach(() => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('featureName starts as empty string', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+    expect(result.current.featureName).toBe('')
+  })
+
+  it('featureName updates when SDD_PHASE_STATUS arrives for the active session', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildStatusMessage({ feature: 'auth-refresh' }))
+    })
+
+    expect(result.current.featureName).toBe('auth-refresh')
+  })
+
+  it('featureName is not updated for a different sessionId', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildStatusMessage({ sessionId: 'other-sess', feature: 'other-feature' }))
+    })
+
+    expect(result.current.featureName).toBe('')
+  })
+
+  it('featureName updates on each successive SDD_PHASE_STATUS event', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildStatusMessage({ feature: 'first-feature' }))
+    })
+    expect(result.current.featureName).toBe('first-feature')
+
+    act(() => {
+      result.current.handleWsMessage(buildStatusMessage({ feature: 'second-feature' }))
+    })
+    expect(result.current.featureName).toBe('second-feature')
+  })
+})
+
+describe('useSddGate — phaseSummaries (spec-006)', () => {
+  beforeEach(() => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('phaseSummaries is a ref with an empty object initially', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+    expect(result.current.phaseSummaries).toBeDefined()
+    expect(result.current.phaseSummaries.current).toEqual({})
+  })
+
+  it('phaseSummaries.current[phase] is populated when SDD_PHASE_GATE arrives', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+    const expectedSummary = {
+      headline: 'Plan ready',
+      producedItems: ['plan.md'],
+      flags: [],
+    }
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ phase: 'plan', summary: expectedSummary }))
+    })
+
+    expect(result.current.phaseSummaries.current['plan']).toEqual(expectedSummary)
+  })
+
+  it('phaseSummaries accumulates summaries across multiple gate events', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ phase: 'specify', summary: { headline: 'Spec done', producedItems: ['spec.md'], flags: [] } }))
+    })
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ phase: 'plan', summary: { headline: 'Plan done', producedItems: ['plan.md'], flags: [] } }))
+    })
+
+    expect(result.current.phaseSummaries.current['specify']).toMatchObject({ headline: 'Spec done' })
+    expect(result.current.phaseSummaries.current['plan']).toMatchObject({ headline: 'Plan done' })
+  })
+
+  it('phaseSummaries is not populated for a different sessionId', () => {
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    act(() => {
+      result.current.handleWsMessage(buildGateMessage({ sessionId: 'other-sess', phase: 'plan', summary: { headline: 'Should not store', producedItems: [], flags: [] } }))
+    })
+
+    expect(result.current.phaseSummaries.current['plan']).toBeUndefined()
+  })
+})
+
+// ── fetchPendingGate — demand-pull path (fix: sdd-gate-card-demand-pull) ──────
+// When the developer clicks an awaiting-decision phase cell, the dashboard calls
+// fetchPendingGate() to recover the gate card without waiting for a new WebSocket event.
+
+describe('useSddGate — fetchPendingGate', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('exposes fetchPendingGate as a function', () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false })
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+    expect(typeof result.current.fetchPendingGate).toBe('function')
+  })
+
+  it('sets the card when the status endpoint returns a pendingCard', async () => {
+    const pendingCard = {
+      cardId:    'gate-plan-77',
+      sessionId: ACTIVE_SESSION_ID,
+      phase:     'plan',
+      actions:   ['approve', 'reject', 'clarify'],
+    }
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })         // hook-status (mount)
+      .mockResolvedValueOnce({ ok: false })         // status recovery (mount)
+      .mockResolvedValueOnce({                      // fetchPendingGate call
+        ok: true,
+        json: () => Promise.resolve({ pendingCard }),
+      })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    await act(async () => {
+      await result.current.fetchPendingGate()
+    })
+
+    expect(result.current.isCardOpen).toBe(true)
+    expect(result.current.card).toMatchObject({ phase: 'plan', cardId: 'gate-plan-77' })
+  })
+
+  it('leaves card null when the status endpoint returns no pendingCard', async () => {
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })         // hook-status (mount)
+      .mockResolvedValueOnce({ ok: false })         // status recovery (mount)
+      .mockResolvedValueOnce({                      // fetchPendingGate call
+        ok: true,
+        json: () => Promise.resolve({ phases: [], feature: '' }),
+      })
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    await act(async () => {
+      await result.current.fetchPendingGate()
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+  })
+
+  it('silently does nothing when the fetch throws', async () => {
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false })         // hook-status (mount)
+      .mockResolvedValueOnce({ ok: false })         // status recovery (mount)
+      .mockRejectedValueOnce(new Error('network error')) // fetchPendingGate call
+
+    const { result } = renderHook(() => useSddGate({ activeSessionId: ACTIVE_SESSION_ID }))
+
+    // Should not throw.
+    await act(async () => {
+      await result.current.fetchPendingGate()
+    })
+
+    expect(result.current.isCardOpen).toBe(false)
+  })
+})

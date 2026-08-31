@@ -9,12 +9,12 @@
  *
  * Secret values are NEVER displayed — only metadata (names, env var names, flags).
  *
- * Architecture decision: credentials are stored as two independent VaultEntry
- * records rather than a grouped type. This avoids any backend schema change and
- * keeps the inject logic simple — each env var is still injected individually.
+ * Architecture decision: credentials are still stored as independent VaultEntry
+ * records so injection stays one-env-var-per-entry, but related username/password
+ * entries share bundle metadata and are rendered together as one grouped card.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Lock,
   Plus,
@@ -28,10 +28,60 @@ import {
   CheckCircle,
   AlertCircle,
   KeyRound,
+  Search,
   User,
 } from 'lucide-react'
 import { useVault } from '../hooks/useVault'
+import { buildVaultDisplayItems } from './vaultEntryGrouping'
+import { deriveEnvVarName, describeEnvVarNameAdvisory } from './envVarName'
+import { detectSecretInDescription } from '../utils/secretDetector'
 import './VaultPanel.css'
+
+// EnvVarNameAdvisory renders an inline, non-blocking note when a variable name
+// is not a plain POSIX identifier. Such a name is perfectly usable on Windows
+// and through auto-inject, but POSIX shells cannot export it, so vault scripts
+// substitute the underscore form there — this says so before the surprise, and
+// offers the substitute as a one-click alternative.
+function EnvVarNameAdvisory({ envVarName, onUseSuggestedName }) {
+  const advisory = describeEnvVarNameAdvisory(envVarName)
+  if (!advisory) {
+    return null
+  }
+  return (
+    <div className="vp-description-warning" role="status">
+      <AlertCircle size={13} className="vp-description-warning-icon" />
+      <span>
+        {advisory.message}
+        {advisory.suggestedName && (
+          <button
+            type="button"
+            className="vp-inline-link-btn"
+            onClick={() => onUseSuggestedName(advisory.suggestedName)}
+          >
+            Use {advisory.suggestedName}
+          </button>
+        )}
+      </span>
+    </div>
+  )
+}
+
+// DescriptionSecretWarning renders an inline, non-blocking warning when the given
+// description text appears to contain a secret. It nudges the user to store the
+// value in the encrypted secret field instead of the plaintext description. The
+// authoritative check also runs server-side on save (internal/vault/secretscan.go).
+function DescriptionSecretWarning({ text }) {
+  const { isSuspicious, reason } = detectSecretInDescription(text)
+  if (!isSuspicious) {
+    return null
+  }
+  return (
+    <div className="vp-description-warning" role="alert">
+      <AlertCircle size={13} className="vp-description-warning-icon" />
+      <span>{reason} Store the value in the secret field above, not the description.</span>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -48,19 +98,9 @@ const SECRET_TYPE_API_TOKEN = 'apiToken'
 
 /** Identifies the username + password credential secret type. */
 const SECRET_TYPE_CREDENTIAL = 'credential'
-
-/**
- * Derives an environment variable name from a human-readable secret name.
- * "OpenAI API Key" → "OPENAI_API_KEY"
- *
- * @param {string} secretName - The human-readable name to convert
- * @returns {string} The derived env var name
- */
-const deriveEnvVarName = (secretName) =>
-  secretName
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
+const SORT_MODE_COMMON = 'common'
+const SORT_MODE_ALPHABETICAL = 'alphabetical'
+const SORT_MODE_RECENT = 'recent'
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -81,6 +121,9 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
   const [isValueVisible, setIsValueVisible] = useState(false)
   const [isCopied, setIsCopied]             = useState(false)
   const [isRevealing, setIsRevealing]       = useState(false)
+  // Separate loading state for the copy-without-reveal path so the Reveal
+  // button's spinner is not affected when the user just wants a silent copy.
+  const [isCopyFetching, setIsCopyFetching] = useState(false)
   const autoHideTimerRef = useRef(null)
 
   // Cancel the auto-hide timer on unmount so there are no dangling state updates.
@@ -136,21 +179,43 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
     }
   }, [revealedValue, onReveal, entry.id, startAutoHideTimer])
 
-  /** Writes the revealed value to the clipboard and shows a brief confirmation. */
+  /**
+   * Copies the secret value to the clipboard without requiring the user to
+   * reveal it first. If the value is already in memory (post-reveal), it copies
+   * directly. Otherwise it fetches silently — the value never appears in the UI.
+   */
   const handleCopyClick = useCallback(async (clickEvent) => {
     clickEvent.stopPropagation()
-    if (!revealedValue) return
+
+    // Fast path: value already in memory from a prior reveal.
+    if (revealedValue !== null) {
+      try {
+        await navigator.clipboard.writeText(revealedValue)
+        setIsCopied(true)
+        startAutoHideTimer()
+        setTimeout(() => setIsCopied(false), 2000)
+      } catch (copyErr) {
+        console.error('[Vault] clipboard write failed:', copyErr)
+      }
+      return
+    }
+
+    // Silent fetch path: retrieve the value purely for clipboard — don't
+    // update revealedValue so nothing is displayed in the card.
+    setIsCopyFetching(true)
+    const fetchedValue = await onReveal(entry.id)
+    setIsCopyFetching(false)
+
+    if (fetchedValue === null) return
 
     try {
-      await navigator.clipboard.writeText(revealedValue)
+      await navigator.clipboard.writeText(fetchedValue)
       setIsCopied(true)
-      // Reset auto-hide so the user has the full window after copying
-      startAutoHideTimer()
       setTimeout(() => setIsCopied(false), 2000)
     } catch (copyErr) {
       console.error('[Vault] clipboard write failed:', copyErr)
     }
-  }, [revealedValue, startAutoHideTimer])
+  }, [revealedValue, onReveal, entry.id, startAutoHideTimer])
 
   const handleVisibilityToggle = useCallback((clickEvent) => {
     clickEvent.stopPropagation()
@@ -191,6 +256,20 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
       </div>
 
       <div className="vp-entry-env-var">${entry.envVarName}</div>
+      {entry.url && (
+        <a className="vp-entry-url" href={entry.url} target="_blank" rel="noreferrer" title={entry.url}>
+          {entry.url}
+        </a>
+      )}
+      {entry.descriptionWarning && (
+        <div
+          className="vp-entry-warning"
+          title={`${entry.descriptionWarning} Rotate this credential and remove the secret from its description.`}
+        >
+          <AlertCircle size={12} className="vp-entry-warning-icon" />
+          <span>Possible secret in description — rotate &amp; remove</span>
+        </div>
+      )}
 
       {/* Auto-inject toggle pill */}
       <button
@@ -207,7 +286,10 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
         </span>
       </button>
 
-      {/* Reveal / Copy action row */}
+      {/* Reveal / Copy action row.
+          Copy is always visible so the user can silently copy without ever
+          seeing the value. Reveal is kept for the rare case where the raw
+          value must be inspected. */}
       <div className="vp-entry-reveal-actions">
         <button
           className={`vp-reveal-btn${isRevealed ? ' is-active' : ''}`}
@@ -224,19 +306,20 @@ function VaultEntryCard({ entry, onEdit, onDelete, onToggleAutoInject, onReveal 
           )}
         </button>
 
-        {isRevealed && (
-          <button
-            className={`vp-copy-btn${isCopied ? ' is-copied' : ''}`}
-            onClick={handleCopyClick}
-            aria-label={isCopied ? 'Copied!' : `Copy value for ${entry.secretName}`}
-          >
-            {isCopied ? (
-              <><CheckCircle size={12} /> Copied!</>
-            ) : (
-              <><Copy size={12} /> Copy</>
-            )}
-          </button>
-        )}
+        <button
+          className={`vp-copy-btn${isCopied ? ' is-copied' : ''}`}
+          onClick={handleCopyClick}
+          disabled={isCopyFetching}
+          aria-label={isCopied ? 'Copied!' : `Copy value for ${entry.secretName}`}
+        >
+          {isCopyFetching ? (
+            <span className="vp-spinner">⟳</span>
+          ) : isCopied ? (
+            <><CheckCircle size={12} /> Copied!</>
+          ) : (
+            <><Copy size={12} /> Copy</>
+          )}
+        </button>
       </div>
 
       {/* Revealed value — only rendered while active */}
@@ -279,6 +362,55 @@ function VaultEmptyState() {
       <p className="vp-empty-state-subtext">
         Forge auto-injects them into every new terminal session — your agents never see the raw values.
       </p>
+    </div>
+  )
+}
+
+/**
+ * Groups username/password entries into one visual card while preserving
+ * independent entry actions underneath.
+ */
+function VaultCredentialBundleCard({
+  bundleItem,
+  onEdit,
+  onDelete,
+  onToggleAutoInject,
+  onReveal,
+}) {
+  const bundledEntries = [bundleItem.usernameEntry, bundleItem.passwordEntry].filter(Boolean)
+
+  return (
+    <div className="vp-bundle-card" role="listitem">
+      <div className="vp-bundle-header">
+        <div className="vp-entry-name-row">
+          <User size={14} color="#8b949e" />
+          <span className="vp-entry-name">{bundleItem.title}</span>
+        </div>
+        {bundleItem.url && (
+          <a
+            className="vp-bundle-url"
+            href={bundleItem.url}
+            target="_blank"
+            rel="noreferrer"
+            title={bundleItem.url}
+          >
+            {bundleItem.url}
+          </a>
+        )}
+      </div>
+
+      <div className="vp-bundle-entries">
+        {bundledEntries.map((entry) => (
+          <VaultEntryCard
+            key={entry.id}
+            entry={entry}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onToggleAutoInject={onToggleAutoInject}
+            onReveal={onReveal}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -336,6 +468,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
   const [passwordEnvVar, setPasswordEnvVar]         = useState('')
 
   // Shared fields
+  const [associatedUrl, setAssociatedUrl] = useState('')
   const [description, setDescription]       = useState('')
   const [shouldAutoInject, setShouldAutoInject] = useState(true)
 
@@ -387,6 +520,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
         secretName: secretName.trim(),
         envVarName: envVarName.trim(),
         secretValue,
+        url: associatedUrl.trim(),
         description: description.trim(),
         shouldAutoInject,
       })
@@ -395,18 +529,26 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
       if (!credentialName.trim() || !usernameEnvVar.trim() || !credentialUsername ||
           !passwordEnvVar.trim() || !credentialPassword) return
 
+      const credentialBundleId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
+
       const usernameWasStored = await onSubmit({
         secretName: `${credentialName.trim()} — Username`,
         envVarName: usernameEnvVar.trim(),
         secretValue: credentialUsername,
+        url: associatedUrl.trim(),
         description: description.trim(),
+        bundleId: credentialBundleId,
+        bundleType: 'username',
         shouldAutoInject,
       })
       const passwordWasStored = await onSubmit({
         secretName: `${credentialName.trim()} — Password`,
         envVarName: passwordEnvVar.trim(),
         secretValue: credentialPassword,
+        url: associatedUrl.trim(),
         description: description.trim(),
+        bundleId: credentialBundleId,
+        bundleType: 'password',
         shouldAutoInject,
       })
       wasSuccessful = usernameWasStored && passwordWasStored
@@ -428,6 +570,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
         setCredentialName('')
         setUsernameEnvVar('')
         setPasswordEnvVar('')
+        setAssociatedUrl('')
         setDescription('')
         setShouldAutoInject(true)
         setIsSuccess(false)
@@ -437,7 +580,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
     secretType, secretName, envVarName, secretValue,
     credentialName, credentialUsername, credentialPassword,
     usernameEnvVar, passwordEnvVar,
-    description, shouldAutoInject, onSubmit,
+    associatedUrl, description, shouldAutoInject, onSubmit,
   ])
 
   const isApiTokenSubmittable =
@@ -531,6 +674,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
                 placeholder="OPENAI_API_KEY"
                 autoComplete="off"
               />
+              <EnvVarNameAdvisory envVarName={envVarName} onUseSuggestedName={setEnvVarName} />
             </div>
 
             <div className="vp-form-field">
@@ -644,6 +788,21 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
           </>
         )}
 
+        <div className="vp-form-field">
+          <label className="vp-form-label" htmlFor="vault-associated-url">
+            Associated URL <span>(optional)</span>
+          </label>
+          <input
+            id="vault-associated-url"
+            className="vp-form-input"
+            type="url"
+            value={associatedUrl}
+            onChange={(changeEvent) => setAssociatedUrl(changeEvent.target.value)}
+            placeholder="https://service.example.com/login"
+            autoComplete="off"
+          />
+        </div>
+
         {/* Description — shared by both types */}
         <div className="vp-form-field">
           <label className="vp-form-label" htmlFor="vault-description">
@@ -656,6 +815,7 @@ function AddSecretForm({ isAdding, onSubmit, onCancel }) {
             onChange={(changeEvent) => setDescription(changeEvent.target.value)}
             placeholder="Used for code generation tasks"
           />
+          <DescriptionSecretWarning text={description} />
         </div>
 
         {/* Auto-inject toggle */}
@@ -723,6 +883,7 @@ function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
   const [secretName, setSecretName]   = useState(entryToEdit.secretName)
   const [envVarName, setEnvVarName]   = useState(entryToEdit.envVarName)
   const [secretValue, setSecretValue] = useState('')
+  const [associatedUrl, setAssociatedUrl] = useState(entryToEdit.url || '')
   const [description, setDescription] = useState(entryToEdit.description || '')
   const [isValueVisible, setIsValueVisible] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -741,6 +902,9 @@ function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
     }
     if (secretValue) {
       fieldsToUpdate.secretValue = secretValue
+    }
+    if (associatedUrl.trim() !== (entryToEdit.url || '')) {
+      fieldsToUpdate.url = associatedUrl.trim()
     }
     if (description.trim() !== (entryToEdit.description || '')) {
       fieldsToUpdate.description = description.trim()
@@ -762,7 +926,7 @@ function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
         onCancel()
       }, SUCCESS_DISPLAY_MS)
     }
-  }, [secretName, envVarName, secretValue, description, entryToEdit, onSubmit, onCancel])
+  }, [secretName, envVarName, secretValue, associatedUrl, description, entryToEdit, onSubmit, onCancel])
 
   const isFormSubmittable = secretName.trim() && !isLoading
 
@@ -811,6 +975,7 @@ function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
             onChange={(changeEvent) => setEnvVarName(changeEvent.target.value.toUpperCase())}
             autoComplete="off"
           />
+          <EnvVarNameAdvisory envVarName={envVarName} onUseSuggestedName={setEnvVarName} />
         </div>
 
         <div className="vp-form-field">
@@ -839,6 +1004,21 @@ function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
         </div>
 
         <div className="vp-form-field">
+          <label className="vp-form-label" htmlFor="vault-edit-url">
+            Associated URL <span>(optional)</span>
+          </label>
+          <input
+            id="vault-edit-url"
+            className="vp-form-input"
+            type="url"
+            value={associatedUrl}
+            onChange={(changeEvent) => setAssociatedUrl(changeEvent.target.value)}
+            placeholder="https://service.example.com/login"
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="vp-form-field">
           <label className="vp-form-label" htmlFor="vault-edit-description">
             Description <span>(optional)</span>
           </label>
@@ -849,6 +1029,7 @@ function EditSecretForm({ entryToEdit, isLoading, onSubmit, onCancel }) {
             onChange={(changeEvent) => setDescription(changeEvent.target.value)}
             placeholder="Used for code generation tasks"
           />
+          <DescriptionSecretWarning text={description} />
         </div>
 
         <div className="vp-form-actions">
@@ -913,6 +1094,8 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
   const [isAddFormVisible, setIsAddFormVisible] = useState(false)
   const [entryBeingDeleted, setEntryBeingDeleted] = useState(null)
   const [entryBeingEdited, setEntryBeingEdited] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortMode, setSortMode] = useState(SORT_MODE_COMMON)
 
   // Load data whenever the panel is opened
   useEffect(() => {
@@ -966,6 +1149,10 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
 
   const isVaultSecured = status?.isOpen ?? false
   const entryCount = status?.entryCount ?? entries.length
+  const displayItems = useMemo(
+    () => buildVaultDisplayItems(entries, searchTerm, sortMode),
+    [entries, searchTerm, sortMode]
+  )
 
   // Render nothing when closed — avoids hidden DOM and accidental event capture
   if (!isOpen) return null
@@ -1037,6 +1224,30 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
               ? `${entryCount} secret${entryCount === 1 ? '' : 's'} stored`
               : 'No secrets yet'}
           </span>
+          <div className="vp-toolbar-controls">
+            <label className="vp-search-box" htmlFor="vault-search">
+              <Search size={13} />
+              <input
+                id="vault-search"
+                className="vp-search-input"
+                type="text"
+                value={searchTerm}
+                onChange={(changeEvent) => setSearchTerm(changeEvent.target.value)}
+                placeholder="Search by name, env var, or URL"
+                autoComplete="off"
+              />
+            </label>
+            <select
+              className="vp-sort-select"
+              value={sortMode}
+              onChange={(changeEvent) => setSortMode(changeEvent.target.value)}
+              aria-label="Sort vault entries"
+            >
+              <option value={SORT_MODE_COMMON}>Commonly used</option>
+              <option value={SORT_MODE_ALPHABETICAL}>Alphabetical</option>
+              <option value={SORT_MODE_RECENT}>Recently added</option>
+            </select>
+          </div>
           <button
             className="vp-btn-primary vp-btn-sm"
             onClick={() => setIsAddFormVisible(true)}
@@ -1048,25 +1259,36 @@ export function VaultPanel({ isOpen, onClose, onToast }) {
 
         {/* ── Entry List ──────────────────────────────────────────────────── */}
         <div className="vp-entry-list" role="list" aria-label="Stored secrets">
-          {isLoading && entries.length === 0 && (
+          {isLoading && displayItems.length === 0 && (
             <div className="vp-loading-row">
               <span className="vp-spinner">⟳</span>
               Loading…
             </div>
           )}
 
-          {!isLoading && entries.length === 0 && <VaultEmptyState />}
+          {!isLoading && displayItems.length === 0 && <VaultEmptyState />}
 
-          {entries.map((entry) => (
-            <VaultEntryCard
-              key={entry.id}
-              entry={entry}
-              onEdit={handleEditRequest}
-              onDelete={handleDeleteRequest}
-              onToggleAutoInject={toggleAutoInject}
-              onReveal={revealEntry}
-            />
-          ))}
+          {displayItems.map((displayItem) =>
+            displayItem.type === 'bundle' ? (
+              <VaultCredentialBundleCard
+                key={displayItem.key}
+                bundleItem={displayItem}
+                onEdit={handleEditRequest}
+                onDelete={handleDeleteRequest}
+                onToggleAutoInject={toggleAutoInject}
+                onReveal={revealEntry}
+              />
+            ) : (
+              <VaultEntryCard
+                key={displayItem.entry.id}
+                entry={displayItem.entry}
+                onEdit={handleEditRequest}
+                onDelete={handleDeleteRequest}
+                onToggleAutoInject={toggleAutoInject}
+                onReveal={revealEntry}
+              />
+            )
+          )}
         </div>
 
         {/* ── Add Secret Modal ────────────────────────────────────────────── */}

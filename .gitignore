@@ -5,6 +5,15 @@ bin/
 *.dll
 *.so
 *.dylib
+# Cross-compiled release binaries built into the repo root (extension-less, so
+# the *.exe rule above misses them). These are release artifacts — they belong
+# in bin/ and on the GitHub Release/R2, never committed. Leaving stale copies in
+# the root once caused a release to ship the wrong (old) binary.
+/forge-linux-amd64
+/forge-darwin-amd64
+/forge-darwin-arm64
+/forge-windows-amd64.exe
+/forge
 
 # Windows resource files (generated)
 *.syso
@@ -47,6 +56,10 @@ issue-images/
 
 # Copilot session documentation (temporary)
 docs/sessions/
+
+# Playwright test artefacts (screenshots, traces, results)
+test-results/
+playwright-report/
 
 # Test artifacts
 frontend/test-results/
@@ -97,10 +110,19 @@ RELEASE_SUMMARY_*.md
 CHANGELOG_*.md
 V*.md
 v*.md
+# Re-include shared Claude skill files — the v*.md rule above would otherwise
+# block vault-operations.md and any future skill whose name starts with 'v'.
+!.claude/commands/*.md
 *_RELEASE_*.md
 *_FIX_*.md
 *_VALIDATION*.md
 *_DASHBOARD*.html
+
+# Re-include the entire Spec Kit artifact tree. The customer-facing-doc ignore
+# rules above (V*.md, RELEASE_*.md, *_FIX_*.md, …) are meant for root-level
+# changelogs, but they silently swallowed specs/.../contracts/verification-gates.md.
+# specs/ holds tracked pipeline artifacts and must never be caught by those rules.
+!specs/**
 *-dashboard*.html
 *-validation*.html
 

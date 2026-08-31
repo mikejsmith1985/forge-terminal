@@ -16,6 +16,38 @@ import { API_CONFIG } from '../config'
 // ---------------------------------------------------------------------------
 
 const ERROR_AUTO_CLEAR_MS = 5000
+const API_BASE_STORAGE_KEY = 'forge_api_base'
+
+/**
+ * Reads the vault session token used to authenticate /api/vault/* calls.
+ *
+ * The backend injects the token into the served page as window.__forgeVaultToken
+ * (see injectVaultTokenIntoHTML in cmd/forge/main.go). Every vault route now
+ * requires this token — without it the API returns 401 — so attaching it is what
+ * keeps the legitimate UI working after the auth gate was added. Falls back to the
+ * shared forge-auth-token in localStorage for parity with the other API hooks.
+ *
+ * @returns {string} the token, or '' when none is available
+ */
+const getVaultAuthToken = () => {
+  if (typeof window !== 'undefined' && window.__forgeVaultToken) {
+    return window.__forgeVaultToken
+  }
+  if (typeof localStorage !== 'undefined') {
+    return localStorage.getItem('forge-auth-token') || ''
+  }
+  return ''
+}
+
+const getVaultApiBaseCandidates = () => {
+  const configuredBase = API_CONFIG.base
+  const sameOriginBase = typeof window !== 'undefined' ? window.location.origin : configuredBase
+
+  if (sameOriginBase && sameOriginBase !== configuredBase) {
+    return [configuredBase, sameOriginBase]
+  }
+  return [configuredBase]
+}
 
 // ---------------------------------------------------------------------------
 // Fetch helper
@@ -31,27 +63,63 @@ const ERROR_AUTO_CLEAR_MS = 5000
  * @returns {Promise<any>} Parsed JSON response body
  */
 const vaultFetch = async (path, options = {}) => {
-  const baseUrl = API_CONFIG.base
-
   const requestHeaders = {
     'Content-Type': 'application/json',
     ...options.headers,
   }
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers: requestHeaders,
-  })
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => '')
-    throw new Error(errorBody || `Vault API error: ${response.status} ${response.statusText}`)
+  // Attach the vault session token so the request passes the auth gate. The
+  // secret-exposing routes (reveal/inject) accept the token ONLY via this header,
+  // never a cookie, which is what makes them immune to CSRF.
+  const vaultAuthToken = getVaultAuthToken()
+  if (vaultAuthToken && !requestHeaders.Authorization) {
+    requestHeaders.Authorization = `Bearer ${vaultAuthToken}`
   }
 
-  // DELETE and some POSTs return 204 No Content
-  if (response.status === 204) return null
+  const candidateBases = getVaultApiBaseCandidates()
+  const attemptedEndpoints = []
+  let latestError = null
 
-  return response.json()
+  for (const candidateBase of candidateBases) {
+    const endpointUrl = `${candidateBase}${path}`
+    attemptedEndpoints.push(endpointUrl)
+
+    try {
+      const response = await fetch(endpointUrl, {
+        ...options,
+        headers: requestHeaders,
+      })
+
+      if (!response.ok) {
+        // If the configured base does not expose Vault routes, try same-origin fallback.
+        const hasWindowObject = typeof window !== 'undefined'
+        if (response.status === 404 && hasWindowObject && candidateBase !== window.location.origin) {
+          continue
+        }
+
+        const errorBody = await response.text().catch(() => '')
+        throw new Error(errorBody || `Vault API error: ${response.status} ${response.statusText}`)
+      }
+
+      if (typeof window !== 'undefined' && candidateBase === window.location.origin) {
+        const storedBase = localStorage.getItem(API_BASE_STORAGE_KEY)
+        if (storedBase !== candidateBase) {
+          localStorage.setItem(API_BASE_STORAGE_KEY, candidateBase)
+        }
+      }
+
+      // DELETE and some POSTs return 204 No Content
+      if (response.status === 204) return null
+
+      return response.json()
+    } catch (fetchError) {
+      latestError = fetchError
+    }
+  }
+
+  throw new Error(
+    `Vault API unreachable at ${attemptedEndpoints.join(' or ')}${latestError?.message ? ` — ${latestError.message}` : ''}`
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +226,7 @@ export function useVault() {
    * Stores a new secret in the vault.
    * The secret value is sent once and never returned by subsequent API calls.
    *
-   * @param {{ secretName: string, envVarName: string, secretValue: string, description?: string, shouldAutoInject: boolean }} request
+   * @param {{ secretName: string, envVarName: string, secretValue: string, url?: string, description?: string, bundleId?: string, bundleType?: string, shouldAutoInject: boolean }} request
    * @returns {Promise<boolean>} True if the entry was created successfully
    */
   const addEntry = useCallback(async (request) => {
@@ -198,7 +266,7 @@ export function useVault() {
    * Updates local state optimistically for instant UI feedback.
    *
    * @param {string} entryId - The ID of the entry to update
-   * @param {{ secretName?: string, envVarName?: string, secretValue?: string, description?: string }} fieldsToUpdate
+   * @param {{ secretName?: string, envVarName?: string, secretValue?: string, url?: string, description?: string }} fieldsToUpdate
    * @returns {Promise<boolean>} True if the update was applied successfully
    */
   const updateEntry = useCallback(async (entryId, fieldsToUpdate) => {

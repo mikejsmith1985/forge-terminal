@@ -1,6 +1,7 @@
+// MonacoEditor — file viewer and editor rendered inside Forge Terminal's file panel.
 import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
-import { Save, X, Play } from 'lucide-react';
+import { Save, X, Play, Copy, Check } from 'lucide-react';
 import { useAPI } from '../hooks/useAPI';
 import './MonacoEditor.css';
 
@@ -19,6 +20,7 @@ export default function MonacoEditor({
   const [loading, setLoading] = useState(true);
   const [modified, setModified] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isPathCopied, setIsPathCopied] = useState(false);
   const editorRef = useRef(null);
 
   useEffect(() => {
@@ -115,6 +117,17 @@ export default function MonacoEditor({
     }
   };
   
+  const handleCopyFilePath = async () => {
+    if (!file?.path) return;
+    try {
+      await navigator.clipboard.writeText(file.path);
+      setIsPathCopied(true);
+      setTimeout(() => setIsPathCopied(false), 2000);
+    } catch (err) {
+      console.error('[MonacoEditor] Failed to copy file path:', err);
+    }
+  };
+
   const handleClose = () => {
     if (modified) {
       if (confirm('You have unsaved changes. Close anyway?')) {
@@ -168,6 +181,15 @@ export default function MonacoEditor({
             </button>
           )}
           
+          <button
+            className="monaco-toolbar-btn"
+            onClick={handleCopyFilePath}
+            title={file?.path ? `Copy path: ${file.path}` : 'Copy file path'}
+          >
+            {isPathCopied ? <Check size={16} /> : <Copy size={16} />}
+            {isPathCopied ? 'Copied!' : 'Copy Path'}
+          </button>
+
           <button
             className="monaco-toolbar-btn"
             onClick={handleSave}

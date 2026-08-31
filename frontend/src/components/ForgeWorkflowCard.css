@@ -194,6 +194,44 @@
   box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
 }
 
+/* Global constitution install — full-width, distinct teal accent so it reads as
+   a machine-wide action separate from the project-scoped buttons below it. */
+.fwc-btn-global {
+  width: 100%;
+  justify-content: center;
+  background: rgba(20, 184, 166, 0.14);
+  color: #5eead4;
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  margin-bottom: 12px;
+}
+.fwc-btn-global:hover { background: rgba(20, 184, 166, 0.22); }
+.fwc-btn-global:disabled { opacity: 0.6; cursor: default; }
+
+/* In-app confirmation panel for the global install (replaces window.confirm). */
+.fwc-confirm {
+  background: rgba(20, 184, 166, 0.08);
+  border: 1px solid rgba(20, 184, 166, 0.3);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+.fwc-confirm-message {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  opacity: 0.9;
+}
+.fwc-confirm-message code {
+  font-size: 11px;
+  opacity: 0.9;
+}
+.fwc-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+.fwc-confirm-actions .fwc-btn { flex: 1; justify-content: center; }
+
 /* ─── Unconfigured State ──────────────────────────────────────────────────── */
 
 .fwc-unconfigured-body {

@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-const mobileGracePeriod = 30 * time.Minute
+// Phone browsers kill background tabs aggressively, so a mobile client is even
+// more likely to vanish without meaning to. It gets the same full-day retention
+// as the desktop — see sessionGracePeriod for the reasoning.
+const mobileGracePeriod = sessionGracePeriod
 
 // IsMobileClient checks if the User-Agent indicates a mobile device.
 // Detects iOS (iPhone, iPad, iPod) and Android phones (UA contains "Mobile").

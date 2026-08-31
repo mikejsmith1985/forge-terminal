@@ -26,7 +26,7 @@
 
 .vault-panel {
   width: 100%;
-  max-width: 480px;
+  max-width: 840px;
   max-height: 85vh;
   background: #0d1117;
   border: 1px solid rgba(48, 54, 61, 1);
@@ -183,6 +183,48 @@
   letter-spacing: 0.05em;
 }
 
+.vp-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.vp-search-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 220px;
+  padding: 6px 8px;
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 1);
+  border-radius: 8px;
+  color: #8b949e;
+}
+
+.vp-search-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #e6edf3;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.vp-search-input::placeholder {
+  color: rgba(139, 148, 158, 0.55);
+}
+
+.vp-sort-select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(48, 54, 61, 1);
+  background: #161b22;
+  color: #e6edf3;
+  font-size: 0.78rem;
+}
+
 /* ─── Entry List ──────────────────────────────────────────────────────────── */
 
 .vp-entry-list {
@@ -294,6 +336,54 @@
   font-size: 0.72rem;
   color: #39d353;
   margin-top: 1px;
+}
+
+.vp-entry-url {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 0.68rem;
+  color: #58a6ff;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.vp-entry-url:hover {
+  text-decoration: underline;
+}
+
+.vp-bundle-card {
+  background: rgba(88, 166, 255, 0.04);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.vp-bundle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.vp-bundle-url {
+  font-size: 0.68rem;
+  color: #58a6ff;
+  text-decoration: none;
+  max-width: 50%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vp-bundle-url:hover {
+  text-decoration: underline;
+}
+
+.vp-bundle-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .vp-entry-card-actions {
@@ -1392,6 +1482,63 @@
   letter-spacing: 0;
   color: #8b949e;
   opacity: 0.7;
+}
+
+/* ── Secret-in-description warnings ──────────────────────────────────────────
+   Amber, non-blocking advisories shown when a description looks like it holds a
+   secret: inline beneath the form textarea, and as a badge on existing entries. */
+.vp-description-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 7px 9px;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: #f0c674;
+  background: rgba(187, 128, 9, 0.12);
+  border: 1px solid rgba(187, 128, 9, 0.35);
+  border-radius: 6px;
+}
+
+.vp-description-warning-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #f0c674;
+}
+
+/* Inline "apply this suggestion" action inside an advisory line — reads as a
+   link so it never competes with the form's real submit button. */
+.vp-inline-link-btn {
+  margin-left: 6px;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #f0c674;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.vp-inline-link-btn:hover {
+  color: #ffd98a;
+}
+
+.vp-entry-warning {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #f0c674;
+  cursor: help;
+}
+
+.vp-entry-warning-icon {
+  flex-shrink: 0;
+  color: #f0c674;
 }
 
 .vp-form-input {

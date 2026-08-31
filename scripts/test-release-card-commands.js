@@ -12,9 +12,9 @@ function generateReleaseCommand(next, shellType) {
   if (!next) return '';
   
   if (shellType === 'powershell') {
-    return `$b = git branch --show-current; git add -A; if ($?) { git commit -m 'Release ${next}' --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host 'Tag ${next} pushed! GitHub Actions will build.' -ForegroundColor Green } } } } } } } } }`;
+    return `$b = git branch --show-current; git add -A; if ($?) { git commit -m 'chore: release ${next}' --allow-empty; if ($?) { git push origin $b; if ($?) { git checkout main; if ($?) { git pull origin main; if ($?) { git merge $b --no-edit; if ($?) { git push origin main; if ($?) { git push origin :refs/tags/${next} 2>$null; git tag -d ${next} 2>$null; git tag ${next}; if ($?) { git push origin ${next}; if ($?) { git checkout $b; Write-Host 'Release ${next} published on GitHub.' -ForegroundColor Green } } } } } } } } }`;
   } else {
-    return `b=$(git branch --show-current) && git add -A && git commit -m 'Release ${next}' --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "Tag ${next} pushed! GitHub Actions will build."`;
+    return `b=$(git branch --show-current) && git add -A && git commit -m 'chore: release ${next}' --allow-empty && git push origin $b && git checkout main && git pull origin main && git merge $b --no-edit && git push origin main && git push origin :refs/tags/${next} 2>/dev/null; git tag -d ${next} 2>/dev/null; git tag ${next} && git push origin ${next} && git checkout $b && echo "Release ${next} published on GitHub."`;
   }
 }
 
@@ -101,12 +101,12 @@ console.log(`📊 Results: ${passed} passed, ${failed} failed`);
 console.log(`${'='.repeat(60)}\n`);
 
 if (failed === 0) {
-  console.log('✅ Release card commands properly handle re-releases!\n');
+  console.log('✅ Release card commands properly handle local GitHub releases!\n');
   console.log('🎯 How it works:');
   console.log('  1. Delete remote tag (if exists) - silent fail OK');
   console.log('  2. Delete local tag (if exists) - silent fail OK');
   console.log('  3. Create fresh local tag');
-  console.log('  4. Push tag to trigger workflow\n');
+  console.log('  4. Push tag and publish the GitHub Release locally\n');
   console.log('👉 Just click Execute on the release card - it handles everything!\n');
   process.exit(0);
 } else {

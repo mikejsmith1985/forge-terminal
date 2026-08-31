@@ -1,0 +1,653 @@
+/* SddDashboard — unified SDD pipeline surface, always visible below the terminal.
+   Replaces SddPipelinePanel (collapsible bar) and PhaseDecisionCard (floating drawer).
+   specs/006-sdd-pipeline-dashboard. */
+
+/* ── Spin keyframe shared by active (blue) and iterating (amber) cells ──────── */
+@keyframes sdd-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ── Root container ────────────────────────────────────────────────────────────
+   flex-shrink: 0 so the terminal pane gives this space and never squeezes it. */
+.sdd-dashboard {
+  flex-shrink: 0;
+  width: 100%;
+  border-top: 1px solid #2a2a2a;
+  background: #0e0e0e;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8em;
+}
+
+/* ── Header row — feature name and pipeline-level badge ───────────────────── */
+.sdd-dashboard__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 0 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.sdd-dashboard__feature-name {
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sdd-dashboard__badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sdd-dashboard__badge--idle     { background: #1e1e1e; color: #6b7280; }
+.sdd-dashboard__badge--running  { background: #1e3a5f; color: #60a5fa; }
+.sdd-dashboard__badge--awaiting { background: #451a03; color: #fbbf24; }
+.sdd-dashboard__badge--rejected { background: #451a03; color: #fbbf24; }
+.sdd-dashboard__badge--complete { background: #052e16; color: #22c55e; }
+
+/* ── Rail wrapper — relative so the detail strip can float above it ────────── */
+.sdd-dashboard__rail-wrapper {
+  position: relative;
+  flex: 1;
+  /* min-height prevents the rail from collapsing to 0 in a flex-column parent
+     that has no explicit height (flex:1 on an unconstrained parent = 0px). */
+  min-height: 44px;
+}
+
+/* ── Phase rail — horizontal flex row of phase cells ──────────────────────── */
+.sdd-dashboard__rail {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  padding: 4px 10px;
+  height: 100%;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+
+/* Idle row shown when phases array is empty */
+.sdd-dashboard__idle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 0.9em;
+  padding: 4px 0;
+}
+
+/* ── Phase cell ───────────────────────────────────────────────────────────── */
+.sdd-dashboard__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 4px;
+  gap: 1px;
+  transition: background-color 200ms ease, color 200ms ease;
+  background: #141414;
+  position: relative;
+}
+
+.sdd-dashboard__cell--clickable {
+  cursor: pointer;
+}
+
+.sdd-dashboard__cell--clickable:hover {
+  background: #1e1e1e;
+}
+
+.sdd-dashboard__cell--selected {
+  background: #1e2a1e;
+  box-shadow: 0 0 0 1px #22c55e44;
+}
+
+/* ── Cell icon — status glyph, animated for active/iterating ─────────────── */
+.sdd-dashboard__cell-icon {
+  font-family: var(--font-mono, monospace);
+  font-size: 1em;
+  line-height: 1;
+  width: 14px;
+  text-align: center;
+}
+
+.sdd-dashboard__cell--pending     .sdd-dashboard__cell-icon { color: #666; }
+.sdd-dashboard__cell--active      .sdd-dashboard__cell-icon { color: #60a5fa; animation: sdd-spin 0.8s linear infinite; }
+.sdd-dashboard__cell--awaiting-decision .sdd-dashboard__cell-icon { color: #fbbf24; }
+.sdd-dashboard__cell--iterating   .sdd-dashboard__cell-icon { color: #f59e0b; animation: sdd-spin 0.8s linear infinite; }
+.sdd-dashboard__cell--rejected    .sdd-dashboard__cell-icon { color: #f59e0b; }
+.sdd-dashboard__cell--complete    .sdd-dashboard__cell-icon { color: #22c55e; }
+.sdd-dashboard__cell--unknown     .sdd-dashboard__cell-icon { color: #6b7280; }
+
+/* ── Cell name and status label ──────────────────────────────────────────── */
+.sdd-dashboard__cell-name {
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: capitalize;
+  color: #c8c8c8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
+}
+
+.sdd-dashboard__cell-status {
+  font-size: 0.7em;
+  color: #5a5a5a;
+  white-space: nowrap;
+}
+
+.sdd-dashboard__cell--awaiting-decision .sdd-dashboard__cell-name { color: #fde68a; }
+.sdd-dashboard__cell--iterating         .sdd-dashboard__cell-name { color: #fde68a; }
+.sdd-dashboard__cell--rejected          .sdd-dashboard__cell-name { color: #fde68a; }
+.sdd-dashboard__cell--complete          .sdd-dashboard__cell-name { color: #86efac; }
+
+/* ── ×N run-count badge ───────────────────────────────────────────────────── */
+.sdd-dashboard__cell-badge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.65em;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* ── Chevron indicator for expandable complete cells ─────────────────────── */
+.sdd-dashboard__cell-chevron {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  color: #22c55e66;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Phase detail strip — floats above the rail, no layout reflow ───────────
+   position: absolute; bottom: 100% means it rises above the rail-wrapper
+   without pushing the terminal upward.                                        */
+.sdd-dashboard__detail-strip {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  padding: 8px 10px;
+  z-index: 10;
+}
+
+.sdd-dashboard__detail-headline {
+  margin: 0 0 5px;
+  font-size: 0.82em;
+  font-weight: 600;
+  color: #d0d0d0;
+}
+
+.sdd-dashboard__detail-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.sdd-dashboard__detail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  font-size: 0.75em;
+  color: #a0a0a0;
+  font-family: var(--font-mono, monospace);
+}
+
+.sdd-dashboard__detail-empty {
+  font-size: 0.75em;
+  color: #4a4a4a;
+}
+
+.sdd-dashboard__detail-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.sdd-dashboard__detail-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.72em;
+  font-weight: 600;
+}
+
+.sdd-dashboard__detail-flag--info  { background: #1e3a5f; color: #60a5fa; }
+.sdd-dashboard__detail-flag--warn  { background: #451a03; color: #fbbf24; }
+.sdd-dashboard__detail-flag--block { background: #3b0a0a; color: #f87171; }
+
+.sdd-dashboard__detail-no-flags {
+  font-size: 0.72em;
+  color: #3a3a3a;
+}
+
+.sdd-dashboard__detail-artifact-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.78em;
+  color: #60a5fa;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sdd-dashboard__detail-artifact-link:hover {
+  color: #93c5fd;
+}
+
+/* ── Action prompt strip (from ActionPromptStrip component) ──────────────── */
+/* ActionPromptStrip has its own CSS; the dashboard just provides the slot.   */
+
+/* ── Decision bar — shown only when isCardOpen ───────────────────────────── */
+.sdd-dashboard__decision-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 10px;
+  border-top: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+
+.sdd-dashboard__decision-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76em;
+  color: #f87171;
+}
+
+.sdd-dashboard__decision-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sdd-dashboard__decision-submitting {
+  font-size: 0.78em;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.sdd-dashboard__decision-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 0.8em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.sdd-dashboard__decision-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sdd-dashboard__decision-btn--approve {
+  background: #052e16;
+  color: #22c55e;
+  border-color: #166534;
+}
+.sdd-dashboard__decision-btn--approve:not(:disabled):hover {
+  background: #14532d;
+}
+
+.sdd-dashboard__decision-btn--reject {
+  background: #3b0a0a;
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+.sdd-dashboard__decision-btn--reject:not(:disabled):hover {
+  background: #7f1d1d;
+}
+
+.sdd-dashboard__decision-btn--clarify {
+  background: #1e1e2e;
+  color: #a78bfa;
+  border-color: #4c1d95;
+}
+.sdd-dashboard__decision-btn--clarify:not(:disabled):hover {
+  background: #2d1d5f;
+}
+
+/* ── Clarify modal (native <dialog>) ─────────────────────────────────────── */
+.sdd-dashboard__clarify-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  background: #111;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 16px;
+  width: 380px;
+  max-width: 90vw;
+  color: #d0d0d0;
+  z-index: 1000;
+}
+
+.sdd-dashboard__clarify-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.sdd-dashboard__clarify-prompt {
+  margin: 0 0 10px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #c0c0c0;
+}
+
+.sdd-dashboard__clarify-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0e0e0e;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  color: #d0d0d0;
+  font-size: 0.82em;
+  font-family: var(--font-mono, monospace);
+  padding: 8px;
+  resize: vertical;
+  min-height: 72px;
+  margin-bottom: 10px;
+  outline: none;
+}
+
+.sdd-dashboard__clarify-input:focus {
+  border-color: #60a5fa;
+}
+
+.sdd-dashboard__clarify-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sdd-dashboard__clarify-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 0.8em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sdd-dashboard__clarify-btn--cancel {
+  background: #1e1e1e;
+  color: #8a8a8a;
+  border-color: #3a3a3a;
+}
+.sdd-dashboard__clarify-btn--cancel:hover {
+  background: #2a2a2a;
+}
+
+.sdd-dashboard__clarify-btn--confirm {
+  background: #1e1e2e;
+  color: #a78bfa;
+  border-color: #4c1d95;
+}
+.sdd-dashboard__clarify-btn--confirm:not(:disabled):hover {
+  background: #2d1d5f;
+}
+.sdd-dashboard__clarify-btn--confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Hook install banner (specs/008-sdd-real-enforcement FR-003) ─────────── */
+.sdd-dashboard__hook-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(234, 179, 8, 0.10);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.30);
+  font-size: 11px;
+  color: #fbbf24;
+}
+.sdd-dashboard__hook-banner-icon {
+  flex-shrink: 0;
+  color: #f59e0b;
+}
+.sdd-dashboard__hook-banner-text {
+  flex: 1;
+  line-height: 1.4;
+}
+.sdd-dashboard__hook-banner-cmd {
+  font-family: monospace;
+  background: rgba(0,0,0,0.25);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.sdd-dashboard__hook-banner-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid rgba(234, 179, 8, 0.40);
+  color: #fbbf24;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sdd-dashboard__hook-banner-btn:hover {
+  background: rgba(234, 179, 8, 0.15);
+}
+.sdd-dashboard__hook-banner-btn--dismiss {
+  padding: 2px 6px;
+  border-color: transparent;
+}
+
+/* ── Phase report card (specs/010 US3): concise, scannable gate surface ───────── */
+.sdd-dashboard__report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  margin: 4px 0;
+  background: rgba(96, 165, 250, 0.06);
+  border: 1px solid rgba(96, 165, 250, 0.20);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.sdd-dashboard__report-scope {
+  margin: 0;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+.sdd-dashboard__report-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sdd-dashboard__report-group-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.sdd-dashboard__report-files,
+.sdd-dashboard__report-decisions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sdd-dashboard__report-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #94a3b8;
+}
+.sdd-dashboard__report-file-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+.sdd-dashboard__report-file-stat {
+  flex-shrink: 0;
+  font-family: monospace;
+  color: #22c55e;
+}
+.sdd-dashboard__report-more {
+  color: #64748b;
+  font-style: italic;
+}
+.sdd-dashboard__report-decision {
+  position: relative;
+  padding-left: 12px;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+.sdd-dashboard__report-decision::before {
+  content: '•';
+  position: absolute;
+  left: 2px;
+  color: #60a5fa;
+}
+.sdd-dashboard__report-full-output {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  color: #60a5fa;
+  font-size: 11px;
+  cursor: pointer;
+}
+.sdd-dashboard__report-full-output:hover {
+  text-decoration: underline;
+}
+
+/* Worktree binding indicator (specs/011, FR-007): a quiet chip in the header showing
+   which isolated worktree/branch this tab runs in. Absent on the main checkout. */
+.sdd-dashboard__worktree {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(96, 165, 250, 0.12);
+  color: #93c5fd;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+/* Per-tab "Isolate this tab" control (specs/013 US3, FR-007): the proactive, explicit opt-in to
+   an isolated worktree. Shown only when the tab is on the main checkout (never when isolated). */
+.sdd-dashboard__isolate-btn {
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  border-radius: 10px;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sdd-dashboard__isolate-btn:hover {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+/* Collision offer (specs/013 FR-003): a tab bound to a repo with another ACTIVE pipeline is
+   OFFERED isolation. Confirm provisions; Stay shared dismisses with no side effects. */
+.sdd-dashboard__collision {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.10);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+  font-size: 12px;
+}
+.sdd-dashboard__collision-text { flex: 1; }
+.sdd-dashboard__collision-btn {
+  padding: 2px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.sdd-dashboard__collision-btn--confirm { background: #1e3a5f; color: #93c5fd; }
+.sdd-dashboard__collision-btn--dismiss { background: #1e1e1e; color: #9ca3af; }
+.sdd-dashboard__collision-btn:hover { filter: brightness(1.2); }
+
+/* Verification verdict chip (specs/012 US4): the honest-failure surface. A blocked phase
+   shows WHY (TDD / Playwright UX evidence missing); a bypass and an exemption are shown so
+   neither is silent. A plain pass renders nothing. */
+.sdd-dashboard__verification {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.sdd-dashboard__verification-icon { flex: 0 0 auto; }
+.sdd-dashboard__verification-text { overflow-wrap: anywhere; }
+.sdd-dashboard__verification--block {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+.sdd-dashboard__verification--bypass {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fcd34d;
+}
+.sdd-dashboard__verification--exempt {
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+}

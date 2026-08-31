@@ -38,6 +38,15 @@ func scaffoldManifest() []scaffoldEntry {
 			category: "config",
 			render:   RenderClaudeMD,
 		},
+		// Project Constitution — the GitHub Spec Kit (Spec-Driven Development)
+		// source of truth, read first by every speckit stage. Emitted natively so
+		// new projects get Forge's merged rules without per-repo reconstruction.
+		{
+			moduleID: ModuleConstitution,
+			relPath:  filepath.Join(".specify", "memory", "constitution.md"),
+			category: "config",
+			render:   RenderConstitution,
+		},
 		// Workflow config
 		{
 			moduleID: ModuleCopilotInstructions, // Tied to core module
@@ -81,12 +90,6 @@ func scaffoldManifest() []scaffoldEntry {
 			relPath:  filepath.Join(".github", "skills", "multi-agent", "SKILL.md"),
 			category: "skill",
 			render:   func(c WorkflowConfig) (string, error) { return RenderSkill(ModuleMultiAgent, c) },
-		},
-		{
-// ModuleCodeTutor entry removed — Code Tutor fully disabled
-			relPath:  filepath.Join(".github", "skills", "code-tutor-workflow", "SKILL.md"),
-			category: "skill",
-		
 		},
 		{
 			moduleID: ModuleWorkflowEnforcer,
@@ -303,6 +306,36 @@ func ScaffoldProject(projectPath string, config WorkflowConfig) (*ScaffoldResult
 		} else {
 			result.FilesCreated = append(result.FilesCreated, entry.relPath)
 			log.Printf("[Workflow] Created: %s", entry.relPath)
+		}
+	}
+
+	// Replay the embedded Spec Kit pipeline (.specify/ payload + speckit-* skills)
+	// so the project can run Spec-Driven Development offline. Done outside the
+	// manifest loop because it writes a whole embedded directory tree rather than
+	// a single rendered file. The constitution is excluded from the payload — the
+	// manifest's RenderConstitution owns .specify/memory/constitution.md.
+	if config.HasModule(ModuleSpecKit) {
+		specKitPaths, specKitErr := ScaffoldSpecKit(absolutePath, config.ConflictStrategy)
+		if specKitErr != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("speckit pipeline: %s", specKitErr))
+			result.Success = false
+		} else {
+			result.FilesCreated = append(result.FilesCreated, specKitPaths...)
+			log.Printf("[Workflow] Spec Kit pipeline: %d files written", len(specKitPaths))
+		}
+
+		// Project the pipeline onto the other tools' skill surfaces so SDD is
+		// runnable cross-tool, not just under Claude. ScaffoldSpecKit above already
+		// wrote Claude's .claude/skills/ via the embedded payload mapping, so only
+		// the additional tools are projected here. (Google's instruction-based
+		// surface is added in a later increment.)
+		copilotPaths, copilotErr := ProjectSpecKitForTool(absolutePath, "copilot", config.ConflictStrategy)
+		if copilotErr != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("speckit copilot projection: %s", copilotErr))
+			result.Success = false
+		} else {
+			result.FilesCreated = append(result.FilesCreated, copilotPaths...)
+			log.Printf("[Workflow] Spec Kit Copilot projection: %d files written", len(copilotPaths))
 		}
 	}
 

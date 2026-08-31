@@ -2,8 +2,8 @@
 //
 // The Vault API intentionally never returns secret values in any response body.
 // Values are only used server-side for two purposes:
-//   1. Building the environment for new PTY sessions (auto-inject, transparent).
-//   2. Writing a short-lived temp script that the frontend sources in the terminal.
+//  1. Building the environment for new PTY sessions (auto-inject, transparent).
+//  2. Writing a short-lived temp script that the frontend sources in the terminal.
 //
 // All endpoints operate on the application-wide vault singleton (activeVault).
 // Callers must have already initialised the vault via initVault() in main.go.
@@ -11,8 +11,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -56,6 +58,9 @@ func handleVaultStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !requireVaultAuth(w, r) {
+		return
+	}
 	if !requireVault(w) {
 		return
 	}
@@ -72,6 +77,9 @@ func handleVaultStatus(w http.ResponseWriter, r *http.Request) {
 func handleVaultListEntries(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuth(w, r) {
 		return
 	}
 	if !requireVault(w) {
@@ -96,6 +104,9 @@ func handleVaultAddEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !requireVaultAuth(w, r) {
+		return
+	}
 	if !requireVault(w) {
 		return
 	}
@@ -112,8 +123,18 @@ func handleVaultAddEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "secretName, envVarName, and secretValue are required", http.StatusBadRequest)
 		return
 	}
+
+	normalizedURL, urlErr := normalizeOptionalURL(addRequest.URL)
+	if urlErr != nil {
+		http.Error(w, urlErr.Error(), http.StatusBadRequest)
+		return
+	}
+
 	addRequest.SecretName = trimmedSecretName
 	addRequest.EnvVarName = trimmedEnvVarName
+	addRequest.URL = normalizedURL
+	addRequest.BundleID = strings.TrimSpace(addRequest.BundleID)
+	addRequest.BundleType = strings.TrimSpace(addRequest.BundleType)
 
 	createdEntry, addErr := activeVault.AddEntry(addRequest)
 	if addErr != nil {
@@ -138,6 +159,9 @@ func handleVaultUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !requireVaultAuth(w, r) {
+		return
+	}
 	if !requireVault(w) {
 		return
 	}
@@ -153,18 +177,8 @@ func handleVaultUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Trim whitespace from name fields while preserving empty-means-no-change semantics.
-	updateRequest.SecretName = strings.TrimSpace(updateRequest.SecretName)
-	updateRequest.EnvVarName = strings.TrimSpace(updateRequest.EnvVarName)
-	updateRequest.Description = strings.TrimSpace(updateRequest.Description)
-
-	// Require at least one field to actually update.
-	hasNoFieldsToUpdate := updateRequest.SecretName == "" &&
-		updateRequest.EnvVarName == "" &&
-		updateRequest.SecretValue == "" &&
-		updateRequest.Description == ""
-	if hasNoFieldsToUpdate {
-		http.Error(w, "at least one field (secretName, envVarName, secretValue, description) must be provided", http.StatusBadRequest)
+	if normalizeErr := normalizeUpdateRequest(&updateRequest); normalizeErr != nil {
+		http.Error(w, normalizeErr.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -193,6 +207,9 @@ func handleVaultDeleteEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !requireVaultAuth(w, r) {
+		return
+	}
 	if !requireVault(w) {
 		return
 	}
@@ -219,6 +236,9 @@ func handleVaultDeleteEntry(w http.ResponseWriter, r *http.Request) {
 func handleVaultToggleAutoInject(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuth(w, r) {
 		return
 	}
 	if !requireVault(w) {
@@ -255,6 +275,9 @@ func handleVaultToggleAutoInject(w http.ResponseWriter, r *http.Request) {
 func handleVaultInject(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuthBearerOnly(w, r) {
 		return
 	}
 	if !requireVault(w) {
@@ -309,6 +332,65 @@ func scheduleScriptCleanup(scriptPath string) {
 	os.Remove(scriptPath)
 }
 
+// normalizeUpdateRequest trims a vault update request's fields in place, enforces
+// that at least one updatable field is present, and validates the URL when one is
+// being set. The pointer fields (URL, Description) keep their tri-state meaning:
+// a nil pointer stays nil (field omitted), while a non-nil value is trimmed — and
+// an empty result is a valid update meaning "clear this field", which is what lets
+// a user actually blank out a description or URL.
+func normalizeUpdateRequest(updateRequest *vault.UpdateEntryRequest) error {
+	updateRequest.SecretName = strings.TrimSpace(updateRequest.SecretName)
+	updateRequest.EnvVarName = strings.TrimSpace(updateRequest.EnvVarName)
+	trimStringPointer(&updateRequest.URL)
+	trimStringPointer(&updateRequest.Description)
+
+	hasNoFieldsToUpdate := updateRequest.SecretName == "" &&
+		updateRequest.EnvVarName == "" &&
+		updateRequest.SecretValue == "" &&
+		updateRequest.URL == nil &&
+		updateRequest.Description == nil
+	if hasNoFieldsToUpdate {
+		return errors.New("at least one field (secretName, envVarName, secretValue, url, description) must be provided")
+	}
+
+	// Validate the URL only when a non-empty one is supplied; an empty pointer is
+	// an intentional clear and needs no validation.
+	if updateRequest.URL != nil && *updateRequest.URL != "" {
+		normalizedURL, urlErr := normalizeOptionalURL(*updateRequest.URL)
+		if urlErr != nil {
+			return urlErr
+		}
+		updateRequest.URL = &normalizedURL
+	}
+	return nil
+}
+
+// trimStringPointer trims whitespace from the pointed-to string when the pointer
+// is non-nil, leaving a nil pointer untouched so "field omitted" stays distinct
+// from "field explicitly blanked".
+func trimStringPointer(target **string) {
+	if *target == nil {
+		return
+	}
+	trimmedValue := strings.TrimSpace(**target)
+	*target = &trimmedValue
+}
+
+// normalizeOptionalURL validates an optional URL field and returns a normalized value.
+// Empty input is allowed and represented as an empty string.
+func normalizeOptionalURL(rawURL string) (string, error) {
+	trimmedURL := strings.TrimSpace(rawURL)
+	if trimmedURL == "" {
+		return "", nil
+	}
+
+	parsedURL, parseErr := url.ParseRequestURI(trimmedURL)
+	if parseErr != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return "", errors.New("url must be a valid absolute URL, e.g. https://example.com/login")
+	}
+	return trimmedURL, nil
+}
+
 // ── GET /api/vault/entries/value ─────────────────────────────────────────────
 
 // handleVaultRevealValue returns the decrypted plaintext value for a single
@@ -318,6 +400,9 @@ func scheduleScriptCleanup(scriptPath string) {
 func handleVaultRevealValue(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !requireVaultAuthBearerOnly(w, r) {
 		return
 	}
 	if !requireVault(w) {
