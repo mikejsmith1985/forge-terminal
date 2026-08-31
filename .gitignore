@@ -141,3 +141,7 @@ nul
 !.dev.vars.example
 .env*
 !.env.example
+
+# Playwright run artefacts (regenerated per run, never committed)
+playwright-report/
+test-results/

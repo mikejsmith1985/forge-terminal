@@ -1,0 +1,634 @@
+/* Visual design for the engineering portfolio.
+ *
+ * The page is typographic and dark: the argument is the content, so the layout
+ * gets out of its way. Product screens are dark UI, so a dark ground lets them
+ * sit on the page without a bright frame fighting them. Accent colour is used
+ * sparingly and always to mean something — cyan for verified evidence, amber
+ * for the theory that turned out to be wrong.
+ */
+
+:root {
+  --ink: #0a0a0d;
+  --ink-raised: #111117;
+  --ink-card: #15151c;
+  --line: #26262f;
+  --line-soft: #1c1c24;
+  --text: #ececf2;
+  --text-muted: #a0a0b0;
+  --text-faint: #6e6e7d;
+  --cyan: #22d3ee;
+  --amber: #f59e0b;
+  --green: #34d399;
+  --violet: #8b8bf5;
+  --measure: 68ch;
+  --shell: 1200px;
+  --mono: "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --sans: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+img { max-width: 100%; display: block; }
+
+a { color: var(--cyan); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  left: 16px;
+  top: 16px;
+  z-index: 10;
+  background: var(--cyan);
+  color: var(--ink);
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+
+/* ── Masthead ─────────────────────────────────────────────────────────────── */
+
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px max(24px, calc((100vw - var(--shell)) / 2));
+  background: rgba(10, 10, 13, 0.86);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.masthead__name {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.masthead__nav {
+  display: flex;
+  gap: 26px;
+  font-size: 14px;
+}
+.masthead__nav a { color: var(--text-muted); }
+.masthead__nav a:hover { color: var(--text); text-decoration: none; }
+
+/* ── Shared section furniture ─────────────────────────────────────────────── */
+
+main > section {
+  padding: 96px max(24px, calc((100vw - var(--shell)) / 2));
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.kicker {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.section-label {
+  margin: 0 0 28px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.section-intro { max-width: var(--measure); }
+.section-intro h2 {
+  margin: 0 0 18px;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+.section-intro p { color: var(--text-muted); margin: 0 0 16px; }
+
+.tech-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 20px 0 0;
+}
+.tech-stack span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.evidence-note {
+  margin-top: 22px;
+  padding-left: 14px;
+  border-left: 2px solid var(--line);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+
+/* ── Thesis ───────────────────────────────────────────────────────────────── */
+
+.thesis { padding-top: 108px; padding-bottom: 84px; }
+
+.thesis h1 {
+  margin: 0 0 30px;
+  max-width: 22ch;
+  font-size: clamp(38px, 6.2vw, 68px);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  font-weight: 680;
+}
+
+.thesis__statement {
+  max-width: var(--measure);
+  margin: 0 0 52px;
+  font-size: clamp(18px, 2vw, 21px);
+  line-height: 1.62;
+  color: var(--text-muted);
+}
+
+.thesis__pillars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--line-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.thesis__pillars li { background: var(--ink); padding: 26px 24px; }
+.thesis__pillars h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.thesis__pillars p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ── Checkable numbers ────────────────────────────────────────────────────── */
+
+.proof-strip { background: var(--ink-raised); }
+
+/* Six stats in three columns fills exactly two rows, so no card is orphaned. */
+.proof-strip__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.proof-stat {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px 20px;
+  background: var(--ink-card);
+}
+.proof-stat__value {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--cyan);
+}
+.proof-stat__label {
+  margin: 12px 0 3px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.proof-stat__detail {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  color: var(--text-faint);
+}
+.proof-stat__command {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #0b0b0f;
+  border: 1px solid var(--line-soft);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--green);
+}
+
+/* ── Entry headline, claims, and links ────────────────────────────────────── */
+/* Three optional blocks a full-width entry may carry. Only U2 Counter uses all
+   three today: it is the one entry whose opening line is the argument, and the
+   only one that hands the reader somewhere to go and check. */
+
+/* Set above the product name and in the page's largest non-heading type,
+   because it is the sentence the entry is asking to be remembered by. */
+.app-headline {
+  max-width: 46ch;
+  margin: 0 0 20px;
+  font-size: clamp(21px, 2.5vw, 27px);
+  line-height: 1.32;
+  font-weight: 550;
+  letter-spacing: -0.018em;
+  color: var(--text);
+  border-left: 3px solid var(--cyan);
+  padding-left: 20px;
+}
+
+.app-key-points {
+  max-width: var(--measure);
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+/* Cyan marks verified evidence everywhere else on the page, and these claims
+   are each either checkable in the repository or an admission — so they get the
+   same mark rather than a bullet. */
+.app-key-points li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--text-muted);
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+.app-key-points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 9px;
+  height: 2px;
+  background: var(--cyan);
+}
+
+.app-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+.app-link {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.app-link::before {
+  content: '↗';
+  margin-right: 8px;
+  color: var(--cyan);
+}
+.app-link:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+/* The evidence note sits closer to a link row than to a paragraph, because the
+   links are pill-shaped and carry their own padding. */
+.app-links + .evidence-note { margin-top: 30px; }
+
+/* ── Flagship ─────────────────────────────────────────────────────────────── */
+
+.flagship__tagline {
+  font-size: 19px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.flagship__figures {
+  display: grid;
+  gap: 60px;
+  margin-top: 60px;
+}
+
+.flagship-figure { margin: 0; }
+.flagship-figure img {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--ink);
+}
+.flagship-figure figcaption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 40px;
+  margin-top: 22px;
+}
+.flagship-figure h4 {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+.figure-why { margin: 0; color: var(--text-muted); font-size: 15px; }
+.figure-shows { margin: 0; color: var(--text-faint); font-size: 14px; }
+
+/* Depth tier: same treatment as the flagship, on a raised ground so the page
+   still reads as flagship-then-everything-else rather than two flagships. */
+.depth { background: var(--ink-raised); }
+.depth-entry + .depth-entry { margin-top: 96px; padding-top: 88px;
+  border-top: 1px solid var(--line); }
+
+/* ── Case studies ─────────────────────────────────────────────────────────── */
+
+.case-studies { background: var(--ink-raised); }
+
+.case-studies__list {
+  display: grid;
+  gap: 20px;
+  margin-top: 52px;
+}
+
+.case-study {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--ink-card);
+  overflow: hidden;
+}
+
+.case-study__header {
+  display: flex;
+  gap: 20px;
+  padding: 28px 30px 22px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.case-study__index {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-faint);
+  padding-top: 6px;
+}
+.case-study__header h3 {
+  margin: 0 0 6px;
+  font-size: 23px;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.case-study__lesson {
+  margin: 0;
+  font-size: 15px;
+  color: var(--cyan);
+}
+
+.case-study__beats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.beat {
+  padding: 22px 24px;
+  border-right: 1px solid var(--line-soft);
+  border-top: 1px solid var(--line-soft);
+}
+.beat:last-child { border-right: 0; }
+.beat__label {
+  margin: 0 0 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.beat__text {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* Colour carries the argument: the wrong theory is marked, the real one is not. */
+.beat--wrong { background: rgba(245, 158, 11, 0.045); }
+.beat--wrong .beat__label { color: var(--amber); }
+.beat--actual .beat__label { color: var(--text); }
+.beat--actual .beat__text { color: var(--text); }
+.beat--insight .beat__label { color: var(--violet); }
+.beat--proof { background: rgba(34, 211, 238, 0.04); }
+.beat--proof .beat__label { color: var(--cyan); }
+
+.case-study__footer {
+  padding: 18px 30px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+  font-family: var(--mono);
+}
+
+/* ── Supporting products ──────────────────────────────────────────────────── */
+
+.products__list {
+  display: grid;
+  gap: 22px;
+  margin-top: 52px;
+}
+
+.product-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--ink-card);
+  padding: 30px;
+}
+.product-card header { max-width: var(--measure); margin-bottom: 28px; }
+.product-card h3 {
+  margin: 0 0 4px;
+  font-size: 25px;
+  letter-spacing: -0.02em;
+}
+.product-card__category {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.product-card__tagline { margin: 0; color: var(--text-muted); font-size: 16px; }
+
+.product-card__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+.product-figure { margin: 0; }
+.product-figure img {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.product-figure figcaption { margin-top: 14px; }
+.product-figure h4 {
+  margin: 0 0 6px;
+  font-size: 15.5px;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+.product-figure .figure-why { font-size: 13.5px; }
+.product-figure .figure-shows { display: none; }
+
+
+/* ── Architecture diagram ─────────────────────────────────────────────────── */
+/* Built from markup rather than an image so it reflows on a phone and keeps the
+   page's type scale. A scaled SVG would render 8px text on a narrow screen. */
+
+.architecture-slot { margin: 64px 0 8px; }
+
+.arch-heading { margin: 0 0 10px; font-size: 24px; letter-spacing: -0.02em; }
+.arch-intro { margin: 0 0 22px; max-width: var(--measure); color: var(--text-muted);
+  font-size: 15px; }
+.arch-intro code, .arch-route__loop code { font-family: var(--mono); font-size: 13.5px;
+  color: var(--cyan); }
+
+.arch-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 26px; padding: 0;
+  list-style: none; }
+.arch-legend__item { border: 1px solid var(--line); border-left-width: 3px; border-radius: 7px;
+  padding: 6px 12px; font-size: 12.5px; color: var(--text-faint); }
+.arch-legend__item b { color: var(--text); margin-right: 5px; }
+
+.arch-node-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.arch-node-list--trunk { max-width: 560px; margin-bottom: 8px; }
+/* The connector between stacked nodes. Drawn with a pseudo-element so there is
+   no image to load and no JS to run. */
+.arch-node-list > .arch-node + .arch-node::before { content: '↓'; display: block;
+  margin: -20px 0 8px; color: var(--text-faint); font-size: 15px; }
+
+.arch-node { border: 1px solid var(--line); border-left-width: 3px; border-radius: 9px;
+  padding: 13px 16px; background: var(--ink-card); }
+.arch-node h4 { margin: 4px 0 6px; font-size: 15.5px; letter-spacing: -0.01em; }
+.arch-node p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--text-muted); }
+.arch-node__kind { font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; }
+.arch-node__name { display: inline-block; font-family: var(--mono); font-size: 12.5px;
+  background: #0b0b0f; border: 1px solid var(--line-soft); border-radius: 5px;
+  padding: 2px 8px; color: var(--text); }
+
+/* One colour per node kind, used identically in the legend and the diagram. */
+.arch-node--agent { border-left-color: var(--violet); }
+.arch-node--agent .arch-node__kind, .arch-legend__item.arch-node--agent b { color: var(--violet); }
+.arch-node--function { border-left-color: var(--text-faint); }
+.arch-node--function .arch-node__kind { color: var(--text-faint); }
+.arch-node--pause { border-left-color: var(--amber); }
+.arch-node--pause .arch-node__kind, .arch-legend__item.arch-node--pause b { color: var(--amber); }
+.arch-node--terminal { border-left-color: var(--text-muted); }
+.arch-node--terminal .arch-node__kind { color: var(--text-muted); }
+
+.arch-branch-label { margin: 26px 0 14px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); }
+
+/* Four routes across at desktop so none orphans onto a row of its own, and
+   start-aligned because the clarification route is legitimately taller. */
+.arch-routes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start; gap: 14px; }
+.arch-route { border: 1px solid var(--line); border-top-width: 3px; border-radius: 10px;
+  padding: 15px 16px; background: var(--ink-raised); }
+.arch-route header { margin-bottom: 12px; }
+.arch-route__label { display: block; font-family: var(--mono); font-size: 13px;
+  margin-bottom: 3px; }
+.arch-route__summary { font-size: 13px; color: var(--text-muted); }
+.arch-route__loop, .arch-route__end { margin: 12px 0 0; font-size: 12.5px;
+  color: var(--text-faint); line-height: 1.55; }
+
+.arch-route--ready { border-top-color: var(--green); }
+.arch-route--ready .arch-route__label { color: var(--green); }
+.arch-route--loop { border-top-color: var(--amber); }
+.arch-route--loop .arch-route__label { color: var(--amber); }
+.arch-route--blocked { border-top-color: var(--violet); }
+.arch-route--blocked .arch-route__label { color: var(--violet); }
+.arch-route--error { border-top-color: #f87171; }
+.arch-route--error .arch-route__label { color: #f87171; }
+
+.arch-control-plane { margin-top: 26px; border: 1px solid var(--line);
+  border-left: 3px solid var(--cyan); border-radius: 10px; padding: 16px 18px;
+  background: var(--ink-card); }
+.arch-control-plane h4 { margin: 0 0 8px; font-size: 15.5px; }
+.arch-control-plane p { margin: 0 0 12px; max-width: var(--measure); font-size: 13.5px;
+  line-height: 1.6; color: var(--text-muted); }
+.arch-control-plane ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.arch-control-plane li { font-size: 13px; color: var(--text-faint); }
+.arch-control-plane li b { color: var(--text); margin-right: 5px; }
+
+.arch-observability { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px 18px; background: var(--ink-card); }
+.arch-observability h4 { margin: 0 0 12px; font-size: 15.5px; }
+.arch-observability dl { margin: 0; display: grid; gap: 11px; }
+.arch-observability dt { font-size: 14px; font-weight: 650; }
+.arch-observability dt span { margin-left: 8px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan); }
+.arch-observability dd { margin: 3px 0 0; font-size: 13px; color: var(--text-muted); }
+
+@media (max-width: 1080px) {
+  .arch-routes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .architecture-slot { margin-top: 44px; }
+  .arch-routes { grid-template-columns: 1fr; }
+  /* Micro-labels that read fine on a desktop are too small on a phone, which is
+     where this page is most often opened. */
+  .arch-node__kind, .arch-observability dt span { font-size: 11px; }
+  .arch-branch-label { font-size: 12px; }
+  .arch-node__name, .arch-route__label { font-size: 13px; }
+  .arch-node p, .arch-control-plane li, .arch-route__loop, .arch-route__end { font-size: 14px; }
+  .arch-legend__item { font-size: 13.5px; }
+  .arch-legend__item { width: 100%; }
+}
+
+/* ── Colophon ─────────────────────────────────────────────────────────────── */
+
+.colophon {
+  padding: 56px max(24px, calc((100vw - var(--shell)) / 2)) 80px;
+  color: var(--text-faint);
+  font-size: 14px;
+}
+.colophon p { margin: 0 0 8px; max-width: var(--measure); }
+.colophon__meta { font-family: var(--mono); font-size: 12.5px; }
+
+/* ── Narrow screens ───────────────────────────────────────────────────────── */
+
+@media (max-width: 980px) {
+  .proof-strip__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .proof-strip__grid { grid-template-columns: 1fr; }
+  main > section { padding-top: 64px; padding-bottom: 64px; }
+  .masthead__nav { gap: 16px; font-size: 13px; }
+  .flagship-figure figcaption { grid-template-columns: 1fr; }
+  .beat { border-right: 0; }
+  /* The headline keeps its rule but loses the inset, which costs a phone most
+     of a short line. Links stack rather than wrapping mid-label. */
+  .app-headline { padding-left: 14px; }
+  .app-links { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 520px) {
+  .masthead__nav { display: none; }
+}

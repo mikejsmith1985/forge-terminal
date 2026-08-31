@@ -1,0 +1,224 @@
+// The argument the portfolio makes, and the evidence that backs it.
+//
+// The page has one job: convince a hiring engineer that work directed through
+// coding agents can be held to a normal engineering standard. Marketing copy
+// cannot do that. What does it is a checkable number and a debugging story
+// where the obvious answer was wrong — so this file carries both, and the
+// accompanying tests refuse to let either drift away from the repository.
+
+export const PORTFOLIO_THESIS = {
+  headline: 'I direct coding agents, and I built the machinery that makes their output trustworthy.',
+
+  statement:
+    'Every application here was built by directing coding agents. That is the interesting part, '
+    + 'not a caveat. The hard problem in agent-assisted engineering is not getting code written — '
+    + 'it is proving the code does what it claims before it reaches anyone. So I built the tooling '
+    + 'that enforces it: a workflow that blocks a commit whose tests were never recorded, browser '
+    + 'tests that check real behaviour instead of green unit tests, and a credential vault the '
+    + 'agent can use but never read. The evidence below is checkable. Every number ships with the '
+    + 'command that proves it, and every debugging story names the commit that fixed it.',
+
+  subclaims: [
+    {
+      title: 'Verification is mechanical, not optional',
+      detail:
+        'A pre-commit hook reads a ledger of workflow gates and refuses the commit when the '
+        + 'branch, the test, or the passing run was never recorded. Being in a hurry is not an '
+        + 'input the hook accepts.',
+    },
+    {
+      title: 'Behaviour is proven in a real browser',
+      detail:
+        'UI claims are settled by driving the running application and reading the terminal\'s own '
+        + 'buffer, never by asserting that a function returned. A suite of green unit tests is not '
+        + 'evidence that a feature works — one of the case studies below is exactly that failure.',
+    },
+    {
+      title: 'Root cause over symptom',
+      detail:
+        'Every case study here started with a plausible wrong theory, and in two of them a fix had '
+        + 'already shipped against it. Finding the real cause meant explaining a detail the wrong '
+        + 'theory could not — usually the one nobody thought was interesting.',
+    },
+    {
+      title: 'Secrets are directed, never handled',
+      detail:
+        'The agent names where a credential must go; the vault resolves and injects it into the '
+        + 'shell. The value never enters a conversation, a file, or a log. The agent is a director, '
+        + 'not a courier.',
+    },
+  ],
+};
+
+// Headline numbers. Each carries the command a sceptical reader can run in a
+// clone of the repository to check it, which is the only reason to print them.
+export const PORTFOLIO_PROOF_STATS = [
+  {
+    id: 'go-tests',
+    value: '800+',
+    label: 'Go test functions',
+    detail: 'Across 141 test files',
+    verifyCommand: "git grep -h '^func Test' main -- '*_test.go' | wc -l",
+  },
+  {
+    id: 'browser-specs',
+    value: '40',
+    label: 'Browser test specs',
+    detail: 'Playwright, driving the real app',
+    verifyCommand: "git ls-tree -r --name-only main | grep -c '^tests/e2e/.*\\.spec\\.js$'",
+  },
+  {
+    id: 'releases',
+    value: '565',
+    label: 'Releases shipped',
+    detail: 'v1.0.0 through v7.23.9',
+    verifyCommand: "git tag | grep -c '^v'",
+  },
+  {
+    id: 'reviewed-changes',
+    value: '92',
+    label: 'Reviewed changes merged',
+    detail: 'Every one via pull request',
+    verifyCommand: "git log main --oneline | grep -cE '\\(#[0-9]+\\)'",
+  },
+  {
+    id: 'spec-features',
+    value: '14',
+    label: 'Features run spec-first',
+    detail: 'Specify → plan → tasks → implement',
+    verifyCommand: 'ls specs/',
+  },
+  {
+    id: 'go-lines',
+    value: '~70k',
+    label: 'Lines of Go',
+    detail: 'Plus a React front end',
+    verifyCommand: "git ls-tree -r --name-only main | grep '\\.go$' | xargs wc -l | tail -1",
+  },
+];
+
+// The case studies. Each one is drawn from a real commit whose message contains
+// the same reasoning; the reference lets a reader go and read it in full.
+export const ENGINEERING_CASE_STUDIES = [
+  {
+    id: 'green-tests-dead-feature',
+    title: 'Every test passed. The feature did not exist.',
+    lesson: 'A green suite is evidence about code, not about behaviour.',
+    symptom:
+      'A new opt-in prompt was finished. The Go unit tests passed, the real-git integration tests '
+      + 'passed, and 85 front-end tests passed. By every signal available, the feature was done.',
+    assumedCause:
+      'Nothing looked wrong, so there was nothing to diagnose — the work was ready to ship.',
+    actualCause:
+      'The WebSocket handler forwarded exactly two message types to the dashboard, and the new '
+      + 'prompt was not one of them. The message was constructed correctly, sent correctly, and '
+      + 'silently dropped one layer before the screen. The prompt would never once have appeared '
+      + 'in production.',
+    whyItMattered:
+      'Every test was green because every test checked a layer. Nothing checked the seam between '
+      + 'them. This is the exact failure that makes a green suite feel like proof when it is not.',
+    proof:
+      'The browser test caught it — driving the running app and waiting for a prompt that never '
+      + 'arrived. The forwarding allow-list was the one-line fix; the test is why it was found '
+      + 'before release rather than by a user.',
+    reference: { pullRequestNumber: 202, commitSha: '28a53601' },
+  },
+  {
+    id: 'keyboard-mode-desync',
+    title: 'The tab that accepted letters but not numbers',
+    lesson: 'The detail everyone dismissed as irrelevant was the whole diagnosis.',
+    symptom:
+      'After an app update, a restored terminal tab silently ignored digits and arrow keys. '
+      + 'Letters typed fine. The tab looked completely normal.',
+    assumedCause:
+      'A focus bug — a hidden tab stealing keyboard input. Two fixes shipped against that theory. '
+      + 'Both corrected genuine defects. Neither fixed this one.',
+    actualCause:
+      'A keyboard-mode desync. A terminal program sets application keypad and cursor modes once, '
+      + 'at startup. Over a long session those bytes aged out of the scrollback journal. On '
+      + 'restart the fresh terminal replayed only the scrollback, so it came up in default mode '
+      + 'while the program was still in application mode.',
+    whyItMattered:
+      'That letters worked was the tell, and it ruled the focus theory out entirely. Letters are '
+      + 'mode-independent ASCII; digits and arrows are mode-dependent. A broken focus would have '
+      + 'swallowed everything. Only a mode mismatch can swallow digits and spare letters.',
+    proof:
+      'Confirmed against the live broken tab, whose journal contained zero mode-setup sequences. '
+      + 'The fix tracks mode changes, persists them beside the session so they survive journal '
+      + 'trimming, and re-asserts them ahead of the replay.',
+    reference: { pullRequestNumber: 206, commitSha: '3df996e6' },
+  },
+  {
+    id: 'reconnect-kills-reader',
+    title: 'Tabs that came back connected, alive, and permanently silent',
+    lesson: 'A log with nothing in it is a finding, if you know what should have been there.',
+    symptom:
+      'A tab reconnected to a still-running shell and looked healthy. It accepted keystrokes and '
+      + 'the shell really did run them. It never displayed output again.',
+    assumedCause:
+      'Reconnect flakiness — a dropped socket or a race that a retry ought to smooth over.',
+    actualCause:
+      'Detaching deliberately leaves a session live so a reconnecting client can find its '
+      + 'scrollback. That made the reconnect match the "live session" branch and join as a passive '
+      + 'watcher — and the watcher path stops the previous owner\'s reader while a guard skips '
+      + 'starting a replacement. Nobody was reading the shell\'s output. The intended reattach '
+      + 'path was unreachable code.',
+    whyItMattered:
+      'The confirming evidence was an absence: a 9.4-million-line production log containing zero '
+      + 'reattach entries and a watcher signature on every single reconnect. The path everyone '
+      + 'assumed was running had never run once.',
+    proof:
+      'A client that finds a detach record now knows no one is reading the terminal, so it '
+      + 'reclaims ownership and starts its own reader. Reclaiming is atomic, so two concurrent '
+      + 'reconnects can never both own it.',
+    reference: { pullRequestNumber: 214, commitSha: '5b0a4971' },
+  },
+  {
+    id: 'zombie-second-instance',
+    title: '"The bug you fixed is still happening"',
+    lesson: 'When a verified fix does not take, stop debugging the fix and check what is running.',
+    symptom:
+      'Bugs fixed in the previous release kept occurring: windows stealing focus, calls reaching '
+      + 'the wrong place, session state disagreeing with itself.',
+    assumedCause:
+      'The fixes were wrong or incomplete, and the same defects needed fixing again.',
+    actualCause:
+      'Two copies of the application were running. A stale instance from an older version had sat '
+      + 'beside the current one for weeks, because a second launch quietly fell through its '
+      + 'preferred ports instead of refusing to start. Half the traffic was being served by the '
+      + 'version that still had the bugs.',
+    whyItMattered:
+      'The diagnostics that would have shown this had been blank since June: the log writer '
+      + 'aborted at a dead output stream and had been silently discarding everything. The missing '
+      + 'evidence was itself a second bug, and it was hiding the first.',
+    proof:
+      'Startup now detects a running instance and either defers to it or takes over deliberately, '
+      + 'and the log writer survives a dead stream and rotates. Both causes were fixed together '
+      + 'because neither was visible while the other stood.',
+    reference: { pullRequestNumber: 210, commitSha: '8404234a' },
+  },
+  {
+    id: 'phantom-cd-injection',
+    title: 'Commands nobody typed, and the test that could not miss them',
+    lesson: 'Prove the absence of an event by watching the wire, not the screen.',
+    symptom:
+      'Switching to a background tab revealed a directory-change command nobody had typed. Worse, '
+      + 'an agent running in that tab read the injected text as a submitted prompt.',
+    assumedCause:
+      'Cosmetic replay noise — leftover text being redrawn from the scrollback.',
+    actualCause:
+      'A directory-restore fallback guarded on a flag that is true only for a socket that dropped '
+      + 'and retried. A restart or page reload opens a first-attempt socket, so the guard passed '
+      + 'and a real command was typed into a shell already in the right directory. The decision '
+      + 'was also made milliseconds before the signal that would have prevented it arrived.',
+    whyItMattered:
+      'It was not cosmetic at all: the application was sending genuine keystrokes. Measured on the '
+      + 'unfixed build, a single page reload injected the command into five hidden tabs at once.',
+    proof:
+      'The rule moved to one testable decision, re-evaluated at the moment the command would be '
+      + 'sent. The browser test spies on every WebSocket frame the page sends across a reload and '
+      + 'asserts none is command-shaped — shown failing on the old build and passing on the fix, '
+      + 'on the same harness.',
+    reference: { pullRequestNumber: 215, commitSha: '2d3d8487' },
+  },
+];

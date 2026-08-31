@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mike Smith — Engineering Portfolio</title>
+    <meta
+      name="description"
+      content="Applications built by directing coding agents, and the tooling that makes their output verifiable. Every claim on this page ships with the command that proves it."
+    />
+    <link rel="stylesheet" href="./styles.css?v=20260826-architecture" />
+  </head>
+  <body>
+    <a class="skip-link" href="#thesis">Skip to content</a>
+
+    <header class="masthead">
+      <p class="masthead__name">Mike Smith</p>
+      <nav class="masthead__nav" aria-label="Sections">
+        <a href="#thesis">Approach</a>
+        <a href="#flagship">Flagship</a>
+        <a href="#depth">Depth</a>
+        <a href="#case-studies">Debugging</a>
+        <a href="#products">Products</a>
+      </nav>
+    </header>
+
+    <main>
+      <!-- The claim, stated once, without hedging. -->
+      <section id="thesis" class="thesis" aria-labelledby="thesis-heading">
+        <p class="kicker">Engineering portfolio</p>
+        <h1 id="thesis-heading"></h1>
+        <p class="thesis__statement"></p>
+        <ul class="thesis__pillars"></ul>
+      </section>
+
+      <!-- Numbers a reader can check themselves. -->
+      <section class="proof-strip" aria-labelledby="proof-heading">
+        <h2 id="proof-heading" class="section-label">Checkable in a clone of the repository</h2>
+        <div class="proof-strip__grid"></div>
+      </section>
+
+      <!-- The flagship product carries the argument. -->
+      <section id="flagship" class="flagship" aria-labelledby="flagship-heading"></section>
+
+      <!-- Second tier: the deepest product, given room rather than a grid cell. -->
+      <section id="depth" class="depth" aria-label="Deep product work"></section>
+
+      <!-- The differentiator: reasoning under uncertainty. -->
+      <section id="case-studies" class="case-studies" aria-labelledby="case-studies-heading">
+        <div class="section-intro">
+          <p class="kicker">Debugging</p>
+          <h2 id="case-studies-heading">Five times the obvious answer was wrong</h2>
+          <p>
+            Anyone can show the code that worked. These are the ones where the first
+            explanation was convincing and incorrect — twice with a fix already shipped
+            against it. Each links to the commit, so the reasoning can be read in full.
+          </p>
+        </div>
+        <div class="case-studies__list"></div>
+      </section>
+
+      <!-- Breadth, deliberately compact. -->
+      <section id="products" class="products" aria-labelledby="products-heading">
+        <div class="section-intro">
+          <p class="kicker">Also built</p>
+          <h2 id="products-heading">A smaller tool, same standard</h2>
+          <p>
+            Screens are rebuilt from the running interface and populated with invented data.
+            No real workspace, customer, file, or credential appears anywhere on this page.
+          </p>
+        </div>
+        <div class="products__list"></div>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <p>
+        Built with Go, React, and coding agents — under a workflow that refuses a commit
+        whose tests were never recorded.
+      </p>
+      <p class="colophon__meta"></p>
+    </footer>
+
+    <script type="module" src="./app.js?v=20260826-architecture"></script>
+  </body>
+</html>
