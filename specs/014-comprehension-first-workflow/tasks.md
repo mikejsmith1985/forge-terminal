@@ -81,14 +81,14 @@ that must first fail.
 
 ### Tests (write first, must fail)
 
-- [ ] T026 [P] [US3] Write the failing unit test in `internal/terminal/format_check_test.go`: a section over the word cap is flagged, a response with headers and dividers is not, and a response the developer explicitly asked to be detailed is not flagged
-- [ ] T027 [US3] Write the failing unit test in `internal/terminal/format_check_test.go` asserting the safety property: **no detection outcome, including a false positive, ever returns a blocking result**
+- [X] T026 [P] [US3] Write the failing unit test in `internal/terminal/format_check_test.go`: a section over the word cap is flagged, a response with headers and dividers is not, and a response the developer explicitly asked to be detailed is not flagged
+- [X] T027 [US3] Write the failing unit test in `internal/terminal/format_check_test.go` asserting the safety property: **no detection outcome, including a false positive, ever returns a blocking result**
 
 ### Implementation
 
-- [ ] T028 [US3] Implement the heuristic format detector in `internal/terminal/format_check.go` reading the scrollback via the existing `GetSessionScrollback`, to turn T026 and T027 green
-- [ ] T029 [US3] Surface a non-blocking warning in the frontend when a violation is detected, reusing the existing toast surface in `frontend/src/components/Toast.jsx`
-- [ ] T030 [US3] Document the heuristic's known limits as a purpose comment at the top of `internal/terminal/format_check.go`, so a future reader does not mistake it for a guarantee
+- [X] T028 [US3] Implement the heuristic format detector in `internal/terminal/format_check.go` reading the scrollback via the existing `GetSessionScrollback`, to turn T026 and T027 green
+- [X] T029 [US3] Surface a non-blocking warning in the frontend when a violation is detected, reusing the existing toast surface in `frontend/src/components/Toast.jsx`
+- [X] T030 [US3] Document the heuristic's known limits as a purpose comment at the top of `internal/terminal/format_check.go`, so a future reader does not mistake it for a guarantee
 
 ---
 
