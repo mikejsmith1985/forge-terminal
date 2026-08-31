@@ -125,7 +125,11 @@ func initMCPServer() {
 		TermHandler:    termHandler,
 		WorkflowConfig: workflowCfg,
 		ProjectPath:    projectPath,
-		AllowedTools:   cfg.AllowedTools,
+		// Resolved per call: the developer changes tabs, and the project a tool
+		// should write to changes with them. Without this the path is wherever
+		// Forge was launched, which on Windows is a directory nobody works in.
+		ProjectPathFunc: newMcpProjectPathResolver(),
+		AllowedTools:    cfg.AllowedTools,
 		// VaultAccess wires vault_inject to the live vault singleton.
 		// GetGlobal() returns nil when the vault has not been opened yet; the
 		// tool handles nil gracefully and returns a descriptive error to the agent.
