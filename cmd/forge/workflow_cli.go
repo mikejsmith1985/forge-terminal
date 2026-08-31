@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
 )
@@ -39,7 +41,11 @@ func runWorkflowPreflight() int {
 		fmt.Fprintf(os.Stderr, "preflight: %v\n", err)
 		return 1
 	}
-	result, err := workflow.Preflight(root)
+	// Scoped to what is actually staged, so a documentation-only commit is not
+	// asked for a change brief.  A gate that fires on everything gets bypassed
+	// on everything, and a bypass used by reflex is a gate that has stopped
+	// working.
+	result, err := workflow.PreflightForChange(root, stagedPaths(root))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "preflight: %v\n", err)
 		return 1
@@ -78,4 +84,29 @@ func runWorkflowRecord(args []string) int {
 	body, _ := json.MarshalIndent(ticket, "", "  ")
 	fmt.Println(string(body))
 	return 0
+}
+
+// stagedPaths returns the repository-relative paths git has staged.
+//
+// Returns nil when git cannot be asked — outside a repository, or with no git
+// on the path.  A nil result means no source is known to have changed, so the
+// brief gate does not fire.  That is the right way to fail: the alternative is
+// blocking a commit over a question we were unable to ask.
+func stagedPaths(projectRoot string) []string {
+	command := exec.Command("git", "diff", "--cached", "--name-only")
+	command.Dir = projectRoot
+
+	output, err := command.Output()
+	if err != nil {
+		return nil
+	}
+
+	var paths []string
+	for _, line := range strings.Split(string(output), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			paths = append(paths, trimmed)
+		}
+	}
+	return paths
 }
