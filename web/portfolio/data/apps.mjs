@@ -105,6 +105,10 @@ export const PORTFOLIO_APPS = [
     ],
     "links": [
       {
+        "label": "The seven fixes, measured against the original",
+        "repoPath": "u2-mcp/blob/main/evidence/hardening-evidence.md"
+      },
+      {
         "label": "Source — u2-counter",
         "repoPath": "u2-counter"
       },

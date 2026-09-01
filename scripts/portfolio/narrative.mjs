@@ -7,16 +7,38 @@
 // accompanying tests refuse to let either drift away from the repository.
 
 export const PORTFOLIO_THESIS = {
+  // Who is speaking, before what they believe. A reader deciding in a few
+  // seconds whether to keep reading needs a role and a stack to place the claim
+  // against; the page previously opened with a philosophical assertion from an
+  // unidentified person, which is the wrong order.
+  role: 'AI-native systems engineer',
+
+  stack: ['Go', 'React', 'MCP', 'Playwright', 'WebSockets', 'PTY'],
+
   headline: 'I direct coding agents, and I built the machinery that makes their output trustworthy.',
 
+  // Two sentences. The long version of this argument was 107 words at the top of
+  // the page, ahead of any evidence — which asked the reader to accept the
+  // thesis before seeing a single thing that supports it. The detail now lives
+  // below the proof, where somebody already interested will still find it.
   statement:
-    'Every application here was built by directing coding agents. That is the interesting part, '
-    + 'not a caveat. The hard problem in agent-assisted engineering is not getting code written — '
-    + 'it is proving the code does what it claims before it reaches anyone. So I built the tooling '
-    + 'that enforces it: a workflow that blocks a commit whose tests were never recorded, browser '
-    + 'tests that check real behaviour instead of green unit tests, and a credential vault the '
-    + 'agent can use but never read. The evidence below is checkable. Every number ships with the '
+    'The hard problem in agent-assisted engineering is not getting code written — it is proving '
+    + 'the code does what it claims before it reaches anyone. Every number below ships with the '
     + 'command that proves it, and every debugging story names the commit that fixed it.',
+
+  // The artefact shown first, chosen because it answers the question a reader
+  // actually has — can this person do the work — rather than the question the
+  // thesis answers, which is how they know the work is right.
+  leadArtifact: {
+    appSlug: 'u2-counter',
+    featureId: 'mcp-transcript',
+    claim: 'I had never heard of Eclipse or a Pick database on Friday afternoon. '
+      + 'By Monday morning this was running.',
+    detail:
+      'An AI answering trade-counter questions against a 1960s MultiValue ERP, through a hardened '
+      + 'fork of the U2 MCP server. Every call it made is shown under the answer, and the raw '
+      + 'record with its separator bytes is the part a relational database could not have produced.',
+  },
 
   subclaims: [
     {
@@ -55,42 +77,42 @@ export const PORTFOLIO_THESIS = {
 export const PORTFOLIO_PROOF_STATS = [
   {
     id: 'go-tests',
-    value: '800+',
+    value: '896',
     label: 'Go test functions',
-    detail: 'Across 141 test files',
+    detail: 'Across 153 test files',
     verifyCommand: "git grep -h '^func Test' main -- '*_test.go' | wc -l",
   },
   {
     id: 'browser-specs',
-    value: '40',
+    value: '42',
     label: 'Browser test specs',
     detail: 'Playwright, driving the real app',
     verifyCommand: "git ls-tree -r --name-only main | grep -c '^tests/e2e/.*\\.spec\\.js$'",
   },
   {
     id: 'releases',
-    value: '565',
+    value: '569',
     label: 'Releases shipped',
-    detail: 'v1.0.0 through v7.23.9',
+    detail: 'v1.0.0 through v7.25.1',
     verifyCommand: "git tag | grep -c '^v'",
   },
   {
     id: 'reviewed-changes',
-    value: '92',
+    value: '93',
     label: 'Reviewed changes merged',
     detail: 'Every one via pull request',
     verifyCommand: "git log main --oneline | grep -cE '\\(#[0-9]+\\)'",
   },
   {
     id: 'spec-features',
-    value: '14',
+    value: '15',
     label: 'Features run spec-first',
     detail: 'Specify → plan → tasks → implement',
-    verifyCommand: 'ls specs/',
+    verifyCommand: 'ls -d specs/*/ | wc -l',
   },
   {
     id: 'go-lines',
-    value: '~70k',
+    value: '71,796',
     label: 'Lines of Go',
     detail: 'Plus a React front end',
     verifyCommand: "git ls-tree -r --name-only main | grep '\\.go$' | xargs wc -l | tail -1",

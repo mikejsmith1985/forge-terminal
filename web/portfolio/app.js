@@ -65,8 +65,11 @@ function selectElement(selector) {
 // ── Thesis ──────────────────────────────────────────────────────────────────
 
 function renderThesis() {
+  selectElement('.thesis__role').textContent = PORTFOLIO_THESIS.role;
   selectElement('#thesis-heading').textContent = PORTFOLIO_THESIS.headline;
   selectElement('.thesis__statement').textContent = PORTFOLIO_THESIS.statement;
+  selectElement('.thesis__stack').innerHTML = createStackChips(PORTFOLIO_THESIS.stack);
+  selectElement('.thesis__lead').innerHTML = createLeadArtifact();
 
   selectElement('.thesis__pillars').innerHTML = PORTFOLIO_THESIS.subclaims
     .map((subclaim) => `
@@ -75,6 +78,42 @@ function renderThesis() {
         <p>${escapeHtml(subclaim.detail)}</p>
       </li>`)
     .join('');
+}
+
+/** Emits the stack a recruiter scans for before reading a word of prose. */
+function createStackChips(stack) {
+  return stack
+    .map((technology) => `<span>${escapeHtml(technology)}</span>`)
+    .join('');
+}
+
+/**
+ * Emits the first artefact, so something built appears before any argument.
+ *
+ * The page used to put its first image 2,548 pixels down — roughly three
+ * screens of prose before a reader saw anything that had been made. This puts
+ * one in the opening screen, and picks the artefact that answers "can this
+ * person do the work" rather than the one that answers "how do they know it is
+ * right".
+ */
+function createLeadArtifact() {
+  const lead = PORTFOLIO_THESIS.leadArtifact;
+  const app = PORTFOLIO_APPS.find((candidate) => candidate.slug === lead.appSlug);
+  const feature = app?.features.find((candidate) => candidate.id === lead.featureId);
+
+  if (!app || !feature) {
+    throw new Error(`The lead artefact ${lead.appSlug}/${lead.featureId} is missing from the portfolio data.`);
+  }
+
+  return `
+    <figure class="lead-artifact">
+      <img src="${escapeHtml(feature.imagePath)}?v=${escapeHtml(ASSET_VERSION)}"
+           alt="${escapeHtml(app.name)} — ${escapeHtml(feature.title)}" />
+      <figcaption>
+        <p class="lead-artifact__claim">${escapeHtml(lead.claim)}</p>
+        <p class="lead-artifact__detail">${escapeHtml(lead.detail)}</p>
+      </figcaption>
+    </figure>`;
 }
 
 // ── Checkable numbers ───────────────────────────────────────────────────────
@@ -171,6 +210,12 @@ function createArchitectureSlot(appSlug) {
   return appSlug === ARCHITECTURE_APP_SLUG ? '<div class="architecture-slot"></div>' : '';
 }
 
+/** Reports whether a feature is the one already shown in the hero. */
+function isLeadArtifact(appSlug, featureId) {
+  const lead = PORTFOLIO_THESIS.leadArtifact;
+  return lead.appSlug === appSlug && lead.featureId === featureId;
+}
+
 function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
   const portfolioApp = PORTFOLIO_APPS.find((app) => app.slug === appSlug);
   if (!portfolioApp) {
@@ -178,7 +223,12 @@ function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
   }
 
   const headingId = `${appSlug}-heading`;
+
+  // The hero already shows one artefact in full. Repeating it here reads as
+  // padding — the reader recognises the picture, learns nothing, and starts
+  // skimming the section that was meant to hold their attention.
   const figuresMarkup = portfolioApp.features
+    .filter((feature) => !isLeadArtifact(portfolioApp.slug, feature.id))
     .map((feature) => createFeatureFigure(feature, portfolioApp, figureClassName))
     .join('');
 
@@ -312,7 +362,14 @@ function renderArchitecture() {
     throw new Error('The architecture slot is missing from the LG-Builder entry.');
   }
 
+  // Collapsed by default. The diagram is the deepest thing on the page and cost
+  // every reader roughly a screen and a half to scroll past, including the ones
+  // who leave in fifteen seconds. Anybody who wants it opens it; nobody has to
+  // pay for it. Demotion rather than deletion — it is still the strongest thing
+  // in this entry for the reader who reaches it.
   architectureHost.innerHTML = `
+    <details class="arch-details">
+    <summary class="arch-summary">How a ticket moves through the graph — the compiled graph, node by node</summary>
     <h3 class="arch-heading">How a ticket moves through the graph</h3>
     <p class="arch-intro">Every box below is a node the compiled graph registers, named exactly as
       the orchestrator names it. State travels between them as
@@ -324,7 +381,8 @@ function renderArchitecture() {
     <p class="arch-branch-label">One decision, four routes</p>
     <div class="arch-routes">${ARCHITECTURE_ROUTES.map(createArchitectureRoute).join('')}</div>
     ${createControlPlaneCallout()}
-    ${createObservabilityCallout()}`;
+    ${createObservabilityCallout()}
+    </details>`;
 }
 
 // ── Debugging case studies ──────────────────────────────────────────────────
@@ -350,6 +408,7 @@ function renderCaseStudies() {
         </header>
         <div class="case-study__beats">
           ${createCaseStudyBeat('Symptom', caseStudy.symptom, 'symptom')}
+          <!-- The pair the whole section exists for: what was believed, beside what was true. -->
           ${createCaseStudyBeat('The obvious answer', caseStudy.assumedCause, 'wrong')}
           ${createCaseStudyBeat('Actual cause', caseStudy.actualCause, 'actual')}
           ${createCaseStudyBeat('Why it mattered', caseStudy.whyItMattered, 'insight')}
