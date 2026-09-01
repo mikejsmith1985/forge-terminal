@@ -210,3 +210,197 @@ func TestWaitForPTYQuiet_ActiveOutput(t *testing.T) {
 		t.Errorf("active-output case returned too soon (%v); expected output to drain first", elapsed)
 	}
 }
+
+// ── Macro delivery (paste + Enter) tests ───────────────────────────────────
+
+// recordedPtyWrite captures one write to the PTY together with the moment it
+// happened, so a test can assert the ORDER and the SPACING of the paste and
+// the Enter that submits it.
+type recordedPtyWrite struct {
+	payload  string
+	happened time.Time
+}
+
+// redrawingPtySession is a fake terminal session that models the one
+// behaviour that matters here: a TUI keeps redrawing for a short while after
+// it receives a paste, and only once that redraw stops has the pasted text
+// actually landed in its input box.
+//
+// It satisfies both halves of a PTY session (read activity + write) so the
+// whole delivery path can be exercised without a real terminal.
+type redrawingPtySession struct {
+	mu sync.Mutex
+
+	writes []recordedPtyWrite
+
+	// redrawDuration is how long the fake TUI keeps producing output after a
+	// paste arrives. Real CLIs spend this time rendering the
+	// "[Pasted text +N lines]" placeholder.
+	redrawDuration time.Duration
+
+	// redrawingUntil is when the current burst of output stops. Zero means
+	// the session has never produced output.
+	redrawingUntil time.Time
+}
+
+func newRedrawingPtySession(redrawDuration time.Duration) *redrawingPtySession {
+	return &redrawingPtySession{redrawDuration: redrawDuration}
+}
+
+func (session *redrawingPtySession) WriteToPty(payload []byte) (int, error) {
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	session.writes = append(session.writes, recordedPtyWrite{
+		payload:  string(payload),
+		happened: time.Now(),
+	})
+	// A paste makes the TUI redraw; a bare Enter is not modelled as output
+	// because the test only cares about the window BEFORE the Enter.
+	if strings.Contains(string(payload), "\x1b[200~") {
+		session.redrawingUntil = time.Now().Add(session.redrawDuration)
+	}
+	return len(payload), nil
+}
+
+func (session *redrawingPtySession) LastOutputAt() time.Time {
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	if session.redrawingUntil.IsZero() {
+		return time.Time{}
+	}
+	// While the burst is still running the session looks busy "right now";
+	// once it ends, the last output stays pinned at the end of the burst.
+	if time.Now().Before(session.redrawingUntil) {
+		return time.Now()
+	}
+	return session.redrawingUntil
+}
+
+func (session *redrawingPtySession) IsBracketedPasteEnabled() bool { return true }
+
+func (session *redrawingPtySession) RecentOutput() []byte { return nil }
+
+// recordedWrites returns a copy so assertions never race the fake.
+func (session *redrawingPtySession) recordedWrites() []recordedPtyWrite {
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	copied := make([]recordedPtyWrite, len(session.writes))
+	copy(copied, session.writes)
+	return copied
+}
+
+// TestBracketedMacroSendsPasteThenEnter pins the delivery shape: the payload
+// is wrapped in bracketed-paste markers and the Enter that submits it is a
+// SEPARATE write. If the Enter were folded into the paste it would become one
+// more line of pasted text instead of a submit.
+func TestBracketedMacroSendsPasteThenEnter(t *testing.T) {
+	session := newRedrawingPtySession(0)
+
+	if _, _, err := writeMacro(session, "line one\nline two", "bracketed"); err != nil {
+		t.Fatalf("writeMacro returned an error: %v", err)
+	}
+
+	writes := session.recordedWrites()
+	if len(writes) != 2 {
+		t.Fatalf("expected exactly 2 writes (paste, Enter); got %d: %#v", len(writes), writes)
+	}
+	if !strings.HasPrefix(writes[0].payload, "\x1b[200~") || !strings.HasSuffix(writes[0].payload, "\x1b[201~") {
+		t.Errorf("first write is not a bracketed paste: %q", writes[0].payload)
+	}
+	if strings.Contains(writes[0].payload, "\n") {
+		t.Errorf("paste still contains a line feed; TUIs need CR: %q", writes[0].payload)
+	}
+	if writes[1].payload != "\r" {
+		t.Errorf("second write should be the submitting Enter; got %q", writes[1].payload)
+	}
+}
+
+// TestBracketedMacroWaitsForPasteToLandBeforeEnter is the regression guard for
+// the "the card pastes but never runs" bug.
+//
+// A fixed pause before the Enter is a race: when the receiving CLI is still
+// assembling the paste, the Enter is swallowed into it and the prompt sits in
+// the input box unsent. The Enter must instead wait until the CLI has stopped
+// redrawing, which is the observable proof that the paste has landed.
+func TestBracketedMacroWaitsForPasteToLandBeforeEnter(t *testing.T) {
+	const slowRedraw = 300 * time.Millisecond
+	session := newRedrawingPtySession(slowRedraw)
+
+	if _, _, err := writeMacro(session, "a slow-to-render payload", "bracketed"); err != nil {
+		t.Fatalf("writeMacro returned an error: %v", err)
+	}
+
+	writes := session.recordedWrites()
+	if len(writes) != 2 {
+		t.Fatalf("expected paste then Enter; got %d writes", len(writes))
+	}
+
+	gapBeforeEnter := writes[1].happened.Sub(writes[0].happened)
+	if gapBeforeEnter < slowRedraw {
+		t.Fatalf(
+			"Enter was sent %v after the paste, before the CLI stopped redrawing (%v) — "+
+				"it would be absorbed into the paste and the prompt would never be submitted",
+			gapBeforeEnter, slowRedraw,
+		)
+	}
+}
+
+// TestBracketedMacroEnterIsNotDelayedForeverByAChattyCli proves the wait is
+// capped. A CLI that never stops printing (a spinner, a progress bar) must not
+// hold the Enter indefinitely — a late submit is recoverable, a missing one is
+// not.
+func TestBracketedMacroEnterIsNotDelayedForeverByAChattyCli(t *testing.T) {
+	session := newRedrawingPtySession(30 * time.Second)
+
+	startedAt := time.Now()
+	if _, _, err := writeMacro(session, "payload", "bracketed"); err != nil {
+		t.Fatalf("writeMacro returned an error: %v", err)
+	}
+	elapsed := time.Since(startedAt)
+
+	writes := session.recordedWrites()
+	if len(writes) != 2 || writes[1].payload != "\r" {
+		t.Fatalf("Enter was never sent to a continuously-printing CLI: %#v", writes)
+	}
+
+	const enterWaitCap = macroPostPasteMaxWaitMs * time.Millisecond
+	if elapsed > enterWaitCap+(500*time.Millisecond) {
+		t.Errorf("waited %v before Enter; the cap is %v", elapsed, enterWaitCap)
+	}
+}
+
+// TestBracketedMacroSubmitsPromptlyWhenTheCliIsSilent guards the other edge:
+// a CLI that acknowledges the paste without redrawing must still get its Enter
+// quickly, so the common case does not feel sluggish.
+func TestBracketedMacroSubmitsPromptlyWhenTheCliIsSilent(t *testing.T) {
+	session := newRedrawingPtySession(0)
+
+	startedAt := time.Now()
+	if _, _, err := writeMacro(session, "payload", "bracketed"); err != nil {
+		t.Fatalf("writeMacro returned an error: %v", err)
+	}
+	elapsed := time.Since(startedAt)
+
+	const generousBudget = 750 * time.Millisecond
+	if elapsed > generousBudget {
+		t.Errorf("a silent CLI waited %v for its Enter; budget is %v", elapsed, generousBudget)
+	}
+}
+
+// TestChunkedMacroAlsoWaitsForThePasteToLand keeps the fallback path honest:
+// the CLIs that do not advertise bracketed paste have the same race.
+func TestChunkedMacroAlsoWaitsForThePasteToLand(t *testing.T) {
+	session := newRedrawingPtySession(0)
+
+	if _, _, err := writeMacro(session, "one\ntwo", "chunked"); err != nil {
+		t.Fatalf("writeMacro returned an error: %v", err)
+	}
+
+	writes := session.recordedWrites()
+	if len(writes) == 0 {
+		t.Fatal("chunked mode wrote nothing")
+	}
+	if writes[len(writes)-1].payload != "\r" {
+		t.Errorf("chunked mode did not finish with a submitting Enter; got %q", writes[len(writes)-1].payload)
+	}
+}
