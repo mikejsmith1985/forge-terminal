@@ -173,7 +173,17 @@ export const PORTFOLIO_THESIS = {
     "appSlug": "u2-counter",
     "featureId": "mcp-transcript",
     "claim": "I had never heard of Eclipse or a Pick database on Friday afternoon. By Monday morning this was running.",
-    "detail": "An AI answering trade-counter questions against a 1960s MultiValue ERP, through a hardened fork of the U2 MCP server. Every call it made is shown under the answer, and the raw record with its separator bytes is the part a relational database could not have produced."
+    "detail": "An AI answering trade-counter questions against a 1960s MultiValue ERP, through a hardened fork of the U2 MCP server. Every call it made is shown under the answer, and the raw record with its separator bytes is the part a relational database could not have produced.",
+    "links": [
+      {
+        "label": "The seven fixes, each measured against the original",
+        "repoPath": "u2-mcp/blob/main/evidence/hardening-evidence.md"
+      },
+      {
+        "label": "What it does not show",
+        "repoPath": "u2-counter/blob/main/docs/what-it-does-not-show.md"
+      }
+    ]
   },
   "subclaims": [
     {

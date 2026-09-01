@@ -188,3 +188,25 @@ test('the renderer turns a repo path into a link and escapes it', () => {
   // two links cannot live there.
   assert.match(rendererSource, /DEPTH_APP_SLUGS = \[[^\]]*'u2-counter'/);
 });
+
+test('the hero claim carries its own proof link', async () => {
+  // The claim was moved to the top of the page and its evidence was not, which
+  // put the least believable statement on the site five screens from the only
+  // thing that supports it. A reader doubting "a weekend" does so immediately.
+  const { PORTFOLIO_THESIS } = await import(pathToFileURL(PORTFOLIO_NARRATIVE_PATH).href);
+  const lead = PORTFOLIO_THESIS.leadArtifact;
+
+  assert.ok(lead.links?.length >= 1, 'the lead artefact needs at least one proof link.');
+  assert.match(
+    lead.links[0].repoPath,
+    /evidence\/hardening-evidence\.md$/,
+    'the evidence table leads, because it is what the claim rests on.',
+  );
+
+  const rendererSource = fs.readFileSync(PORTFOLIO_RENDERER_PATH, 'utf8');
+  assert.match(
+    rendererSource,
+    /createLeadArtifact[\s\S]*createAppLinks\(lead\)/,
+    'the hero must render its links, not merely carry them in data.',
+  );
+});
