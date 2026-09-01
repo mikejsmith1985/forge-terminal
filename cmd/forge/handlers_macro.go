@@ -66,6 +66,11 @@ type MacroResponse struct {
 	WaitedMs  int64  `json:"waitedMs"`
 	Mode      string `json:"mode"` // "bracketed" | "chunked"
 	Bytes     int    `json:"bytes"`
+
+	// SettleMs is how long the paste took to land before Enter was sent.
+	// Surfaced so a future "the card pasted but did not run" report can be
+	// triaged from the log instead of guessed at.
+	SettleMs int64 `json:"settleMs"`
 }
 
 // Defaults tuned against copilot/claude/aider cold-starts.  They are
@@ -88,12 +93,35 @@ const (
 	// typing.
 	macroChunkPauseMs = 8
 
-	// macroPostPasteSettleMs is how long we wait between the closing
-	// bracketed-paste marker (or final chunk) and the trailing carriage
-	// return that submits the prompt.  TUIs need a moment to ingest the
-	// paste event before Enter; without this, the Enter sometimes wins
-	// the race and submits a partial buffer.
-	macroPostPasteSettleMs = 50
+	// The three knobs below govern the pause between the closing bracketed-
+	// paste marker (or final chunk) and the trailing carriage return that
+	// submits the prompt.
+	//
+	// A FIXED pause here was the cause of the "the card pastes but never
+	// runs" bug.  Modern AI CLIs do not act on a paste the instant the
+	// closing marker arrives — they assemble it, then redraw their input box
+	// as a "[Pasted text +N lines]" placeholder.  An Enter that arrives
+	// before that assembly finishes is read as one more line INSIDE the
+	// paste rather than as "submit", so the prompt sits in the input box
+	// unsent.  At 50 ms the Enter won that race only some of the time, which
+	// is why the command card worked intermittently.
+	//
+	// The fix is to stop guessing: wait until the CLI has stopped redrawing,
+	// which is the observable proof that the paste has landed.
+
+	// macroPostPasteFloorMs is the head start the CLI gets to begin echoing
+	// the paste.  Without it, quiet-detection would look at a terminal that
+	// has not reacted yet, call it quiet, and send Enter immediately.
+	macroPostPasteFloorMs = 50
+
+	// macroPostPasteQuietMs is the continuous silence that proves the CLI has
+	// finished drawing the pasted text and is waiting for the next keystroke.
+	macroPostPasteQuietMs = 150
+
+	// macroPostPasteMaxWaitMs caps the wait so a CLI that never stops
+	// printing (a spinner, a progress bar) cannot hold the Enter forever.
+	// A late submit is recoverable; a missing one is the bug being fixed.
+	macroPostPasteMaxWaitMs = 2000
 )
 
 // ptyActivityReader is the minimal read-only view of a terminal session
@@ -109,6 +137,14 @@ type ptyActivityReader interface {
 // ptyActivityReader so test doubles only need to implement what they use.
 type ptyWriter interface {
 	WriteToPty([]byte) (int, error)
+}
+
+// ptySession is a session the macro path both watches and writes to.  The
+// delivery step needs BOTH halves: it writes the paste, then watches the
+// terminal to learn when that paste has landed before writing the Enter.
+type ptySession interface {
+	ptyActivityReader
+	ptyWriter
 }
 
 // registerMacroHandler wires POST /api/terminal/{id}/macro into the
@@ -167,7 +203,7 @@ func handleMacro(w http.ResponseWriter, r *http.Request) {
 	}
 	session, found := termHandler.GetSession(sessionID)
 	if !found {
-		appendMacroLog(sessionID, "n/a", 0, len(req.Payload), false, "session not found")
+		appendMacroLog(sessionID, "n/a", 0, 0, len(req.Payload), false, "session not found")
 		writeMacroError(w, http.StatusNotFound, "session not found", nil)
 		return
 	}
@@ -186,21 +222,23 @@ func handleMacro(w http.ResponseWriter, r *http.Request) {
 	waitForPTYQuiet(session, req.QuietMs, req.MaxDelayMs, startedAt, baseline)
 
 	mode := pickMacroMode(session, req.Mode)
-	bytesWritten, err := writeMacro(session, req.Payload, mode)
+	bytesWritten, settleWait, err := writeMacro(session, req.Payload, mode)
 
 	waited := time.Since(startedAt).Milliseconds()
+	settleMs := settleWait.Milliseconds()
 	if err != nil {
-		appendMacroLog(sessionID, mode, waited, len(req.Payload), false, err.Error())
+		appendMacroLog(sessionID, mode, waited, settleMs, len(req.Payload), false, err.Error())
 		writeMacroError(w, http.StatusInternalServerError, "failed to write macro", err)
 		return
 	}
 
-	appendMacroLog(sessionID, mode, waited, bytesWritten, true, "")
+	appendMacroLog(sessionID, mode, waited, settleMs, bytesWritten, true, "")
 	writeJSON(w, http.StatusOK, MacroResponse{
 		Delivered: true,
 		WaitedMs:  waited,
 		Mode:      mode,
 		Bytes:     bytesWritten,
+		SettleMs:  settleMs,
 	})
 }
 
@@ -311,8 +349,9 @@ func pickMacroMode(session ptyActivityReader, requestedMode string) string {
 }
 
 // writeMacro performs the actual PTY write.  It returns the total bytes
-// written (excluding the trailing CR) so the caller can log the size.
-func writeMacro(session ptyWriter, payload, mode string) (int, error) {
+// written (excluding the trailing CR) and how long it waited for the paste to
+// land before submitting, so the caller can log both.
+func writeMacro(session ptySession, payload, mode string) (int, time.Duration, error) {
 	// Normalise newlines: bracketed-paste mode expects CR (0x0D) as the
 	// in-paste line separator.  Chunked-typed mode also wants CR, since
 	// most TUIs interpret LF mid-input as a literal character.
@@ -325,37 +364,63 @@ func writeMacro(session ptyWriter, payload, mode string) (int, error) {
 	return writeChunked(session, normalized)
 }
 
-func writeBracketed(session ptyWriter, payload string) (int, error) {
-	var buf bytes.Buffer
-	buf.WriteString("\x1b[200~")
-	buf.WriteString(payload)
-	buf.WriteString("\x1b[201~")
-	if _, err := session.WriteToPty(buf.Bytes()); err != nil {
-		return 0, err
+// writeBracketed delivers the payload as a single paste event, then submits it.
+func writeBracketed(session ptySession, payload string) (int, time.Duration, error) {
+	var pasteBuffer bytes.Buffer
+	pasteBuffer.WriteString("\x1b[200~")
+	pasteBuffer.WriteString(payload)
+	pasteBuffer.WriteString("\x1b[201~")
+	if _, err := session.WriteToPty(pasteBuffer.Bytes()); err != nil {
+		return 0, 0, err
 	}
-	time.Sleep(macroPostPasteSettleMs * time.Millisecond)
-	if _, err := session.WriteToPty([]byte("\r")); err != nil {
-		return len(payload), err
-	}
-	return len(payload), nil
+	return submitAfterPasteLands(session, len(payload))
 }
 
-func writeChunked(session ptyWriter, payload string) (int, error) {
+// writeChunked delivers the payload as simulated typing, for CLIs that never
+// advertised bracketed-paste support, then submits it.
+func writeChunked(session ptySession, payload string) (int, time.Duration, error) {
 	for offset := 0; offset < len(payload); offset += macroChunkSize {
 		end := offset + macroChunkSize
 		if end > len(payload) {
 			end = len(payload)
 		}
 		if _, err := session.WriteToPty([]byte(payload[offset:end])); err != nil {
-			return offset, err
+			return offset, 0, err
 		}
 		time.Sleep(macroChunkPauseMs * time.Millisecond)
 	}
-	time.Sleep(macroPostPasteSettleMs * time.Millisecond)
+	return submitAfterPasteLands(session, len(payload))
+}
+
+// submitAfterPasteLands waits for the receiving CLI to finish drawing the text
+// it was just given, then presses Enter.
+//
+// Waiting on the terminal itself — rather than on a fixed timer — is what makes
+// the submit reliable: a CLI only redraws its input box AFTER it has finished
+// absorbing a paste, so silence following that redraw is proof that the next
+// carriage return will be read as "submit" rather than as one more line of
+// pasted text.
+func submitAfterPasteLands(session ptySession, payloadBytes int) (int, time.Duration, error) {
+	waitStartedAt := time.Now()
+	awaitPasteAbsorbed(session)
+	settleWait := time.Since(waitStartedAt)
+
 	if _, err := session.WriteToPty([]byte("\r")); err != nil {
-		return len(payload), err
+		return payloadBytes, settleWait, err
 	}
-	return len(payload), nil
+	return payloadBytes, settleWait, nil
+}
+
+// awaitPasteAbsorbed blocks until the terminal has been quiet long enough to
+// show the paste has been taken in, or until the cap expires.
+func awaitPasteAbsorbed(session ptyActivityReader) {
+	baseline := time.Now()
+
+	// Give the CLI a head start to react before judging it "quiet"; otherwise
+	// a terminal that simply has not responded yet looks silent.
+	time.Sleep(macroPostPasteFloorMs * time.Millisecond)
+
+	waitForPTYQuiet(session, macroPostPasteQuietMs, macroPostPasteMaxWaitMs, baseline, baseline)
 }
 
 // writeMacroError emits a structured error response and logs internally.
@@ -373,10 +438,12 @@ func writeMacroError(w http.ResponseWriter, status int, msg string, cause error)
 
 // writeJSON is defined in handlers_notify.go and reused here.
 
-// appendMacroLog writes one line to ~/.forge/logs/macro.log.  Best-effort:
+// appendMacroLog writes one line to ~/.forge/logs/macro.log.  settleMs records
+// how long the Enter waited for the paste to land, which is the field to read
+// first when a command card pastes without running.  Best-effort:
 // if the log can't be written we still proceed with the response so a
 // disk-full edge case can't break the user-visible flow.
-func appendMacroLog(sessionID, mode string, waitedMs int64, bytesWritten int, delivered bool, errMsg string) {
+func appendMacroLog(sessionID, mode string, waitedMs, settleMs int64, bytesWritten int, delivered bool, errMsg string) {
 	logsDir := filepath.Join(storage.GetForgeDir(), "logs")
 	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		log.Printf("[Macro] failed to ensure logs dir: %v", err)
@@ -391,9 +458,9 @@ func appendMacroLog(sessionID, mode string, waitedMs int64, bytesWritten int, de
 	defer f.Close()
 
 	line := fmt.Sprintf(
-		"%s session=%s waited=%dms mode=%s bytes=%d delivered=%t",
+		"%s session=%s waited=%dms settle=%dms mode=%s bytes=%d delivered=%t",
 		time.Now().UTC().Format(time.RFC3339),
-		sessionID, waitedMs, mode, bytesWritten, delivered,
+		sessionID, waitedMs, settleMs, mode, bytesWritten, delivered,
 	)
 	if errMsg != "" {
 		line += " err=" + strings.ReplaceAll(errMsg, "\n", " ")

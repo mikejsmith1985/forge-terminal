@@ -412,7 +412,7 @@ func injectSddCommand(sessionID, text string) {
 	time.Sleep(time.Duration(defaultMacroMinDelayMs) * time.Millisecond)
 	waitForPTYQuiet(session, defaultMacroQuietMs, defaultMacroMaxDelayMs, startedAt, startedAt)
 	mode := pickMacroMode(session, "")
-	if _, err := writeMacro(session, text, mode); err != nil {
+	if _, _, err := writeMacro(session, text, mode); err != nil {
 		log.Printf("[sdd] inject failed for session %s: %v", sessionID, err)
 	}
 }
