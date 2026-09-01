@@ -112,6 +112,7 @@ function createLeadArtifact() {
       <figcaption>
         <p class="lead-artifact__claim">${escapeHtml(lead.claim)}</p>
         <p class="lead-artifact__detail">${escapeHtml(lead.detail)}</p>
+        ${createAppLinks(lead)}
       </figcaption>
     </figure>`;
 }
