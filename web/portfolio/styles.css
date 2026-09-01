@@ -379,10 +379,16 @@ main > section {
   font-weight: 500;
 }
 
+/* Two columns rather than one. The flagship and depth sections were 70% of the
+   page between them, entirely because every screenshot was stacked full-width
+   with its caption beneath. Pairing them halves the scroll and loses nothing —
+   the reader still sees every surface, just without paying a screen apiece.
+   Demotion of space, not of content. */
 .flagship__figures {
   display: grid;
-  gap: 60px;
-  margin-top: 60px;
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  gap: 44px 32px;
+  margin-top: 48px;
 }
 
 .flagship-figure { margin: 0; }
@@ -394,14 +400,13 @@ main > section {
 }
 .flagship-figure figcaption {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px 40px;
-  margin-top: 22px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin-top: 16px;
 }
 .flagship-figure h4 {
-  grid-column: 1 / -1;
-  margin: 0 0 4px;
-  font-size: 21px;
+  margin: 0 0 2px;
+  font-size: 18px;
   letter-spacing: -0.02em;
 }
 .figure-why { margin: 0; color: var(--text-muted); font-size: 15px; }
@@ -686,3 +691,29 @@ main > section {
 @media (max-width: 520px) {
   .masthead__nav { display: none; }
 }
+
+/* ── Architecture, collapsed ──────────────────────────────────────────────── */
+/* The diagram is the deepest artefact on the page. Open, it costs every reader
+   a screen and a half; closed, it costs one line and stays one click away. */
+
+.arch-details { margin-top: 28px; }
+
+.arch-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cyan);
+  border-radius: 8px;
+  background: var(--ink-card);
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--text);
+}
+.arch-summary::-webkit-details-marker { display: none; }
+.arch-summary::before { content: '▸ '; color: var(--cyan); }
+.arch-details[open] .arch-summary::before { content: '▾ '; }
+.arch-summary:hover { border-color: var(--cyan); }
+
+/* The heading inside repeats the summary, so it is hidden once open. */
+.arch-details[open] .arch-heading { display: none; }

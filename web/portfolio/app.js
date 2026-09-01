@@ -210,6 +210,12 @@ function createArchitectureSlot(appSlug) {
   return appSlug === ARCHITECTURE_APP_SLUG ? '<div class="architecture-slot"></div>' : '';
 }
 
+/** Reports whether a feature is the one already shown in the hero. */
+function isLeadArtifact(appSlug, featureId) {
+  const lead = PORTFOLIO_THESIS.leadArtifact;
+  return lead.appSlug === appSlug && lead.featureId === featureId;
+}
+
 function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
   const portfolioApp = PORTFOLIO_APPS.find((app) => app.slug === appSlug);
   if (!portfolioApp) {
@@ -217,7 +223,12 @@ function renderFullWidthApp(appSlug, sectionSelector, kicker, figureClassName) {
   }
 
   const headingId = `${appSlug}-heading`;
+
+  // The hero already shows one artefact in full. Repeating it here reads as
+  // padding — the reader recognises the picture, learns nothing, and starts
+  // skimming the section that was meant to hold their attention.
   const figuresMarkup = portfolioApp.features
+    .filter((feature) => !isLeadArtifact(portfolioApp.slug, feature.id))
     .map((feature) => createFeatureFigure(feature, portfolioApp, figureClassName))
     .join('');
 
@@ -351,7 +362,14 @@ function renderArchitecture() {
     throw new Error('The architecture slot is missing from the LG-Builder entry.');
   }
 
+  // Collapsed by default. The diagram is the deepest thing on the page and cost
+  // every reader roughly a screen and a half to scroll past, including the ones
+  // who leave in fifteen seconds. Anybody who wants it opens it; nobody has to
+  // pay for it. Demotion rather than deletion — it is still the strongest thing
+  // in this entry for the reader who reaches it.
   architectureHost.innerHTML = `
+    <details class="arch-details">
+    <summary class="arch-summary">How a ticket moves through the graph — the compiled graph, node by node</summary>
     <h3 class="arch-heading">How a ticket moves through the graph</h3>
     <p class="arch-intro">Every box below is a node the compiled graph registers, named exactly as
       the orchestrator names it. State travels between them as
@@ -363,7 +381,8 @@ function renderArchitecture() {
     <p class="arch-branch-label">One decision, four routes</p>
     <div class="arch-routes">${ARCHITECTURE_ROUTES.map(createArchitectureRoute).join('')}</div>
     ${createControlPlaneCallout()}
-    ${createObservabilityCallout()}`;
+    ${createObservabilityCallout()}
+    </details>`;
 }
 
 // ── Debugging case studies ──────────────────────────────────────────────────
