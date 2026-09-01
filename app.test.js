@@ -145,10 +145,18 @@ test('U2 Counter publishes the headline, key points, and links it leads with', a
   assert.match(JSON.stringify(counterApp.keyPoints), /regression test/i);
   assert.match(JSON.stringify(counterApp.keyPoints), /never been validated against a live/i);
 
-  assert.equal(counterApp.links.length, 2);
+  assert.equal(counterApp.links.length, 3);
+
+  // The evidence link leads, because the claim it supports is the one a reader
+  // is most entitled to doubt. "Built it in a weekend" is what every junior
+  // says; a table showing each fix failing upstream and passing on the fork is
+  // not. Without it the strongest claim on the page was the only one with no
+  // one-click proof, while weaker claims shipped shell commands.
+  assert.match(counterApp.links[0].repoPath, /evidence\/hardening-evidence\.md$/);
+
   for (const publishedLink of counterApp.links) {
     assert.ok(publishedLink.label, 'every link needs a label.');
-    assert.match(publishedLink.repoPath, /^u2-counter/, 'links resolve under the repo base URL.');
+    assert.match(publishedLink.repoPath, /^u2-(counter|mcp)/, 'links resolve under the repo base URL.');
     assert.ok(
       !('href' in publishedLink),
       'a link must carry a repo path, not a full URL, so no handle reaches the data file.',
