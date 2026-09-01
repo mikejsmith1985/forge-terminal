@@ -149,21 +149,21 @@ main > section {
 
 /* ── Thesis ───────────────────────────────────────────────────────────────── */
 
-.thesis { padding-top: 108px; padding-bottom: 84px; }
+.thesis { padding-top: 72px; padding-bottom: 72px; }
 
 .thesis h1 {
   margin: 0 0 30px;
-  max-width: 22ch;
-  font-size: clamp(38px, 6.2vw, 68px);
-  line-height: 1.06;
+  max-width: 30ch;
+  font-size: clamp(32px, 4.2vw, 50px);
+  line-height: 1.1;
   letter-spacing: -0.035em;
   font-weight: 680;
 }
 
 .thesis__statement {
   max-width: var(--measure);
-  margin: 0 0 52px;
-  font-size: clamp(18px, 2vw, 21px);
+  margin: 0 0 26px;
+  font-size: clamp(17px, 1.7vw, 19px);
   line-height: 1.62;
   color: var(--text-muted);
 }
@@ -316,6 +316,60 @@ main > section {
 /* The evidence note sits closer to a link row than to a paragraph, because the
    links are pill-shaped and carry their own padding. */
 .app-links + .evidence-note { margin-top: 30px; }
+
+/* ── Hero: role, stack, and the first artefact ────────────────────────────── */
+/* The page used to open with a philosophical claim from an unidentified person
+   and put its first image roughly three screens down. A reader deciding in
+   seconds needs to know who is speaking, in what stack, and to see one thing
+   that was actually built — before being asked to accept an argument. */
+
+.thesis__role { color: var(--cyan); }
+
+.thesis__stack { margin-top: 18px; }
+
+.thesis__lead { margin-top: 26px; }
+
+.lead-artifact {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.lead-artifact img {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--ink);
+}
+
+/* The claim sits beside the artefact rather than under it, so the two are read
+   as one statement: here is the thing, and here is what it cost to build. */
+.lead-artifact__claim {
+  margin: 0 0 14px;
+  font-size: clamp(19px, 2.1vw, 25px);
+  line-height: 1.3;
+  font-weight: 550;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  border-left: 3px solid var(--cyan);
+  padding-left: 18px;
+}
+
+.lead-artifact__detail {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  /* Stacked, with the artefact first: on a phone the picture is what stops the
+     scroll, and a caption above it would be read as another paragraph. */
+  .lead-artifact { grid-template-columns: 1fr; gap: 20px; }
+  .lead-artifact__claim { padding-left: 14px; }
+}
 
 /* ── Flagship ─────────────────────────────────────────────────────────────── */
 

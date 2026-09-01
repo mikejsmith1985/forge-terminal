@@ -65,8 +65,11 @@ function selectElement(selector) {
 // ── Thesis ──────────────────────────────────────────────────────────────────
 
 function renderThesis() {
+  selectElement('.thesis__role').textContent = PORTFOLIO_THESIS.role;
   selectElement('#thesis-heading').textContent = PORTFOLIO_THESIS.headline;
   selectElement('.thesis__statement').textContent = PORTFOLIO_THESIS.statement;
+  selectElement('.thesis__stack').innerHTML = createStackChips(PORTFOLIO_THESIS.stack);
+  selectElement('.thesis__lead').innerHTML = createLeadArtifact();
 
   selectElement('.thesis__pillars').innerHTML = PORTFOLIO_THESIS.subclaims
     .map((subclaim) => `
@@ -75,6 +78,42 @@ function renderThesis() {
         <p>${escapeHtml(subclaim.detail)}</p>
       </li>`)
     .join('');
+}
+
+/** Emits the stack a recruiter scans for before reading a word of prose. */
+function createStackChips(stack) {
+  return stack
+    .map((technology) => `<span>${escapeHtml(technology)}</span>`)
+    .join('');
+}
+
+/**
+ * Emits the first artefact, so something built appears before any argument.
+ *
+ * The page used to put its first image 2,548 pixels down — roughly three
+ * screens of prose before a reader saw anything that had been made. This puts
+ * one in the opening screen, and picks the artefact that answers "can this
+ * person do the work" rather than the one that answers "how do they know it is
+ * right".
+ */
+function createLeadArtifact() {
+  const lead = PORTFOLIO_THESIS.leadArtifact;
+  const app = PORTFOLIO_APPS.find((candidate) => candidate.slug === lead.appSlug);
+  const feature = app?.features.find((candidate) => candidate.id === lead.featureId);
+
+  if (!app || !feature) {
+    throw new Error(`The lead artefact ${lead.appSlug}/${lead.featureId} is missing from the portfolio data.`);
+  }
+
+  return `
+    <figure class="lead-artifact">
+      <img src="${escapeHtml(feature.imagePath)}?v=${escapeHtml(ASSET_VERSION)}"
+           alt="${escapeHtml(app.name)} — ${escapeHtml(feature.title)}" />
+      <figcaption>
+        <p class="lead-artifact__claim">${escapeHtml(lead.claim)}</p>
+        <p class="lead-artifact__detail">${escapeHtml(lead.detail)}</p>
+      </figcaption>
+    </figure>`;
 }
 
 // ── Checkable numbers ───────────────────────────────────────────────────────

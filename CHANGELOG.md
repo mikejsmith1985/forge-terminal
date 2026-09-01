@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The portfolio opens with something built, not an argument** — Three reviewers independently said the page buried its own product, and measuring it settled the question: 19,416 pixels, 4,772 words, and the first image 2,548 pixels down — roughly three screens of prose before a reader saw anything that had been made. The page now opens with a role, the hook, the stack, and an artefact at 561 pixels: U2 Counter answering a trade-counter question against a 1960s MultiValue ERP, beside the line about never having heard of a Pick database on Friday afternoon. The opening statement went from 107 words to 45; the long version still exists further down, where somebody already interested will find it. The reviewers' other warning — that claiming everything is checkable reads as self-mythologising if the repositories are thin — turned out to be inverted here: every number was understated. 800+ tests are 896, 40 browser specs are 42, 565 releases are 569, 92 merged changes are 93. All corrected upward, and one verification command that returned a directory listing rather than a count now returns the count.
+- **The strongest claim on the page had no proof link, while weaker ones shipped shell commands** — U2 Counter's seven machine-verified fixes are the least believable-sounding thing on the site and had nothing to click. The card now leads with a link to the evidence table showing each fix failing on the upstream commit and passing on the fork. Making that link work meant merging the hardening branch into the fork's public main, which until now showed visitors what looked like an untouched copy of somebody else's project.
+
 ## [7.25.1] - 2026-08-31
 
 ---

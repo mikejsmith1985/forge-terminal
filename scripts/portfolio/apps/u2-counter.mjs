@@ -56,6 +56,16 @@ export const U2_COUNTER_APP = {
   // published here, because a container that scales to zero takes twenty seconds
   // to answer and a cold link reads as a broken one.
   links: [
+    // The evidence link leads, because the claim it supports is the one a
+    // reader is most entitled to doubt. "Built it in a weekend" is what every
+    // junior says; a table showing each fix failing on the upstream commit and
+    // passing on the fork, with the raw output of both runs, is not. Without
+    // this link the strongest claim on the page was the only one with no
+    // one-click proof, while weaker claims shipped shell commands.
+    {
+      label: 'The seven fixes, measured against the original',
+      repoPath: 'u2-mcp/blob/main/evidence/hardening-evidence.md',
+    },
     {
       label: 'Source — u2-counter',
       repoPath: 'u2-counter',
