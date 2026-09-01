@@ -167,7 +167,7 @@ export const PORTFOLIO_THESIS = {
     "WebSockets",
     "PTY"
   ],
-  "headline": "I direct coding agents, and I built the machinery that makes their output trustworthy.",
+  "headline": "I direct coding agents, and I built the machinery that refuses their work when the proof is missing.",
   "statement": "The hard problem in agent-assisted engineering is not getting code written — it is proving the code does what it claims before it reaches anyone. Every number below ships with the command that proves it, and every debugging story names the commit that fixed it.",
   "leadArtifact": {
     "appSlug": "u2-counter",

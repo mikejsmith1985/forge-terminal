@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The headline claimed more than the work behind it does** — "the machinery that makes their output trustworthy" was the one sentence on the page that did not survive contact with what was built: the comprehension gate concedes in its own specification that what an agent says cannot be enforced, only what it does. The headline now says what the machinery actually does — it refuses work when the proof is missing — which is both literally true and the more specific sentence. The two neighbouring claims a reviewer also flagged were checked and left alone: every proof number does ship with a command, and all six return exactly the figure claimed; every debugging story does name its commit, and all five resolve. Softening a claim that is exactly true is not calibration, it is a different inaccuracy — a reader who checks then finds the page undersold.
 - **The hero claim had no proof beside it** — Moving U2 Counter's Friday-to-Monday line to the top of the page without moving its evidence recreated the exact problem the evidence link was added to solve. The claim sat at 561 pixels and the only thing supporting it at 5,569 — five screens away, in a different section — so a reader who doubted "a weekend" had nothing to click at the moment they doubted it. Both the evidence table and the limitations document now sit directly under the claim.
 
 ### Changed
