@@ -38,6 +38,23 @@ export const PORTFOLIO_THESIS = {
       'An AI answering trade-counter questions against a 1960s MultiValue ERP, through a hardened '
       + 'fork of the U2 MCP server. Every call it made is shown under the answer, and the raw '
       + 'record with its separator bytes is the part a relational database could not have produced.',
+
+    // The claim needs its proof beside it, not five screens below it. Moving
+    // the claim to the top without moving its evidence recreated exactly the
+    // problem the evidence link was added to solve: the least believable thing
+    // on the page, with nothing to click. A reader who doubts "a weekend" does
+    // so in the first ten seconds, and by then they have either found the
+    // measurements or decided.
+    links: [
+      {
+        label: 'The seven fixes, each measured against the original',
+        repoPath: 'u2-mcp/blob/main/evidence/hardening-evidence.md',
+      },
+      {
+        label: 'What it does not show',
+        repoPath: 'u2-counter/blob/main/docs/what-it-does-not-show.md',
+      },
+    ],
   },
 
   subclaims: [
