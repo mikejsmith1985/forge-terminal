@@ -408,6 +408,7 @@ function renderCaseStudies() {
         </header>
         <div class="case-study__beats">
           ${createCaseStudyBeat('Symptom', caseStudy.symptom, 'symptom')}
+          <!-- The pair the whole section exists for: what was believed, beside what was true. -->
           ${createCaseStudyBeat('The obvious answer', caseStudy.assumedCause, 'wrong')}
           ${createCaseStudyBeat('Actual cause', caseStudy.actualCause, 'actual')}
           ${createCaseStudyBeat('Why it mattered', caseStudy.whyItMattered, 'insight')}

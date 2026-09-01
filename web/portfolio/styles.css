@@ -459,9 +459,31 @@ main > section {
   color: var(--cyan);
 }
 
+/* The post-mortem, laid out as the argument it is.
+ *
+ * Five equal columns gave equal weight to five unequal things, and the pair
+ * that makes these stories worth reading — the theory that was wrong, beside
+ * the cause that was real — was just two columns of five. Now the symptom
+ * opens, the contradiction sits across the middle as a pair, and the
+ * consequence and the receipt close underneath. Same words, read in the order
+ * the reasoning actually happened. */
 .case-study__beats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* The symptom is what was observed, so it opens across the full width. */
+.beat--symptom { grid-column: 1 / -1; }
+
+/* The consequence and the receipt are the footnotes to the contradiction, not
+   equals of it, so they read smaller. */
+.beat--insight .beat__text,
+.beat--proof .beat__text { font-size: 14px; }
+
+@media (max-width: 720px) {
+  /* One column on a phone: the contrast is carried by the labels and colour
+     rather than by two columns too narrow to read either side of it. */
+  .case-study__beats { grid-template-columns: 1fr; }
 }
 
 .beat {
@@ -486,10 +508,14 @@ main > section {
 }
 
 /* Colour carries the argument: the wrong theory is marked, the real one is not. */
-.beat--wrong { background: rgba(245, 158, 11, 0.045); }
+.beat--wrong { background: rgba(245, 158, 11, 0.06); border-left: 3px solid var(--amber); }
 .beat--wrong .beat__label { color: var(--amber); }
-.beat--actual .beat__label { color: var(--text); }
-.beat--actual .beat__text { color: var(--text); }
+.beat--wrong .beat__text { color: var(--text-muted); }
+/* The real cause is the one claim in the pair that survived, so it is the one
+   set in full-strength type against the theory that did not. */
+.beat--actual { background: rgba(34, 211, 238, 0.05); border-left: 3px solid var(--cyan); }
+.beat--actual .beat__label { color: var(--cyan); }
+.beat--actual .beat__text { color: var(--text); font-weight: 450; }
 .beat--insight .beat__label { color: var(--violet); }
 .beat--proof { background: rgba(34, 211, 238, 0.04); }
 .beat--proof .beat__label { color: var(--cyan); }
