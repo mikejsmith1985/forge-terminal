@@ -15,7 +15,7 @@ export const PORTFOLIO_THESIS = {
 
   stack: ['Go', 'React', 'MCP', 'Playwright', 'WebSockets', 'PTY'],
 
-  headline: 'I direct coding agents, and I built the machinery that makes their output trustworthy.',
+  headline: 'I direct coding agents, and I built the machinery that refuses their work when the proof is missing.',
 
   // Two sentences. The long version of this argument was 107 words at the top of
   // the page, ahead of any evidence — which asked the reader to accept the
