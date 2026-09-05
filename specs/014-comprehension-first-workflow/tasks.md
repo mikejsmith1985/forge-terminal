@@ -75,6 +75,11 @@ that must first fail.
 
 ## Phase 5: User Story 3 — The response format is enforced, not merely requested (P1)
 
+> **REVERTED 2026-09-05.** Shipped in v7.25.0 and removed in the next release. The warning fired on
+> every waiting→idle transition, which a terminal produces on scrolling and typing, not only when a
+> reply ends. It was noise, and noise is worse than nothing. T026–T030 below are kept as history;
+> the code they describe no longer exists.
+
 **Goal**: A wall of text is detected and surfaced. It is **never** blocked — the detector reads screen redraws and cannot be trusted to gate.
 
 **Independent test**: Quickstart Scenario 5, prose half — cause a long unformatted response; a warning appears and nothing is blocked.
