@@ -34,6 +34,7 @@ by `internal/mcp/tools_workflow_gate.go`.
 | `isRoutine` | boolean | yes | An explicit claim that no real decision was made |
 | `decisions` | array | conditional | Required unless `isRoutine` is true |
 | `filesTouched` | integer | yes | A count, not a list |
+| `sessionId` | string | effectively yes | The calling tab's `FORGE_SESSION_ID`. Names both the panel that renders the brief and the project it is filed under; omitted, the brief is stored and gated but rendered nowhere, and the result says so |
 
 Each entry in `decisions`:
 

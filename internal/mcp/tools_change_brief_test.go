@@ -39,7 +39,7 @@ func validBriefArgs() map[string]any {
 
 func TestPublishingAValidBriefRecordsTheGate(t *testing.T) {
 	projectRoot := t.TempDir()
-	tool := newChangeBriefPublishTool(staticProjectPath(projectRoot), nil)
+	tool := newChangeBriefPublishTool(staticSessionProjectPath(projectRoot), nil)
 
 	result, err := tool.Execute(validBriefArgs())
 	if err != nil {
@@ -65,7 +65,7 @@ func TestPublishingAValidBriefRecordsTheGate(t *testing.T) {
 func TestPublishingReturnsTheBriefIdentity(t *testing.T) {
 	// The caller needs the identity back so a correction can replace the brief
 	// rather than adding a second one.
-	tool := newChangeBriefPublishTool(staticProjectPath(t.TempDir()), nil)
+	tool := newChangeBriefPublishTool(staticSessionProjectPath(t.TempDir()), nil)
 
 	result, err := tool.Execute(validBriefArgs())
 	if err != nil {
@@ -78,7 +78,7 @@ func TestPublishingReturnsTheBriefIdentity(t *testing.T) {
 
 func TestAnInvalidBriefRecordsNothing(t *testing.T) {
 	projectRoot := t.TempDir()
-	tool := newChangeBriefPublishTool(staticProjectPath(projectRoot), nil)
+	tool := newChangeBriefPublishTool(staticSessionProjectPath(projectRoot), nil)
 
 	args := validBriefArgs()
 	args["whatCouldBreak"] = ""
@@ -107,7 +107,7 @@ func TestAnInvalidBriefRecordsNothing(t *testing.T) {
 func TestARejectionNamesTheOffendingField(t *testing.T) {
 	// An agent told only that something was wrong will guess.  Naming the field
 	// is what makes the rejection actionable.
-	tool := newChangeBriefPublishTool(staticProjectPath(t.TempDir()), nil)
+	tool := newChangeBriefPublishTool(staticSessionProjectPath(t.TempDir()), nil)
 
 	args := validBriefArgs()
 	args["whyItChanged"] = ""
@@ -120,7 +120,7 @@ func TestARejectionNamesTheOffendingField(t *testing.T) {
 }
 
 func TestOmittingDecisionsWithoutClaimingRoutineIsRejected(t *testing.T) {
-	tool := newChangeBriefPublishTool(staticProjectPath(t.TempDir()), nil)
+	tool := newChangeBriefPublishTool(staticSessionProjectPath(t.TempDir()), nil)
 
 	args := validBriefArgs()
 	delete(args, "decisions")
@@ -135,7 +135,7 @@ func TestOmittingDecisionsWithoutClaimingRoutineIsRejected(t *testing.T) {
 
 func TestARoutineChangeMayPublishWithNoDecisions(t *testing.T) {
 	projectRoot := t.TempDir()
-	tool := newChangeBriefPublishTool(staticProjectPath(projectRoot), nil)
+	tool := newChangeBriefPublishTool(staticSessionProjectPath(projectRoot), nil)
 
 	args := validBriefArgs()
 	delete(args, "decisions")
@@ -153,7 +153,7 @@ func TestARoutineChangeMayPublishWithNoDecisions(t *testing.T) {
 func TestPublishingWithNoTaskIsRejected(t *testing.T) {
 	// Without a task the brief cannot be tied to the ledger entry that gates
 	// the commit, so it would be stored and enforce nothing.
-	tool := newChangeBriefPublishTool(staticProjectPath(t.TempDir()), nil)
+	tool := newChangeBriefPublishTool(staticSessionProjectPath(t.TempDir()), nil)
 
 	args := validBriefArgs()
 	delete(args, "taskId")
@@ -167,7 +167,7 @@ func TestPublishingWithNoTaskIsRejected(t *testing.T) {
 
 func TestRepublishingUpdatesRatherThanAccumulating(t *testing.T) {
 	projectRoot := t.TempDir()
-	tool := newChangeBriefPublishTool(staticProjectPath(projectRoot), nil)
+	tool := newChangeBriefPublishTool(staticSessionProjectPath(projectRoot), nil)
 
 	if _, err := tool.Execute(validBriefArgs()); err != nil {
 		t.Fatalf("first publish should succeed, got: %v", err)

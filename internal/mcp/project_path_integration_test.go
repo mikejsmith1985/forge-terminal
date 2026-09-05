@@ -37,7 +37,7 @@ func TestABriefIsWrittenToTheResolvedProjectNotTheProcessDirectory(t *testing.T)
 	mustCreateDirectory(t, filepath.Join(projectRoot, ".git"))
 
 	resolver := NewProjectPathResolver(func() string { return projectRoot }, unwritableProcessDirectory)
-	tool := newChangeBriefPublishTool(resolver, nil)
+	tool := newChangeBriefPublishTool(forEverySession(resolver), nil)
 
 	result, err := tool.Execute(validBriefArguments())
 	if err != nil {
@@ -66,7 +66,7 @@ func TestTheGateIsRecordedInTheResolvedProject(t *testing.T) {
 	mustCreateDirectory(t, filepath.Join(projectRoot, ".git"))
 
 	resolver := NewProjectPathResolver(func() string { return projectRoot }, t.TempDir())
-	tool := newChangeBriefPublishTool(resolver, nil)
+	tool := newChangeBriefPublishTool(forEverySession(resolver), nil)
 
 	if _, err := tool.Execute(validBriefArguments()); err != nil {
 		t.Fatalf("publishing should not error, got: %v", err)
@@ -86,7 +86,7 @@ func TestAnUnresolvableProjectIsSaidPlainly(t *testing.T) {
 	// which describes a symptom of a decision made much earlier. An agent given
 	// that has nothing to act on.
 	resolver := NewProjectPathResolver(nil, t.TempDir())
-	tool := newChangeBriefPublishTool(resolver, nil)
+	tool := newChangeBriefPublishTool(forEverySession(resolver), nil)
 
 	result, err := tool.Execute(validBriefArguments())
 	if err != nil {

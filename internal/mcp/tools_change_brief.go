@@ -39,11 +39,24 @@ type changeBriefPublishTool struct {
 	// A brief belongs to the project the developer's tab is in, and a path
 	// captured when Forge started describes where Forge was launched instead —
 	// which on Windows meant attempting to write into C:\WINDOWS\system32.
-	resolveProjectPath func() string
+	//
+	// It takes the calling session: the same id names the tab whose panel
+	// should show the brief and the project the brief belongs to.
+	resolveProjectPath func(sessionID string) string
 	broadcaster        briefBroadcaster
 }
 
-func newChangeBriefPublishTool(resolveProjectPath func() string, broadcaster briefBroadcaster) ToolHandler {
+// missingSessionWarning is returned when a brief was published with no
+// session, so the agent learns why nothing appeared rather than assuming it did.
+const missingSessionWarning = "not rendered: no sessionId was given. Pass the value of the FORGE_SESSION_ID " +
+	"environment variable from your terminal so the brief appears in that tab and is filed under its project."
+
+// unreachableSessionWarning is returned when a session was named but no tab
+// with that id is connected to receive the brief.
+const unreachableSessionWarning = "not rendered: no connected tab has that sessionId. Check the value of " +
+	"FORGE_SESSION_ID in the terminal you are working in."
+
+func newChangeBriefPublishTool(resolveProjectPath func(sessionID string) string, broadcaster briefBroadcaster) ToolHandler {
 	return &changeBriefPublishTool{resolveProjectPath: resolveProjectPath, broadcaster: broadcaster}
 }
 
@@ -64,7 +77,7 @@ func (t *changeBriefPublishTool) Definition() ToolDefinition {
 				"whatCouldBreak": {"type": "string", "description": "The risk or assumption. Say 'nothing, because ...' if there genuinely is none."},
 				"isRoutine":      {"type": "boolean", "description": "Claim explicitly that the change had no real decision in it. Required when decisions is empty."},
 				"filesTouched":   {"type": "integer", "description": "How many files changed. A count, not a list."},
-				"sessionId":      {"type": "string", "description": "Optional: the terminal session whose panel should show this brief."},
+				"sessionId":      {"type": "string", "description": "The value of the FORGE_SESSION_ID environment variable in the terminal you are working in. Without it the brief is stored and gated but rendered nowhere, and with several projects open it may be filed under the wrong one."},
 				"decisions": {
 					"type": "array",
 					"description": "The forks that mattered. Omit only when isRoutine is true.",
@@ -86,7 +99,7 @@ func (t *changeBriefPublishTool) Definition() ToolDefinition {
 }
 
 func (t *changeBriefPublishTool) Execute(args map[string]any) (*CallToolResult, error) {
-	projectPath := t.resolveProjectPath()
+	projectPath := t.resolveProjectPath(stringArg(args, "sessionId"))
 	if projectPath == "" {
 		// Said plainly, because the alternative — writing into whatever
 		// directory Forge happened to start in — produced an operating-system
@@ -115,15 +128,30 @@ func (t *changeBriefPublishTool) Execute(args map[string]any) (*CallToolResult, 
 	// attached or the panel is unavailable.
 	wasShown := t.broadcastBrief(brief)
 
-	body, marshalErr := json.MarshalIndent(map[string]any{
+	publishResult := map[string]any{
 		"briefId":  brief.BriefID,
 		"taskId":   brief.TaskID,
 		"rendered": wasShown,
-	}, "", "  ")
+	}
+	// A brief that rendered nowhere used to report only `rendered: false`, and
+	// nobody acted on it. Saying why gives the agent something to fix.
+	if !wasShown {
+		publishResult["warning"] = renderFailureReason(brief.SessionID)
+	}
+
+	body, marshalErr := json.MarshalIndent(publishResult, "", "  ")
 	if marshalErr != nil {
 		return errorContent("encoding the publish result: " + marshalErr.Error()), nil
 	}
 	return textContent(string(body)), nil
+}
+
+// renderFailureReason names what stopped the brief from appearing.
+func renderFailureReason(sessionID string) string {
+	if sessionID == "" {
+		return missingSessionWarning
+	}
+	return unreachableSessionWarning
 }
 
 // broadcastBrief shows the brief, reporting whether anywhere received it.

@@ -148,7 +148,10 @@ func RecordGate(projectRoot, taskID, gate, evidence string) (*Ticket, error) {
 	}
 	if ticket == nil || (taskID != "" && ticket.TaskID != taskID) {
 		// New task starts a fresh ledger so gate evidence cannot leak across tasks.
-		ticket = &Ticket{TaskID: taskID, StartedAt: time.Now().UTC()}
+		// The branch is stamped here rather than left to the caller, because a
+		// ticket that does not know its branch cannot be told apart from a stale
+		// one — and preflight refuses those.
+		ticket = &Ticket{TaskID: taskID, Branch: CurrentBranch(projectRoot), StartedAt: time.Now().UTC()}
 		// Auto-install the pre-commit hook the first time a ticket is created for
 		// this project.  Best-effort: a hook-install failure is never surfaced to
 		// the caller — it should not block an agent from recording gate evidence.
@@ -173,6 +176,9 @@ type PreflightResult struct {
 	MissingGates []string `json:"missingGates"`
 	// Branch is the branch the ticket targets (empty when no ticket exists).
 	Branch string `json:"branch"`
+	// HeadBranch is the branch the repository is actually on, so a refusal
+	// for a branch mismatch can show both sides. Empty outside a repository.
+	HeadBranch string `json:"headBranch,omitempty"`
 	// TaskID is the task identifier on the ticket (empty when none).
 	TaskID string `json:"taskId"`
 	// Reason is a single human-readable summary suitable for an error message.
@@ -216,19 +222,53 @@ func preflightAgainst(projectRoot string, requiredGates []string) (*PreflightRes
 		}
 	}
 	sort.Strings(missing)
-	if len(missing) == 0 {
+	headBranch := CurrentBranch(projectRoot)
+	if len(missing) > 0 {
 		return &PreflightResult{
-			OK:     true,
-			Branch: ticket.Branch,
-			TaskID: ticket.TaskID,
-			Reason: "all required gates recorded",
+			OK:           false,
+			MissingGates: missing,
+			Branch:       ticket.Branch,
+			HeadBranch:   headBranch,
+			TaskID:       ticket.TaskID,
+			Reason:       "missing gates: " + strings.Join(missing, ", "),
+		}, nil
+	}
+	if reason := branchMismatchReason(ticket.Branch, headBranch); reason != "" {
+		return &PreflightResult{
+			OK:         false,
+			Branch:     ticket.Branch,
+			HeadBranch: headBranch,
+			TaskID:     ticket.TaskID,
+			Reason:     reason,
 		}, nil
 	}
 	return &PreflightResult{
-		OK:           false,
-		MissingGates: missing,
-		Branch:       ticket.Branch,
-		TaskID:       ticket.TaskID,
-		Reason:       "missing gates: " + strings.Join(missing, ", "),
+		OK:         true,
+		Branch:     ticket.Branch,
+		HeadBranch: headBranch,
+		TaskID:     ticket.TaskID,
+		Reason:     "all required gates recorded",
 	}, nil
+}
+
+// branchMismatchReason explains why a ticket cannot vouch for the current
+// branch, or returns empty when it can.
+//
+// A ticket is tied to the branch it was opened on. One left over from earlier
+// work would otherwise satisfy every later commit in the project, which is the
+// exact failure that turned the gate into a formality. Outside a repository
+// there is nothing to compare against, so the gates alone decide.
+func branchMismatchReason(ticketBranch, headBranch string) string {
+	if headBranch == "" {
+		return ""
+	}
+	if ticketBranch == "" {
+		return fmt.Sprintf("the ticket carries no branch but HEAD is %q — it predates this work; "+
+			"start a new taskId with workflow_gate_record so a fresh ticket is opened for this branch", headBranch)
+	}
+	if ticketBranch != headBranch {
+		return fmt.Sprintf("the ticket is for branch %q but HEAD is %q — record this branch's own gates "+
+			"under a new taskId rather than reusing an earlier ticket", ticketBranch, headBranch)
+	}
+	return ""
 }

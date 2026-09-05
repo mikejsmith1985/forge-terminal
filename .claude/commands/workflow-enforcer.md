@@ -195,22 +195,39 @@ and BLOCKS any commit whose ledger is missing a required gate.
 - `branch-created` — proves a feature branch was created before code
 - `tests-written` — proves at least one test was added or updated
 - `tests-passed` — proves the test run succeeded
+- `brief-published` — proves a change brief was published for any change touching source
 
-**Record gates as you complete them via the MCP tool:**
+**Record gates as you complete them via the MCP tool.** Every call carries your tab's
+session id, read from the `FORGE_SESSION_ID` environment variable in your terminal
+(`echo $FORGE_SESSION_ID` in bash, `$env:FORGE_SESSION_ID` in PowerShell). That id is what
+routes the ledger and the brief to *this* tab's project when several projects are open —
+without it they can land in another repository's `.forge/`.
 ```
 workflow_gate_record({
-  taskId:   "<stable id for this task>",
-  gate:     "branch-created" | "tests-written" | "tests-passed" | ...,
-  evidence: "<short proof, e.g. 'feature/foo created at HEAD ac04dbc'>",
-  branch:   "<branch name, optional>"
+  taskId:    "<stable id for this task>",
+  gate:      "branch-created" | "tests-written" | "tests-passed" | ...,
+  evidence:  "<short proof, e.g. 'feature/foo created at HEAD ac04dbc'>",
+  sessionId: "<value of FORGE_SESSION_ID>"
 })
 ```
+The ticket is stamped with the branch it was opened on, and preflight refuses a ticket from
+any other branch. Start a **new `taskId`** for each branch of work; never reuse an earlier one.
+
+**Publish the change brief before committing** — the `brief-published` gate is required for
+any change that touches source:
+```
+change_brief_publish({
+  taskId: "<same taskId>", sessionId: "<value of FORGE_SESSION_ID>",
+  headline, whatChanged, whyItChanged, whatCouldBreak, isRoutine, decisions
+})
+```
+A result of `rendered: false` carries a `warning` naming what to fix. It is not success.
 
 **Verify the hook will allow your commit before running git:**
 ```
-workflow_preflight_check()
+workflow_preflight_check({ sessionId: "<value of FORGE_SESSION_ID>" })
 ```
-or shell-equivalent:
+or shell-equivalent, from inside the repository:
 ```
 forge workflow preflight
 ```

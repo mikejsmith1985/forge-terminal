@@ -202,3 +202,9 @@ func TestASubdirectoryResolvesToItsProjectRoot(t *testing.T) {
 		t.Errorf("want the root %q, got %q", projectRoot, resolved)
 	}
 }
+
+// staticSessionProjectPath is staticProjectPath in the session-aware shape the
+// project-writing tools take; the session is irrelevant when the answer is fixed.
+func staticSessionProjectPath(path string) func(sessionID string) string {
+	return forEverySession(staticProjectPath(path))
+}

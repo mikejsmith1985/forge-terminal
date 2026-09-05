@@ -22,10 +22,14 @@ type workflowGateRecordTool struct {
 	// resolveProjectPath is asked on every call rather than once at startup,
 	// because the project a gate belongs to is the one the developer's tab is
 	// in, and that changes as they switch tabs.
-	resolveProjectPath func() string
+	//
+	// It takes the calling session because with two projects open a
+	// session-blind answer can be the wrong project, and a gate recorded in
+	// the wrong project satisfies a commit there while the right one stays empty.
+	resolveProjectPath func(sessionID string) string
 }
 
-func newWorkflowGateRecordTool(resolveProjectPath func() string) ToolHandler {
+func newWorkflowGateRecordTool(resolveProjectPath func(sessionID string) string) ToolHandler {
 	return &workflowGateRecordTool{resolveProjectPath: resolveProjectPath}
 }
 
@@ -41,7 +45,8 @@ func (t *workflowGateRecordTool) Definition() ToolDefinition {
 				"taskId":   {"type": "string", "description": "Stable identifier for the current task. Starting a new taskId resets the ledger."},
 				"gate":     {"type": "string", "description": "Gate identifier, e.g. 'branch-created', 'tests-written', 'tests-passed'."},
 				"evidence": {"type": "string", "description": "Short human-readable proof. Empty values are rejected."},
-				"branch":   {"type": "string", "description": "Optional: the git branch this work targets (recorded once per ticket)."}
+				"branch":   {"type": "string", "description": "Optional: the git branch this work targets. Stamped from HEAD automatically when omitted."},
+				"sessionId": {"type": "string", "description": "The value of the FORGE_SESSION_ID environment variable in the terminal you are working in. Pass it: it routes the ledger to that tab's project when several are open."}
 			},
 			"required": ["gate", "evidence"]
 		}`),
@@ -49,7 +54,7 @@ func (t *workflowGateRecordTool) Definition() ToolDefinition {
 }
 
 func (t *workflowGateRecordTool) Execute(args map[string]any) (*CallToolResult, error) {
-	projectPath := t.resolveProjectPath()
+	projectPath := t.resolveProjectPath(stringArg(args, "sessionId"))
 	if projectPath == "" {
 		return errorContent("no project path configured — cannot record gate"), nil
 	}
@@ -77,10 +82,10 @@ func (t *workflowGateRecordTool) Execute(args map[string]any) (*CallToolResult, 
 
 // workflowPreflightTool returns whether the ticket has all required gates.
 type workflowPreflightTool struct {
-	resolveProjectPath func() string
+	resolveProjectPath func(sessionID string) string
 }
 
-func newWorkflowPreflightTool(resolveProjectPath func() string) ToolHandler {
+func newWorkflowPreflightTool(resolveProjectPath func(sessionID string) string) ToolHandler {
 	return &workflowPreflightTool{resolveProjectPath: resolveProjectPath}
 }
 
@@ -91,14 +96,16 @@ func (t *workflowPreflightTool) Definition() ToolDefinition {
 			"Use before attempting a commit to confirm runtime enforcement will allow it.",
 		InputSchema: json.RawMessage(`{
 			"type": "object",
-			"properties": {},
+			"properties": {
+				"sessionId": {"type": "string", "description": "The value of the FORGE_SESSION_ID environment variable in the terminal you are working in, so the check reads that tab's project."}
+			},
 			"required": []
 		}`),
 	}
 }
 
-func (t *workflowPreflightTool) Execute(_ map[string]any) (*CallToolResult, error) {
-	projectPath := t.resolveProjectPath()
+func (t *workflowPreflightTool) Execute(args map[string]any) (*CallToolResult, error) {
+	projectPath := t.resolveProjectPath(stringArg(args, "sessionId"))
 	if projectPath == "" {
 		return errorContent("no project path configured — cannot run preflight"), nil
 	}
