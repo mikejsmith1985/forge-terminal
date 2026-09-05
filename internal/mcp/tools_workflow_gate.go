@@ -12,6 +12,7 @@ package mcp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
@@ -77,7 +78,19 @@ func (t *workflowGateRecordTool) Execute(args map[string]any) (*CallToolResult, 
 	if marshalErr != nil {
 		return errorContent("encoding ticket: " + marshalErr.Error()), nil
 	}
-	return textContent(string(body)), nil
+	return textContent(string(body) + hookInstallWarning(projectPath)), nil
+}
+
+// hookInstallWarning names the one install failure worth telling the agent
+// about: another tool's hook occupies pre-commit, so the ledger is being
+// written but nothing will read it at commit time. Silence here is how the
+// gate went missing for months without anyone noticing.
+func hookInstallWarning(projectPath string) string {
+	installErr := workflow.EnsureHookInstalled(projectPath)
+	if !errors.Is(installErr, workflow.ErrForeignPreCommitHook) {
+		return ""
+	}
+	return "\n\nWARNING: " + installErr.Error()
 }
 
 // workflowPreflightTool returns whether the ticket has all required gates.

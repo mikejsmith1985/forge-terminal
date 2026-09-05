@@ -119,10 +119,26 @@ func forgeSessionEnv(baseEnv []string, sessionID string) []string {
 		fmt.Sprintf("FORGE_INSTANCE_PID=%d", os.Getpid()),
 		fmt.Sprintf("FORGE_INSTANCE_PORT=%d", getForgePort()),
 	)
+	if binaryPath := forgeBinaryPath(); binaryPath != "" {
+		augmented = append(augmented, "FORGE_BIN="+binaryPath)
+	}
 	if sessionID != "" {
 		augmented = append(augmented, fmt.Sprintf("FORGE_SESSION_ID=%s", sessionID))
 	}
 	return augmented
+}
+
+// forgeBinaryPath is the running Forge executable, exported into every tab as
+// FORGE_BIN so the pre-commit hook can call the program that is actually
+// running rather than whatever PATH calls "forge" — an unrelated npm package
+// answered to that name on one machine and the gate silently ran nothing.
+// Empty when the path cannot be determined; the hook then falls back to PATH.
+func forgeBinaryPath() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return executable
 }
 
 // convertWSLPath converts a Windows UNC path to a Linux path for WSL
@@ -329,11 +345,11 @@ func NewTerminalSessionWithConfig(id string, config *ShellConfig) (*TerminalSess
 // the session's activity tracker so the macro injection endpoint can
 // detect a quiet window before pasting.
 func (s *TerminalSession) Read(p []byte) (int, error) {
-	n, err := s.PTY.Read(p)
-	if n > 0 {
-		s.recordOutput(p[:n])
+	bytesRead, err := s.PTY.Read(p)
+	if bytesRead > 0 {
+		s.recordOutput(p[:bytesRead])
 	}
-	return n, err
+	return bytesRead, err
 }
 
 // recordOutput is the single write-point for the activity tracker.  It is
@@ -427,14 +443,14 @@ func (s *TerminalSession) WriteToPty(data []byte) (int, error) {
 		return 0, fmt.Errorf("PTY is nil")
 	}
 
-	n, err := s.PTY.Write(data)
+	bytesWritten, err := s.PTY.Write(data)
 	if err != nil {
 		log.Printf("[Terminal] WriteToPty error for session %s: %v", s.ID, err)
-		return n, err
+		return bytesWritten, err
 	}
 
-	log.Printf("[Terminal] WriteToPty: wrote %d bytes to session %s", n, s.ID)
-	return n, nil
+	log.Printf("[Terminal] WriteToPty: wrote %d bytes to session %s", bytesWritten, s.ID)
+	return bytesWritten, nil
 }
 
 // Resize changes the terminal size.

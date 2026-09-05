@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,12 +21,14 @@ import (
 // exit code the caller should use.
 func runWorkflowCommand(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: forge workflow <preflight|record|naming> [...]")
+		fmt.Fprintln(os.Stderr, "usage: forge workflow <preflight|record|naming|hooks> [...]")
 		return 1
 	}
 	switch args[0] {
 	case "preflight":
 		return runWorkflowPreflight()
+	case "hooks":
+		return runWorkflowHooks()
 	case "record":
 		return runWorkflowRecord(args[1:])
 	case "naming":
@@ -58,6 +61,38 @@ func runWorkflowPreflight() int {
 	if !result.OK {
 		return 2
 	}
+	return 0
+}
+
+// runWorkflowHooks installs the workflow gate into the pre-commit hook git
+// runs for the current repository, and says where that is.
+//
+// This is what scripts/install-workflow-hooks.{ps1,sh} call, so the hook body
+// has one source of truth. Exit 0 when the gate is in place, 2 when a hook
+// written by another tool is in the way, 1 on any other failure.
+func runWorkflowHooks() int {
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "hooks: %v\n", err)
+		return 1
+	}
+
+	hooksDirectory, err := workflow.EffectiveHooksDir(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "hooks: %s is not a git repository\n", root)
+		return 1
+	}
+
+	installErr := workflow.EnsureHookInstalled(root)
+	if errors.Is(installErr, workflow.ErrForeignPreCommitHook) {
+		fmt.Fprintf(os.Stderr, "hooks: %v\n  hook: %s\n", installErr, filepath.Join(hooksDirectory, "pre-commit"))
+		return 2
+	}
+	if installErr != nil {
+		fmt.Fprintf(os.Stderr, "hooks: %v\n", installErr)
+		return 1
+	}
+	fmt.Printf("[forge] workflow gate installed in %s\n", filepath.Join(hooksDirectory, "pre-commit"))
 	return 0
 }
 

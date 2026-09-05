@@ -5,6 +5,7 @@ package mcp
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -74,3 +75,28 @@ func TestWorkflowPreflightCheck_ReportsBlockedWhenLedgerEmpty(t *testing.T) {
 	}
 }
 
+
+// A gate that quietly failed to install is indistinguishable from one that
+// passed. When another tool's hook is in the way, the agent is told.
+func TestWorkflowGateRecord_SaysWhenAForeignHookBlockedInstallation(t *testing.T) {
+	projectRoot := projectRootForTest(t)
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".git", "hooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, ".git", "hooks", "pre-commit"), []byte("#!/bin/sh\necho mine\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tool := newWorkflowGateRecordTool(staticSessionProjectPath(projectRoot))
+
+	result, err := tool.Execute(map[string]any{
+		"gate":     workflow.GateBranchCreated,
+		"evidence": "branch checked out",
+		"taskId":   "task-hook",
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("recording still succeeds, got err=%v", err)
+	}
+	if !strings.Contains(result.Content[0].Text, "another tool") {
+		t.Errorf("the result should warn that the gate is not installed, got: %s", result.Content[0].Text)
+	}
+}

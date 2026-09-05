@@ -2,6 +2,7 @@
 package workflow
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,8 +79,9 @@ func TestEnsureHookInstalled_PreservesForeignHook(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := EnsureHookInstalled(dir); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// Preserved, but no longer silently: the caller is told the gate is absent.
+	if err := EnsureHookInstalled(dir); !errors.Is(err, ErrForeignPreCommitHook) {
+		t.Fatalf("expected ErrForeignPreCommitHook, got: %v", err)
 	}
 
 	got, _ := os.ReadFile(hookPath)

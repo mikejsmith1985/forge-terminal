@@ -152,11 +152,13 @@ func RecordGate(projectRoot, taskID, gate, evidence string) (*Ticket, error) {
 		// ticket that does not know its branch cannot be told apart from a stale
 		// one — and preflight refuses those.
 		ticket = &Ticket{TaskID: taskID, Branch: CurrentBranch(projectRoot), StartedAt: time.Now().UTC()}
-		// Auto-install the pre-commit hook the first time a ticket is created for
-		// this project.  Best-effort: a hook-install failure is never surfaced to
-		// the caller — it should not block an agent from recording gate evidence.
-		_ = EnsureHookInstalled(projectRoot)
 	}
+	// Keep the hook installed on every record, not only when a ticket is
+	// opened: repositories scaffolded before the gate learned where git looks
+	// migrate the next time anything is recorded. Best-effort here — a
+	// hook-install failure must not stop evidence being written — and the MCP
+	// tool reports it separately so it is never silent.
+	_ = EnsureHookInstalled(projectRoot)
 	ticket.Gates = append(ticket.Gates, GateRecord{
 		Gate:     gate,
 		PassedAt: time.Now().UTC(),
