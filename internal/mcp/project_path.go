@@ -136,3 +136,43 @@ func NewProjectPathResolver(lookUpBoundRepository func() string, processDirector
 		return FindProjectRoot(processDirectory)
 	}
 }
+
+// NewSessionProjectPathResolver builds the resolver tools call with the
+// session that made the request.
+//
+// The general resolver above answers "some bound repository", which is right
+// when one project is open and wrong when two are: the request carried no
+// session, so a gate recorded from one tab could land in the other tab's
+// project. Forge already exports FORGE_SESSION_ID into every tab, and every tab
+// in a repository is bound to it, so the session is enough to name the project
+// exactly. The fallback is kept for a request that carries no session at all.
+//
+// @param lookUpSessionRepository Returns the repository a specific session is
+//   bound to, or empty when that session is unknown or unbound.
+// @param fallback The session-blind resolver to use when the session yields nothing.
+func NewSessionProjectPathResolver(lookUpSessionRepository func(sessionID string) string, fallback func() string) func(sessionID string) string {
+	return func(sessionID string) string {
+		if sessionID != "" && lookUpSessionRepository != nil {
+			if sessionRoot := FindProjectRoot(lookUpSessionRepository(sessionID)); sessionRoot != "" {
+				return sessionRoot
+			}
+		}
+		if fallback == nil {
+			return ""
+		}
+		return fallback()
+	}
+}
+
+// forEverySession adapts a session-blind resolver to the session-aware shape.
+//
+// For callers that genuinely know the project up front — tests, and the CLI
+// standing inside the repository — the session adds nothing, so it is ignored.
+func forEverySession(resolve func() string) func(sessionID string) string {
+	return func(string) string {
+		if resolve == nil {
+			return ""
+		}
+		return resolve()
+	}
+}

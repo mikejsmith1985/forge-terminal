@@ -129,7 +129,10 @@ func initMCPServer() {
 		// should write to changes with them. Without this the path is wherever
 		// Forge was launched, which on Windows is a directory nobody works in.
 		ProjectPathFunc: newMcpProjectPathResolver(),
-		AllowedTools:    cfg.AllowedTools,
+		// Keyed by the calling tab's FORGE_SESSION_ID, so two open projects
+		// never receive each other's ledger entries or briefs.
+		ProjectPathForSessionFunc: newMcpSessionProjectPathResolver(),
+		AllowedTools:              cfg.AllowedTools,
 		// VaultAccess wires vault_inject to the live vault singleton.
 		// GetGlobal() returns nil when the vault has not been opened yet; the
 		// tool handles nil gracefully and returns a descriptive error to the agent.

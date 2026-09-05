@@ -90,6 +90,15 @@ type Dependencies struct {
 	// Nil falls back to ProjectPath.
 	ProjectPathFunc func() string
 
+	// ProjectPathForSessionFunc resolves the project for the tab that made the
+	// request, given its FORGE_SESSION_ID.
+	//
+	// ProjectPathFunc answers "some bound repository", which with two projects
+	// open can be the wrong one. Tools that write project state pass the
+	// caller's session here first and fall back to ProjectPathFunc only when
+	// no session was given. Nil means every call falls back.
+	ProjectPathForSessionFunc func(sessionID string) string
+
 	// AllowedTools restricts which built-in tools are registered.
 	// An empty/nil slice means all tools are exposed (the default).
 	AllowedTools []string
@@ -134,6 +143,17 @@ func (deps Dependencies) resolveProjectPath() string {
 		}
 	}
 	return deps.ProjectPath
+}
+
+// resolveProjectPathForSession returns the project for the calling tab, or the
+// session-blind answer when no session was given or the session is unbound.
+func (deps Dependencies) resolveProjectPathForSession(sessionID string) string {
+	if sessionID != "" && deps.ProjectPathForSessionFunc != nil {
+		if resolved := deps.ProjectPathForSessionFunc(sessionID); resolved != "" {
+			return resolved
+		}
+	}
+	return deps.resolveProjectPath()
 }
 
 func NewServer(authToken string, deps Dependencies) *Server {
@@ -382,11 +402,11 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newTaskSubmitTool(srv.broker),
 		newWorkflowStatusTool(srv.deps.ProjectPath, srv.deps.WorkflowConfig),
 		// These three write project state, so they resolve the project when they
-		// run rather than when Forge started — the developer changes tabs, and
-		// the right project changes with them.
-		newWorkflowGateRecordTool(srv.deps.resolveProjectPath),
-		newWorkflowPreflightTool(srv.deps.resolveProjectPath),
-		newChangeBriefPublishTool(srv.deps.resolveProjectPath, srv.deps.TermHandler),
+		// run, from the session that called them — the developer has several
+		// tabs open, and the right project is the one the calling tab is in.
+		newWorkflowGateRecordTool(srv.deps.resolveProjectPathForSession),
+		newWorkflowPreflightTool(srv.deps.resolveProjectPathForSession),
+		newChangeBriefPublishTool(srv.deps.resolveProjectPathForSession, srv.deps.TermHandler),
 		newEnvironmentDetectTool(environmentRunner),
 		newEnvironmentRunTool(environmentRunner, environmentJobManager),
 		newEnvironmentJobsTool(environmentJobManager),

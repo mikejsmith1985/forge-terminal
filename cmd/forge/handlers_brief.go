@@ -14,7 +14,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 
 	"github.com/mikejsmith1985/forge-terminal/internal/workflow"
 )
@@ -30,21 +29,26 @@ func handleBriefLatest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectRoot, err := os.Getwd()
-	if err != nil {
-		http.Error(w, "cannot determine project root", http.StatusInternalServerError)
+	sessionID := r.URL.Query().Get("sessionId")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// The tab's own project, never the process directory. Launched from a
+	// shortcut on Windows the process stands in system32, and a lookup there
+	// answered "nothing published" for every tab — which is how a brief lost
+	// to a refresh stayed lost. No resolvable project means no brief can
+	// exist, and an empty answer is the honest one.
+	projectRoot := resolveProjectPathForSession(sessionID)
+	if projectRoot == "" {
+		_ = json.NewEncoder(w).Encode(map[string]any{})
 		return
 	}
-
-	sessionID := r.URL.Query().Get("sessionId")
 
 	briefs, err := workflow.ListBriefs(projectRoot)
 	if err != nil {
 		http.Error(w, "cannot read briefs", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 
 	// ListBriefs returns newest first, so the first match is the one the
 	// developer has most likely not yet seen.

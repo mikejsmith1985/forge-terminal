@@ -46,6 +46,33 @@ func anyBoundRepository() string {
 	return boundRepoRoot
 }
 
+// sessionBoundRepository returns the repository one specific tab is bound to.
+//
+// This is the disambiguation anyBoundRepository cannot do. Every tab sitting
+// in a repository is bound to it by the frontend, keyed by the same id Forge
+// exports into that tab as FORGE_SESSION_ID — so an agent that passes its
+// session names its project exactly, however many are open.
+func sessionBoundRepository(sessionID string) string {
+	pipeline, isBound := sddPipelineFor(sessionID)
+	if !isBound {
+		return ""
+	}
+	return pipeline.repoRoot
+}
+
+// newMcpSessionProjectPathResolver builds the session-aware resolver the
+// project-writing tools call, falling back to the session-blind one.
+func newMcpSessionProjectPathResolver() func(sessionID string) string {
+	return mcp.NewSessionProjectPathResolver(sessionBoundRepository, newMcpProjectPathResolver())
+}
+
+// resolveProjectPathForSession answers, for one request, which project a tab
+// is working in. Built fresh per call because the process directory it falls
+// back to is read at construction.
+func resolveProjectPathForSession(sessionID string) string {
+	return newMcpSessionProjectPathResolver()(sessionID)
+}
+
 // newMcpProjectPathResolver builds what MCP tools call to find their project.
 //
 // Wired at startup, asked at call time — the developer changes tabs, and the
