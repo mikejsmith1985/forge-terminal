@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **The "looks like a wall of text" toast is gone** — It fired constantly: scrolling the terminal or typing your own prompt was enough to raise it. The check ran whenever a tab went from waiting to idle, and that transition is not "an agent reply just ended" — it is any pause in output, which is most of what a terminal does. On top of that the verdict was drawn from screen redraws of a full-screen program, which its own purpose comment conceded was a guess. A guess that fires on every keystroke is not advisory, it is noise, and noise trains you to dismiss the one warning that might have mattered. Removed outright rather than throttled: the scrollback heuristic, the `/api/format-check` endpoint, the frontend trigger, and their tests. The hard part of the comprehension-first workflow — the change brief and its commit gate — is untouched, because that is the part built on something detectable rather than something inferred.
+
 ## [7.25.2] - 2026-09-01
 
 ---

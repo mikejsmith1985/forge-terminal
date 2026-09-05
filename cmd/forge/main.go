@@ -632,9 +632,6 @@ func main() {
 	// WebSocket; this covers only the refresh case, where a lost brief would
 	// leave the developer believing they reviewed something they never saw.
 	http.HandleFunc("/api/brief/latest", WrapWithMiddleware(handleBriefLatest))
-	// Advisory only. The verdict is drawn from screen redraws, so it is shown
-	// to the developer and never acted on.
-	http.HandleFunc("/api/format-check", WrapWithMiddleware(handleFormatCheck))
 	// phase-event is the authoritative phase signal emitted by the speckit skill workflow:
 	// "started" marks a phase running, "complete" opens its gate — replacing file-watcher
 	// inference as the primary state driver (specs/010-sdd-authoritative-state, FR-001).

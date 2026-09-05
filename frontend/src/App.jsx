@@ -1307,39 +1307,18 @@ function App() {
     updateTabTitle(tabId, newTitle);
   }, [updateTabTitle]);
 
-  // Handle waiting state change from terminal
-  /**
-   * Asks whether the reply that just finished reads as a wall of text.
-   *
-   * Failure is silent on purpose. This is a nicety, and a nicety that produces
-   * error noise when the endpoint is unavailable would train the developer to
-   * ignore the warning it exists to deliver.
-   */
-  const checkReplyFormat = useCallback(async (tabId) => {
-    try {
-      const response = await fetch(`/api/format-check?sessionId=${encodeURIComponent(tabId)}`)
-      if (!response.ok) return
-
-      const verdict = await response.json()
-      if (verdict?.shouldWarn && verdict.summary) {
-        addToast(`📏 ${verdict.summary}`, 'warning', 6000)
-      }
-    } catch {
-      // Nothing to say. The check is advisory and its absence changes nothing.
-    }
-  }, [addToast]);
-
+  // Handle waiting state change from terminal.
+  //
+  // This used to also trigger the wall-of-text format check on every
+  // waiting→idle transition. That check was removed: the transition fires on
+  // ordinary scrolling and typing, not only when an agent reply ends, so the
+  // warning toast never stopped. See CHANGELOG (Removed) for the full account.
   const handleWaitingChange = useCallback((tabId, isWaiting) => {
-    setWaitingTabs(prev => {
-      // A tab going from waiting to idle is a turn ending, which is the only
-      // moment a reply is complete enough to judge. Advisory only: the check
-      // reads screen redraws, so it warns and never blocks.
-      if (prev[tabId] && !isWaiting) {
-        checkReplyFormat(tabId)
-      }
-      return { ...prev, [tabId]: isWaiting }
-    });
-  }, [checkReplyFormat]);
+    setWaitingTabs(prev => ({
+      ...prev,
+      [tabId]: isWaiting
+    }));
+  }, []);
 
   // Handle directory change from the terminal: track the shell's current directory
   // for features that depend on it (git panel, release/workflow cards), but NEVER
