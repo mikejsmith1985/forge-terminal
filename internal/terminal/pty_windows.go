@@ -56,7 +56,9 @@ func startPTYWithShell(shell string, args []string, workingDir string, sessionID
 	// Inject critical environment variables for process safeguard system
 	forgePID := os.Getpid()
 	forgePortNum := getForgePort()
-	
+	// Exported so the pre-commit hook runs this Forge, not whatever PATH calls "forge".
+	forgeBinary := forgeBinaryPath()
+
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		
@@ -65,6 +67,9 @@ func startPTYWithShell(shell string, args []string, workingDir string, sessionID
 			// PowerShell: use $env:VAR syntax
 			cpty.Write([]byte(fmt.Sprintf("$env:FORGE_INSTANCE_PID=%d\r", forgePID)))
 			cpty.Write([]byte(fmt.Sprintf("$env:FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
+			if forgeBinary != "" {
+				cpty.Write([]byte("$env:FORGE_BIN='" + forgeBinary + "'\r"))
+			}
 			// Per-tab SDD identity (FR-003). Single-quoted; sessionID is app-generated, not user input.
 			if sessionID != "" {
 				cpty.Write([]byte(fmt.Sprintf("$env:FORGE_SESSION_ID='%s'\r", sessionID)))
@@ -77,6 +82,9 @@ func startPTYWithShell(shell string, args []string, workingDir string, sessionID
 			// Unix shells: use export
 			cpty.Write([]byte(fmt.Sprintf("export FORGE_INSTANCE_PID=%d\r", forgePID)))
 			cpty.Write([]byte(fmt.Sprintf("export FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
+			if forgeBinary != "" {
+				cpty.Write([]byte("export FORGE_BIN='" + forgeBinary + "'\r"))
+			}
 			// Per-tab SDD identity (FR-003).
 			if sessionID != "" {
 				cpty.Write([]byte(fmt.Sprintf("export FORGE_SESSION_ID=%s\r", sessionID)))
@@ -89,6 +97,9 @@ func startPTYWithShell(shell string, args []string, workingDir string, sessionID
 			// CMD.exe: use SET
 			cpty.Write([]byte(fmt.Sprintf("SET FORGE_INSTANCE_PID=%d\r", forgePID)))
 			cpty.Write([]byte(fmt.Sprintf("SET FORGE_INSTANCE_PORT=%d\r", forgePortNum)))
+			if forgeBinary != "" {
+				cpty.Write([]byte("SET FORGE_BIN=" + forgeBinary + "\r"))
+			}
 			// Per-tab SDD identity (FR-003).
 			if sessionID != "" {
 				cpty.Write([]byte(fmt.Sprintf("SET FORGE_SESSION_ID=%s\r", sessionID)))

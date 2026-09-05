@@ -119,6 +119,10 @@ func runHook(t *testing.T, bash, hookPath, dir string) string {
 	t.Helper()
 	cmd := exec.Command(bash, hookPath)
 	cmd.Dir = dir
+	// These tests exercise the scaffold's own gates. Blank FORGE_BIN so the
+	// runtime ledger gate at the top of the hook stands down: inside a Forge
+	// tab it would otherwise run a real preflight against this temp repo.
+	cmd.Env = append(os.Environ(), "FORGE_BIN=")
 	out, _ := cmd.CombinedOutput() // non-zero exit is expected when violations exist
 	return string(out)
 }

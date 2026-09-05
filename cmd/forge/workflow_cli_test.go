@@ -64,3 +64,36 @@ func TestRunWorkflowCommand_UnknownSubcommandExitsNonZero(t *testing.T) {
 		t.Errorf("expected non-zero exit for unknown subcommand, got 0")
 	}
 }
+
+// `forge workflow hooks` is what the installer scripts call, so it must put the
+// gate where git looks rather than in .git/hooks unconditionally.
+func TestRunWorkflowCommand_HooksInstallsWhereGitLooks(t *testing.T) {
+	dir := withTempCwd(t)
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".git", "config"), []byte("[core]\n\thooksPath = .forge/hooks\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if exit := runWorkflowCommand([]string{"hooks"}); exit != 0 {
+		t.Fatalf("hooks expected exit 0, got %d", exit)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".forge", "hooks", "pre-commit")); err != nil {
+		t.Fatalf("expected the hook under .forge/hooks: %v", err)
+	}
+}
+
+func TestRunWorkflowCommand_HooksReportsAForeignHookWithExitTwo(t *testing.T) {
+	dir := withTempCwd(t)
+	if err := os.MkdirAll(filepath.Join(dir, ".git", "hooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".git", "hooks", "pre-commit"), []byte("#!/bin/sh\necho mine\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if exit := runWorkflowCommand([]string{"hooks"}); exit != 2 {
+		t.Fatalf("a foreign hook should be reported with exit 2, got %d", exit)
+	}
+}

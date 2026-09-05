@@ -50,3 +50,14 @@ func TestRenderClaudeMD_IncludesAgentContextMarkers(t *testing.T) {
 		}
 	}
 }
+
+// A freshly scaffolded repository must get the ledger gate in the hook git
+// runs, ahead of the scaffold's own checks — which end in their own exit 0.
+func TestScaffoldedPreCommitHookCarriesTheLedgerGateFirst(t *testing.T) {
+	if !strings.Contains(preCommitSHTemplate, hookMarker) {
+		t.Fatal("the scaffold's sh pre-commit hook should carry the ledger gate marker")
+	}
+	if strings.Index(preCommitSHTemplate, "workflow preflight") > strings.Index(preCommitSHTemplate, "set +e") {
+		t.Error("the ledger gate must precede the scaffold's own checks")
+	}
+}

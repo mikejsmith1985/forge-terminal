@@ -70,3 +70,17 @@ func TestForgeSessionEnvPreservesBaseEnv(t *testing.T) {
 		}
 	}
 }
+
+// The pre-commit hook needs to find the Forge binary that is actually running,
+// not whatever happens to be called "forge" on PATH (an unrelated npm package
+// was). Forge knows its own path; exporting it into every tab removes the guess.
+func TestForgeSessionEnvExportsTheRunningBinaryPath(t *testing.T) {
+	env := forgeSessionEnv([]string{"PATH=/usr/bin"}, "tab-1")
+
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "FORGE_BIN=") && len(entry) > len("FORGE_BIN=") {
+			return
+		}
+	}
+	t.Errorf("expected FORGE_BIN=<executable path> in the tab environment, got %v", env)
+}
