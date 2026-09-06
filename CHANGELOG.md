@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.25.5] - 2026-09-06
+
+---
+
+## [v7.25.5] - 2026-09-06
+
 ### Added
 - **The portfolio now shows the six changes merged into BasedHardware/omi** — Everything else on the page is graded by its author: the test counts, the case studies, the product screens. This is the first section graded by maintainers of a repository the author does not control, in a Flutter app and a Python backend rather than the Go the rest of the page is about. It sits between the debugging stories and the smaller products as a six-row ledger: number, title, area, merge day, and diff size, each row linking to the pull request, with the `gh pr list` command underneath that reproduces the list. The one pull request that was closed without merging is listed beside them with the reason, because a record that only shows wins is a record a reader stops trusting. The data is held to the same standard as the rest of the narrative: a unit suite checks the shape and that no author handle or absolute URL reaches the published data file (the handle is a renderer constant, so the leak scanner can keep treating it as private), and an integration suite asks GitHub itself, through `gh pr view`, that every listed number is merged, by that author, on that day, at that size — and that the admitted non-merge really did not merge.
 
