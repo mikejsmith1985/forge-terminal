@@ -527,6 +527,82 @@ main > section {
   font-family: var(--mono);
 }
 
+/* ── Upstream contributions ───────────────────────────────────────────────── */
+/* A ledger, not a card grid. Six rows that read as a timeline: number, one
+   line, where it landed, when, and how big. The colour rule holds — the number
+   is a link in cyan because it is the checkable thing on the row. */
+
+.upstream__repository { font-size: 15px; }
+.upstream__repository a { font-family: var(--mono); font-size: 14px; }
+
+.upstream__list {
+  list-style: none;
+  margin: 44px 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--ink-card);
+  overflow: hidden;
+}
+
+.upstream-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: center;
+  padding: 18px 26px;
+  border-top: 1px solid var(--line-soft);
+}
+.upstream-row:first-child { border-top: 0; }
+
+.upstream-row__number {
+  font-family: var(--mono);
+  font-size: 14px;
+}
+.upstream-row__title {
+  margin: 0 0 5px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.upstream-row__meta {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+.upstream-row__area {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.upstream-row__size {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.upstream__footer { max-width: var(--measure); margin-top: 22px; }
+.upstream__command { margin-bottom: 20px; }
+
+/* The one that did not land, set like the evidence notes elsewhere: plainly. */
+.upstream__admission {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.upstream__admission a { font-family: var(--mono); }
+.upstream__admission b { color: var(--text); font-weight: 600; }
+
+@media (max-width: 720px) {
+  .upstream-row { grid-template-columns: 1fr; gap: 8px; }
+  .upstream-row__size { white-space: normal; }
+}
+
 /* ── Supporting products ──────────────────────────────────────────────────── */
 
 .products__list {

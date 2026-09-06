@@ -8,7 +8,7 @@
       name="description"
       content="Applications built by directing coding agents, and the tooling that makes their output verifiable. Every claim on this page ships with the command that proves it."
     />
-    <link rel="stylesheet" href="./styles.css?v=20260826-architecture" />
+    <link rel="stylesheet" href="./styles.css?v=20260906-upstream" />
   </head>
   <body>
     <a class="skip-link" href="#thesis">Skip to content</a>
@@ -20,6 +20,7 @@
         <a href="#flagship">Flagship</a>
         <a href="#depth">Depth</a>
         <a href="#case-studies">Debugging</a>
+        <a href="#upstream">Upstream</a>
         <a href="#products">Products</a>
       </nav>
     </header>
@@ -62,6 +63,18 @@
         <div class="case-studies__list"></div>
       </section>
 
+      <!-- The one section graded by people with no stake in the argument. -->
+      <section id="upstream" class="upstream" aria-labelledby="upstream-heading">
+        <div class="section-intro">
+          <p class="kicker">Merged upstream</p>
+          <h2 id="upstream-heading"></h2>
+          <p class="upstream__statement"></p>
+          <p class="upstream__repository"></p>
+        </div>
+        <ol class="upstream__list"></ol>
+        <div class="upstream__footer"></div>
+      </section>
+
       <!-- Breadth, deliberately compact. -->
       <section id="products" class="products" aria-labelledby="products-heading">
         <div class="section-intro">
@@ -84,6 +97,6 @@
       <p class="colophon__meta"></p>
     </footer>
 
-    <script type="module" src="./app.js?v=20260826-architecture"></script>
+    <script type="module" src="./app.js?v=20260906-upstream"></script>
   </body>
 </html>
