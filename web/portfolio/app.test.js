@@ -24,6 +24,7 @@ const REQUIRED_RENDER_STEPS = [
   'renderFlagship',
   'renderDepth',
   'renderCaseStudies',
+  'renderUpstream',
   'renderSupportingProducts',
   'renderColophon',
 ];
@@ -89,6 +90,9 @@ test('the markup provides every mount point the renderer writes into', () => {
     'id="flagship"',
     'id="depth"',
     'class="case-studies__list"',
+    'id="upstream"',
+    'class="upstream__list"',
+    'class="upstream__footer"',
     'class="products__list"',
     'class="colophon__meta"',
   ];
@@ -121,6 +125,37 @@ test('the published narrative data carries the full argument', async () => {
   assert.ok(narrativeModule.PORTFOLIO_THESIS.headline);
   assert.ok(narrativeModule.PORTFOLIO_PROOF_STATS.length >= 4);
   assert.ok(narrativeModule.ENGINEERING_CASE_STUDIES.length >= 4);
+  assert.ok(narrativeModule.UPSTREAM_CONTRIBUTIONS.pullRequests.length >= 6);
+});
+
+// ── Upstream: the handle stays in the renderer ───────────────────────────────
+//
+// The section's verify command names the author's GitHub account, and the
+// pull request links name the upstream repository. The account handle is the
+// string the leak scanner treats as a private path, so it must be supplied by
+// the renderer and never appear in the data file the scanner reads.
+
+test('the upstream verify command and links are assembled by the renderer', () => {
+  const rendererSource = fs.readFileSync(PORTFOLIO_RENDERER_PATH, 'utf8');
+
+  assert.match(rendererSource, /const GITHUB_HANDLE = /);
+  assert.match(rendererSource, /function createUpstreamVerifyCommand\(/);
+  assert.match(
+    rendererSource,
+    /createUpstreamVerifyCommand[\s\S]*?--author \$\{GITHUB_HANDLE\}/,
+    'the verify command must take the handle from the renderer constant.',
+  );
+  assert.match(rendererSource, /function createUpstreamPullRequestUrl\(/);
+});
+
+test('the upstream nav entry sits between debugging and the smaller products', () => {
+  const markupSource = fs.readFileSync(PORTFOLIO_MARKUP_PATH, 'utf8');
+  const navigationOrder = [...markupSource.matchAll(/<a href="#([a-z-]+)">/g)].map((match) => match[1]);
+
+  assert.deepEqual(
+    navigationOrder,
+    ['thesis', 'flagship', 'depth', 'case-studies', 'upstream', 'products'],
+  );
 });
 
 // ── U2 Counter: the headline, the key points, and the two links ──────────────

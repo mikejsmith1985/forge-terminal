@@ -6,7 +6,7 @@
 // obvious answer was wrong. All content comes from generated data modules so
 // the page can never drift from what the repository actually contains.
 
-import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260826-architecture';
+import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260906-upstream';
 import {
   ARCHITECTURE_CONTROL_PLANE,
   ARCHITECTURE_FLOW,
@@ -17,7 +17,8 @@ import {
   ENGINEERING_CASE_STUDIES,
   PORTFOLIO_PROOF_STATS,
   PORTFOLIO_THESIS,
-} from './data/narrative.mjs?v=20260826-architecture';
+  UPSTREAM_CONTRIBUTIONS,
+} from './data/narrative.mjs?v=20260906-upstream';
 
 // Forge Terminal is the flagship because it is the tooling that enforces the
 // standard the rest of the page claims. Everything else is supporting breadth.
@@ -43,7 +44,9 @@ const ASSET_VERSION = '20260830-u2-counter';
 // that data file is scanned for exactly this string as a sign that a local path
 // has leaked into published copy. An app's links therefore carry a repo-relative
 // path and this constant supplies the rest.
-const GITHUB_REPO_BASE_URL = 'https://github.com/mikejsmith1985/';
+const GITHUB_BASE_URL = 'https://github.com/';
+const GITHUB_HANDLE = 'mikejsmith1985';
+const GITHUB_REPO_BASE_URL = `${GITHUB_BASE_URL}${GITHUB_HANDLE}/`;
 const GITHUB_COMMIT_BASE_URL = `${GITHUB_REPO_BASE_URL}forge-terminal/commit/`;
 
 function escapeHtml(value) {
@@ -424,6 +427,80 @@ function renderCaseStudies() {
     .join('');
 }
 
+// ── Upstream contributions ──────────────────────────────────────────────────
+// Laid out as a ledger, not cards: six rows a reader scans in a few seconds
+// and clicks one of. Everything a row shows is checkable on the pull request
+// it links to, and the command underneath reproduces the whole list.
+
+/** Builds the link to one pull request in the upstream repository. */
+function createUpstreamPullRequestUrl(pullRequestNumber) {
+  return `${GITHUB_BASE_URL}${UPSTREAM_CONTRIBUTIONS.repository}/pull/${pullRequestNumber}`;
+}
+
+/** Builds the command a reader runs to see the same list GitHub holds. */
+function createUpstreamVerifyCommand() {
+  return `gh pr list --repo ${UPSTREAM_CONTRIBUTIONS.repository} --author ${GITHUB_HANDLE} --state merged`;
+}
+
+/** Shows a merge day the way GitHub shows it, without the clock time. */
+function formatMergedDay(isoDay) {
+  return new Date(`${isoDay}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+  });
+}
+
+/** Formats a diff the way a reviewer reads it: added, removed, files. */
+function formatDiffSize(pullRequest) {
+  return `+${pullRequest.linesAdded} / −${pullRequest.linesRemoved} · ${pullRequest.filesChanged} files`;
+}
+
+function createUpstreamRow(pullRequest) {
+  const pullRequestUrl = createUpstreamPullRequestUrl(pullRequest.number);
+  const pullRequestLabel = `#${pullRequest.number}`;
+
+  return `
+    <li class="upstream-row">
+      <a class="upstream-row__number" href="${escapeHtml(pullRequestUrl)}" rel="noopener">${escapeHtml(pullRequestLabel)}</a>
+      <div class="upstream-row__body">
+        <p class="upstream-row__title">${escapeHtml(pullRequest.title)}</p>
+        <p class="upstream-row__meta">
+          <span class="upstream-row__area">${escapeHtml(pullRequest.area)}</span>
+          <time datetime="${escapeHtml(pullRequest.mergedOn)}">${escapeHtml(formatMergedDay(pullRequest.mergedOn))}</time>
+        </p>
+      </div>
+      <code class="upstream-row__size">${escapeHtml(formatDiffSize(pullRequest))}</code>
+    </li>`;
+}
+
+/** Emits the pull requests that did not land, because the record is incomplete without them. */
+function createUpstreamAdmissions() {
+  return UPSTREAM_CONTRIBUTIONS.notMerged
+    .map((unmergedPullRequest) => `
+      <p class="upstream__admission">
+        <a href="${escapeHtml(createUpstreamPullRequestUrl(unmergedPullRequest.number))}" rel="noopener">#${escapeHtml(String(unmergedPullRequest.number))}</a>
+        <b>${escapeHtml(unmergedPullRequest.outcome)}.</b> ${escapeHtml(unmergedPullRequest.reason)}
+      </p>`)
+    .join('');
+}
+
+function renderUpstream() {
+  const repositoryUrl = `${GITHUB_BASE_URL}${UPSTREAM_CONTRIBUTIONS.repository}`;
+
+  selectElement('#upstream-heading').textContent = UPSTREAM_CONTRIBUTIONS.headline;
+  selectElement('.upstream__statement').textContent = UPSTREAM_CONTRIBUTIONS.statement;
+  selectElement('.upstream__repository').innerHTML = `
+    <a href="${escapeHtml(repositoryUrl)}" rel="noopener">${escapeHtml(UPSTREAM_CONTRIBUTIONS.repository)}</a>
+    — ${escapeHtml(UPSTREAM_CONTRIBUTIONS.repositoryDescription)}`;
+
+  selectElement('.upstream__list').innerHTML = UPSTREAM_CONTRIBUTIONS.pullRequests
+    .map(createUpstreamRow)
+    .join('');
+
+  selectElement('.upstream__footer').innerHTML = `
+    <code class="proof-stat__command upstream__command">${escapeHtml(createUpstreamVerifyCommand())}</code>
+    ${createUpstreamAdmissions()}`;
+}
+
 // ── Colophon ────────────────────────────────────────────────────────────────
 
 function renderColophon() {
@@ -434,7 +511,8 @@ function renderColophon() {
 
   selectElement('.colophon__meta').textContent =
     `${PORTFOLIO_APPS.length} applications · ${totalFeatureCount} product screens · `
-    + `${ENGINEERING_CASE_STUDIES.length} debugging case studies`;
+    + `${ENGINEERING_CASE_STUDIES.length} debugging case studies · `
+    + `${UPSTREAM_CONTRIBUTIONS.pullRequests.length} changes merged upstream`;
 }
 
 renderThesis();
@@ -443,5 +521,6 @@ renderFlagship();
 renderDepth();
 renderArchitecture();
 renderCaseStudies();
+renderUpstream();
 renderSupportingProducts();
 renderColophon();

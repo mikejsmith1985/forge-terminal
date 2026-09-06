@@ -26,6 +26,7 @@ import {
   ENGINEERING_CASE_STUDIES,
   PORTFOLIO_PROOF_STATS,
   PORTFOLIO_THESIS,
+  UPSTREAM_CONTRIBUTIONS,
 } from './narrative.mjs';
 
 const require = createRequire(import.meta.url);
@@ -329,6 +330,7 @@ async function writeNarrativeData() {
     ['PORTFOLIO_THESIS', PORTFOLIO_THESIS],
     ['PORTFOLIO_PROOF_STATS', PORTFOLIO_PROOF_STATS],
     ['ENGINEERING_CASE_STUDIES', ENGINEERING_CASE_STUDIES],
+    ['UPSTREAM_CONTRIBUTIONS', UPSTREAM_CONTRIBUTIONS],
   ];
 
   const narrativeSource = narrativeExports
