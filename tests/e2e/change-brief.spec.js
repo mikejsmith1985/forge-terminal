@@ -6,15 +6,20 @@
 // commit gate is already satisfied, so a brief that never renders leaves the
 // developer believing they reviewed a change they never saw.
 //
-// The brief is written to disk exactly as the publishing tool writes it, and
-// the page is then loaded. That exercises the real restore path — the one that
-// covers a reload — through real backend code, without shipping a test-only
-// hook into the application to make the test convenient.
+// Two paths are proven. The restore path: the brief is written to disk exactly
+// as the publishing tool writes it, and the page is then loaded — real backend
+// code, no test-only hook. And the live path: a CHANGE_BRIEF frame arrives on
+// the active tab's real terminal socket, as the publishing tool pushes it. The
+// live path is the one that had never been tested, and it had never worked —
+// the terminal's forwarding list dropped the frame, so a brief only ever showed
+// after a reload. That reload happened to coincide with a second Forge
+// instance taking over, which is how the defect looked like a feature.
 //
 // Runs against the dev instance on :9999 started by run-dev-clean.ps1, never
 // against production on :3005.
 
 const { test, expect } = require('@playwright/test');
+const { visitWithoutTour } = require('../fixtures/forge');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -132,4 +137,107 @@ test('the brief can be dismissed once read', async ({ page }) => {
   await page.locator('.brief-dismiss').click();
 
   await expect(page.locator('.change-brief')).toHaveCount(0);
+});
+
+// ── Live path: a brief pushed over the active tab's socket ─────────────────
+//
+// WS injection mirrors the production socket and is the established technique
+// in worktree-recovery.spec.js: the frame is dispatched on the real WebSocket
+// the terminal opened, so it travels through the terminal's own message
+// handler and its forwarding decision — the exact place the brief used to die.
+
+const LIVE_BRIEF_HEADLINE = 'A brief pushed live reaches the panel without a reload';
+
+/** Wraps window.WebSocket so the test can dispatch a frame on the active tab's socket. */
+async function enableWsInjection(page) {
+  await page.addInitScript(() => {
+    const OriginalWebSocket = window.WebSocket;
+    window.WebSocket = class extends OriginalWebSocket {
+      constructor(...args) {
+        super(...args);
+        window.__testWS = this;
+      }
+    };
+    window.__wsInject = (message) => {
+      if (!window.__testWS) return false;
+      window.__testWS.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(message) }));
+      return true;
+    };
+  });
+}
+
+/**
+ * Opens a fresh tab and returns its session id.
+ *
+ * The dev instance restores whatever tabs the developer had open, and each one
+ * opens its own socket, so "the last socket constructed" is only guaranteed to
+ * be the ACTIVE tab's when the test itself just opened that tab. Opening one is
+ * a real click, and the brief must name that tab's id or the hook discards it
+ * as another tab's work.
+ */
+async function openFreshTabAndReadSessionId(page) {
+  await page.locator('.xterm').first().waitFor({ state: 'visible', timeout: 20000 });
+  const socketUrlBefore = await page.evaluate(() => window.__testWS?.url ?? '');
+  await page.locator('.new-tab-btn').click();
+  await page.waitForFunction(
+    (previousUrl) => !!(window.__testWS && window.__testWS.url && window.__testWS.url !== previousUrl),
+    socketUrlBefore,
+    { timeout: 10000 },
+  );
+  await page.waitForTimeout(1500); // let the new tab's hook settle on its session id.
+  return page.evaluate(() => new URL(window.__testWS.url).searchParams.get('tabId'));
+}
+
+/** A brief addressed to one session, as change_brief_publish broadcasts it. */
+function liveBrief(sessionId) {
+  return {
+    ...sampleBrief(),
+    briefId: 'brief-e2e-live-001',
+    sessionId,
+    taskId: 'task-e2e-live-001',
+    headline: LIVE_BRIEF_HEADLINE,
+  };
+}
+
+test.describe('live path — the brief arrives over the terminal socket', () => {
+  test.beforeEach(async ({ page }) => {
+    await enableWsInjection(page);
+  });
+
+  test('a CHANGE_BRIEF frame on the active socket renders in the panel', async ({ page }) => {
+    await visitWithoutTour(page, DEV_BASE_URL);
+    const sessionId = await openFreshTabAndReadSessionId(page);
+
+    const wasInjected = await page.evaluate(
+      (message) => window.__wsInject(message),
+      { type: 'CHANGE_BRIEF', brief: liveBrief(sessionId) },
+    );
+    expect(wasInjected).toBe(true);
+
+    // The restored disk brief may already be showing; the live one must replace it.
+    await expect(page.locator('.brief-headline')).toHaveText(LIVE_BRIEF_HEADLINE, { timeout: 10000 });
+  });
+
+  test('a CHANGE_BRIEF frame is never written to the terminal as output', async ({ page }) => {
+    await visitWithoutTour(page, DEV_BASE_URL);
+    const sessionId = await openFreshTabAndReadSessionId(page);
+
+    await page.evaluate(
+      (message) => window.__wsInject(message),
+      { type: 'CHANGE_BRIEF', brief: liveBrief(sessionId) },
+    );
+    await expect(page.locator('.brief-headline')).toHaveText(LIVE_BRIEF_HEADLINE, { timeout: 10000 });
+
+    // Article X: read the xterm buffer model, never the DOM. A control frame
+    // that leaked into the terminal would show its JSON in the scrollback.
+    const bufferText = await page.evaluate(() => {
+      const buffer = window.term?.buffer?.active;
+      if (!buffer) return '';
+      const lines = [];
+      for (let i = 0; i < buffer.length; i++) lines.push(buffer.getLine(i)?.translateToString(true) ?? '');
+      return lines.join('\n');
+    });
+    expect(bufferText).not.toContain('CHANGE_BRIEF');
+    expect(bufferText).not.toContain(LIVE_BRIEF_HEADLINE);
+  });
 });
