@@ -12,6 +12,7 @@ import {
 } from '../utils/terminalScrollTarget';
 import { getTerminalTheme } from '../themes';
 import { logger } from '../utils/logger';
+import { isDashboardControlMessage } from '../utils/dashboardControlMessages';
 import { diagnosticCore } from '../utils/diagnosticCore';
 import { isLLMCommand } from '../utils/llmDetection';
 import { extractProjectFolder, isFileLikeName, isTempOrSystemPath } from '../utils/projectFolder';
@@ -1933,11 +1934,12 @@ const ForgeTerminal = forwardRef(function ForgeTerminal({
             try {
               const msg = JSON.parse(str);
 
-              // SDD orchestrator (specs/003, 006, 013): surface gate, live-status, and
-              // worktree-collision offers to the dashboard hook and stop — these are control
-              // messages, not terminal output. SDD_WORKTREE_COLLISION must be forwarded here
-              // or the recovery-first opt-in prompt (specs/013 FR-003) never reaches the UI.
-              if (msg.type === 'SDD_PHASE_GATE' || msg.type === 'SDD_PHASE_STATUS' || msg.type === 'SDD_WORKTREE_COLLISION') {
+              // Dashboard control messages (specs/003, 006, 013, 014): phase gates, live
+              // status, worktree-collision offers and change briefs go up to the app hook
+              // and stop — they are control messages, not terminal output. The list lives
+              // in dashboardControlMessages.js with a test naming every type, because a
+              // type missing from an inline check here was dropped silently twice.
+              if (isDashboardControlMessage(msg.type)) {
                 if (onSddGateRef.current) onSddGateRef.current(str);
                 return;
               }
