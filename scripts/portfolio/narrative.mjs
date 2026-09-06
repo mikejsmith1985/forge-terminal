@@ -261,3 +261,108 @@ export const ENGINEERING_CASE_STUDIES = [
     reference: { pullRequestNumber: 215, commitSha: '2d3d8487' },
   },
 ];
+
+// Work accepted into a repository the author does not control.
+//
+// Every other section of the page is graded by the person it is about. This
+// one was graded by the maintainers of an open-source project with no stake in
+// the argument, in Dart and Python rather than Go, against a codebase first
+// opened in August. The same standard travelled with it: each change is a fix
+// with a test, small enough to review in a sitting — and the one that did not
+// land is listed beside the ones that did, because a page that only shows wins
+// is a page a reader stops trusting.
+//
+// The author's GitHub handle is deliberately absent: the renderer supplies it
+// when it builds the verify command, so the published data file stays clean
+// for the scanner that treats the handle as a leaked private path.
+export const UPSTREAM_CONTRIBUTIONS = {
+  repository: 'BasedHardware/omi',
+  repositoryDescription:
+    'An open-source AI wearable: a Flutter app, a Python backend, and the firmware between them.',
+
+  headline: 'Six changes merged by maintainers with no reason to be generous',
+
+  statement:
+    'Every number above was counted by me. These were reviewed by strangers, in a Flutter app and a '
+    + 'Python backend rather than the Go on this page, in a codebase I first opened in August. The '
+    + 'same standard travelled: each one is a fix with a test, sized to be reviewed in a sitting.',
+
+  // In merge order. `subject` is the pull request title exactly as GitHub holds
+  // it and is what the integration test checks; `title` is the same line with
+  // its conventional-commit prefix removed, which is what the page shows.
+  pullRequests: [
+    {
+      number: 11293,
+      mergedOn: '2026-08-13',
+      area: 'Flutter app',
+      subject: 'fix(app): keep a progress indicator running for the whole app search',
+      title: 'Keep a progress indicator running for the whole app search',
+      linesAdded: 169,
+      linesRemoved: 68,
+      filesChanged: 3,
+    },
+    {
+      number: 11297,
+      mergedOn: '2026-08-13',
+      area: 'Flutter app',
+      subject: 'fix(app): hold the apps search in its searching state until the newest query lands',
+      title: 'Hold the apps search in its searching state until the newest query lands',
+      linesAdded: 347,
+      linesRemoved: 57,
+      filesChanged: 2,
+    },
+    {
+      number: 11524,
+      mergedOn: '2026-08-17',
+      area: 'CI ratchet',
+      subject: 'harden(ci): match deepPurple and the Dart hex form in the INV-UI-1 ratchet, and clear the apps pages',
+      title: 'Match deepPurple and the Dart hex form in the INV-UI-1 ratchet, and clear the apps pages',
+      linesAdded: 126,
+      linesRemoved: 56,
+      filesChanged: 17,
+    },
+    {
+      number: 12790,
+      mergedOn: '2026-09-06',
+      area: 'Python backend',
+      subject: 'fix(backend): drop marketplace records with no id before the shared catalog reads them',
+      title: 'Drop marketplace records with no id before the shared catalog reads them',
+      linesAdded: 137,
+      linesRemoved: 4,
+      filesChanged: 2,
+    },
+    {
+      number: 12807,
+      mergedOn: '2026-09-06',
+      area: 'Python backend',
+      subject: 'fix(backend): drop id-less records from the popular-apps listing too',
+      title: 'Drop id-less records from the popular-apps listing too',
+      linesAdded: 90,
+      linesRemoved: 2,
+      filesChanged: 2,
+    },
+    {
+      number: 12864,
+      mergedOn: '2026-09-06',
+      area: 'Flutter app',
+      subject: 'fix(app): re-read device storage after clearing recordings',
+      title: 'Re-read device storage after clearing recordings',
+      linesAdded: 130,
+      linesRemoved: 3,
+      filesChanged: 2,
+    },
+  ],
+
+  // The record is only worth showing if it includes the one that did not land.
+  notMerged: [
+    {
+      number: 11526,
+      outcome: 'Closed without merging',
+      reason:
+        'A 367-line performance change to serve app search from a catalog the browse endpoints '
+        + 'already cached. I closed it myself once the same change had landed through a maintainer\'s '
+        + 'cleaner seam, with a table on the pull request accounting for every commit as either landed '
+        + 'by another route or superseded.',
+    },
+  ],
+};
