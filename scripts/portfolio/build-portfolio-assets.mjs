@@ -42,9 +42,12 @@ const NODE_TOOLBOX_PLAYWRIGHT_PATH = 'C:\\ProjectsWin\\NodeToolbox\\node_modules
 // A capture is trimmed to the height its content actually occupies, so a short
 // screen does not ship with a band of dead space beneath it. The floor keeps
 // every asset large enough to read; the ceiling stops one long screen from
-// dominating its card.
+// dominating its card. The ceiling was 1600 until Recall Radar's real answer
+// arrived with ten citations: the record opened beneath them — the whole point
+// of that screen — sat just below the cut. Two thousand fits it; no other
+// screen on the site comes within 300 pixels of the old ceiling.
 const MINIMUM_CAPTURE_HEIGHT = 780;
-const MAXIMUM_CAPTURE_HEIGHT = 1600;
+const MAXIMUM_CAPTURE_HEIGHT = 2000;
 const DESKTOP_SCREEN_WIDTH = 1600;
 const DESKTOP_SCREEN_HEIGHT = 1000;
 
@@ -73,8 +76,8 @@ const SOURCE_DERIVED_SCREEN_BUILDERS = {
   // so its screens carry the real attribute and value marks rather than a
   // table standing in for them.
   ...createScreenRegistry('u2-counter', U2_COUNTER_SCREEN_BUILDERS),
-  // Recall Radar replicates a grounded-answer surface, so its screens derive
-  // every highlight offset and fused score rather than typing them in.
+  // Recall Radar shows a real session on public NHTSA records; its tests re-run
+  // the product's own checks on every highlight offset and fused score.
   ...createScreenRegistry('recall-radar', RECALL_RADAR_SCREEN_BUILDERS),
 };
 

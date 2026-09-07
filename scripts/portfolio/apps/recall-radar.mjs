@@ -8,6 +8,10 @@
 // flagged. The entry leads with the number that makes the project credible —
 // the evaluation that got worse when embeddings were added — because a
 // retrieval project that only publishes its good numbers has published nothing.
+//
+// Unlike every other product on the site, the screens show real data. NHTSA
+// records are public, and a reader can look any of them up; hiding them behind
+// invented ones would have made the product look less credible, not more.
 
 const LOCAL_REPO_PATH = 'C:\\ProjectsWin\\recall-radar';
 
@@ -36,13 +40,13 @@ export const RECALL_RADAR_APP = {
   accent: '#1a56db',
   category: 'Grounded RAG over public records',
   launchSurface: './scripts/run-dev-clean.ps1',
-  techStack: ['C# / .NET 10', 'PostgreSQL + pgvector', 'Claude API', 'React / TypeScript', 'Testcontainers'],
+  techStack: ['RAG', 'C# / .NET 10', 'PostgreSQL + pgvector', 'Claude API', 'React / TypeScript', 'Testcontainers'],
   // The four claims the entry rests on. Each is either falsifiable from the
   // repository or an admission.
   keyPoints: [
     'Grounding fails closed. A citation is verified as a literal substring of its source record '
     + 'before it is shown; unverified citations are dropped and the count is displayed even when '
-    + 'it is zero, so a silent drop is impossible.',
+    + 'it is zero — as it is on the screen below — so a silent drop is impossible.',
     'Retrieval quality is measured against ground truth nobody hand-labelled: NHTSA records which '
     + 'investigation led to which recall, and which complaints were filed while it was open. '
     + 'Eighty cases, three retrieval modes, two record pools, results committed.',
@@ -70,28 +74,29 @@ export const RECALL_RADAR_APP = {
     },
   ],
   proofNote:
-    'These screens are source-derived replicas of the shipped interface. The vehicle and the '
-    + 'symptom are the ones the README walks through; every record number, narrative, quote, '
-    + 'offset and rank was invented for publication, with the record numbers chosen outside the '
-    + 'ranges NHTSA issues. The one exception is the evaluation table, which reproduces the '
-    + 'measured run committed in the repository, zeros included.',
+    'These screens are source-derived replicas of the shipped interface showing a real session. '
+    + 'The question, the answer, its ten citations, the records they name, the search ranks and the '
+    + 'evaluation were produced by the running product against the loaded NHTSA data on 7 September '
+    + '2026 and are reproduced exactly — nothing is invented or tidied. The records are public '
+    + 'federal filings, and every complaint and investigation number on these screens can be looked '
+    + 'up.',
   features: [
     {
       id: 'grounded-answer',
-      title: 'An answer that says what it could not prove',
+      title: 'An answer that can only say what it can quote',
       wowFactor:
-        'The model offered six quotes and one of them was a paraphrase. It is gone, and the panel '
-        + 'says so — the dropped count is shown when it is zero too, so silence never hides a drop. '
-        + 'Beneath the answer, the recall that was retrieved but never quoted is labelled unverified '
-        + 'rather than left to borrow credibility from the ones that were.',
+        'Ten quotes offered, ten found character for character in the record each names — six '
+        + 'owner complaints and two federal investigations. The last quote is the agency\'s own '
+        + 'conclusion that it found no defect, which the model cited rather than left out, because '
+        + 'a citation schema does not let it paraphrase the inconvenient part away. The dropped '
+        + 'count is shown at zero, so silence never hides a drop.',
       whatItShows:
         'The Ask tab after a symptom is described: the grounded and known-pattern verdicts, the '
-        + 'answer, the dropped-citation line, five surviving citations each naming its record, and '
-        + 'the related campaigns split into quoted and merely retrieved.',
+        + 'answer, the line stating every citation was verified, ten citations each naming its '
+        + 'record, and the related panel listing the two investigations by name.',
       mockDataApproach:
-        'The question is the README\'s worked example; every record, quote and campaign number is '
-        + 'invented, and the surviving citations are the ones whose quote is found in its record at '
-        + 'build time — the paraphrase is dropped by the same rule the product applies.',
+        'None. This is the product\'s real answer to this question, captured from the running API '
+        + 'and reproduced exactly; the records are public NHTSA filings.',
       capturePlan:
         'Render the Ask tab with the answer and related-campaigns panels and trim to content height.',
       imageKind: 'source-derived-replica',
@@ -102,17 +107,18 @@ export const RECALL_RADAR_APP = {
       title: 'The quote, at the character it was found',
       wowFactor:
         'Opening a citation shows the whole record with the quoted span marked at the offsets the '
-        + 'verifier matched — not a search for similar words, the exact characters. This is the '
-        + 'picture of what "checked" means, and it is the reason the answer above it can be '
-        + 'trusted without trusting the model.',
+        + 'verifier matched — not a search for similar words, the exact characters, here 368 to '
+        + '469 of an owner\'s complaint: the sentence about the dealer\'s fix that did not work. This '
+        + 'is the picture of what "checked" means, and it is why the answer above can be trusted '
+        + 'without trusting the model.',
       whatItShows:
-        'The first citation opened: the owner\'s complaint in full, in the upper case NHTSA stores '
-        + 'it in, with the quoted span highlighted where it sits in the narrative.',
+        'One citation opened: the owner\'s complaint in full, in the upper case NHTSA files it in, '
+        + 'with the quoted sentence highlighted where it sits in the narrative.',
       mockDataApproach:
-        'The narrative is invented. The highlight offsets are not typed: they are found by looking '
-        + 'the quote up in the body, so the marked span and the quote in the list cannot disagree.',
+        'None. The record is the real NHTSA complaint, and the highlight is at the offsets the '
+        + 'API returned; the test suite re-checks that those offsets spell the quote.',
       capturePlan:
-        'Render the Ask tab with the first citation opened beneath the answer and trim to content.',
+        'Render the Ask tab with the fifth citation opened beneath the answer and trim to content.',
       imageKind: 'source-derived-replica',
       imagePath: './assets/recall-radar/recall-radar-verified-quote.png',
     },
@@ -120,19 +126,19 @@ export const RECALL_RADAR_APP = {
       id: 'explained-search',
       title: 'Every result says how it was found',
       wowFactor:
-        'Rank explanations are part of the API contract, not a debug extra. The complaint about '
-        + 'headaches never says "exhaust smell", so keyword search misses it and meaning search '
-        + 'finds it — and the card says exactly that, with the fused score the two ranks produce.',
+        'Rank explanations are part of the API contract, not a debug extra. The top result was '
+        + 'neither method\'s first choice — sixteenth by meaning, twenty-second by keyword — and it '
+        + 'wins because both found it. The record meaning search ranked first was not in keyword\'s '
+        + 'top fifty at all, and the card says so.',
       whatItShows:
-        'The Search tab in combined mode: four records, each with its meaning rank, its keyword '
+        'The Search tab in combined mode: the top results, each with its meaning rank, its keyword '
         + 'rank or the note that keyword search did not surface it, and the reciprocal-rank-fusion '
-        + 'score they add up to.',
+        + 'score the two produce.',
       mockDataApproach:
-        'The ranks are invented; the fused scores are computed from them at build time and the '
-        + 'list is sorted by the result, so the screen cannot show an order its own arithmetic '
-        + 'would reject.',
+        'None. These are the ten hits the API returned for this query, in its order; the test '
+        + 'suite recomputes every fused score from the ranks beside it.',
       capturePlan:
-        'Render the Search tab with the mode switch and four result cards and trim to content.',
+        'Render the Search tab with the mode switch and the result cards and trim to content.',
       imageKind: 'source-derived-replica',
       imagePath: './assets/recall-radar/recall-radar-explained-search.png',
     },
@@ -149,9 +155,8 @@ export const RECALL_RADAR_APP = {
         + 'pools — every record, then recalls and investigations only — with recall@5, recall@10 '
         + 'and MRR for each.',
       mockDataApproach:
-        'These six rows are the measured run committed in the repository, reproduced exactly and '
-        + 'checked against that file by the test suite. Nothing on this screen is invented except '
-        + 'the run number.',
+        'None. This is the latest run as the API reports it, the same run committed in the '
+        + 'repository, and the test suite compares the six rows against that file.',
       capturePlan:
         'Render the Evaluation tab with both pools and trim to content height.',
       imageKind: 'source-derived-replica',
@@ -169,31 +174,30 @@ export const RECALL_RADAR_PORTFOLIO_CONFIG = {
   launchStrategy: {
     localRepoPath: LOCAL_REPO_PATH,
     command: './scripts/run-dev-clean.ps1',
-    readySignal: 'http://127.0.0.1:5173',
+    readySignal: 'http://127.0.0.1:5180/health',
     environmentVariables: {},
   },
   demoSetupHooks: [
     {
-      id: 'seed-invented-answer-session',
+      id: 'reproduce-the-captured-session',
       description:
-        'Populate the replica with invented records, quotes and ranks rather than reading the '
-        + 'local database, so the published image depends on nothing that can change and carries '
-        + 'no record NHTSA actually holds.',
+        'Render the session captured from the running product rather than calling it again, so '
+        + 'the published image does not change every time the model phrases an answer differently.',
       mockDataApproach:
-        'All values come from the portfolio demo-data module; the running product is never '
-        + 'started and no API key is needed.',
+        'No mocking. The captured answer, citations, records, hits and evaluation live in the '
+        + 'portfolio demo-data module exactly as the API returned them.',
       runnerInstruction:
         'Render the screen builders directly — they are self-contained documents and need no '
-        + 'running server.',
+        + 'running server or API key.',
     },
     {
-      id: 'reproduce-the-measured-evaluation',
+      id: 'keep-the-measured-evaluation-exact',
       description:
         'Show the committed evaluation figures exactly, zeros included, because a replica that '
         + 'improved on the measured run would be the overclaim the product exists to prevent.',
       mockDataApproach:
-        'The metrics are copied from eval/results.json in the product repository and the test '
-        + 'suite compares them against that file when it is present.',
+        'The metrics are the API\'s latest run and the test suite compares them against '
+        + 'eval/results.json in the product repository when it is present.',
       runnerInstruction:
         'Do not adjust or round the metric values; the product prints three decimal places.',
     },

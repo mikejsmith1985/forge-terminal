@@ -2,21 +2,22 @@
 //
 // Recall Radar is a single-page application with three tabs, and the replicas
 // follow the shipped stylesheet token for token in the light theme it opens
-// in. The screens are ordered as an argument: the answer says what the product
-// does, the opened record shows what "checked" means, the search results show
-// the arithmetic under a rank, and the evaluation table shows the numbers the
-// author chose to publish rather than hide.
+// in. The data on them is a real session captured from the running product —
+// see recall-radar-demo-data.mjs for what that means. The screens are ordered
+// as an argument: the answer says what the product does, the opened record
+// shows what "checked" means, the search results show the arithmetic under a
+// rank, and the evaluation table shows the numbers the author chose to publish
+// rather than hide.
 
 import {
   DEMO_ANSWER,
+  DEMO_CITATIONS,
   DEMO_EVALUATION,
   DEMO_QUESTION,
   DEMO_RECORDS,
   DEMO_SEARCH,
   DEMO_THEME,
   DEMO_VEHICLES,
-  buildSearchHits,
-  buildVerifiedCitations,
 } from './recall-radar-demo-data.mjs';
 
 // The product prints fused scores to four places and metrics to three.
@@ -117,7 +118,7 @@ function createStylesheet() {
     .record-body { white-space: pre-wrap; line-height: 1.6; margin: 12px 0 0;
       font-family: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace; font-size: 13px;
       background: ${DEMO_THEME.surfaceSunken}; border: 1px solid ${DEMO_THEME.line}; border-radius: 10px;
-      padding: 16px; }
+      padding: 16px; max-height: 24rem; overflow: hidden; }
     .record-body mark { background: ${DEMO_THEME.mark}; color: ${DEMO_THEME.ink}; padding: 0 4px; border-radius: 2px; }
 
     .eval-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
@@ -202,6 +203,10 @@ function createSearchBox(text, submitLabel) {
     </div>`;
 }
 
+function findRecord(documentId) {
+  return DEMO_RECORDS.find((candidate) => candidate.id === documentId);
+}
+
 // ── Ask tab ─────────────────────────────────────────────────────────────────
 
 /** The product's wording for the dropped count, shown even when it is zero. */
@@ -217,11 +222,11 @@ function describeDroppedCitations(droppedCitationCount) {
  * The answer panel: the verdict pills, the text, the dropped count, and every
  * surviving citation as something the reader can open.
  *
- * @param openedExternalId The citation drawn as selected, or an empty string.
+ * @param openedCitationIndex Index of the citation drawn as selected, or -1.
  */
-function createAnswerPanel(openedExternalId = '') {
-  const citationsMarkup = buildVerifiedCitations().map((citation) => `
-    <li class="${citation.externalId === openedExternalId ? 'opened' : ''}">
+function createAnswerPanel(openedCitationIndex = -1) {
+  const citationsMarkup = DEMO_CITATIONS.map((citation, citationIndex) => `
+    <li class="${citationIndex === openedCitationIndex ? 'opened' : ''}">
       <span class="kind">${escapeHtml(citation.kind)}</span> ${escapeHtml(citation.externalId)}
       <blockquote>${escapeHtml(citation.quote)}</blockquote>
     </li>`).join('');
@@ -240,7 +245,7 @@ function createAnswerPanel(openedExternalId = '') {
 function collectCitedCampaignRecords() {
   const seenExternalIds = new Set();
 
-  return buildVerifiedCitations().filter((citation) => {
+  return DEMO_CITATIONS.filter((citation) => {
     const isActionable = citation.kind === 'recall' || citation.kind === 'investigation';
     if (!isActionable || seenExternalIds.has(citation.externalId)) {
       return false;
@@ -250,36 +255,51 @@ function collectCitedCampaignRecords() {
   });
 }
 
-/** The recalls and investigations the answer tied the symptom to, and the ones it only retrieved. */
+/** Campaign-pool matches the answer did not quote — retrieved, so a lead to read, never evidence. */
+function collectUncitedMatches() {
+  const citedExternalIds = new Set(collectCitedCampaignRecords().map((record) => record.externalId));
+  return DEMO_ANSWER.campaignMatches.filter((match) => !citedExternalIds.has(match.externalId));
+}
+
+function createRecordListItem(record) {
+  return `<li><span class="kind">${escapeHtml(record.kind)}</span> ${escapeHtml(record.externalId)}</li>`;
+}
+
+/**
+ * The recalls and investigations the answer tied the symptom to, section by
+ * section as the product renders them — each only when it has something to
+ * show, and an empty-state line when none do.
+ */
 function createKnownPatternPanel() {
-  const campaignsMarkup = DEMO_ANSWER.linkedCampaigns
-    .map((campaign) => `<li>${escapeHtml(campaign)}</li>`).join('');
-  const citedMarkup = collectCitedCampaignRecords()
-    .map((record) => `<li><span class="kind">${escapeHtml(record.kind)}</span> ${escapeHtml(record.externalId)}</li>`)
-    .join('');
-  const uncitedMarkup = DEMO_ANSWER.uncitedMatches
-    .map((match) => `<li><span class="kind">${escapeHtml(match.kind)}</span> ${escapeHtml(match.externalId)} — ${escapeHtml(match.title)}</li>`)
-    .join('');
+  const citedRecords = collectCitedCampaignRecords();
+  const uncitedMatches = collectUncitedMatches();
+  const hasAnything = DEMO_ANSWER.linkedCampaigns.length > 0 || citedRecords.length > 0 || uncitedMatches.length > 0;
+
+  const campaignsMarkup = DEMO_ANSWER.linkedCampaigns.length === 0 ? '' : `
+    <strong>Recall campaigns</strong>
+    <ul>${DEMO_ANSWER.linkedCampaigns.map((campaign) => `<li>${escapeHtml(campaign)}</li>`).join('')}</ul>`;
+  const citedMarkup = citedRecords.length === 0 ? '' : `
+    <strong>Cited records</strong>
+    <ul>${citedRecords.map(createRecordListItem).join('')}</ul>`;
+  const uncitedMarkup = uncitedMatches.length === 0 ? '' : `
+    <strong>Also matched, not quoted</strong>
+    <p class="caption">Retrieved from this vehicle's recalls and investigations. Nothing here was quoted in
+      the answer, so none of it has been verified — read it yourself.</p>
+    <ul>${uncitedMatches.map((match) => `<li><span class="kind">${escapeHtml(match.kind)}</span> ${escapeHtml(match.externalId)} — ${escapeHtml(match.title)}</li>`).join('')}</ul>`;
+  const emptyMarkup = hasAnything ? '' : `
+    <p class="empty-state">No recall campaign or investigation was linked to this answer.</p>`;
 
   return `
     <section class="panel known-pattern-panel">
       <h3>Related recalls and investigations</h3>
-      <strong>Recall campaigns</strong>
-      <ul>${campaignsMarkup}</ul>
-      <strong>Cited records</strong>
-      <ul>${citedMarkup}</ul>
-      <strong>Also matched, not quoted</strong>
-      <p class="caption">Retrieved from this vehicle's recalls and investigations. Nothing here was quoted in
-        the answer, so none of it has been verified — read it yourself.</p>
-      <ul>${uncitedMarkup}</ul>
+      ${emptyMarkup}${campaignsMarkup}${citedMarkup}${uncitedMarkup}
     </section>`;
 }
 
-/** The opened record in full, with the verified span marked at its exact offsets. */
+/** The opened record in full, with the verified span marked at the offsets the verifier matched. */
 function createCitationView() {
-  const openedCitation = buildVerifiedCitations()
-    .find((citation) => citation.externalId === DEMO_ANSWER.openedCitationExternalId);
-  const record = DEMO_RECORDS.find((candidate) => candidate.externalId === openedCitation.externalId);
+  const openedCitation = DEMO_CITATIONS[DEMO_ANSWER.openedCitationIndex];
+  const record = findRecord(openedCitation.documentId);
   const bodyMarkup = escapeHtml(record.body.slice(0, openedCitation.startOffset))
     + `<mark>${escapeHtml(record.body.slice(openedCitation.startOffset, openedCitation.endOffset))}</mark>`
     + escapeHtml(record.body.slice(openedCitation.endOffset));
@@ -443,14 +463,14 @@ function createVerifiedQuoteScreen() {
       ${createHeader('Ask')}
       ${createVehiclesPanel()}
       ${createSearchBox(DEMO_QUESTION, 'Ask')}
-      ${createAnswerPanel(DEMO_ANSWER.openedCitationExternalId)}
+      ${createAnswerPanel(DEMO_ANSWER.openedCitationIndex)}
       ${createCitationView()}
     </div>`);
 }
 
 /** The Search tab: every result says how it was found — by meaning, by keyword, or by both. */
 function createExplainedSearchScreen() {
-  const resultsMarkup = buildSearchHits()
+  const resultsMarkup = DEMO_SEARCH.hits
     .map((searchHit, index) => createResultCard(searchHit, index + 1))
     .join('');
 

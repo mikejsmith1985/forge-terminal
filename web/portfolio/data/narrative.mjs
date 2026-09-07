@@ -161,8 +161,10 @@ export const PORTFOLIO_THESIS = {
   "role": "AI-native systems engineer",
   "stack": [
     "Go",
+    "RAG",
     "React",
     "MCP",
+    "pgvector",
     "Playwright",
     "WebSockets",
     "PTY"
