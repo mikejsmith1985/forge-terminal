@@ -1,4 +1,4 @@
-// Validates the shared portfolio app and capture registries for all five products.
+// Validates the shared portfolio app and capture registries for every product.
 
 import assert from 'node:assert/strict';
 import test from 'node:test';

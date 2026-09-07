@@ -14,6 +14,7 @@ import { NODETOOLBOX_SCREEN_BUILDERS } from './screens/nodetoolbox-screens.mjs';
 import { LGBUILDER_SCREEN_BUILDERS } from './screens/lgbuilder-screens.mjs';
 import { MBL2PC_SCREEN_BUILDERS } from './screens/mbl2pc-screens.mjs';
 import { U2_COUNTER_SCREEN_BUILDERS } from './screens/u2-counter-screens.mjs';
+import { RECALL_RADAR_SCREEN_BUILDERS } from './screens/recall-radar-screens.mjs';
 import {
   ARCHITECTURE_CONTROL_PLANE,
   ARCHITECTURE_FLOW,
@@ -72,6 +73,9 @@ const SOURCE_DERIVED_SCREEN_BUILDERS = {
   // so its screens carry the real attribute and value marks rather than a
   // table standing in for them.
   ...createScreenRegistry('u2-counter', U2_COUNTER_SCREEN_BUILDERS),
+  // Recall Radar replicates a grounded-answer surface, so its screens derive
+  // every highlight offset and fused score rather than typing them in.
+  ...createScreenRegistry('recall-radar', RECALL_RADAR_SCREEN_BUILDERS),
 };
 
 function escapeHtml(value) {
