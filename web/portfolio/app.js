@@ -6,7 +6,7 @@
 // obvious answer was wrong. All content comes from generated data modules so
 // the page can never drift from what the repository actually contains.
 
-import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260906-upstream';
+import { PORTFOLIO_APPS } from './data/apps.mjs?v=20260907-recall-radar';
 import {
   ARCHITECTURE_CONTROL_PLANE,
   ARCHITECTURE_FLOW,
@@ -18,7 +18,7 @@ import {
   PORTFOLIO_PROOF_STATS,
   PORTFOLIO_THESIS,
   UPSTREAM_CONTRIBUTIONS,
-} from './data/narrative.mjs?v=20260906-upstream';
+} from './data/narrative.mjs?v=20260907-recall-radar';
 
 // Forge Terminal is the flagship because it is the tooling that enforces the
 // standard the rest of the page claims. Everything else is supporting breadth.
@@ -27,10 +27,13 @@ const FLAGSHIP_APP_SLUG = 'forge-terminal';
 // These get their own full-width tier rather than a grid cell. None is the
 // flagship — Forge Terminal is the machinery the thesis is about — but each
 // carries the same argument in a different domain: U2 Counter refuses to quote
-// a figure it cannot trace to a lookup, LG-Builder refuses to proceed without a
-// human, NodeToolbox refuses to guess at a number. U2 Counter leads the tier
-// because its opening line is the one a reader will remember.
-const DEPTH_APP_SLUGS = ['u2-counter', 'lgbuilder', 'nodetoolbox'];
+// a figure it cannot trace to a lookup, Recall Radar refuses to show a quote it
+// cannot find in the record, LG-Builder refuses to proceed without a human,
+// NodeToolbox refuses to guess at a number. U2 Counter leads the tier because
+// its opening line is the one a reader will remember; Recall Radar follows it
+// because its opening line is a number that got worse, which is the second
+// thing a reader will remember.
+const DEPTH_APP_SLUGS = ['u2-counter', 'recall-radar', 'lgbuilder', 'nodetoolbox'];
 
 // Only one product carries an architecture diagram; the rest are product tours.
 const ARCHITECTURE_APP_SLUG = 'lgbuilder';
@@ -38,7 +41,7 @@ const ARCHITECTURE_APP_SLUG = 'lgbuilder';
 // Screenshot filenames are stable across rebuilds, so a returning visitor's
 // browser serves the old image until its cache expires. Bump this whenever the
 // assets are regenerated so a redeploy is never invisible.
-const ASSET_VERSION = '20260830-u2-counter';
+const ASSET_VERSION = '20260907-recall-radar';
 
 // The repository handle lives here rather than in the generated data, because
 // that data file is scanned for exactly this string as a sign that a local path

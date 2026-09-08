@@ -13,7 +13,10 @@ export const PORTFOLIO_THESIS = {
   // unidentified person, which is the wrong order.
   role: 'AI-native systems engineer',
 
-  stack: ['Go', 'React', 'MCP', 'Playwright', 'WebSockets', 'PTY'],
+  // RAG sits second because it is the signal a reader scanning for it must not
+  // have to hunt for: Recall Radar is a full retrieval system with a measured
+  // evaluation, and a chip is the only place that fact reaches the first screen.
+  stack: ['Go', 'RAG', 'React', 'MCP', 'pgvector', 'Playwright', 'WebSockets', 'PTY'],
 
   headline: 'I direct coding agents, and I built the machinery that refuses their work when the proof is missing.',
 
