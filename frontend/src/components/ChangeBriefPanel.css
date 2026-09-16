@@ -202,6 +202,126 @@
   color: var(--brief-evidence);
 }
 
+/* ── The dock ───────────────────────────────────────────────────────────── */
+
+/* The brief floats over the tab it belongs to and scrolls inside its own box.
+   It used to be laid into the page, which pushed the terminal out and let a
+   long brief run past the bottom of the window with nothing to scroll. The
+   dock is bounded by the terminal area, so the tab bar above it is never
+   covered and switching tabs is always one click away. */
+.change-brief-dock {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: min(1100px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  z-index: 40;
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+
+.brief-park {
+  margin-right: 10px;
+  background: transparent;
+  border: 1px solid var(--brief-line);
+  border-radius: 999px;
+  padding: 9px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brief-muted);
+  cursor: pointer;
+}
+
+.brief-park:hover {
+  border-color: var(--brief-muted);
+  color: var(--brief-text);
+}
+
+/* ── The pill ───────────────────────────────────────────────────────────── */
+
+/* How a brief announces itself before it is opened. It sits where the dock
+   will open, so opening it does not move the eye. An unread pill pulses; a
+   parked one stays quiet, because the developer already knows it is there. */
+.brief-pill {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 39;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, calc(100% - 24px));
+  padding: 8px 14px 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #22d3ee;
+  background: #0f0f14;
+  color: #f2f2f7;
+  font-family: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.brief-pill__label {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: #22d3ee;
+  white-space: nowrap;
+}
+
+.brief-pill__headline {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #a8a8b8;
+}
+
+.brief-pill--unread {
+  animation: brief-pill-pulse 2.4s ease-in-out infinite;
+}
+
+.brief-pill--parked {
+  border-color: #2a2a35;
+}
+
+.brief-pill--parked .brief-pill__label {
+  color: #a8a8b8;
+}
+
+.brief-pill:hover {
+  border-color: #f2f2f7;
+}
+
+@keyframes brief-pill-pulse {
+  0%, 100% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 0 rgba(34, 211, 238, 0.45); }
+  50% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 6px rgba(34, 211, 238, 0); }
+}
+
+/* ── The tab indicator ──────────────────────────────────────────────────── */
+
+/* A tab holding a brief says so on itself, because when the developer is on
+   another tab that is the only place it can. */
+.tab-brief-indicator {
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  color: #22d3ee;
+}
+
+.tab-brief-indicator[data-brief-state="unread"] {
+  animation: brief-pill-pulse 2.4s ease-in-out infinite;
+  border-radius: 999px;
+}
+
+.tab-brief-indicator[data-brief-state="parked"],
+.tab-brief-indicator[data-brief-state="open"] {
+  color: #a8a8b8;
+}
+
 /* ── Narrow screens ─────────────────────────────────────────────────────── */
 
 @media (max-width: 720px) {

@@ -25,6 +25,9 @@ function TabBar({
   isVaultOpen = false,
   disableNewTab = false,
   waitingTabs = {},
+  // sessionId → brief state, for tabs holding a change brief the developer
+  // has not finished with.
+  briefTabs = {},
   activeReleaseJobs = {},
   mode = 'dark',
   devMode = false,
@@ -100,6 +103,7 @@ function TabBar({
             tab={tab}
             isActive={tab.id === activeTabId}
             isWaiting={waitingTabs[tab.id] || false}
+            briefState={briefTabs[tab.id] || null}
             mode={tab.mode || mode}
             onClick={() => handleTabClick(tab.id)}
             onClose={() => handleTabClose(tab.id)}

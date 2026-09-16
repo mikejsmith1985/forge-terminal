@@ -14,61 +14,72 @@
 // A routine change stays small. Padding a mechanical edit out to look
 // substantial trains the reader to skim, which is the habit this exists to
 // break.
+//
+// The panel sits in a dock over the tab it belongs to. The dock scrolls, so a
+// long brief never runs past the bottom of the window, and it leaves the tab
+// bar clear, so the developer can walk away to another tab and come back.
+// "Later" puts the brief down; "Got it" is for a brief that has been read.
 
 import React from 'react'
 import './ChangeBriefPanel.css'
 
 /**
- * Renders one published change brief.
+ * Renders one published change brief inside its scrolling dock.
  *
  * @param brief The published brief, or null when nothing has been published.
+ * @param onPark Called when the developer wants the brief out of the way for now.
  * @param onDismiss Called when the developer has finished reading.
  */
-export default function ChangeBriefPanel({ brief, onDismiss }) {
+export default function ChangeBriefPanel({ brief, onPark, onDismiss }) {
   if (!brief) return null
 
   return (
-    <section className="change-brief" aria-label="Change brief">
-      <header className="brief-header">
-        <p className="brief-kicker">What just changed</p>
-        <h2 className="brief-headline">{brief.headline}</h2>
-        <p className="brief-scale">
-          {brief.filesTouched} {brief.filesTouched === 1 ? 'file' : 'files'}
-          {brief.isRoutine ? ' · routine change, no decision to weigh' : ''}
-        </p>
-      </header>
+    <div className="change-brief-dock" data-testid="change-brief-dock">
+      <section className="change-brief" aria-label="Change brief">
+        <header className="brief-header">
+          <p className="brief-kicker">What just changed</p>
+          <h2 className="brief-headline">{brief.headline}</h2>
+          <p className="brief-scale">
+            {brief.filesTouched} {brief.filesTouched === 1 ? 'file' : 'files'}
+            {brief.isRoutine ? ' · routine change, no decision to weigh' : ''}
+          </p>
+        </header>
 
-      <div className="brief-panels">
-        <article className="brief-panel brief-panel--changed">
-          <h3>Changed</h3>
-          <p>{brief.whatChanged}</p>
-        </article>
+        <div className="brief-panels">
+          <article className="brief-panel brief-panel--changed">
+            <h3>Changed</h3>
+            <p>{brief.whatChanged}</p>
+          </article>
 
-        <article className="brief-panel brief-panel--why">
-          <h3>Why</h3>
-          <p>{brief.whyItChanged}</p>
-        </article>
+          <article className="brief-panel brief-panel--why">
+            <h3>Why</h3>
+            <p>{brief.whyItChanged}</p>
+          </article>
 
-        <article className="brief-panel brief-panel--risk">
-          <h3>Could break</h3>
-          <p>{brief.whatCouldBreak}</p>
-        </article>
-      </div>
-
-      {brief.decisions?.length > 0 && (
-        <div className="brief-decisions">
-          {brief.decisions.map((decision, index) => (
-            <BriefDecision key={`${brief.briefId}-decision-${index}`} decision={decision} />
-          ))}
+          <article className="brief-panel brief-panel--risk">
+            <h3>Could break</h3>
+            <p>{brief.whatCouldBreak}</p>
+          </article>
         </div>
-      )}
 
-      <footer className="brief-footer">
-        <button type="button" className="brief-dismiss" onClick={onDismiss}>
-          Got it
-        </button>
-      </footer>
-    </section>
+        {brief.decisions?.length > 0 && (
+          <div className="brief-decisions">
+            {brief.decisions.map((decision, index) => (
+              <BriefDecision key={`${brief.briefId}-decision-${index}`} decision={decision} />
+            ))}
+          </div>
+        )}
+
+        <footer className="brief-footer">
+          <button type="button" className="brief-park" onClick={onPark}>
+            Later
+          </button>
+          <button type="button" className="brief-dismiss" onClick={onDismiss}>
+            Got it
+          </button>
+        </footer>
+      </section>
+    </div>
   )
 }
 

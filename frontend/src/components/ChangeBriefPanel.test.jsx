@@ -5,6 +5,11 @@
 // it the shape that gets looked at": risk visually separate rather than buried
 // in a clause, the decision's open question actually present, and a routine
 // change staying small instead of padding itself out to look substantial.
+//
+// It also has to be a panel the developer can put down. It sits in a dock that
+// scrolls rather than growing past the window, and it offers "Later" beside
+// "Got it", because not being ready to read something is not the same as
+// having read it.
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -31,15 +36,25 @@ function makeBrief(overrides = {}) {
   }
 }
 
+function renderPanel(brief = makeBrief(), handlers = {}) {
+  return render(
+    <ChangeBriefPanel
+      brief={brief}
+      onPark={handlers.onPark ?? vi.fn()}
+      onDismiss={handlers.onDismiss ?? vi.fn()}
+    />,
+  )
+}
+
 describe('ChangeBriefPanel', () => {
   it('leads with the headline', () => {
-    render(<ChangeBriefPanel brief={makeBrief()} onDismiss={vi.fn()} />)
+    renderPanel()
 
     expect(screen.getByText(/Folders now give up their path/)).toBeTruthy()
   })
 
   it('renders what changed, why, and what could break as separate panels', () => {
-    render(<ChangeBriefPanel brief={makeBrief()} onDismiss={vi.fn()} />)
+    renderPanel()
 
     expect(document.querySelector('.brief-panel--changed')).toBeTruthy()
     expect(document.querySelector('.brief-panel--why')).toBeTruthy()
@@ -50,7 +65,7 @@ describe('ChangeBriefPanel', () => {
     // A risk inside a paragraph is a risk nobody sees. It gets its own class so
     // colour can carry the meaning without the reader having to parse a
     // sentence to find it.
-    render(<ChangeBriefPanel brief={makeBrief()} onDismiss={vi.fn()} />)
+    renderPanel()
 
     const riskPanel = document.querySelector('.brief-panel--risk')
     const changedPanel = document.querySelector('.brief-panel--changed')
@@ -60,7 +75,7 @@ describe('ChangeBriefPanel', () => {
   })
 
   it('shows the decision as a fork, both sides visible', () => {
-    render(<ChangeBriefPanel brief={makeBrief()} onDismiss={vi.fn()} />)
+    renderPanel()
 
     expect(screen.getByText(/One shared context menu/)).toBeTruthy()
     expect(screen.getByText(/A separate menu implementation/)).toBeTruthy()
@@ -69,7 +84,7 @@ describe('ChangeBriefPanel', () => {
   it('ends every decision with its open question', () => {
     // This is the mechanism that turns review into a question rather than a
     // nod, so its absence is a failure and not a missing nicety.
-    render(<ChangeBriefPanel brief={makeBrief()} onDismiss={vi.fn()} />)
+    renderPanel()
 
     expect(screen.getByText(/Is the shared menu worth coupling/)).toBeTruthy()
   })
@@ -87,7 +102,7 @@ describe('ChangeBriefPanel', () => {
       ],
     })
 
-    render(<ChangeBriefPanel brief={brief} onDismiss={vi.fn()} />)
+    renderPanel(brief)
 
     expect(document.querySelectorAll('.brief-decision').length).toBe(2)
   })
@@ -97,29 +112,50 @@ describe('ChangeBriefPanel', () => {
     // skim, which is the habit the whole feature exists to break.
     const brief = makeBrief({ isRoutine: true, decisions: [] })
 
-    render(<ChangeBriefPanel brief={brief} onDismiss={vi.fn()} />)
+    renderPanel(brief)
 
     expect(document.querySelectorAll('.brief-decision').length).toBe(0)
     expect(screen.getByText(/routine/i)).toBeTruthy()
   })
 
   it('shows how many files changed without listing them', () => {
-    render(<ChangeBriefPanel brief={makeBrief()} onDismiss={vi.fn()} />)
+    renderPanel()
 
     expect(screen.getByText(/6/)).toBeTruthy()
   })
 
+  it('sits in a dock that can scroll, so a long brief never outgrows the window', () => {
+    // The reported defect: a twelve-file brief with two decisions ran past the
+    // bottom of the screen with no way to scroll to it.
+    renderPanel()
+
+    const dock = document.querySelector('.change-brief-dock')
+    expect(dock).toBeTruthy()
+    expect(dock.contains(document.querySelector('.change-brief'))).toBe(true)
+  })
+
+  it('can be put down for later without being dismissed', () => {
+    const onPark = vi.fn()
+    const onDismiss = vi.fn()
+    renderPanel(makeBrief(), { onPark, onDismiss })
+
+    fireEvent.click(screen.getByRole('button', { name: /later/i }))
+
+    expect(onPark).toHaveBeenCalled()
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
   it('can be dismissed once read', () => {
     const onDismiss = vi.fn()
-    render(<ChangeBriefPanel brief={makeBrief()} onDismiss={onDismiss} />)
+    renderPanel(makeBrief(), { onDismiss })
 
-    fireEvent.click(screen.getByRole('button', { name: /got it|dismiss|close/i }))
+    fireEvent.click(screen.getByRole('button', { name: /got it/i }))
 
     expect(onDismiss).toHaveBeenCalled()
   })
 
   it('renders nothing when there is no brief', () => {
-    const { container } = render(<ChangeBriefPanel brief={null} onDismiss={vi.fn()} />)
+    const { container } = renderPanel(null)
 
     expect(container.firstChild).toBeNull()
   })
@@ -127,8 +163,7 @@ describe('ChangeBriefPanel', () => {
   it('escapes nothing into markup unsafely', () => {
     // React escapes by default; this pins that no dangerouslySetInnerHTML crept
     // in as a shortcut for formatting a panel.
-    const brief = makeBrief({ headline: '<img src=x onerror=alert(1)>' })
-    render(<ChangeBriefPanel brief={brief} onDismiss={vi.fn()} />)
+    renderPanel(makeBrief({ headline: '<img src=x onerror=alert(1)>' }))
 
     expect(document.querySelector('img')).toBeNull()
   })

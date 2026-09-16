@@ -151,6 +151,9 @@ body {
   display: flex;
   flex-direction: row;
   overflow: hidden;
+  /* The change brief's pill and dock float over this area, so it must be the
+     box they are positioned against — never the tab bar above it. */
+  position: relative;
 }
 
 /* Custom cursor for terminal - color matches theme */
