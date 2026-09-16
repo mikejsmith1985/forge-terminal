@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Terminal, TerminalSquare, Edit2, Sun, Moon, Palette, Tag } from 'lucide-react';
+import { X, Terminal, TerminalSquare, Edit2, Sun, Moon, Palette, Tag, FileText } from 'lucide-react';
 import { themes, themeOrder } from '../themes';
 
 /**
@@ -32,7 +32,7 @@ function getTabAccentColor(colorTheme, mode = 'dark') {
 /**
  * Tab component for terminal tab bar
  */
-function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragOver = false, isDragging = false, hasActiveReleaseJob = false }) {
+function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggleViewMode, onChangeTheme, isWaiting = false, mode = 'dark', devMode = false, onDragStart, onDragOver, onDrop, onDragEnd, isDragOver = false, isDragging = false, hasActiveReleaseJob = false, briefState = null }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(tab.title);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -181,6 +181,7 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggle
         onDrop={onDrop}
         onDragEnd={onDragEnd}
         data-shell={shellType}
+        data-tab-id={tab.id}
         style={tabStyle}
         role="tab"
         aria-selected={isActive}
@@ -204,6 +205,18 @@ function Tab({ tab, isActive, onClick, onClose, onRename, onToggleMode, onToggle
           />
         ) : (
           <span className="tab-title">{tab.title}</span>
+        )}
+
+        {/* A brief waiting on this tab. The developer may be on another tab,
+            and this is the only place that brief can announce itself. */}
+        {briefState && (
+          <span
+            className="tab-brief-indicator"
+            data-brief-state={briefState}
+            title={briefState === 'unread' ? 'A change brief is waiting on this tab' : 'This tab is holding a change brief'}
+          >
+            <FileText size={12} />
+          </span>
         )}
 
         {hasActiveReleaseJob && (

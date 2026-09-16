@@ -38,6 +38,7 @@ import { useTabManager } from './hooks/useTabManager'
 import { useSddGate } from './hooks/useSddGate'
 import { useChangeBrief } from './hooks/useChangeBrief'
 import ChangeBriefPanel from './components/ChangeBriefPanel'
+import ChangeBriefPill from './components/ChangeBriefPill'
 import { useDevMode } from './hooks/useDevMode'
 // useWorkflowManager REMOVED - v3.9.0: Workflows deleted
 import { logger } from './utils/logger'
@@ -2123,6 +2124,7 @@ function App() {
             isVaultOpen={isVaultOpen}
             disableNewTab={tabs.length >= MAX_TABS}
             waitingTabs={waitingTabs}
+            briefTabs={changeBrief.briefStatesBySession}
             activeReleaseJobs={activeReleaseJobs}
             mode={theme}
             devMode={devMode}
@@ -2207,10 +2209,13 @@ function App() {
                     onSpawnFailed={handleSpawnFailed}
                     onWaitingChange={(isWaiting) => handleWaitingChange(tab.id, isWaiting)}
                     onDirectoryChange={(folderName, fullPath) => handleDirectoryChange(tab.id, folderName, fullPath)}
-                    onSddGate={tab.id === activeTabId ? (raw) => {
-                      sddGate.handleWsMessage(raw)
-                      changeBrief.handleWsMessage(raw)
-                    } : undefined}
+                    onSddGate={(raw) => {
+                      // A brief is filed under the tab whose socket carried it,
+                      // so a background tab's brief is kept for that tab rather
+                      // than dropped because the developer was looking elsewhere.
+                      changeBrief.handleWsMessage(raw, tab.id)
+                      if (tab.id === activeTabId) sddGate.handleWsMessage(raw)
+                    }}
                     onCopy={() => addToast('✓ Copied to clipboard', 'success', 1500)}
                     onFileOpen={handleFileOpen}
                     onPaste={(type, metadata) => {
@@ -2247,18 +2252,29 @@ function App() {
               </div>
             )})}
           </div>
+          {/* The active tab's change brief: a pill until the developer opens
+              it, then a dock that scrolls over this pane and leaves the tab
+              bar clear. Each tab keeps its own. */}
+          <ErrorBoundary>
+            <ChangeBriefPill
+              briefState={changeBrief.briefState}
+              headline={changeBrief.brief?.headline ?? ''}
+              onOpen={changeBrief.openBrief}
+            />
+            {changeBrief.isBriefOpen && (
+              <ChangeBriefPanel
+                brief={changeBrief.brief}
+                onPark={changeBrief.parkBrief}
+                onDismiss={changeBrief.dismissBrief}
+              />
+            )}
+          </ErrorBoundary>
         </div>
         {/* spec-006: unified SDD dashboard — always visible, replaces SddPipelinePanel
              and PhaseDecisionCard with a single inline surface (phase rail + decision bar).
              Wrapped in its own ErrorBoundary so a dashboard render crash never takes
              down the terminal (the whole-app boundary at AppWithErrorBoundary would
              otherwise blank the entire UI on any SDD panel error). */}
-        {changeBrief.isBriefOpen && (
-          <ErrorBoundary>
-            <ChangeBriefPanel brief={changeBrief.brief} onDismiss={changeBrief.dismiss} />
-          </ErrorBoundary>
-        )}
-
         <ErrorBoundary>
           <SddDashboard
             phases={sddGate.phaseStatuses}
