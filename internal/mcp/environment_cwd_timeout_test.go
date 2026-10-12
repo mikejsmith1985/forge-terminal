@@ -35,8 +35,8 @@ func (runner *directoryRecordingRunner) RunCommand(_ context.Context, _ string, 
 	return mcp.RunOutput{ExitCode: 0, Stdout: "ok"}, nil
 }
 
-// lastDirectory returns the working directory of the most recent command, or "" if none ran.
-func (runner *directoryRecordingRunner) lastDirectory() string {
+// readLastDirectory returns the working directory of the most recent command, or "" if none ran.
+func (runner *directoryRecordingRunner) readLastDirectory() string {
 	runner.mutex.Lock()
 	defer runner.mutex.Unlock()
 	if len(runner.recordedDirectories) == 0 {
@@ -69,8 +69,8 @@ func TestNativeCommandRunsInTheRequestedDirectory(t *testing.T) {
 	if result.IsError {
 		t.Fatalf("unexpected error: %v", result.Content)
 	}
-	if runner.lastDirectory() != requestedDirectory {
-		t.Fatalf("command ran in %q, want %q", runner.lastDirectory(), requestedDirectory)
+	if runner.readLastDirectory() != requestedDirectory {
+		t.Fatalf("command ran in %q, want %q", runner.readLastDirectory(), requestedDirectory)
 	}
 }
 
@@ -86,8 +86,8 @@ func TestCommandWithoutCwdRunsInTheCallingTabsProject(t *testing.T) {
 	if result.IsError {
 		t.Fatalf("unexpected error: %v", result.Content)
 	}
-	if runner.lastDirectory() != tabProject {
-		t.Fatalf("command ran in %q, want the tab's project %q", runner.lastDirectory(), tabProject)
+	if runner.readLastDirectory() != tabProject {
+		t.Fatalf("command ran in %q, want the tab's project %q", runner.readLastDirectory(), tabProject)
 	}
 }
 
@@ -100,7 +100,7 @@ func TestCommandWithoutCwdOrProjectIsRefusedInsteadOfRunningInTheLaunchFolder(t 
 	if !result.IsError || !strings.Contains(result.Content[0].Text, "cwd") {
 		t.Fatalf("expected a refusal naming cwd, got: %v", result.Content)
 	}
-	if runner.lastDirectory() != "" {
+	if runner.readLastDirectory() != "" {
 		t.Fatal("a command ran even though no directory could be identified")
 	}
 }
