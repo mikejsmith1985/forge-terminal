@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.25.7] - 2026-10-12
+
+---
+
+## [v7.25.7] - 2026-10-12
+
 ### Fixed
 - **v7.25.6 could not be installed: Windows Defender quarantined `fterm.exe` as `Trojan:Win32/Bearfoos.B!ml`** — the release was built from a fresh git worktree, and the Windows version resource (`cmd/forge/resource_windows_amd64.syso`, which gives the exe its name, description and version) is a gitignored, generated file that only existed in the main checkout. The release script's "generate" step ran `go generate`, but no package carries a `//go:generate` directive, so it never produced anything, and it only warned on failure in any case. The result was the first release since the resource was introduced to ship as an anonymous executable, and Defender's machine-learning heuristic quarantined it both on download and after the in-app update applied it. The script now generates the resource itself with `goversioninfo`, stamped with the real release version instead of the long-stale 3.16.6, and stops the release if that fails. After building, it refuses to upload any `fterm.exe` that does not carry the Forge version resource for this exact version, so a build from any checkout either matches or never ships. Covered by Pester tests in `scripts/release-helpers.Tests.ps1`, which run a real `goversioninfo` and a real `go build`.
 - **Releases needed `-Force` for commits that were perfectly conventional** — the release preflight's commit-format check accepted `fix: ...` but rejected the scoped form `fix(mcp): ...`, which is standard Conventional Commits, so a release whose recent commits used scopes raised a warning that non-interactive mode could only pass with `-Force`. Scopes and the `!` breaking-change marker are now accepted.
