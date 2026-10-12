@@ -87,7 +87,8 @@ type Dependencies struct {
 	// the project only by coincidence — and on Windows that coincidence produced
 	// writes into C:\WINDOWS\system32.
 	//
-	// Nil falls back to ProjectPath.
+	// Nil falls back to ProjectPath. When set, an empty answer means "no
+	// project" and is not replaced by ProjectPath.
 	ProjectPathFunc func() string
 
 	// ProjectPathForSessionFunc resolves the project for the tab that made the
@@ -136,11 +137,14 @@ type Dependencies struct {
 //
 // Resolved per call rather than held, because the developer changes tabs and the
 // answer changes with them.
+//
+// When ProjectPathFunc is wired its answer is final, including an empty one.
+// It already weighs the process directory and rejects it when it is not a
+// project; falling back to ProjectPath here would undo that and hand tools
+// C:\WINDOWS\system32 again.
 func (deps Dependencies) resolveProjectPath() string {
 	if deps.ProjectPathFunc != nil {
-		if resolved := deps.ProjectPathFunc(); resolved != "" {
-			return resolved
-		}
+		return deps.ProjectPathFunc()
 	}
 	return deps.ProjectPath
 }
@@ -243,7 +247,7 @@ func (srv *Server) ExecuteTool(name string, args map[string]any) (*CallToolResul
 	if !found {
 		return nil, fmt.Errorf("tool %q not registered", name)
 	}
-	return handler.Execute(args)
+	return executeWithDeclaredArgumentNames(handler, args)
 }
 
 // HandleHTTP is the single HTTP handler for POST and GET /api/mcp.
@@ -347,7 +351,7 @@ func (srv *Server) handleToolsCall(w http.ResponseWriter, req *JSONRPCRequest) {
 		return
 	}
 
-	result, execErr := handler.Execute(callReq.Arguments)
+	result, execErr := executeWithDeclaredArgumentNames(handler, callReq.Arguments)
 	if execErr != nil {
 		srv.writeRPCError(w, req.ID, ErrorCodeInternalError, execErr.Error())
 		return
@@ -358,6 +362,14 @@ func (srv *Server) handleToolsCall(w http.ResponseWriter, req *JSONRPCRequest) {
 		ID:      req.ID,
 		Result:  result,
 	})
+}
+
+// executeWithDeclaredArgumentNames runs a tool after mapping each argument to
+// the spelling the tool declared. Both entry points go through here so tests
+// exercise the same path production requests take.
+func executeWithDeclaredArgumentNames(handler ToolHandler, arguments map[string]any) (*CallToolResult, error) {
+	definition := handler.Definition()
+	return handler.Execute(normalizeArgumentNames(definition.Name, definition.InputSchema, arguments))
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────
@@ -396,9 +408,11 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newTerminalSessionsTool(srv.deps.TermHandler),
 		newTerminalExecuteTool(srv.deps.TermHandler),
 		newTerminalReadTool(srv.deps.TermHandler),
-		newFileReadTool(srv.deps.ProjectPath),
-		newFileWriteTool(srv.deps.ProjectPath),
-		newFileListTool(srv.deps.ProjectPath),
+		// Per call and per session, like the workflow tools below: a path fixed
+		// at startup is wherever Forge was launched — system32 from a shortcut.
+		newFileReadTool(srv.deps.resolveProjectPathForSession),
+		newFileWriteTool(srv.deps.resolveProjectPathForSession),
+		newFileListTool(srv.deps.resolveProjectPathForSession),
 		newTaskSubmitTool(srv.broker),
 		newWorkflowStatusTool(srv.deps.ProjectPath, srv.deps.WorkflowConfig),
 		// These three write project state, so they resolve the project when they
