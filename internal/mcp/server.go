@@ -393,7 +393,7 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 	}
 	environmentJobStore := srv.deps.EnvironmentJobStore
 	if environmentJobStore == nil {
-		environmentJobStore = NewEnvironmentJobStore(srv.deps.ProjectPath)
+		environmentJobStore = NewUserEnvironmentJobStore()
 	}
 	environmentJobManager := NewEnvironmentJobManager(environmentRunner, environmentJobStore)
 
@@ -422,7 +422,7 @@ func (srv *Server) buildToolRegistry(allowedTools []string) map[string]ToolHandl
 		newWorkflowPreflightTool(srv.deps.resolveProjectPathForSession),
 		newChangeBriefPublishTool(srv.deps.resolveProjectPathForSession, srv.deps.TermHandler),
 		newEnvironmentDetectTool(environmentRunner),
-		newEnvironmentRunTool(environmentRunner, environmentJobManager),
+		newEnvironmentRunTool(environmentRunner, environmentJobManager, srv.deps.resolveProjectPathForSession),
 		newEnvironmentJobsTool(environmentJobManager),
 		newEnvironmentReadJobTool(environmentJobManager),
 		newVaultInjectTool(srv.deps.VaultAccess),

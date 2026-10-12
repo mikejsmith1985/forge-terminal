@@ -60,12 +60,13 @@ func (t *environmentDetectTool) Execute(_ map[string]any) (*CallToolResult, erro
 // environmentRunTool executes a shell command inside the requested Linux environment
 // and returns the exit code, stdout, stderr, and timing as structured JSON.
 type environmentRunTool struct {
-	runner     CommandRunner
-	jobManager *EnvironmentJobManager
+	runner             CommandRunner
+	jobManager         *EnvironmentJobManager
+	resolveProjectPath projectRootResolver
 }
 
-func newEnvironmentRunTool(runner CommandRunner, jobManager *EnvironmentJobManager) ToolHandler {
-	return &environmentRunTool{runner: runner, jobManager: jobManager}
+func newEnvironmentRunTool(runner CommandRunner, jobManager *EnvironmentJobManager, resolveProjectPath projectRootResolver) ToolHandler {
+	return &environmentRunTool{runner: runner, jobManager: jobManager, resolveProjectPath: resolveProjectPath}
 }
 
 // Definition returns the MCP tool descriptor for environment_run.
@@ -90,7 +91,11 @@ func (t *environmentRunTool) Definition() ToolDefinition {
 				},
 				"cwd": {
 					"type": "string",
-					"description": "Working directory for the command. Defaults to the current Forge project directory if omitted."
+					"description": "Working directory for the command. Defaults to the project of the tab named by tab_id; refused when neither identifies a directory."
+				},
+				"tab_id": {
+					"type": "string",
+					"description": "Your Forge tab's ID (FORGE_SESSION_ID). Used to find the project when cwd is omitted."
 				},
 				"image": {
 					"type": "string",
@@ -98,7 +103,7 @@ func (t *environmentRunTool) Definition() ToolDefinition {
 				},
 				"timeout_seconds": {
 					"type": "number",
-					"description": "Maximum seconds to wait for the command to finish (1–600). Default: 120."
+					"description": "Maximum seconds the command may run. Blocking: 1–600, default 120. Detached: 1–3600, default 1800."
 				},
 				"detach": {
 					"type": "boolean",
@@ -116,6 +121,14 @@ func (t *environmentRunTool) Execute(args map[string]any) (*CallToolResult, erro
 	parsedArgs, parseErr := parseEnvironmentRunArgs(args)
 	if parseErr != nil {
 		return errorContent(parseErr.Error()), nil
+	}
+	if parsedArgs.WorkingDirectory == "" && t.resolveProjectPath != nil {
+		parsedArgs.WorkingDirectory = t.resolveProjectPath(readAliasedStringArgument(args, "tab_id", "sessionId"))
+	}
+	// Refused rather than defaulted: the only other directory available is
+	// Forge's launch folder, which is where builds used to land by mistake.
+	if parsedArgs.WorkingDirectory == "" {
+		return errorContent(noWorkingDirectoryMessage), nil
 	}
 	if parsedArgs.Detach {
 		return t.startDetachedJob(parsedArgs)
@@ -173,6 +186,10 @@ func (t *environmentRunTool) startDetachedJob(parsedArgs environmentRunArgs) (*C
 
 // ── Argument Parsing ──────────────────────────────────────────────────────────
 
+// noWorkingDirectoryMessage says why environment_run refused and how to fix it.
+const noWorkingDirectoryMessage = "environment_run needs a directory: pass cwd, or tab_id (your FORGE_SESSION_ID) " +
+	"from a Forge tab open inside the project"
+
 // environmentRunArgs holds the validated, normalised arguments for one environment_run call.
 type environmentRunArgs struct {
 	Command          string
@@ -187,9 +204,8 @@ type environmentRunArgs struct {
 // applying defaults for optional fields.
 func parseEnvironmentRunArgs(args map[string]any) (environmentRunArgs, error) {
 	parsed := environmentRunArgs{
-		Environment:    StrategyAuto,
-		DockerImage:    DefaultDockerImage,
-		TimeoutSeconds: defaultEnvironmentTimeoutSec,
+		Environment: StrategyAuto,
+		DockerImage: DefaultDockerImage,
 	}
 
 	// command is the only required field.
@@ -229,12 +245,6 @@ func parseEnvironmentRunArgs(args map[string]any) (environmentRunArgs, error) {
 		}
 	}
 
-	if rawTimeout, hasTimeout := args["timeout_seconds"]; hasTimeout {
-		if floatVal, isFloat := rawTimeout.(float64); isFloat {
-			parsed.TimeoutSeconds = clampTimeout(int(floatVal))
-		}
-	}
-
 	if rawDetach, hasDetach := args["detach"]; hasDetach {
 		detachValue, isBool := rawDetach.(bool)
 		if !isBool {
@@ -243,7 +253,25 @@ func parseEnvironmentRunArgs(args map[string]any) (environmentRunArgs, error) {
 		parsed.Detach = detachValue
 	}
 
+	requestedTimeout := 0
+	if floatVal, isFloat := args["timeout_seconds"].(float64); isFloat {
+		requestedTimeout = int(floatVal)
+	}
+	parsed.TimeoutSeconds = resolveRunTimeout(requestedTimeout, parsed.Detach)
+
 	return parsed, nil
+}
+
+// resolveRunTimeout applies the default and cap for the kind of run: detached
+// jobs get the long rules, blocking calls the short ones. Zero means "not given".
+func resolveRunTimeout(requestedSeconds int, isDetached bool) int {
+	if isDetached {
+		return defaultJobTimeout(requestedSeconds)
+	}
+	if requestedSeconds == 0 {
+		return defaultEnvironmentTimeoutSec
+	}
+	return clampTimeout(requestedSeconds)
 }
 
 // isValidEnvironmentStrategy returns true if the given strategy name is one

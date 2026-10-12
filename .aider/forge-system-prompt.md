@@ -695,7 +695,7 @@ Follow up with `terminal_execute` to source the script:
 {
   "tool": "terminal_execute",
   "arguments": {
-    "session_id": "<background-session-id>",
+    "tab_id": "<background-session-id>",
     "command": ". 'C:\\Users\\...\\forge-vault-abc123.ps1'"
   }
 }

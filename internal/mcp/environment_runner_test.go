@@ -34,7 +34,7 @@ func newMockCommandRunner(responsesByExecutable map[string]RunOutput) *mockComma
 	}
 }
 
-func (m *mockCommandRunner) RunCommand(_ context.Context, name string, args []string) (RunOutput, error) {
+func (m *mockCommandRunner) RunCommand(_ context.Context, name string, args []string, _ string) (RunOutput, error) {
 	m.recordedCalls = append(m.recordedCalls, recordedCommandCall{
 		ExecutableName: name,
 		Arguments:      args,
@@ -307,6 +307,6 @@ type callCountingMockRunner struct {
 	onRunCommand func(name string, args []string) RunOutput
 }
 
-func (c *callCountingMockRunner) RunCommand(_ context.Context, name string, args []string) (RunOutput, error) {
+func (c *callCountingMockRunner) RunCommand(_ context.Context, name string, args []string, _ string) (RunOutput, error) {
 	return c.onRunCommand(name, args), nil
 }

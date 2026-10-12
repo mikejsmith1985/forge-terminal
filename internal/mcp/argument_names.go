@@ -87,6 +87,25 @@ func findDifferentlySpelledArgument(declaredName string, arguments map[string]an
 	return "", false
 }
 
+// readAliasedStringArgument returns the first non-empty string argument whose
+// name matches any of acceptedNames in any spelling (tab_id, tabId, Session-ID ...).
+//
+// For arguments that were renamed: the Claude desktop app strips one named
+// session_id outright, so the terminal tools now declare tab_id, and this keeps
+// every older spelling working for clients and prompts that still send it.
+func readAliasedStringArgument(arguments map[string]any, acceptedNames ...string) string {
+	for _, acceptedName := range acceptedNames {
+		acceptedForm := toSpellingIndependentForm(acceptedName)
+		for sentName, sentValue := range arguments {
+			stringValue, isString := sentValue.(string)
+			if isString && stringValue != "" && toSpellingIndependentForm(sentName) == acceptedForm {
+				return stringValue
+			}
+		}
+	}
+	return ""
+}
+
 // toSpellingIndependentForm lowercases a name and drops word separators, so
 // session_id, sessionId, SessionID and session-id all compare equal.
 func toSpellingIndependentForm(argumentName string) string {

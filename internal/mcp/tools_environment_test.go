@@ -24,7 +24,7 @@ type testCommandRunner struct {
 	responsesByExecutable map[string]mcp.RunOutput
 }
 
-func (m *testCommandRunner) RunCommand(_ context.Context, name string, _ []string) (mcp.RunOutput, error) {
+func (m *testCommandRunner) RunCommand(_ context.Context, name string, _ []string, _ string) (mcp.RunOutput, error) {
 	if output, hasOutput := m.responsesByExecutable[name]; hasOutput {
 		return output, nil
 	}

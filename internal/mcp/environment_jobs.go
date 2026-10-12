@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 )
 
 const (
@@ -76,6 +78,21 @@ type EnvironmentJobStore struct {
 func NewEnvironmentJobStore(projectRoot string) *EnvironmentJobStore {
 	jobsRoot := filepath.Join(projectRoot, ".forge", environmentJobsDirectoryName)
 	return &EnvironmentJobStore{projectRoot: projectRoot, jobsRoot: jobsRoot}
+}
+
+// NewUserEnvironmentJobStore creates the store Forge uses by default:
+// ~/.forge/adaptive-build-jobs, shared by every project.
+//
+// It used to be rooted at Forge's launch folder, so jobs landed in
+// Downloads\.forge when Forge was started from there. Each job records its own
+// cwd, so one per-user store loses nothing and survives tab and project changes.
+func NewUserEnvironmentJobStore() *EnvironmentJobStore {
+	return NewEnvironmentJobStore(filepath.Dir(storage.GetForgeDir()))
+}
+
+// JobsRoot returns the directory holding one folder per job.
+func (store *EnvironmentJobStore) JobsRoot() string {
+	return store.jobsRoot
 }
 
 // ProjectRoot returns the root path backing the store, primarily for restart tests.
@@ -247,7 +264,7 @@ func NewEnvironmentJobManager(runner CommandRunner, store *EnvironmentJobStore) 
 		runner = &realCommandRunner{}
 	}
 	if store == nil {
-		store = NewEnvironmentJobStore("")
+		store = NewUserEnvironmentJobStore()
 	}
 	return &EnvironmentJobManager{runner: runner, store: store}
 }
@@ -348,11 +365,12 @@ func defaultJobDockerImage(dockerImage string) string {
 	return dockerImage
 }
 
+// defaultJobTimeout applies the detached-job rules: long default, one-hour cap.
 func defaultJobTimeout(timeoutSeconds int) int {
 	if timeoutSeconds == 0 {
-		return defaultEnvironmentTimeoutSec
+		return defaultDetachedJobTimeoutSec
 	}
-	return clampTimeout(timeoutSeconds)
+	return clampDetachedTimeout(timeoutSeconds)
 }
 
 func logEnvironmentJobStoreError(jobID string, action string, err error) {
