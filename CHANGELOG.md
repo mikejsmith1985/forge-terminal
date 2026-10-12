@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.25.8] - 2026-10-12
+
+---
+
+## [v7.25.8] - 2026-10-12
+
 ### Fixed
 - **The Claude desktop app could not use `terminal_read` or `terminal_execute`, because it strips an argument named `session_id`** — the earlier spelling-tolerance fix assumed the key was being renamed, but this client removes it outright (`job_id` survives, so it is the name, not the underscore). The terminal tools now declare `tab_id`, and `session_id` stays accepted in any spelling (`session_id`, `sessionId`, `Session-ID`), so existing prompts and other clients keep working. The bundled agent instructions and the MCP developer docs now show `tab_id`.
 - **`environment_run` ignored `cwd` for native commands and ran them in Forge's launch folder** — WSL and Docker runs carried the directory inside their own arguments, but the native path never told the operating system where to start the process, so a PlatformIO build pointed at `C:\ProjectsWin\CreeperEyes` ran in Downloads. The runner now sets the process's working directory, proven by an integration test that spawns a real shell and reads back where it started. With no `cwd`, the command now runs in the project of the tab named by `tab_id`, and is refused, with a message saying what to pass, rather than falling back to the launch folder.
