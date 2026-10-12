@@ -5,12 +5,18 @@
 //   - file_list  — list a directory's children
 //
 // All three tools enforce a path safety check: the resolved absolute path must
-// remain inside the configured project root. This prevents path traversal
-// attacks that could expose or overwrite files outside the project.
+// remain inside the project root. This prevents path traversal attacks that
+// could expose or overwrite files outside the project.
+//
+// The root is resolved on every call from the calling tab's session, never fixed
+// at startup: Forge's own working directory is wherever it was launched, which
+// from a Windows shortcut is C:\WINDOWS\system32. When no project can be
+// identified the tools refuse rather than guess.
 package mcp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,17 +29,33 @@ const (
 	// fileReadSizeCap limits how many bytes file_read returns.
 	// 1 MiB is generous for tool output but prevents reading multi-GB binary files.
 	fileReadSizeCap = 1 * 1024 * 1024
+
+	// noProjectRootMessage tells the agent why a file tool refused and how to fix
+	// it, instead of letting a relative path land in Forge's launch directory.
+	noProjectRootMessage = "Forge cannot tell which project you are working in — pass sessionId " +
+		"(the FORGE_SESSION_ID of your terminal tab), or open a Forge tab inside the project first"
+
+	// fileToolSessionIDSchema is the shared schema for the optional sessionId
+	// argument every file tool accepts.
+	fileToolSessionIDSchema = `{
+					"type": "string",
+					"description": "The value of the FORGE_SESSION_ID environment variable in the terminal you are working in. Pass it: relative paths then resolve inside that tab's project."
+				}`
 )
+
+// projectRootResolver returns the project root for the tab with the given
+// session id (possibly empty), or empty when no project can be identified.
+type projectRootResolver func(sessionID string) string
 
 // ── file_read ────────────────────────────────────────────────────────────────
 
 // fileReadTool reads a file and returns its contents.
 type fileReadTool struct {
-	projectRoot string
+	resolveProjectRoot projectRootResolver
 }
 
-func newFileReadTool(projectRoot string) ToolHandler {
-	return &fileReadTool{projectRoot: projectRoot}
+func newFileReadTool(resolveProjectRoot projectRootResolver) ToolHandler {
+	return &fileReadTool{resolveProjectRoot: resolveProjectRoot}
 }
 
 func (t *fileReadTool) Definition() ToolDefinition {
@@ -46,7 +68,8 @@ func (t *fileReadTool) Definition() ToolDefinition {
 				"path": {
 					"type": "string",
 					"description": "Path to the file to read, relative to the project root or absolute."
-				}
+				},
+				"sessionId": `+fileToolSessionIDSchema+`
 			},
 			"required": ["path"]
 		}`),
@@ -54,7 +77,7 @@ func (t *fileReadTool) Definition() ToolDefinition {
 }
 
 func (t *fileReadTool) Execute(args map[string]any) (*CallToolResult, error) {
-	safePath, err := resolveAndValidatePath(t.projectRoot, args)
+	safePath, err := resolveAndValidatePath(t.resolveProjectRoot, args, "")
 	if err != nil {
 		return errorContent(err.Error()), nil
 	}
@@ -84,11 +107,11 @@ func (t *fileReadTool) Execute(args map[string]any) (*CallToolResult, error) {
 
 // fileWriteTool writes content to a file, creating intermediate directories.
 type fileWriteTool struct {
-	projectRoot string
+	resolveProjectRoot projectRootResolver
 }
 
-func newFileWriteTool(projectRoot string) ToolHandler {
-	return &fileWriteTool{projectRoot: projectRoot}
+func newFileWriteTool(resolveProjectRoot projectRootResolver) ToolHandler {
+	return &fileWriteTool{resolveProjectRoot: resolveProjectRoot}
 }
 
 func (t *fileWriteTool) Definition() ToolDefinition {
@@ -105,7 +128,8 @@ func (t *fileWriteTool) Definition() ToolDefinition {
 				"content": {
 					"type": "string",
 					"description": "The text content to write."
-				}
+				},
+				"sessionId": `+fileToolSessionIDSchema+`
 			},
 			"required": ["path", "content"]
 		}`),
@@ -113,7 +137,7 @@ func (t *fileWriteTool) Definition() ToolDefinition {
 }
 
 func (t *fileWriteTool) Execute(args map[string]any) (*CallToolResult, error) {
-	safePath, err := resolveAndValidatePath(t.projectRoot, args)
+	safePath, err := resolveAndValidatePath(t.resolveProjectRoot, args, "")
 	if err != nil {
 		return errorContent(err.Error()), nil
 	}
@@ -142,11 +166,11 @@ func (t *fileWriteTool) Execute(args map[string]any) (*CallToolResult, error) {
 
 // fileListTool lists the contents of a directory.
 type fileListTool struct {
-	projectRoot string
+	resolveProjectRoot projectRootResolver
 }
 
-func newFileListTool(projectRoot string) ToolHandler {
-	return &fileListTool{projectRoot: projectRoot}
+func newFileListTool(resolveProjectRoot projectRootResolver) ToolHandler {
+	return &fileListTool{resolveProjectRoot: resolveProjectRoot}
 }
 
 func (t *fileListTool) Definition() ToolDefinition {
@@ -159,7 +183,8 @@ func (t *fileListTool) Definition() ToolDefinition {
 				"path": {
 					"type": "string",
 					"description": "Directory to list, relative to the project root or absolute. Defaults to project root if omitted."
-				}
+				},
+				"sessionId": `+fileToolSessionIDSchema+`
 			},
 			"required": []
 		}`),
@@ -167,12 +192,9 @@ func (t *fileListTool) Definition() ToolDefinition {
 }
 
 func (t *fileListTool) Execute(args map[string]any) (*CallToolResult, error) {
-	// path is optional for file_list — default to project root.
-	if _, hasPath := args["path"]; !hasPath {
-		args["path"] = "."
-	}
-
-	safePath, err := resolveAndValidatePath(t.projectRoot, args)
+	// path is optional for file_list — default to the project root. Defaulted
+	// here rather than written into args, which may be nil when omitted.
+	safePath, err := resolveAndValidatePath(t.resolveProjectRoot, args, ".")
 	if err != nil {
 		return errorContent(err.Error()), nil
 	}
@@ -209,12 +231,21 @@ func (t *fileListTool) Execute(args map[string]any) (*CallToolResult, error) {
 // ── Shared Path Utilities ─────────────────────────────────────────────────────
 
 // resolveAndValidatePath extracts the "path" key from args, resolves it to an
-// absolute path, and verifies it stays inside the project root.
+// absolute path, and verifies it stays inside the calling tab's project root.
+// defaultPath is used when "path" is absent; empty means "path" is required.
 // Returns the safe absolute path or an error describing the rejection reason.
-func resolveAndValidatePath(projectRoot string, args map[string]any) (string, error) {
+func resolveAndValidatePath(resolveProjectRoot projectRootResolver, args map[string]any, defaultPath string) (string, error) {
+	projectRoot := resolveProjectRoot(stringArg(args, "sessionId"))
+	if projectRoot == "" {
+		return "", errors.New(noProjectRootMessage)
+	}
+
 	rawPath, ok := args["path"]
-	if !ok {
+	if !ok && defaultPath == "" {
 		return "", fmt.Errorf("path is required")
+	}
+	if !ok {
+		rawPath = defaultPath
 	}
 	pathStr, ok := rawPath.(string)
 	if !ok {
