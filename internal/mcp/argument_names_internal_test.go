@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// schemaDeclaring builds an input schema that declares the given property names.
-func schemaDeclaring(t *testing.T, propertyNames ...string) json.RawMessage {
+// buildSchemaDeclaring builds an input schema that declares the given property names.
+func buildSchemaDeclaring(t *testing.T, propertyNames ...string) json.RawMessage {
 	t.Helper()
 	properties := make(map[string]any, len(propertyNames))
 	for _, propertyName := range propertyNames {
@@ -22,7 +22,7 @@ func schemaDeclaring(t *testing.T, propertyNames ...string) json.RawMessage {
 
 func TestEveryCommonRewriteOfASnakeCaseNameIsRecognised(t *testing.T) {
 	for _, sentName := range []string{"sessionId", "SessionID", "session-id", "SESSION_ID"} {
-		normalized := normalizeArgumentNames("tool", schemaDeclaring(t, "session_id"), map[string]any{sentName: "tab-1"})
+		normalized := normalizeArgumentNames("tool", buildSchemaDeclaring(t, "session_id"), map[string]any{sentName: "tab-1"})
 		if normalized["session_id"] != "tab-1" {
 			t.Errorf("%q was not accepted as session_id: %v", sentName, normalized)
 		}
@@ -30,7 +30,7 @@ func TestEveryCommonRewriteOfASnakeCaseNameIsRecognised(t *testing.T) {
 }
 
 func TestUndeclaredArgumentsPassThroughUntouched(t *testing.T) {
-	normalized := normalizeArgumentNames("tool", schemaDeclaring(t, "path"), map[string]any{"extra_flag": true})
+	normalized := normalizeArgumentNames("tool", buildSchemaDeclaring(t, "path"), map[string]any{"extra_flag": true})
 
 	if normalized["extra_flag"] != true {
 		t.Errorf("an undeclared argument was dropped: %v", normalized)
@@ -40,7 +40,7 @@ func TestUndeclaredArgumentsPassThroughUntouched(t *testing.T) {
 func TestTheCallersArgumentsAreNotModified(t *testing.T) {
 	sentArguments := map[string]any{"sessionId": "tab-1"}
 
-	normalizeArgumentNames("tool", schemaDeclaring(t, "session_id"), sentArguments)
+	normalizeArgumentNames("tool", buildSchemaDeclaring(t, "session_id"), sentArguments)
 
 	if _, wasAdded := sentArguments["session_id"]; wasAdded {
 		t.Error("the caller's map was mutated")

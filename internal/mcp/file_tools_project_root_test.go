@@ -25,10 +25,10 @@ func createDirectoryForTest(t *testing.T, directoryPath string) {
 	}
 }
 
-// serverWithNoIdentifiableProject mimics Forge launched from system32 with no
+// buildServerWithNoIdentifiableProject mimics Forge launched from system32 with no
 // tab bound to a repository: the resolver finds nothing, and the startup
 // directory is somewhere nobody works.
-func serverWithNoIdentifiableProject(launchDirectory string) *mcp.Server {
+func buildServerWithNoIdentifiableProject(launchDirectory string) *mcp.Server {
 	return mcp.NewServer("test-token", mcp.Dependencies{
 		ProjectPath:               launchDirectory,
 		ProjectPathFunc:           func() string { return "" },
@@ -39,7 +39,7 @@ func serverWithNoIdentifiableProject(launchDirectory string) *mcp.Server {
 func TestFileListRefusesWhenNoProjectCanBeIdentified(t *testing.T) {
 	launchDirectory := t.TempDir()
 	createDirectoryForTest(t, filepath.Join(launchDirectory, "system-file-marker"))
-	srv := serverWithNoIdentifiableProject(launchDirectory)
+	srv := buildServerWithNoIdentifiableProject(launchDirectory)
 
 	result := callTool(t, srv, "file_list", map[string]any{"path": "."})
 
@@ -53,7 +53,7 @@ func TestFileListRefusesWhenNoProjectCanBeIdentified(t *testing.T) {
 
 func TestFileWriteRefusesWhenNoProjectCanBeIdentified(t *testing.T) {
 	launchDirectory := t.TempDir()
-	srv := serverWithNoIdentifiableProject(launchDirectory)
+	srv := buildServerWithNoIdentifiableProject(launchDirectory)
 
 	result := callTool(t, srv, "file_write", map[string]any{"path": "stray.txt", "content": "x"})
 
