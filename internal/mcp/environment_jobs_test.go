@@ -12,7 +12,7 @@ import (
 
 type failingEnvironmentJobRunner struct{}
 
-func (runner *failingEnvironmentJobRunner) RunCommand(_ context.Context, _ string, _ []string) (RunOutput, error) {
+func (runner *failingEnvironmentJobRunner) RunCommand(_ context.Context, _ string, _ []string, _ string) (RunOutput, error) {
 	return RunOutput{}, errors.New("process could not start")
 }
 

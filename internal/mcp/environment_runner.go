@@ -36,6 +36,15 @@ const (
 	// maxEnvironmentTimeoutSec is the hard upper limit — 10 minutes for large builds.
 	maxEnvironmentTimeoutSec = 600
 
+	// defaultDetachedJobTimeoutSec is used when a detached job omits timeout_seconds.
+	// Detached jobs exist for builds too long to wait on; inheriting the 120-second
+	// blocking default marked a 122-second PlatformIO build as failed.
+	defaultDetachedJobTimeoutSec = 1800
+
+	// maxDetachedJobTimeoutSec caps a detached job at one hour. Nobody is blocked
+	// waiting on it, so it can run far longer than a blocking call.
+	maxDetachedJobTimeoutSec = 3600
+
 	// wslExecutable is the WSL2 launcher binary on Windows.
 	wslExecutable = "wsl.exe"
 
@@ -73,7 +82,9 @@ type CommandRunner interface {
 	// A non-zero ExitCode in the returned RunOutput is NOT an error —
 	// it means the command ran but reported failure. Only process-level
 	// failures (binary not found, permission denied) return a non-nil error.
-	RunCommand(ctx context.Context, name string, args []string) (RunOutput, error)
+	//
+	// workingDirectory is where the process starts; empty means the caller's own.
+	RunCommand(ctx context.Context, name string, args []string, workingDirectory string) (RunOutput, error)
 }
 
 // RunOutput holds the result of a single command execution.
@@ -94,8 +105,11 @@ type realCommandRunner struct{}
 //
 // suppressConsoleWindow is called before Start so that wsl.exe and cmd.exe
 // do not pop a visible terminal window when Forge itself is the terminal.
-func (r *realCommandRunner) RunCommand(ctx context.Context, name string, args []string) (RunOutput, error) {
+func (r *realCommandRunner) RunCommand(ctx context.Context, name string, args []string, workingDirectory string) (RunOutput, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	// Without this a native command ran in Forge's own launch folder, whatever
+	// cwd the caller passed. WSL and Docker carry the directory in their args.
+	cmd.Dir = workingDirectory
 	suppressConsoleWindow(cmd) // platform-specific; no-op on non-Windows
 
 	var stdoutBuffer, stderrBuffer bytes.Buffer
@@ -145,17 +159,17 @@ func detectAvailableEnvironments(runner CommandRunner) EnvironmentAvailability {
 	availability := EnvironmentAvailability{}
 
 	// WSL2 probe: wsl.exe --status exits 0 when WSL2 is installed and configured.
-	wslOutput, wslErr := runner.RunCommand(probeCtx, wslExecutable, []string{wslStatusSubcommand})
+	wslOutput, wslErr := runner.RunCommand(probeCtx, wslExecutable, []string{wslStatusSubcommand}, "")
 	availability.WSL2Available = wslErr == nil && wslOutput.ExitCode == 0
 
 	// Docker daemon probe: docker info exits 0 only when the daemon is reachable.
-	dockerInfoOutput, dockerInfoErr := runner.RunCommand(probeCtx, dockerExecutable, []string{dockerInfoSubcommand})
+	dockerInfoOutput, dockerInfoErr := runner.RunCommand(probeCtx, dockerExecutable, []string{dockerInfoSubcommand}, "")
 	availability.DockerAvailable = dockerInfoErr == nil && dockerInfoOutput.ExitCode == 0
 
 	if !availability.DockerAvailable {
 		// Secondary probe: docker --version succeeds even when the daemon is down.
 		// This distinguishes "not installed" from "installed but daemon not running".
-		versionOutput, versionErr := runner.RunCommand(probeCtx, dockerExecutable, []string{dockerVersionSubcommand})
+		versionOutput, versionErr := runner.RunCommand(probeCtx, dockerExecutable, []string{dockerVersionSubcommand}, "")
 		if versionErr == nil && versionOutput.ExitCode == 0 {
 			availability.DockerInstalledButNotRunning = true
 			availability.InstallHint = "Start Docker Desktop from your system tray or Start menu."
@@ -309,15 +323,15 @@ func runInEnvironment(ctx context.Context, runner CommandRunner, opts RunOptions
 	switch strategy {
 	case StrategyLinuxWSL:
 		wslArgs := buildWSLCommandArgs(opts.Command, workingDirectory)
-		runOutput, runErr = runner.RunCommand(ctx, wslExecutable, wslArgs)
+		runOutput, runErr = runner.RunCommand(ctx, wslExecutable, wslArgs, "")
 
 	case StrategyLinuxDocker:
 		dockerArgs := buildDockerCommandArgs(opts.Command, workingDirectory, opts.DockerImage)
-		runOutput, runErr = runner.RunCommand(ctx, dockerExecutable, dockerArgs)
+		runOutput, runErr = runner.RunCommand(ctx, dockerExecutable, dockerArgs, "")
 
 	default: // StrategyNative — also the fallback when "auto" finds nothing better
 		executable, nativeArgs := buildNativeCommandArgs(opts.Command)
-		runOutput, runErr = runner.RunCommand(ctx, executable, nativeArgs)
+		runOutput, runErr = runner.RunCommand(ctx, executable, nativeArgs, workingDirectory)
 		strategy = StrategyNative // Normalise "auto → native" for the result field.
 	}
 
@@ -349,11 +363,21 @@ func truncateKeepEnd(s string, maxBytes int) string {
 
 // clampTimeout ensures the caller's requested timeout falls within 1–600 seconds.
 func clampTimeout(requestedSeconds int) int {
+	return clampTimeoutTo(requestedSeconds, maxEnvironmentTimeoutSec)
+}
+
+// clampDetachedTimeout ensures a detached job's timeout falls within 1–3600 seconds.
+func clampDetachedTimeout(requestedSeconds int) int {
+	return clampTimeoutTo(requestedSeconds, maxDetachedJobTimeoutSec)
+}
+
+// clampTimeoutTo bounds a requested timeout to at least one second and at most maxSeconds.
+func clampTimeoutTo(requestedSeconds, maxSeconds int) int {
 	if requestedSeconds < 1 {
 		return 1
 	}
-	if requestedSeconds > maxEnvironmentTimeoutSec {
-		return maxEnvironmentTimeoutSec
+	if requestedSeconds > maxSeconds {
+		return maxSeconds
 	}
 	return requestedSeconds
 }

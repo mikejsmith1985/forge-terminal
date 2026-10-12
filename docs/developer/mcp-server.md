@@ -118,7 +118,7 @@ Runs a command in a PTY session and returns the output.
   "params": {
     "name": "terminal_execute",
     "arguments": {
-      "session_id": "abc123",
+      "tab_id": "abc123",
       "command": "npm test",
       "timeout_seconds": 15
     }

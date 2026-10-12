@@ -70,7 +70,7 @@ the server namespace is `forge-vault`, so these are the names agents can call:
 {
   "tool": "forge-vault-terminal_execute",
   "arguments": {
-    "session_id": "<id from step 1>",
+    "tab_id": "<id from step 1>",
     "command": "wsl -e bash -c 'cd /mnt/c/ProjectsWin/RLL/website && npm install && npm run build'",
     "timeout_seconds": 480
   }

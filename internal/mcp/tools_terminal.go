@@ -28,6 +28,9 @@ const (
 	// terminal_execute for long-running builds that stream live in the Forge tab.
 	maxExecuteTimeoutSec = 600
 
+	// tabIDRequiredMessage is returned when no tab id arrived under any accepted name.
+	tabIDRequiredMessage = "tab_id is required (a session ID from terminal_sessions)"
+
 	// executeOutputPollInterval is how often terminal_execute checks for new output.
 	executeOutputPollInterval = 100 * time.Millisecond
 )
@@ -90,9 +93,9 @@ func (t *terminalExecuteTool) Definition() ToolDefinition {
 		InputSchema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"session_id": {
+"tab_id": {
 					"type": "string",
-					"description": "The PTY session ID to send the command to. Obtain from terminal_sessions."
+					"description": "The Forge tab (PTY session) ID to send the command to. Obtain from terminal_sessions. session_id is accepted as an older name."
 				},
 				"command": {
 					"type": "string",
@@ -103,7 +106,7 @@ func (t *terminalExecuteTool) Definition() ToolDefinition {
 					"description": "How long to wait for output (1-600). Defaults to 3 seconds. Use 300-600 for builds."
 				}
 			},
-			"required": ["session_id", "command"]
+			"required": ["tab_id", "command"]
 		}`),
 	}
 }
@@ -173,13 +176,9 @@ func (t *terminalExecuteTool) pollForOutput(sessionID string, startOffset int, t
 
 // parseExecuteArgs extracts and validates the arguments for terminal_execute.
 func parseExecuteArgs(args map[string]any) (sessionID string, command string, timeout time.Duration, err error) {
-	rawSession, ok := args["session_id"]
-	if !ok {
-		return "", "", 0, fmt.Errorf("session_id is required")
-	}
-	sessionID, ok = rawSession.(string)
-	if !ok || sessionID == "" {
-		return "", "", 0, fmt.Errorf("session_id must be a non-empty string")
+	sessionID = readTabIDArgument(args)
+	if sessionID == "" {
+		return "", "", 0, fmt.Errorf(tabIDRequiredMessage)
 	}
 
 	rawCmd, ok := args["command"]
@@ -226,24 +225,20 @@ func (t *terminalReadTool) Definition() ToolDefinition {
 		InputSchema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"session_id": {
+"tab_id": {
 					"type": "string",
-					"description": "The PTY session ID to read from. Obtain from terminal_sessions."
+					"description": "The Forge tab (PTY session) ID to read from. Obtain from terminal_sessions. session_id is accepted as an older name."
 				}
 			},
-			"required": ["session_id"]
+			"required": ["tab_id"]
 		}`),
 	}
 }
 
 func (t *terminalReadTool) Execute(args map[string]any) (*CallToolResult, error) {
-	rawSession, ok := args["session_id"]
-	if !ok {
-		return errorContent("session_id is required"), nil
-	}
-	sessionID, ok := rawSession.(string)
-	if !ok || sessionID == "" {
-		return errorContent("session_id must be a non-empty string"), nil
+	sessionID := readTabIDArgument(args)
+	if sessionID == "" {
+		return errorContent(tabIDRequiredMessage), nil
 	}
 
 	if t.termHandler == nil {
@@ -260,4 +255,9 @@ func (t *terminalReadTool) Execute(args map[string]any) (*CallToolResult, error)
 	}
 
 	return textContent(string(scrollback)), nil
+}
+
+// readTabIDArgument reads the tab id under its current name or any older one.
+func readTabIDArgument(args map[string]any) string {
+	return readAliasedStringArgument(args, "tab_id", "session_id")
 }
