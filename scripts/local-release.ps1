@@ -44,6 +44,9 @@ $ErrorActionPreference = "Stop"
 $ROOT = Split-Path $PSScriptRoot -Parent
 Set-Location $ROOT
 
+# Checks that must stop a broken release before it ships; tested in release-helpers.Tests.ps1.
+Import-Module (Join-Path $PSScriptRoot 'release-helpers.psm1') -Force
+
 # ── Colours ──────────────────────────────────────────────────────────────────
 function Write-Step  { param($msg) Write-Host "  $msg" -ForegroundColor Cyan }
 function Write-OK    { param($msg) Write-Host "  [OK] $msg" -ForegroundColor Green }
@@ -124,11 +127,10 @@ if ($currentBranch -and $currentBranch -notmatch $validBranchPattern) {
 # Check 4: Recent commit format (conventional commits)
 $recentCommits = git log --oneline --no-merges -10 --format="%s" 2>$null
 $badCommitCount = 0
-$conventionalPattern = '^(feat|fix|chore|docs|test|refactor|perf): .+'
 if ($recentCommits) {
     foreach ($subject in $recentCommits) {
         $subject = $subject.Trim()
-        if ($subject -and -not $subject.StartsWith("Revert ") -and -not $subject.StartsWith("Merge ") -and $subject -notmatch $conventionalPattern) {
+        if ($subject -and -not $subject.StartsWith("Revert ") -and -not $subject.StartsWith("Merge ") -and -not (Test-ConventionalCommitSubject $subject)) {
             $badCommitCount++
         }
     }
@@ -313,17 +315,14 @@ try {
 
 # ── Generate Windows resources ────────────────────────────────────────────────
 Write-Banner "Generating Windows resources"
-Write-Step "Running go generate (goversioninfo)..."
-Push-Location "$ROOT\cmd\forge"
+# Fatal, not a warning: v7.25.6 was built in a fresh worktree where this file did
+# not exist, shipped with no version resource, and Defender quarantined it.
+Write-Step "Running goversioninfo (stamped $NEW_VERSION)..."
 try {
-    $genOut = go generate ./... 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warn "go generate had warnings (non-fatal): $genOut"
-    } else {
-        Write-OK "Windows resource file generated"
-    }
-} finally {
-    Pop-Location
+    $resourcePath = New-WindowsResourceFile -ForgeDirectory "$ROOT\cmd\forge" -Version $NEW_VERSION
+    Write-OK "Windows resource file generated: $resourcePath"
+} catch {
+    Write-Fail "Windows resource generation failed: $_"
 }
 
 # ── Cross-compile all binaries ────────────────────────────────────────────────
@@ -358,6 +357,14 @@ foreach ($b in $builds) {
 
 Remove-Item Env:\GOOS  -ErrorAction SilentlyContinue
 Remove-Item Env:\GOARCH -ErrorAction SilentlyContinue
+
+# Checked before anything is uploaded, so a binary Windows will distrust never ships.
+try {
+    Assert-WindowsVersionInfo -BinaryPath "$BINDIR\fterm.exe" -ExpectedVersion $NEW_VERSION
+    Write-OK "fterm.exe carries the Forge version resource ($NEW_VERSION)"
+} catch {
+    Write-Fail "$_"
+}
 
 # ── Upload binaries to R2 ─────────────────────────────────────────────────────
 Write-Banner "Uploading binaries to R2 (forge-releases)"
