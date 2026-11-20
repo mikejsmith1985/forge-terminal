@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Claude Desktop now starts Forge Terminal when it is not running** — the `mcp-forge-vault` bridge used to exit the moment it found no Forge, which Claude Desktop reports as "Connection closed" and stops retrying after three attempts. The bridge now answers Claude's handshake immediately, starts Forge on the first real request (from `FORGE_EXE`, or the path Forge now records in `~/.forge/forge-exe` each time it starts), waits up to 45 seconds for it, and reconnects on its own if Forge restarts mid-session. Forge opens its window as usual; set `FORGE_MCP_NO_BROWSER=1` to start it silently. Dev builds never record their path, so the bridge never launches a throwaway build.
+
 ## [7.25.8] - 2026-10-12
 
 ---

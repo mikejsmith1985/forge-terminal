@@ -792,6 +792,10 @@ func main() {
 		}
 	})
 
+	// This instance now owns the port, so it is the binary the MCP bridge should
+	// launch next time Forge is not running.
+	recordRunningExecutable(forgeDir, devMode == "true")
+
 	// Auto-open browser (skip if NO_BROWSER env var is set, running in Codespaces, or hosted mode)
 	if os.Getenv("NO_BROWSER") == "" && !inCodespaces && !hostedCfg.NoBrowser {
 		go openBrowser("http://" + addr)

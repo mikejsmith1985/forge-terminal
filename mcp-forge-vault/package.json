@@ -1,13 +1,17 @@
 {
   "name": "mcp-forge-vault",
-  "version": "1.0.0",
-  "description": "MCP server exposing Forge Vault secrets to Claude Code",
+  "version": "1.1.0",
+  "description": "Stdio bridge from Claude to Forge Terminal's MCP server; starts Forge when it is not running",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.12"
   }
 }
