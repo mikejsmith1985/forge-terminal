@@ -274,42 +274,62 @@ func LoadCommands() ([]Command, error) {
 		return nil, fmt.Errorf("failed to get commands path: %w", err)
 	}
 
-	// Create default if doesn't exist
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	savedCommands, err := readSavedCommands(path)
+	if os.IsNotExist(err) {
+		// First launch on this machine: write the defaults so the user starts with cards.
 		if err := SaveCommands(DefaultCommands); err != nil {
 			return nil, fmt.Errorf("failed to create default commands: %w", err)
 		}
 		return DefaultCommands, nil
 	}
-
-	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read commands file: %w", err)
+		return nil, err
 	}
 
-	var commands []Command
-	if err := json.Unmarshal(data, &commands); err != nil {
-		return nil, fmt.Errorf("failed to parse commands JSON: %w", err)
-	}
-
-	// Deduplicate by ID - keep first occurrence
-	seen := make(map[int]bool)
-	deduplicated := make([]Command, 0, len(commands))
-	for _, cmd := range commands {
-		if !seen[cmd.ID] {
-			seen[cmd.ID] = true
-			deduplicated = append(deduplicated, cmd)
-		}
-	}
-
-	// If we removed duplicates, save the cleaned version
-	if len(deduplicated) < len(commands) {
+	deduplicated := removeDuplicateCommandIDs(savedCommands)
+	if len(deduplicated) < len(savedCommands) {
 		if err := SaveCommands(deduplicated); err != nil {
 			return nil, fmt.Errorf("failed to save deduplicated commands: %w", err)
 		}
 	}
 
 	return deduplicated, nil
+}
+
+// readSavedCommands reads and parses the commands file exactly as it is on disk.
+// Unlike LoadCommands it never writes, which is what lets SaveCommands use it to
+// compare against the previous save. Calling LoadCommands from SaveCommands made
+// the two call each other forever whenever LoadCommands needed to write (a fresh
+// install, or a file with duplicate IDs), crashing Forge silently at startup.
+// A missing file returns an error that satisfies os.IsNotExist.
+func readSavedCommands(path string) ([]Command, error) {
+	fileContents, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("failed to read commands file: %w", err)
+	}
+
+	var savedCommands []Command
+	if err := json.Unmarshal(fileContents, &savedCommands); err != nil {
+		return nil, fmt.Errorf("failed to parse commands JSON: %w", err)
+	}
+	return savedCommands, nil
+}
+
+// removeDuplicateCommandIDs keeps the first card for each ID and drops later
+// copies, so a hand-edited or merged file cannot show the same card twice.
+func removeDuplicateCommandIDs(commands []Command) []Command {
+	seenIDs := make(map[int]bool)
+	deduplicated := make([]Command, 0, len(commands))
+	for _, cmd := range commands {
+		if !seenIDs[cmd.ID] {
+			seenIDs[cmd.ID] = true
+			deduplicated = append(deduplicated, cmd)
+		}
+	}
+	return deduplicated
 }
 
 // SaveCommands saves commands to the JSON file with per-card versioning
@@ -330,8 +350,10 @@ func SaveCommands(commands []Command) error {
 		return err
 	}
 
-	// Load existing commands to compare for changes
-	existingCommands, _ := LoadCommands()
+	// Read the previous save to compare for changes. This must be the read-only
+	// reader, never LoadCommands (see readSavedCommands). A missing or unreadable
+	// file just means every card is treated as new.
+	existingCommands, _ := readSavedCommands(path)
 	existingMap := make(map[int]Command)
 	for _, cmd := range existingCommands {
 		existingMap[cmd.ID] = cmd
@@ -548,16 +570,16 @@ func RestoreCardVersion(cardID int, versionNum int) error {
 	}
 
 	// Replace the card
-	found := false
+	wasCardFound := false
 	for i, cmd := range commands {
 		if cmd.ID == cardID {
 			commands[i] = targetVersion.Command
-			found = true
+			wasCardFound = true
 			break
 		}
 	}
 
-	if !found {
+	if !wasCardFound {
 		// Card was deleted, re-add it
 		commands = append(commands, targetVersion.Command)
 	}
