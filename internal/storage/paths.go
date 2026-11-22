@@ -96,12 +96,3 @@ func GetVaultDir() string {
 	return filepath.Join(GetForgeDir(), "vault")
 }
 
-// GetLicenseCachePath returns the path to the AES-256-GCM encrypted license cache.
-func GetLicenseCachePath() string {
-	return filepath.Join(GetForgeDir(), "license.dat")
-}
-
-// GetLicenseKeyPath returns the path to the OS-protected license master key.
-func GetLicenseKeyPath() string {
-	return filepath.Join(GetForgeDir(), "license.key")
-}

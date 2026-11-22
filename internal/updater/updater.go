@@ -21,11 +21,6 @@ import (
 // show a reasonable fallback instead of a stale release from months ago.
 var Version = "7.25.8"
 
-// DownloadURLResolver, when set by main at startup, is called to obtain a
-// signed R2 URL instead of using the public GitHub release asset URL.
-// Signature: func(version, platform string) (downloadURL string, err error)
-var DownloadURLResolver func(version, platform string) (string, error)
-
 // crossCheckCacheTTL is how long we cache the fallback releases-list result.
 // The SSE ticker fires every 30 s; a 10-min TTL means at most 6 GitHub API calls
 // per hour when the worker cache is stale — safely within the 60-req/hr limit.
@@ -138,14 +133,14 @@ func CheckForUpdate() (*UpdateInfo, error) {
 	for _, name := range assetNames {
 		for _, asset := range release.Assets {
 			// Case-insensitive match for Windows .exe extension
-			match := false
+			isNameMatch := false
 			if runtime.GOOS == "windows" {
-				match = strings.EqualFold(asset.Name, name)
+				isNameMatch = strings.EqualFold(asset.Name, name)
 			} else {
-				match = asset.Name == name
+				isNameMatch = asset.Name == name
 			}
 
-			if match {
+			if isNameMatch {
 				downloadURL = asset.BrowserDownloadURL
 				assetSize = asset.Size
 				assetName = name
@@ -280,18 +275,8 @@ func downloadUpdateAttempt(info *UpdateInfo, attempt int) (string, error) {
 		},
 	}
 
-	// Resolve the actual download URL — use signed R2 URL when available.
+	// Download straight from the public GitHub release asset.
 	downloadURL := info.DownloadURL
-	if DownloadURLResolver != nil {
-		resolved, resolveErr := DownloadURLResolver(
-			strings.TrimPrefix(info.LatestVersion, "v"),
-			platformString(),
-		)
-		if resolveErr != nil {
-			return "", fmt.Errorf("resolving signed download URL: %w", resolveErr)
-		}
-		downloadURL = resolved
-	}
 
 	// Create request with context for cancellation
 	ctx, cancel := context.WithCancel(context.Background())
@@ -506,11 +491,6 @@ func getExeSuffix() string {
 	return ""
 }
 
-// platformString returns a string like "linux-amd64" or "windows-amd64"
-// used when requesting a signed download URL from the license Worker.
-func platformString() string {
-	return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
-}
 
 func compareVersions(v1, v2 string) int {
 	parts1 := parseVersion(v1)
@@ -684,14 +664,14 @@ func newTimeoutReader(ctx context.Context, r io.Reader, timeout time.Duration) (
 }
 
 func (tr *timeoutReader) Read(p []byte) (int, error) {
-	n, err := tr.reader.Read(p)
-	if n > 0 {
+	bytesRead, err := tr.reader.Read(p)
+	if bytesRead > 0 {
 		tr.mu.Lock()
 		tr.lastRead = time.Now()
-		tr.totalBytes += int64(n)
+		tr.totalBytes += int64(bytesRead)
 		tr.mu.Unlock()
 	}
-	return n, err
+	return bytesRead, err
 }
 
 func (tr *timeoutReader) Close() {

@@ -149,11 +149,11 @@ type ptySession interface {
 
 // registerMacroHandler wires POST /api/terminal/{id}/macro into the
 // default ServeMux.  Called from main() AFTER termHandler is initialised
-// so the closure captures a non-nil pointer.  Auth and license middleware
-// match the /ws path: the macro is essentially synthetic terminal input
+// so the closure captures a non-nil pointer.  Auth middleware
+// matches the /ws path: the macro is essentially synthetic terminal input
 // and must not be reachable without the same credentials.
 func registerMacroHandler() {
-	http.HandleFunc("/api/terminal/", AuthMiddleware(LicenseMiddleware(handleMacro)))
+	http.HandleFunc("/api/terminal/", AuthMiddleware(handleMacro))
 }
 
 // handleMacro is the HTTP entry-point.  Path shape:
@@ -450,12 +450,12 @@ func appendMacroLog(sessionID, mode string, waitedMs, settleMs int64, bytesWritt
 		return
 	}
 	path := filepath.Join(logsDir, "macro.log")
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	macroLogFile, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Printf("[Macro] failed to open log: %v", err)
 		return
 	}
-	defer f.Close()
+	defer macroLogFile.Close()
 
 	line := fmt.Sprintf(
 		"%s session=%s waited=%dms settle=%dms mode=%s bytes=%d delivered=%t",
@@ -465,7 +465,7 @@ func appendMacroLog(sessionID, mode string, waitedMs, settleMs int64, bytesWritt
 	if errMsg != "" {
 		line += " err=" + strings.ReplaceAll(errMsg, "\n", " ")
 	}
-	if _, err := fmt.Fprintln(f, line); err != nil {
+	if _, err := fmt.Fprintln(macroLogFile, line); err != nil {
 		log.Printf("[Macro] failed to append log line: %v", err)
 	}
 }

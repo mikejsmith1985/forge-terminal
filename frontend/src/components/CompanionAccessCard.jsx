@@ -1,17 +1,16 @@
 // CompanionAccessCard.jsx — Desktop sidebar card for the Forge Companion PWA.
 //
-// Gates the mobile companion feature behind the `mobile_access` license flag
-// and, when entitled, surfaces everything a user needs to connect their phone:
-// a QR-code deep link (forgeUrl + mobileToken), copy-to-clipboard helpers,
-// a guided step-by-step connection flow, and a disable/revoke button.
+// Lets the user switch the free `mobile_access` feature on and, once it is on,
+// surfaces everything needed to connect a phone: a QR-code deep link
+// (forgeUrl + mobileToken), copy-to-clipboard helpers, a guided step-by-step
+// connection flow, and a disable/revoke button.
 //
 // Backend contract:
 //   GET  /api/mobile/settings  → { mobile_access_enabled, mobile_token, token_path }
 //   POST /api/mobile/settings  → { enabled: bool }
 //
-// License gating is ultimately enforced server-side (the /api/mobile/* endpoints
-// return 403 when the feature flag is off). This card only provides UI for the
-// common cases — entitled-and-enabled, entitled-but-disabled, and not-entitled.
+// The switch is enforced server-side: the /api/mobile/* endpoints return 403
+// while mobile access is off.
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import QRCode from 'qrcode'
@@ -22,7 +21,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Lock,
   Info,
   Cloud,
   Settings,
@@ -40,7 +38,6 @@ import CompanionConnectionWizard from './CompanionConnectionWizard'
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const COPY_RESET_DELAY_MS = 2000
-const UPGRADE_URL = 'https://rootlevellabs.tech/upgrade'
 const COMPANION_DOCS_URL = 'https://github.com/mikejsmith1985/forge-terminal/tree/main/forge-companion'
 
 // localStorage keys used to remember the user's tunnel URL and companion host.
@@ -52,10 +49,9 @@ const STORAGE_COMPANION_HOST = 'forge.companion.hostUrl'
 /**
  * CompanionAccessCard — sidebar card for the Forge Companion mobile PWA.
  *
- * Three rendering paths based on the license/feature state:
- *   1. Not entitled — show upgrade CTA
- *   2. Entitled but disabled — show "Enable" toggle + explainer
- *   3. Enabled — show QR + token + instructions + disable button
+ * Two rendering paths based on the mobile_access switch:
+ *   1. Off — show the "Enable" button + explainer
+ *   2. On  — show QR + token + instructions + disable button
  */
 const CompanionAccessCard = () => {
   const [isExpanded, setIsExpanded]         = useState(false)
@@ -202,7 +198,7 @@ const CompanionAccessCard = () => {
           <div className="cac-header-info">
             <span className="cac-title">Forge Companion</span>
             <span className="cac-subtitle">
-              Mobile access · {isEnabled ? 'QR ready' : 'Paid add-on'}
+              Mobile access · {isEnabled ? 'QR ready' : 'Off'}
             </span>
           </div>
         </div>
@@ -244,23 +240,19 @@ const CompanionAccessCard = () => {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 /**
- * DisabledView — rendered when mobile_access is off.
- *
- * Two calls to action: "Enable" (for users already entitled, the server accepts
- * the toggle) and "Upgrade" (for users who need to subscribe first). We cannot
- * cheaply tell the two cases apart client-side, so we surface both paths and
- * let the server reject the enable if the license does not permit it.
+ * DisabledView — rendered when mobile_access is off. Mobile access is free;
+ * it stays off until the user switches it on because it opens Forge to a phone.
  */
 const DisabledView = ({ onEnable, isTogglePending }) => (
   <>
     <div className="cac-section">
       <div className="cac-lead">
-        <Lock size={16} />
+        <Smartphone size={16} />
         <div>
-          <strong>Mobile access is a paid add-on.</strong>
+          <strong>Mobile access is off.</strong>
           <p className="cac-muted">
             View and drive your Forge terminal sessions from your phone via a
-            lightweight PWA. Requires an active Forge Companion subscription.
+            lightweight PWA. Switch it on to get the connection QR code.
           </p>
         </div>
       </div>
@@ -271,18 +263,10 @@ const DisabledView = ({ onEnable, isTogglePending }) => (
         className="cac-btn cac-btn-primary"
         onClick={onEnable}
         disabled={isTogglePending}
-        title="Enable if your license includes Forge Companion"
+        title="Let your phone connect to this Forge"
       >
         {isTogglePending ? 'Enabling…' : 'Enable Mobile Access'}
       </button>
-      <a
-        className="cac-btn cac-btn-secondary"
-        href={UPGRADE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Upgrade <ExternalLink size={14} />
-      </a>
     </div>
 
     <InstructionsBlock />
