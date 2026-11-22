@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Forge now starts on a PC that has never run it before** — on a fresh install, loading the command cards found no `commands.json`, asked to save the defaults, and saving re-loaded the cards to compare against the previous save. The file still did not exist, so the two called each other until Go's 1 GB stack limit killed the process, before it logged anything. Launching did nothing, even as admin. Saving now compares against a read-only read of the file. A `commands.json` holding duplicate card IDs triggered the same loop and is fixed too.
+
 ### Added
 - **Any MCP server can now get its secrets from the Forge Vault instead of a plaintext config entry** — `mcp-forge-vault/with-vault.js --secrets NAME[,NAME] -- <command>` asks Forge for a self-deleting injection script, loads it in a child shell, and runs the server with stdin/stdout passed straight through. Claude Desktop's `env` block no longer has to hold passwords; the wrapper also starts Forge when it is not running.
 - **Claude Desktop now starts Forge Terminal when it is not running** — the `mcp-forge-vault` bridge used to exit the moment it found no Forge, which Claude Desktop reports as "Connection closed" and stops retrying after three attempts. The bridge now answers Claude's handshake immediately, starts Forge on the first real request (from `FORGE_EXE`, or the path Forge now records in `~/.forge/forge-exe` each time it starts), waits up to 45 seconds for it, and reconnects on its own if Forge restarts mid-session. Forge opens its window as usual; set `FORGE_MCP_NO_BROWSER=1` to start it silently. Dev builds never record their path, so the bridge never launches a throwaway build.
