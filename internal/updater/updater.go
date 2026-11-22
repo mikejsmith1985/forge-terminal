@@ -19,7 +19,7 @@ import (
 // Version is set at build time via ldflags.
 // Keep this in sync with the latest git tag so dev builds without ldflags
 // show a reasonable fallback instead of a stale release from months ago.
-var Version = "7.25.8"
+var Version = "7.26.0"
 
 // crossCheckCacheTTL is how long we cache the fallback releases-list result.
 // The SSE ticker fires every 30 s; a 10-min TTL means at most 6 GitHub API calls

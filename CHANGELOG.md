@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.26.0] - 2026-11-22
+
+---
+
+## [v7.26.0] - 2026-11-22
+
 ### Removed
 - **Forge no longer needs a license** — the startup license check, the "license required" screen, the 402 answer on every API route, license activation and deactivation (`/api/license/*`), and the background heartbeat are all gone. A new install opens straight into the workspace. In-app updates now download straight from the public GitHub release instead of a signed, license-only link. Forge Companion mobile access is now a free switch in the sidebar's MCP view, still off until you turn it on. Settings saved by earlier versions carry over unchanged. Old `license.dat` / `license.key` files are left on disk, unused, and are safe to delete.
 
