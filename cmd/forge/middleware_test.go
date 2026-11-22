@@ -175,9 +175,9 @@ func TestWrapWithMiddleware_ChainsAllMiddleware(t *testing.T) {
 	os.Setenv("ALLOWED_ORIGINS", "*")
 	defer os.Unsetenv("ALLOWED_ORIGINS")
 
-	called := false
+	wasInnerCalled := false
 	inner := func(w http.ResponseWriter, r *http.Request) {
-		called = true
+		wasInnerCalled = true
 		w.WriteHeader(http.StatusOK)
 	}
 
@@ -188,7 +188,7 @@ func TestWrapWithMiddleware_ChainsAllMiddleware(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if !called {
+	if !wasInnerCalled {
 		t.Error("inner handler was not called — middleware chain is broken")
 	}
 	// CORS header (from CORSMiddleware)
@@ -201,5 +201,48 @@ func TestWrapWithMiddleware_ChainsAllMiddleware(t *testing.T) {
 	}
 	if got := rec.Header().Get("Content-Security-Policy"); got == "" {
 		t.Error("missing Content-Security-Policy header")
+	}
+}
+
+// TestRootlevellabsOrigin keeps the CORS allow-list honest: only HTTPS on the
+// rootlevellabs.tech domain or a real subdomain of it is trusted.
+func TestRootlevellabsOrigin(t *testing.T) {
+	cases := []struct {
+		origin string
+		want   bool
+	}{
+		{"https://rootlevellabs.tech", true},
+		{"https://license.rootlevellabs.tech", true},
+		{"https://app.rootlevellabs.tech", true},
+		{"http://rootlevellabs.tech", false},       // HTTP not HTTPS
+		{"https://evil-rootlevellabs.tech", false}, // not a real subdomain
+		{"https://google.com", false},
+		{"", false},
+	}
+
+	for _, tc := range cases {
+		if got := rootlevellabsOrigin(tc.origin); got != tc.want {
+			t.Errorf("rootlevellabsOrigin(%q) = %v, want %v", tc.origin, got, tc.want)
+		}
+	}
+}
+
+// TestWrapWithMiddleware_ServesWithoutLicense proves a protected API route
+// answers on an install that has never had a license, instead of the old
+// 402 "license required".
+func TestWrapWithMiddleware_ServesWithoutLicense(t *testing.T) {
+	wasInnerHandlerCalled := false
+	handler := WrapWithMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		wasInnerHandlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/commands", nil)
+	request.RemoteAddr = "127.0.0.1:12345"
+	recorder := httptest.NewRecorder()
+	handler(recorder, request)
+
+	if !wasInnerHandlerCalled || recorder.Code != http.StatusOK {
+		t.Fatalf("expected the route to be served without a license, got status %d", recorder.Code)
 	}
 }

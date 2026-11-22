@@ -16,7 +16,6 @@ import (
 	"github.com/mikejsmith1985/forge-terminal/internal/commands"
 	"github.com/mikejsmith1985/forge-terminal/internal/diagnostic"
 	"github.com/mikejsmith1985/forge-terminal/internal/files"
-	"github.com/mikejsmith1985/forge-terminal/internal/license"
 	"github.com/mikejsmith1985/forge-terminal/internal/llm"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/terminal"
@@ -50,17 +49,6 @@ var devMode string
 
 // Terminal handler (set at startup for session management)
 var termHandler *terminal.Handler
-
-// licenseGated is true when no valid license was found at startup.
-// LicenseMiddleware reads this to return 402 on all gated API routes.
-var licenseGated bool
-
-// activeLicenseStatus and activeLicenseInfo hold the startup license check result.
-// handlers_license.go updates these after a successful in-process activation.
-var (
-	activeLicenseStatus license.Status
-	activeLicenseInfo   *license.Info
-)
 
 // headerFixingResponseWriter wraps http.ResponseWriter to fix MIME types for embedded assets
 type headerFixingResponseWriter struct {
@@ -148,8 +136,8 @@ func main() {
 	for i := 1; i < len(os.Args); i++ {
 		if os.Args[i] == "-port" || os.Args[i] == "--port" {
 			if i+1 < len(os.Args) {
-				if p, err := strconv.Atoi(os.Args[i+1]); err == nil {
-					overridePort = p
+				if parsedPort, err := strconv.Atoi(os.Args[i+1]); err == nil {
+					overridePort = parsedPort
 				}
 			}
 		}
@@ -162,8 +150,8 @@ func main() {
 	// Also check environment variables
 	if overridePort == 0 {
 		if envPort := os.Getenv("FORGE_PORT"); envPort != "" {
-			if p, err := strconv.Atoi(envPort); err == nil {
-				overridePort = p
+			if parsedPort, err := strconv.Atoi(envPort); err == nil {
+				overridePort = parsedPort
 			}
 		}
 	}
@@ -276,17 +264,6 @@ func main() {
 	// it the vault would be readable by any local process (see vault_auth.go).
 	initVaultSessionToken()
 
-	// Check license at startup — gates all /api/* routes via LicenseMiddleware.
-	activeLicenseStatus, activeLicenseInfo = license.CheckLicense()
-	licenseGated = activeLicenseStatus != license.StatusOK && activeLicenseStatus != license.StatusGrace
-	log.Printf("[License] Startup: status=%s gated=%v", activeLicenseStatus, licenseGated)
-	if !licenseGated {
-		updater.DownloadURLResolver = func(ver, platform string) (string, error) {
-			return license.SignedDownloadURL(activeLicenseInfo, ver, platform)
-		}
-		go license.StartHeartbeat(activeLicenseInfo)
-	}
-
 	// Serve embedded frontend with no-cache headers
 	webFS, err := fs.Sub(embeddedFS, "web")
 	if err != nil {
@@ -372,7 +349,7 @@ func main() {
 
 	// Create terminal handler with direct dependencies
 	termHandler = terminal.NewHandlerDirect(nil, visionParser, llmDetector)
-	http.HandleFunc("/ws", AuthMiddleware(LicenseMiddleware(termHandler.HandleWebSocket)))
+	http.HandleFunc("/ws", AuthMiddleware(termHandler.HandleWebSocket))
 
 	// Closing a tab is the ONLY thing that should destroy a running shell — an
 	// unattended PTY otherwise survives a full day of disconnection (see
@@ -671,11 +648,6 @@ func main() {
 	http.HandleFunc("/api/mobile/settings", WrapWithMiddleware(handleMobileSettings))
 	http.HandleFunc("/api/companion/preference", WrapWithMiddleware(handleCompanionPreference))
 
-	// ── License routes (always available — bypass LicenseMiddleware) ──────
-	http.HandleFunc("/api/license/activate", WrapLicenseHandler(handleLicenseActivate))
-	http.HandleFunc("/api/license/status", WrapLicenseHandler(handleLicenseStatus))
-	http.HandleFunc("/api/license/deactivate", WrapLicenseHandler(handleLicenseDeactivate))
-
 	// ── Forge Vault routes (AES-256-GCM encrypted secret store) ──────────
 	http.HandleFunc("/api/vault/status", WrapWithMiddleware(handleVaultStatus))
 	// /api/vault/entries/value is registered before /api/vault/entries so
@@ -716,10 +688,10 @@ func main() {
 
 	// Extract port number and inject into child processes
 	if _, portStr, err := net.SplitHostPort(addr); err == nil {
-		if p, err := strconv.Atoi(portStr); err == nil {
-			activePort = p
-			terminal.SetForgePort(p)
-			log.Printf("[Process Safeguard] Injecting FORGE_INSTANCE_PID=%d FORGE_INSTANCE_PORT=%d into child processes", os.Getpid(), p)
+		if parsedPort, err := strconv.Atoi(portStr); err == nil {
+			activePort = parsedPort
+			terminal.SetForgePort(parsedPort)
+			log.Printf("[Process Safeguard] Injecting FORGE_INSTANCE_PID=%d FORGE_INSTANCE_PORT=%d into child processes", os.Getpid(), parsedPort)
 		}
 	}
 
@@ -1146,11 +1118,11 @@ func printLocalNetworkURLs(port int, token string) {
 		}
 		for _, addr := range addrs {
 			var ip net.IP
-			switch v := addr.(type) {
+			switch typedAddr := addr.(type) {
 			case *net.IPNet:
-				ip = v.IP
+				ip = typedAddr.IP
 			case *net.IPAddr:
-				ip = v.IP
+				ip = typedAddr.IP
 			}
 			if ip == nil || ip.IsLoopback() || ip.To4() == nil {
 				continue
@@ -1651,8 +1623,8 @@ func handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Ensure response is fully sent
-	if f, ok := w.(http.Flusher); ok {
-		f.Flush()
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
 	}
 
 	// Restart the application after delay
@@ -1726,8 +1698,8 @@ func handleInstallManualUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Ensure response is fully sent
-	if f, ok := w.(http.Flusher); ok {
-		f.Flush()
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
 	}
 
 	// Restart the application after delay
@@ -1874,8 +1846,8 @@ func handleUpdateEvents(w http.ResponseWriter, r *http.Request) {
 			case <-ticker.C:
 				// Send heartbeat to keep connection alive
 				fmt.Fprintf(w, "event: heartbeat\ndata: {}\n\n")
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
+				if flusher, ok := w.(http.Flusher); ok {
+					flusher.Flush()
 				}
 			}
 		}

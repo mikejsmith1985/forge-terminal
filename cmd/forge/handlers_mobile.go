@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mikejsmith1985/forge-terminal/internal/license"
+	"github.com/mikejsmith1985/forge-terminal/internal/features"
 	"github.com/mikejsmith1985/forge-terminal/internal/storage"
 	"github.com/mikejsmith1985/forge-terminal/internal/updater"
 )
@@ -182,10 +182,10 @@ func writeMobileJSON(w http.ResponseWriter, statusCode int, v any) {
 
 // ── Feature Gate ──────────────────────────────────────────────────────────────
 
-// isMobileAccessEnabled returns true when the mobile_access feature flag is on
-// for the currently loaded license. It reads from the package-level activeLicenseInfo.
+// isMobileAccessEnabled returns true when the user has switched on mobile
+// access in the Forge Companion sidebar card.
 func isMobileAccessEnabled() bool {
-	return license.HasFeature(activeLicenseInfo, license.FeatureMobileAccess)
+	return features.IsEnabled(features.MobileAccess)
 }
 
 // ── Endpoint: GET /api/mobile/info ───────────────────────────────────────────
@@ -492,7 +492,7 @@ func handlePostMobileSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := license.SetLocalFeatureOverride(license.FeatureMobileAccess, updateRequest.Enabled); err != nil {
+	if err := features.SetEnabled(features.MobileAccess, updateRequest.Enabled); err != nil {
 		http.Error(w, "could not save feature override: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Forge no longer needs a license** — the startup license check, the "license required" screen, the 402 answer on every API route, license activation and deactivation (`/api/license/*`), and the background heartbeat are all gone. A new install opens straight into the workspace. In-app updates now download straight from the public GitHub release instead of a signed, license-only link. Forge Companion mobile access is now a free switch in the sidebar's MCP view, still off until you turn it on. Settings saved by earlier versions carry over unchanged. Old `license.dat` / `license.key` files are left on disk, unused, and are safe to delete.
+
 ### Fixed
 - **Forge now starts on a PC that has never run it before** — on a fresh install, loading the command cards found no `commands.json`, asked to save the defaults, and saving re-loaded the cards to compare against the previous save. The file still did not exist, so the two called each other until Go's 1 GB stack limit killed the process, before it logged anything. Launching did nothing, even as admin. Saving now compares against a read-only read of the file. A `commands.json` holding duplicate card IDs triggered the same loop and is fixed too.
 

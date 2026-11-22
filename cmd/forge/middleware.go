@@ -218,27 +218,7 @@ func SecureHeaders(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// LicenseMiddleware returns 402 Payment Required when the server started without
-// a valid license. licenseGated is set in main.go after CheckLicense().
-func LicenseMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if licenseGated {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			_, _ = w.Write([]byte(`{"error":"license required","code":"license_required"}`))
-			return
-		}
-		next(w, r)
-	}
-}
-
-// WrapWithMiddleware wraps a handler with CORS, security, auth, and license middleware.
+// WrapWithMiddleware wraps a handler with CORS, security, and auth middleware.
 func WrapWithMiddleware(handler http.HandlerFunc) http.HandlerFunc {
-	return CORSMiddleware(SecureHeaders(AuthMiddleware(LicenseMiddleware(handler))))
-}
-
-// WrapLicenseHandler wraps a handler with CORS, security, and auth — but NOT the
-// license check. Used for /api/license/* endpoints that must work pre-activation.
-func WrapLicenseHandler(handler http.HandlerFunc) http.HandlerFunc {
 	return CORSMiddleware(SecureHeaders(AuthMiddleware(handler)))
 }
