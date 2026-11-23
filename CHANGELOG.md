@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Clear message when an update can't find Forge's own program file** — if the folder Forge was launched from is deleted or moved while it is still running, "Update Now" used to fail with a raw Windows error (`GetFileAttributesEx ... The system cannot find the file specified`). It now explains that the folder was moved or deleted and links to the latest release so you can download the new version and launch it from a folder you'll keep.
+
 ## [7.26.0] - 2026-11-22
 
 ---
