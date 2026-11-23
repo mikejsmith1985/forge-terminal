@@ -3,8 +3,10 @@ package updater
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -348,15 +350,35 @@ func downloadUpdateAttempt(info *UpdateInfo, attempt int) (string, error) {
 	return tmpFile, nil
 }
 
+// resolveRunningBinaryPath turns the path Forge was launched from into the real file to replace.
+// If that file has vanished — typically because its folder was deleted or moved while Forge was
+// still running — the raw Windows error ("GetFileAttributesEx ... cannot find the file") means
+// nothing to a user, so it is replaced with what happened and how to recover.
+func resolveRunningBinaryPath(executablePath string) (string, error) {
+	resolvedPath, err := filepath.EvalSymlinks(executablePath)
+	if err == nil {
+		return resolvedPath, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+	releasePageURL := fmt.Sprintf("https://github.com/%s/%s/releases/latest", repoOwner, repoName)
+	return "", fmt.Errorf(
+		"Forge can't update itself because its program file is no longer at %s — "+
+			"that folder was moved or deleted while Forge was running. "+
+			"Please download the new version from %s, save it in a folder you'll keep, "+
+			"then close Forge and launch the new copy",
+		executablePath, releasePageURL)
+}
+
 // ApplyUpdate replaces the current binary with the new one
 func ApplyUpdate(newBinaryPath string) error {
-	currentPath, err := os.Executable()
+	executablePath, err := os.Executable()
 	if err != nil {
 		return err
 	}
 
-	// Resolve symlinks
-	currentPath, err = filepath.EvalSymlinks(currentPath)
+	currentPath, err := resolveRunningBinaryPath(executablePath)
 	if err != nil {
 		return err
 	}
